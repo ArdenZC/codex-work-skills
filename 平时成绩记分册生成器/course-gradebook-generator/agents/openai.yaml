@@ -1,0 +1,4 @@
+interface:
+  display_name: "平时成绩记分册生成器"
+  short_description: "按课程成绩单自动生成并校验平时成绩记分册Excel文件"
+  default_prompt: "Use $course-gradebook-generator（平时成绩记分册生成器）to generate 平时成绩记分册 files from 课程成绩单.xls."
