@@ -24,7 +24,14 @@ from package_common import (
     source_total_matches,
     validate_input,
 )
-from validate_template import _cell_format_signature, _dimension_signature, convert_to_xlsx, find_soffice
+from validate_template import (
+    _cell_format_signature,
+    _dimension_signature,
+    _non_target_sheet_signature,
+    _signature_differences,
+    convert_to_xlsx,
+    find_soffice,
+)
 
 
 def _number(value: Any, label: str) -> float:
@@ -79,6 +86,20 @@ def _row_has_content(ws, row: int, max_col: int) -> bool:
     return any(ws.cell(row, col).value not in (None, "") for col in range(1, max_col + 1))
 
 
+def _non_target_sheet_format_errors(workbook, template_workbook, target_sheet: str) -> list[str]:
+    errors: list[str] = []
+    for sheet in workbook.worksheets:
+        if sheet.title == target_sheet or sheet.title not in template_workbook.sheetnames:
+            continue
+        expected = _non_target_sheet_signature(template_workbook[sheet.title])
+        actual = _non_target_sheet_signature(sheet)
+        if expected != actual:
+            paths = ",".join(item["path"] for item in _signature_differences(expected, actual)[:3])
+            suffix = f" ({paths})" if paths else ""
+            errors.append(f"Protected worksheet changed: {sheet.title}{suffix}")
+    return errors
+
+
 def _check_workbook_protection(
     ws,
     workbook,
@@ -128,6 +149,12 @@ def _check_workbook_protection(
         errors.append(f"Output conditional formats changed: expected {expected_cf}, got {actual_cf}")
     formatting_errors = _target_sheet_format_errors(ws, template_ws, manifest, skill_enabled) if template_ws is not None else []
     errors.extend(formatting_errors)
+    non_target_errors = (
+        _non_target_sheet_format_errors(workbook, template_ws.parent, ws.title)
+        if template_ws is not None
+        else []
+    )
+    errors.extend(non_target_errors)
     return {
         "sheets": workbook.sheetnames,
         "sheet_states": actual_states,
@@ -142,6 +169,8 @@ def _check_workbook_protection(
         "conditional_formats": actual_cf,
         "target_formatting_checked": template_ws is not None,
         "target_formatting_error_count": len(formatting_errors),
+        "non_target_formatting_checked": template_ws is not None,
+        "non_target_formatting_error_count": len(non_target_errors),
     }
 
 

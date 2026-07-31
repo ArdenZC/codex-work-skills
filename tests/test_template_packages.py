@@ -155,6 +155,11 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "knowledge": [],
                 "message": "teaching_content exceeds manifest max_chars=1200",
             },
+            "knowledge_goal": {
+                "flows": [],
+                "knowledge": ["知识点" for _ in range(6)],
+                "message": "knowledge_goal exceeds manifest max_paragraphs=5",
+            },
             "title": {
                 "course_name": "课" * 32,
                 "task": "任务" * 40,
@@ -741,6 +746,73 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("theory score mismatch", result.stderr)
+
+    def test_output_validation_rejects_non_target_sheet_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-non-target-mismatch-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(output.glob("*.xls"))
+
+            xlsx_dir = folder / "tamper-xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(generated)],
+                check=True,
+                capture_output=True,
+            )
+            tampered_xlsx = xlsx_dir / f"{generated.stem}.xlsx"
+            workbook = load_workbook(tampered_xlsx)
+            workbook["Sheet1"]["B1"] = "被篡改的受保护工作表内容"
+            workbook.save(tampered_xlsx)
+            tampered_dir = folder / "tampered"
+            tampered_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(tampered_dir), str(tampered_xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            tampered = output / "tampered.xls"
+            shutil.copy2(tampered_dir / f"{generated.stem}.xls", tampered)
+
+            normalized = folder / "normalized.json"
+            normalized.write_text(
+                json.dumps(
+                    {
+                        "term": "2025-2026-2",
+                        "course": "软件测试实训",
+                        "teacher": "张老师",
+                        "class_name": "软件技术2401班",
+                        "weights": {"regular": 0.6, "theory": 0.4, "skill": 0.0},
+                        "students": [
+                            {"id": "240101001", "name": "学生1", "regular": 86.5, "theory": 88.0, "skill": 0.0, "total": 87.0},
+                            {"id": "240101002", "name": "学生2", "regular": 91.0, "theory": 90.0, "skill": 0.0, "total": 91.0},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_output.py",
+                "--input-json",
+                str(normalized),
+                "--output-dir",
+                str(output),
+                "--output-file",
+                str(tampered),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Protected worksheet changed: Sheet1", result.stderr)
 
     def test_python_generator_skill_and_leading_zero_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-skill-") as temp_name:

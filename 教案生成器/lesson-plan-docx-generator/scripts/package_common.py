@@ -133,6 +133,7 @@ def _validate_composed_limit(label: str, value: str, spec: dict[str, Any]) -> No
 
 def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> None:
     teaching_spec = field_spec(manifest, "teaching_content")
+    knowledge_goal_spec = field_spec(manifest, "knowledge_goal")
     title_spec = field_spec(manifest, "title")
     for index, lesson in enumerate(data.get("lessons", []), start=1):
         if not isinstance(lesson, dict):
@@ -152,6 +153,12 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
             f"lessons[{index - 1}].teaching_content",
             teaching_content,
             teaching_spec,
+        )
+        knowledge_goal = _numbered_text(knowledge) or f"1. 理解{task}的核心概念\n2. 掌握相关流程和成果要求"
+        _validate_composed_limit(
+            f"lessons[{index - 1}].knowledge_goal",
+            knowledge_goal,
+            knowledge_goal_spec,
         )
         title = f"{index} 《{course}》教学单元设计：{task}"
         _validate_composed_limit(f"lessons[{index - 1}].title", title, title_spec)
