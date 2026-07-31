@@ -23,3 +23,15 @@
 适配范围包括 Codex、Claude Code、Gemini CLI、Cursor、Cline、Continue、Windsurf、OpenCode、GitHub Copilot CLI/Cloud Agent、Aider，以及使用 DeepSeek、Claude、GLM、Gemini、OpenAI 等模型的其他 agent 工具。纯网页聊天工具可以先生成结构化输入，再交给具备本地文件和命令权限的 agent 执行。
 
 在任一 skill 目录运行 scripts/install_adapters.py 可以把适配规则安装到目标项目；默认不会覆盖已有规则文件。
+
+## 模板包标准
+
+文档和表格生成器使用版本化模板包。每个包的 canonical template、`manifest.yaml`、输入 schema、模板/输出校验器和 `CHANGELOG.md` 都随 skill 分发；旧模板路径继续保留为兼容入口，并由 SHA-256 校验防止两份模板分叉。
+
+统一流程为：
+
+```text
+输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
+```
+
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过。

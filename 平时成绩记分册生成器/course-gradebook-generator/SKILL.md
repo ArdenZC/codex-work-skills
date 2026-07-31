@@ -19,7 +19,9 @@ If the user has not provided a source workbook, remind them that this skill need
 
 ## Bundled Resources
 
-- Template: `assets/平时成绩记分册模板.xls`
+- Canonical template: `assets/templates/course-gradebook/v1.0.0/template.xls`
+- Compatibility template entry: `assets/平时成绩记分册模板.xls`
+- Manifest and input schema: `manifest.yaml`, `schemas/gradebook-input.schema.json`
 - Windows generator: `scripts/generate_gradebook.ps1`
 - Cross-platform generator: `scripts/generate_gradebook.py`
 
@@ -95,3 +97,9 @@ Read 多Agent兼容说明.md for the compatibility matrix and platform-specific 
   - Ensure the average of all 8 values equals the source 平时成绩 exactly.
 - Write formulas for 折合 and 总评 using the source score proportions.
 - If 技能成绩比例 is `0%`, delete the 技能成绩 and 技能折合 columns from the output.
+
+## Template Package Workflow
+
+Both generators follow `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告`. The Python path reads `manifest.yaml` directly. The Windows Excel COM path uses the bundled `manifest_to_json.py` bridge, so worksheet names, metadata cells, student rows, score columns, formula columns, and the zero-skill column switch come from the same manifest. Normal generation writes `qa-report.json`; `--manifest`, `--schema`, `--skip-template-validation`, `--skip-output-validation`, and `--qa-report` are optional additions to the original CLI.
+
+Install Python dependencies from `requirements.txt`. The Windows COM path still requires Microsoft Excel; the cross-platform path still requires LibreOffice/soffice for `.xls` conversion. No external absolute tool path is a formal dependency.

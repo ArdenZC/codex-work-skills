@@ -1,0 +1,78 @@
+template:
+  id: course-gradebook
+  name: 湖北职业技术学院学生平时成绩登记表
+  version: 1.0.0
+  format: xls
+  file: assets/templates/course-gradebook/v1.0.0/template.xls
+  compatibility_entries:
+    - assets/平时成绩记分册模板.xls
+generator:
+  supported_major: 1
+structure:
+  worksheet: 平时成绩
+  source:
+    metadata_line2_cell: A2
+    metadata_line3_cell: A3
+    header_row: 4
+    data_start_row: 5
+  metadata:
+    term: C2
+    course: G2
+    teacher: L2
+    class_name: O2
+  headers:
+    regular: D3
+    theory: M3
+    skill: O3
+  header_row: 4
+  data_start_row: 5
+  template_last_data_row: 52
+  style_source_row: 5
+  columns:
+    serial: A
+    student_id: B
+    student_name: C
+    regular_items_start: D
+    regular_items_end: K
+    regular_weighted: L
+    theory_score: M
+    theory_weighted: N
+    skill_score: O
+    skill_weighted: P
+    total_score: Q
+  no_skill_delete_columns: [O, P]
+  no_skill_total_column: O
+  required_sheets: [平时成绩, Sheet3, Sheet1]
+  required_merged_ranges: [A1:Q1, A2:B2, C2:E2, G2:J2, L2:M2, O2:Q2, A3:A4, B3:B4, C3:C4, D3:L3, M3:N3, O3:P3, Q3:Q4]
+fields:
+  term: {target: C2, mode: replace_value, max_chars: 32}
+  course: {target: G2, mode: replace_value, max_chars: 64}
+  teacher: {target: L2, mode: replace_value, max_chars: 32}
+  class_name: {target: O2, mode: replace_value, max_chars: 64}
+  student_id: {column: B, mode: text, pattern: '^\d{8,}$'}
+  regular_scores: {columns: [D, E, F, G, H, I, J, K], mode: decimal_half, average_matches: students.regular}
+  theory_score: {column: M, mode: number}
+  skill_score: {column: O, mode: number, optional_when: weights.skill == 0}
+  formula_columns_with_skill: {columns: [L, N, P, Q], mode: formula}
+  formula_columns_without_skill: {columns: [L, N, O], mode: formula}
+allowed_changes:
+  - metadata cells declared under structure.metadata
+  - student rows from data_start_row through the generated last row
+  - regular score cells, theory score, optional skill score and declared formulas
+  - deletion of the two skill columns when weights.skill is zero
+protected:
+  - workbook sheet names and non-target sheets
+  - merged ranges, page setup, print settings, widths, heights and base styles
+  - header labels except declared percentage text
+  - formulas and number formats outside declared output columns
+  - student ID text format
+validation:
+  required_headers: [序号, 学号, 姓名, 平时成绩(20%), 理论成绩(50%), "总评\n成绩"]
+  template_data_rows: 48
+  regular_item_count: 8
+  require_formula_columns: true
+  require_student_id_text: true
+  require_xls_open: true
+fingerprint:
+  algorithm: sha256
+  sha256: 938BEE460AAF218343F03324E856F9535CBDF5FBB776A63959B775EFC2F609BD
