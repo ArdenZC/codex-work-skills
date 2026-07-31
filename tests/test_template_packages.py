@@ -160,6 +160,10 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "knowledge": ["知识点" for _ in range(6)],
                 "message": "knowledge_goal exceeds manifest max_paragraphs=5",
             },
+            "resources": {
+                "tools": "\n".join("工具" for _ in range(7)),
+                "message": "resources exceeds manifest max_paragraphs=8",
+            },
             "title": {
                 "course_name": "课" * 32,
                 "task": "任务" * 40,
@@ -534,6 +538,63 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("forbidden template text", result.stderr)
+
+    def test_output_validation_rejects_evaluation_score_above_rubric_maximum(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-score-cap-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            nested = document.tables[0].cell(12, 1).tables[0]
+            original_row_10 = Decimal(nested.cell(10, 2).text.strip())
+            nested.cell(1, 2).text = "3.5"
+            nested.cell(10, 2).text = str(original_row_10 - Decimal("0.5"))
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("evaluation score row 1 exceeds rubric maximum 3", result.stderr)
+
+    def test_output_validation_rejects_header_footer_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-header-footer-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            document.sections[0].header.paragraphs[0].text = "被篡改页眉"
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
 
 
 class GradebookTotalRuleTests(unittest.TestCase):
@@ -1082,6 +1143,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             tampered_font = copy(workbook["平时成绩"]["C5"].font)
             tampered_font.sz = (tampered_font.sz or 10) + 1
             workbook["平时成绩"]["C5"].font = tampered_font
+            workbook["平时成绩"]["E4"] = "被篡改的常规项目"
             workbook.save(tampered_xlsx)
             tampered_dir = folder / "tampered"
             tampered_dir.mkdir()
@@ -1122,6 +1184,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("target sheet formatting mismatch", result.stderr)
+            self.assertIn("target sheet protected value mismatch at E4", result.stderr)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:

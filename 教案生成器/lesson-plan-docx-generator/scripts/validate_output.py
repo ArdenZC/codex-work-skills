@@ -19,6 +19,7 @@ from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, field_spec, load_ma
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
+EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
 
 
 def actual_cells(row) -> list[_Cell]:
@@ -96,6 +97,13 @@ def protected_layout_signature(document) -> dict[str, Any]:
             }
             for section in document.sections
         ],
+        "headers_footers": [
+            {
+                "header": _xml(section.header._element),
+                "footer": _xml(section.footer._element),
+            }
+            for section in document.sections
+        ],
     }
 
 
@@ -144,6 +152,17 @@ def _document_text(document, table) -> str:
         values.extend(paragraph.text for paragraph in section.header.paragraphs)
         values.extend(paragraph.text for paragraph in section.footer.paragraphs)
     return "\n".join(values)
+
+
+def _evaluation_score_errors(score_values: list[Decimal]) -> list[str]:
+    errors: list[str] = []
+    for row, value in enumerate(score_values, 1):
+        maximum = EVALUATION_MAX_POINTS[row - 1] if row <= len(EVALUATION_MAX_POINTS) else None
+        if value < 0:
+            errors.append(f"evaluation score row {row} is negative: {value}")
+        elif maximum is not None and value > maximum:
+            errors.append(f"evaluation score row {row} exceeds rubric maximum {maximum}: {value}")
+    return errors
 
 
 def _base_qa_report(
@@ -371,6 +390,7 @@ def validate_output_dir(
                 parse_decimal(nested.cell(row, 2).text, f"evaluation score row {row}")
                 for row in range(1, int(nested_spec["rows"]))
             ]
+            item_errors.extend(_evaluation_score_errors(score_values))
             target = parse_decimal(item.get("score", 89 + ((index - 1) % 6) * 0.5), f"evaluation target {index}")
             score_sum = sum(score_values, Decimal("0"))
             if score_sum != target:

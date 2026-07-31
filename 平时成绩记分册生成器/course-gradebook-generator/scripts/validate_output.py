@@ -149,6 +149,12 @@ def _check_workbook_protection(
         errors.append(f"Output conditional formats changed: expected {expected_cf}, got {actual_cf}")
     formatting_errors = _target_sheet_format_errors(ws, template_ws, manifest, skill_enabled) if template_ws is not None else []
     errors.extend(formatting_errors)
+    protected_value_errors = (
+        _target_protected_value_errors(ws, template_ws, manifest, skill_enabled)
+        if template_ws is not None
+        else []
+    )
+    errors.extend(protected_value_errors)
     non_target_errors = (
         _non_target_sheet_format_errors(workbook, template_ws.parent, ws.title)
         if template_ws is not None
@@ -169,6 +175,8 @@ def _check_workbook_protection(
         "conditional_formats": actual_cf,
         "target_formatting_checked": template_ws is not None,
         "target_formatting_error_count": len(formatting_errors),
+        "target_protected_values_checked": template_ws is not None,
+        "target_protected_value_error_count": len(protected_value_errors),
         "non_target_formatting_checked": template_ws is not None,
         "non_target_formatting_error_count": len(non_target_errors),
     }
@@ -310,6 +318,55 @@ def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any]
                     f"({_format_signature_difference(actual_signature, expected_signature)})"
                 )
     return errors[:20]
+
+
+def _shift_cell_address_after_delete(address: str, start_col: int, count: int) -> str | None:
+    match = re.fullmatch(r"([A-Z]+)(\d+)", str(address).upper())
+    if not match:
+        return None
+    shifted = _shift_column_after_delete(column_number(match.group(1)), start_col, count)
+    if shifted is None:
+        return None
+    return f"{get_column_letter(shifted)}{match.group(2)}"
+
+
+def _normalized_cell_value(value: Any) -> Any:
+    return value.replace("\r\n", "\n") if isinstance(value, str) else value
+
+
+def _target_protected_value_errors(output_ws, template_ws, manifest: dict[str, Any], skill_enabled: bool) -> list[str]:
+    structure = manifest["structure"]
+    writable_cells = {
+        str(cell).upper()
+        for cell in [*structure.get("metadata", {}).values(), *structure.get("headers", {}).values()]
+        if cell
+    }
+    addresses = [structure.get("title_cell"), *structure.get("header_label_cells", {}).values()]
+    regular_start = column_number(structure["columns"]["regular_items_start"])
+    regular_end = column_number(structure["columns"]["regular_items_end"])
+    header_row = int(structure.get("header_row", 4))
+    addresses.extend(
+        f"{get_column_letter(column)}{header_row}"
+        for column in range(regular_start, regular_end + 1)
+    )
+    errors: list[str] = []
+    for address in dict.fromkeys(str(item).upper() for item in addresses if item):
+        if address in writable_cells:
+            continue
+        expected_address = address
+        if not skill_enabled:
+            expected_address = _shift_cell_address_after_delete(
+                address,
+                column_number(structure["columns"]["skill_score"]),
+                2,
+            )
+            if expected_address is None:
+                continue
+        expected = _normalized_cell_value(template_ws[expected_address].value)
+        actual = _normalized_cell_value(output_ws[expected_address].value)
+        if actual != expected:
+            errors.append(f"target sheet protected value mismatch at {expected_address}")
+    return errors
 
 
 def _base_qa_report(
