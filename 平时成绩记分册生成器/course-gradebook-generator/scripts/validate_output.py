@@ -6,6 +6,7 @@ import math
 import re
 import sys
 import tempfile
+from copy import copy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -483,11 +484,14 @@ def validate_output_dir(
                     if template_ws is None:
                         errors.append(f"Missing worksheet in template: {sheet_name}")
                     elif not skill_enabled:
+                        class_name_cell = structure["metadata"]["class_name"]
+                        class_name_style = copy(template_ws[class_name_cell]._style)
                         _delete_columns_for_signature(
                             template_ws,
                             column_number(columns["skill_score"]),
                             2,
                         )
+                        template_ws[class_name_cell]._style = copy(class_name_style)
                         no_skill_total = structure["no_skill_total_column"]
                         template_ws.column_dimensions[no_skill_total].width = max(
                             template_ws.column_dimensions[no_skill_total].width or 0,

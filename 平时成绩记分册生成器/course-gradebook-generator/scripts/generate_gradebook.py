@@ -345,8 +345,13 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
         ws = wb[structure["worksheet"]] if structure["worksheet"] in wb.sheetnames else wb.worksheets[0]
         has_skill = meta["skill_pct"] > 0.000001
         skill_start = column_number(columns["skill_score"])
+        class_name_cell = structure["metadata"]["class_name"]
+        class_name_style = copy(ws[class_name_cell]._style)
         if not has_skill:
             delete_columns_preserving_merges(ws, skill_start, 2)
+            # Deleting the optional columns removes the original O2:Q2 anchor;
+            # restore the surviving class-name cell's protected base style.
+            ws[class_name_cell]._style = copy(class_name_style)
 
         data_start = int(structure["data_start_row"])
         template_last_row = int(structure["template_last_data_row"])
