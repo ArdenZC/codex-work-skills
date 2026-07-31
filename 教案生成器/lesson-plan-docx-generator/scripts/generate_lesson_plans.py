@@ -17,7 +17,7 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.table import _Cell
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_spec, implementation_cell_values, load_manifest, manifest_template_path, validate_composed_fields, validate_input
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -174,29 +174,9 @@ def score_breakdown(target: float) -> list[float]:
 def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):
     table = cell.tables[0] if cell.tables else cell.add_table(rows=14, cols=4)
     table.style = "Table Grid"
-    headers = ["评价维度", "评价要素", "得分", "备注"]
-    rows = [
-        ("课堂表现度\n（10）", "考勤（3）"),
-        ("课堂表现度\n（10）", "专注度（3）"),
-        ("课堂表现度\n（10）", "参与度（4）"),
-        ("素质形成度\n（20）", "遵守规范、守法意识（5）"),
-        ("素质形成度\n（20）", "质量意识与职业责任（5）"),
-        ("素质形成度\n（20）", "工程伦理与数据安全（5）"),
-        ("素质形成度\n（20）", "行为习惯、环境维护（5）"),
-        ("知识掌握度\n（30）", "线上学习情况统计（10）"),
-        ("知识掌握度\n（30）", "课中讨论、答题等（10）"),
-        ("知识掌握度\n（30）", "课后作业（10）"),
-        ("能力达成度\n（40）", "实操实训情况（25）"),
-        ("能力达成度\n（40）", "成果展示（10）"),
-        ("能力达成度\n（40）", "后续改进拓展（5）"),
-    ]
-    for idx, header in enumerate(headers):
-        set_cell_text(table.cell(0, idx), header, WD_ALIGN_PARAGRAPH.CENTER)
     scores = score_breakdown(target)
     remarks = REMARKS[(seq - 1) % len(REMARKS)]
-    for r_idx, row in enumerate(rows, 1):
-        set_cell_multiline(table.cell(r_idx, 0), row[0], WD_ALIGN_PARAGRAPH.CENTER)
-        set_cell_multiline(table.cell(r_idx, 1), row[1], WD_ALIGN_PARAGRAPH.CENTER)
+    for r_idx in range(1, len(scores) + 1):
         value = scores[r_idx - 1]
         display = str(int(value)) if abs(value - int(value)) < 0.01 else f"{value:.1f}"
         set_cell_text(table.cell(r_idx, 2), display, WD_ALIGN_PARAGRAPH.CENTER)
@@ -256,15 +236,8 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
     preparation_row, introduction_row, demonstration_row, task_row, extension_row, practice_row, peer_row, summary_row, after_row = implementation_rows
 
-    set_row(table, preparation_row, {0: "课前准备\n10min\n线上+线下", 1: f"阅读任务单，了解{task}的成果要求和评价标准", 2: "1. 发布任务单和模板\n2. 推送操作提示\n3. 收集预习问题", 3: "1. 阅读任务材料\n2. 检查工具环境\n3. 标记疑问", 4: "保证任务开始前目标明确、环境可用"})
-    set_row(table, introduction_row, {0: "任务导入5min\n线下", 1: f"以项目情境导入“{task}”，说明本次任务产出物", 2: "1. 展示项目背景\n2. 明确任务边界\n3. 说明评分要点", 3: "1. 了解项目情境\n2. 明确小组分工\n3. 确认成果要求", 4: "用真实任务激活学习动机，形成任务驱动"})
-    set_row(table, demonstration_row, {0: "操作示范\n15min\n线下", 1: f"示范本次任务关键步骤：\n{numbered(flows[:3])}", 2: "1. 演示关键流程\n2. 提醒易错点\n3. 展示合格成果样例", 3: "1. 观察记录\n2. 对照模板理解要求\n3. 提问确认", 4: "降低实操门槛，让学生掌握基本路径"})
-    set_row(table, task_row, {0: "任务实施\n25min\n线下", 1: f"小组完成{task}，形成课堂阶段性成果", 2: "1. 巡视指导\n2. 解答工具和流程问题\n3. 记录共性问题", 3: "1. 按分工完成任务\n2. 记录操作过程\n3. 整理成果文件", 4: "通过做中学完成知识、技能和规范的转化"})
-    set_row(table, extension_row, {0: "任务拓展\n10min\n线下", 1: "根据教师反馈修正记录、脚本、用例或文档中的问题", 2: "1. 点评典型问题\n2. 指导小组修正\n3. 强调质量标准", 3: "1. 对照反馈修改\n2. 复查成果完整性\n3. 完成自评", 4: "强化规范意识和质量闭环"})
-    set_row(table, practice_row, {0: "项目实训\n15min\n线下", 1: f"提交{task}相关成果包，包括记录、截图、脚本或文档", 2: "1. 检查提交材料\n2. 抽查关键成果\n3. 给出即时建议", 3: "1. 提交成果包\n2. 补充说明\n3. 记录改进点", 4: "形成可评价、可追溯的学习成果"})
-    set_row(table, peer_row, {0: "组间互评8min\n线下", 1: "小组交换成果，从正确性、完整性、规范性和可复现性四方面互评", 2: "1. 下发互评标准\n2. 组织互评\n3. 抽取典型成果点评", 3: "1. 根据标准互评\n2. 记录建议\n3. 完善本组成果", 4: "让评价标准显性化，促进互学互改"})
-    set_row(table, summary_row, {0: "课堂小结7min\n线下", 1: "归纳本次任务的关键流程、常见问题和成果规范", 2: "1. 总结重难点\n2. 发布课后完善要求\n3. 提醒下次课准备", 3: "1. 回顾任务过程\n2. 完成自评\n3. 明确课后任务", 4: "帮助学生沉淀经验，形成持续改进意识"})
-    set_row(table, after_row, {0: "课后完善\n15min\n线上+线下", 1: "根据课堂反馈完善成果包，并在线提交最终版本", 2: "1. 在线答疑\n2. 检查最终提交\n3. 记录过程性成绩", 3: "1. 修改成果\n2. 上传最终版本\n3. 完成学习反思", 4: "延伸课堂任务，保证成果质量"})
+    for row_index, values in zip(implementation_rows, implementation_cell_values(task, flows)):
+        set_row(table, row_index, values)
     reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
     set_row(table, reflection_rows[0], {2: f"多数学生能按要求完成{task}，对任务流程和成果规范有较清晰认识；少数学生在记录完整性和结果分析上仍需加强。"})
     set_row(table, reflection_rows[1], {2: "以项目任务贯穿教学，突出实操产出和过程评价，学生参与度较高，互评环节能促进成果完善。"})

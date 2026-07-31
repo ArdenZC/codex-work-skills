@@ -67,8 +67,65 @@ def _xml(element) -> str:
     return etree.tostring(copy.deepcopy(element), encoding="unicode")
 
 
-def protected_layout_signature(document) -> dict[str, Any]:
-    table = document.tables[0]
+def _cell_text_signature(cell) -> list[Any]:
+    values: list[Any] = [paragraph.text for paragraph in cell.paragraphs]
+    for nested in cell.tables:
+        values.append(
+            [
+                [_cell_text_signature(nested_cell) for nested_cell in actual_cells(row)]
+                for row in nested.rows
+            ]
+        )
+    return values
+
+
+def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    table = document.tables[int(manifest["structure"]["main_table"]["index"])]
+    writable: set[tuple[int, int]] = set()
+    evaluation: tuple[int, int] | None = None
+    for spec in manifest.get("fields", {}).values():
+        if spec.get("mode") == "row_cells":
+            writable.update(
+                (int(row), int(cell))
+                for row in spec.get("rows", [])
+                for cell in spec.get("cells", [])
+            )
+        elif spec.get("mode") == "nested_table":
+            if int(spec.get("table", -1)) == 0:
+                evaluation = (int(spec["row"]), int(spec["cell"]))
+        elif int(spec.get("table", -1)) == 0 and "row" in spec and "cell" in spec:
+            writable.add((int(spec["row"]), int(spec["cell"])))
+
+    values: list[dict[str, Any]] = []
+    for row_index, row in enumerate(table.rows):
+        for cell_index, cell in enumerate(actual_cells(row)):
+            coordinate = (row_index, cell_index)
+            if coordinate in writable or coordinate == evaluation:
+                continue
+            values.append(
+                {"scope": "main", "row": row_index, "cell": cell_index, "text": _cell_text_signature(cell)}
+            )
+
+    if evaluation is not None:
+        parent = actual_cells(table.rows[evaluation[0]])[evaluation[1]]
+        nested = parent.tables[0] if parent.tables else None
+        if nested is not None:
+            for row_index, row in enumerate(nested.rows):
+                for cell_index, cell in enumerate(actual_cells(row)):
+                    if row_index == 0 or cell_index in (0, 1):
+                        values.append(
+                            {
+                                "scope": "evaluation",
+                                "row": row_index,
+                                "cell": cell_index,
+                                "text": _cell_text_signature(cell),
+                            }
+                        )
+    return values
+
+
+def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
+    table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     rows = []
     for row in table.rows:
         rows.append(
@@ -104,6 +161,7 @@ def protected_layout_signature(document) -> dict[str, Any]:
             }
             for section in document.sections
         ],
+        "protected_text": _protected_text_signature(document, manifest),
     }
 
 
@@ -325,7 +383,7 @@ def validate_output_dir(
         canonical_template = manifest_template_path(manifest)
         if canonical_template.exists():
             canonical_document = Document(str(canonical_template))
-            if protected_layout_signature(document) != protected_layout_signature(canonical_document):
+            if protected_layout_signature(document, manifest) != protected_layout_signature(canonical_document, manifest):
                 item_errors.append("protected DOCX layout changed")
         if len(table.rows) != int(main_spec["rows"]):
             item_errors.append(f"main table rows expected {main_spec['rows']}, got {len(table.rows)}")

@@ -164,6 +164,11 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "tools": "\n".join("工具" for _ in range(7)),
                 "message": "resources exceeds manifest max_paragraphs=8",
             },
+            "implementation": {
+                "flows": ["流" * 200 for _ in range(3)],
+                "knowledge": [],
+                "message": "implementation row 3 cell 1 exceeds manifest max_chars=600",
+            },
             "title": {
                 "course_name": "课" * 32,
                 "task": "任务" * 40,
@@ -585,6 +590,34 @@ class LessonTemplatePackageTests(unittest.TestCase):
             path = sorted(output.glob("*.docx"))[0]
             document = Document(path)
             document.sections[0].header.paragraphs[0].text = "被篡改页眉"
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
+    def test_output_validation_rejects_fixed_label_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-fixed-label-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            nested = document.tables[0].cell(12, 1).tables[0]
+            nested.cell(1, 1).text = "被篡改的评价要素"
             document.save(path)
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",

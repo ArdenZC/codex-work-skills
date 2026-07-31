@@ -119,6 +119,75 @@ def _numbered_text(items: list[Any]) -> str:
     return "\n".join(f"{index}. {item}" for index, item in enumerate(values, 1))
 
 
+def implementation_cell_values(task: str, flows: list[Any]) -> list[dict[int, str]]:
+    numbered_flows = _numbered_text(flows[:3])
+    return [
+        {
+            0: "课前准备\n10min\n线上+线下",
+            1: f"阅读任务单，了解{task}的成果要求和评价标准",
+            2: "1. 发布任务单和模板\n2. 推送操作提示\n3. 收集预习问题",
+            3: "1. 阅读任务材料\n2. 检查工具环境\n3. 标记疑问",
+            4: "保证任务开始前目标明确、环境可用",
+        },
+        {
+            0: "任务导入5min\n线下",
+            1: f"以项目情境导入“{task}”，说明本次任务产出物",
+            2: "1. 展示项目背景\n2. 明确任务边界\n3. 说明评分要点",
+            3: "1. 了解项目情境\n2. 明确小组分工\n3. 确认成果要求",
+            4: "用真实任务激活学习动机，形成任务驱动",
+        },
+        {
+            0: "操作示范\n15min\n线下",
+            1: f"示范本次任务关键步骤：\n{numbered_flows}",
+            2: "1. 演示关键流程\n2. 提醒易错点\n3. 展示合格成果样例",
+            3: "1. 观察记录\n2. 对照模板理解要求\n3. 提问确认",
+            4: "降低实操门槛，让学生掌握基本路径",
+        },
+        {
+            0: "任务实施\n25min\n线下",
+            1: f"小组完成{task}，形成课堂阶段性成果",
+            2: "1. 巡视指导\n2. 解答工具和流程问题\n3. 记录共性问题",
+            3: "1. 按分工完成任务\n2. 记录操作过程\n3. 整理成果文件",
+            4: "通过做中学完成知识、技能和规范的转化",
+        },
+        {
+            0: "任务拓展\n10min\n线下",
+            1: "根据教师反馈修正记录、脚本、用例或文档中的问题",
+            2: "1. 点评典型问题\n2. 指导小组修正\n3. 强调质量标准",
+            3: "1. 对照反馈修改\n2. 复查成果完整性\n3. 完成自评",
+            4: "强化规范意识和质量闭环",
+        },
+        {
+            0: "项目实训\n15min\n线下",
+            1: f"提交{task}相关成果包，包括记录、截图、脚本或文档",
+            2: "1. 检查提交材料\n2. 抽查关键成果\n3. 给出即时建议",
+            3: "1. 提交成果包\n2. 补充说明\n3. 记录改进点",
+            4: "形成可评价、可追溯的学习成果",
+        },
+        {
+            0: "组间互评8min\n线下",
+            1: "小组交换成果，从正确性、完整性、规范性和可复现性四方面互评",
+            2: "1. 下发互评标准\n2. 组织互评\n3. 抽取典型成果点评",
+            3: "1. 根据标准互评\n2. 记录建议\n3. 完善本组成果",
+            4: "让评价标准显性化，促进互学互改",
+        },
+        {
+            0: "课堂小结7min\n线下",
+            1: "归纳本次任务的关键流程、常见问题和成果规范",
+            2: "1. 总结重难点\n2. 发布课后完善要求\n3. 提醒下次课准备",
+            3: "1. 回顾任务过程\n2. 完成自评\n3. 明确课后任务",
+            4: "帮助学生沉淀经验，形成持续改进意识",
+        },
+        {
+            0: "课后完善\n15min\n线上+线下",
+            1: "根据课堂反馈完善成果包，并在线提交最终版本",
+            2: "1. 在线答疑\n2. 检查最终提交\n3. 记录过程性成绩",
+            3: "1. 修改成果\n2. 上传最终版本\n3. 完成学习反思",
+            4: "延伸课堂任务，保证成果质量",
+        },
+    ]
+
+
 def _validate_composed_limit(label: str, value: str, spec: dict[str, Any]) -> None:
     max_chars = spec.get("max_chars")
     if max_chars is not None and len(value) > int(max_chars):
@@ -135,6 +204,7 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
     teaching_spec = field_spec(manifest, "teaching_content")
     knowledge_goal_spec = field_spec(manifest, "knowledge_goal")
     resources_spec = field_spec(manifest, "resources")
+    implementation_spec = field_spec(manifest, "implementation")
     title_spec = field_spec(manifest, "title")
     for index, lesson in enumerate(data.get("lessons", []), start=1):
         if not isinstance(lesson, dict):
@@ -172,5 +242,12 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
             resources,
             resources_spec,
         )
+        for row_index, values in enumerate(implementation_cell_values(task, flows), start=1):
+            for cell_index, value in values.items():
+                _validate_composed_limit(
+                    f"lessons[{index - 1}].implementation row {row_index} cell {cell_index}",
+                    str(value),
+                    implementation_spec,
+                )
         title = f"{index} 《{course}》教学单元设计：{task}"
         _validate_composed_limit(f"lessons[{index - 1}].title", title, title_spec)
