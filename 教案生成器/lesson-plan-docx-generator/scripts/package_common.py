@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
+MAX_TEACHING_CONTENT_ITEMS = 8
 
 
 def load_manifest(path: Path | str = DEFAULT_MANIFEST) -> dict[str, Any]:
@@ -42,33 +43,34 @@ def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
     return schema
 
 
+def _validate_positive_number(value: Any, field_name: str) -> None:
+    if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+        return
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError(f"{field_name} must be a positive number; received {value}.") from None
+    if not number.is_finite() or number <= 0:
+        raise ValueError(f"{field_name} must be a positive number; received {value}.")
+
+
 def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEMA) -> None:
-    for field_name in ("default_hours",):
-        if field_name not in data:
-            continue
-        value = data[field_name]
-        if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
-            continue
-        try:
-            hours = Decimal(str(value))
-        except (InvalidOperation, TypeError, ValueError):
-            raise ValueError(f"{field_name} must be a positive number; received {value}.") from None
-        if not hours.is_finite() or hours <= 0:
-            raise ValueError(f"{field_name} must be a positive number; received {value}.")
+    for field_name in ("default_hours", "total_hours"):
+        if field_name in data:
+            _validate_positive_number(data[field_name], field_name)
 
     for index, lesson in enumerate(data.get("lessons", [])):
         if isinstance(lesson, dict) and "hours" in lesson:
-            value = lesson["hours"]
-            if not isinstance(value, bool) and isinstance(value, (str, int, float, Decimal)):
-                try:
-                    hours = Decimal(str(value))
-                except (InvalidOperation, TypeError, ValueError):
+            _validate_positive_number(lesson["hours"], f"lessons[{index}].hours")
+        if isinstance(lesson, dict):
+            flows = lesson.get("flows", [])
+            knowledge = lesson.get("knowledge", [])
+            if isinstance(flows, list) and isinstance(knowledge, list):
+                content_items = len(flows) + len(knowledge)
+                if content_items > MAX_TEACHING_CONTENT_ITEMS:
                     raise ValueError(
-                        f"lessons[{index}].hours must be a positive number; received {value}."
-                    ) from None
-                if not hours.is_finite() or hours <= 0:
-                    raise ValueError(
-                        f"lessons[{index}].hours must be a positive number; received {value}."
+                        f"lessons[{index}] flows and knowledge combined must contain at most "
+                        f"{MAX_TEACHING_CONTENT_ITEMS} items; received {content_items}."
                     )
         if not isinstance(lesson, dict) or "score" not in lesson:
             continue

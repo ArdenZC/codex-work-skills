@@ -9,7 +9,7 @@
     "major": {"type": "string", "minLength": 1, "maxLength": 32},
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
     "default_hours": {"type": ["string", "number"], "minLength": 1, "exclusiveMinimum": 0},
-    "total_hours": {"type": ["string", "number"], "minimum": 0},
+    "total_hours": {"type": ["string", "number"], "minLength": 1, "exclusiveMinimum": 0},
     "lessons": {
       "type": "array",
       "minItems": 1,
@@ -23,8 +23,8 @@
           "unit": {"type": "string", "minLength": 1, "maxLength": 60},
           "task": {"type": "string", "minLength": 1, "maxLength": 80},
           "hours": {"type": ["string", "number"], "minLength": 1, "exclusiveMinimum": 0},
-          "flows": {"type": "array", "items": {"type": "string", "maxLength": 200}},
-          "knowledge": {"type": "array", "items": {"type": "string", "maxLength": 200}},
+          "flows": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 200}},
+          "knowledge": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 200}},
           "tools": {"type": "string", "maxLength": 300},
           "score": {"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.5}
         },

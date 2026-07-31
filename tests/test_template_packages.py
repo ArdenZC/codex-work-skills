@@ -108,6 +108,46 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertIn("lessons[0].hours must be a positive number; received -2.", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_invalid_total_hours_reject_before_docx_generation(self) -> None:
+        for invalid_total in ("abc", "-2", 0, "0"):
+            with self.subTest(invalid_total=invalid_total), tempfile.TemporaryDirectory(prefix="lesson-package-total-hours-") as temp_name:
+                folder = Path(temp_name)
+                payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+                payload["total_hours"] = invalid_total
+                source = folder / "tasks.json"
+                output = folder / "output"
+                source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                result = run_script(
+                    LESSON / "scripts" / "generate_lesson_plans.py",
+                    "--tasks-json",
+                    str(source),
+                    "--output-dir",
+                    str(output),
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("total_hours must be a positive number", result.stderr)
+                self.assertFalse(output.exists())
+
+    def test_teaching_content_capacity_rejects_before_docx_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-content-capacity-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"][0]["flows"] = [f"流程{i}" for i in range(6)]
+            payload["lessons"][0]["knowledge"] = [f"知识点{i}" for i in range(3)]
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("flows and knowledge combined must contain at most 8 items", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_score_precision_rejects_before_docx_generation(self) -> None:
         for invalid_score in (89.2, 89.25):
             with self.subTest(invalid_score=invalid_score), tempfile.TemporaryDirectory(prefix="lesson-package-score-") as temp_name:
@@ -154,6 +194,29 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 Decimal("0"),
             )
             self.assertEqual(score_sum, Decimal("89"))
+
+    def test_lesson_course_override_is_validated(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-course-override-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"] = [payload["lessons"][0]]
+            payload["total_hours"] = 2
+            payload["lessons"][0]["course_name"] = "接口测试实训"
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(output.glob("*.docx"))
+            document = Document(generated)
+            self.assertEqual(document.tables[0].cell(0, 1).text.strip(), "接口测试实训")
+            self.assertIn("《接口测试实训》", document.paragraphs[0].text)
 
     def test_long_teaching_content_is_generated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-long-") as temp_name:

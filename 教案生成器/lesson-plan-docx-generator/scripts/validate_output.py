@@ -301,13 +301,14 @@ def validate_output_dir(
         if len(table.columns) != int(main_spec["columns"]):
             item_errors.append(f"main table columns expected {main_spec['columns']}, got {len(table.columns)}")
 
+        expected_course = str(item.get("course_name") or data["course_name"])
         field_values = {
             "course_name": manifest_field_text(document, table, manifest, "course_name"),
             "unit": manifest_field_text(document, table, manifest, "unit"),
             "task": manifest_field_text(document, table, manifest, "task"),
             "hours": manifest_field_text(document, table, manifest, "hours"),
         }
-        if field_values["course_name"] != course_expected:
+        if field_values["course_name"] != expected_course:
             item_errors.append("course field mismatch")
         if field_values["unit"] != str(item["unit"]):
             item_errors.append("unit field mismatch")
@@ -326,7 +327,7 @@ def validate_output_dir(
 
         title_spec = field_spec(manifest, "title")
         title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
-        expected_title = f"{index} 《{course_expected}》教学单元设计：{item['task']}"
+        expected_title = f"{index} 《{expected_course}》教学单元设计：{item['task']}"
         actual_title = document.paragraphs[title_index].text if 0 <= title_index < len(document.paragraphs) else ""
         if actual_title != expected_title:
             item_errors.append("title field mismatch")
@@ -359,11 +360,11 @@ def validate_output_dir(
 
         all_text = _document_text(document, table)
         for forbidden in manifest.get("validation", {}).get("forbidden_template_text", []):
-            if forbidden in {course_expected, str(item["unit"]), str(item["task"])}:
+            if forbidden in {course_expected, expected_course, str(item["unit"]), str(item["task"])}:
                 continue
             if forbidden in all_text:
                 item_errors.append(f"forbidden template text remains: {forbidden}")
-        if course_expected != "Linux操作系统应用" and "Linux操作系统应用" in all_text:
+        if expected_course != "Linux操作系统应用" and "Linux操作系统应用" in all_text:
             item_errors.append("template course-name placeholder Linux操作系统应用 remains")
         if item_errors:
             errors.extend(f"file {index}: {message}" for message in item_errors)
