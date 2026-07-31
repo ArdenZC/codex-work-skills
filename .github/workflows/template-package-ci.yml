@@ -68,7 +68,11 @@ jobs:
           if (-not $programPath) {
             throw "LibreOffice installation path was not found."
           }
-          $programPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $soffice = Join-Path $programPath "soffice.com"
+          if (-not (Test-Path $soffice)) {
+            throw "LibreOffice command was not found: $soffice"
+          }
+          & $soffice --version | Select-Object -First 1
 
       - name: Install Python dependencies
         run: |
