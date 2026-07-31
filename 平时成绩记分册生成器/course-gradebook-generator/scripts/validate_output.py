@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 from package_common import (
     DEFAULT_MANIFEST,
@@ -22,7 +23,7 @@ from package_common import (
     source_total_matches,
     validate_input,
 )
-from validate_template import convert_to_xlsx, find_soffice
+from validate_template import _cell_format_signature, _dimension_signature, convert_to_xlsx, find_soffice
 
 
 def _number(value: Any, label: str) -> float:
@@ -83,6 +84,7 @@ def _check_workbook_protection(
     manifest: dict[str, Any],
     skill_enabled: bool,
     errors: list[str],
+    template_ws=None,
 ) -> dict[str, Any]:
     structure = manifest["structure"]
     validation = manifest["validation"]
@@ -123,6 +125,8 @@ def _check_workbook_protection(
     actual_cf = len(ws.conditional_formatting)
     if actual_cf != expected_cf:
         errors.append(f"Output conditional formats changed: expected {expected_cf}, got {actual_cf}")
+    formatting_errors = _target_sheet_format_errors(ws, template_ws, manifest, skill_enabled) if template_ws is not None else []
+    errors.extend(formatting_errors)
     return {
         "sheets": workbook.sheetnames,
         "sheet_states": actual_states,
@@ -135,6 +139,8 @@ def _check_workbook_protection(
         "named_ranges": actual_named_ranges,
         "data_validations": actual_dv,
         "conditional_formats": actual_cf,
+        "target_formatting_checked": template_ws is not None,
+        "target_formatting_error_count": len(formatting_errors),
     }
 
 
@@ -149,6 +155,120 @@ def _scan_formula_errors(formula_workbook, value_workbook) -> list[str]:
                 if value_sheet is not None and _contains_formula_error(value_sheet[cell.coordinate].value):
                     errors.append(f"{sheet.title}!{cell.coordinate} has a cached formula error: {value_sheet[cell.coordinate].value}")
     return errors
+
+
+def _dimension_signature_for_column(sheet, column: int, width_floor: float | None = None) -> tuple[Any, ...]:
+    dimension = sheet.column_dimensions.get(get_column_letter(column))
+    width = _dimension_signature(dimension.width if dimension is not None else None)
+    if width_floor is not None:
+        width = max(width or 0, width_floor)
+    return (
+        width,
+        bool(dimension.hidden) if dimension is not None else False,
+        int(dimension.outlineLevel) if dimension is not None else 0,
+        bool(dimension.collapsed) if dimension is not None else False,
+    )
+
+
+def _dimension_signature_for_row(sheet, row: int) -> tuple[Any, ...]:
+    dimension = sheet.row_dimensions.get(row)
+    return (
+        _dimension_signature(dimension.height if dimension is not None else None),
+        bool(dimension.hidden) if dimension is not None else False,
+        int(dimension.outlineLevel) if dimension is not None else 0,
+        bool(dimension.collapsed) if dimension is not None else False,
+    )
+
+
+def _target_cell_format_signature(cell) -> dict[str, Any]:
+    signature = _cell_format_signature(cell)
+    alignment = list(signature["alignment"])
+    if alignment[0] in (None, "general"):
+        alignment[0] = "general"
+    if alignment[1] in (None, "bottom"):
+        alignment[1] = "bottom"
+    signature["alignment"] = tuple(alignment)
+    return signature
+
+
+def _shift_column_after_delete(column: int, start: int, count: int) -> int | None:
+    if column < start:
+        return column
+    if column >= start + count:
+        return column - count
+    return None
+
+
+def _delete_columns_for_signature(ws, start_col: int, count: int) -> None:
+    original_ranges = [
+        (merged.min_row, merged.max_row, merged.min_col, merged.max_col)
+        for merged in list(ws.merged_cells.ranges)
+    ]
+    for merged in list(ws.merged_cells.ranges):
+        ws.unmerge_cells(str(merged))
+    ws.delete_cols(start_col, count)
+    for min_row, max_row, min_col, max_col in original_ranges:
+        shifted_min = _shift_column_after_delete(min_col, start_col, count)
+        shifted_max = _shift_column_after_delete(max_col, start_col, count)
+        if shifted_min is None:
+            shifted_min = start_col
+        if shifted_max is None:
+            shifted_max = start_col - 1
+        if min_col < start_col and max_col >= start_col + count:
+            shifted_min = min_col
+            shifted_max = max_col - count
+        elif min_col < start_col <= max_col:
+            shifted_min = min_col
+            shifted_max = start_col - 1
+        elif min_col >= start_col and max_col < start_col + count:
+            continue
+        if shifted_max < shifted_min:
+            continue
+        if shifted_min != shifted_max or min_row != max_row:
+            ws.merge_cells(
+                start_row=min_row,
+                start_column=shifted_min,
+                end_row=max_row,
+                end_column=shifted_max,
+            )
+
+
+def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any], skill_enabled: bool) -> list[str]:
+    structure = manifest["structure"]
+    columns = structure["columns"]
+    template_last_row = int(structure["template_last_data_row"])
+    style_source_row = int(structure["style_source_row"])
+    output_total_column = column_number(columns["total_score"] if skill_enabled else structure["no_skill_total_column"])
+    errors: list[str] = []
+
+    for output_column in range(1, output_total_column + 1):
+        expected_dimension = _dimension_signature_for_column(template_ws, output_column)
+        actual_dimension = _dimension_signature_for_column(output_ws, output_column)
+        if expected_dimension != actual_dimension:
+            errors.append(
+                f"target sheet formatting mismatch in column {get_column_letter(output_column)}"
+            )
+
+    for output_row in range(1, output_ws.max_row + 1):
+        source_row = output_row if output_row <= template_last_row else style_source_row
+        if source_row > template_ws.max_row:
+            errors.append(f"target sheet formatting mismatch in row {output_row}")
+            continue
+        if _dimension_signature_for_row(output_ws, output_row) != _dimension_signature_for_row(template_ws, source_row):
+            errors.append(f"target sheet formatting mismatch in row {output_row}")
+        for output_column in range(1, output_total_column + 1):
+            if output_column > template_ws.max_column:
+                errors.append(
+                    f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row}"
+                )
+                continue
+            if _target_cell_format_signature(output_ws.cell(output_row, output_column)) != _target_cell_format_signature(
+                template_ws.cell(source_row, output_column)
+            ):
+                errors.append(
+                    f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row}"
+                )
+    return errors[:20]
 
 
 def _base_qa_report(
@@ -335,14 +455,35 @@ def validate_output_dir(
                 xlsx = convert_to_xlsx(path, Path(temp_name), find_soffice())
                 formulas = load_workbook(xlsx, data_only=False)
                 values = load_workbook(xlsx, data_only=True)
+                selected_template = Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest)
+                template_xlsx = (
+                    selected_template
+                    if selected_template.suffix.lower() == ".xlsx"
+                    else convert_to_xlsx(selected_template, Path(temp_name) / "template", find_soffice())
+                )
+                template_workbook = load_workbook(template_xlsx, data_only=False)
                 sheet_name = structure["worksheet"]
                 if sheet_name not in formulas.sheetnames:
                     errors.append(f"Missing worksheet: {sheet_name}")
                 else:
                     ws_formula = formulas[sheet_name]
                     ws_values = values[sheet_name]
+                    template_ws = template_workbook[sheet_name] if sheet_name in template_workbook.sheetnames else None
+                    if template_ws is None:
+                        errors.append(f"Missing worksheet in template: {sheet_name}")
+                    elif not skill_enabled:
+                        _delete_columns_for_signature(
+                            template_ws,
+                            column_number(columns["skill_score"]),
+                            2,
+                        )
+                        no_skill_total = structure["no_skill_total_column"]
+                        template_ws.column_dimensions[no_skill_total].width = max(
+                            template_ws.column_dimensions[no_skill_total].width or 0,
+                            18,
+                        )
                     report["checks"]["structure"] = _check_workbook_protection(
-                        ws_formula, formulas, manifest, skill_enabled, errors
+                        ws_formula, formulas, manifest, skill_enabled, errors, template_ws
                     )
                     errors.extend(_scan_formula_errors(formulas, values))
 

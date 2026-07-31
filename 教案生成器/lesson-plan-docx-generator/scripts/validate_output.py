@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import math
+import re
 import sys
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -15,6 +16,9 @@ from docx.table import _Cell
 from lxml import etree
 
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
+
+
+LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
 
 
 def actual_cells(row) -> list[_Cell]:
@@ -49,6 +53,13 @@ def parse_decimal(value: Any, label: str) -> Decimal:
     if not number.is_finite():
         raise ValueError(f"{label} must be finite: {value!r}")
     return number
+
+
+def _lesson_file_sort_key(path: Path) -> tuple[int, int, str]:
+    match = LESSON_FILE_PATTERN.match(path.name)
+    if match:
+        return 0, int(match.group("sequence")), path.name
+    return 1, 0, path.name
 
 
 def _xml(element) -> str:
@@ -248,7 +259,7 @@ def validate_output_dir(
     validate_input(data, schema_path)
     validate_composed_fields(data, manifest)
     lessons = data["lessons"]
-    files = sorted(out_dir.glob("*.docx"))
+    files = sorted(out_dir.glob("*.docx"), key=_lesson_file_sort_key)
     report = _base_qa_report(
         out_dir,
         manifest,

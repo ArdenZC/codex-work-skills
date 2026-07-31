@@ -43,12 +43,62 @@ def _xml_without_text(element) -> str:
     return etree.tostring(cloned, encoding="unicode")
 
 
-def _main_table_signature(table) -> dict[str, Any]:
+def _clear_text_nodes(element) -> None:
+    for node in element.iter():
+        if node.tag in {qn("w:t"), qn("w:instrText"), qn("w:delText")}:
+            node.text = ""
+
+
+def _cell_signature(cell, writable: bool = False, evaluation: bool = False) -> str:
+    cloned = copy.deepcopy(cell._tc)
+    if writable:
+        _clear_text_nodes(cloned)
+    elif evaluation:
+        for nested_table in cloned.iter(qn("w:tbl")):
+            rows = [child for child in nested_table if child.tag == qn("w:tr")]
+            for row_index, row in enumerate(rows):
+                if row_index == 0:
+                    continue
+                nested_cells = [child for child in row if child.tag == qn("w:tc")]
+                for cell_index in (2, 3):
+                    if cell_index < len(nested_cells):
+                        _clear_text_nodes(nested_cells[cell_index])
+    return etree.tostring(cloned, encoding="unicode")
+
+
+def _writable_main_table_cells(manifest: dict[str, Any]) -> tuple[set[tuple[int, int]], tuple[int, int] | None]:
+    writable: set[tuple[int, int]] = set()
+    evaluation: tuple[int, int] | None = None
+    for spec in manifest.get("fields", {}).values():
+        if spec.get("mode") == "row_cells":
+            writable.update(
+                (int(row), int(cell))
+                for row in spec.get("rows", [])
+                for cell in spec.get("cells", [])
+            )
+            continue
+        if spec.get("mode") == "nested_table":
+            if int(spec.get("table", -1)) == 0:
+                evaluation = (int(spec["row"]), int(spec["cell"]))
+            continue
+        if int(spec.get("table", -1)) == 0 and "row" in spec and "cell" in spec:
+            writable.add((int(spec["row"]), int(spec["cell"])))
+    return writable, evaluation
+
+
+def _main_table_signature(table, manifest: dict[str, Any]) -> dict[str, Any]:
+    writable_cells, evaluation_cell = _writable_main_table_cells(manifest)
     rows = []
-    for row in table.rows:
+    for row_index, row in enumerate(table.rows):
         cells = []
-        for cell in actual_cells(row):
-            cells.append(_xml_without_text(cell._tc))
+        for cell_index, cell in enumerate(actual_cells(row)):
+            cells.append(
+                _cell_signature(
+                    cell,
+                    writable=(row_index, cell_index) in writable_cells,
+                    evaluation=evaluation_cell == (row_index, cell_index),
+                )
+            )
         rows.append({"tr": _xml_without_text(row._tr), "cells": cells})
     return {
         "table": _xml_without_text(table._tbl),
@@ -225,7 +275,7 @@ def validate_template(
 
     if canonical.exists() and not is_canonical:
         canonical_doc = Document(str(canonical))
-        if _main_table_signature(canonical_doc.tables[table_index]) != _main_table_signature(document.tables[table_index]):
+        if _main_table_signature(canonical_doc.tables[table_index], manifest) != _main_table_signature(document.tables[table_index], manifest):
             errors.append("Custom template changed protected main-table structure or formatting.")
         if _section_signature(canonical_doc) != _section_signature(document):
             errors.append("Custom template changed protected page, header, footer, or section settings.")

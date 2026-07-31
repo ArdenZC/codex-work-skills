@@ -299,6 +299,24 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Unsupported template major version", result.stdout)
 
+    def test_custom_lesson_template_rejects_fixed_label_relocation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-fixed-label-") as temp_name:
+            custom = Path(temp_name) / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            table = document.tables[0]
+            table.cell(0, 0).text = "授课专业"
+            table.cell(0, 3).text = "课程名称"
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
+
     def test_generation_writes_qa_report_and_preserves_structure(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-test-") as temp_name:
             output = Path(temp_name) / "output"
@@ -329,6 +347,36 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     Decimal("0"),
                 )
                 self.assertEqual(score_sum, Decimal(str(item["score"])))
+
+    def test_output_validation_orders_three_digit_lesson_files_numerically(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-three-digit-") as temp_name:
+            folder = Path(temp_name)
+            payload = {
+                "course_name": "软件测试实训",
+                "total_hours": 200,
+                "lessons": [
+                    {
+                        "unit": f"项目{i + 1} 测试任务",
+                        "task": f"完成测试任务{i + 1}",
+                        "hours": "2",
+                        "flows": [],
+                        "knowledge": [],
+                        "score": 89.5,
+                    }
+                    for i in range(100)
+                ],
+            }
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
     def test_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-compat-qa-") as temp_name:
@@ -849,6 +897,75 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+
+    def test_output_validation_rejects_target_sheet_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-format-mismatch-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(output.glob("*.xls"))
+
+            xlsx_dir = folder / "tamper-xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(generated)],
+                check=True,
+                capture_output=True,
+            )
+            tampered_xlsx = xlsx_dir / f"{generated.stem}.xlsx"
+            workbook = load_workbook(tampered_xlsx)
+            tampered_font = copy(workbook["平时成绩"]["C5"].font)
+            tampered_font.sz = (tampered_font.sz or 10) + 1
+            workbook["平时成绩"]["C5"].font = tampered_font
+            workbook.save(tampered_xlsx)
+            tampered_dir = folder / "tampered"
+            tampered_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(tampered_dir), str(tampered_xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            tampered = output / "tampered.xls"
+            shutil.copy2(tampered_dir / f"{generated.stem}.xls", tampered)
+
+            normalized = folder / "normalized.json"
+            normalized.write_text(
+                json.dumps(
+                    {
+                        "term": "2025-2026-2",
+                        "course": "软件测试实训",
+                        "teacher": "张老师",
+                        "class_name": "软件技术2401班",
+                        "weights": {"regular": 0.6, "theory": 0.4, "skill": 0.0},
+                        "students": [
+                            {"id": "240101001", "name": "学生1", "regular": 86.5, "theory": 88.0, "skill": 0.0, "total": 87.0},
+                            {"id": "240101002", "name": "学生2", "regular": 91.0, "theory": 90.0, "skill": 0.0, "total": 91.0},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_output.py",
+                "--input-json",
+                str(normalized),
+                "--output-dir",
+                str(output),
+                "--output-file",
+                str(tampered),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("target sheet formatting mismatch", result.stderr)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:
