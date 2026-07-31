@@ -128,10 +128,11 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 
 ## Template Package
 
-- Manifest: `manifest.yaml`
+- Manifest: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`
 - Canonical template: `assets/templates/lesson-plan/v1.0.0/template.docx`
+- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`, `assets/templates/lesson-plan/v1.0.0/CHANGELOG.md`
 - Input schema: `schemas/lesson-plan-input.schema.json`
 - Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
 - QA output: `qa-report.json` in the generated output directory
 
-The package preserves the original single-paragraph replacement and multiline-cell writing modes. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them.
+The package preserves the original single-paragraph replacement and multiline-cell writing modes. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.

@@ -12,7 +12,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from package_common import DEFAULT_MANIFEST, ensure_supported_major, load_manifest, manifest_template_path
+from package_common import DEFAULT_MANIFEST, column_number, ensure_supported_major, load_manifest, manifest_template_path
 
 
 class TemplateValidationError(RuntimeError):
@@ -71,16 +71,34 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
     structure = manifest["structure"]
     sheet_name = structure["worksheet"]
     ws = workbook[sheet_name]
-    fixed_cells = [
-        "A1", "A3", "B3", "C3", "D3", "M3", "O3", "Q3", "D4", "L4", "M4", "N4", "O4", "P4", "Q4",
+    label_cells = structure.get("header_label_cells", {})
+    fixed_cells = ["A1", *structure.get("metadata", {}).values(), *label_cells.values()]
+    header_row = int(structure.get("header_row", 4))
+    fixed_cells.extend(f"{column}{header_row}" for column in ("A", "B", "C", "D", "L", "M", "N", "O", "P", "Q"))
+    fixed_cells = list(dict.fromkeys(str(cell) for cell in fixed_cells))
+    style_row = int(structure["style_source_row"])
+    format_columns = [
+        structure["columns"]["student_id"],
+        structure["columns"]["regular_weighted"],
+        structure["columns"]["theory_weighted"],
+        structure["columns"]["skill_weighted"],
+        structure["columns"]["total_score"],
     ]
     return {
         "sheetnames": list(workbook.sheetnames),
+        "sheet_states": {sheet.title: sheet.sheet_state for sheet in workbook.worksheets},
         "dimension": [ws.max_row, ws.max_column],
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},
-        "number_formats": {cell: ws[cell].number_format for cell in ["B5", "L5", "Q5"]},
+        "number_formats": {f"{column}{style_row}": ws[f"{column}{style_row}"].number_format for column in format_columns},
         "orientation": ws.page_setup.orientation,
+        "print_area": str(ws.print_area or ""),
+        "freeze_panes": str(ws.freeze_panes or ""),
+        "named_ranges": sorted(str(name) for name in workbook.defined_names),
+        "data_validations": len(ws.data_validations.dataValidation),
+        "conditional_formats": len(ws.conditional_formatting),
+        "column_widths": {key: value.width for key, value in ws.column_dimensions.items()},
+        "row_heights": {str(key): value.height for key, value in ws.row_dimensions.items() if value.height is not None},
     }
 
 
@@ -109,7 +127,7 @@ def validate_template(
         errors.append(f"Template not found: {template}")
         raise TemplateValidationError(report)
 
-    expected_hash = str(manifest.get("fingerprint", {}).get("sha256", "")).upper()
+    expected_hash = str(manifest.get("fingerprint", {}).get("sha256") or manifest.get("fingerprint", {}).get("value", "")).upper()
     actual_hash = sha256(template)
     canonical = manifest_template_path(manifest)
     is_canonical = template == canonical
@@ -147,28 +165,58 @@ def validate_template(
             expected_sheets = list(structure.get("required_sheets", []))
             if expected_sheets and workbook.sheetnames != expected_sheets:
                 errors.append(f"Worksheet names changed: expected {expected_sheets}, got {workbook.sheetnames}")
+            expected_states = {str(key): str(value) for key, value in structure.get("required_sheet_states", {}).items()}
+            actual_states = {sheet.title: sheet.sheet_state for sheet in workbook.worksheets}
+            if expected_states and actual_states != expected_states:
+                errors.append(f"Worksheet visibility changed: expected {expected_states}, got {actual_states}")
             expected_last_row = int(structure["template_last_data_row"])
             if ws.max_row != expected_last_row:
                 errors.append(f"Template row count mismatch: expected {expected_last_row}, got {ws.max_row}")
             expected_total_col = structure["columns"]["total_score"]
-            if ws.max_column != 17:
-                errors.append(f"Template column count mismatch: expected 17, got {ws.max_column}")
+            expected_columns = column_number(structure["columns"]["total_score"])
+            if ws.max_column != expected_columns:
+                errors.append(f"Template column count mismatch: expected {expected_columns}, got {ws.max_column}")
             merged = set(str(item).upper() for item in ws.merged_cells.ranges)
             required_merged = set(str(item).upper() for item in structure.get("required_merged_ranges", []))
-            if not required_merged.issubset(merged):
-                errors.append(f"Missing protected merged ranges: {sorted(required_merged - merged)}")
+            if merged != required_merged:
+                errors.append(f"Protected merged ranges changed: expected {sorted(required_merged)}, got {sorted(merged)}")
             required_headers = manifest["validation"]["required_headers"]
-            header_values = [ws["A3"].value, ws["B3"].value, ws["C3"].value, ws["D3"].value, ws["M3"].value, ws["Q3"].value]
+            label_cells = structure.get("header_label_cells", {"serial": "A3", "student_id": "B3", "student_name": "C3", "regular": "D3", "theory": "M3", "total": "Q3"})
+            header_values = [ws[label_cells[key]].value for key in ("serial", "student_id", "student_name", "regular", "theory", "total")]
             for expected, actual in zip(required_headers, header_values):
                 if str(expected) not in str(actual):
                     errors.append(f"Missing required header fragment {expected!r}; got {actual!r}")
-            for cell in ["L5", "N5", "P5", "Q5"]:
+            formula_columns = manifest["fields"].get("formula_columns_with_skill", {}).get("columns", ["L", "N", "P", "Q"])
+            formula_row = int(structure["style_source_row"])
+            for column in formula_columns:
+                cell = f"{column}{formula_row}"
                 if not isinstance(ws[cell].value, str) or not ws[cell].value.startswith("="):
                     errors.append(f"Expected formula in template cell {cell}")
-            if ws["B5"].number_format != "@":
-                errors.append(f"Student ID cell B5 must be text formatted, got {ws['B5'].number_format!r}")
-            if ws.page_setup.orientation != "landscape":
+            student_id_column = structure["columns"]["student_id"]
+            student_id_cell = f"{student_id_column}{formula_row}"
+            if ws[student_id_cell].number_format != "@":
+                errors.append(f"Student ID cell {student_id_cell} must be text formatted, got {ws[student_id_cell].number_format!r}")
+            expected_orientation = manifest["validation"].get("page_orientation", "landscape")
+            if ws.page_setup.orientation != expected_orientation:
                 errors.append(f"Template page orientation changed: {ws.page_setup.orientation}")
+            expected_print_area = str(manifest["validation"].get("expected_print_area") or "")
+            if str(ws.print_area or "") != expected_print_area:
+                errors.append(f"Template print area changed: expected {expected_print_area!r}, got {str(ws.print_area or '')!r}")
+            expected_freeze = str(manifest["validation"].get("expected_freeze_panes") or "")
+            if str(ws.freeze_panes or "") != expected_freeze:
+                errors.append(f"Template freeze panes changed: expected {expected_freeze!r}, got {str(ws.freeze_panes or '')!r}")
+            expected_named_ranges = sorted(str(item) for item in manifest["validation"].get("required_named_ranges", []))
+            actual_named_ranges = sorted(str(name) for name in workbook.defined_names)
+            if actual_named_ranges != expected_named_ranges:
+                errors.append(f"Named ranges changed: expected {expected_named_ranges}, got {actual_named_ranges}")
+            expected_dv = int(manifest["validation"].get("required_data_validations", 0))
+            actual_dv = len(ws.data_validations.dataValidation)
+            if actual_dv != expected_dv:
+                errors.append(f"Data validations changed: expected {expected_dv}, got {actual_dv}")
+            expected_cf = int(manifest["validation"].get("required_conditional_formats", 0))
+            actual_cf = len(ws.conditional_formatting)
+            if actual_cf != expected_cf:
+                errors.append(f"Conditional formats changed: expected {expected_cf}, got {actual_cf}")
             report["checks"]["structure"] = {
                 "sheets": workbook.sheetnames,
                 "rows": ws.max_row,

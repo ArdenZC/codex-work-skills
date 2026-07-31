@@ -9,7 +9,7 @@ from jsonschema import Draft202012Validator
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = SKILL_DIR / "manifest.yaml"
+DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 
 

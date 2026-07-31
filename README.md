@@ -35,3 +35,12 @@
 ```
 
 规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过。
+
+模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
+
+```bash
+python scripts/validate_template.py --template <template> --manifest <manifest.yaml>
+python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
+```
+
+自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/v1.0.0/`，不应直接覆盖。

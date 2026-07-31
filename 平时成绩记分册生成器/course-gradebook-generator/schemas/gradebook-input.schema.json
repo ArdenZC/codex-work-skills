@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://codex.local/schemas/gradebook-input.schema.json",
   "title": "Normalized gradebook input",
+  "$comment": "The normalized student identifier key is id; source workbook labels are mapped through manifest.structure.source.headers.",
   "type": "object",
   "required": ["term", "course", "teacher", "class_name", "weights", "students"],
   "properties": {

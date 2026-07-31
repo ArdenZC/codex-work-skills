@@ -101,7 +101,7 @@ def set_manifest_field(table, manifest: dict[str, Any], name: str, value: Any, a
         raise ValueError(f"Field {name} is not a single table-cell field")
     target_table = table if int(spec["table"]) == 0 else table._parent.tables[int(spec["table"])]
     cell = actual_cells(target_table.rows[int(spec["row"])])[int(spec["cell"])]
-    writer = set_cell_multiline if spec.get("mode") == "replace_multiline" else set_cell_text
+    writer = set_cell_multiline if spec.get("mode") in {"replace_paragraphs", "replace_multiline"} else set_cell_text
     writer(cell, value, align)
 
 
@@ -191,10 +191,11 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     score = float(item.get("score", 89 + ((seq - 1) % 6) * 0.5))
 
     doc = Document(str(template))
-    for paragraph in doc.paragraphs:
-        if paragraph.text.strip():
-            set_paragraph_text(paragraph, f"{seq} 《{course}》教学单元设计：{task}", WD_ALIGN_PARAGRAPH.CENTER)
-            break
+    title_spec = field_spec(manifest, "title")
+    title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+    if title_index >= len(doc.paragraphs):
+        raise ValueError(f"Title paragraph coordinate is invalid: {title_index}")
+    set_paragraph_text(doc.paragraphs[title_index], f"{seq} 《{course}》教学单元设计：{task}", WD_ALIGN_PARAGRAPH.CENTER)
 
     table = doc.tables[0]
     set_manifest_field(table, manifest, "course_name", course)

@@ -136,9 +136,18 @@ def read_students(ws, manifest: dict | None = None) -> list[dict]:
     source = (manifest or {}).get("structure", {}).get("source", {})
     header_row = int(source.get("header_row", 4))
     data_start_row = int(source.get("data_start_row", 5))
+    header_names = {
+        "student_id": "学号",
+        "student_name": "姓名",
+        "regular": "平时成绩",
+        "theory": "理论成绩",
+        "skill": "技能成绩",
+        "total": "总成绩",
+        **source.get("headers", {}),
+    }
     starts = []
     for col in range(1, ws.max_column + 1):
-        if cell_text(ws.cell(header_row, col).value) == "学号" and cell_text(ws.cell(header_row, col + 1).value) == "姓名":
+        if cell_text(ws.cell(header_row, col).value) == header_names["student_id"] and cell_text(ws.cell(header_row, col + 1).value) == header_names["student_name"]:
             starts.append(col)
     if not starts:
         raise RuntimeError("Could not find 学号/姓名 headers in source workbook.")
@@ -155,17 +164,17 @@ def read_students(ws, manifest: dict | None = None) -> list[dict]:
             name = cell_text(ws.cell(row, start + 1).value)
             if not re.fullmatch(r"\d{8,}", student_id) or not name:
                 continue
-            for required in ("理论成绩", "平时成绩", "总成绩"):
+            for required in (header_names["theory"], header_names["regular"], header_names["total"]):
                 if required not in headers:
                     raise RuntimeError(f"Source block is missing {required}.")
             students.append(
                 {
                     "id": student_id,
                     "name": name,
-                    "skill": to_number(ws.cell(row, headers["技能成绩"]).value) if "技能成绩" in headers else 0.0,
-                    "theory": to_number(ws.cell(row, headers["理论成绩"]).value),
-                    "regular": to_number(ws.cell(row, headers["平时成绩"]).value),
-                    "total": to_number(ws.cell(row, headers["总成绩"]).value),
+                    "skill": to_number(ws.cell(row, headers[header_names["skill"]]).value) if header_names["skill"] in headers else 0.0,
+                    "theory": to_number(ws.cell(row, headers[header_names["theory"]]).value),
+                    "regular": to_number(ws.cell(row, headers[header_names["regular"]]).value),
+                    "total": to_number(ws.cell(row, headers[header_names["total"]]).value),
                 }
             )
     if not students:
@@ -238,6 +247,49 @@ def set_value(ws, row: int, col: int, value) -> None:
     writable_cell(ws, row, col).value = value
 
 
+def _shift_column_after_delete(column: int, start: int, count: int) -> int | None:
+    if column < start:
+        return column
+    if column >= start + count:
+        return column - count
+    return None
+
+
+def delete_columns_preserving_merges(ws, start_col: int, count: int) -> None:
+    """Delete optional columns while retaining every surviving merged range."""
+    original_ranges = [
+        (merged.min_row, merged.max_row, merged.min_col, merged.max_col)
+        for merged in list(ws.merged_cells.ranges)
+    ]
+    for merged in list(ws.merged_cells.ranges):
+        ws.unmerge_cells(str(merged))
+    ws.delete_cols(start_col, count)
+    for min_row, max_row, min_col, max_col in original_ranges:
+        shifted_min = _shift_column_after_delete(min_col, start_col, count)
+        shifted_max = _shift_column_after_delete(max_col, start_col, count)
+        if shifted_min is None:
+            shifted_min = start_col
+        if shifted_max is None:
+            shifted_max = start_col - 1
+        if min_col < start_col and max_col >= start_col + count:
+            shifted_min = min_col
+            shifted_max = max_col - count
+        elif min_col < start_col <= max_col:
+            shifted_min = min_col
+            shifted_max = start_col - 1
+        elif min_col >= start_col and max_col < start_col + count:
+            continue
+        if shifted_max < shifted_min:
+            continue
+        if shifted_min != shifted_max or min_row != max_row:
+            ws.merge_cells(
+                start_row=min_row,
+                start_column=shifted_min,
+                end_row=max_row,
+                end_column=shifted_max,
+            )
+
+
 def formula_number(value: float) -> str:
     return f"{value:.8f}".rstrip("0").rstrip(".") or "0"
 
@@ -281,10 +333,7 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
         has_skill = meta["skill_pct"] > 0.000001
         skill_start = column_number(columns["skill_score"])
         if not has_skill:
-            for merged_range in list(ws.merged_cells.ranges):
-                if merged_range.max_col >= skill_start:
-                    ws.unmerge_cells(str(merged_range))
-            ws.delete_cols(skill_start, 2)
+            delete_columns_preserving_merges(ws, skill_start, 2)
 
         data_start = int(structure["data_start_row"])
         template_last_row = int(structure["template_last_data_row"])

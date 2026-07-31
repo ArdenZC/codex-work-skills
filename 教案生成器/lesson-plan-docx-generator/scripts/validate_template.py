@@ -91,6 +91,11 @@ def _all_text(document) -> str:
 def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[str]) -> None:
     table_count = len(document.tables)
     for name, spec in manifest.get("fields", {}).items():
+        if spec.get("target") == "document_paragraph" or "paragraph" in spec:
+            paragraph_index = int(spec.get("paragraph", -1))
+            if paragraph_index < 0 or paragraph_index >= len(document.paragraphs):
+                errors.append(f"Field {name} points to missing document paragraph {paragraph_index}")
+            continue
         if spec.get("mode") == "row_cells":
             rows = spec.get("rows", [])
             cells = spec.get("cells", [])

@@ -28,9 +28,9 @@
           "tools": {"type": "string", "maxLength": 300},
           "score": {"type": "number", "minimum": 0, "maximum": 100}
         },
-        "additionalProperties": true
+          "additionalProperties": false
       }
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

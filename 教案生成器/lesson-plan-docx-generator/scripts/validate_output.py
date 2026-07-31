@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any
 
 from docx import Document
-from docx.oxml.ns import qn
 from docx.table import _Cell
 from lxml import etree
 
@@ -58,6 +57,11 @@ def protected_layout_signature(document) -> dict[str, Any]:
                 "bottom_margin": section.bottom_margin.twips,
                 "left_margin": section.left_margin.twips,
                 "right_margin": section.right_margin.twips,
+                "header_footer_refs": [
+                    _xml(child)
+                    for child in section._sectPr
+                    if child.tag.endswith("headerReference") or child.tag.endswith("footerReference")
+                ],
             }
             for section in document.sections
         ],
@@ -68,6 +72,47 @@ def _validate_text_length(name: str, value: str, spec: dict[str, Any], errors: l
     max_chars = spec.get("max_chars")
     if max_chars is not None and len(value) > int(max_chars):
         errors.append(f"{name} exceeds manifest max_chars={max_chars}: {len(value)}")
+
+
+def _field_targets(document, table, spec: dict[str, Any]):
+    if spec.get("target") == "document_paragraph" or "paragraph" in spec:
+        index = int(spec.get("paragraph", -1))
+        if 0 <= index < len(document.paragraphs):
+            return [(document.paragraphs[index].text, 1)]
+        return []
+    if spec.get("mode") == "row_cells":
+        values = []
+        for row_index in spec.get("rows", []):
+            if row_index >= len(table.rows):
+                continue
+            cells = actual_cells(table.rows[int(row_index)])
+            for cell_index in spec.get("cells", []):
+                if cell_index < len(cells):
+                    values.append((cells[int(cell_index)].text, len(cells[int(cell_index)].paragraphs)))
+        return values
+    if "table" in spec and "row" in spec and "cell" in spec:
+        table_index = int(spec["table"])
+        if table_index == 0 and int(spec["row"]) < len(table.rows):
+            cells = actual_cells(table.rows[int(spec["row"])])
+            cell_index = int(spec["cell"])
+            if cell_index < len(cells):
+                cell = cells[cell_index]
+                return [(cell.text, len(cell.paragraphs))]
+    return []
+
+
+def _document_text(document, table) -> str:
+    values = [paragraph.text for paragraph in document.paragraphs]
+    for row in table.rows:
+        for cell in actual_cells(row):
+            values.append(cell.text)
+            for nested in cell.tables:
+                for nested_row in nested.rows:
+                    values.extend(nested_cell.text for nested_cell in nested_row.cells)
+    for section in document.sections:
+        values.extend(paragraph.text for paragraph in section.header.paragraphs)
+        values.extend(paragraph.text for paragraph in section.footer.paragraphs)
+    return "\n".join(values)
 
 
 def validate_output_dir(
@@ -94,6 +139,7 @@ def validate_output_dir(
         "errors": errors,
         "warnings": warnings,
         "checks": checks,
+        "files_checked": 0,
     }
 
     if not files:
@@ -107,6 +153,11 @@ def validate_output_dir(
     lesson_checks = []
     for index, (path, item) in enumerate(zip(files, lessons), start=1):
         item_errors: list[str] = []
+        if not path.is_file() or path.stat().st_size == 0:
+            item_errors.append("file is missing or empty")
+            errors.extend(f"{path.name}: {message}" for message in item_errors)
+            lesson_checks.append({"file": path.name, "errors": item_errors})
+            continue
         try:
             document = Document(str(path))
         except Exception as exc:  # pragma: no cover - library-specific parse errors
@@ -153,9 +204,21 @@ def validate_output_dir(
         if not field_values["unit"].startswith("项目"):
             item_errors.append(f"unit is not projectized: {field_values['unit']}")
 
-        for name, value in field_values.items():
-            if name in manifest.get("fields", {}):
-                _validate_text_length(name, value, field_spec(manifest, name), item_errors)
+        title_spec = field_spec(manifest, "title")
+        title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+        expected_title = f"{index} 《{course_expected}》教学单元设计：{item['task']}"
+        actual_title = document.paragraphs[title_index].text if 0 <= title_index < len(document.paragraphs) else ""
+        if actual_title != expected_title:
+            item_errors.append(f"title mismatch: expected {expected_title!r}, got {actual_title!r}")
+
+        for name, spec in manifest.get("fields", {}).items():
+            if name in {"evaluation"}:
+                continue
+            for value, paragraph_count in _field_targets(document, table, spec):
+                _validate_text_length(name, value, spec, item_errors)
+                max_paragraphs = spec.get("max_paragraphs")
+                if max_paragraphs is not None and paragraph_count > int(max_paragraphs):
+                    item_errors.append(f"{name} exceeds manifest max_paragraphs={max_paragraphs}: {paragraph_count}")
 
         nested_spec = manifest["structure"]["evaluation_table"]
         try:
@@ -171,8 +234,12 @@ def validate_output_dir(
         except (IndexError, ValueError) as exc:
             item_errors.append(f"evaluation table validation failed: {exc}")
 
-        table_text = [cell.text for row in table.rows for cell in actual_cells(row)]
-        all_text = "\n".join([p.text for p in document.paragraphs] + table_text)
+        all_text = _document_text(document, table)
+        for forbidden in manifest.get("validation", {}).get("forbidden_template_text", []):
+            if forbidden in {course_expected, str(item["unit"]), str(item["task"])}:
+                continue
+            if forbidden in all_text:
+                item_errors.append(f"forbidden template text remains: {forbidden}")
         if course_expected != "Linux操作系统应用" and "Linux操作系统应用" in all_text:
             item_errors.append("template course-name placeholder Linux操作系统应用 remains")
         if item_errors:
@@ -189,6 +256,7 @@ def validate_output_dir(
     checks["file_count"] = {"expected": len(lessons), "actual": len(files)}
     checks["total_hours"] = {"expected": expected_total, "actual": total_hours}
     checks["lessons"] = lesson_checks
+    report["files_checked"] = len(files)
     if not warnings:
         warnings = report["warnings"]
     if not errors:

@@ -21,7 +21,8 @@ If the user has not provided a source workbook, remind them that this skill need
 
 - Canonical template: `assets/templates/course-gradebook/v1.0.0/template.xls`
 - Compatibility template entry: `assets/平时成绩记分册模板.xls`
-- Manifest and input schema: `manifest.yaml`, `schemas/gradebook-input.schema.json`
+- Manifest and changelog: `assets/templates/course-gradebook/v1.0.0/manifest.yaml`, `assets/templates/course-gradebook/v1.0.0/CHANGELOG.md`
+- Input schema: `schemas/gradebook-input.schema.json`
 - Windows generator: `scripts/generate_gradebook.ps1`
 - Cross-platform generator: `scripts/generate_gradebook.py`
 

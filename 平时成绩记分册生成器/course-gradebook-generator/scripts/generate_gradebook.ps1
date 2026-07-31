@@ -27,7 +27,7 @@
 $ErrorActionPreference = 'Stop'
 
 if (-not $ManifestPath) {
-  $ManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'manifest.yaml'
+  $ManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\templates\course-gradebook\v1.0.0\manifest.yaml'
 }
 if (-not $SchemaPath) {
   $SchemaPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'schemas\gradebook-input.schema.json'
@@ -129,14 +129,21 @@ function HeaderMap($sheet, [int]$startCol, [int]$endCol, [int]$headerRow) {
 function Read-Students($sheet) {
   $headerRow = [int]$ManifestData.structure.source.header_row
   $dataStartRow = [int]$ManifestData.structure.source.data_start_row
+  $sourceHeaders = $ManifestData.structure.source.headers
+  $studentIdHeader = [string]$sourceHeaders.student_id
+  $studentNameHeader = [string]$sourceHeaders.student_name
+  $regularHeader = [string]$sourceHeaders.regular
+  $theoryHeader = [string]$sourceHeaders.theory
+  $skillHeader = [string]$sourceHeaders.skill
+  $totalHeader = [string]$sourceHeaders.total
   $used = $sheet.UsedRange
   $rows = $used.Row + $used.Rows.Count - 1
   $firstCol = $used.Column
   $cols = $used.Column + $used.Columns.Count - 1
   $starts = @()
   for ($c = $firstCol; $c -le $cols; $c++) {
-    if ((([string]$sheet.Cells.Item($headerRow, $c).Text).Trim() -eq '学号') -and
-        (([string]$sheet.Cells.Item($headerRow, $c + 1).Text).Trim() -eq '姓名')) {
+    if ((([string]$sheet.Cells.Item($headerRow, $c).Text).Trim() -eq $studentIdHeader) -and
+        (([string]$sheet.Cells.Item($headerRow, $c + 1).Text).Trim() -eq $studentNameHeader)) {
       $starts += $c
     }
   }
@@ -159,16 +166,16 @@ function Read-Students($sheet) {
       $id = ([string]$sheet.Cells.Item($r, $start).Text).Trim()
       $name = ([string]$sheet.Cells.Item($r, $start + 1).Text).Trim()
       if ($id -notmatch '^\d{8,}$' -or -not $name) { continue }
-      if (-not $map.ContainsKey('理论成绩') -or -not $map.ContainsKey('平时成绩') -or -not $map.ContainsKey('总成绩')) {
+      if (-not $map.ContainsKey($theoryHeader) -or -not $map.ContainsKey($regularHeader) -or -not $map.ContainsKey($totalHeader)) {
         throw "Source block is missing 理论成绩/平时成绩/总成绩 headers."
       }
       $students.Add([pscustomobject]@{
         Id = $id
         Name = $name
-        Skill = if ($map.ContainsKey('技能成绩')) { To-Number $sheet.Cells.Item($r, $map['技能成绩']).Value2 } else { 0.0 }
-        Theory = To-Number $sheet.Cells.Item($r, $map['理论成绩']).Value2
-        Regular = To-Number $sheet.Cells.Item($r, $map['平时成绩']).Value2
-        Total = To-Number $sheet.Cells.Item($r, $map['总成绩']).Value2
+        Skill = if ($map.ContainsKey($skillHeader)) { To-Number $sheet.Cells.Item($r, $map[$skillHeader]).Value2 } else { 0.0 }
+        Theory = To-Number $sheet.Cells.Item($r, $map[$theoryHeader]).Value2
+        Regular = To-Number $sheet.Cells.Item($r, $map[$regularHeader]).Value2
+        Total = To-Number $sheet.Cells.Item($r, $map[$totalHeader]).Value2
       })
     }
   }

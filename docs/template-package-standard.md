@@ -12,12 +12,12 @@ assets/
   templates/<template-id>/v1.0.0/
     template.<docx|xls>                 # 规范模板，唯一 canonical source
     manifest.yaml                        # 模板结构、字段和保护规则
+    CHANGELOG.md
 schemas/
   <input>.schema.json                   # 标准化输入数据契约
 scripts/
   validate_template.py                  # 模板结构与指纹校验
   validate_output.py                    # 生成物校验并输出 QA 报告
-CHANGELOG.md
 requirements.txt
 ```
 
@@ -34,13 +34,14 @@ requirements.txt
 - `allowed_changes` 与 `protected`，说明生成器可以改什么、不能改什么；
 - `validation`，包括固定标签、行列数、公式、格式和输出检查项；
 - canonical template 的 `fingerprint.sha256`。
+- `validation` 中的禁止残留文字、长度/段落限制和是否要求渲染检查。
 
 版本使用 `MAJOR.MINOR.PATCH`。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
 
 ## 标准工作流
 
 ```text
-输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
+输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → 渲染预览（按 manifest） → QA 报告
 ```
 
 校验失败必须返回非零退出码，并在标准错误输出清晰原因。非阻断提醒放入 `warnings`，不能把警告伪装成成功校验。正常生成默认启用模板校验和输出校验；只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才能跳过。
@@ -59,3 +60,12 @@ requirements.txt
 - DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式。
 - `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。
 - 仓库内脚本不得依赖个人电脑上的临时工具目录或其他外部绝对路径。
+- 当前模板版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。
+- 默认校验命令：
+
+  ```bash
+  python scripts/validate_template.py --template <template> --manifest <manifest.yaml>
+  python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
+  ```
+
+- 自定义模板应同时提供匹配的 manifest；不建议直接修改内置 canonical 模板。
