@@ -67,12 +67,97 @@ def convert_to_xlsx(source: Path, out_dir: Path, soffice: str) -> Path:
     raise RuntimeError(f"LibreOffice did not create an XLSX file for {source}")
 
 
+def _cell_format_signature(cell) -> dict[str, Any]:
+    def color_signature(color) -> tuple[Any, ...]:
+        if color is None:
+            return ()
+        return (
+            color.type,
+            color.rgb,
+            color.indexed,
+            color.auto,
+            color.theme,
+            color.tint,
+        )
+
+    def side_signature(side) -> tuple[Any, ...]:
+        if side is None:
+            return ()
+        return side.style, color_signature(side.color)
+
+    font = cell.font
+    fill = cell.fill
+    border = cell.border
+    alignment = cell.alignment
+    protection = cell.protection
+    return {
+        "number_format": cell.number_format,
+        "font": (
+            font.name,
+            font.sz,
+            bool(font.b),
+            bool(font.i),
+            font.u,
+            bool(font.strike),
+            font.charset,
+            font.family,
+            font.scheme,
+            color_signature(font.color),
+        ),
+        "fill": (
+            fill.patternType,
+            color_signature(fill.fgColor),
+            color_signature(fill.bgColor),
+        ),
+        "border": (
+            border.outline,
+            border.diagonalUp,
+            border.diagonalDown,
+            side_signature(border.left),
+            side_signature(border.right),
+            side_signature(border.top),
+            side_signature(border.bottom),
+            side_signature(border.diagonal),
+            side_signature(border.start),
+            side_signature(border.end),
+        ),
+        "alignment": (
+            alignment.horizontal,
+            alignment.vertical,
+            alignment.textRotation,
+            bool(alignment.wrapText),
+            bool(alignment.shrinkToFit),
+            alignment.indent or 0,
+            alignment.relativeIndent or 0,
+            alignment.justifyLastLine,
+            alignment.readingOrder or 0,
+        ),
+        "protection": (bool(protection.locked), bool(protection.hidden)),
+    }
+
+
+def _dimension_signature(value: Any) -> float | None:
+    if value is None:
+        return None
+    # LibreOffice can shift XLS column widths by hundredths during a round trip.
+    return round(float(value), 1)
+
+
 def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
     structure = manifest["structure"]
     sheet_name = structure["worksheet"]
     ws = workbook[sheet_name]
     label_cells = structure.get("header_label_cells", {})
-    fixed_cells = [structure.get("title_cell"), *structure.get("metadata", {}).values(), *label_cells.values()]
+    writable_cells = {
+        str(cell)
+        for cell in [
+            *structure.get("metadata", {}).values(),
+            *structure.get("headers", {}).values(),
+        ]
+        if cell
+    }
+    fixed_cells = [structure.get("title_cell"), *label_cells.values()]
+    fixed_cells = [cell for cell in fixed_cells if cell and str(cell) not in writable_cells]
     header_row = int(structure.get("header_row", 4))
     fixed_columns = {str(column).upper() for column in structure.get("columns", {}).values() if column}
     for field_name in ("formula_columns_with_skill", "formula_columns_without_skill"):
@@ -96,6 +181,9 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
         "dimension": [ws.max_row, ws.max_column],
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},
+        "writable_cell_formats": {
+            cell: _cell_format_signature(ws[cell]) for cell in sorted(writable_cells)
+        },
         "number_formats": {f"{column}{style_row}": ws[f"{column}{style_row}"].number_format for column in format_columns},
         "orientation": ws.page_setup.orientation,
         "print_area": str(ws.print_area or ""),
@@ -103,8 +191,12 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
         "named_ranges": sorted(str(name) for name in workbook.defined_names),
         "data_validations": len(ws.data_validations.dataValidation),
         "conditional_formats": len(ws.conditional_formatting),
-        "column_widths": {key: value.width for key, value in ws.column_dimensions.items()},
-        "row_heights": {str(key): value.height for key, value in ws.row_dimensions.items() if value.height is not None},
+        "column_widths": {key: _dimension_signature(value.width) for key, value in ws.column_dimensions.items()},
+        "row_heights": {
+            str(key): _dimension_signature(value.height)
+            for key, value in ws.row_dimensions.items()
+            if value.height is not None
+        },
     }
 
 
@@ -192,7 +284,10 @@ def validate_template(
             label_cells = structure.get("header_label_cells", {"serial": "A3", "student_id": "B3", "student_name": "C3", "regular": "D3", "theory": "M3", "total": "Q3"})
             header_values = [ws[label_cells[key]].value for key in ("serial", "student_id", "student_name", "regular", "theory", "total")]
             for expected, actual in zip(required_headers, header_values):
-                if str(expected) not in str(actual):
+                expected_text = str(expected)
+                if not is_canonical and "(" in expected_text and expected_text.endswith(")"):
+                    expected_text = expected_text.split("(", 1)[0]
+                if expected_text not in str(actual):
                     errors.append(f"Missing required header fragment {expected!r}; got {actual!r}")
             formula_columns = manifest["fields"].get("formula_columns_with_skill", {}).get("columns", ["L", "N", "P", "Q"])
             formula_row = int(structure["style_source_row"])

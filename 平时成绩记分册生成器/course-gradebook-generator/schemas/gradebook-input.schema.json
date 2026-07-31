@@ -29,7 +29,7 @@
         "properties": {
           "id": {"type": "string", "pattern": "^\\d{8,}$"},
           "name": {"type": "string", "minLength": 1, "maxLength": 32},
-          "regular": {"type": "number", "minimum": 0, "maximum": 100},
+          "regular": {"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.5},
           "theory": {"type": "number", "minimum": 0, "maximum": 100},
           "skill": {"type": "number", "minimum": 0, "maximum": 100},
           "total": {"type": "number", "minimum": 0, "maximum": 100}

@@ -14,6 +14,8 @@ from jsonschema import Draft202012Validator
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "manifest.yaml"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "gradebook-input.schema.json"
+REGULAR_SCORE_INCREMENT = Decimal("0.5")
+FLOAT_NOISE_TOLERANCE = Decimal("1e-9")
 
 
 def _decimal(value: Any, label: str) -> Decimal:
@@ -41,14 +43,15 @@ def calculate_expected_total(student: dict[str, Any], weights: dict[str, Any]) -
 
 
 def source_total_matches(source_total: Any, expected_total: int) -> bool:
-    return excel_round(source_total) == int(expected_total)
+    actual = _decimal(source_total, "Source total")
+    return abs(actual - Decimal(int(expected_total))) <= FLOAT_NOISE_TOLERANCE
 
 
 def validate_source_totals(students: list[dict[str, Any]], weights: dict[str, Any]) -> None:
     for index, student in enumerate(students, start=1):
         expected = calculate_expected_total(student, weights)
         if not source_total_matches(student["total"], expected):
-            actual = excel_round(student["total"])
+            actual = _decimal(student["total"], "Source total")
             raise ValueError(
                 f"Source total mismatch at record {index}: expected {expected} after Excel ROUND(...,0), "
                 f"received {actual}. The source total may include a manual adjustment or be inconsistent "
@@ -84,6 +87,17 @@ def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
 
 
 def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEMA) -> None:
+    for index, student in enumerate(data.get("students", [])):
+        if not isinstance(student, dict) or "regular" not in student:
+            continue
+        try:
+            regular = Decimal(str(student["regular"]))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if not regular.is_finite() or regular % REGULAR_SCORE_INCREMENT != 0:
+            raise ValueError(
+                f"students[{index}].regular must use 0.5-point increments; received {student['regular']}."
+            )
     schema = load_schema(schema_path)
     errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda error: list(error.path))
     if errors:

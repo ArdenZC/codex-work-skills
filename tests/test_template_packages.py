@@ -317,6 +317,7 @@ class GradebookTotalRuleTests(unittest.TestCase):
         no_skill_expected = calculate_expected_total(no_skill, no_skill_weights)
         self.assertEqual(no_skill_expected, 87)
         self.assertTrue(source_total_matches(87.0000000001, no_skill_expected))
+        self.assertFalse(source_total_matches(87.4, no_skill_expected))
         validate_source_totals([no_skill], no_skill_weights)
 
         skill_weights = {"regular": 0.5, "theory": 0.3, "skill": 0.2}
@@ -331,6 +332,8 @@ class GradebookTotalRuleTests(unittest.TestCase):
             validate_source_totals([{**no_skill, "total": 88}], no_skill_weights)
         with self.assertRaisesRegex(ValueError, "Source total mismatch"):
             validate_source_totals([{**no_skill, "total": 86}], no_skill_weights)
+        with self.assertRaisesRegex(ValueError, "Source total mismatch"):
+            validate_source_totals([{**no_skill, "total": 87.4}], no_skill_weights)
 
 
 class GradebookPowerShellContractTests(unittest.TestCase):
@@ -338,7 +341,10 @@ class GradebookPowerShellContractTests(unittest.TestCase):
         script = (GRADE / "scripts" / "generate_gradebook.ps1").read_text(encoding="utf-8-sig")
         self.assertIn("function Excel-Round", script)
         self.assertIn("[System.MidpointRounding]::AwayFromZero", script)
+        self.assertIn("function Source-Total-Matches", script)
+        self.assertIn("function Assert-HalfPointRegularScores", script)
         self.assertIn("function Assert-SourceTotals", script)
+        self.assertIn("Assert-HalfPointRegularScores $students", script)
         self.assertIn("Assert-SourceTotals $students $meta", script)
         self.assertIn("'--output-file'", script)
         self.assertNotIn("abs_tol=1.0", script)
@@ -353,6 +359,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
         count: int = 2,
         leading_zero: bool = False,
         total_delta: float = 0.0,
+        regular_override: float | None = None,
     ) -> Path:
         xlsx = folder / "课程成绩单.xlsx"
         workbook = Workbook()
@@ -368,7 +375,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             sheet.cell(4, col).value = value
         rows = []
         for index in range(count):
-            regular = [86.5, 91.0, 100.0, 0.0][index % 4]
+            regular = regular_override if regular_override is not None and index == 0 else [86.5, 91.0, 100.0, 0.0][index % 4]
             theory = [88.0, 90.0, 100.0, 0.0][index % 4]
             skill_score = [92.0, 90.0, 100.0, 0.0][index % 4]
             total = math.floor(regular * regular_pct + theory * theory_pct + skill_score * skill_pct + 0.5)
@@ -509,6 +516,80 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Source total mismatch", result.stderr)
             self.assertFalse(output.exists())
+
+    def test_rejects_fractional_source_total_before_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-total-fraction-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, total_delta=0.4)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Source total mismatch", result.stderr)
+            self.assertIn("received 87.4", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_rejects_fractional_regular_score_before_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-regular-fraction-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, regular_override=89.2)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("students[0].regular must use 0.5-point increments; received 89.2.", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_custom_template_allows_writable_values_but_preserves_formatting(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-values-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            xlsx = xlsx_dir / "template.xlsx"
+            workbook = load_workbook(xlsx)
+            sheet = workbook["平时成绩"]
+            for cell, value in {
+                "C2": "自定义学期",
+                "G2": "自定义课程",
+                "L2": "自定义教师",
+                "O2": "自定义班级",
+                "D3": "平时成绩(99%)",
+                "M3": "理论成绩(1%)",
+                "O3": "技能成绩（0%）",
+            }.items():
+                sheet[cell] = value
+            workbook.save(xlsx)
+            custom_dir = folder / "custom"
+            custom_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(custom_dir), str(xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            custom = custom_dir / "template.xls"
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:

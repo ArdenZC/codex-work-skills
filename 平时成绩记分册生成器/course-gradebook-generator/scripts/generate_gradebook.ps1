@@ -193,6 +193,19 @@ function Excel-Round([decimal]$value) {
   return [int][decimal]::Round($value, 0, [System.MidpointRounding]::AwayFromZero)
 }
 
+function Source-Total-Matches([decimal]$sourceTotal, [int]$expectedTotal) {
+  return [Math]::Abs($sourceTotal - [decimal]$expectedTotal) -le [decimal]0.000000001
+}
+
+function Assert-HalfPointRegularScores($students) {
+  for ($i = 0; $i -lt $students.Count; $i++) {
+    [decimal]$regular = $students[$i].Regular
+    if (($regular % [decimal]0.5) -ne 0) {
+      throw "students[$i].regular must use 0.5-point increments; received $regular."
+    }
+  }
+}
+
 function Expected-Total($student, $meta) {
   [decimal]$weighted = ([decimal]$student.Regular * [decimal]$meta.RegularPct) +
     ([decimal]$student.Theory * [decimal]$meta.TheoryPct) +
@@ -203,8 +216,8 @@ function Expected-Total($student, $meta) {
 function Assert-SourceTotals($students, $meta) {
   for ($i = 0; $i -lt $students.Count; $i++) {
     $expected = Expected-Total $students[$i] $meta
-    $actual = Excel-Round ([decimal]$students[$i].Total)
-    if ($actual -ne $expected) {
+    [decimal]$actual = $students[$i].Total
+    if (-not (Source-Total-Matches $actual $expected)) {
       throw "Source total mismatch at record $($i + 1): expected $expected after Excel ROUND(...,0), received $actual. The source total may include a manual adjustment or be inconsistent with the configured formula."
     }
   }
@@ -284,6 +297,7 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $srcSheet = $srcWb.Worksheets.Item(1)
     $meta = Read-Meta $srcSheet
     $students = @(Read-Students $srcSheet)
+    Assert-HalfPointRegularScores $students
     Assert-SourceTotals $students $meta
   } finally {
     $srcWb.Close($false)
