@@ -72,9 +72,15 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
     sheet_name = structure["worksheet"]
     ws = workbook[sheet_name]
     label_cells = structure.get("header_label_cells", {})
-    fixed_cells = ["A1", *structure.get("metadata", {}).values(), *label_cells.values()]
+    fixed_cells = [structure.get("title_cell"), *structure.get("metadata", {}).values(), *label_cells.values()]
     header_row = int(structure.get("header_row", 4))
-    fixed_cells.extend(f"{column}{header_row}" for column in ("A", "B", "C", "D", "L", "M", "N", "O", "P", "Q"))
+    fixed_columns = {str(column).upper() for column in structure.get("columns", {}).values() if column}
+    for field_name in ("formula_columns_with_skill", "formula_columns_without_skill"):
+        fixed_columns.update(
+            str(column).upper()
+            for column in manifest.get("fields", {}).get(field_name, {}).get("columns", [])
+        )
+    fixed_cells.extend(f"{column}{header_row}" for column in sorted(fixed_columns))
     fixed_cells = list(dict.fromkeys(str(cell) for cell in fixed_cells))
     style_row = int(structure["style_source_row"])
     format_columns = [
@@ -135,7 +141,9 @@ def validate_template(
     if is_canonical and actual_hash != expected_hash:
         errors.append(f"Canonical template SHA-256 mismatch: expected {expected_hash}, got {actual_hash}")
     elif not is_canonical and actual_hash != expected_hash:
-        warnings.append("Custom template fingerprint differs from the v1.0.0 canonical template.")
+        warnings.append(
+            f"Custom template fingerprint differs from the {manifest.get('template', {}).get('version')} canonical template."
+        )
 
     if compatibility_template is None:
         entries = manifest.get("template", {}).get("compatibility_entries", [])
@@ -248,9 +256,9 @@ def main() -> int:
     parser.add_argument("--compatibility-template", default="")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
-    manifest = load_manifest(args.manifest)
-    template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
     try:
+        manifest = load_manifest(args.manifest)
+        template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
         report = validate_template(template, args.manifest, args.compatibility_template or None)
     except TemplateValidationError as exc:
         report = exc.report
@@ -261,6 +269,20 @@ def main() -> int:
                 print(f"ERROR: {error}", file=sys.stderr)
             for warning in report.get("warnings", []):
                 print(f"WARNING: {warning}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        report = {
+            "template": str(Path(args.template).expanduser().resolve()) if args.template else "",
+            "manifest": str(Path(args.manifest).expanduser().resolve()),
+            "template_version": None,
+            "errors": [str(exc)],
+            "warnings": [],
+            "checks": {},
+        }
+        if args.as_json:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     if args.as_json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

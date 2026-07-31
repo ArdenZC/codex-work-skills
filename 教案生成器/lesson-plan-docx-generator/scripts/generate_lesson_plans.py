@@ -16,7 +16,7 @@ from docx.shared import Pt
 from docx.table import _Cell
 
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_spec, load_manifest, manifest_template_path, validate_input
-from validate_output import validate_output_dir
+from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
 
@@ -244,8 +244,30 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     return out
 
 
-def validate_outputs(out_dir: Path, meta: dict[str, Any], manifest: dict[str, Any], schema_path: Path, qa_report: Path | None = None) -> dict[str, Any]:
-    return validate_output_dir(out_dir, meta, manifest, qa_report, schema_path)
+def validate_outputs(
+    out_dir: Path,
+    meta: dict[str, Any],
+    manifest: dict[str, Any],
+    schema_path: Path,
+    qa_report: Path | None = None,
+    *,
+    template: Path,
+    custom_template: bool,
+    template_validation: bool,
+    template_warnings: list[str],
+) -> dict[str, Any]:
+    return validate_output_dir(
+        out_dir,
+        meta,
+        manifest,
+        qa_report,
+        schema_path,
+        template_path=template,
+        custom_template=custom_template,
+        engine="python-docx",
+        template_validation=template_validation,
+        extra_warnings=template_warnings,
+    )
 
 
 def main() -> None:
@@ -272,9 +294,11 @@ def main() -> None:
     validate_input(meta, args.schema)
     lessons = meta["lessons"]
 
+    template_warnings: list[str] = []
     if not args.skip_template_validation:
         template_report = validate_template(template, args.manifest)
-        for warning in template_report.get("warnings", []):
+        template_warnings = template_report.get("warnings", [])
+        for warning in template_warnings:
             print(f"WARNING: {warning}")
 
     if out_dir.exists() and any(out_dir.iterdir()):
@@ -289,10 +313,33 @@ def main() -> None:
     for seq, item in enumerate(lessons, 1):
         print(build_lesson(template, out_dir, meta, item, seq, manifest))
     if not args.skip_output_validation:
-        report = validate_outputs(out_dir, meta, manifest, Path(args.schema), Path(args.qa_report) if args.qa_report else None)
-        print(f"validated files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
+        report = validate_outputs(
+            out_dir,
+            meta,
+            manifest,
+            Path(args.schema),
+            Path(args.qa_report) if args.qa_report else None,
+            template=template,
+            custom_template=bool(args.template),
+            template_validation=not args.skip_template_validation,
+            template_warnings=template_warnings,
+        )
+        action = "skipped validation" if report["status"] == "skipped" else "validated"
+        print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
     else:
-        print("WARNING: output validation skipped; no QA report was written")
+        report = write_skipped_report(
+            out_dir,
+            meta,
+            manifest,
+            Path(args.qa_report) if args.qa_report else None,
+            args.schema,
+            template_path=template,
+            custom_template=bool(args.template),
+            engine="python-docx",
+            template_validation=not args.skip_template_validation,
+            warnings=template_warnings,
+        )
+        print(f"WARNING: output validation skipped; qa={report['qa_report']}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +55,8 @@ def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEM
 def ensure_supported_major(manifest: dict[str, Any]) -> None:
     version = str(manifest.get("template", {}).get("version", ""))
     supported = manifest.get("generator", {}).get("supported_major")
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise ValueError("Manifest must declare a semantic template version and generator.supported_major")
     try:
         major = int(version.split(".", 1)[0])
         supported_major = int(supported)

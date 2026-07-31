@@ -7,7 +7,7 @@
 | 技能名称 | 简介 | 安装目录 |
 | --- | --- | --- |
 | 教案生成器 | 按内置 Word 教案模板生成项目化中文教案 DOCX；可读取能力图谱、章节任务拆解或旧教案，并能在资料不足时按课程特点推断项目和任务。 | `教案生成器/lesson-plan-docx-generator` |
-| 平时成绩记分册生成器 | 根据 `课程成绩单.xls` 自动生成平时成绩记分册，内置模板，自动生成 8 次平时成绩，并按成绩比例删除或保留技能成绩列；支持 Windows Excel COM 和 macOS/Linux LibreOffice 路径。 | `平时成绩记分册生成器/course-gradebook-generator` |
+| 平时成绩记分册生成器 | 根据 `课程成绩单.xls` 自动生成平时成绩记分册，内置模板，按 manifest 定义生成平时成绩项目，并按成绩比例删除或保留技能成绩列；支持 Windows Excel COM 和 macOS/Linux LibreOffice 路径。 | `平时成绩记分册生成器/course-gradebook-generator` |
 
 ## 使用约定
 
@@ -34,7 +34,7 @@
 输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过。
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
 
 模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
 

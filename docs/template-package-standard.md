@@ -28,6 +28,7 @@ requirements.txt
 `manifest.yaml` 是模板坐标的唯一事实来源，至少声明：
 
 - `template.id`、`template.name`、`template.version`、`template.format`、`template.file`；
+- `generator.version`，记录当前生成器版本；
 - `generator.supported_major`，用于拒绝不兼容的模板大版本；
 - `structure`，包括工作表/主表、数据区、嵌套表、字段坐标、公式列和技能列开关；
 - `fields`，包括字段名称、位置、写入模式、允许的长度或数值范围；
@@ -52,13 +53,13 @@ requirements.txt
 
 ## QA 报告
 
-每次成功生成都应在输出目录生成 `qa-report.json`，包含模板版本、指纹、生成时间、检查项、错误和警告。报告不替代进程退出码：有阻断错误时进程必须返回非零。
+每次生成都应在输出目录生成 QA 报告，至少包含 `template_id`、`template_version`、`generator_version`、`status`、`checks`、`errors` 和 `warnings`，并记录实际 `template_path`、`custom_template`、`engine`、`validation_skipped`。完整校验通过时 `status` 为 `passed`；显式跳过任一校验时为 `skipped`，不能用警告伪装成完整通过。报告只记录校验元数据、行号、数量和错误类别，不写入学生姓名、学号或其他原始输入内容。报告不替代进程退出码：有阻断错误时进程必须返回非零。
 
 ## 兼容性
 
 - 原有 CLI 参数继续保留；新参数只做可选扩展。
 - DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式。
-- `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。
+- `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。Windows COM 负责生成时保留 Excel 原生格式，但默认结构化 QA 仍调用 Python/LibreOffice 转换器；没有 LibreOffice 时只能显式跳过相应校验，报告会标记为 `skipped`。
 - 仓库内脚本不得依赖个人电脑上的临时工具目录或其他外部绝对路径。
 - 当前模板版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。
 - 默认校验命令：

@@ -12,7 +12,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, column_number, load_manifest, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, column_number, load_manifest, manifest_template_path, validate_input
 from validate_template import convert_to_xlsx, find_soffice
 
 
@@ -146,31 +146,130 @@ def _scan_formula_errors(formula_workbook, value_workbook) -> list[str]:
     return errors
 
 
+def _base_qa_report(
+    out_dir: Path,
+    manifest: dict[str, Any],
+    qa_report_path: Path | str | None,
+    template_path: Path | str | None,
+    custom_template: bool | None,
+    engine: str | None,
+    template_validation: bool,
+    output_validation: bool,
+    extra_warnings: list[str] | None,
+) -> dict[str, Any]:
+    canonical_template = manifest_template_path(manifest)
+    selected_template = (
+        Path(template_path).expanduser().resolve() if template_path else canonical_template
+    )
+    is_custom_template = (
+        bool(custom_template) if custom_template is not None else selected_template != canonical_template
+    )
+    skipped = []
+    if not template_validation:
+        skipped.append("template")
+    if not output_validation:
+        skipped.append("output")
+    warnings = list(extra_warnings or [])
+    if is_custom_template:
+        warnings.append("Custom template selected; output was validated against the supplied manifest.")
+    if not template_validation:
+        warnings.append("Template validation skipped by explicit flag.")
+    if not output_validation:
+        warnings.append("Output validation skipped by explicit flag.")
+    warnings = list(dict.fromkeys(warnings))
+    validation = {"template": template_validation, "output": output_validation, "skipped": skipped}
+    report_path = Path(qa_report_path).expanduser().resolve() if qa_report_path else out_dir / "qa-report.json"
+    return {
+        "status": "failed",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "template_id": manifest.get("template", {}).get("id"),
+        "template_version": manifest.get("template", {}).get("version"),
+        "generator_version": manifest.get("generator", {}).get("version"),
+        "template_sha256": manifest.get("fingerprint", {}).get("sha256") or manifest.get("fingerprint", {}).get("value"),
+        "template_path": str(selected_template),
+        "custom_template": is_custom_template,
+        "engine": engine or "unknown",
+        "validation": validation,
+        "validation_skipped": skipped,
+        "output_dir": str(out_dir),
+        "errors": [],
+        "warnings": warnings,
+        "checks": {"validation": validation},
+        "files_checked": 0,
+        "qa_report": str(report_path),
+    }
+
+
+def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
+    report_path = Path(report["qa_report"])
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return report
+
+
+def write_skipped_report(
+    output_dir: Path | str,
+    data: dict[str, Any],
+    manifest: dict[str, Any] | None = None,
+    qa_report_path: Path | str | None = None,
+    schema_path: Path | str = DEFAULT_SCHEMA,
+    *,
+    template_path: Path | str | None = None,
+    custom_template: bool | None = None,
+    engine: str | None = None,
+    template_validation: bool = True,
+    warnings: list[str] | None = None,
+) -> dict[str, Any]:
+    out_dir = Path(output_dir).expanduser().resolve()
+    manifest = manifest or load_manifest()
+    validate_input(data, schema_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    report = _base_qa_report(
+        out_dir,
+        manifest,
+        qa_report_path,
+        template_path,
+        custom_template,
+        engine,
+        template_validation,
+        False,
+        warnings,
+    )
+    report["status"] = "skipped"
+    report["checks"]["file_count"] = {"expected": 1, "actual": len(list(out_dir.glob("*.xls")))}
+    return _write_qa_report(report)
+
+
 def validate_output_dir(
     output_dir: Path | str,
     data: dict[str, Any],
     manifest: dict[str, Any] | None = None,
     qa_report_path: Path | str | None = None,
     schema_path: Path | str = DEFAULT_SCHEMA,
+    *,
+    template_path: Path | str | None = None,
+    custom_template: bool | None = None,
+    engine: str | None = None,
+    template_validation: bool = True,
+    output_validation: bool = True,
+    extra_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_input(data, schema_path)
     files = sorted(out_dir.glob("*.xls"))
-    errors: list[str] = []
-    warnings: list[str] = []
-    report: dict[str, Any] = {
-        "status": "failed",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "template_id": manifest.get("template", {}).get("id"),
-        "template_version": manifest.get("template", {}).get("version"),
-        "template_sha256": manifest.get("fingerprint", {}).get("sha256") or manifest.get("fingerprint", {}).get("value"),
-        "output_dir": str(out_dir),
-        "errors": errors,
-        "warnings": warnings,
-        "checks": {},
-        "files_checked": 0,
-    }
+    report = _base_qa_report(
+        out_dir,
+        manifest,
+        qa_report_path,
+        template_path,
+        custom_template,
+        engine,
+        template_validation,
+        output_validation,
+        extra_warnings,
+    )
+    errors: list[str] = report["errors"]
     if len(files) != 1:
         errors.append(f"Expected one generated XLS file, got {len(files)}")
     if files:
@@ -237,7 +336,7 @@ def validate_output_dir(
                         cell = structure["metadata"][name]
                         actual = ws_values[cell].value
                         if str(actual).strip() != str(expected).strip():
-                            errors.append(f"{name} mismatch: expected {expected!r}, got {actual!r}")
+                            errors.append(f"{name} metadata mismatch")
 
                     expected_last_row = start_row + len(data["students"]) - 1
                     if ws_values.max_row < expected_last_row:
@@ -255,12 +354,12 @@ def validate_output_dir(
                         row_errors: list[str] = []
                         actual_id = _cell(ws_values, columns["student_id"], row).value
                         if str(actual_id).strip() != student["id"]:
-                            row_errors.append(f"student ID mismatch: expected {student['id']}, got {actual_id}")
+                            row_errors.append("student ID mismatch")
                         if _cell(ws_formula, columns["student_id"], row).number_format != "@":
                             row_errors.append("student ID is not text-formatted")
                         actual_name = _cell(ws_values, columns["student_name"], row).value
                         if str(actual_name).strip() != student["name"]:
-                            row_errors.append(f"student name mismatch: expected {student['name']}, got {actual_name}")
+                            row_errors.append("student name mismatch")
 
                         regular_values = [
                             _number(ws_values.cell(row, col).value, f"regular score {row}")
@@ -273,7 +372,7 @@ def validate_output_dir(
                                 row_errors.append(f"regular score is outside 0..100 or not a half-point: {score}")
                         average = sum(regular_values) / len(regular_values)
                         if not math.isclose(average, float(student["regular"]), abs_tol=0.001):
-                            row_errors.append(f"regular score average mismatch: expected {student['regular']}, got {average}")
+                            row_errors.append("regular score average mismatch")
 
                         theory_value = _number(_cell(ws_values, columns["theory_score"], row).value, f"theory score {row}")
                         if not 0 <= theory_value <= 100:
@@ -300,18 +399,18 @@ def validate_output_dir(
                                 if not 0 <= skill_value <= 100:
                                     row_errors.append(f"skill score outside 0..100: {skill_value}")
                                 if not math.isclose(skill_value, float(student["skill"]), abs_tol=0.001):
-                                    row_errors.append(f"skill score mismatch: expected {student['skill']}, got {skill_value}")
+                                    row_errors.append("skill score mismatch")
                                 expected_calculated_total += skill_value * float(data["weights"]["skill"])
                             if total_number != _excel_round(expected_calculated_total):
-                                row_errors.append(f"total formula result mismatch: expected {_excel_round(expected_calculated_total)}, got {total_number}")
+                                row_errors.append("total formula result mismatch")
                             if not math.isclose(total_number, float(student["total"]), abs_tol=1.0):
-                                row_errors.append(f"total differs from source: expected {student['total']}, got {total_number}")
+                                row_errors.append("total differs from source")
                         except ValueError as exc:
                             row_errors.append(str(exc))
 
                         if row_errors:
-                            errors.extend(f"{path.name} row {row}: {message}" for message in row_errors)
-                        student_checks.append({"row": row, "id": student["id"], "errors": row_errors, "regular_average": average})
+                            errors.extend(f"generated workbook row {row}: {message}" for message in row_errors)
+                        student_checks.append({"row": row, "status": "failed" if row_errors else "passed", "error_count": len(row_errors)})
                     report["checks"]["students"] = student_checks
                     report["checks"]["skill_enabled"] = skill_enabled
                     report["checks"]["formula_columns"] = formula_columns
@@ -320,11 +419,8 @@ def validate_output_dir(
     report["checks"]["file_count"] = {"expected": 1, "actual": len(files)}
     report["files_checked"] = len(files)
     if not errors:
-        report["status"] = "passed"
-    report_path = Path(qa_report_path).expanduser().resolve() if qa_report_path else out_dir / "qa-report.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report["qa_report"] = str(report_path)
-    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        report["status"] = "skipped" if report["validation_skipped"] else "passed"
+    _write_qa_report(report)
     if errors:
         raise RuntimeError("Output validation failed: " + "; ".join(errors[:8]))
     return report
@@ -337,14 +433,46 @@ def main() -> int:
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
+    parser.add_argument("--template-path", default="")
+    parser.add_argument("--custom-template", action="store_true")
+    parser.add_argument("--engine", default="")
+    parser.add_argument("--skip-template-validation", action="store_true")
+    parser.add_argument("--skip-validation", action="store_true")
     args = parser.parse_args()
     try:
         data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
-        report = validate_output_dir(args.output_dir, data, load_manifest(args.manifest), args.qa_report or None, args.schema)
+        manifest = load_manifest(args.manifest)
+        template_path = args.template_path or None
+        custom_template = args.custom_template if args.custom_template else None
+        if args.skip_validation:
+            report = write_skipped_report(
+                args.output_dir,
+                data,
+                manifest,
+                args.qa_report or None,
+                args.schema,
+                template_path=template_path,
+                custom_template=custom_template,
+                engine=args.engine or None,
+                template_validation=not args.skip_template_validation,
+            )
+        else:
+            report = validate_output_dir(
+                args.output_dir,
+                data,
+                manifest,
+                args.qa_report or None,
+                args.schema,
+                template_path=template_path,
+                custom_template=custom_template,
+                engine=args.engine or None,
+                template_validation=not args.skip_template_validation,
+            )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
-    print(f"validated files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={report['qa_report']}")
+    action = "skipped validation" if report["status"] == "skipped" else "validated"
+    print(f"{action} files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={report['qa_report']}")
     return 0
 
 

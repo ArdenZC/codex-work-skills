@@ -26,7 +26,7 @@ from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, cell_address, column_number, ensure_supported_major, load_manifest, manifest_template_path, validate_input
-from validate_output import validate_output_dir
+from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
 
@@ -187,14 +187,16 @@ def stable_seed(text: str) -> int:
     return int.from_bytes(digest[:4], "little") & 0x7FFFFFFF
 
 
-def generate_regular_scores(target: float, seed_text: str) -> list[float]:
+def generate_regular_scores(target: float, seed_text: str, item_count: int = 8) -> list[float]:
+    if item_count <= 0:
+        raise ValueError("regular item count must be positive")
     target_units = round(target * 2)
-    target_total_units = target_units * 8
+    target_total_units = target_units * item_count
     rng = random.Random(stable_seed(seed_text))
     for _ in range(2000):
         scores = []
         total = 0
-        for _idx in range(7):
+        for _idx in range(item_count - 1):
             low = max(-8, -target_units)
             high = min(8, 200 - target_units)
             score = target_units + rng.randint(low, high)
@@ -209,7 +211,7 @@ def generate_regular_scores(target: float, seed_text: str) -> list[float]:
         values = [score / 2 for score in scores]
         if max(abs(value - target) for value in values) <= 6:
             return values
-    return [target] * 8
+    return [target] * item_count
 
 
 def copy_row_style(ws, source_row: int, target_row: int, max_col: int) -> None:
@@ -338,6 +340,15 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
         data_start = int(structure["data_start_row"])
         template_last_row = int(structure["template_last_data_row"])
         style_source_row = int(structure["style_source_row"])
+        regular_item_count = int(manifest["validation"]["regular_item_count"])
+        if regular_item_count <= 0:
+            raise ValueError("Manifest validation.regular_item_count must be positive")
+        regular_start = column_number(columns["regular_items_start"])
+        regular_end = column_number(columns["regular_items_end"])
+        if regular_end - regular_start + 1 != regular_item_count:
+            raise ValueError(
+                "Manifest regular item count does not match columns.regular_items_start/regular_items_end"
+            )
         total_col = column_number(columns["total_score"]) if has_skill else column_number(structure["no_skill_total_column"])
         max_col = total_col
         existing_rows = template_last_row - data_start + 1
@@ -374,13 +385,13 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
 
         for idx, student in enumerate(students):
             row = data_start + idx
-            scores = generate_regular_scores(student["regular"], f"{class_code}|{student['id']}|{student['regular']}")
+            scores = generate_regular_scores(
+                student["regular"], f"{class_code}|{student['id']}|{student['regular']}", regular_item_count
+            )
             ws.cell(row, column_number(columns["serial"])).value = idx + 1
             ws.cell(row, column_number(columns["student_id"])).value = student["id"]
             ws.cell(row, column_number(columns["student_id"])).number_format = "@"
             ws.cell(row, column_number(columns["student_name"])).value = student["name"]
-            regular_start = column_number(columns["regular_items_start"])
-            regular_end = column_number(columns["regular_items_end"])
             for offset, score in enumerate(scores):
                 ws.cell(row, regular_start + offset).value = score
             ws.cell(row, column_number(columns["regular_weighted"])).value = f"=AVERAGE({columns['regular_items_start']}{row}:{columns['regular_items_end']}{row})*{regular_pct}"
@@ -455,17 +466,31 @@ def main() -> int:
         raise RuntimeError(f"Template not found: {template}")
     output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else sources[0].parent / "平时成绩记分册_生成"
     soffice = find_soffice()
+    template_warnings: list[str] = []
     if not args.skip_template_validation:
         template_report = validate_template(template, args.manifest)
-        for warning in template_report.get("warnings", []):
+        template_warnings = template_report.get("warnings", [])
+        for warning in template_warnings:
             print(f"WARNING: {warning}")
     schema_path = Path(args.schema).expanduser().resolve()
     results = [build_one(source, template, output_dir, soffice, manifest, schema_path) for source in sources]
     if not args.skip_output_validation:
         if len(results) == 1:
             qa_path = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
-            report = validate_output_dir(output_dir, results[0]["normalized_input"], manifest, qa_path, schema_path)
-            print(f"validated files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={report['qa_report']}")
+            report = validate_output_dir(
+                output_dir,
+                results[0]["normalized_input"],
+                manifest,
+                qa_path,
+                schema_path,
+                template_path=template,
+                custom_template=bool(args.template),
+                engine=results[0]["engine"],
+                template_validation=not args.skip_template_validation,
+                extra_warnings=template_warnings,
+            )
+            action = "skipped validation" if report["status"] == "skipped" else "validated"
+            print(f"{action} files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={report['qa_report']}")
         else:
             print("WARNING: batch output validation is performed per generated file")
             for result in results:
@@ -474,9 +499,50 @@ def main() -> int:
                     validation_root = Path(validation_dir)
                     validation_copy = validation_root / output_path.name
                     shutil.copy2(output_path, validation_copy)
-                    validate_output_dir(validation_root, result["normalized_input"], manifest, None, schema_path)
+                    validate_output_dir(
+                        validation_root,
+                        result["normalized_input"],
+                        manifest,
+                        output_dir / f"{output_path.stem}.qa-report.json",
+                        schema_path,
+                        template_path=template,
+                        custom_template=bool(args.template),
+                        engine=result["engine"],
+                        template_validation=not args.skip_template_validation,
+                        extra_warnings=template_warnings,
+                    )
     else:
-        print("WARNING: output validation skipped; no QA report was written")
+        if len(results) == 1:
+            qa_path = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
+            report = write_skipped_report(
+                output_dir,
+                results[0]["normalized_input"],
+                manifest,
+                qa_path,
+                schema_path,
+                template_path=template,
+                custom_template=bool(args.template),
+                engine=results[0]["engine"],
+                template_validation=not args.skip_template_validation,
+                warnings=template_warnings,
+            )
+            print(f"WARNING: output validation skipped; qa={report['qa_report']}")
+        else:
+            for result in results:
+                output_path = Path(result["output"])
+                report = write_skipped_report(
+                    output_dir,
+                    result["normalized_input"],
+                    manifest,
+                    output_dir / f"{output_path.stem}.qa-report.json",
+                    schema_path,
+                    template_path=template,
+                    custom_template=bool(args.template),
+                    engine=result["engine"],
+                    template_validation=not args.skip_template_validation,
+                    warnings=template_warnings,
+                )
+            print("WARNING: output validation skipped; QA reports were written with status=skipped")
     for result in results:
         result.pop("normalized_input", None)
     payload = results[0] if len(results) == 1 else results

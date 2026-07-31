@@ -54,6 +54,9 @@ class LessonTemplatePackageTests(unittest.TestCase):
         bad = {"course_name": "软件测试", "lessons": [{"unit": "项目一"}]}
         with self.assertRaises(ValueError):
             validate_input(bad)
+        bad["weights"] = {"regular": 0.5, "theory": 0.5, "skill": 0.5}
+        with self.assertRaises(ValueError):
+            validate_input(bad)
         with self.assertRaises(ValueError):
             validate_input({"course_name": "软件测试", "lessons": [{"unit": "", "task": "", "hours": "2"}]})
         with self.assertRaises(ValueError):
@@ -118,8 +121,80 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             self.assertTrue((output / "qa-report.json").exists())
             self.assertEqual(len(list(output.glob("*.docx"))), 2)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["template_id"], "lesson-plan")
+            self.assertEqual(report["template_version"], "1.0.0")
+            self.assertEqual(report["generator_version"], "1.0.0")
+            self.assertEqual(report["engine"], "python-docx")
+            self.assertFalse(report["custom_template"])
+            self.assertEqual(report["validation_skipped"], [])
+            self.assertEqual(report["status"], "passed")
             for path in output.glob("*.docx"):
                 self.assertEqual(len(Document(path).tables[0].rows), 30)
+
+    def test_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-compat-qa-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--template",
+                str(LESSON / "assets" / "lesson-plan-template.docx"),
+                "--tasks-json",
+                str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
+                "--output-dir",
+                str(output),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "skipped")
+            self.assertTrue(report["custom_template"])
+            self.assertEqual(report["validation_skipped"], ["output"])
+            self.assertIn("output", report["checks"]["validation"]["skipped"])
+            self.assertIn("Custom template selected", " ".join(report["warnings"]))
+
+    def test_manifest_loading_failures_are_clear(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-manifest-errors-") as temp_name:
+            folder = Path(temp_name)
+            template = folder / "template.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", template)
+            missing = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(template),
+                "--manifest",
+                str(folder / "missing.yaml"),
+                "--json",
+            )
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn("No such file", missing.stdout)
+
+            malformed = folder / "malformed.yaml"
+            malformed.write_text("template: [", encoding="utf-8")
+            result = run_script(LESSON / "scripts" / "validate_template.py", "--manifest", str(malformed), "--json")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("errors", result.stdout)
+
+            manifest_text = (LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml").read_text(encoding="utf-8")
+            missing_version = folder / "missing-version.yaml"
+            missing_version.write_text(manifest_text.replace("  version: 1.0.0\n", "", 1), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(template),
+                "--manifest",
+                str(missing_version),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("semantic template version", result.stdout)
+
+            missing_template = folder / "missing-template.yaml"
+            missing_template.write_text(manifest_text.replace("file: template.docx", "file: missing.docx", 1), encoding="utf-8")
+            result = run_script(LESSON / "scripts" / "validate_template.py", "--manifest", str(missing_template), "--json")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Template not found", result.stdout)
 
     def test_structure_breaking_docx_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-broken-") as temp_name:
@@ -230,6 +305,14 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             self.assertTrue((output / "qa-report.json").exists())
             self.assertEqual(len(list(output.glob("*.xls"))), 1)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["template_id"], "course-gradebook")
+            self.assertEqual(report["template_version"], "1.0.0")
+            self.assertEqual(report["generator_version"], "1.0.0")
+            self.assertEqual(report["engine"], "libreoffice-openpyxl")
+            self.assertFalse(report["custom_template"])
+            self.assertEqual(report["validation_skipped"], [])
+            self.assertEqual(report["status"], "passed")
 
     def test_python_generator_skill_and_leading_zero_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-skill-") as temp_name:
@@ -247,7 +330,31 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertTrue(report["checks"]["skill_enabled"])
             self.assertEqual(report["checks"]["structure"]["columns"], 17)
-            self.assertEqual(report["checks"]["students"][0]["id"], "0012345678")
+            self.assertEqual(report["checks"]["students"][0]["status"], "passed")
+            self.assertNotIn("0012345678", json.dumps(report, ensure_ascii=False))
+
+    def test_python_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-compat-qa-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--template",
+                str(GRADE / "assets" / "平时成绩记分册模板.xls"),
+                "--output-dir",
+                str(output),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "skipped")
+            self.assertTrue(report["custom_template"])
+            self.assertEqual(report["engine"], "libreoffice-openpyxl")
+            self.assertEqual(report["validation_skipped"], ["output"])
+            self.assertIn("Custom template selected", " ".join(report["warnings"]))
 
     def test_python_generator_expands_beyond_template_rows(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-many-") as temp_name:
@@ -276,6 +383,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertAlmostEqual(sum(scores) / len(scores), target, places=7)
             self.assertTrue(all(0 <= score <= 100 for score in scores))
             self.assertTrue(all(abs(score * 2 - round(score * 2)) < 1e-7 for score in scores))
+        self.assertEqual(len(generate_regular_scores(86.5, "four-items", item_count=4)), 4)
 
     def test_structure_breaking_xls_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-broken-") as temp_name:
@@ -307,6 +415,48 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             result = run_script(GRADE / "scripts" / "validate_template.py", "--template", str(template), "--manifest", str(manifest), "--json")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Unsupported template major version", result.stdout)
+
+    def test_manifest_loading_failures_are_clear(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-manifest-errors-") as temp_name:
+            folder = Path(temp_name)
+            template = folder / "template.xls"
+            shutil.copy2(GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls", template)
+            missing = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(template),
+                "--manifest",
+                str(folder / "missing.yaml"),
+                "--json",
+            )
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn("No such file", missing.stdout)
+
+            malformed = folder / "malformed.yaml"
+            malformed.write_text("template: [", encoding="utf-8")
+            result = run_script(GRADE / "scripts" / "validate_template.py", "--manifest", str(malformed), "--json")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("errors", result.stdout)
+
+            manifest_text = (GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "manifest.yaml").read_text(encoding="utf-8")
+            missing_version = folder / "missing-version.yaml"
+            missing_version.write_text(manifest_text.replace("  version: 1.0.0\n", "", 1), encoding="utf-8")
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(template),
+                "--manifest",
+                str(missing_version),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("semantic template version", result.stdout)
+
+            missing_template = folder / "missing-template.yaml"
+            missing_template.write_text(manifest_text.replace("file: template.xls", "file: missing.xls", 1), encoding="utf-8")
+            result = run_script(GRADE / "scripts" / "validate_template.py", "--manifest", str(missing_template), "--json")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Template not found", result.stdout)
 
     def test_formula_error_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-formula-") as temp_name:

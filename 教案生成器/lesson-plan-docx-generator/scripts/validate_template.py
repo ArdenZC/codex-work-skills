@@ -101,7 +101,12 @@ def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[st
             cells = spec.get("cells", [])
             for row_index in rows:
                 for cell_index in cells:
-                    if row_index >= manifest["structure"]["main_table"]["rows"] or cell_index >= manifest["structure"]["main_table"]["columns"]:
+                    if (
+                        row_index < 0
+                        or cell_index < 0
+                        or row_index >= manifest["structure"]["main_table"]["rows"]
+                        or cell_index >= manifest["structure"]["main_table"]["columns"]
+                    ):
                         errors.append(f"Field {name} points outside the declared main table: row={row_index}, cell={cell_index}")
             continue
         if "table" not in spec or "row" not in spec or "cell" not in spec:
@@ -109,14 +114,14 @@ def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[st
         table_index = int(spec["table"])
         row_index = int(spec["row"])
         cell_index = int(spec["cell"])
-        if table_index >= table_count:
+        if table_index < 0 or table_index >= table_count:
             errors.append(f"Field {name} points to missing table {table_index}")
             continue
         table = document.tables[table_index]
-        if row_index >= len(table.rows):
+        if row_index < 0 or row_index >= len(table.rows):
             errors.append(f"Field {name} points to missing row {row_index}")
             continue
-        if cell_index >= len(actual_cells(table.rows[row_index])):
+        if cell_index < 0 or cell_index >= len(actual_cells(table.rows[row_index])):
             errors.append(f"Field {name} points to missing cell {cell_index} in row {row_index}")
 
 
@@ -155,7 +160,9 @@ def validate_template(
     if is_canonical and actual_hash != expected_hash:
         errors.append(f"Canonical template SHA-256 mismatch: expected {expected_hash}, got {actual_hash}")
     elif not is_canonical and actual_hash != expected_hash:
-        warnings.append("Custom template fingerprint differs from the v1.0.0 canonical template.")
+        warnings.append(
+            f"Custom template fingerprint differs from the {manifest.get('template', {}).get('version')} canonical template."
+        )
 
     if compatibility_template is None:
         entries = manifest.get("template", {}).get("compatibility_entries", [])
@@ -235,9 +242,9 @@ def main() -> int:
     parser.add_argument("--compatibility-template", default="")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
-    manifest = load_manifest(args.manifest)
-    template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
     try:
+        manifest = load_manifest(args.manifest)
+        template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
         report = validate_template(template, args.manifest, args.compatibility_template or None)
     except TemplateValidationError as exc:
         report = exc.report
@@ -248,6 +255,20 @@ def main() -> int:
                 print(f"ERROR: {error}", file=sys.stderr)
             for warning in report.get("warnings", []):
                 print(f"WARNING: {warning}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        report = {
+            "template": str(Path(args.template).expanduser().resolve()) if args.template else "",
+            "manifest": str(Path(args.manifest).expanduser().resolve()),
+            "template_version": None,
+            "errors": [str(exc)],
+            "warnings": [],
+            "checks": {},
+        }
+        if args.as_json:
+            print(json.dumps(report, ensure_ascii=False, indent=2))
+        else:
+            print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     if args.as_json:
         print(json.dumps(report, ensure_ascii=False, indent=2))

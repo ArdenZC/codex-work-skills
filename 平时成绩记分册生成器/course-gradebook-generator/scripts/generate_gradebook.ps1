@@ -53,6 +53,7 @@ if ($LASTEXITCODE -ne 0) {
 $ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
 Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
 
+$TemplateWasProvided = [bool]$TemplatePath
 if (-not $TemplatePath) {
   $TemplatePath = Join-Path (Split-Path -Parent $ManifestPath) $ManifestData.template.file
 }
@@ -190,14 +191,15 @@ function Get-StableSeed([string]$text) {
   return [System.BitConverter]::ToInt32($hash, 0) -band 0x7fffffff
 }
 
-function Generate-RegularScores([double]$target, [string]$seedText) {
+function Generate-RegularScores([double]$target, [string]$seedText, [int]$itemCount = 8) {
+  if ($itemCount -le 0) { throw 'Manifest validation.regular_item_count must be positive.' }
   $targetUnits = [int][Math]::Round($target * 2)
-  $targetTotalUnits = $targetUnits * 8
+  $targetTotalUnits = $targetUnits * $itemCount
   $rand = [System.Random]::new((Get-StableSeed $seedText))
   for ($attempt = 0; $attempt -lt 2000; $attempt++) {
     $scores = New-Object System.Collections.Generic.List[int]
     $sum = 0
-    for ($i = 0; $i -lt 7; $i++) {
+    for ($i = 0; $i -lt ($itemCount - 1); $i++) {
       $low = [Math]::Max(-8, -1 * $targetUnits)
       $high = [Math]::Min(8, 200 - $targetUnits)
       $score = $targetUnits + $rand.Next($low, $high + 1)
@@ -212,7 +214,7 @@ function Generate-RegularScores([double]$target, [string]$seedText) {
     $maxDev = ($values | ForEach-Object { [Math]::Abs($_ - $target) } | Measure-Object -Maximum).Maximum
     if ($maxDev -le 6.0) { return $values }
   }
-  return @(1..8 | ForEach-Object { $target })
+  return @(1..$itemCount | ForEach-Object { $target })
 }
 
 function FormulaNumber([double]$n) {
@@ -290,6 +292,11 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory) {
     $studentNameCol = ColumnToNumber ([string]$columns.student_name)
     $regularStartCol = ColumnToNumber ([string]$columns.regular_items_start)
     $regularEndCol = ColumnToNumber ([string]$columns.regular_items_end)
+    $regularItemCount = [int]$ManifestData.validation.regular_item_count
+    if ($regularItemCount -le 0) { throw 'Manifest validation.regular_item_count must be positive.' }
+    if (($regularEndCol - $regularStartCol + 1) -ne $regularItemCount) {
+      throw 'Manifest regular item count does not match columns.regular_items_start/regular_items_end.'
+    }
     $regularWeightedCol = ColumnToNumber ([string]$columns.regular_weighted)
     $theoryScoreCol = ColumnToNumber ([string]$columns.theory_score)
     $theoryWeightedCol = ColumnToNumber ([string]$columns.theory_weighted)
@@ -326,12 +333,12 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory) {
     for ($i = 0; $i -lt $students.Count; $i++) {
       $student = $students[$i]
       $r = $dataStart + $i
-      $scores = Generate-RegularScores $student.Regular ("$classCode|$($student.Id)|$($student.Regular)")
+      $scores = Generate-RegularScores $student.Regular ("$classCode|$($student.Id)|$($student.Regular)") $regularItemCount
       Set-Value $ws $r $serialCol ([double]($i + 1))
       $ws.Range((CellAddress $r $studentIdCol)).NumberFormatLocal = '@'
       Set-Value $ws $r $studentIdCol $student.Id
       Set-Value $ws $r $studentNameCol $student.Name
-      for ($j = 0; $j -lt 8; $j++) {
+      for ($j = 0; $j -lt $regularItemCount; $j++) {
         Set-Value $ws $r ($regularStartCol + $j) ([double]$scores[$j])
       }
       Set-Formula $ws $r $regularWeightedCol "=AVERAGE($($columns.regular_items_start)$r`:$($columns.regular_items_end)$r)*$regularPct"
@@ -397,6 +404,7 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory) {
     RegularPct = $meta.RegularPct
     TheoryPct = $meta.TheoryPct
     SkillPct = $meta.SkillPct
+    Engine = 'excel-com'
     NormalizedInput = $normalizedInput
   }
 }
@@ -428,6 +436,14 @@ try {
 
 $normalizedJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-input-" + [guid]::NewGuid().ToString('N') + '.json')
 try {
+  $validationArgs = @(
+    '--manifest', $ManifestPath,
+    '--schema', $SchemaPath,
+    '--template-path', $TemplatePath,
+    '--engine', 'excel-com'
+  )
+  if ($TemplateWasProvided) { $validationArgs += '--custom-template' }
+  if ($SkipTemplateValidation) { $validationArgs += '--skip-template-validation' }
   if (-not $SkipOutputValidation) {
     if ($results.Count -ne 1) {
       Write-Warning 'Batch output validation uses one temporary validation directory per generated workbook.'
@@ -437,7 +453,8 @@ try {
         try {
           Copy-Item -LiteralPath $result.Output -Destination (Join-Path $validationDir (Split-Path -Leaf $result.Output)) -Force
           $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-          & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') --input-json $normalizedJsonPath --output-dir $validationDir --manifest $ManifestPath --schema $SchemaPath
+          $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir) + $validationArgs
+          & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
           if ($LASTEXITCODE -ne 0) { throw "Output validation failed: $($result.Output)" }
         } finally {
           Remove-Item -LiteralPath $validationDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -446,11 +463,28 @@ try {
     } else {
       $results[0].NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
       $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') --input-json $normalizedJsonPath --output-dir $OutputDir --manifest $ManifestPath --schema $SchemaPath --qa-report $qaPath
+      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--qa-report', $qaPath) + $validationArgs
+      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
       if ($LASTEXITCODE -ne 0) { throw 'Output validation failed.' }
     }
   } else {
-    Write-Warning 'Output validation skipped; no QA report was written.'
+    if ($results.Count -ne 1) {
+      foreach ($result in $results) {
+        $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
+        $qaPath = Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($result.Output)) + '.qa-report.json')
+        $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
+        & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
+        if ($LASTEXITCODE -ne 0) { throw "Could not write skipped QA report: $($result.Output)" }
+      }
+    } else {
+      $result = $results[0]
+      $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
+      $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
+      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
+      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
+      if ($LASTEXITCODE -ne 0) { throw 'Could not write skipped QA report.' }
+    }
+    Write-Warning 'Output validation skipped; QA report status is skipped.'
   }
 } finally {
   Remove-Item -LiteralPath $normalizedJsonPath -Force -ErrorAction SilentlyContinue

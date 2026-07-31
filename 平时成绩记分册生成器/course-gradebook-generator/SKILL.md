@@ -1,6 +1,6 @@
 ---
 name: course-gradebook-generator
-description: Generate 湖北职业技术学院 style 平时成绩记分册 .xls workbooks from 课程成绩单.xls files using the bundled template. 中文显示名：平时成绩记分册生成器。Use when the user asks to create, fill, batch-generate, or update 平时成绩记分册, 平时成绩登记表, or 8次平时成绩 from a 课程成绩单/成绩单 Excel file, including cases where skill columns should be removed when 技能成绩 is 0%.
+description: Generate 湖北职业技术学院 style 平时成绩记分册 .xls workbooks from 课程成绩单.xls files using the bundled template. 中文显示名：平时成绩记分册生成器。Use when the user asks to create, fill, batch-generate, or update 平时成绩记分册, 平时成绩登记表, or manifest-defined 平时成绩项目 from a 课程成绩单/成绩单 Excel file, including cases where skill columns should be removed when 技能成绩 is 0%.
 ---
 
 # 平时成绩记分册生成器
@@ -66,7 +66,7 @@ Read 多Agent兼容说明.md for the compatibility matrix and platform-specific 
 3. Verify before responding.
    - Confirm output row count equals parsed student count.
    - Confirm 学号 and 姓名 match the source row order.
-   - Confirm 8 generated 平时成绩 values average exactly to source 平时成绩.
+   - Confirm the manifest-defined number of generated 平时成绩 values average exactly to source 平时成绩.
    - Confirm 总评 equals source 总成绩.
    - Confirm no visible Excel errors such as `#REF!` or `#VALUE!`.
    - Confirm 技能成绩 columns are deleted when 技能成绩比例 is `0%`; otherwise keep 技能成绩 and 折合 columns.
@@ -101,6 +101,6 @@ Read 多Agent兼容说明.md for the compatibility matrix and platform-specific 
 
 ## Template Package Workflow
 
-Both generators follow `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告`. The Python path reads `manifest.yaml` directly. The Windows Excel COM path uses the bundled `manifest_to_json.py` bridge, so worksheet names, metadata cells, student rows, score columns, formula columns, and the zero-skill column switch come from the same manifest. Normal generation writes `qa-report.json`; `--manifest`, `--schema`, `--skip-template-validation`, `--skip-output-validation`, and `--qa-report` are optional additions to the original CLI.
+Both generators follow `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告`. The Python path reads `manifest.yaml` directly. The Windows Excel COM path uses the bundled `manifest_to_json.py` bridge, so worksheet names, metadata cells, student rows, score columns, formula columns, the manifest-defined regular-item count, and the zero-skill column switch come from the same manifest. Normal generation writes `qa-report.json`; the report includes template/generator versions, actual template path, custom-template flag, engine, validation status, checks, errors, warnings, and skipped checks without copying student identifiers or raw scores. `--manifest`, `--schema`, `--skip-template-validation`, `--skip-output-validation`, and `--qa-report` are optional additions to the original CLI; skipped validation still writes a report with `status=skipped`.
 
-Install Python dependencies from `requirements.txt`. The Windows COM path still requires Microsoft Excel; the cross-platform path still requires LibreOffice/soffice for `.xls` conversion. No external absolute tool path is a formal dependency.
+Install Python dependencies from `requirements.txt`. The Windows COM path requires Microsoft Excel and uses Python/LibreOffice for default structural QA; the cross-platform path requires LibreOffice/soffice for `.xls` conversion. No external absolute tool path is a formal dependency.

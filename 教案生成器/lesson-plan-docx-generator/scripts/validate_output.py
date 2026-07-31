@@ -24,6 +24,15 @@ def cell_text(table, row_index: int, cell_index: int) -> str:
     return actual_cells(table.rows[row_index])[cell_index].text.strip()
 
 
+def manifest_field_text(document, main_table, manifest: dict[str, Any], name: str) -> str:
+    spec = field_spec(manifest, name)
+    if not all(key in spec for key in ("table", "row", "cell")):
+        raise ValueError(f"Manifest field {name} is not a table-cell field")
+    table_index = int(spec["table"])
+    target_table = main_table if table_index == 0 else document.tables[table_index]
+    return cell_text(target_table, int(spec["row"]), int(spec["cell"]))
+
+
 def parse_number(value: Any, label: str) -> float:
     try:
         return float(str(value).strip())
@@ -115,32 +124,132 @@ def _document_text(document, table) -> str:
     return "\n".join(values)
 
 
+def _base_qa_report(
+    out_dir: Path,
+    manifest: dict[str, Any],
+    qa_report_path: Path | str | None,
+    template_path: Path | str | None,
+    custom_template: bool | None,
+    engine: str | None,
+    template_validation: bool,
+    output_validation: bool,
+    extra_warnings: list[str] | None,
+) -> dict[str, Any]:
+    canonical_template = manifest_template_path(manifest)
+    selected_template = (
+        Path(template_path).expanduser().resolve() if template_path else canonical_template
+    )
+    is_custom_template = (
+        bool(custom_template) if custom_template is not None else selected_template != canonical_template
+    )
+    skipped = []
+    if not template_validation:
+        skipped.append("template")
+    if not output_validation:
+        skipped.append("output")
+    warnings = list(extra_warnings or [])
+    if is_custom_template:
+        warnings.append("Custom template selected; output was validated against the supplied manifest.")
+    if not template_validation:
+        warnings.append("Template validation skipped by explicit flag.")
+    if not output_validation:
+        warnings.append("Output validation skipped by explicit flag.")
+    warnings = list(dict.fromkeys(warnings))
+    validation = {"template": template_validation, "output": output_validation, "skipped": skipped}
+    report_path = Path(qa_report_path).expanduser().resolve() if qa_report_path else out_dir / "qa-report.json"
+    report: dict[str, Any] = {
+        "status": "failed",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "template_id": manifest.get("template", {}).get("id"),
+        "template_version": manifest.get("template", {}).get("version"),
+        "generator_version": manifest.get("generator", {}).get("version"),
+        "template_path": str(selected_template),
+        "custom_template": is_custom_template,
+        "engine": engine or "unknown",
+        "validation": validation,
+        "validation_skipped": skipped,
+        "output_dir": str(out_dir),
+        "errors": [],
+        "warnings": warnings,
+        "checks": {"validation": validation},
+        "files_checked": 0,
+        "qa_report": str(report_path),
+    }
+    return report
+
+
+def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
+    report_path = Path(report["qa_report"])
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return report
+
+
+def write_skipped_report(
+    output_dir: Path | str,
+    data: dict[str, Any],
+    manifest: dict[str, Any] | None = None,
+    qa_report_path: Path | str | None = None,
+    schema_path: Path | str = DEFAULT_SCHEMA,
+    *,
+    template_path: Path | str | None = None,
+    custom_template: bool | None = None,
+    engine: str | None = None,
+    template_validation: bool = True,
+    warnings: list[str] | None = None,
+) -> dict[str, Any]:
+    out_dir = Path(output_dir).expanduser().resolve()
+    manifest = manifest or load_manifest()
+    validate_input(data, schema_path)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    report = _base_qa_report(
+        out_dir,
+        manifest,
+        qa_report_path,
+        template_path,
+        custom_template,
+        engine,
+        template_validation,
+        False,
+        warnings,
+    )
+    report["status"] = "skipped"
+    report["checks"]["file_count"] = {"expected": len(data["lessons"]), "actual": len(list(out_dir.glob("*.docx")))}
+    return _write_qa_report(report)
+
+
 def validate_output_dir(
     output_dir: Path | str,
     data: dict[str, Any],
     manifest: dict[str, Any] | None = None,
     qa_report_path: Path | str | None = None,
     schema_path: Path | str = DEFAULT_SCHEMA,
+    *,
+    template_path: Path | str | None = None,
+    custom_template: bool | None = None,
+    engine: str | None = None,
+    template_validation: bool = True,
+    output_validation: bool = True,
+    extra_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_input(data, schema_path)
     lessons = data["lessons"]
     files = sorted(out_dir.glob("*.docx"))
-    errors: list[str] = []
-    warnings: list[str] = []
-    checks: dict[str, Any] = {}
-    report: dict[str, Any] = {
-        "status": "failed",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "template_id": manifest.get("template", {}).get("id"),
-        "template_version": manifest.get("template", {}).get("version"),
-        "output_dir": str(out_dir),
-        "errors": errors,
-        "warnings": warnings,
-        "checks": checks,
-        "files_checked": 0,
-    }
+    report = _base_qa_report(
+        out_dir,
+        manifest,
+        qa_report_path,
+        template_path,
+        custom_template,
+        engine,
+        template_validation,
+        output_validation,
+        extra_warnings,
+    )
+    errors: list[str] = report["errors"]
+    checks: dict[str, Any] = report["checks"]
 
     if not files:
         errors.append(f"No DOCX files generated in {out_dir}")
@@ -155,20 +264,20 @@ def validate_output_dir(
         item_errors: list[str] = []
         if not path.is_file() or path.stat().st_size == 0:
             item_errors.append("file is missing or empty")
-            errors.extend(f"{path.name}: {message}" for message in item_errors)
-            lesson_checks.append({"file": path.name, "errors": item_errors})
+            errors.extend(f"file {index}: {message}" for message in item_errors)
+            lesson_checks.append({"file_index": index, "errors": item_errors})
             continue
         try:
             document = Document(str(path))
         except Exception as exc:  # pragma: no cover - library-specific parse errors
             item_errors.append(f"DOCX could not be opened: {exc}")
-            lesson_checks.append({"file": path.name, "errors": item_errors})
-            errors.extend(f"{path.name}: {message}" for message in item_errors)
+            lesson_checks.append({"file_index": index, "errors": item_errors})
+            errors.extend(f"file {index}: {message}" for message in item_errors)
             continue
         if len(document.tables) <= int(main_spec["index"]):
             item_errors.append("main table is missing")
-            lesson_checks.append({"file": path.name, "errors": item_errors})
-            errors.extend(f"{path.name}: {message}" for message in item_errors)
+            lesson_checks.append({"file_index": index, "errors": item_errors})
+            errors.extend(f"file {index}: {message}" for message in item_errors)
             continue
         table = document.tables[int(main_spec["index"])]
         canonical_template = manifest_template_path(manifest)
@@ -182,17 +291,17 @@ def validate_output_dir(
             item_errors.append(f"main table columns expected {main_spec['columns']}, got {len(table.columns)}")
 
         field_values = {
-            "course_name": cell_text(table, 0, int(field_spec(manifest, "course_name")["cell"])),
-            "unit": cell_text(table, 1, int(field_spec(manifest, "unit")["cell"])),
-            "task": cell_text(table, 1, int(field_spec(manifest, "task")["cell"])),
-            "hours": cell_text(table, 1, int(field_spec(manifest, "hours")["cell"])),
+            "course_name": manifest_field_text(document, table, manifest, "course_name"),
+            "unit": manifest_field_text(document, table, manifest, "unit"),
+            "task": manifest_field_text(document, table, manifest, "task"),
+            "hours": manifest_field_text(document, table, manifest, "hours"),
         }
         if field_values["course_name"] != course_expected:
-            item_errors.append(f"course mismatch: expected {course_expected!r}, got {field_values['course_name']!r}")
+            item_errors.append("course field mismatch")
         if field_values["unit"] != str(item["unit"]):
-            item_errors.append(f"unit mismatch: expected {item['unit']!r}, got {field_values['unit']!r}")
+            item_errors.append("unit field mismatch")
         if field_values["task"] != str(item["task"]):
-            item_errors.append(f"task mismatch: expected {item['task']!r}, got {field_values['task']!r}")
+            item_errors.append("task field mismatch")
         try:
             hours = parse_number(field_values["hours"], "hours")
             expected_hours = parse_number(item["hours"], "input hours")
@@ -202,14 +311,14 @@ def validate_output_dir(
         except ValueError as exc:
             item_errors.append(str(exc))
         if not field_values["unit"].startswith("项目"):
-            item_errors.append(f"unit is not projectized: {field_values['unit']}")
+            item_errors.append("unit is not projectized")
 
         title_spec = field_spec(manifest, "title")
         title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
         expected_title = f"{index} 《{course_expected}》教学单元设计：{item['task']}"
         actual_title = document.paragraphs[title_index].text if 0 <= title_index < len(document.paragraphs) else ""
         if actual_title != expected_title:
-            item_errors.append(f"title mismatch: expected {expected_title!r}, got {actual_title!r}")
+            item_errors.append("title field mismatch")
 
         for name, spec in manifest.get("fields", {}).items():
             if name in {"evaluation"}:
@@ -226,7 +335,10 @@ def validate_output_dir(
             nested = eval_cell.tables[0]
             if len(nested.rows) != int(nested_spec["rows"]) or len(nested.columns) != int(nested_spec["columns"]):
                 item_errors.append("evaluation table structure changed")
-            score_values = [parse_number(nested.cell(row, 2).text, f"evaluation score row {row}") for row in range(1, 14)]
+            score_values = [
+                parse_number(nested.cell(row, 2).text, f"evaluation score row {row}")
+                for row in range(1, int(nested_spec["rows"]))
+            ]
             target = float(item.get("score", 89 + ((index - 1) % 6) * 0.5))
             score_sum = round(sum(score_values), 1)
             if not math.isclose(score_sum, target, abs_tol=float(manifest["validation"].get("score_tolerance", 0.1))):
@@ -243,8 +355,8 @@ def validate_output_dir(
         if course_expected != "Linux操作系统应用" and "Linux操作系统应用" in all_text:
             item_errors.append("template course-name placeholder Linux操作系统应用 remains")
         if item_errors:
-            errors.extend(f"{path.name}: {message}" for message in item_errors)
-        lesson_checks.append({"file": path.name, "errors": item_errors, "fields": field_values})
+            errors.extend(f"file {index}: {message}" for message in item_errors)
+        lesson_checks.append({"file_index": index, "errors": item_errors, "fields_checked": sorted(field_values)})
 
     expected_total = data.get("total_hours")
     if expected_total is not None:
@@ -257,15 +369,10 @@ def validate_output_dir(
     checks["total_hours"] = {"expected": expected_total, "actual": total_hours}
     checks["lessons"] = lesson_checks
     report["files_checked"] = len(files)
-    if not warnings:
-        warnings = report["warnings"]
     if not errors:
-        report["status"] = "passed"
+        report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
-    report_path = Path(qa_report_path).expanduser().resolve() if qa_report_path else out_dir / "qa-report.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report["qa_report"] = str(report_path)
-    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _write_qa_report(report)
     if errors:
         raise RuntimeError("Output validation failed: " + "; ".join(errors[:8]))
     return report
@@ -278,16 +385,48 @@ def main() -> int:
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
+    parser.add_argument("--template-path", default="")
+    parser.add_argument("--custom-template", action="store_true")
+    parser.add_argument("--engine", default="")
+    parser.add_argument("--skip-template-validation", action="store_true")
+    parser.add_argument("--skip-validation", action="store_true")
     args = parser.parse_args()
     try:
         data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
-        report = validate_output_dir(args.output_dir, data, load_manifest(args.manifest), args.qa_report or None, args.schema)
+        manifest = load_manifest(args.manifest)
+        template_path = args.template_path or None
+        custom_template = args.custom_template if args.custom_template else None
+        if args.skip_validation:
+            report = write_skipped_report(
+                args.output_dir,
+                data,
+                manifest,
+                args.qa_report or None,
+                args.schema,
+                template_path=template_path,
+                custom_template=custom_template,
+                engine=args.engine or None,
+                template_validation=not args.skip_template_validation,
+            )
+        else:
+            report = validate_output_dir(
+                args.output_dir,
+                data,
+                manifest,
+                args.qa_report or None,
+                args.schema,
+                template_path=template_path,
+                custom_template=custom_template,
+                engine=args.engine or None,
+                template_validation=not args.skip_template_validation,
+            )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     for warning in report.get("warnings", []):
         print(f"WARNING: {warning}")
-    print(f"validated files={report['checks']['file_count']['actual']} qa={report['qa_report']}")
+    action = "skipped validation" if report["status"] == "skipped" else "validated"
+    print(f"{action} files={report['checks']['file_count']['actual']} qa={report['qa_report']}")
     return 0
 
 

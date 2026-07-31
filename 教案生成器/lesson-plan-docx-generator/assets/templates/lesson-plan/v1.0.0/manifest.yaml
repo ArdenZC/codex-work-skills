@@ -7,6 +7,7 @@ template:
   compatibility_entries:
     - ../../../../assets/lesson-plan-template.docx
 generator:
+  version: 1.0.0
   supported_major: 1
 structure:
   top_level_tables: 1

@@ -7,6 +7,7 @@ template:
   compatibility_entries:
     - ../../../../assets/平时成绩记分册模板.xls
 generator:
+  version: 1.0.0
   supported_major: 1
 structure:
   worksheet: 平时成绩
@@ -22,6 +23,7 @@ structure:
       theory: 理论成绩
       skill: 技能成绩
       total: 总成绩
+  title_cell: A1
   metadata:
     term: C2
     course: G2
