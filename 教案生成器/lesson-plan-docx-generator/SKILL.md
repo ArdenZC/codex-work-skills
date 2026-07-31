@@ -28,6 +28,19 @@ Require or infer:
 - `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
 - `hours`: per task or inferred by total hours. For 实训课 with 12 total hours, prefer 6 tasks x 2 hours unless the user supplies another structure.
 
+
+## Multi-Agent Use
+
+Treat tasks.json and scripts/generate_lesson_plans.py as the cross-agent contract. Codex loads this file as a skill; other agents should first read 通用提示词.md and the nearest tool adapter before producing the same JSON and running the same script.
+
+- AGENTS.md is the shared baseline for Codex CLI, OpenCode, Windsurf, Cursor CLI, and GitHub Copilot agents.
+- CLAUDE.md and GEMINI.md are native entry points for Claude Code and Gemini CLI.
+- Cursor, Cline, Continue, Windsurf, GitHub Copilot, and Aider adapters are included in the package and can be copied into another project with scripts/install_adapters.py.
+- The workflow is model/provider independent. DeepSeek, Claude, GLM, Gemini, OpenAI, and other models can use it when their host tool can read files and run Python; the DOCX result does not depend on a particular model API.
+- The adapter installer skips existing files by default and creates a timestamped backup when --replace is explicitly supplied.
+
+Read 多Agent兼容说明.md for the compatibility matrix and examples/tasks.example.json for a complete input example.
+
 ## Workflow
 
 1. Use the `documents` skill for DOCX work. If an Excel 能力图谱 is supplied, use the `spreadsheets` skill only to inspect/extract task data, not to author the final DOCX.
@@ -105,6 +118,7 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 - Use natural Chinese teaching text for learning analysis, goals, teaching process, and reflection.
 - For 实训课, emphasize task output, tools,操作记录,成果包,互评, and过程性评价.
 - Scores should look realistic, usually 88.5-91.5, not all identical.
+- Keep the canonical JSON provider-neutral so another agent or model can continue the task without reinterpreting the document template.
 - Do not change unrelated source files or existing folders without backing them up.
 
 ## Verification Notes
