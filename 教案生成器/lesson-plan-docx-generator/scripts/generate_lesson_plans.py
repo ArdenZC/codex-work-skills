@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import re
@@ -45,16 +46,18 @@ def clear_paragraph(paragraph):
 
 
 def copy_run_format(src, dst):
-    dst.bold = src.bold
-    dst.italic = src.italic
-    dst.underline = src.underline
-    dst.font.name = src.font.name
-    dst.font.size = src.font.size
-    if src._element.rPr is not None and src._element.rPr.rFonts is not None and dst._element.rPr is not None:
-        for key in ("w:eastAsia", "w:ascii", "w:hAnsi"):
-            value = src._element.rPr.rFonts.get(qn(key))
-            if value:
-                dst._element.rPr.rFonts.set(qn(key), value)
+    source_rpr = src._element.rPr
+    target_rpr = dst._element.rPr
+    if source_rpr is None:
+        if target_rpr is not None:
+            dst._element.remove(target_rpr)
+        return
+    if target_rpr is None:
+        target_rpr = dst._element.get_or_add_rPr()
+    for child in list(target_rpr):
+        target_rpr.remove(child)
+    for child in source_rpr:
+        target_rpr.append(copy.deepcopy(child))
 
 
 def set_paragraph_text(paragraph, text, align=None):
@@ -67,7 +70,7 @@ def set_paragraph_text(paragraph, text, align=None):
         paragraph.alignment = align
 
 
-def set_cell_text(cell, text, align=WD_ALIGN_PARAGRAPH.LEFT):
+def set_cell_text(cell, text, align=None):
     paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
     set_paragraph_text(paragraph, text, align)
     for extra in list(cell.paragraphs)[1:]:
@@ -75,7 +78,7 @@ def set_cell_text(cell, text, align=WD_ALIGN_PARAGRAPH.LEFT):
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
 
-def set_cell_multiline(cell, text, align=WD_ALIGN_PARAGRAPH.LEFT):
+def set_cell_multiline(cell, text, align=None):
     lines = str(text).splitlines() or [""]
     paragraphs = list(cell.paragraphs) if cell.paragraphs else [cell.add_paragraph()]
     while len(paragraphs) < len(lines):
@@ -98,7 +101,7 @@ def set_row(table, row_idx, values_by_idx):
             writer(cells[idx], value)
 
 
-def set_manifest_field(table, manifest: dict[str, Any], name: str, value: Any, align=WD_ALIGN_PARAGRAPH.LEFT):
+def set_manifest_field(table, manifest: dict[str, Any], name: str, value: Any, align=None):
     spec = field_spec(manifest, name)
     if "table" not in spec or "row" not in spec or "cell" not in spec:
         raise ValueError(f"Field {name} is not a single table-cell field")

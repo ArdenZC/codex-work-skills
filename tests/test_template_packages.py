@@ -757,6 +757,36 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("protected DOCX layout changed", result.stderr)
 
+    def test_output_validation_rejects_writable_direct_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-direct-format-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            paragraph = document.tables[0].cell(4, 1).paragraphs[0]
+            paragraph.paragraph_format.space_before = Pt(1)
+            run = paragraph.runs[0]
+            run.bold = True
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
     def test_output_validation_rejects_composed_content_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-composed-output-") as temp_name:
             folder = Path(temp_name)
@@ -1269,6 +1299,40 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(formatted_result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", formatted_result.stdout)
+
+    def test_custom_template_rejects_protected_target_cell_formatting(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-target-format-guard-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            xlsx = xlsx_dir / "template.xlsx"
+            workbook = load_workbook(xlsx)
+            sheet = workbook["平时成绩"]
+            changed_font = copy(sheet["A1"].font)
+            changed_font.sz = (changed_font.sz or 11) + 1
+            sheet["A1"].font = changed_font
+            workbook.save(xlsx)
+            custom_dir = folder / "custom"
+            custom_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(custom_dir), str(xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom_dir / "template.xls"),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
 
     def test_custom_template_rejects_non_target_sheet_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-custom-non-target-") as temp_name:

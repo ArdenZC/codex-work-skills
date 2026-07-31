@@ -102,20 +102,7 @@ def _body_paragraph_signature(document, manifest: dict[str, Any]) -> list[dict[s
 
 def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
-    writable: set[tuple[int, int]] = set()
-    evaluation: tuple[int, int] | None = None
-    for spec in manifest.get("fields", {}).values():
-        if spec.get("mode") == "row_cells":
-            writable.update(
-                (int(row), int(cell))
-                for row in spec.get("rows", [])
-                for cell in spec.get("cells", [])
-            )
-        elif spec.get("mode") == "nested_table":
-            if int(spec.get("table", -1)) == 0:
-                evaluation = (int(spec["row"]), int(spec["cell"]))
-        elif int(spec.get("table", -1)) == 0 and "row" in spec and "cell" in spec:
-            writable.add((int(spec["row"]), int(spec["cell"])))
+    writable, evaluation = _writable_main_table_cells(manifest)
 
     values: list[dict[str, Any]] = []
     for row_index, row in enumerate(table.rows):
@@ -142,6 +129,78 @@ def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[s
                                 "text": _cell_text_signature(cell),
                             }
                         )
+    return values
+
+
+def _writable_main_table_cells(manifest: dict[str, Any]) -> tuple[set[tuple[int, int]], tuple[int, int] | None]:
+    writable: set[tuple[int, int]] = set()
+    evaluation: tuple[int, int] | None = None
+    for spec in manifest.get("fields", {}).values():
+        if spec.get("mode") == "row_cells":
+            writable.update(
+                (int(row), int(cell))
+                for row in spec.get("rows", [])
+                for cell in spec.get("cells", [])
+            )
+            continue
+        if spec.get("mode") == "nested_table":
+            if int(spec.get("table", -1)) == 0:
+                evaluation = (int(spec["row"]), int(spec["cell"]))
+            continue
+        if int(spec.get("table", -1)) == 0 and "row" in spec and "cell" in spec:
+            writable.add((int(spec["row"]), int(spec["cell"])))
+    return writable, evaluation
+
+
+def _normalized_direct_xml(element) -> str:
+    if len(element) == 0 and not element.attrib and not (element.text or "").strip():
+        return ""
+    return _xml(element)
+
+
+def _direct_format_signature(cell) -> dict[str, list[str]]:
+    paragraph_formats = {
+        _normalized_direct_xml(paragraph._p.pPr)
+        for paragraph in cell.paragraphs
+        if paragraph._p.pPr is not None
+    }
+    run_formats = {
+        _normalized_direct_xml(run._r.rPr)
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+        if run._r.rPr is not None
+    }
+    return {
+        "paragraph_formats": sorted(value for value in paragraph_formats if value),
+        "run_formats": sorted(value for value in run_formats if value),
+    }
+
+
+def _writable_direct_format_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    table = document.tables[int(manifest["structure"]["main_table"]["index"])]
+    writable, evaluation = _writable_main_table_cells(manifest)
+    values: list[dict[str, Any]] = []
+    for row_index, cell_index in sorted(writable):
+        cell = actual_cells(table.rows[row_index])[cell_index]
+        values.append(
+            {
+                "scope": "main",
+                "row": row_index,
+                "cell": cell_index,
+                "format": _direct_format_signature(cell),
+            }
+        )
+
+    if evaluation is not None:
+        parent = actual_cells(table.rows[evaluation[0]])[evaluation[1]]
+        values.append(
+            {
+                "scope": "evaluation_parent",
+                "row": evaluation[0],
+                "cell": evaluation[1],
+                "format": _direct_format_signature(parent),
+            }
+        )
     return values
 
 
@@ -191,7 +250,34 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "themes": _theme_signature(document),
         "body_paragraphs": _body_paragraph_signature(document, manifest),
         "protected_text": _protected_text_signature(document, manifest),
+        "writable_direct_formats": _writable_direct_format_signature(document, manifest),
     }
+
+
+def _protected_layout_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
+    actual_direct = actual.get("writable_direct_formats", [])
+    expected_direct = expected.get("writable_direct_formats", [])
+    actual_base = {key: value for key, value in actual.items() if key != "writable_direct_formats"}
+    expected_base = {key: value for key, value in expected.items() if key != "writable_direct_formats"}
+    if actual_base != expected_base or len(actual_direct) != len(expected_direct):
+        return False
+
+    # Text replacement can collapse source runs/paragraphs, so output formats may be a subset of the template formats.
+    expected_by_coordinate = {
+        (item["scope"], item.get("row"), item.get("cell")): item["format"]
+        for item in expected_direct
+    }
+    for item in actual_direct:
+        coordinate = (item["scope"], item.get("row"), item.get("cell"))
+        expected_format = expected_by_coordinate.get(coordinate)
+        if expected_format is None:
+            return False
+        actual_format = item["format"]
+        if not set(actual_format["paragraph_formats"]).issubset(expected_format["paragraph_formats"]):
+            return False
+        if not set(actual_format["run_formats"]).issubset(expected_format["run_formats"]):
+            return False
+    return True
 
 
 def _validate_text_length(name: str, value: str, spec: dict[str, Any], errors: list[str]) -> None:
@@ -412,7 +498,10 @@ def validate_output_dir(
         canonical_template = manifest_template_path(manifest)
         if canonical_template.exists():
             canonical_document = Document(str(canonical_template))
-            if protected_layout_signature(document, manifest) != protected_layout_signature(canonical_document, manifest):
+            if not _protected_layout_matches(
+                protected_layout_signature(document, manifest),
+                protected_layout_signature(canonical_document, manifest),
+            ):
                 item_errors.append("protected DOCX layout changed")
         if len(table.rows) != int(main_spec["rows"]):
             item_errors.append(f"main table rows expected {main_spec['rows']}, got {len(table.rows)}")

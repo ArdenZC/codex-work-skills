@@ -195,6 +195,14 @@ def _non_target_sheet_signature(sheet) -> dict[str, Any]:
     }
 
 
+def _target_cell_format_signature(sheet) -> dict[str, dict[str, Any]]:
+    return {
+        cell.coordinate: _cell_format_signature(cell)
+        for row in sheet.iter_rows(min_row=1, max_row=sheet.max_row, min_col=1, max_col=sheet.max_column)
+        for cell in row
+    }
+
+
 def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[str, Any]]:
     differences: list[dict[str, Any]] = []
     if isinstance(left, dict) and isinstance(right, dict):
@@ -266,6 +274,7 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
         "dimension": [ws.max_row, ws.max_column],
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},
+        "target_cell_formats": _target_cell_format_signature(ws),
         "writable_cell_formats": {
             cell: _cell_format_signature(ws[cell]) for cell in sorted(writable_cells)
         },
