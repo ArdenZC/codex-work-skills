@@ -12,6 +12,7 @@ on:
       - "requirements*.txt"
   push:
     branches:
+      - main
       - master
     paths:
       - ".github/workflows/template-package-ci.yml"

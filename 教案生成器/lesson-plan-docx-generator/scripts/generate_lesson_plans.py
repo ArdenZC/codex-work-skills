@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -25,6 +26,7 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
 
 MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
+MAX_FILENAME_BYTES = 255
 REMARKS = [
     ["出勤正常", "注意力较稳", "参与较积极", "规范意识较好", "质量意识较强", "安全意识较好", "习惯较好", "预习较完整", "答题较准确", "作业较认真", "实操较熟练", "展示较清楚"],
     ["基本到课", "个别环节需提醒", "能主动配合", "流程执行较规范", "能联系项目实际", "职业责任意识较好", "工具使用较规范", "线上学习较及时", "讨论质量尚可", "提交较规范", "任务完成度较高", "汇报条理较清楚"],
@@ -116,6 +118,26 @@ def numbered(items: list[str], limit: int | None = None) -> str:
 def safe_name(text: str) -> str:
     text = re.sub(r"\s+", "", str(text))
     return re.sub(r'[\\/:*?"<>|]+', "", text)
+
+
+def _utf8_prefix(text: str, max_bytes: int) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def lesson_filename(seq: int, unit: str, task: str) -> str:
+    prefix = f"教案{seq:02d}_"
+    suffix = ".docx"
+    stem = f"{safe_name(unit)}_{safe_name(task)}"
+    filename = f"{prefix}{stem}{suffix}"
+    if len(filename.encode("utf-8")) <= MAX_FILENAME_BYTES:
+        return filename
+    digest = hashlib.sha256(stem.encode("utf-8")).hexdigest()[:10]
+    marker = f"~{digest}"
+    stem_budget = MAX_FILENAME_BYTES - len((prefix + marker + suffix).encode("utf-8"))
+    return f"{prefix}{_utf8_prefix(stem, stem_budget)}{marker}{suffix}"
 
 
 def half_round(value: float) -> float:
@@ -248,7 +270,7 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     set_row(table, reflection_rows[1], {2: "以项目任务贯穿教学，突出实操产出和过程评价，学生参与度较高，互评环节能促进成果完善。"})
     set_row(table, reflection_rows[2], {2: "后续增加优秀成果样例和常见错误清单，对基础薄弱学生提供分步检查表，对能力较强学生增加扩展场景。"})
 
-    out = out_dir / f"教案{seq:02d}_{safe_name(unit)}_{safe_name(task)}.docx"
+    out = out_dir / lesson_filename(seq, unit, task)
     doc.save(out)
     return out
 

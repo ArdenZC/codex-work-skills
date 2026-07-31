@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 
 from package_common import DEFAULT_MANIFEST, column_number, ensure_supported_major, load_manifest, manifest_template_path
 
@@ -239,6 +240,12 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
             for column in manifest.get("fields", {}).get(field_name, {}).get("columns", [])
         )
     fixed_cells.extend(f"{column}{header_row}" for column in sorted(fixed_columns))
+    regular_start = column_number(structure["columns"]["regular_items_start"])
+    regular_end = column_number(structure["columns"]["regular_items_end"])
+    fixed_cells.extend(
+        f"{get_column_letter(column)}{header_row}"
+        for column in range(regular_start, regular_end + 1)
+    )
     fixed_cells = list(dict.fromkeys(str(cell) for cell in fixed_cells))
     style_row = int(structure["style_source_row"])
     format_columns = [

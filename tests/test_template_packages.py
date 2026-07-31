@@ -237,6 +237,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
             payload["lessons"] = [payload["lessons"][0]]
             payload["total_hours"] = 2
             payload["lessons"][0]["course_name"] = "接口测试实训"
+            payload["lessons"][0]["major"] = "数据科学与大数据技术"
+            payload["lessons"][0]["audience"] = "高职三年级"
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -251,7 +253,52 @@ class LessonTemplatePackageTests(unittest.TestCase):
             generated = next(output.glob("*.docx"))
             document = Document(generated)
             self.assertEqual(document.tables[0].cell(0, 1).text.strip(), "接口测试实训")
+            self.assertEqual(document.tables[0].cell(0, 5).text.strip(), "数据科学与大数据技术")
+            self.assertEqual(document.tables[0].cell(0, 9).text.strip(), "高职三年级")
             self.assertIn("《接口测试实训》", document.paragraphs[0].text)
+
+            document.tables[0].cell(0, 5).text = "错误专业"
+            document.save(generated)
+            validation = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(validation.returncode, 0)
+            self.assertIn("major field mismatch", validation.stderr)
+
+    def test_lesson_filename_is_bounded_by_utf8_bytes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-long-filename-") as temp_name:
+            folder = Path(temp_name)
+            payload = {
+                "course_name": "软件测试",
+                "total_hours": 2,
+                "lessons": [
+                    {
+                        "unit": "项目一" + "单元" * 28,
+                        "task": "完成" + "测试任务" * 19,
+                        "hours": "2",
+                        "flows": [],
+                        "knowledge": [],
+                    }
+                ],
+            }
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(output.glob("*.docx"))
+            self.assertLessEqual(len(generated.name.encode("utf-8")), 255)
+            self.assertIn("~", generated.stem)
 
     def test_long_teaching_content_is_generated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-long-") as temp_name:
@@ -531,6 +578,12 @@ class GradebookPowerShellContractTests(unittest.TestCase):
         self.assertIn("Assert-SourceTotals $students $meta", script)
         self.assertIn("'--output-file'", script)
         self.assertNotIn("abs_tol=1.0", script)
+
+
+class WorkflowContractTests(unittest.TestCase):
+    def test_template_package_ci_runs_on_main_push(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
+        self.assertIn("      - main\n      - master", workflow)
 
 
 @unittest.skipUnless(soffice_path(), "LibreOffice is required for XLS package tests")
@@ -893,6 +946,37 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 GRADE / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+
+    def test_custom_template_rejects_regular_item_header_change(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-header-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            xlsx = xlsx_dir / "template.xlsx"
+            workbook = load_workbook(xlsx)
+            workbook["平时成绩"]["E4"] = "被修改的常规项目"
+            workbook.save(xlsx)
+            custom_dir = folder / "custom"
+            custom_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(custom_dir), str(xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom_dir / "template.xls"),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)

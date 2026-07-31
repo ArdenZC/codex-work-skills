@@ -314,14 +314,22 @@ def validate_output_dir(
             item_errors.append(f"main table columns expected {main_spec['columns']}, got {len(table.columns)}")
 
         expected_course = str(item.get("course_name") or data["course_name"])
+        expected_major = str(item.get("major") or data.get("major", "软件技术"))
+        expected_audience = str(item.get("audience") or data.get("audience", "高职二年级"))
         field_values = {
             "course_name": manifest_field_text(document, table, manifest, "course_name"),
+            "major": manifest_field_text(document, table, manifest, "major"),
+            "audience": manifest_field_text(document, table, manifest, "audience"),
             "unit": manifest_field_text(document, table, manifest, "unit"),
             "task": manifest_field_text(document, table, manifest, "task"),
             "hours": manifest_field_text(document, table, manifest, "hours"),
         }
         if field_values["course_name"] != expected_course:
             item_errors.append("course field mismatch")
+        if field_values["major"] != expected_major:
+            item_errors.append("major field mismatch")
+        if field_values["audience"] != expected_audience:
+            item_errors.append("audience field mismatch")
         if field_values["unit"] != str(item["unit"]):
             item_errors.append("unit field mismatch")
         if field_values["task"] != str(item["task"]):
