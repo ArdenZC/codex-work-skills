@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from copy import copy
 from decimal import Decimal
 from pathlib import Path
@@ -126,6 +127,25 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("lessons[0].hours must be a positive number; received -2.", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_long_lesson_hours_reject_before_docx_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-hours-length-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"][0]["hours"] = "1234567890123"
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Input schema validation failed", result.stderr)
             self.assertFalse(output.exists())
 
     def test_invalid_total_hours_reject_before_docx_generation(self) -> None:
@@ -404,6 +424,59 @@ class LessonTemplatePackageTests(unittest.TestCase):
             shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
             document = Document(custom)
             document.styles["Normal"].font.size = Pt(13)
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
+
+    def test_custom_lesson_template_rejects_header_footer_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-header-format-guard-") as temp_name:
+            custom = Path(temp_name) / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            document.sections[0].header.paragraphs[0].paragraph_format.space_before = Pt(1)
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected page, header, footer, or section settings", result.stdout)
+
+    def test_custom_lesson_template_rejects_theme_definition_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-theme-guard-") as temp_name:
+            folder = Path(temp_name)
+            custom = folder / "custom.docx"
+            tampered = folder / "tampered.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            with zipfile.ZipFile(custom, "r") as source, zipfile.ZipFile(tampered, "w") as target:
+                for info in source.infolist():
+                    data = source.read(info.filename)
+                    if info.filename == "word/theme/theme1.xml":
+                        data = data.replace(b"Office Theme", b"Tampered Theme")
+                    target.writestr(info, data)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(tampered),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
+
+    def test_custom_lesson_template_rejects_protected_body_paragraph_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-body-guard-") as temp_name:
+            custom = Path(temp_name) / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            document.paragraphs[1].add_run("未声明正文")
             document.save(custom)
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",

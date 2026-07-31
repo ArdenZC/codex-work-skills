@@ -79,6 +79,27 @@ def _cell_text_signature(cell) -> list[Any]:
     return values
 
 
+def _theme_signature(document) -> list[dict[str, Any]]:
+    return [
+        {"partname": str(part.partname), "blob": part.blob}
+        for part in document.part.package.iter_parts()
+        if str(part.partname).startswith("/word/theme/")
+    ]
+
+
+def _body_paragraph_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    title_spec = manifest.get("fields", {}).get("title", {})
+    title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+    return [
+        {
+            "index": index,
+            "xml": _xml(paragraph._p),
+        }
+        for index, paragraph in enumerate(document.paragraphs)
+        if index != title_index
+    ]
+
+
 def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable: set[tuple[int, int]] = set()
@@ -162,6 +183,8 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
             for section in document.sections
         ],
         "styles": _xml(document.styles._element),
+        "themes": _theme_signature(document),
+        "body_paragraphs": _body_paragraph_signature(document, manifest),
         "protected_text": _protected_text_signature(document, manifest),
     }
 

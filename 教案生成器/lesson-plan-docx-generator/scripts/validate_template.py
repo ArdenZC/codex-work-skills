@@ -90,6 +90,27 @@ def _styles_signature(document) -> str:
     return etree.tostring(copy.deepcopy(document.styles._element), encoding="unicode")
 
 
+def _theme_signature(document) -> list[dict[str, Any]]:
+    return [
+        {"partname": str(part.partname), "blob": part.blob}
+        for part in document.part.package.iter_parts()
+        if str(part.partname).startswith("/word/theme/")
+    ]
+
+
+def _body_paragraph_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    title_spec = manifest.get("fields", {}).get("title", {})
+    title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+    return [
+        {
+            "index": index,
+            "xml": etree.tostring(copy.deepcopy(paragraph._p), encoding="unicode"),
+        }
+        for index, paragraph in enumerate(document.paragraphs)
+        if index != title_index
+    ]
+
+
 def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable_cells, evaluation_cell = _writable_main_table_cells(manifest)
@@ -111,6 +132,8 @@ def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
         "row_count": len(table.rows),
         "column_count": len(table.columns),
         "styles": _styles_signature(document),
+        "themes": _theme_signature(document),
+        "body_paragraphs": _body_paragraph_signature(document, manifest),
     }
 
 
@@ -127,6 +150,8 @@ def _section_signature(document) -> list[dict[str, Any]]:
                 "right_margin": section.right_margin.twips,
                 "header": [p.text for p in section.header.paragraphs],
                 "footer": [p.text for p in section.footer.paragraphs],
+                "header_xml": etree.tostring(copy.deepcopy(section.header._element), encoding="unicode"),
+                "footer_xml": etree.tostring(copy.deepcopy(section.footer._element), encoding="unicode"),
             }
         )
     return result
