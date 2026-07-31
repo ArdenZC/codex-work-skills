@@ -143,6 +143,28 @@ def _dimension_signature(value: Any) -> float | None:
     return round(float(value), 1)
 
 
+def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[str, Any]]:
+    differences: list[dict[str, Any]] = []
+    if isinstance(left, dict) and isinstance(right, dict):
+        for key in sorted(set(left) | set(right), key=str):
+            child_path = f"{path}.{key}" if path else str(key)
+            if key not in left:
+                differences.append({"path": child_path, "expected": "<missing>", "actual": right[key]})
+            elif key not in right:
+                differences.append({"path": child_path, "expected": left[key], "actual": "<missing>"})
+            else:
+                differences.extend(_signature_differences(left[key], right[key], child_path))
+    elif isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
+        if len(left) != len(right):
+            differences.append({"path": path, "expected": left, "actual": right})
+        else:
+            for index, (expected, actual) in enumerate(zip(left, right)):
+                differences.extend(_signature_differences(expected, actual, f"{path}[{index}]"))
+    elif left != right:
+        differences.append({"path": path, "expected": left, "actual": right})
+    return differences
+
+
 def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
     structure = manifest["structure"]
     sheet_name = structure["worksheet"]
@@ -332,7 +354,13 @@ def validate_template(
                 with tempfile.TemporaryDirectory(prefix="gradebook-canonical-") as canonical_temp:
                     canonical_xlsx = convert_to_xlsx(canonical, Path(canonical_temp), find_soffice())
                     canonical_workbook = load_workbook(canonical_xlsx, data_only=False)
-                    if _workbook_signature(canonical_workbook, manifest) != _workbook_signature(workbook, manifest):
+                    canonical_signature = _workbook_signature(canonical_workbook, manifest)
+                    custom_signature = _workbook_signature(workbook, manifest)
+                    if canonical_signature != custom_signature:
+                        report["checks"]["protected_signature_differences"] = _signature_differences(
+                            canonical_signature,
+                            custom_signature,
+                        )[:20]
                         errors.append("Custom template changed protected workbook structure or formatting.")
     except TemplateValidationError:
         raise
