@@ -92,16 +92,16 @@ def _cell_format_signature(cell) -> dict[str, Any]:
     protection = cell.protection
     return {
         "number_format": cell.number_format,
+        # Font family and charset can be replaced by locale-specific fallbacks during XLS round trips.
         "font": (
-            font.name,
             font.sz,
             bool(font.b),
             bool(font.i),
             font.u,
             bool(font.strike),
-            font.charset,
-            font.family,
-            font.scheme,
+            bool(font.outline),
+            bool(font.shadow),
+            font.vertAlign,
             color_signature(font.color),
         ),
         "fill": (

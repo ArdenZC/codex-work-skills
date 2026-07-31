@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from copy import copy
 from decimal import Decimal
 from pathlib import Path
 
@@ -590,6 +591,30 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 "--json",
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+            formatted_xlsx = folder / "formatted-template.xlsx"
+            formatted_workbook = load_workbook(xlsx)
+            formatted_sheet = formatted_workbook["平时成绩"]
+            formatted_font = copy(formatted_sheet["C2"].font)
+            formatted_font.sz = (formatted_font.sz or 11) + 1
+            formatted_sheet["C2"].font = formatted_font
+            formatted_workbook.save(formatted_xlsx)
+            formatted_dir = folder / "formatted"
+            formatted_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(formatted_dir), str(formatted_xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            formatted = formatted_dir / "formatted-template.xls"
+            formatted_result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(formatted),
+                "--json",
+            )
+            self.assertNotEqual(formatted_result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", formatted_result.stdout)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:
