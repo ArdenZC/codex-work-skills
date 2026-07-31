@@ -144,6 +144,61 @@ def _dimension_signature(value: Any) -> float | None:
     return round(float(value), 1)
 
 
+def _page_setup_value(value: Any) -> Any:
+    if isinstance(value, float):
+        # LibreOffice can introduce a few-millionths drift in inch-based margins.
+        return round(value, 4)
+    return value
+
+
+def _page_setup_signature(sheet) -> dict[str, Any]:
+    page_setup = sheet.page_setup
+    margins = sheet.page_margins
+    print_options = sheet.print_options
+    page_setup_properties = sheet.sheet_properties.pageSetUpPr
+    return {
+        "page_setup": {
+            name: _page_setup_value(getattr(page_setup, name, None))
+            for name in (
+                "orientation",
+                "paperSize",
+                "scale",
+                "fitToHeight",
+                "fitToWidth",
+                "firstPageNumber",
+                "useFirstPageNumber",
+                "paperHeight",
+                "paperWidth",
+                "pageOrder",
+                "usePrinterDefaults",
+                "blackAndWhite",
+                "draft",
+                "cellComments",
+                "errors",
+                "horizontalDpi",
+                "verticalDpi",
+                "copies",
+                "autoPageBreaks",
+                "fitToPage",
+            )
+        },
+        "margins": {
+            name: _page_setup_value(getattr(margins, name, None))
+            for name in ("left", "right", "top", "bottom", "header", "footer")
+        },
+        "print_options": {
+            name: getattr(print_options, name, None)
+            for name in ("horizontalCentered", "verticalCentered", "headings", "gridLines", "gridLinesSet")
+        },
+        "page_setup_properties": {
+            "fitToPage": getattr(page_setup_properties, "fitToPage", None) if page_setup_properties else None,
+            "autoPageBreaks": getattr(page_setup_properties, "autoPageBreaks", None) if page_setup_properties else None,
+        },
+        "print_title_rows": str(sheet.print_title_rows or ""),
+        "print_title_cols": str(sheet.print_title_cols or ""),
+    }
+
+
 def _non_target_dimension_signature(value: Any) -> float | None:
     if value is None:
         return None
@@ -192,6 +247,7 @@ def _non_target_sheet_signature(sheet) -> dict[str, Any]:
         "orientation": sheet.page_setup.orientation,
         "print_area": str(sheet.print_area or ""),
         "freeze_panes": str(sheet.freeze_panes or ""),
+        "page_setup": _page_setup_signature(sheet),
     }
 
 
@@ -273,6 +329,7 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
         },
         "dimension": [ws.max_row, ws.max_column],
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
+        "page_setup": _page_setup_signature(ws),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},
         "target_cell_formats": _target_cell_format_signature(ws),
         "writable_cell_formats": {

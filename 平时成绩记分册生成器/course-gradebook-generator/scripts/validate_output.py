@@ -29,6 +29,7 @@ from validate_template import (
     _cell_format_signature,
     _dimension_signature,
     _non_target_sheet_signature,
+    _page_setup_signature,
     _signature_differences,
     convert_to_xlsx,
     find_soffice,
@@ -136,6 +137,8 @@ def _check_workbook_protection(
     expected_freeze = str(validation.get("expected_freeze_panes") or "")
     if "expected_freeze_panes" in validation and str(ws.freeze_panes or "") != expected_freeze:
         errors.append(f"Output freeze panes changed: expected {expected_freeze!r}, got {str(ws.freeze_panes or '')!r}")
+    if template_ws is not None and _page_setup_signature(ws) != _page_setup_signature(template_ws):
+        errors.append("target sheet print settings mismatch")
     expected_named_ranges = sorted(str(item) for item in validation.get("required_named_ranges", []))
     actual_named_ranges = sorted(str(name) for name in workbook.defined_names)
     if actual_named_ranges != expected_named_ranges:
@@ -171,6 +174,7 @@ def _check_workbook_protection(
         "orientation": ws.page_setup.orientation,
         "print_area": str(ws.print_area or ""),
         "freeze_panes": str(ws.freeze_panes or ""),
+        "page_setup": _page_setup_signature(ws),
         "named_ranges": actual_named_ranges,
         "data_validations": actual_dv,
         "conditional_formats": actual_cf,

@@ -15,7 +15,17 @@ from docx import Document
 from docx.table import _Cell
 from lxml import etree
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, composed_lesson_fields, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
+from package_common import (
+    DEFAULT_MANIFEST,
+    DEFAULT_SCHEMA,
+    composed_lesson_fields,
+    field_spec,
+    implementation_cell_values,
+    load_manifest,
+    manifest_template_path,
+    validate_composed_fields,
+    validate_input,
+)
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
@@ -158,21 +168,25 @@ def _normalized_direct_xml(element) -> str:
     return _xml(element)
 
 
-def _direct_format_signature(cell) -> dict[str, list[str]]:
-    paragraph_formats = {
+def _direct_format_signature(cell) -> dict[str, Any]:
+    paragraph_values = [
         _normalized_direct_xml(paragraph._p.pPr)
         for paragraph in cell.paragraphs
         if paragraph._p.pPr is not None
-    }
-    run_formats = {
+    ]
+    run_values = [
         _normalized_direct_xml(run._r.rPr)
         for paragraph in cell.paragraphs
         for run in paragraph.runs
         if run._r.rPr is not None
-    }
+    ]
+    paragraph_formats = sorted({value for value in paragraph_values if value})
+    run_formats = sorted({value for value in run_values if value})
     return {
-        "paragraph_formats": sorted(value for value in paragraph_formats if value),
-        "run_formats": sorted(value for value in run_formats if value),
+        "paragraph_formats": paragraph_formats,
+        "paragraph_primary": next((value for value in paragraph_values if value), ""),
+        "run_formats": run_formats,
+        "run_primary": next((value for value in run_values if value), ""),
     }
 
 
@@ -226,6 +240,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
                 "bottom_margin": section.bottom_margin.twips,
                 "left_margin": section.left_margin.twips,
                 "right_margin": section.right_margin.twips,
+                "sectPr": _xml(section._sectPr),
                 "header_footer_refs": [
                     _xml(child)
                     for child in section._sectPr
@@ -276,6 +291,10 @@ def _protected_layout_matches(actual: dict[str, Any], expected: dict[str, Any]) 
         if not set(actual_format["paragraph_formats"]).issubset(expected_format["paragraph_formats"]):
             return False
         if not set(actual_format["run_formats"]).issubset(expected_format["run_formats"]):
+            return False
+        if expected_format["paragraph_primary"] and expected_format["paragraph_primary"] not in actual_format["paragraph_formats"]:
+            return False
+        if expected_format["run_primary"] and expected_format["run_primary"] not in actual_format["run_formats"]:
             return False
     return True
 
@@ -566,6 +585,18 @@ def validate_output_dir(
                 max_paragraphs = spec.get("max_paragraphs")
                 if max_paragraphs is not None and paragraph_count > int(max_paragraphs):
                     item_errors.append(f"{name} exceeds manifest max_paragraphs={max_paragraphs}: {paragraph_count}")
+
+        implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
+        for row_index, expected_values in zip(
+            implementation_rows,
+            implementation_cell_values(str(item["task"]), item.get("flows", [])),
+        ):
+            cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
+            for cell_index, expected_value in expected_values.items():
+                actual_value = cells[cell_index].text if cell_index < len(cells) else ""
+                expected_text = str(expected_value).rstrip("\r\n")
+                if actual_value != expected_text:
+                    item_errors.append(f"implementation cell mismatch at row {row_index} cell {cell_index}")
 
         nested_spec = manifest["structure"]["evaluation_table"]
         try:

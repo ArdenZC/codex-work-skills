@@ -13,6 +13,8 @@ from decimal import Decimal
 from pathlib import Path
 
 from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Pt
 from openpyxl import Workbook, load_workbook
 
@@ -469,6 +471,25 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected page, header, footer, or section settings", result.stdout)
 
+    def test_custom_lesson_template_rejects_section_property_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-section-property-guard-") as temp_name:
+            folder = Path(temp_name)
+            custom = folder / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            columns = OxmlElement("w:cols")
+            columns.set(qn("w:num"), "2")
+            document.sections[0]._sectPr.append(columns)
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected page, header, footer, or section settings", result.stdout)
+
     def test_custom_lesson_template_rejects_theme_definition_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-theme-guard-") as temp_name:
             folder = Path(temp_name)
@@ -787,6 +808,38 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("protected DOCX layout changed", result.stderr)
 
+    def test_output_validation_rejects_removed_writable_direct_formatting(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-direct-format-removal-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            paragraph = document.tables[0].cell(4, 1).paragraphs[0]
+            if paragraph._p.pPr is not None:
+                paragraph._p.remove(paragraph._p.pPr)
+            for run in paragraph.runs:
+                if run._r.rPr is not None:
+                    run._r.remove(run._r.rPr)
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
     def test_output_validation_rejects_composed_content_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-composed-output-") as temp_name:
             folder = Path(temp_name)
@@ -813,6 +866,33 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("teaching_content content mismatch", result.stderr)
+
+    def test_output_validation_rejects_implementation_content_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-implementation-output-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            document.tables[0].cell(16, 1).text = "被替换的实施内容"
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("implementation cell mismatch", result.stderr)
 
 
 class GradebookTotalRuleTests(unittest.TestCase):
@@ -1427,6 +1507,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             tampered_font.sz = (tampered_font.sz or 10) + 1
             workbook["平时成绩"]["C5"].font = tampered_font
             workbook["平时成绩"]["E4"] = "被篡改的常规项目"
+            workbook["平时成绩"].page_margins.left = (workbook["平时成绩"].page_margins.left or 0) + 1
             workbook.save(tampered_xlsx)
             tampered_dir = folder / "tampered"
             tampered_dir.mkdir()
@@ -1468,6 +1549,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("target sheet formatting mismatch", result.stderr)
             self.assertIn("target sheet protected value mismatch at E4", result.stderr)
+            self.assertIn("target sheet print settings mismatch", result.stderr)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:

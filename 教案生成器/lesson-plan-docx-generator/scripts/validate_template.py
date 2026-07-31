@@ -148,6 +148,7 @@ def _section_signature(document) -> list[dict[str, Any]]:
                 "bottom_margin": section.bottom_margin.twips,
                 "left_margin": section.left_margin.twips,
                 "right_margin": section.right_margin.twips,
+                "sectPr": etree.tostring(copy.deepcopy(section._sectPr), encoding="unicode"),
                 "header": [p.text for p in section.header.paragraphs],
                 "footer": [p.text for p in section.footer.paragraphs],
                 "header_xml": etree.tostring(copy.deepcopy(section.header._element), encoding="unicode"),
@@ -307,13 +308,14 @@ def validate_template(
         errors.append(f"Missing fixed labels: {', '.join(missing_labels)}")
     _check_field_coordinates(document, manifest, errors)
     report["checks"]["required_labels"] = {"count": len(labels), "missing": missing_labels}
-    report["checks"]["sections"] = _section_signature(document)
+    document_sections = _section_signature(document)
+    report["checks"]["sections"] = document_sections
 
     if canonical.exists() and not is_canonical:
         canonical_doc = Document(str(canonical))
         if _main_table_signature(canonical_doc, manifest) != _main_table_signature(document, manifest):
             errors.append("Custom template changed protected main-table structure or formatting.")
-        if _section_signature(canonical_doc) != _section_signature(document):
+        if _section_signature(canonical_doc) != document_sections:
             errors.append("Custom template changed protected page, header, footer, or section settings.")
 
     if errors:
