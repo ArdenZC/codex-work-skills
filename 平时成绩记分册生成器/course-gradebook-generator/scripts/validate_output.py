@@ -195,6 +195,10 @@ def _target_cell_format_signature(cell) -> dict[str, Any]:
     return signature
 
 
+def _format_signature_difference(actual: dict[str, Any], expected: dict[str, Any]) -> str:
+    return ",".join(key for key in actual if actual.get(key) != expected.get(key))
+
+
 def _shift_column_after_delete(column: int, start: int, count: int) -> int | None:
     if column < start:
         return column
@@ -269,8 +273,11 @@ def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any]
             if _target_cell_format_signature(output_ws.cell(output_row, output_column)) != _target_cell_format_signature(
                 template_ws.cell(source_row, output_column)
             ):
+                actual_signature = _target_cell_format_signature(output_ws.cell(output_row, output_column))
+                expected_signature = _target_cell_format_signature(template_ws.cell(source_row, output_column))
                 errors.append(
-                    f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row}"
+                    f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row} "
+                    f"({_format_signature_difference(actual_signature, expected_signature)})"
                 )
     return errors[:20]
 
