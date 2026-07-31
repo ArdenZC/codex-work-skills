@@ -15,3 +15,11 @@
 - 实际 Codex skill 目录保留兼容命名，便于安装到 `.codex/skills` 后稳定调用。
 - 每个 skill 需要包含中文简介，说明它能做什么、需要用户提供哪些资料、没有资料时会如何默认处理。
 - 如果 skill 内置模板或脚本，放在 skill 目录下的 `assets/`、`scripts/` 等子目录中，避免依赖个人电脑上的临时路径。
+
+## 多Agent兼容
+
+仓库中的所有现有 skill 都提供统一的多 Agent 工作协议：AI 负责理解输入资料，技能脚本负责稳定生成最终文件。每个 skill 都包含 AGENTS.md、CLAUDE.md、GEMINI.md、通用提示词.md、Aider 约定和可生成 Cursor/Cline/Continue/Windsurf/Copilot 规则的适配器脚本。
+
+适配范围包括 Codex、Claude Code、Gemini CLI、Cursor、Cline、Continue、Windsurf、OpenCode、GitHub Copilot CLI/Cloud Agent、Aider，以及使用 DeepSeek、Claude、GLM、Gemini、OpenAI 等模型的其他 agent 工具。纯网页聊天工具可以先生成结构化输入，再交给具备本地文件和命令权限的 agent 执行。
+
+在任一 skill 目录运行 scripts/install_adapters.py 可以把适配规则安装到目标项目；默认不会覆盖已有规则文件。
