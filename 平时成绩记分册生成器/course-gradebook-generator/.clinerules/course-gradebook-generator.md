@@ -1,0 +1,16 @@
+# Cline 成绩册生成规则
+
+# 平时成绩记分册生成器工作规则
+
+本目录是一个与模型供应商无关的成绩册生成工作包。处理平时成绩记分册任务时，先阅读 SKILL.md 和 通用提示词.md，再根据用户提供的 课程成绩单.xls 执行。
+
+## 工作协议
+
+1. 开始前提醒用户提供 课程成绩单.xls 或包含该文件的班级文件夹。没有源文件时不能伪造成绩。
+2. 优先使用 Windows 的 scripts/generate_gradebook.ps1；没有 Excel COM 或使用 macOS/Linux 时使用 scripts/generate_gradebook.py 和 LibreOffice/soffice。
+3. 生成后校验学生行数、学号和姓名顺序、8 次平时成绩平均值、总评、公式错误，以及技能成绩比例为 0% 时的列删除。
+4. 保留内置模板的样式、边框、公式和 xls 格式；输出目录需要用户明确或按脚本默认值处理。
+
+## 平台与模型
+
+模型可使用 DeepSeek、Claude、GLM、Gemini、OpenAI 等，结果不依赖某一模型 API。只具备网页对话能力的工具可以先整理输入和命令，再交给能读写本地文件并执行 PowerShell/Python 的 agent。macOS/Linux 需要 Python 3、openpyxl 和 LibreOffice/soffice。
