@@ -5,6 +5,7 @@ import json
 import re
 import shutil
 from datetime import datetime
+from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -118,26 +119,34 @@ def safe_name(text: str) -> str:
 
 
 def half_round(value: float) -> float:
-    return round(value * 2) / 2
+    return float((Decimal(str(value)) * 2).quantize(Decimal("1"), rounding=ROUND_HALF_UP) / 2)
 
 
 def score_breakdown(target: float) -> list[float]:
-    scores = [half_round(point * target / 100) for point in MAX_POINTS]
-    diff = round(target - sum(scores), 1)
-    step = 0.5 if diff > 0 else -0.5
+    target_decimal = Decimal(str(target))
+    target_units_decimal = target_decimal * 2
+    if target_units_decimal != target_units_decimal.to_integral_value():
+        raise ValueError(f"Evaluation score must use 0.5-point increments: {target}")
+    target_units = int(target_units_decimal)
+    scores_units = [
+        int((Decimal(point) * target_decimal * 2 / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        for point in MAX_POINTS
+    ]
+    diff_units = target_units - sum(scores_units)
+    step = 1 if diff_units > 0 else -1
     order = [10, 8, 9, 12, 2, 7, 11, 3, 4, 5, 6, 1, 0]
-    while abs(diff) >= 0.25:
+    while diff_units:
         changed = False
         for pos in order:
-            candidate = scores[pos] + step
-            if 0 <= candidate <= MAX_POINTS[pos]:
-                scores[pos] = candidate
-                diff = round(target - sum(scores), 1)
+            candidate = scores_units[pos] + step
+            if 0 <= candidate <= MAX_POINTS[pos] * 2:
+                scores_units[pos] = candidate
+                diff_units = target_units - sum(scores_units)
                 changed = True
                 break
         if not changed:
             break
-    return scores
+    return [units / 2 for units in scores_units]
 
 
 def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):

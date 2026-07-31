@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,17 @@ def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
 
 
 def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEMA) -> None:
+    for index, lesson in enumerate(data.get("lessons", [])):
+        if not isinstance(lesson, dict) or "score" not in lesson:
+            continue
+        try:
+            score = Decimal(str(lesson["score"]))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if not score.is_finite() or score % Decimal("0.5") != 0:
+            raise ValueError(
+                f"lessons[{index}].score must use 0.5-point increments; received {lesson['score']}."
+            )
     schema = load_schema(schema_path)
     errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda error: list(error.path))
     if errors:

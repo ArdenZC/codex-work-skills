@@ -12,7 +12,16 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, column_number, load_manifest, manifest_template_path, validate_input
+from package_common import (
+    DEFAULT_MANIFEST,
+    DEFAULT_SCHEMA,
+    calculate_expected_total,
+    column_number,
+    load_manifest,
+    manifest_template_path,
+    source_total_matches,
+    validate_input,
+)
 from validate_template import convert_to_xlsx, find_soffice
 
 
@@ -39,10 +48,6 @@ def _contains_formula_error(value: Any) -> bool:
     return isinstance(value, str) and any(
         token in value.upper() for token in ("#REF!", "#VALUE!", "#DIV/0!", "#NAME?", "#N/A")
     )
-
-
-def _excel_round(value: float) -> int:
-    return math.floor(value + 0.5)
 
 
 def _expected_formulas(
@@ -150,6 +155,7 @@ def _base_qa_report(
     out_dir: Path,
     manifest: dict[str, Any],
     qa_report_path: Path | str | None,
+    output_file: Path | None,
     template_path: Path | str | None,
     custom_template: bool | None,
     engine: str | None,
@@ -179,6 +185,12 @@ def _base_qa_report(
     warnings = list(dict.fromkeys(warnings))
     validation = {"template": template_validation, "output": output_validation, "skipped": skipped}
     report_path = Path(qa_report_path).expanduser().resolve() if qa_report_path else out_dir / "qa-report.json"
+    output_label = ""
+    if output_file is not None:
+        try:
+            output_label = output_file.resolve().relative_to(out_dir).as_posix()
+        except ValueError:
+            output_label = output_file.name
     return {
         "status": "failed",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -192,6 +204,7 @@ def _base_qa_report(
         "validation": validation,
         "validation_skipped": skipped,
         "output_dir": str(out_dir),
+        "output_file": output_label,
         "errors": [],
         "warnings": warnings,
         "checks": {"validation": validation},
@@ -218,16 +231,20 @@ def write_skipped_report(
     custom_template: bool | None = None,
     engine: str | None = None,
     template_validation: bool = True,
+    output_file: Path | str | None = None,
     warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_input(data, schema_path)
     out_dir.mkdir(parents=True, exist_ok=True)
+    selected_file = _resolve_output_file(out_dir, output_file)
+    files = [selected_file] if selected_file is not None else sorted(out_dir.glob("*.xls"))
     report = _base_qa_report(
         out_dir,
         manifest,
         qa_report_path,
+        selected_file,
         template_path,
         custom_template,
         engine,
@@ -236,8 +253,23 @@ def write_skipped_report(
         warnings,
     )
     report["status"] = "skipped"
-    report["checks"]["file_count"] = {"expected": 1, "actual": len(list(out_dir.glob("*.xls")))}
+    report["checks"]["file_count"] = {"expected": 1, "actual": len(files)}
+    report["files_checked"] = len(files)
     return _write_qa_report(report)
+
+
+def _resolve_output_file(out_dir: Path, output_file: Path | str | None) -> Path | None:
+    if output_file is None or str(output_file).strip() == "":
+        return None
+    candidate = Path(output_file).expanduser()
+    if not candidate.is_absolute():
+        candidate = out_dir / candidate
+    candidate = candidate.resolve()
+    try:
+        candidate.relative_to(out_dir)
+    except ValueError as exc:
+        raise ValueError("--output-file must be inside --output-dir") from exc
+    return candidate
 
 
 def validate_output_dir(
@@ -252,16 +284,19 @@ def validate_output_dir(
     engine: str | None = None,
     template_validation: bool = True,
     output_validation: bool = True,
+    output_file: Path | str | None = None,
     extra_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_input(data, schema_path)
-    files = sorted(out_dir.glob("*.xls"))
+    selected_file = _resolve_output_file(out_dir, output_file)
+    files = [selected_file] if selected_file is not None else sorted(out_dir.glob("*.xls"))
     report = _base_qa_report(
         out_dir,
         manifest,
         qa_report_path,
+        selected_file,
         template_path,
         custom_template,
         engine,
@@ -270,10 +305,19 @@ def validate_output_dir(
         extra_warnings,
     )
     errors: list[str] = report["errors"]
-    if len(files) != 1:
+    if selected_file is None and len(files) != 1:
         errors.append(f"Expected one generated XLS file, got {len(files)}")
-    if files:
+    path = None
+    if selected_file is not None:
+        if not selected_file.exists():
+            errors.append(f"Generated XLS file not found: {selected_file.name}")
+        elif not selected_file.is_file():
+            errors.append(f"Generated XLS path is not a file: {selected_file.name}")
+        else:
+            path = selected_file
+    elif len(files) == 1:
         path = files[0]
+    if path is not None:
         structure = manifest["structure"]
         columns = structure["columns"]
         start_row = int(structure["data_start_row"])
@@ -391,8 +435,6 @@ def validate_output_dir(
 
                         try:
                             total_number = _number(_cell(ws_values, total_column, row).value, f"total {row}")
-                            expected_calculated_total = float(student["regular"]) * float(data["weights"]["regular"])
-                            expected_calculated_total += theory_value * float(data["weights"]["theory"])
                             skill_value = 0.0
                             if skill_enabled:
                                 skill_value = _number(_cell(ws_values, columns["skill_score"], row).value, f"skill score {row}")
@@ -400,10 +442,14 @@ def validate_output_dir(
                                     row_errors.append(f"skill score outside 0..100: {skill_value}")
                                 if not math.isclose(skill_value, float(student["skill"]), abs_tol=0.001):
                                     row_errors.append("skill score mismatch")
-                                expected_calculated_total += skill_value * float(data["weights"]["skill"])
-                            if total_number != _excel_round(expected_calculated_total):
+                            output_total = calculate_expected_total(
+                                {"regular": student["regular"], "theory": theory_value, "skill": skill_value},
+                                data["weights"],
+                            )
+                            source_total = calculate_expected_total(student, data["weights"])
+                            if total_number != output_total:
                                 row_errors.append("total formula result mismatch")
-                            if not math.isclose(total_number, float(student["total"]), abs_tol=1.0):
+                            if not source_total_matches(student["total"], source_total):
                                 row_errors.append("total differs from source")
                         except ValueError as exc:
                             row_errors.append(str(exc))
@@ -417,7 +463,7 @@ def validate_output_dir(
         except Exception as exc:
             errors.append(f"Generated XLS could not be opened or inspected: {exc}")
     report["checks"]["file_count"] = {"expected": 1, "actual": len(files)}
-    report["files_checked"] = len(files)
+    report["files_checked"] = 1 if path is not None else 0
     if not errors:
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
     _write_qa_report(report)
@@ -430,6 +476,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate a generated XLS gradebook and write a QA report.")
     parser.add_argument("--input-json", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--output-file", default="")
     parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
@@ -455,6 +502,7 @@ def main() -> int:
                 custom_template=custom_template,
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
+                output_file=args.output_file or None,
             )
         else:
             report = validate_output_dir(
@@ -467,6 +515,7 @@ def main() -> int:
                 custom_template=custom_template,
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
+                output_file=args.output_file or None,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

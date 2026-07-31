@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import math
 import re
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,46 @@ from jsonschema import Draft202012Validator
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "manifest.yaml"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "gradebook-input.schema.json"
+
+
+def _decimal(value: Any, label: str) -> Decimal:
+    try:
+        number = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"{label} is not numeric: {value!r}") from exc
+    if not number.is_finite():
+        raise ValueError(f"{label} must be finite: {value!r}")
+    return number
+
+
+def excel_round(value: Any) -> int:
+    """Return the positive-grade equivalent of Excel ROUND(value, 0)."""
+    return int(_decimal(value, "Grade value").quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
+
+def calculate_expected_total(student: dict[str, Any], weights: dict[str, Any]) -> int:
+    weighted = (
+        _decimal(student["regular"], "regular score") * _decimal(weights["regular"], "regular weight")
+        + _decimal(student["theory"], "theory score") * _decimal(weights["theory"], "theory weight")
+        + _decimal(student.get("skill", 0), "skill score") * _decimal(weights["skill"], "skill weight")
+    )
+    return excel_round(weighted)
+
+
+def source_total_matches(source_total: Any, expected_total: int) -> bool:
+    return excel_round(source_total) == int(expected_total)
+
+
+def validate_source_totals(students: list[dict[str, Any]], weights: dict[str, Any]) -> None:
+    for index, student in enumerate(students, start=1):
+        expected = calculate_expected_total(student, weights)
+        if not source_total_matches(student["total"], expected):
+            actual = excel_round(student["total"])
+            raise ValueError(
+                f"Source total mismatch at record {index}: expected {expected} after Excel ROUND(...,0), "
+                f"received {actual}. The source total may include a manual adjustment or be inconsistent "
+                "with the configured formula."
+            )
 
 
 def load_manifest(path: Path | str = DEFAULT_MANIFEST) -> dict[str, Any]:

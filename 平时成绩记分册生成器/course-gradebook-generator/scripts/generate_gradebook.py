@@ -25,7 +25,17 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, cell_address, column_number, ensure_supported_major, load_manifest, manifest_template_path, validate_input
+from package_common import (
+    DEFAULT_MANIFEST,
+    DEFAULT_SCHEMA,
+    cell_address,
+    column_number,
+    ensure_supported_major,
+    load_manifest,
+    manifest_template_path,
+    validate_input,
+    validate_source_totals,
+)
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -327,6 +337,7 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
             "students": students,
         }
         validate_input(normalized, schema_path)
+        validate_source_totals(students, normalized["weights"])
 
         wb = load_workbook(template_xlsx)
         structure = manifest["structure"]
@@ -487,6 +498,7 @@ def main() -> int:
                 custom_template=bool(args.template),
                 engine=results[0]["engine"],
                 template_validation=not args.skip_template_validation,
+                output_file=results[0]["output"],
                 extra_warnings=template_warnings,
             )
             action = "skipped validation" if report["status"] == "skipped" else "validated"
@@ -509,6 +521,7 @@ def main() -> int:
                         custom_template=bool(args.template),
                         engine=result["engine"],
                         template_validation=not args.skip_template_validation,
+                        output_file=validation_copy,
                         extra_warnings=template_warnings,
                     )
     else:
@@ -524,6 +537,7 @@ def main() -> int:
                 custom_template=bool(args.template),
                 engine=results[0]["engine"],
                 template_validation=not args.skip_template_validation,
+                output_file=results[0]["output"],
                 warnings=template_warnings,
             )
             print(f"WARNING: output validation skipped; qa={report['qa_report']}")
@@ -540,6 +554,7 @@ def main() -> int:
                     custom_template=bool(args.template),
                     engine=result["engine"],
                     template_validation=not args.skip_template_validation,
+                    output_file=output_path,
                     warnings=template_warnings,
                 )
             print("WARNING: output validation skipped; QA reports were written with status=skipped")

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import math
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from decimal import Decimal
 from pathlib import Path
 
 from docx import Document
@@ -61,6 +63,65 @@ class LessonTemplatePackageTests(unittest.TestCase):
             validate_input({"course_name": "软件测试", "lessons": [{"unit": "", "task": "", "hours": "2"}]})
         with self.assertRaises(ValueError):
             validate_input({"course_name": "课" * 33, "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]})
+
+    def test_score_precision_accepts_half_points_and_defaults(self) -> None:
+        sys.modules.pop("package_common", None)
+        sys.path.insert(0, str(LESSON / "scripts"))
+        from package_common import validate_input
+
+        base = {"course_name": "软件测试实训", "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]}
+        for score in (89, 89.0, 89.5):
+            payload = json.loads(json.dumps(base, ensure_ascii=False))
+            payload["lessons"][0]["score"] = score
+            validate_input(payload)
+        validate_input(base)
+
+    def test_score_precision_rejects_before_docx_generation(self) -> None:
+        for invalid_score in (89.2, 89.25):
+            with self.subTest(invalid_score=invalid_score), tempfile.TemporaryDirectory(prefix="lesson-package-score-") as temp_name:
+                folder = Path(temp_name)
+                payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+                payload["lessons"][0]["score"] = invalid_score
+                source = folder / "tasks.json"
+                output = folder / "output"
+                source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                result = run_script(
+                    LESSON / "scripts" / "generate_lesson_plans.py",
+                    "--tasks-json",
+                    str(source),
+                    "--output-dir",
+                    str(output),
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    f"lessons[0].score must use 0.5-point increments; received {invalid_score}.",
+                    result.stderr,
+                )
+                self.assertFalse(output.exists())
+
+    def test_default_score_generates_exact_evaluation_total(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-default-score-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"][0].pop("score")
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = sorted(output.glob("*.docx"))[0]
+            nested = Document(generated).tables[0].cell(12, 1).tables[0]
+            score_sum = sum(
+                (Decimal(nested.cell(row, 2).text.strip()) for row in range(1, 14)),
+                Decimal("0"),
+            )
+            self.assertEqual(score_sum, Decimal("89"))
 
     def test_long_teaching_content_is_generated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-long-") as temp_name:
@@ -129,8 +190,15 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertFalse(report["custom_template"])
             self.assertEqual(report["validation_skipped"], [])
             self.assertEqual(report["status"], "passed")
-            for path in output.glob("*.docx"):
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            for path, item in zip(sorted(output.glob("*.docx")), payload["lessons"]):
                 self.assertEqual(len(Document(path).tables[0].rows), 30)
+                nested = Document(path).tables[0].cell(12, 1).tables[0]
+                score_sum = sum(
+                    (Decimal(nested.cell(row, 2).text.strip()) for row in range(1, 14)),
+                    Decimal("0"),
+                )
+                self.assertEqual(score_sum, Decimal(str(item["score"])))
 
     def test_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-compat-qa-") as temp_name:
@@ -238,9 +306,54 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertIn("forbidden template text", result.stderr)
 
 
+class GradebookTotalRuleTests(unittest.TestCase):
+    def test_total_rule_matches_exactly_with_zero_and_nonzero_skill_weights(self) -> None:
+        sys.modules.pop("package_common", None)
+        sys.path.insert(0, str(GRADE / "scripts"))
+        from package_common import calculate_expected_total, source_total_matches, validate_source_totals
+
+        no_skill_weights = {"regular": 0.6, "theory": 0.4, "skill": 0.0}
+        no_skill = {"regular": 86.5, "theory": 88.0, "skill": 0.0, "total": 87.0}
+        no_skill_expected = calculate_expected_total(no_skill, no_skill_weights)
+        self.assertEqual(no_skill_expected, 87)
+        self.assertTrue(source_total_matches(87.0000000001, no_skill_expected))
+        validate_source_totals([no_skill], no_skill_weights)
+
+        skill_weights = {"regular": 0.5, "theory": 0.3, "skill": 0.2}
+        skill = {"regular": 91.0, "theory": 90.0, "skill": 90.0, "total": 91.0}
+        skill_expected = calculate_expected_total(skill, skill_weights)
+        self.assertEqual(skill_expected, 91)
+        validate_source_totals([skill], skill_weights)
+
+        self.assertFalse(source_total_matches(88, no_skill_expected))
+        self.assertFalse(source_total_matches(86, no_skill_expected))
+        with self.assertRaisesRegex(ValueError, "Source total mismatch"):
+            validate_source_totals([{**no_skill, "total": 88}], no_skill_weights)
+        with self.assertRaisesRegex(ValueError, "Source total mismatch"):
+            validate_source_totals([{**no_skill, "total": 86}], no_skill_weights)
+
+
+class GradebookPowerShellContractTests(unittest.TestCase):
+    def test_com_path_uses_same_rounding_preflight_and_exact_output_contract(self) -> None:
+        script = (GRADE / "scripts" / "generate_gradebook.ps1").read_text(encoding="utf-8-sig")
+        self.assertIn("function Excel-Round", script)
+        self.assertIn("[System.MidpointRounding]::AwayFromZero", script)
+        self.assertIn("function Assert-SourceTotals", script)
+        self.assertIn("Assert-SourceTotals $students $meta", script)
+        self.assertIn("'--output-file'", script)
+        self.assertNotIn("abs_tol=1.0", script)
+
+
 @unittest.skipUnless(soffice_path(), "LibreOffice is required for XLS package tests")
 class GradebookTemplatePackageTests(unittest.TestCase):
-    def make_source(self, folder: Path, skill: bool = False, count: int = 2, leading_zero: bool = False) -> Path:
+    def make_source(
+        self,
+        folder: Path,
+        skill: bool = False,
+        count: int = 2,
+        leading_zero: bool = False,
+        total_delta: float = 0.0,
+    ) -> Path:
         xlsx = folder / "课程成绩单.xlsx"
         workbook = Workbook()
         sheet = workbook.active
@@ -258,7 +371,9 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             regular = [86.5, 91.0, 100.0, 0.0][index % 4]
             theory = [88.0, 90.0, 100.0, 0.0][index % 4]
             skill_score = [92.0, 90.0, 100.0, 0.0][index % 4]
-            total = round(regular * regular_pct + theory * theory_pct + skill_score * skill_pct)
+            total = math.floor(regular * regular_pct + theory * theory_pct + skill_score * skill_pct + 0.5)
+            if index == 0:
+                total += total_delta
             student_id = "0012345678" if leading_zero and index == 0 else f"240101{index + 1:03d}"
             values = [student_id, f"学生{index + 1}", regular, theory] + ([skill_score] if skill else []) + [total]
             rows.append(values)
@@ -313,6 +428,9 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertFalse(report["custom_template"])
             self.assertEqual(report["validation_skipped"], [])
             self.assertEqual(report["status"], "passed")
+            generated = next(output.glob("*.xls"))
+            self.assertEqual(report["output_file"], generated.name)
+            self.assertEqual(report["files_checked"], 1)
 
     def test_python_generator_skill_and_leading_zero_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-skill-") as temp_name:
@@ -331,7 +449,88 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertTrue(report["checks"]["skill_enabled"])
             self.assertEqual(report["checks"]["structure"]["columns"], 17)
             self.assertEqual(report["checks"]["students"][0]["status"], "passed")
+            generated = next(output.glob("*.xls"))
+            self.assertEqual(report["output_file"], generated.name)
+            self.assertEqual(report["files_checked"], 1)
             self.assertNotIn("0012345678", json.dumps(report, ensure_ascii=False))
+
+    def test_python_generator_ignores_unrelated_xls_files(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-unrelated-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            output = folder / "output"
+            output.mkdir()
+            template = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            shutil.copy2(template, output / "unrelated-a.xls")
+            shutil.copy2(template, output / "unrelated-b.xls")
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = [path for path in output.glob("*.xls") if path.name.startswith(folder.name)]
+            self.assertEqual(len(generated), 1)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["output_file"], generated[0].name)
+            self.assertEqual(report["files_checked"], 1)
+            self.assertEqual(report["checks"]["file_count"]["actual"], 1)
+
+    def test_rejects_source_total_mismatch_positive_one(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-total-plus-one-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, total_delta=1.0)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Source total mismatch", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_rejects_source_total_mismatch_negative_one(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-total-minus-one-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, total_delta=-1.0)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Source total mismatch", result.stderr)
+            self.assertFalse(output.exists())
+
+    def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            output.mkdir()
+            template = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            shutil.copy2(template, output / "candidate-a.xls")
+            shutil.copy2(template, output / "candidate-b.xls")
+            result = run_script(
+                GRADE / "scripts" / "validate_output.py",
+                "--input-json",
+                str(ROOT / "tests" / "fixtures" / "gradebook-input.json"),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Expected one generated XLS file, got 2", result.stderr)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["output_file"], "")
+            self.assertEqual(report["files_checked"], 0)
+            self.assertEqual(report["checks"]["file_count"]["actual"], 2)
 
     def test_python_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-compat-qa-") as temp_name:

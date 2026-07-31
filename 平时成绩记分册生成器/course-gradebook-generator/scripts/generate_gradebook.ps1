@@ -21,7 +21,10 @@
   [switch]$SkipOutputValidation,
 
   [Parameter(Mandatory=$false)]
-  [string]$QaReportPath = ""
+  [string]$QaReportPath = "",
+
+  [Parameter(Mandatory=$false)]
+  [string]$OutputFile = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -186,6 +189,27 @@ function Read-Students($sheet) {
   return $students
 }
 
+function Excel-Round([decimal]$value) {
+  return [int][decimal]::Round($value, 0, [System.MidpointRounding]::AwayFromZero)
+}
+
+function Expected-Total($student, $meta) {
+  [decimal]$weighted = ([decimal]$student.Regular * [decimal]$meta.RegularPct) +
+    ([decimal]$student.Theory * [decimal]$meta.TheoryPct) +
+    ([decimal]$student.Skill * [decimal]$meta.SkillPct)
+  return Excel-Round $weighted
+}
+
+function Assert-SourceTotals($students, $meta) {
+  for ($i = 0; $i -lt $students.Count; $i++) {
+    $expected = Expected-Total $students[$i] $meta
+    $actual = Excel-Round ([decimal]$students[$i].Total)
+    if ($actual -ne $expected) {
+      throw "Source total mismatch at record $($i + 1): expected $expected after Excel ROUND(...,0), received $actual. The source total may include a manual adjustment or be inconsistent with the configured formula."
+    }
+  }
+}
+
 function Get-StableSeed([string]$text) {
   $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text))
   return [System.BitConverter]::ToInt32($hash, 0) -band 0x7fffffff
@@ -254,12 +278,13 @@ function Set-Formula($sheet, [int]$row, [int]$col, [string]$formula) {
   $sheet.Range((CellAddress $row $col)).Formula = $formula
 }
 
-function Build-One($excel, [string]$sourceFile, [string]$outputDirectory) {
+function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [string]$outputFile = "") {
   $srcWb = $excel.Workbooks.Open($sourceFile, 0, $true)
   try {
     $srcSheet = $srcWb.Worksheets.Item(1)
     $meta = Read-Meta $srcSheet
     $students = @(Read-Students $srcSheet)
+    Assert-SourceTotals $students $meta
   } finally {
     $srcWb.Close($false)
   }
@@ -268,7 +293,9 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory) {
   if (-not $classCode -or $classCode -eq '.') {
     $classCode = [System.IO.Path]::GetFileNameWithoutExtension($sourceFile)
   }
-  $outPath = Join-Path $outputDirectory ("{0}-平时成绩记分册.xls" -f $classCode)
+  $outPath = if ($outputFile) { $outputFile } else { Join-Path $outputDirectory ("{0}-平时成绩记分册.xls" -f $classCode) }
+  $outParent = Split-Path -Parent $outPath
+  if ($outParent) { New-Item -ItemType Directory -Path $outParent -Force | Out-Null }
   Copy-Item -LiteralPath $TemplatePath -Destination $outPath -Force
 
   $wb = $excel.Workbooks.Open($outPath)
@@ -413,6 +440,16 @@ $sources = Resolve-SourceFiles $SourcePath
 if (-not $OutputDir) {
   $OutputDir = Join-Path (Split-Path -Parent $sources[0].FullName) '平时成绩记分册_生成'
 }
+if ($OutputFile) {
+  if ($sources.Count -ne 1) {
+    throw '-OutputFile can only be used when exactly one source workbook is selected.'
+  }
+  if (-not [System.IO.Path]::IsPathRooted($OutputFile)) {
+    $OutputFile = Join-Path $OutputDir $OutputFile
+  }
+  $OutputFile = [System.IO.Path]::GetFullPath($OutputFile)
+  $OutputDir = Split-Path -Parent $OutputFile
+}
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 
 $excel = New-Object -ComObject Excel.Application
@@ -422,7 +459,8 @@ $excel.AskToUpdateLinks = $false
 $results = @()
 try {
   foreach ($source in $sources) {
-    $builtValues = @(Build-One $excel $source.FullName $OutputDir)
+    $buildOutputFile = if ($OutputFile) { $OutputFile } else { '' }
+    $builtValues = @(Build-One $excel $source.FullName $OutputDir $buildOutputFile)
     foreach ($builtValue in $builtValues) {
       if ($null -ne $builtValue -and $null -ne $builtValue.PSObject.Properties['Output']) {
         $results += $builtValue
@@ -451,9 +489,10 @@ try {
         $validationDir = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-validation-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $validationDir -Force | Out-Null
         try {
-          Copy-Item -LiteralPath $result.Output -Destination (Join-Path $validationDir (Split-Path -Leaf $result.Output)) -Force
+          $validationFile = Join-Path $validationDir (Split-Path -Leaf $result.Output)
+          Copy-Item -LiteralPath $result.Output -Destination $validationFile -Force
           $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-          $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir) + $validationArgs
+          $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir, '--output-file', $validationFile) + $validationArgs
           & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
           if ($LASTEXITCODE -ne 0) { throw "Output validation failed: $($result.Output)" }
         } finally {
@@ -463,7 +502,7 @@ try {
     } else {
       $results[0].NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
       $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--qa-report', $qaPath) + $validationArgs
+      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $results[0].Output, '--qa-report', $qaPath) + $validationArgs
       & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
       if ($LASTEXITCODE -ne 0) { throw 'Output validation failed.' }
     }
@@ -472,7 +511,7 @@ try {
       foreach ($result in $results) {
         $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
         $qaPath = Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($result.Output)) + '.qa-report.json')
-        $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
+        $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $result.Output, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
         & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
         if ($LASTEXITCODE -ne 0) { throw "Could not write skipped QA report: $($result.Output)" }
       }
@@ -480,7 +519,7 @@ try {
       $result = $results[0]
       $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
       $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
+      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $result.Output, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
       & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
       if ($LASTEXITCODE -ne 0) { throw 'Could not write skipped QA report.' }
     }

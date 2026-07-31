@@ -78,7 +78,6 @@ validation:
   evaluation_rows: 14
   evaluation_columns: 4
   score_total: 100
-  score_tolerance: 0.1
   require_docx_open: true
   require_render_check: false
 fingerprint:

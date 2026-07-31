@@ -117,7 +117,7 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 - Use `course_name` in both the title and row 1 course cell.
 - Use natural Chinese teaching text for learning analysis, goals, teaching process, and reflection.
 - For 实训课, emphasize task output, tools,操作记录,成果包,互评, and过程性评价.
-- Scores should look realistic, usually 88.5-91.5, not all identical.
+- Scores should look realistic, usually 88.5-91.5, not all identical; input scores use 0.5-point increments.
 - Keep the canonical JSON provider-neutral so another agent or model can continue the task without reinterpreting the document template.
 - Do not change unrelated source files or existing folders without backing them up.
 

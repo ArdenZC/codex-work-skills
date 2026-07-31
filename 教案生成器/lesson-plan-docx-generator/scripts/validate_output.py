@@ -6,6 +6,7 @@ import json
 import math
 import sys
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,16 @@ def parse_number(value: Any, label: str) -> float:
         return float(str(value).strip())
     except (TypeError, ValueError) as exc:
         raise ValueError(f"{label} is not numeric: {value!r}") from exc
+
+
+def parse_decimal(value: Any, label: str) -> Decimal:
+    try:
+        number = Decimal(str(value).strip())
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValueError(f"{label} is not numeric: {value!r}") from exc
+    if not number.is_finite():
+        raise ValueError(f"{label} must be finite: {value!r}")
+    return number
 
 
 def _xml(element) -> str:
@@ -336,12 +347,12 @@ def validate_output_dir(
             if len(nested.rows) != int(nested_spec["rows"]) or len(nested.columns) != int(nested_spec["columns"]):
                 item_errors.append("evaluation table structure changed")
             score_values = [
-                parse_number(nested.cell(row, 2).text, f"evaluation score row {row}")
+                parse_decimal(nested.cell(row, 2).text, f"evaluation score row {row}")
                 for row in range(1, int(nested_spec["rows"]))
             ]
-            target = float(item.get("score", 89 + ((index - 1) % 6) * 0.5))
-            score_sum = round(sum(score_values), 1)
-            if not math.isclose(score_sum, target, abs_tol=float(manifest["validation"].get("score_tolerance", 0.1))):
+            target = parse_decimal(item.get("score", 89 + ((index - 1) % 6) * 0.5), f"evaluation target {index}")
+            score_sum = sum(score_values, Decimal("0"))
+            if score_sum != target:
                 item_errors.append(f"evaluation total mismatch: expected {target}, got {score_sum}")
         except (IndexError, ValueError) as exc:
             item_errors.append(f"evaluation table validation failed: {exc}")
