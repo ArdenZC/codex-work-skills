@@ -183,7 +183,11 @@ def _dimension_signature_for_row(sheet, row: int) -> tuple[Any, ...]:
 def _target_cell_format_signature(cell) -> dict[str, Any]:
     signature = _cell_format_signature(cell)
     alignment = list(signature["alignment"])
-    if alignment[0] in (None, "general"):
+    if alignment[0] in (None, "general") or (
+        alignment[0] == "left"
+        and isinstance(cell.value, str)
+        and not cell.value.startswith("=")
+    ):
         alignment[0] = "general"
     if alignment[1] in (None, "bottom"):
         alignment[1] = "bottom"
