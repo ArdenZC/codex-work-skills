@@ -25,6 +25,20 @@ If the user has not provided a source workbook, remind them that this skill need
 
 Use Excel COM on Windows to preserve legacy `.xls` formatting. Use the cross-platform Python/LibreOffice path on macOS/Linux or when Excel COM is unavailable.
 
+
+## Multi-Agent Use
+
+Treat the bundled generator scripts and the source workbook as the cross-agent contract. Codex loads this file as a skill; other agents should first read 通用提示词.md and the nearest tool adapter, then select the Windows or macOS/Linux path described here.
+
+- AGENTS.md is the shared baseline for Codex CLI, OpenCode, Windsurf, Cursor CLI, and GitHub Copilot agents.
+- CLAUDE.md and GEMINI.md are native entry points for Claude Code and Gemini CLI.
+- Cursor, Cline, Continue, Windsurf, GitHub Copilot, and Aider adapters are included in the package and can be copied into another project with scripts/install_adapters.py.
+- The workflow is model/provider independent. DeepSeek, Claude, GLM, Gemini, OpenAI, and other models can use it when their host tool can read files and run PowerShell or Python.
+- Never invent a source workbook. If 课程成绩单.xls is missing, remind the user to provide it.
+- The adapter installer skips existing files by default and creates a timestamped backup when --replace is explicitly supplied.
+
+Read 多Agent兼容说明.md for the compatibility matrix and platform-specific limitations.
+
 ## Workflow
 
 1. Locate the source workbook.
