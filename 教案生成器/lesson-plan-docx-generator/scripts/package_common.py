@@ -112,3 +112,46 @@ def field_spec(manifest: dict[str, Any], name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise KeyError(f"Manifest field is missing or invalid: {name}")
     return value
+
+
+def _numbered_text(items: list[Any]) -> str:
+    values = [str(item).strip() for item in items if str(item).strip()]
+    return "\n".join(f"{index}. {item}" for index, item in enumerate(values, 1))
+
+
+def _validate_composed_limit(label: str, value: str, spec: dict[str, Any]) -> None:
+    max_chars = spec.get("max_chars")
+    if max_chars is not None and len(value) > int(max_chars):
+        raise ValueError(f"{label} exceeds manifest max_chars={max_chars}: {len(value)}")
+    max_paragraphs = spec.get("max_paragraphs")
+    paragraph_count = len(value.splitlines()) or 1
+    if max_paragraphs is not None and paragraph_count > int(max_paragraphs):
+        raise ValueError(
+            f"{label} exceeds manifest max_paragraphs={max_paragraphs}: {paragraph_count}"
+        )
+
+
+def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> None:
+    teaching_spec = field_spec(manifest, "teaching_content")
+    title_spec = field_spec(manifest, "title")
+    for index, lesson in enumerate(data.get("lessons", []), start=1):
+        if not isinstance(lesson, dict):
+            continue
+        unit = str(lesson.get("unit", ""))
+        task = str(lesson.get("task", ""))
+        course = str(lesson.get("course_name") or data.get("course_name", ""))
+        flows = [str(item) for item in lesson.get("flows", [])]
+        knowledge = [str(item) for item in lesson.get("knowledge", [])]
+        teaching_content = (
+            f"围绕“{unit}”开展“{task}”，完成以下任务：\n"
+            f"{_numbered_text(flows)}\n"
+            f"核心知识点：\n"
+            f"{_numbered_text(knowledge)}"
+        )
+        _validate_composed_limit(
+            f"lessons[{index - 1}].teaching_content",
+            teaching_content,
+            teaching_spec,
+        )
+        title = f"{index} 《{course}》教学单元设计：{task}"
+        _validate_composed_limit(f"lessons[{index - 1}].title", title, title_spec)

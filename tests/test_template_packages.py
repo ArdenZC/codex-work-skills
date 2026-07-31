@@ -148,6 +148,41 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertIn("flows and knowledge combined must contain at most 8 items", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_composed_lesson_fields_reject_before_docx_generation(self) -> None:
+        cases = {
+            "teaching_content": {
+                "flows": ["流" * 200 for _ in range(8)],
+                "knowledge": [],
+                "message": "teaching_content exceeds manifest max_chars=1200",
+            },
+            "title": {
+                "course_name": "课" * 32,
+                "task": "任务" * 40,
+                "message": "title exceeds manifest max_chars=120",
+            },
+        }
+        for name, case in cases.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory(prefix="lesson-package-composed-") as temp_name:
+                folder = Path(temp_name)
+                payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+                payload["lessons"] = [payload["lessons"][0]]
+                payload["total_hours"] = 2
+                lesson = payload["lessons"][0]
+                lesson.update({key: value for key, value in case.items() if key != "message"})
+                source = folder / "tasks.json"
+                output = folder / "output"
+                source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+                result = run_script(
+                    LESSON / "scripts" / "generate_lesson_plans.py",
+                    "--tasks-json",
+                    str(source),
+                    "--output-dir",
+                    str(output),
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(case["message"], result.stderr)
+                self.assertFalse(output.exists())
+
     def test_score_precision_rejects_before_docx_generation(self) -> None:
         for invalid_score in (89.2, 89.25):
             with self.subTest(invalid_score=invalid_score), tempfile.TemporaryDirectory(prefix="lesson-package-score-") as temp_name:
@@ -781,6 +816,39 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(formatted_result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", formatted_result.stdout)
+
+    def test_custom_template_rejects_non_target_sheet_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-non-target-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            xlsx = xlsx_dir / "template.xlsx"
+            workbook = load_workbook(xlsx)
+            workbook["Sheet1"]["B1"] = "被修改的非目标工作表内容"
+            workbook["Sheet3"]["A1"] = "=1+1"
+            workbook.save(xlsx)
+            custom_dir = folder / "custom"
+            custom_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(custom_dir), str(xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            custom = custom_dir / "template.xls"
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:

@@ -143,6 +143,57 @@ def _dimension_signature(value: Any) -> float | None:
     return round(float(value), 1)
 
 
+def _non_target_dimension_signature(value: Any) -> float | None:
+    if value is None:
+        return None
+    # LibreOffice can shift compatibility-sheet dimensions by fractional units during an XLS round trip.
+    return round(float(value))
+
+
+def _non_target_sheet_signature(sheet) -> dict[str, Any]:
+    max_row = sheet.max_row
+    max_column = sheet.max_column
+    cells = []
+    for row in sheet.iter_rows(min_row=1, max_row=max_row, min_col=1, max_col=max_column):
+        cells.append(
+            [
+                {
+                    "value": cell.value,
+                    "data_type": cell.data_type,
+                    "format": _cell_format_signature(cell),
+                }
+                for cell in row
+            ]
+        )
+    return {
+        "dimension": [max_row, max_column],
+        "cells": cells,
+        "merged": sorted(str(item).upper() for item in sheet.merged_cells.ranges),
+        "column_widths": {
+            key: {
+                "width": _non_target_dimension_signature(value.width),
+                "hidden": bool(value.hidden),
+                "outline_level": value.outlineLevel,
+                "collapsed": bool(value.collapsed),
+            }
+            for key, value in sheet.column_dimensions.items()
+        },
+        "row_heights": {
+            str(key): {
+                "height": _non_target_dimension_signature(value.height),
+                "hidden": bool(value.hidden),
+                "outline_level": value.outlineLevel,
+                "collapsed": bool(value.collapsed),
+            }
+            for key, value in sheet.row_dimensions.items()
+            if value.height is not None or value.hidden or value.outlineLevel or value.collapsed
+        },
+        "orientation": sheet.page_setup.orientation,
+        "print_area": str(sheet.print_area or ""),
+        "freeze_panes": str(sheet.freeze_panes or ""),
+    }
+
+
 def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[str, Any]]:
     differences: list[dict[str, Any]] = []
     if isinstance(left, dict) and isinstance(right, dict):
@@ -200,6 +251,11 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
     return {
         "sheetnames": list(workbook.sheetnames),
         "sheet_states": {sheet.title: sheet.sheet_state for sheet in workbook.worksheets},
+        "non_target_sheets": {
+            sheet.title: _non_target_sheet_signature(sheet)
+            for sheet in workbook.worksheets
+            if sheet.title != sheet_name
+        },
         "dimension": [ws.max_row, ws.max_column],
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},

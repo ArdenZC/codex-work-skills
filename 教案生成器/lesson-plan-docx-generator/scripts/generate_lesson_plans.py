@@ -16,7 +16,7 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.table import _Cell
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_spec, load_manifest, manifest_template_path, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -301,6 +301,7 @@ def main() -> None:
     with open(args.tasks_json, "r", encoding="utf-8") as f:
         meta = json.load(f)
     validate_input(meta, args.schema)
+    validate_composed_fields(meta, manifest)
     lessons = meta["lessons"]
 
     template_warnings: list[str] = []

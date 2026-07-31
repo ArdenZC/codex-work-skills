@@ -14,7 +14,7 @@ from docx import Document
 from docx.table import _Cell
 from lxml import etree
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, field_spec, load_manifest, manifest_template_path, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
 
 
 def actual_cells(row) -> list[_Cell]:
@@ -246,6 +246,7 @@ def validate_output_dir(
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_input(data, schema_path)
+    validate_composed_fields(data, manifest)
     lessons = data["lessons"]
     files = sorted(out_dir.glob("*.docx"))
     report = _base_qa_report(
