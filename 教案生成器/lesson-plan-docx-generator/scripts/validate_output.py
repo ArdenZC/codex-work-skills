@@ -15,7 +15,7 @@ from docx import Document
 from docx.table import _Cell
 from lxml import etree
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, composed_lesson_fields, field_spec, load_manifest, manifest_template_path, validate_composed_fields, validate_input
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
@@ -179,6 +179,11 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
             {
                 "header": _xml(section.header._element),
                 "footer": _xml(section.footer._element),
+                "first_page_header": _xml(section.first_page_header._element),
+                "first_page_footer": _xml(section.first_page_footer._element),
+                "even_page_header": _xml(section.even_page_header._element),
+                "even_page_footer": _xml(section.even_page_footer._element),
+                "odd_and_even_pages_header_footer": bool(document.settings.odd_and_even_pages_header_footer),
             }
             for section in document.sections
         ],
@@ -435,6 +440,17 @@ def validate_output_dir(
             item_errors.append("unit field mismatch")
         if field_values["task"] != str(item["task"]):
             item_errors.append("task field mismatch")
+        composed = composed_lesson_fields(
+            str(item["unit"]),
+            str(item["task"]),
+            item.get("flows", []),
+            item.get("knowledge", []),
+            item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"),
+        )
+        for name, expected in composed.items():
+            actual = manifest_field_text(document, table, manifest, name)
+            if actual != expected:
+                item_errors.append(f"{name} content mismatch")
         try:
             hours = parse_number(field_values["hours"], "hours")
             expected_hours = parse_number(item["hours"], "input hours")

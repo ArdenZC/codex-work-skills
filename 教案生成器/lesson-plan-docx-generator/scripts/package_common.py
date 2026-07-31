@@ -126,6 +126,31 @@ def _numbered_text(items: list[Any]) -> str:
     return "\n".join(f"{index}. {item}" for index, item in enumerate(values, 1))
 
 
+def composed_lesson_fields(
+    unit: str,
+    task: str,
+    flows: list[Any],
+    knowledge: list[Any],
+    tools: Any = "课程PPT、微课视频、任务单、评分表和成果模板",
+) -> dict[str, str]:
+    numbered_flows = _numbered_text(flows)
+    numbered_knowledge = _numbered_text(knowledge)
+    return {
+        "teaching_content": (
+            f"围绕“{unit}”开展“{task}”，完成以下任务：\n"
+            f"{numbered_flows}\n"
+            f"核心知识点：\n"
+            f"{numbered_knowledge}"
+        ).rstrip("\n"),
+        "knowledge_goal": numbered_knowledge or f"1. 理解{task}的核心概念\n2. 掌握相关流程和成果要求",
+        "resources": (
+            "1. 教学环境：标准机房、多媒体设备、网络环境及课程实训平台\n"
+            f"2. 实训工具：{str(tools)}\n"
+            "3. 数字资源：课程PPT、微课视频、任务单、评分表和成果模板"
+        ),
+    }
+
+
 def implementation_cell_values(task: str, flows: list[Any]) -> list[dict[int, str]]:
     numbered_flows = _numbered_text(flows[:3])
     return [
@@ -221,33 +246,33 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
         course = str(lesson.get("course_name") or data.get("course_name", ""))
         flows = [str(item) for item in lesson.get("flows", [])]
         knowledge = [str(item) for item in lesson.get("knowledge", [])]
-        teaching_content = (
-            f"围绕“{unit}”开展“{task}”，完成以下任务：\n"
-            f"{_numbered_text(flows)}\n"
-            f"核心知识点：\n"
-            f"{_numbered_text(knowledge)}"
+        composed = composed_lesson_fields(
+            unit,
+            task,
+            flows,
+            knowledge,
+            lesson.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"),
         )
         _validate_composed_limit(
             f"lessons[{index - 1}].teaching_content",
-            teaching_content,
+            composed["teaching_content"],
             teaching_spec,
         )
-        knowledge_goal = _numbered_text(knowledge) or f"1. 理解{task}的核心概念\n2. 掌握相关流程和成果要求"
         _validate_composed_limit(
             f"lessons[{index - 1}].knowledge_goal",
-            knowledge_goal,
+            composed["knowledge_goal"],
             knowledge_goal_spec,
-        )
-        tools = str(lesson.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"))
-        resources = (
-            "1. 教学环境：标准机房、多媒体设备、网络环境及课程实训平台\n"
-            f"2. 实训工具：{tools}\n"
-            "3. 数字资源：课程PPT、微课视频、任务单、评分表和成果模板"
         )
         _validate_composed_limit(
             f"lessons[{index - 1}].resources",
-            resources,
+            composed["resources"],
             resources_spec,
+        )
+        hours_spec = field_spec(manifest, "hours")
+        _validate_composed_limit(
+            f"lessons[{index - 1}].hours",
+            str(lesson.get("hours", "")).strip(),
+            hours_spec,
         )
         for row_index, values in enumerate(implementation_cell_values(task, flows), start=1):
             for cell_index, value in values.items():

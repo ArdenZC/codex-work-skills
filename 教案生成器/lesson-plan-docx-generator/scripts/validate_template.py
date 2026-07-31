@@ -152,6 +152,11 @@ def _section_signature(document) -> list[dict[str, Any]]:
                 "footer": [p.text for p in section.footer.paragraphs],
                 "header_xml": etree.tostring(copy.deepcopy(section.header._element), encoding="unicode"),
                 "footer_xml": etree.tostring(copy.deepcopy(section.footer._element), encoding="unicode"),
+                "first_page_header_xml": etree.tostring(copy.deepcopy(section.first_page_header._element), encoding="unicode"),
+                "first_page_footer_xml": etree.tostring(copy.deepcopy(section.first_page_footer._element), encoding="unicode"),
+                "even_page_header_xml": etree.tostring(copy.deepcopy(section.even_page_header._element), encoding="unicode"),
+                "even_page_footer_xml": etree.tostring(copy.deepcopy(section.even_page_footer._element), encoding="unicode"),
+                "odd_and_even_pages_header_footer": bool(document.settings.odd_and_even_pages_header_footer),
             }
         )
     return result

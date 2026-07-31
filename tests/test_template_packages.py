@@ -148,6 +148,25 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertIn("Input schema validation failed", result.stderr)
             self.assertFalse(output.exists())
 
+    def test_numeric_lesson_hours_length_rejects_before_docx_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-numeric-hours-length-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"][0]["hours"] = 1234567890123
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("hours exceeds manifest max_chars=12", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_invalid_total_hours_reject_before_docx_generation(self) -> None:
         for invalid_total in ("abc", "-2", 0, "0"):
             with self.subTest(invalid_total=invalid_total), tempfile.TemporaryDirectory(prefix="lesson-package-total-hours-") as temp_name:
@@ -737,6 +756,33 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("protected DOCX layout changed", result.stderr)
+
+    def test_output_validation_rejects_composed_content_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-composed-output-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            document.tables[0].cell(4, 1).text = "被替换的教学内容"
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("teaching_content content mismatch", result.stderr)
 
 
 class GradebookTotalRuleTests(unittest.TestCase):

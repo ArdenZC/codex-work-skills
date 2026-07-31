@@ -17,7 +17,7 @@ from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.table import _Cell
 
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_spec, implementation_cell_values, load_manifest, manifest_template_path, validate_composed_fields, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, composed_lesson_fields, ensure_supported_major, field_spec, implementation_cell_values, load_manifest, manifest_template_path, validate_composed_fields, validate_input
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -199,6 +199,7 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     flows = [str(x) for x in item.get("flows", [])]
     knowledge = [str(x) for x in item.get("knowledge", [])]
     tools = str(item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"))
+    composed = composed_lesson_fields(unit, task, flows, knowledge, tools)
     score = float(item.get("score", 89 + ((seq - 1) % 6) * 0.5))
 
     doc = Document(str(template))
@@ -218,16 +219,16 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     set_manifest_field(table, manifest, "student_base", "1. 已具备相关课程基础，能理解任务涉及的基本概念\n2. 能按照教师演示完成基本工具操作\n3. 对项目案例、实操训练和线上资源接受度较高")
     set_manifest_field(table, manifest, "student_problems", "1. 理论知识向任务迁移时容易停留在照步骤操作\n2. 操作记录、结果分析和成果表达不够规范\n3. 小组分工、工具使用和成果整理能力存在差异")
     set_manifest_field(table, manifest, "student_strategy", "1. 以项目任务驱动教学，明确每次课成果\n2. 提供任务单、模板和检查表降低入门难度\n3. 通过过程性评分和小组互评及时反馈改进")
-    set_manifest_field(table, manifest, "teaching_content", f"围绕“{unit}”开展“{task}”，完成以下任务：\n{numbered(flows)}\n核心知识点：\n{numbered(knowledge)}")
+    set_manifest_field(table, manifest, "teaching_content", composed["teaching_content"])
     set_manifest_field(table, manifest, "quality_goal", "1. 培养规范操作、职业责任和质量意识\n2. 树立严谨记录、客观评价和持续改进的工程态度\n3. 强化团队协作、诚信意识和数据安全意识")
-    set_manifest_field(table, manifest, "knowledge_goal", numbered(knowledge) or f"1. 理解{task}的核心概念\n2. 掌握相关流程和成果要求")
+    set_manifest_field(table, manifest, "knowledge_goal", composed["knowledge_goal"])
     set_manifest_field(table, manifest, "ability_goal", f"1. 能根据任务要求完成{task}相关操作\n2. 能按模板提交规范成果\n3. 能对任务结果进行说明、分析和改进")
     set_manifest_field(table, manifest, "key_content", f"{task}的操作流程、成果规范和结果分析")
     set_manifest_field(table, manifest, "key_strategy", "任务驱动、教师示范、分组实训、过程评价")
     set_manifest_field(table, manifest, "difficult_content", f"在真实项目情境下完成{task}并形成规范成果")
     set_manifest_field(table, manifest, "difficult_strategy", "提供模板清单、分步演示、同伴互评和教师点评")
     set_manifest_field(table, manifest, "teaching_methods", "项目教学法、任务驱动法、演示法、分组实训法、成果评价法")
-    set_manifest_field(table, manifest, "resources", f"1. 教学环境：标准机房、多媒体设备、网络环境及课程实训平台\n2. 实训工具：{tools}\n3. 数字资源：课程PPT、微课视频、任务单、评分表和成果模板")
+    set_manifest_field(table, manifest, "resources", composed["resources"])
     set_manifest_field(table, manifest, "references", "1. 课程配套教学资源\n2. 相关课程标准、项目任务书及主流工具官方文档\n3. 行业案例资料和实训成果模板")
     evaluation_spec = manifest["structure"]["evaluation_table"]
     evaluation_cell = actual_cells(table.rows[int(evaluation_spec["row"])])[int(evaluation_spec["cell"])]
