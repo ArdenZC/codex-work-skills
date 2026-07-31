@@ -12,24 +12,27 @@ from pathlib import Path
 from typing import Any
 
 from docx import Document
+from docx.oxml.ns import qn
 from docx.table import _Cell
 from lxml import etree
 
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
-    composed_lesson_fields,
+    EVALUATION_MAX_POINTS,
+    evaluation_cell_values,
     field_spec,
+    generated_lesson_fields,
     implementation_cell_values,
     load_manifest,
     manifest_template_path,
+    reflection_cell_values,
     validate_composed_fields,
     validate_input,
 )
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
-EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
 
 
 def actual_cells(row) -> list[_Cell]:
@@ -108,6 +111,29 @@ def _body_paragraph_signature(document, manifest: dict[str, Any]) -> list[dict[s
         for index, paragraph in enumerate(document.paragraphs)
         if index != title_index
     ]
+
+
+def _title_format_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
+    title_spec = manifest.get("fields", {}).get("title", {})
+    title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+    if title_index < 0 or title_index >= len(document.paragraphs):
+        return {"paragraph": "", "run_formats": [], "run_primary": ""}
+    paragraph = document.paragraphs[title_index]
+    ppr = copy.deepcopy(paragraph._p.pPr)
+    if ppr is not None:
+        for child in list(ppr):
+            if child.tag == qn("w:jc"):
+                ppr.remove(child)
+    run_values = [
+        etree.tostring(copy.deepcopy(run._r.rPr), encoding="unicode")
+        for run in paragraph.runs
+        if run._r.rPr is not None
+    ]
+    return {
+        "paragraph": etree.tostring(ppr, encoding="unicode") if ppr is not None else "",
+        "run_formats": sorted({value for value in run_values if value}),
+        "run_primary": next((value for value in run_values if value), ""),
+    }
 
 
 def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
@@ -264,6 +290,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "styles": _xml(document.styles._element),
         "themes": _theme_signature(document),
         "body_paragraphs": _body_paragraph_signature(document, manifest),
+        "title_format": _title_format_signature(document, manifest),
         "protected_text": _protected_text_signature(document, manifest),
         "writable_direct_formats": _writable_direct_format_signature(document, manifest),
     }
@@ -272,9 +299,25 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
 def _protected_layout_matches(actual: dict[str, Any], expected: dict[str, Any]) -> bool:
     actual_direct = actual.get("writable_direct_formats", [])
     expected_direct = expected.get("writable_direct_formats", [])
-    actual_base = {key: value for key, value in actual.items() if key != "writable_direct_formats"}
-    expected_base = {key: value for key, value in expected.items() if key != "writable_direct_formats"}
+    actual_title = actual.get("title_format", {})
+    expected_title = expected.get("title_format", {})
+    actual_base = {
+        key: value
+        for key, value in actual.items()
+        if key not in {"writable_direct_formats", "title_format"}
+    }
+    expected_base = {
+        key: value
+        for key, value in expected.items()
+        if key not in {"writable_direct_formats", "title_format"}
+    }
     if actual_base != expected_base or len(actual_direct) != len(expected_direct):
+        return False
+    if actual_title.get("paragraph", "") != expected_title.get("paragraph", ""):
+        return False
+    if not set(actual_title.get("run_formats", [])).issubset(set(expected_title.get("run_formats", []))):
+        return False
+    if expected_title.get("run_primary") and expected_title["run_primary"] not in actual_title.get("run_formats", []):
         return False
 
     # Text replacement can collapse source runs/paragraphs, so output formats may be a subset of the template formats.
@@ -548,14 +591,14 @@ def validate_output_dir(
             item_errors.append("unit field mismatch")
         if field_values["task"] != str(item["task"]):
             item_errors.append("task field mismatch")
-        composed = composed_lesson_fields(
+        generated = generated_lesson_fields(
             str(item["unit"]),
             str(item["task"]),
             item.get("flows", []),
             item.get("knowledge", []),
             item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"),
         )
-        for name, expected in composed.items():
+        for name, expected in generated.items():
             actual = manifest_field_text(document, table, manifest, name)
             if actual != expected:
                 item_errors.append(f"{name} content mismatch")
@@ -598,6 +641,13 @@ def validate_output_dir(
                 if actual_value != expected_text:
                     item_errors.append(f"implementation cell mismatch at row {row_index} cell {cell_index}")
 
+        reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
+        for row_index, expected_value in zip(reflection_rows, reflection_cell_values(str(item["task"]))):
+            cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
+            actual_value = cells[2].text if len(cells) > 2 else ""
+            if actual_value != expected_value:
+                item_errors.append(f"reflection cell mismatch at row {row_index} cell 2")
+
         nested_spec = manifest["structure"]["evaluation_table"]
         try:
             eval_cell = actual_cells(table.rows[int(nested_spec["row"])])[int(nested_spec["cell"])]
@@ -613,6 +663,11 @@ def validate_output_dir(
             score_sum = sum(score_values, Decimal("0"))
             if score_sum != target:
                 item_errors.append(f"evaluation total mismatch: expected {target}, got {score_sum}")
+            for row_index, expected_values in enumerate(evaluation_cell_values(float(target), index), start=1):
+                for cell_index, expected_value in expected_values.items():
+                    actual_value = nested.cell(row_index, cell_index).text.strip()
+                    if actual_value != expected_value:
+                        item_errors.append(f"evaluation cell mismatch at row {row_index} cell {cell_index}")
         except (IndexError, ValueError) as exc:
             item_errors.append(f"evaluation table validation failed: {exc}")
 

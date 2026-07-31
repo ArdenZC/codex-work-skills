@@ -111,6 +111,29 @@ def _body_paragraph_signature(document, manifest: dict[str, Any]) -> list[dict[s
     ]
 
 
+def _title_format_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
+    title_spec = manifest.get("fields", {}).get("title", {})
+    title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+    if title_index < 0 or title_index >= len(document.paragraphs):
+        return {"paragraph": "", "run_formats": [], "run_primary": ""}
+    paragraph = document.paragraphs[title_index]
+    ppr = copy.deepcopy(paragraph._p.pPr)
+    if ppr is not None:
+        for child in list(ppr):
+            if child.tag == qn("w:jc"):
+                ppr.remove(child)
+    run_values = [
+        etree.tostring(copy.deepcopy(run._r.rPr), encoding="unicode")
+        for run in paragraph.runs
+        if run._r.rPr is not None
+    ]
+    return {
+        "paragraph": etree.tostring(ppr, encoding="unicode") if ppr is not None else "",
+        "run_formats": sorted({value for value in run_values if value}),
+        "run_primary": next((value for value in run_values if value), ""),
+    }
+
+
 def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable_cells, evaluation_cell = _writable_main_table_cells(manifest)
@@ -134,6 +157,7 @@ def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
         "styles": _styles_signature(document),
         "themes": _theme_signature(document),
         "body_paragraphs": _body_paragraph_signature(document, manifest),
+        "title_format": _title_format_signature(document, manifest),
     }
 
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +14,12 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 MAX_TEACHING_CONTENT_ITEMS = 8
+EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
+EVALUATION_REMARKS = [
+    ["出勤正常", "注意力较稳", "参与较积极", "规范意识较好", "质量意识较强", "安全意识较好", "习惯较好", "预习较完整", "答题较准确", "作业较认真", "实操较熟练", "展示较清楚"],
+    ["基本到课", "个别环节需提醒", "能主动配合", "流程执行较规范", "能联系项目实际", "职业责任意识较好", "工具使用较规范", "线上学习较及时", "讨论质量尚可", "提交较规范", "任务完成度较高", "汇报条理较清楚"],
+    ["考勤良好", "专注度尚可", "参与较自然", "记录较规范", "质量观念较到位", "能注意风险控制", "实训习惯较好", "资料阅读较完整", "关键问题掌握较好", "成果较完整", "能完成主要步骤", "演示基本清楚"],
+]
 
 
 def load_manifest(path: Path | str = DEFAULT_MANIFEST) -> dict[str, Any]:
@@ -149,6 +155,78 @@ def composed_lesson_fields(
             "3. 数字资源：课程PPT、微课视频、任务单、评分表和成果模板"
         ),
     }
+
+
+def generated_lesson_fields(
+    unit: str,
+    task: str,
+    flows: list[Any],
+    knowledge: list[Any],
+    tools: Any = "课程PPT、微课视频、任务单、评分表和成果模板",
+) -> dict[str, str]:
+    composed = composed_lesson_fields(unit, task, flows, knowledge, tools)
+    return {
+        "student_base": "1. 已具备相关课程基础，能理解任务涉及的基本概念\n2. 能按照教师演示完成基本工具操作\n3. 对项目案例、实操训练和线上资源接受度较高",
+        "student_problems": "1. 理论知识向任务迁移时容易停留在照步骤操作\n2. 操作记录、结果分析和成果表达不够规范\n3. 小组分工、工具使用和成果整理能力存在差异",
+        "student_strategy": "1. 以项目任务驱动教学，明确每次课成果\n2. 提供任务单、模板和检查表降低入门难度\n3. 通过过程性评分和小组互评及时反馈改进",
+        "teaching_content": composed["teaching_content"],
+        "quality_goal": "1. 培养规范操作、职业责任和质量意识\n2. 树立严谨记录、客观评价和持续改进的工程态度\n3. 强化团队协作、诚信意识和数据安全意识",
+        "knowledge_goal": composed["knowledge_goal"],
+        "ability_goal": f"1. 能根据任务要求完成{task}相关操作\n2. 能按模板提交规范成果\n3. 能对任务结果进行说明、分析和改进",
+        "key_content": f"{task}的操作流程、成果规范和结果分析",
+        "key_strategy": "任务驱动、教师示范、分组实训、过程评价",
+        "difficult_content": f"在真实项目情境下完成{task}并形成规范成果",
+        "difficult_strategy": "提供模板清单、分步演示、同伴互评和教师点评",
+        "teaching_methods": "项目教学法、任务驱动法、演示法、分组实训法、成果评价法",
+        "resources": composed["resources"],
+        "references": "1. 课程配套教学资源\n2. 相关课程标准、项目任务书及主流工具官方文档\n3. 行业案例资料和实训成果模板",
+    }
+
+
+def reflection_cell_values(task: str) -> list[str]:
+    return [
+        f"多数学生能按要求完成{task}，对任务流程和成果规范有较清晰认识；少数学生在记录完整性和结果分析上仍需加强。",
+        "以项目任务贯穿教学，突出实操产出和过程评价，学生参与度较高，互评环节能促进成果完善。",
+        "后续增加优秀成果样例和常见错误清单，对基础薄弱学生提供分步检查表，对能力较强学生增加扩展场景。",
+    ]
+
+
+def score_breakdown(target: float) -> list[float]:
+    target_decimal = Decimal(str(target))
+    target_units_decimal = target_decimal * 2
+    if target_units_decimal != target_units_decimal.to_integral_value():
+        raise ValueError(f"Evaluation score must use 0.5-point increments: {target}")
+    target_units = int(target_units_decimal)
+    scores_units = [
+        int((Decimal(point) * target_decimal * 2 / 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        for point in EVALUATION_MAX_POINTS
+    ]
+    diff_units = target_units - sum(scores_units)
+    step = 1 if diff_units > 0 else -1
+    order = [10, 8, 9, 12, 2, 7, 11, 3, 4, 5, 6, 1, 0]
+    while diff_units:
+        changed = False
+        for pos in order:
+            candidate = scores_units[pos] + step
+            if 0 <= candidate <= EVALUATION_MAX_POINTS[pos] * 2:
+                scores_units[pos] = candidate
+                diff_units = target_units - sum(scores_units)
+                changed = True
+                break
+        if not changed:
+            break
+    return [units / 2 for units in scores_units]
+
+
+def evaluation_cell_values(target: float, sequence: int) -> list[dict[int, str]]:
+    target_value = float(target)
+    remarks = EVALUATION_REMARKS[(sequence - 1) % len(EVALUATION_REMARKS)]
+    values = []
+    for row_index, score in enumerate(score_breakdown(target_value), start=1):
+        display = str(int(score)) if abs(score - int(score)) < 0.01 else f"{score:.1f}"
+        note = remarks[row_index - 1] if row_index <= 12 else f"综合{target_value:.1f}分，后续加强完整项目迁移"
+        values.append({2: display, 3: note})
+    return values
 
 
 def implementation_cell_values(task: str, flows: list[Any]) -> list[dict[int, str]]:

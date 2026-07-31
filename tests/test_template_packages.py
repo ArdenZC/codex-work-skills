@@ -16,6 +16,7 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
+from docx.table import _Cell
 from openpyxl import Workbook, load_workbook
 
 
@@ -455,6 +456,22 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
 
+    def test_custom_lesson_template_rejects_title_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-title-format-guard-") as temp_name:
+            custom = Path(temp_name) / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            document.paragraphs[0].runs[0].font.size = Pt(19)
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
+
     def test_custom_lesson_template_rejects_header_footer_formatting_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-header-format-guard-") as temp_name:
             custom = Path(temp_name) / "custom.docx"
@@ -557,6 +574,27 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     Decimal("0"),
                 )
                 self.assertEqual(score_sum, Decimal(str(item["score"])))
+
+    def test_generation_copies_direct_formatting_to_added_multiline_paragraphs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-multiline-format-") as temp_name:
+            output = Path(temp_name) / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            template_cell = Document(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx").tables[0].cell(4, 1)
+            output_cell = Document(sorted(output.glob("*.docx"))[0]).tables[0].cell(4, 1)
+            self.assertGreater(len(output_cell.paragraphs), 1)
+            source_ppr = template_cell.paragraphs[0]._p.pPr.xml
+            source_rpr = template_cell.paragraphs[0].runs[0]._r.rPr.xml
+            for paragraph in output_cell.paragraphs[1:]:
+                self.assertEqual(paragraph._p.pPr.xml, source_ppr)
+                self.assertEqual(paragraph.runs[0]._r.rPr.xml, source_rpr)
 
     def test_output_validation_orders_three_digit_lesson_files_numerically(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-three-digit-") as temp_name:
@@ -808,6 +846,33 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("protected DOCX layout changed", result.stderr)
 
+    def test_output_validation_rejects_title_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-title-output-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            document.paragraphs[0].runs[0].font.size = Pt(19)
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
     def test_output_validation_rejects_removed_writable_direct_formatting(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-direct-format-removal-guard-") as temp_name:
             folder = Path(temp_name)
@@ -823,12 +888,13 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             path = sorted(output.glob("*.docx"))[0]
             document = Document(path)
-            paragraph = document.tables[0].cell(4, 1).paragraphs[0]
-            if paragraph._p.pPr is not None:
-                paragraph._p.remove(paragraph._p.pPr)
-            for run in paragraph.runs:
-                if run._r.rPr is not None:
-                    run._r.remove(run._r.rPr)
+            cell = document.tables[0].cell(4, 1)
+            for paragraph in cell.paragraphs:
+                if paragraph._p.pPr is not None:
+                    paragraph._p.remove(paragraph._p.pPr)
+                for run in paragraph.runs:
+                    if run._r.rPr is not None:
+                        run._r.remove(run._r.rPr)
             document.save(path)
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",
@@ -893,6 +959,63 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("implementation cell mismatch", result.stderr)
+
+    def test_output_validation_rejects_deterministic_field_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-deterministic-output-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            ability_cell = _Cell(document.tables[0].rows[6]._tr.tc_lst[3], document.tables[0].rows[6]._parent)
+            ability_cell.text = "被替换的能力目标"
+            document.tables[0].cell(29, 2).text = "被替换的教学反思"
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("ability_goal content mismatch", result.stderr)
+            self.assertIn("reflection cell mismatch", result.stderr)
+
+    def test_output_validation_rejects_evaluation_cell_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-evaluation-output-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            document.tables[0].cell(12, 1).tables[0].cell(1, 3).text = "被篡改评价备注"
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("evaluation cell mismatch", result.stderr)
 
 
 class GradebookTotalRuleTests(unittest.TestCase):
