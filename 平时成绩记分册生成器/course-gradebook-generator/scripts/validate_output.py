@@ -21,6 +21,7 @@ from package_common import (
     column_number,
     load_manifest,
     manifest_template_path,
+    percentage_label,
     source_total_matches,
     validate_input,
 )
@@ -589,8 +590,8 @@ def validate_output_dir(
                     errors.extend(_scan_formula_errors(formulas, values))
 
                     expected_headers = {
-                        "regular": f"平时成绩({round(float(data['weights']['regular']) * 100)}%)",
-                        "theory": f"理论成绩({round(float(data['weights']['theory']) * 100)}%)",
+                        "regular": f"平时成绩({percentage_label(data['weights']['regular'])}%)",
+                        "theory": f"理论成绩({percentage_label(data['weights']['theory'])}%)",
                         "total": "总评\n成绩",
                     }
                     header_cells = structure["headers"]
@@ -604,7 +605,7 @@ def validate_output_dir(
                         errors.append(f"total header mismatch: expected {expected_headers['total']!r}, got {actual_total_header!r}")
                     if skill_enabled:
                         skill_header = str(ws_values[header_cells["skill"]].value or "").replace("\r\n", "\n")
-                        expected_skill_header = f"技能成绩（{round(float(data['weights']['skill']) * 100)}%）"
+                        expected_skill_header = f"技能成绩（{percentage_label(data['weights']['skill'])}%）"
                         if skill_header != expected_skill_header:
                             errors.append(f"skill header mismatch: expected {expected_skill_header!r}, got {skill_header!r}")
                     else:

@@ -12,6 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from docx import Document
+from docx.shared import Pt
 from openpyxl import Workbook, load_workbook
 
 
@@ -64,6 +65,25 @@ class LessonTemplatePackageTests(unittest.TestCase):
             validate_input({"course_name": "软件测试", "lessons": [{"unit": "", "task": "", "hours": "2"}]})
         with self.assertRaises(ValueError):
             validate_input({"course_name": "课" * 33, "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]})
+
+    def test_non_projectized_unit_rejects_before_docx_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-unit-guard-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"][0]["unit"] = "第一章 基础测试"
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("projectized teaching", result.stderr)
+            self.assertFalse(output.exists())
 
     def test_score_precision_accepts_half_points_and_defaults(self) -> None:
         sys.modules.pop("package_common", None)
@@ -378,6 +398,22 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
 
+    def test_custom_lesson_template_rejects_style_definition_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-style-guard-") as temp_name:
+            custom = Path(temp_name) / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            document.styles["Normal"].font.size = Pt(13)
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected main-table structure or formatting", result.stdout)
+
     def test_generation_writes_qa_report_and_preserves_structure(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-test-") as temp_name:
             output = Path(temp_name) / "output"
@@ -664,6 +700,7 @@ class GradebookPowerShellContractTests(unittest.TestCase):
     def test_com_path_uses_same_rounding_preflight_and_exact_output_contract(self) -> None:
         script = (GRADE / "scripts" / "generate_gradebook.ps1").read_text(encoding="utf-8-sig")
         self.assertIn("function Excel-Round", script)
+        self.assertIn("function Format-Percentage-Label", script)
         self.assertIn("[System.MidpointRounding]::AwayFromZero", script)
         self.assertIn("function Assert-ManifestCompatibility", script)
         self.assertIn("Assert-ManifestCompatibility $ManifestData", script)
@@ -695,15 +732,18 @@ class GradebookTemplatePackageTests(unittest.TestCase):
         leading_zero: bool = False,
         total_delta: float = 0.0,
         regular_override: float | None = None,
+        regular_pct: float | None = None,
+        theory_pct: float | None = None,
+        skill_pct: float | None = None,
     ) -> Path:
         xlsx = folder / "课程成绩单.xlsx"
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "成绩单"
-        regular_pct = 0.5 if skill else 0.6
-        theory_pct = 0.3 if skill else 0.4
-        skill_pct = 0.2 if skill else 0.0
-        sheet["A2"] = f"课程名称:软件测试实训 教师:张老师 上课班级:软件技术2401班 成绩项目比例:技能成绩{int(skill_pct * 100)}% 理论成绩{int(theory_pct * 100)}% 平时成绩{int(regular_pct * 100)}%"
+        regular_pct = (0.5 if skill else 0.6) if regular_pct is None else regular_pct
+        theory_pct = (0.3 if skill else 0.4) if theory_pct is None else theory_pct
+        skill_pct = (0.2 if skill else 0.0) if skill_pct is None else skill_pct
+        sheet["A2"] = f"课程名称:软件测试实训 教师:张老师 上课班级:软件技术2401班 成绩项目比例:技能成绩{skill_pct * 100:g}% 理论成绩{theory_pct * 100:g}% 平时成绩{regular_pct * 100:g}%"
         sheet["A3"] = "开课学期:2025-2026-2"
         headers = ["学号", "姓名", "平时成绩", "理论成绩"] + (["技能成绩"] if skill else []) + ["总成绩"]
         for col, value in enumerate(headers, start=1):
@@ -773,6 +813,33 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             generated = next(output.glob("*.xls"))
             self.assertEqual(report["output_file"], generated.name)
             self.assertEqual(report["files_checked"], 1)
+
+    def test_python_generator_preserves_fractional_weight_headers(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-fractional-weights-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, skill=True, regular_pct=0.333, theory_pct=0.333, skill_pct=0.334)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            xlsx_dir = folder / "xlsx-output"
+            xlsx_dir.mkdir()
+            generated = next(output.glob("*.xls"))
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(generated)],
+                check=True,
+                capture_output=True,
+            )
+            workbook = load_workbook(next(xlsx_dir.glob("*.xlsx")), data_only=False)
+            sheet = workbook["平时成绩"]
+            self.assertEqual(sheet["D3"].value, "平时成绩(33.3%)")
+            self.assertEqual(sheet["M3"].value, "理论成绩(33.3%)")
+            self.assertEqual(sheet["O3"].value, "技能成绩（33.4%）")
 
     def test_output_validation_rejects_theory_score_mismatch(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-theory-mismatch-") as temp_name:

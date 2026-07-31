@@ -161,6 +161,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
             }
             for section in document.sections
         ],
+        "styles": _xml(document.styles._element),
         "protected_text": _protected_text_signature(document, manifest),
     }
 

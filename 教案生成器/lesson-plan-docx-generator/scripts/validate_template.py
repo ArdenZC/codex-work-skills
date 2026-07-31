@@ -86,7 +86,12 @@ def _writable_main_table_cells(manifest: dict[str, Any]) -> tuple[set[tuple[int,
     return writable, evaluation
 
 
-def _main_table_signature(table, manifest: dict[str, Any]) -> dict[str, Any]:
+def _styles_signature(document) -> str:
+    return etree.tostring(copy.deepcopy(document.styles._element), encoding="unicode")
+
+
+def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
+    table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable_cells, evaluation_cell = _writable_main_table_cells(manifest)
     rows = []
     for row_index, row in enumerate(table.rows):
@@ -105,6 +110,7 @@ def _main_table_signature(table, manifest: dict[str, Any]) -> dict[str, Any]:
         "rows": rows,
         "row_count": len(table.rows),
         "column_count": len(table.columns),
+        "styles": _styles_signature(document),
     }
 
 
@@ -275,7 +281,7 @@ def validate_template(
 
     if canonical.exists() and not is_canonical:
         canonical_doc = Document(str(canonical))
-        if _main_table_signature(canonical_doc.tables[table_index], manifest) != _main_table_signature(document.tables[table_index], manifest):
+        if _main_table_signature(canonical_doc, manifest) != _main_table_signature(document, manifest):
             errors.append("Custom template changed protected main-table structure or formatting.")
         if _section_signature(canonical_doc) != _section_signature(document):
             errors.append("Custom template changed protected page, header, footer, or section settings.")

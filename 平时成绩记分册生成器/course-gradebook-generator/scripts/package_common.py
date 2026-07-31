@@ -136,3 +136,10 @@ def column_number(column: str) -> int:
 
 def cell_address(column: str, row: int) -> str:
     return f"{column.upper()}{row}"
+
+
+def percentage_label(value: Any) -> str:
+    percent = (_decimal(value, "Percentage") * Decimal("100")).quantize(
+        Decimal("0.000000000001"), rounding=ROUND_HALF_UP
+    )
+    return format(percent.normalize(), "f")

@@ -33,6 +33,7 @@ from package_common import (
     ensure_supported_major,
     load_manifest,
     manifest_template_path,
+    percentage_label,
     validate_input,
     validate_source_totals,
 )
@@ -386,10 +387,10 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
             "class_name": meta["class_name"],
         }.items():
             _set_address(ws, structure["metadata"][name], value)
-        _set_address(ws, structure["headers"]["regular"], f"平时成绩({round(meta['regular_pct'] * 100)}%)")
-        _set_address(ws, structure["headers"]["theory"], f"理论成绩({round(meta['theory_pct'] * 100)}%)")
+        _set_address(ws, structure["headers"]["regular"], f"平时成绩({percentage_label(meta['regular_pct'])}%)")
+        _set_address(ws, structure["headers"]["theory"], f"理论成绩({percentage_label(meta['theory_pct'])}%)")
         if has_skill:
-            _set_address(ws, structure["headers"]["skill"], f"技能成绩（{round(meta['skill_pct'] * 100)}%）")
+            _set_address(ws, structure["headers"]["skill"], f"技能成绩（{percentage_label(meta['skill_pct'])}%）")
         else:
             no_skill_total = structure["no_skill_total_column"]
             ws.column_dimensions[no_skill_total].width = max(ws.column_dimensions[no_skill_total].width or 0, 18)

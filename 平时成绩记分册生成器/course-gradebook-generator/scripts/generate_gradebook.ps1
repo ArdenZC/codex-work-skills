@@ -212,6 +212,10 @@ function Excel-Round([decimal]$value) {
   return [int][decimal]::Round($value, 0, [System.MidpointRounding]::AwayFromZero)
 }
 
+function Format-Percentage-Label([double]$value) {
+  return (([decimal]$value * [decimal]100).ToString('0.############', [System.Globalization.CultureInfo]::InvariantCulture))
+}
+
 function Source-Total-Matches([decimal]$sourceTotal, [int]$expectedTotal) {
   return [Math]::Abs($sourceTotal - [decimal]$expectedTotal) -le [decimal]0.000000001
 }
@@ -419,10 +423,10 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $ws.Range([string]$structure.metadata.course).Value2 = $meta.CourseName
     $ws.Range([string]$structure.metadata.teacher).Value2 = $meta.Teacher
     $ws.Range([string]$structure.metadata.class_name).Value2 = $meta.ClassName
-    $ws.Range([string]$structure.headers.regular).Value2 = ('平时成绩({0}%)' -f [int]($meta.RegularPct * 100))
-    $ws.Range([string]$structure.headers.theory).Value2 = ('理论成绩({0}%)' -f [int]($meta.TheoryPct * 100))
+    $ws.Range([string]$structure.headers.regular).Value2 = ('平时成绩({0}%)' -f (Format-Percentage-Label $meta.RegularPct))
+    $ws.Range([string]$structure.headers.theory).Value2 = ('理论成绩({0}%)' -f (Format-Percentage-Label $meta.TheoryPct))
     if ($hasSkill) {
-      $ws.Range([string]$structure.headers.skill).Value2 = ('技能成绩（{0}%）' -f [int]($meta.SkillPct * 100))
+      $ws.Range([string]$structure.headers.skill).Value2 = ('技能成绩（{0}%）' -f (Format-Percentage-Label $meta.SkillPct))
     } else {
       $ws.Columns.Item([string]$structure.no_skill_total_column).ColumnWidth = 18
     }

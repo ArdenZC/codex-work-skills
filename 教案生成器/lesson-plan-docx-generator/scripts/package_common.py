@@ -90,6 +90,13 @@ def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEM
             for error in errors[:8]
         )
         raise ValueError(f"Input schema validation failed: {details}")
+    for index, lesson in enumerate(data.get("lessons", [])):
+        if isinstance(lesson, dict) and isinstance(lesson.get("unit"), str):
+            unit = lesson["unit"].strip()
+            if not unit.startswith("项目"):
+                raise ValueError(
+                    f"lessons[{index}].unit must start with 项目 for projectized teaching; received {lesson['unit']!r}."
+                )
 
 
 def ensure_supported_major(manifest: dict[str, Any]) -> None:
