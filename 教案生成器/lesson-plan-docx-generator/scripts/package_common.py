@@ -43,7 +43,33 @@ def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
 
 
 def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEMA) -> None:
+    for field_name in ("default_hours",):
+        if field_name not in data:
+            continue
+        value = data[field_name]
+        if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+            continue
+        try:
+            hours = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            raise ValueError(f"{field_name} must be a positive number; received {value}.") from None
+        if not hours.is_finite() or hours <= 0:
+            raise ValueError(f"{field_name} must be a positive number; received {value}.")
+
     for index, lesson in enumerate(data.get("lessons", [])):
+        if isinstance(lesson, dict) and "hours" in lesson:
+            value = lesson["hours"]
+            if not isinstance(value, bool) and isinstance(value, (str, int, float, Decimal)):
+                try:
+                    hours = Decimal(str(value))
+                except (InvalidOperation, TypeError, ValueError):
+                    raise ValueError(
+                        f"lessons[{index}].hours must be a positive number; received {value}."
+                    ) from None
+                if not hours.is_finite() or hours <= 0:
+                    raise ValueError(
+                        f"lessons[{index}].hours must be a positive number; received {value}."
+                    )
         if not isinstance(lesson, dict) or "score" not in lesson:
             continue
         try:

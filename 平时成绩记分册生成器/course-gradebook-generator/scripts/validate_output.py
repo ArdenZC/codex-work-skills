@@ -421,6 +421,8 @@ def validate_output_dir(
                         theory_value = _number(_cell(ws_values, columns["theory_score"], row).value, f"theory score {row}")
                         if not 0 <= theory_value <= 100:
                             row_errors.append(f"theory score outside 0..100: {theory_value}")
+                        if not math.isclose(theory_value, float(student["theory"]), abs_tol=0.001):
+                            row_errors.append("theory score mismatch")
                         expected_formulas = _expected_formulas(row, data["weights"], columns, skill_enabled, total_column)
                         for col in formula_columns:
                             formula = _cell(ws_formula, col, row).value

@@ -77,6 +77,37 @@ class LessonTemplatePackageTests(unittest.TestCase):
             validate_input(payload)
         validate_input(base)
 
+    def test_nonpositive_hours_rejects_numeric_values_and_strings(self) -> None:
+        sys.modules.pop("package_common", None)
+        sys.path.insert(0, str(LESSON / "scripts"))
+        from package_common import validate_input
+
+        base = {"course_name": "软件测试实训", "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]}
+        for invalid_hours in (-2, "-2", 0, "0"):
+            payload = json.loads(json.dumps(base, ensure_ascii=False))
+            payload["lessons"][0]["hours"] = invalid_hours
+            with self.subTest(invalid_hours=invalid_hours), self.assertRaisesRegex(ValueError, "positive number"):
+                validate_input(payload)
+
+    def test_nonpositive_hours_reject_before_docx_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-hours-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"][0]["hours"] = "-2"
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("lessons[0].hours must be a positive number; received -2.", result.stderr)
+            self.assertFalse(output.exists())
+
     def test_score_precision_rejects_before_docx_generation(self) -> None:
         for invalid_score in (89.2, 89.25):
             with self.subTest(invalid_score=invalid_score), tempfile.TemporaryDirectory(prefix="lesson-package-score-") as temp_name:
@@ -342,8 +373,13 @@ class GradebookPowerShellContractTests(unittest.TestCase):
         script = (GRADE / "scripts" / "generate_gradebook.ps1").read_text(encoding="utf-8-sig")
         self.assertIn("function Excel-Round", script)
         self.assertIn("[System.MidpointRounding]::AwayFromZero", script)
+        self.assertIn("function Assert-ManifestCompatibility", script)
+        self.assertIn("Assert-ManifestCompatibility $ManifestData", script)
         self.assertIn("function Source-Total-Matches", script)
         self.assertIn("function Assert-HalfPointRegularScores", script)
+        self.assertIn("function Assert-NormalizedInput", script)
+        self.assertIn("validate_input.py", script)
+        self.assertIn("Assert-NormalizedInput $normalizedInput", script)
         self.assertIn("function Assert-SourceTotals", script)
         self.assertIn("Assert-HalfPointRegularScores $students", script)
         self.assertIn("Assert-SourceTotals $students $meta", script)
@@ -439,6 +475,73 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             generated = next(output.glob("*.xls"))
             self.assertEqual(report["output_file"], generated.name)
             self.assertEqual(report["files_checked"], 1)
+
+    def test_output_validation_rejects_theory_score_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-theory-mismatch-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(output.glob("*.xls"))
+
+            xlsx_dir = folder / "tamper-xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(generated)],
+                check=True,
+                capture_output=True,
+            )
+            tampered_xlsx = xlsx_dir / f"{generated.stem}.xlsx"
+            workbook = load_workbook(tampered_xlsx)
+            workbook["平时成绩"]["M5"] = 87.0
+            workbook.save(tampered_xlsx)
+            tampered_dir = folder / "tampered"
+            tampered_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(tampered_dir), str(tampered_xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            tampered = output / "tampered.xls"
+            shutil.copy2(tampered_dir / f"{generated.stem}.xls", tampered)
+
+            normalized = folder / "normalized.json"
+            normalized.write_text(
+                json.dumps(
+                    {
+                        "term": "2025-2026-2",
+                        "course": "软件测试实训",
+                        "teacher": "张老师",
+                        "class_name": "软件技术2401班",
+                        "weights": {"regular": 0.6, "theory": 0.4, "skill": 0.0},
+                        "students": [
+                            {"id": "240101001", "name": "学生1", "regular": 86.5, "theory": 88.0, "skill": 0.0, "total": 87.0},
+                            {"id": "240101002", "name": "学生2", "regular": 91.0, "theory": 90.0, "skill": 0.0, "total": 91.0},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_output.py",
+                "--input-json",
+                str(normalized),
+                "--output-dir",
+                str(output),
+                "--output-file",
+                str(tampered),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("theory score mismatch", result.stderr)
 
     def test_python_generator_skill_and_leading_zero_id(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-skill-") as temp_name:

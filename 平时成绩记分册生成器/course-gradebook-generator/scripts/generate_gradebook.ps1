@@ -56,6 +56,25 @@ if ($LASTEXITCODE -ne 0) {
 $ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
 Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
 
+function Assert-ManifestCompatibility($manifest) {
+  $version = [string]$manifest.template.version
+  $supported = $manifest.generator.supported_major
+  if (-not $version -or $version -notmatch '^\d+\.\d+\.\d+$' -or $null -eq $supported) {
+    throw 'Manifest must declare a semantic template version and generator.supported_major'
+  }
+  try {
+    [int]$major = $version.Split('.')[0]
+    [int]$supportedMajor = $supported
+  } catch {
+    throw 'Manifest must declare a semantic template version and generator.supported_major'
+  }
+  if ($major -ne $supportedMajor) {
+    throw "Unsupported template major version $major; generator supports $supportedMajor"
+  }
+}
+
+Assert-ManifestCompatibility $ManifestData
+
 $TemplateWasProvided = [bool]$TemplatePath
 if (-not $TemplatePath) {
   $TemplatePath = Join-Path (Split-Path -Parent $ManifestPath) $ManifestData.template.file
@@ -223,6 +242,24 @@ function Assert-SourceTotals($students, $meta) {
   }
 }
 
+function Normalize-Number($value) {
+  if ($null -eq $value) { return $null }
+  return [double]$value
+}
+
+function Assert-NormalizedInput($normalizedInput) {
+  $inputJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-input-preflight-" + [guid]::NewGuid().ToString('N') + '.json')
+  try {
+    $normalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $inputJsonPath -Encoding UTF8
+    & $PythonCommand (Join-Path $PSScriptRoot 'validate_input.py') --input-json $inputJsonPath --schema $SchemaPath
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Input schema validation failed before output creation.'
+    }
+  } finally {
+    Remove-Item -LiteralPath $inputJsonPath -Force -ErrorAction SilentlyContinue
+  }
+}
+
 function Get-StableSeed([string]$text) {
   $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash([System.Text.Encoding]::UTF8.GetBytes($text))
   return [System.BitConverter]::ToInt32($hash, 0) -band 0x7fffffff
@@ -299,6 +336,29 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $students = @(Read-Students $srcSheet)
     Assert-HalfPointRegularScores $students
     Assert-SourceTotals $students $meta
+    $normalizedStudents = @($students | ForEach-Object {
+      [ordered]@{
+        id = [string]$_.Id
+        name = [string]$_.Name
+        regular = Normalize-Number $_.Regular
+        theory = Normalize-Number $_.Theory
+        skill = Normalize-Number $_.Skill
+        total = Normalize-Number $_.Total
+      }
+    })
+    $normalizedInput = [ordered]@{
+      term = [string]$meta.Term
+      course = [string]$meta.CourseName
+      teacher = [string]$meta.Teacher
+      class_name = [string]$meta.ClassName
+      weights = [ordered]@{
+        regular = [double]$meta.RegularPct
+        theory = [double]$meta.TheoryPct
+        skill = [double]$meta.SkillPct
+      }
+      students = $normalizedStudents
+    }
+    Assert-NormalizedInput $normalizedInput
   } finally {
     $srcWb.Close($false)
   }
@@ -410,29 +470,6 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $wb.Save()
   } finally {
     $wb.Close($true)
-  }
-
-  $normalizedStudents = @($students | ForEach-Object {
-    [ordered]@{
-      id = [string]$_.Id
-      name = [string]$_.Name
-      regular = [double]$_.Regular
-      theory = [double]$_.Theory
-      skill = [double]$_.Skill
-      total = [double]$_.Total
-    }
-  })
-  $normalizedInput = [ordered]@{
-    term = [string]$meta.Term
-    course = [string]$meta.CourseName
-    teacher = [string]$meta.Teacher
-    class_name = [string]$meta.ClassName
-    weights = [ordered]@{
-      regular = [double]$meta.RegularPct
-      theory = [double]$meta.TheoryPct
-      skill = [double]$meta.SkillPct
-    }
-    students = $normalizedStudents
   }
 
   [pscustomobject]@{
