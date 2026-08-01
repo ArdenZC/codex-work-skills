@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/schemas/gradebook-input.schema.json",
+  "title": "Normalized gradebook input",
+  "$comment": "The normalized student identifier key is id; source workbook labels are mapped through manifest.structure.source.headers.",
+  "type": "object",
+  "required": ["term", "course", "teacher", "class_name", "weights", "students"],
+  "properties": {
+    "term": {"type": "string", "minLength": 1, "maxLength": 32},
+    "course": {"type": "string", "minLength": 1, "maxLength": 64},
+    "teacher": {"type": "string", "minLength": 1, "maxLength": 32},
+    "class_name": {"type": "string", "minLength": 1, "maxLength": 64},
+    "weights": {
+      "type": "object",
+      "required": ["regular", "theory", "skill"],
+      "properties": {
+        "regular": {"type": "number", "minimum": 0, "maximum": 1},
+        "theory": {"type": "number", "minimum": 0, "maximum": 1},
+        "skill": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "students": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "regular", "theory", "skill", "total"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^\\d{8,}$"},
+          "name": {"type": "string", "minLength": 1, "maxLength": 32},
+          "regular": {"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.5},
+          "theory": {"type": "number", "minimum": 0, "maximum": 100},
+          "skill": {"type": "number", "minimum": 0, "maximum": 100},
+          "total": {"type": "number", "minimum": 0, "maximum": 100}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

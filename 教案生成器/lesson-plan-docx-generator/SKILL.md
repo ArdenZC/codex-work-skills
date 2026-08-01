@@ -22,7 +22,7 @@ If the user provides none of these, infer a projectized teaching plan from the c
 
 Require or infer:
 
-- `template_docx`: optional. Use the built-in template at `assets/lesson-plan-template.docx` unless the user explicitly supplies a different template.
+- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.0.0/template.docx` unless the user explicitly supplies a different template. `assets/lesson-plan-template.docx` remains a compatibility entry.
 - `output_dir`: final DOCX folder. Back up an existing output folder before overwriting.
 - `course_name`: value for the title and `课程名称` cell.
 - `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
@@ -63,8 +63,8 @@ Read 多Agent兼容说明.md for the compatibility matrix and examples/tasks.exa
    - Use task names as concrete deliverables or skill actions, not generic chapter titles.
    - For database-style courses, follow the pattern `项目一 理解数据库`, `项目二 设计学生信息管理数据库`, `项目三 创建与维护数据库`, `项目四 创建与维护数据表`, `项目五 查询与维护数据表`, etc.
    - For 实训课, use fewer project tasks and emphasize deliverables, tools,成果包,互评, and过程性评价.
-5. Prepare a canonical JSON file and run `scripts/generate_lesson_plans.py`. Omit `--template` to use the built-in template.
-6. Validate all DOCX files:
+5. Prepare a canonical JSON file and run `scripts/generate_lesson_plans.py`. Omit `--template` to use the manifest-selected built-in template.
+6. The generator follows `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告`. Validate all DOCX files:
    - count files and total hours;
    - assert 30 main-table rows;
    - assert `课程名称` and title match `course_name`;
@@ -72,7 +72,7 @@ Read 多Agent兼容说明.md for the compatibility matrix and examples/tasks.exa
    - scan for template course-name leftovers such as `Linux操作系统应用`.
 7. Render and inspect layout:
    - Prefer the `documents` renderer if it works.
-   - On this Windows machine, the stable fallback is `F:\work\tools\render_docx_local.py`, which uses local LibreOffice and pypdfium2.
+   - Use the installed documents renderer or LibreOffice when available; any local rendering helper is optional and is not a skill dependency.
    - Inspect a contact sheet plus at least one dense representative page.
 8. Clean temporary scripts and QA images. Keep only final DOCX outputs and any intentional backup.
 
@@ -117,7 +117,7 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 - Use `course_name` in both the title and row 1 course cell.
 - Use natural Chinese teaching text for learning analysis, goals, teaching process, and reflection.
 - For 实训课, emphasize task output, tools,操作记录,成果包,互评, and过程性评价.
-- Scores should look realistic, usually 88.5-91.5, not all identical.
+- Scores should look realistic, usually 88.5-91.5, not all identical; input scores use 0.5-point increments.
 - Keep the canonical JSON provider-neutral so another agent or model can continue the task without reinterpreting the document template.
 - Do not change unrelated source files or existing folders without backing them up.
 
@@ -125,3 +125,14 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 
 - If PowerShell displays Chinese filenames as mojibake, verify with Python/docx content before assuming files are corrupt.
 - LibreOffice may paginate differently from Word. Use render QA to catch layout defects, but Word COM export is also acceptable when the user needs Word-native pagination.
+
+## Template Package
+
+- Manifest: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`
+- Canonical template: `assets/templates/lesson-plan/v1.0.0/template.docx`
+- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`, `assets/templates/lesson-plan/v1.0.0/CHANGELOG.md`
+- Input schema: `schemas/lesson-plan-input.schema.json`
+- Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
+- QA output: `qa-report.json` in the generated output directory
+
+The package preserves the original single-paragraph replacement and multiline-cell writing modes. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.

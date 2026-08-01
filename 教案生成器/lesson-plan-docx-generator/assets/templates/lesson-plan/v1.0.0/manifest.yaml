@@ -1,0 +1,86 @@
+template:
+  id: lesson-plan
+  name: 中文项目化课程教案模板
+  version: 1.0.0
+  format: docx
+  file: template.docx
+  compatibility_entries:
+    - ../../../../assets/lesson-plan-template.docx
+generator:
+  version: 1.0.0
+  supported_major: 1
+structure:
+  top_level_tables: 1
+  main_table:
+    index: 0
+    rows: 30
+    columns: 10
+  title:
+    paragraph: 0
+  evaluation_table:
+    table: 0
+    row: 12
+    cell: 1
+    rows: 14
+    columns: 4
+fields:
+  title: {target: document_paragraph, paragraph: 0, mode: replace_text_preserve_style, max_chars: 120}
+  course_name: {target: table_cell, table: 0, row: 0, cell: 1, mode: replace_single_paragraph, max_chars: 32, max_paragraphs: 1}
+  major: {target: table_cell, table: 0, row: 0, cell: 3, mode: replace_single_paragraph, max_chars: 32, max_paragraphs: 1}
+  audience: {target: table_cell, table: 0, row: 0, cell: 5, mode: replace_single_paragraph, max_chars: 32, max_paragraphs: 1}
+  unit: {target: table_cell, table: 0, row: 1, cell: 1, mode: replace_single_paragraph, max_chars: 60, max_paragraphs: 1}
+  task: {target: table_cell, table: 0, row: 1, cell: 3, mode: replace_single_paragraph, max_chars: 80, max_paragraphs: 1}
+  hours: {target: table_cell, table: 0, row: 1, cell: 5, mode: replace_single_paragraph, max_chars: 12, max_paragraphs: 1}
+  student_base: {target: table_cell, table: 0, row: 3, cell: 1, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  student_problems: {target: table_cell, table: 0, row: 3, cell: 2, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  student_strategy: {target: table_cell, table: 0, row: 3, cell: 3, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  teaching_content: {target: table_cell, table: 0, row: 4, cell: 1, mode: replace_paragraphs, max_chars: 1200, max_paragraphs: 10}
+  quality_goal: {target: table_cell, table: 0, row: 6, cell: 1, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  knowledge_goal: {target: table_cell, table: 0, row: 6, cell: 2, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  ability_goal: {target: table_cell, table: 0, row: 6, cell: 3, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  key_content: {target: table_cell, table: 0, row: 7, cell: 1, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  key_strategy: {target: table_cell, table: 0, row: 7, cell: 2, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  difficult_content: {target: table_cell, table: 0, row: 8, cell: 1, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  difficult_strategy: {target: table_cell, table: 0, row: 8, cell: 2, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  teaching_methods: {target: table_cell, table: 0, row: 9, cell: 1, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  resources: {target: table_cell, table: 0, row: 10, cell: 1, mode: replace_paragraphs, max_chars: 1000, max_paragraphs: 8}
+  references: {target: table_cell, table: 0, row: 11, cell: 1, mode: replace_paragraphs, max_chars: 700, max_paragraphs: 6}
+  implementation:
+    mode: row_cells
+    rows: [16, 18, 19, 20, 21, 22, 23, 24, 26]
+    cells: [0, 1, 2, 3, 4]
+    max_chars: 600
+    max_paragraphs: 6
+  reflection:
+    mode: row_cells
+    rows: [27, 28, 29]
+    cells: [2]
+    max_chars: 400
+    max_paragraphs: 4
+  evaluation: {target: nested_table, table: 0, row: 12, cell: 1, mode: nested_table, rows: 14, columns: 4, writable_rows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], writable_cells: [2, 3]}
+allowed_changes:
+  - title paragraph text and alignment
+  - declared lesson fields in the main table
+  - evaluation score and remark cells in the nested evaluation table
+  - declared teaching implementation and reflection cells
+protected:
+  - page size and section margins
+  - headers, footers, relationships and embedded resources
+  - main table row and column count
+  - merged-cell topology and fixed label cells
+  - row heights, column widths and base styles
+  - evaluation table row and column count
+validation:
+  required_labels: [课程名称, 授课专业, 授课对象, 单元名称, 任务名称, 学时, 学情分析, 教学内容, 教学目标, 教学重点, 教学难点, 教学策略, 教学资源, 参考文献, 教学评价, 教学实施, 教学反思]
+  forbidden_template_text: [Linux操作系统应用, 单元4：文件与目录管理, 任务12：文件的权限与压缩]
+  main_table_rows: 30
+  main_table_columns: 10
+  evaluation_rows: 14
+  evaluation_columns: 4
+  score_total: 100
+  require_docx_open: true
+  require_render_check: false
+fingerprint:
+  algorithm: sha256
+  sha256: 11783108468204DD67C9F8EAA1543B67279361ECC842A8B37F8541BDD01D16D5
+  value: 11783108468204DD67C9F8EAA1543B67279361ECC842A8B37F8541BDD01D16D5

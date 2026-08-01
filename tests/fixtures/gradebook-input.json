@@ -1,0 +1,11 @@
+{
+  "term": "2025-2026-2",
+  "course": "软件测试实训",
+  "teacher": "张老师",
+  "class_name": "软件技术2401班",
+  "weights": {"regular": 0.6, "theory": 0.4, "skill": 0.0},
+  "students": [
+    {"id": "240101001", "name": "张三", "regular": 86.5, "theory": 88.0, "skill": 0.0, "total": 87.0},
+    {"id": "240101002", "name": "李四", "regular": 91.0, "theory": 90.0, "skill": 0.0, "total": 91.0}
+  ]
+}

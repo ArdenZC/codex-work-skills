@@ -25,10 +25,25 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 
+from package_common import (
+    DEFAULT_MANIFEST,
+    DEFAULT_SCHEMA,
+    cell_address,
+    column_number,
+    ensure_supported_major,
+    load_manifest,
+    manifest_template_path,
+    percentage_label,
+    validate_input,
+    validate_source_totals,
+)
+from validate_output import validate_output_dir, write_skipped_report
+from validate_template import validate_template
+
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
-DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "平时成绩记分册模板.xls"
+DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
 
 
 def find_soffice() -> str:
@@ -78,9 +93,12 @@ def to_number(value) -> float:
     return float(value)
 
 
-def read_meta(ws) -> dict:
-    line2 = cell_text(ws.cell(2, 1).value)
-    line3 = cell_text(ws.cell(3, 1).value)
+def read_meta(ws, manifest: dict | None = None) -> dict:
+    source = (manifest or {}).get("structure", {}).get("source", {})
+    line2_cell = str(source.get("metadata_line2_cell", "A2"))
+    line3_cell = str(source.get("metadata_line3_cell", "A3"))
+    line2 = cell_text(ws[line2_cell].value)
+    line3 = cell_text(ws[line3_cell].value)
     meta = {
         "course": "",
         "teacher": "",
@@ -116,19 +134,31 @@ def read_meta(ws) -> dict:
     return meta
 
 
-def header_map(ws, start_col: int, end_col: int) -> dict[str, int]:
+def header_map(ws, start_col: int, end_col: int, header_row: int = 4) -> dict[str, int]:
     found = {}
     for col in range(start_col, end_col + 1):
-        header = cell_text(ws.cell(4, col).value)
+        header = cell_text(ws.cell(header_row, col).value)
         if header:
             found[header] = col
     return found
 
 
-def read_students(ws) -> list[dict]:
+def read_students(ws, manifest: dict | None = None) -> list[dict]:
+    source = (manifest or {}).get("structure", {}).get("source", {})
+    header_row = int(source.get("header_row", 4))
+    data_start_row = int(source.get("data_start_row", 5))
+    header_names = {
+        "student_id": "学号",
+        "student_name": "姓名",
+        "regular": "平时成绩",
+        "theory": "理论成绩",
+        "skill": "技能成绩",
+        "total": "总成绩",
+        **source.get("headers", {}),
+    }
     starts = []
     for col in range(1, ws.max_column + 1):
-        if cell_text(ws.cell(4, col).value) == "学号" and cell_text(ws.cell(4, col + 1).value) == "姓名":
+        if cell_text(ws.cell(header_row, col).value) == header_names["student_id"] and cell_text(ws.cell(header_row, col + 1).value) == header_names["student_name"]:
             starts.append(col)
     if not starts:
         raise RuntimeError("Could not find 学号/姓名 headers in source workbook.")
@@ -136,26 +166,26 @@ def read_students(ws) -> list[dict]:
     blocks = []
     for i, start in enumerate(starts):
         end = starts[i + 1] - 1 if i + 1 < len(starts) else ws.max_column
-        blocks.append((start, header_map(ws, start, end)))
+        blocks.append((start, header_map(ws, start, end, header_row)))
 
     students = []
-    for row in range(5, ws.max_row + 1):
+    for row in range(data_start_row, ws.max_row + 1):
         for start, headers in blocks:
             student_id = cell_text(ws.cell(row, start).value)
             name = cell_text(ws.cell(row, start + 1).value)
             if not re.fullmatch(r"\d{8,}", student_id) or not name:
                 continue
-            for required in ("理论成绩", "平时成绩", "总成绩"):
+            for required in (header_names["theory"], header_names["regular"], header_names["total"]):
                 if required not in headers:
                     raise RuntimeError(f"Source block is missing {required}.")
             students.append(
                 {
                     "id": student_id,
                     "name": name,
-                    "skill": to_number(ws.cell(row, headers["技能成绩"]).value) if "技能成绩" in headers else 0.0,
-                    "theory": to_number(ws.cell(row, headers["理论成绩"]).value),
-                    "regular": to_number(ws.cell(row, headers["平时成绩"]).value),
-                    "total": to_number(ws.cell(row, headers["总成绩"]).value),
+                    "skill": to_number(ws.cell(row, headers[header_names["skill"]]).value) if header_names["skill"] in headers else 0.0,
+                    "theory": to_number(ws.cell(row, headers[header_names["theory"]]).value),
+                    "regular": to_number(ws.cell(row, headers[header_names["regular"]]).value),
+                    "total": to_number(ws.cell(row, headers[header_names["total"]]).value),
                 }
             )
     if not students:
@@ -168,14 +198,16 @@ def stable_seed(text: str) -> int:
     return int.from_bytes(digest[:4], "little") & 0x7FFFFFFF
 
 
-def generate_regular_scores(target: float, seed_text: str) -> list[float]:
+def generate_regular_scores(target: float, seed_text: str, item_count: int = 8) -> list[float]:
+    if item_count <= 0:
+        raise ValueError("regular item count must be positive")
     target_units = round(target * 2)
-    target_total_units = target_units * 8
+    target_total_units = target_units * item_count
     rng = random.Random(stable_seed(seed_text))
     for _ in range(2000):
         scores = []
         total = 0
-        for _idx in range(7):
+        for _idx in range(item_count - 1):
             low = max(-8, -target_units)
             high = min(8, 200 - target_units)
             score = target_units + rng.randint(low, high)
@@ -190,7 +222,7 @@ def generate_regular_scores(target: float, seed_text: str) -> list[float]:
         values = [score / 2 for score in scores]
         if max(abs(value - target) for value in values) <= 6:
             return values
-    return [target] * 8
+    return [target] * item_count
 
 
 def copy_row_style(ws, source_row: int, target_row: int, max_col: int) -> None:
@@ -228,11 +260,61 @@ def set_value(ws, row: int, col: int, value) -> None:
     writable_cell(ws, row, col).value = value
 
 
+def _shift_column_after_delete(column: int, start: int, count: int) -> int | None:
+    if column < start:
+        return column
+    if column >= start + count:
+        return column - count
+    return None
+
+
+def delete_columns_preserving_merges(ws, start_col: int, count: int) -> None:
+    """Delete optional columns while retaining every surviving merged range."""
+    original_ranges = [
+        (merged.min_row, merged.max_row, merged.min_col, merged.max_col)
+        for merged in list(ws.merged_cells.ranges)
+    ]
+    for merged in list(ws.merged_cells.ranges):
+        ws.unmerge_cells(str(merged))
+    ws.delete_cols(start_col, count)
+    for min_row, max_row, min_col, max_col in original_ranges:
+        shifted_min = _shift_column_after_delete(min_col, start_col, count)
+        shifted_max = _shift_column_after_delete(max_col, start_col, count)
+        if shifted_min is None:
+            shifted_min = start_col
+        if shifted_max is None:
+            shifted_max = start_col - 1
+        if min_col < start_col and max_col >= start_col + count:
+            shifted_min = min_col
+            shifted_max = max_col - count
+        elif min_col < start_col <= max_col:
+            shifted_min = min_col
+            shifted_max = start_col - 1
+        elif min_col >= start_col and max_col < start_col + count:
+            continue
+        if shifted_max < shifted_min:
+            continue
+        if shifted_min != shifted_max or min_row != max_row:
+            ws.merge_cells(
+                start_row=min_row,
+                start_column=shifted_min,
+                end_row=max_row,
+                end_column=shifted_max,
+            )
+
+
 def formula_number(value: float) -> str:
     return f"{value:.8f}".rstrip("0").rstrip(".") or "0"
 
 
-def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str) -> dict:
+def _set_address(ws, address: str, value) -> None:
+    column = re.match(r"([A-Z]+)(\d+)$", address, re.IGNORECASE)
+    if not column:
+        raise ValueError(f"Invalid manifest cell address: {address}")
+    set_value(ws, int(column.group(2)), column_number(column.group(1)), value)
+
+
+def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str, manifest: dict, schema_path: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="gradebook_") as tmp_name:
         tmp = Path(tmp_name)
         source_xlsx = convert_with_soffice(soffice, source_xls, tmp / "source", "xlsx")
@@ -240,43 +322,78 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
 
         src_wb = load_workbook(source_xlsx, data_only=True)
         src_ws = src_wb.worksheets[0]
-        meta = read_meta(src_ws)
-        students = read_students(src_ws)
+        meta = read_meta(src_ws, manifest)
+        students = read_students(src_ws, manifest)
+
+        normalized = {
+            "term": meta["term"],
+            "course": meta["course"],
+            "teacher": meta["teacher"],
+            "class_name": meta["class_name"],
+            "weights": {
+                "regular": meta["regular_pct"],
+                "theory": meta["theory_pct"],
+                "skill": meta["skill_pct"],
+            },
+            "students": students,
+        }
+        validate_input(normalized, schema_path)
+        validate_source_totals(students, normalized["weights"])
 
         wb = load_workbook(template_xlsx)
-        ws = wb["平时成绩"] if "平时成绩" in wb.sheetnames else wb.worksheets[0]
+        structure = manifest["structure"]
+        columns = structure["columns"]
+        ws = wb[structure["worksheet"]] if structure["worksheet"] in wb.sheetnames else wb.worksheets[0]
         has_skill = meta["skill_pct"] > 0.000001
+        skill_start = column_number(columns["skill_score"])
+        class_name_cell = structure["metadata"]["class_name"]
+        class_name_style = copy(ws[class_name_cell]._style)
         if not has_skill:
-            for merged_range in list(ws.merged_cells.ranges):
-                if merged_range.max_col >= 15:
-                    ws.unmerge_cells(str(merged_range))
-            ws.delete_cols(15, 2)
+            delete_columns_preserving_merges(ws, skill_start, 2)
+            # Deleting the optional columns removes the original O2:Q2 anchor;
+            # restore the surviving class-name cell's protected base style.
+            ws[class_name_cell]._style = copy(class_name_style)
 
-        data_start = 5
-        template_last_row = 52
-        max_col = 17 if has_skill else 15
+        data_start = int(structure["data_start_row"])
+        template_last_row = int(structure["template_last_data_row"])
+        style_source_row = int(structure["style_source_row"])
+        regular_item_count = int(manifest["validation"]["regular_item_count"])
+        if regular_item_count <= 0:
+            raise ValueError("Manifest validation.regular_item_count must be positive")
+        regular_start = column_number(columns["regular_items_start"])
+        regular_end = column_number(columns["regular_items_end"])
+        if regular_end - regular_start + 1 != regular_item_count:
+            raise ValueError(
+                "Manifest regular item count does not match columns.regular_items_start/regular_items_end"
+            )
+        total_col = column_number(columns["total_score"]) if has_skill else column_number(structure["no_skill_total_column"])
+        max_col = total_col
         existing_rows = template_last_row - data_start + 1
         if len(students) > existing_rows:
             needed = len(students) - existing_rows
             ws.insert_rows(template_last_row + 1, needed)
             for row in range(template_last_row + 1, template_last_row + needed + 1):
-                copy_row_style(ws, template_last_row, row, max_col)
+                copy_row_style(ws, style_source_row, row, max_col)
             template_last_row += needed
 
         for row in range(data_start, template_last_row + 1):
             for col in range(1, max_col + 1):
                 ws.cell(row, col).value = None
 
-        set_value(ws, 2, 3, meta["term"])
-        set_value(ws, 2, 7, meta["course"])
-        set_value(ws, 2, 12, meta["teacher"])
-        set_value(ws, 2, 15, meta["class_name"])
-        set_value(ws, 3, 4, f"平时成绩({round(meta['regular_pct'] * 100)}%)")
-        set_value(ws, 3, 13, f"理论成绩({round(meta['theory_pct'] * 100)}%)")
+        for name, value in {
+            "term": meta["term"],
+            "course": meta["course"],
+            "teacher": meta["teacher"],
+            "class_name": meta["class_name"],
+        }.items():
+            _set_address(ws, structure["metadata"][name], value)
+        _set_address(ws, structure["headers"]["regular"], f"平时成绩({percentage_label(meta['regular_pct'])}%)")
+        _set_address(ws, structure["headers"]["theory"], f"理论成绩({percentage_label(meta['theory_pct'])}%)")
         if has_skill:
-            set_value(ws, 3, 15, f"技能成绩（{round(meta['skill_pct'] * 100)}%）")
+            _set_address(ws, structure["headers"]["skill"], f"技能成绩（{percentage_label(meta['skill_pct'])}%）")
         else:
-            ws.column_dimensions["O"].width = max(ws.column_dimensions["O"].width or 0, 18)
+            no_skill_total = structure["no_skill_total_column"]
+            ws.column_dimensions[no_skill_total].width = max(ws.column_dimensions[no_skill_total].width or 0, 18)
 
         regular_pct = formula_number(meta["regular_pct"])
         theory_pct = formula_number(meta["theory_pct"])
@@ -285,22 +402,24 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
 
         for idx, student in enumerate(students):
             row = data_start + idx
-            scores = generate_regular_scores(student["regular"], f"{class_code}|{student['id']}|{student['regular']}")
-            ws.cell(row, 1).value = idx + 1
-            ws.cell(row, 2).value = student["id"]
-            ws.cell(row, 2).number_format = "@"
-            ws.cell(row, 3).value = student["name"]
+            scores = generate_regular_scores(
+                student["regular"], f"{class_code}|{student['id']}|{student['regular']}", regular_item_count
+            )
+            ws.cell(row, column_number(columns["serial"])).value = idx + 1
+            ws.cell(row, column_number(columns["student_id"])).value = student["id"]
+            ws.cell(row, column_number(columns["student_id"])).number_format = "@"
+            ws.cell(row, column_number(columns["student_name"])).value = student["name"]
             for offset, score in enumerate(scores):
-                ws.cell(row, 4 + offset).value = score
-            ws.cell(row, 12).value = f"=AVERAGE(D{row}:K{row})*{regular_pct}"
-            ws.cell(row, 13).value = student["theory"]
-            ws.cell(row, 14).value = f"=M{row}*{theory_pct}"
+                ws.cell(row, regular_start + offset).value = score
+            ws.cell(row, column_number(columns["regular_weighted"])).value = f"=AVERAGE({columns['regular_items_start']}{row}:{columns['regular_items_end']}{row})*{regular_pct}"
+            ws.cell(row, column_number(columns["theory_score"])).value = student["theory"]
+            ws.cell(row, column_number(columns["theory_weighted"])).value = f"={columns['theory_score']}{row}*{theory_pct}"
             if has_skill:
-                ws.cell(row, 15).value = student["skill"]
-                ws.cell(row, 16).value = f"=O{row}*{skill_pct}"
-                ws.cell(row, 17).value = f"=ROUND(AVERAGE(D{row}:K{row})*{regular_pct}+M{row}*{theory_pct}+O{row}*{skill_pct},0)"
+                ws.cell(row, column_number(columns["skill_score"])).value = student["skill"]
+                ws.cell(row, column_number(columns["skill_weighted"])).value = f"={columns['skill_score']}{row}*{skill_pct}"
+                ws.cell(row, total_col).value = f"=ROUND(AVERAGE({columns['regular_items_start']}{row}:{columns['regular_items_end']}{row})*{regular_pct}+{columns['theory_score']}{row}*{theory_pct}+{columns['skill_score']}{row}*{skill_pct},0)"
             else:
-                ws.cell(row, 15).value = f"=ROUND(AVERAGE(D{row}:K{row})*{regular_pct}+M{row}*{theory_pct},0)"
+                ws.cell(row, total_col).value = f"=ROUND(AVERAGE({columns['regular_items_start']}{row}:{columns['regular_items_end']}{row})*{regular_pct}+{columns['theory_score']}{row}*{theory_pct},0)"
 
         # Keep exactly as many student rows as the source contains.
         first_extra = data_start + len(students)
@@ -329,6 +448,7 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
             "skill_pct": meta["skill_pct"],
             "engine": "libreoffice-openpyxl",
             "platform": platform.system(),
+            "normalized_input": normalized,
         }
 
 
@@ -347,16 +467,105 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate 平时成绩记分册 from 课程成绩单.xls.")
     parser.add_argument("--source", required=True, help="课程成绩单.xls path or a folder containing it")
     parser.add_argument("--output-dir", default="", help="Output directory")
-    parser.add_argument("--template", default=str(DEFAULT_TEMPLATE), help="Template .xls path")
+    parser.add_argument("--template", default="", help="Template .xls path")
+    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST), help="Versioned template manifest path")
+    parser.add_argument("--schema", default=str(DEFAULT_SCHEMA), help="Normalized input schema path")
+    parser.add_argument("--skip-template-validation", action="store_true")
+    parser.add_argument("--skip-output-validation", action="store_true")
+    parser.add_argument("--qa-report", default="", help="QA report path")
     args = parser.parse_args()
 
+    manifest = load_manifest(args.manifest)
+    ensure_supported_major(manifest)
     sources = resolve_sources(Path(args.source).expanduser().resolve())
-    template = Path(args.template).expanduser().resolve()
+    template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
     if not template.exists():
         raise RuntimeError(f"Template not found: {template}")
     output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else sources[0].parent / "平时成绩记分册_生成"
     soffice = find_soffice()
-    results = [build_one(source, template, output_dir, soffice) for source in sources]
+    template_warnings: list[str] = []
+    if not args.skip_template_validation:
+        template_report = validate_template(template, args.manifest)
+        template_warnings = template_report.get("warnings", [])
+        for warning in template_warnings:
+            print(f"WARNING: {warning}")
+    schema_path = Path(args.schema).expanduser().resolve()
+    results = [build_one(source, template, output_dir, soffice, manifest, schema_path) for source in sources]
+    if not args.skip_output_validation:
+        if len(results) == 1:
+            qa_path = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
+            report = validate_output_dir(
+                output_dir,
+                results[0]["normalized_input"],
+                manifest,
+                qa_path,
+                schema_path,
+                template_path=template,
+                custom_template=bool(args.template),
+                engine=results[0]["engine"],
+                template_validation=not args.skip_template_validation,
+                output_file=results[0]["output"],
+                extra_warnings=template_warnings,
+            )
+            action = "skipped validation" if report["status"] == "skipped" else "validated"
+            print(f"{action} files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={report['qa_report']}")
+        else:
+            print("WARNING: batch output validation is performed per generated file")
+            for result in results:
+                output_path = Path(result["output"])
+                with tempfile.TemporaryDirectory(prefix="gradebook-validate-") as validation_dir:
+                    validation_root = Path(validation_dir)
+                    validation_copy = validation_root / output_path.name
+                    shutil.copy2(output_path, validation_copy)
+                    validate_output_dir(
+                        validation_root,
+                        result["normalized_input"],
+                        manifest,
+                        output_dir / f"{output_path.stem}.qa-report.json",
+                        schema_path,
+                        template_path=template,
+                        custom_template=bool(args.template),
+                        engine=result["engine"],
+                        template_validation=not args.skip_template_validation,
+                        output_file=validation_copy,
+                        extra_warnings=template_warnings,
+                    )
+    else:
+        if len(results) == 1:
+            qa_path = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
+            report = write_skipped_report(
+                output_dir,
+                results[0]["normalized_input"],
+                manifest,
+                qa_path,
+                schema_path,
+                template_path=template,
+                custom_template=bool(args.template),
+                engine=results[0]["engine"],
+                template_validation=not args.skip_template_validation,
+                output_file=results[0]["output"],
+                warnings=template_warnings,
+            )
+            print(f"WARNING: output validation skipped; qa={report['qa_report']}")
+        else:
+            for result in results:
+                output_path = Path(result["output"])
+                report = write_skipped_report(
+                    output_dir,
+                    result["normalized_input"],
+                    manifest,
+                    output_dir / f"{output_path.stem}.qa-report.json",
+                    schema_path,
+                    template_path=template,
+                    custom_template=bool(args.template),
+                    engine=result["engine"],
+                    template_validation=not args.skip_template_validation,
+                    output_file=output_path,
+                    warnings=template_warnings,
+                )
+            print("WARNING: output validation skipped; QA reports were written with status=skipped")
+    for result in results:
+        result.pop("normalized_input", None)
     payload = results[0] if len(results) == 1 else results
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
