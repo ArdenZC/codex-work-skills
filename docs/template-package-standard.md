@@ -39,6 +39,13 @@ requirements.txt
 
 版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。教案模板的版本—定位模式矩阵固定为 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
 
+### 模板身份与指纹
+
+- 只传 `--template` 时，解析器只对 canonical/compatibility 路径或已知 canonical SHA-256 自动选择精确 manifest；任意其他模板必须显式提供 manifest。
+- 显式传入 manifest 时，canonical 和 compatibility 原始路径必须与 manifest 声明的版本精确匹配；自定义路径不再仅凭旧 canonical SHA 推断同一 minor 的 patch 版本，但跨 minor 的已知模板 SHA 仍然拒绝。
+- 自定义模板的 manifest 必须声明实际模板文件路径和 64 位 SHA-256 fingerprint。普通复制 canonical 模板不会被要求改变 ZIP 元数据，复制文件的真实 SHA 可以用于兼容的 patch manifest；fingerprint 不匹配是阻断错误。
+- 本实现对 compatibility 原始路径采取严格 v1.0 身份策略，因此 v1.0.0 compatibility 文件配 v1.0.1 manifest 会被拒绝；如需 patch manifest，应复制到自定义路径并使用实际 fingerprint。
+
 ## 标准工作流
 
 ```text
@@ -51,11 +58,11 @@ requirements.txt
 
 教案 `lesson-plan/v1.1.0` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。所有 managed semantic bookmark 必须匹配 `^[A-Za-z][A-Za-z0-9_]{0,39}$`，不使用中文、空格、连字符、点号、`_GoBack` 或超过 40 个字符的名称；教学实施区使用 `prep`、`intro`、`demo`、`exec`、`extend`、`practice`、`peer`、`summary`、`improve` 等短阶段代码。固定字段、教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确，且 start/end 的完整稳定边界位置未改变。构建器对临时最终 DOCX 扫描主文档、所有页眉和页脚 story 后才原子替换输出；书签 ID 只允许 ASCII 十进制数字。
 
-v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0 的可见内容和结构 XML 严格等价。v1.1 manifest 的 semantic 契约字段必须显式存在，不能由 Python 定义静默补全；包括 `anchors.required`、`anchors.containers`、固定字段的 `target/bookmark/mode`、实施阶段的 `id/code/bookmarks`、反思书签和评价书签。固定字段的 `target`、`mode`、`bookmark`、`container` 来自同一集中定义，未知值会在模板校验和生成前失败。校验器不会用坐标模式静默补写缺失书签。v1.0 canonical 模板和旧 compatibility entry 仅传 `--template` 时自动解析为对应的 v1.0 manifest，QA 报告会标记 `anchor_mode: legacy_coordinates`；v1.1.x 报告会记录 `anchor_mode: word_bookmark`、必需/保留数量以及缺失、重复、非法 ID 和边界错误。自定义模板必须显式提供匹配的 manifest。
+v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0 的可见内容和结构 XML 严格等价。v1.1 manifest 的 semantic 契约字段必须显式存在，不能由 Python 定义静默补全；包括 `anchors.required`、`anchors.containers`、固定字段的 `target/bookmark/mode`、实施阶段的 `id/code/bookmarks`、反思书签和评价书签。固定字段、implementation、reflection、stage 和 evaluation 都采用封闭 allowed-key 契约，未知或冲突的定位键直接失败。v1.0 legacy manifest 只允许坐标字段和 `anchors.mode: legacy_coordinates`，不得出现 semantic `required`、`containers`、`bookmark`、`stages` 或 semantic implementation/reflection 定位元数据。固定字段的 `target`、`mode`、`bookmark`、`container` 来自同一集中定义，未知值会在模板校验和生成前失败。校验器不会用坐标模式静默补写缺失书签。v1.0 canonical 模板和旧 compatibility entry 仅传 `--template` 时自动解析为对应的 v1.0 manifest，QA 报告会标记 `anchor_mode: legacy_coordinates`；v1.1.x 报告会记录 `anchor_mode: word_bookmark`、必需/保留数量以及缺失、重复、非法 ID 和边界错误。自定义模板必须显式提供匹配的 manifest。
 
 ## 模板保护边界
 
-生成器只能写 manifest 中声明的字段，或按声明的行/列规则增删学生行和技能列。页边距、页眉页脚、合并单元格、固定标签、工作表名称、公式列、打印设置、样式和其他未声明结构均视为 protected。canonical 模板和旧 compatibility entry 可以通过 `--template` 参数自动解析；自定义模板必须同时传入匹配的 `--manifest`，指纹不一致必须给出明确警告，结构不满足时仍然失败。
+生成器只能写 manifest 中声明的字段，或按声明的行/列规则增删学生行和技能列。页边距、页眉页脚、合并单元格、固定标签、工作表名称、公式列、打印设置、样式和其他未声明结构均视为 protected。canonical 模板和旧 compatibility entry 可以通过 `--template` 参数自动解析；自定义模板必须同时传入匹配的 `--manifest`，指纹不一致必须作为明确错误报告，结构不满足时仍然失败。
 
 ## QA 报告
 

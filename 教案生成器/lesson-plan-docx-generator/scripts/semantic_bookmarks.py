@@ -201,6 +201,77 @@ SEMANTIC_FIELD_CONTRACTS = {
 }
 
 
+SEMANTIC_FIXED_ALLOWED_KEYS = {
+    "title": frozenset({"target", "bookmark", "mode", "max_chars"}),
+    **{
+        name: frozenset({"target", "bookmark", "mode", "max_chars", "max_paragraphs"})
+        for name in (
+            "course_name",
+            "major",
+            "audience",
+            "unit",
+            "task",
+            "hours",
+            "student_base",
+            "student_problems",
+            "student_strategy",
+            "teaching_content",
+            "quality_goal",
+            "knowledge_goal",
+            "ability_goal",
+            "key_content",
+            "key_strategy",
+            "difficult_content",
+            "difficult_strategy",
+            "teaching_methods",
+            "resources",
+            "references",
+        )
+    },
+    "evaluation": frozenset(
+        {"target", "bookmark", "mode", "rows", "columns", "writable_rows", "writable_cells"}
+    ),
+}
+SEMANTIC_IMPLEMENTATION_ALLOWED_KEYS = frozenset({"mode", "max_chars", "max_paragraphs", "stages"})
+SEMANTIC_STAGE_ALLOWED_KEYS = frozenset({"id", "code", "bookmarks"})
+SEMANTIC_REFLECTION_ALLOWED_KEYS = frozenset({"mode", "max_chars", "max_paragraphs", "bookmarks"})
+SEMANTIC_FIELD_NAMES = frozenset((*SEMANTIC_FIELD_CONTRACTS, "implementation", "reflection"))
+
+LEGACY_FIXED_ALLOWED_KEYS = {
+    "title": frozenset({"target", "paragraph", "mode", "max_chars"}),
+    **{
+        name: frozenset({"target", "table", "row", "cell", "mode", "max_chars", "max_paragraphs"})
+        for name in (
+            "course_name",
+            "major",
+            "audience",
+            "unit",
+            "task",
+            "hours",
+            "student_base",
+            "student_problems",
+            "student_strategy",
+            "teaching_content",
+            "quality_goal",
+            "knowledge_goal",
+            "ability_goal",
+            "key_content",
+            "key_strategy",
+            "difficult_content",
+            "difficult_strategy",
+            "teaching_methods",
+            "resources",
+            "references",
+        )
+    },
+    "evaluation": frozenset(
+        {"target", "table", "row", "cell", "mode", "rows", "columns", "writable_rows", "writable_cells"}
+    ),
+}
+LEGACY_IMPLEMENTATION_ALLOWED_KEYS = frozenset({"mode", "rows", "cells", "max_chars", "max_paragraphs"})
+LEGACY_REFLECTION_ALLOWED_KEYS = frozenset({"mode", "rows", "cells", "max_chars", "max_paragraphs"})
+
+
 def fixed_bookmark(field: str) -> str:
     try:
         return FIXED_BOOKMARK_MAP[field]

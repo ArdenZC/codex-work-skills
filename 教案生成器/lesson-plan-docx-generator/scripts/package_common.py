@@ -12,7 +12,15 @@ from jsonschema import Draft202012Validator
 
 from semantic_bookmarks import (
     IMPLEMENTATION_STAGES,
+    LEGACY_FIXED_ALLOWED_KEYS,
+    LEGACY_IMPLEMENTATION_ALLOWED_KEYS,
+    LEGACY_REFLECTION_ALLOWED_KEYS,
+    SEMANTIC_FIELD_NAMES,
     SEMANTIC_FIELD_CONTRACTS,
+    SEMANTIC_FIXED_ALLOWED_KEYS,
+    SEMANTIC_IMPLEMENTATION_ALLOWED_KEYS,
+    SEMANTIC_REFLECTION_ALLOWED_KEYS,
+    SEMANTIC_STAGE_ALLOWED_KEYS,
     implementation_bookmark_groups,
     managed_bookmark_names,
     reflection_bookmark_names,
@@ -81,20 +89,98 @@ def _known_template_version(path: Path) -> str | None:
     return None
 
 
-def _validate_package_identity(template: Path, manifest: dict[str, Any], *, explicit_manifest: bool) -> None:
+def _exact_template_version(path: Path) -> str | None:
+    path = path.expanduser().resolve()
+    for candidate, version in (
+        (V11_TEMPLATE, "1.1.0"),
+        (V10_TEMPLATE, "1.0.0"),
+        (LEGACY_TEMPLATE, "1.0.0"),
+    ):
+        if path == candidate.resolve():
+            return version
+    return None
+
+
+def _manifest_fingerprint(manifest: dict[str, Any]) -> str:
+    fingerprint = manifest.get("fingerprint")
+    value = fingerprint.get("sha256") if isinstance(fingerprint, dict) else None
+    if value is None and isinstance(fingerprint, dict):
+        value = fingerprint.get("value")
+    expected = str(value or "").upper()
+    if re.fullmatch(r"[0-9A-F]{64}", expected) is None:
+        raise ValueError("Manifest fingerprint.sha256 must be a 64-character SHA-256 value")
+    return expected
+
+
+def _validate_template_fingerprint(template: Path, manifest: dict[str, Any]) -> None:
+    expected = _manifest_fingerprint(manifest)
+    actual = _sha256(template)
+    if actual != expected:
+        raise ValueError(f"Template fingerprint mismatch: expected {expected}, got {actual}")
+
+
+def validate_template_fingerprint(template: Path, manifest: dict[str, Any]) -> None:
+    _validate_template_fingerprint(template, manifest)
+
+
+def _validate_package_identity(
+    template: Path,
+    manifest: dict[str, Any],
+    *,
+    explicit_manifest: bool,
+    explicit_template: bool = False,
+    check_fingerprint: bool = True,
+) -> None:
     template_info = manifest.get("template", {})
     if template_info.get("id") != "lesson-plan":
         raise ValueError("Manifest template.id must be lesson-plan")
     if template_info.get("format") != "docx":
         raise ValueError("Manifest template.format must be docx")
     version = str(template_info.get("version", ""))
+    if not template.exists():
+        raise FileNotFoundError(f"Template not found: {template}")
+
+    exact_version = _exact_template_version(template)
+    if exact_version is not None and exact_version != version:
+        raise ValueError(
+            f"Template/manifest mismatch: {template.name} is v{exact_version}, manifest declares v{version}"
+        )
+
     known_version = _known_template_version(template)
-    if known_version is not None and known_version != version:
+    if known_version is not None and (
+        (not explicit_manifest and known_version != version)
+        or (explicit_manifest and known_version.split(".")[:2] != version.split(".")[:2])
+    ):
         raise ValueError(
             f"Template/manifest mismatch: {template.name} is v{known_version}, manifest declares v{version}"
         )
-    if explicit_manifest and not template.exists():
-        raise FileNotFoundError(f"Template not found: {template}")
+
+    declared_template = manifest_template_path(manifest)
+    if explicit_manifest and explicit_template and template != declared_template:
+        # Existing custom-template validation intentionally compares an override
+        # against the manifest-selected baseline. Its fingerprint is reported by
+        # validate_template.py, while exact canonical/compatibility path and
+        # cross-minor SHA mismatches above remain hard failures.
+        check_fingerprint = False
+    if check_fingerprint:
+        _validate_template_fingerprint(template, manifest)
+
+
+def validate_template_package_identity(
+    template: Path,
+    manifest: dict[str, Any],
+    *,
+    explicit_manifest: bool,
+    explicit_template: bool = False,
+    check_fingerprint: bool = True,
+) -> None:
+    _validate_package_identity(
+        template,
+        manifest,
+        explicit_manifest=explicit_manifest,
+        explicit_template=explicit_template,
+        check_fingerprint=check_fingerprint,
+    )
 
 
 def resolve_template_package(
@@ -113,7 +199,7 @@ def resolve_template_package(
         resolved_manifest = V11_MANIFEST.resolve()
         manifest = load_manifest(resolved_manifest)
         template = manifest_template_path(manifest)
-        _validate_package_identity(template, manifest, explicit_manifest=False)
+        validate_template_package_identity(template, manifest, explicit_manifest=False)
         return template, resolved_manifest, manifest
 
     if manifest_value:
@@ -142,7 +228,12 @@ def resolve_template_package(
         else:
             raise ValueError("Custom template requires a matching --manifest.")
         manifest = load_manifest(resolved_manifest)
-    _validate_package_identity(template, manifest, explicit_manifest=bool(manifest_value))
+    validate_template_package_identity(
+        template,
+        manifest,
+        explicit_manifest=bool(manifest_value),
+        explicit_template=bool(template_value),
+    )
     return template, resolved_manifest, manifest
 
 
@@ -191,19 +282,7 @@ def anchor_mode(manifest: dict[str, Any]) -> str:
                 f"Legacy anchor mode mismatch for template.version {version}: "
                 f"expected anchors.mode={LEGACY_ANCHOR_MODE} or no semantic anchors; got {declared}."
             )
-        semantic_anchor_metadata = isinstance(anchors, dict) and any(
-            key in anchors for key in ("required", "containers")
-        )
-        fields = manifest.get("fields")
-        semantic_field_metadata = isinstance(fields, dict) and any(
-            isinstance(fields.get(name), dict) and "bookmark" in fields[name]
-            for name in SEMANTIC_FIELD_CONTRACTS
-        )
-        if semantic_anchor_metadata or semantic_field_metadata:
-            raise ValueError(
-                f"Legacy anchor mode mismatch for template.version {version}: "
-                "1.0.x must not declare semantic bookmark metadata."
-            )
+        validate_legacy_manifest_contract(manifest)
     return expected
 
 
@@ -224,12 +303,86 @@ def _required_manifest_value(mapping: dict[str, Any], path: str, key: str) -> An
     return mapping[key]
 
 
+def _reject_semantic_keys(mapping: dict[str, Any], path: str, allowed: set[str] | frozenset[str]) -> None:
+    for key in mapping:
+        if key not in allowed:
+            raise ValueError(f"Semantic manifest {path} contains unsupported key {key}.")
+
+
+def validate_legacy_manifest_contract(manifest: dict[str, Any]) -> None:
+    major, minor, patch = parse_template_version(manifest)
+    if (major, minor) != (1, 0):
+        return
+    version = manifest["template"]["version"]
+
+    anchors = manifest.get("anchors")
+    if anchors is not None:
+        if not isinstance(anchors, dict):
+            raise ValueError(f"Legacy manifest anchors must be a mapping for template.version {version}.")
+        for key in anchors:
+            if key != "mode":
+                raise ValueError(
+                    f"Legacy manifest anchors.{key} is not allowed for template.version {version}."
+                )
+        if anchors.get("mode") not in {None, LEGACY_ANCHOR_MODE}:
+            raise ValueError(
+                f"Legacy manifest anchors.mode must be {LEGACY_ANCHOR_MODE} for template.version {version}."
+            )
+
+    fields = _required_manifest_mapping(manifest, "fields")
+    allowed_fields = set(LEGACY_FIXED_ALLOWED_KEYS) | {"implementation", "reflection"}
+    for key in fields:
+        if key not in allowed_fields:
+            raise ValueError(f"Legacy manifest fields.{key} is not allowed for template.version {version}.")
+
+    for name, allowed in LEGACY_FIXED_ALLOWED_KEYS.items():
+        spec = _required_manifest_mapping(manifest, f"fields.{name}")
+        for key in spec:
+            if key not in allowed:
+                raise ValueError(
+                    f"Legacy manifest fields.{name}.{key} is not allowed for template.version {version}."
+                )
+
+    implementation = _required_manifest_mapping(manifest, "fields.implementation")
+    for key in implementation:
+        if key not in LEGACY_IMPLEMENTATION_ALLOWED_KEYS:
+            raise ValueError(
+                f"Legacy manifest fields.implementation.{key} is not allowed for template.version {version}."
+            )
+    if str(_required_manifest_value(implementation, "fields.implementation", "mode")) != "row_cells":
+        raise ValueError(
+            f"Legacy manifest fields.implementation.mode must be row_cells for template.version {version}."
+        )
+
+    reflection = _required_manifest_mapping(manifest, "fields.reflection")
+    for key in reflection:
+        if key not in LEGACY_REFLECTION_ALLOWED_KEYS:
+            raise ValueError(
+                f"Legacy manifest fields.reflection.{key} is not allowed for template.version {version}."
+            )
+    if str(_required_manifest_value(reflection, "fields.reflection", "mode")) != "row_cells":
+        raise ValueError(
+            f"Legacy manifest fields.reflection.mode must be row_cells for template.version {version}."
+        )
+
+    evaluation = _required_manifest_mapping(manifest, "fields.evaluation")
+    if str(_required_manifest_value(evaluation, "fields.evaluation", "mode")) != "nested_table":
+        raise ValueError(
+            f"Legacy manifest fields.evaluation.mode must be nested_table for template.version {version}."
+        )
+    if str(_required_manifest_value(evaluation, "fields.evaluation", "target")) != "nested_table":
+        raise ValueError(
+            f"Legacy manifest fields.evaluation.target must be nested_table for template.version {version}."
+        )
+
+
 def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
     """Require every v1.1 semantic contract field without applying defaults."""
     if anchor_mode(manifest) != SEMANTIC_ANCHOR_MODE:
         return
 
     anchors = _required_manifest_mapping(manifest, "anchors")
+    _reject_semantic_keys(anchors, "anchors", {"mode", "required", "containers"})
     mode = _required_manifest_value(anchors, "anchors", "mode")
     if str(mode) != "word_bookmark":
         raise ValueError("Semantic manifest anchors.mode must be word_bookmark.")
@@ -254,9 +407,11 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
     if {str(name): str(value) for name, value in containers.items()} != expected_containers:
         raise ValueError("Semantic manifest anchors.containers does not match the managed definition.")
 
-    _required_manifest_mapping(manifest, "fields")
+    fields = _required_manifest_mapping(manifest, "fields")
+    _reject_semantic_keys(fields, "fields", SEMANTIC_FIELD_NAMES)
     for field, contract in SEMANTIC_FIELD_CONTRACTS.items():
         spec = _required_manifest_mapping(manifest, f"fields.{field}")
+        _reject_semantic_keys(spec, f"fields.{field}", SEMANTIC_FIXED_ALLOWED_KEYS[field])
         for key in ("target", "bookmark", "mode"):
             value = _required_manifest_value(spec, f"fields.{field}", key)
             expected = contract[key]
@@ -264,6 +419,7 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
                 raise ValueError(f"Semantic manifest fields.{field}.{key} must be {expected}; got {value}.")
 
     implementation = _required_manifest_mapping(manifest, "fields.implementation")
+    _reject_semantic_keys(implementation, "fields.implementation", SEMANTIC_IMPLEMENTATION_ALLOWED_KEYS)
     implementation_mode = _required_manifest_value(implementation, "fields.implementation", "mode")
     if str(implementation_mode) != "anchored_cells":
         raise ValueError("Semantic manifest fields.implementation.mode must be anchored_cells.")
@@ -281,6 +437,7 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
         path = f"fields.implementation.stages[{index}]"
         if not isinstance(stage, dict):
             raise ValueError(f"Semantic manifest {path} must be a mapping.")
+        _reject_semantic_keys(stage, path, SEMANTIC_STAGE_ALLOWED_KEYS)
         stage_id, stage_code, _row = expected
         stage_id_value = _required_manifest_value(stage, path, "id")
         stage_code_value = _required_manifest_value(stage, path, "code")
@@ -299,6 +456,7 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
             raise ValueError(f"Semantic manifest {path}.bookmarks does not match the managed definition.")
 
     reflection = _required_manifest_mapping(manifest, "fields.reflection")
+    _reject_semantic_keys(reflection, "fields.reflection", SEMANTIC_REFLECTION_ALLOWED_KEYS)
     reflection_mode = _required_manifest_value(reflection, "fields.reflection", "mode")
     if str(reflection_mode) != "anchored_cells":
         raise ValueError("Semantic manifest fields.reflection.mode must be anchored_cells.")

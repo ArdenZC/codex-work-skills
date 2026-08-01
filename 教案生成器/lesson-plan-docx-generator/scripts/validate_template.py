@@ -15,7 +15,7 @@ from docx.table import _Cell
 from lxml import etree
 
 from bookmark_utils import bookmark_boundary_locations, bookmark_location, validate_bookmark_inventory
-from package_common import DEFAULT_MANIFEST, bookmark_containers, base_manifest_path, ensure_supported_major, field_spec, is_semantic_manifest, layout_manifest, load_manifest, manifest_template_path, required_bookmarks, resolve_template_package
+from package_common import DEFAULT_MANIFEST, bookmark_containers, base_manifest_path, ensure_supported_major, field_spec, is_semantic_manifest, layout_manifest, load_manifest, manifest_template_path, required_bookmarks, resolve_template_package, validate_template_fingerprint, validate_template_package_identity
 
 
 class TemplateValidationError(RuntimeError):
@@ -321,6 +321,18 @@ def validate_template(
     if not template.exists():
         errors.append(f"Template not found: {template}")
         raise TemplateValidationError(report)
+
+    try:
+        validate_template_package_identity(
+            template,
+            manifest,
+            explicit_manifest=True,
+            explicit_template=True,
+            check_fingerprint=False,
+        )
+        validate_template_fingerprint(template, manifest)
+    except (FileNotFoundError, ValueError) as exc:
+        errors.append(str(exc))
 
     expected_hash = str(manifest.get("fingerprint", {}).get("sha256", "")).upper()
     actual_hash = sha256(template)

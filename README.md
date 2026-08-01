@@ -34,7 +34,7 @@
 输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；其他 `1.x` minor 当前拒绝，版本与 `anchors.mode` 不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明 semantic contract，固定字段的 `target`、`bookmark`、`mode` 和 `container` 必须匹配定义，未知 target/mode 不会降级处理。当前默认使用 `lesson-plan/v1.1.0`，同时保留 `lesson-plan/v1.0.0` 坐标兼容模式；记分册为 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；其他 `1.x` minor 当前拒绝，版本与 `anchors.mode` 不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明 semantic contract，固定字段的 `target`、`bookmark`、`mode` 和 `container` 必须匹配定义，unknown key、未知 target/mode 不会降级处理；legacy `1.0.x` 也不得夹带 semantic anchors、bookmarks、stages 或其他 semantic 定位字段。当前默认使用 `lesson-plan/v1.1.0`，同时保留 `lesson-plan/v1.0.0` 坐标兼容模式；记分册为 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
 
 模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
 
@@ -43,4 +43,4 @@ python scripts/validate_template.py --template <template> --manifest <manifest.y
 python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
 ```
 
-自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖。教案 v1.1 模板只能使用 manifest 显式声明的 Word 书签写入，书签名称遵守 Word 40 字符安全规则并使用短阶段代码，书签 ID 只接受 ASCII 十进制数字；`bookmarkStart`/`bookmarkEnd` 必须位于同一目标段落或物理单元格，构建器还会扫描所有 header/footer story。canonical v1.0 模板和旧 `assets/lesson-plan-template.docx` 仅传 `--template` 时会自动解析为 `legacy_coordinates`，自定义模板仍必须提供匹配 manifest。
+自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖。显式传入 manifest 时，canonical 或 compatibility 原始路径必须与声明版本精确匹配；自定义路径按 manifest 的版本、结构、书签契约和实际 SHA-256 fingerprint 校验，不会仅因 SHA 与旧 canonical 相同而推断 patch 版本。因此，普通 `shutil.copy2` 复制的 v1.1.0 模板可以配套声明真实 fingerprint 的 v1.1.1 manifest；compatibility 原始路径配 v1.0.1 manifest 则按路径身份规则拒绝。教案 v1.1 模板只能使用 manifest 显式声明的 Word 书签写入，书签名称遵守 Word 40 字符安全规则并使用短阶段代码，书签 ID 只接受 ASCII 十进制数字；`bookmarkStart`/`bookmarkEnd` 必须位于同一目标段落或物理单元格，构建器还会扫描所有 header/footer story。canonical v1.0 模板和旧 `assets/lesson-plan-template.docx` 仅传 `--template` 时会自动解析为 `legacy_coordinates`，自定义模板仍必须提供匹配 manifest。

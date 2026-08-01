@@ -67,14 +67,17 @@ def validate_package(package: dict[str, Path | str]) -> str:
     with schema_path.open("r", encoding="utf-8") as stream:
         schema = json.load(stream)
     Draft202012Validator.check_schema(schema)
-    if package["name"] == "lesson-plan-v1.1.0":
+    if package["name"].startswith("lesson-plan-"):
         scripts_path = str(LESSON_SCRIPTS)
         if scripts_path not in sys.path:
             sys.path.insert(0, scripts_path)
-        from package_common import anchor_mode, validate_semantic_manifest_contract
+        from package_common import anchor_mode, validate_legacy_manifest_contract, validate_semantic_manifest_contract
 
-        anchor_mode(manifest)
-        validate_semantic_manifest_contract(manifest)
+        mode = anchor_mode(manifest)
+        if mode == "legacy_coordinates":
+            validate_legacy_manifest_contract(manifest)
+        else:
+            validate_semantic_manifest_contract(manifest)
     version = template_info.get("version")
     return f"{package['name']}: version={version} sha256={expected_hash} schema=valid"
 
