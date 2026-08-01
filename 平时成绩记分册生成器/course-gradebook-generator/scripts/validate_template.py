@@ -88,6 +88,20 @@ _FONT_NAME_ALIASES = {
     "dengxian": "dengxian",
     "等线": "dengxian",
 }
+
+_KNOWN_LIBREOFFICE_FALLBACK_NAMES = {
+    "dejavusans",
+    "dejavuserif",
+    "liberationsans",
+    "liberationserif",
+}
+_KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA = (134, 0.0, None)
+_KNOWN_LIBREOFFICE_FALLBACK_METADATA = {
+    (None, 2.0, None),
+    (None, 2, None),
+}
+
+
 def _font_name_signature(value: Any) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
     compact = re.sub(r"[\s_-]+", "", normalized)
@@ -372,10 +386,17 @@ def _protected_target_values(sheet, manifest: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[str, Any]]:
+def _signature_differences(
+    left: Any,
+    right: Any,
+    path: str = "",
+    font_matcher=None,
+) -> list[dict[str, Any]]:
     differences: list[dict[str, Any]] = []
     if path.endswith(".font") and isinstance(left, tuple) and isinstance(right, tuple):
-        if not _font_signatures_match(left, right):
+        if not _font_signatures_match(left, right) and not (
+            font_matcher is not None and font_matcher(left, right, path)
+        ):
             differences.append({"path": path, "expected": left, "actual": right})
     elif isinstance(left, dict) and isinstance(right, dict):
         for key in sorted(set(left) | set(right), key=str):
@@ -385,16 +406,55 @@ def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[s
             elif key not in right:
                 differences.append({"path": child_path, "expected": left[key], "actual": "<missing>"})
             else:
-                differences.extend(_signature_differences(left[key], right[key], child_path))
+                differences.extend(_signature_differences(left[key], right[key], child_path, font_matcher))
     elif isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
         if len(left) != len(right):
             differences.append({"path": path, "expected": left, "actual": right})
         else:
             for index, (expected, actual) in enumerate(zip(left, right)):
-                differences.extend(_signature_differences(expected, actual, f"{path}[{index}]"))
+                differences.extend(
+                    _signature_differences(expected, actual, f"{path}[{index}]", font_matcher)
+                )
     elif left != right:
         differences.append({"path": path, "expected": left, "actual": right})
     return differences
+
+
+def _conversion_font_fallback_is_proven(
+    expected: tuple[Any, ...],
+    actual: tuple[Any, ...],
+) -> bool:
+    """Recognize only the observed SimSun to LibreOffice fallback conversion."""
+    if _font_name_signature(expected[0]) != "simsun":
+        return False
+    if _font_name_signature(actual[0]) not in _KNOWN_LIBREOFFICE_FALLBACK_NAMES:
+        return False
+    if tuple(expected[1:4]) != _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA:
+        return False
+    if tuple(actual[1:4]) not in _KNOWN_LIBREOFFICE_FALLBACK_METADATA:
+        return False
+    return len(expected) == len(actual) and expected[4:] == actual[4:]
+
+
+def _custom_font_fallback_is_proven(
+    expected: tuple[Any, ...],
+    actual: tuple[Any, ...],
+    path: str,
+    manifest: dict[str, Any],
+    source_suffix: str,
+) -> bool:
+    """Allow conversion drift only for editable metadata in a real XLS round trip."""
+    if source_suffix.lower() != ".xls" or not _conversion_font_fallback_is_proven(expected, actual):
+        return False
+    match = re.search(r"\.([A-Z]+\d+)\.font$", path, flags=re.IGNORECASE)
+    if match is None:
+        return False
+    writable_cells = {
+        str(cell).upper()
+        for cell in manifest.get("structure", {}).get("metadata", {}).values()
+        if cell
+    }
+    return match.group(1).upper() in writable_cells
 
 
 def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
@@ -606,7 +666,17 @@ def validate_template(
                     canonical_workbook = load_workbook(canonical_xlsx, data_only=False)
                     canonical_signature = _workbook_signature(canonical_workbook, manifest)
                     custom_signature = _workbook_signature(workbook, manifest)
-                    differences = _signature_differences(canonical_signature, custom_signature)
+                    differences = _signature_differences(
+                        canonical_signature,
+                        custom_signature,
+                        font_matcher=lambda expected, actual, path: _custom_font_fallback_is_proven(
+                            expected,
+                            actual,
+                            path,
+                            manifest,
+                            template.suffix,
+                        ),
+                    )
                     if differences:
                         report["checks"]["protected_signature_differences"] = differences[:20]
                         errors.append("Custom template changed protected workbook structure or formatting.")

@@ -1872,7 +1872,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 capture_output=True,
             )
             custom = xlsx_dir / "template.xlsx"
-            patch_xlsx_cell_font(custom, "A1", font_name)
+            patch_xlsx_cell_font(custom, "C5", font_name)
             result = run_script(
                 GRADE / "scripts" / "validate_template.py",
                 "--template",
@@ -1881,7 +1881,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
-            self.assertIn("target_cell_formats.A1.font", result.stdout)
+            self.assertIn("target_cell_formats.C5.font", result.stdout)
 
     def test_custom_template_rejects_dejavu_fallback_for_simsun(self) -> None:
         self._assert_custom_template_rejects_font_fallback("DejaVu Sans")

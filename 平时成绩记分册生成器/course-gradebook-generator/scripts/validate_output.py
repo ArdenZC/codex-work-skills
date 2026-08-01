@@ -26,6 +26,9 @@ from package_common import (
     validate_input,
 )
 from validate_template import (
+    _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA,
+    _KNOWN_LIBREOFFICE_FALLBACK_METADATA,
+    _KNOWN_LIBREOFFICE_FALLBACK_NAMES,
     _cell_format_signature,
     _dimension_signature,
     _font_name_signature,
@@ -114,6 +117,7 @@ def _check_workbook_protection(
     errors: list[str],
     template_ws=None,
     template_workbook=None,
+    allow_conversion_fallback: bool = False,
 ) -> dict[str, Any]:
     structure = manifest["structure"]
     validation = manifest["validation"]
@@ -160,7 +164,17 @@ def _check_workbook_protection(
     actual_cf = len(ws.conditional_formatting)
     if actual_cf != expected_cf:
         errors.append(f"Output conditional formats changed: expected {expected_cf}, got {actual_cf}")
-    formatting_errors = _target_sheet_format_errors(ws, template_ws, manifest, skill_enabled) if template_ws is not None else []
+    formatting_errors = (
+        _target_sheet_format_errors(
+            ws,
+            template_ws,
+            manifest,
+            skill_enabled,
+            allow_conversion_fallback,
+        )
+        if template_ws is not None
+        else []
+    )
     errors.extend(formatting_errors)
     protected_value_errors = (
         _target_protected_value_errors(ws, template_ws, manifest, skill_enabled)
@@ -251,35 +265,17 @@ def _format_signature_difference(actual: dict[str, Any], expected: dict[str, Any
     return ",".join(key for key in actual if actual.get(key) != expected.get(key))
 
 
-_KNOWN_LIBREOFFICE_ZERO_SKILL_FALLBACKS = {
-    "dejavusans",
-    "dejavuserif",
-    "liberationsans",
-    "liberationserif",
-}
-_KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA = (134, 0.0, None)
-_KNOWN_LIBREOFFICE_FALLBACK_METADATA = {
-    (None, 2.0, None),
-    (None, 2, None),
-}
-
-
 def _generated_font_fallback_is_proven(
     expected: tuple[Any, ...],
     actual: tuple[Any, ...],
-    cell_address: str,
-    manifest: dict[str, Any],
-    skill_enabled: bool,
+    allow_conversion_fallback: bool,
 ) -> bool:
-    """Allow only the observed LibreOffice zero-skill class-name conversion."""
-    if skill_enabled:
-        return False
-    class_name_cell = str(manifest["structure"]["metadata"]["class_name"]).upper()
-    if str(cell_address).upper() != class_name_cell:
+    """Allow only the observed LibreOffice XLS conversion, never direct XLSX input."""
+    if not allow_conversion_fallback:
         return False
     if _font_name_signature(expected[0]) != "simsun":
         return False
-    if _font_name_signature(actual[0]) not in _KNOWN_LIBREOFFICE_ZERO_SKILL_FALLBACKS:
+    if _font_name_signature(actual[0]) not in _KNOWN_LIBREOFFICE_FALLBACK_NAMES:
         return False
     if tuple(expected[1:4]) != _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA:
         return False
@@ -293,9 +289,7 @@ def _generated_font_fallback_is_proven(
 def _output_cell_format_signatures_match(
     actual: dict[str, Any],
     expected: dict[str, Any],
-    cell_address: str,
-    manifest: dict[str, Any],
-    skill_enabled: bool,
+    allow_conversion_fallback: bool,
 ) -> bool:
     if set(actual) != set(expected):
         return False
@@ -303,7 +297,11 @@ def _output_cell_format_signatures_match(
         if key == "font":
             if _font_signatures_match(actual[key], expected[key]):
                 continue
-            if _generated_font_fallback_is_proven(expected[key], actual[key], cell_address, manifest, skill_enabled):
+            if _generated_font_fallback_is_proven(
+                expected[key],
+                actual[key],
+                allow_conversion_fallback,
+            ):
                 continue
             return False
         if actual[key] != expected[key]:
@@ -353,7 +351,13 @@ def _delete_columns_for_signature(ws, start_col: int, count: int) -> None:
             )
 
 
-def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any], skill_enabled: bool) -> list[str]:
+def _target_sheet_format_errors(
+    output_ws,
+    template_ws,
+    manifest: dict[str, Any],
+    skill_enabled: bool,
+    allow_conversion_fallback: bool,
+) -> list[str]:
     structure = manifest["structure"]
     columns = structure["columns"]
     template_last_row = int(structure["template_last_data_row"])
@@ -388,9 +392,7 @@ def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any]
             if not _output_cell_format_signatures_match(
                 actual_signature,
                 expected_signature,
-                address,
-                manifest,
-                skill_enabled,
+                allow_conversion_fallback,
             ):
                 errors.append(
                     f"target sheet formatting mismatch at {address} "
@@ -674,6 +676,7 @@ def validate_output_dir(
                         errors,
                         template_ws,
                         template_workbook,
+                        path.suffix.lower() == ".xls",
                     )
                     errors.extend(_scan_formula_errors(formulas, values))
 
