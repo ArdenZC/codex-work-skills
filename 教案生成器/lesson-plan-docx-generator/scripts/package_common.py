@@ -155,13 +155,6 @@ def _validate_package_identity(
             f"Template/manifest mismatch: {template.name} is v{known_version}, manifest declares v{version}"
         )
 
-    declared_template = manifest_template_path(manifest)
-    if explicit_manifest and explicit_template and template != declared_template:
-        # Existing custom-template validation intentionally compares an override
-        # against the manifest-selected baseline. Its fingerprint is reported by
-        # validate_template.py, while exact canonical/compatibility path and
-        # cross-minor SHA mismatches above remain hard failures.
-        check_fingerprint = False
     if check_fingerprint:
         _validate_template_fingerprint(template, manifest)
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import math
+import os
 import shutil
 import subprocess
 import sys
@@ -220,6 +221,42 @@ def write_lesson_manifest_package(
         encoding="utf-8",
     )
     return template, manifest_path
+
+
+def write_manifest_for_modified_template(
+    folder: Path,
+    source_manifest: Path,
+    template: Path,
+    reference_template: Path,
+) -> Path:
+    """Create a matching custom manifest while retaining the protected baseline."""
+    folder.mkdir(parents=True, exist_ok=True)
+
+    def relative_or_absolute(path: Path) -> str:
+        try:
+            return os.path.relpath(path.resolve(), folder.resolve())
+        except ValueError:
+            return str(path.resolve())
+
+    manifest = yaml.safe_load(source_manifest.read_text(encoding="utf-8"))
+    manifest["template"]["file"] = relative_or_absolute(reference_template)
+    manifest["template"]["compatibility_entries"] = []
+    manifest["fingerprint"]["sha256"] = file_sha256(template)
+    manifest["fingerprint"]["value"] = file_sha256(template)
+    if str(manifest["template"]["version"]).split(".")[:2] == ["1", "1"]:
+        manifest["template"]["base_manifest"] = relative_or_absolute(LESSON_V10_MANIFEST)
+        manifest["template"]["base_template"] = relative_or_absolute(
+            LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
+        )
+    else:
+        manifest["template"].pop("base_manifest", None)
+        manifest["template"].pop("base_template", None)
+    manifest_path = folder / "manifest.yaml"
+    manifest_path.write_text(
+        yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def update_manifest_fingerprint(manifest_path: Path, template: Path) -> None:
@@ -761,12 +798,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             table.cell(0, 0).text = "授课专业"
             table.cell(0, 3).text = "课程名称"
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                Path(temp_name),
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -779,12 +822,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             document = Document(custom)
             document.styles["Normal"].font.size = Pt(13)
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                Path(temp_name),
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -797,12 +846,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             document = Document(custom)
             document.paragraphs[0].runs[0].font.size = Pt(19)
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                Path(temp_name),
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -815,12 +870,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             document = Document(custom)
             document.sections[0].header.paragraphs[0].paragraph_format.space_before = Pt(1)
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                Path(temp_name),
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -836,12 +897,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             columns.set(qn("w:num"), "2")
             document.sections[0]._sectPr.append(columns)
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                folder,
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -857,12 +924,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             default_tab_stop.set(qn("w:val"), "240")
             document.settings._element.append(default_tab_stop)
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                folder,
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -880,12 +953,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     if info.filename == "word/theme/theme1.xml":
                         data = data.replace(b"Office Theme", b"Tampered Theme")
                     target.writestr(info, data)
+            manifest = write_manifest_for_modified_template(
+                folder,
+                LESSON_V10_MANIFEST,
+                tampered,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(tampered),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -898,12 +977,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             document = Document(custom)
             document.paragraphs[1].add_run("未声明正文")
             document.save(custom)
+            manifest = write_manifest_for_modified_template(
+                Path(temp_name),
+                LESSON_V10_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -1101,12 +1186,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             document = Document(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx")
             document.add_table(rows=1, cols=1)
             document.save(broken)
+            manifest = write_manifest_for_modified_template(
+                Path(temp_name),
+                LESSON_V10_MANIFEST,
+                broken,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx",
+            )
             result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(broken),
                 "--manifest",
-                str(LESSON_V10_MANIFEST),
+                str(manifest),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -1772,12 +1863,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 custom = Path(temp_name) / "custom.docx"
                 shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", custom)
                 patch_docx_document_xml(custom, mutate)
+                manifest = write_manifest_for_modified_template(
+                    Path(temp_name),
+                    LESSON_V11_MANIFEST,
+                    custom,
+                    LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx",
+                )
                 result = run_script(
                     LESSON / "scripts" / "validate_template.py",
                     "--template",
                     str(custom),
                     "--manifest",
-                    str(LESSON_V11_MANIFEST),
+                    str(manifest),
                     "--json",
                 )
                 self.assertNotEqual(result.returncode, 0, result.stdout)
@@ -1986,12 +2083,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 custom = Path(temp_name) / "custom.docx"
                 shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", custom)
                 patch_docx_document_xml(custom, mutate)
+                manifest = write_manifest_for_modified_template(
+                    Path(temp_name),
+                    LESSON_V11_MANIFEST,
+                    custom,
+                    LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx",
+                )
                 result = run_script(
                     LESSON / "scripts" / "validate_template.py",
                     "--template",
                     str(custom),
                     "--manifest",
-                    str(LESSON_V11_MANIFEST),
+                    str(manifest),
                     "--json",
                 )
                 self.assertNotEqual(result.returncode, 0)
@@ -2038,12 +2141,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 custom = Path(temp_name) / "custom.docx"
                 shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", custom)
                 patch_docx_document_xml(custom, mutate)
+                manifest = write_manifest_for_modified_template(
+                    Path(temp_name),
+                    LESSON_V11_MANIFEST,
+                    custom,
+                    LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx",
+                )
                 result = run_script(
                     LESSON / "scripts" / "validate_template.py",
                     "--template",
                     str(custom),
                     "--manifest",
-                    str(LESSON_V11_MANIFEST),
+                    str(manifest),
                     "--json",
                 )
                 self.assertNotEqual(result.returncode, 0)
@@ -2100,12 +2209,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 custom = folder / "custom.docx"
                 shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", custom)
                 patch_docx_document_xml(custom, mutate)
+                template_manifest = write_manifest_for_modified_template(
+                    folder,
+                    LESSON_V11_MANIFEST,
+                    custom,
+                    LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx",
+                )
                 template_result = run_script(
                     LESSON / "scripts" / "validate_template.py",
                     "--template",
                     str(custom),
                     "--manifest",
-                    str(LESSON_V11_MANIFEST),
+                    str(template_manifest),
                     "--json",
                 )
                 self.assertNotEqual(template_result.returncode, 0)
@@ -2151,12 +2266,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
             custom = folder / "custom.docx"
             shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", custom)
             patch_docx_parts(custom, move_end_to_footer)
+            template_manifest = write_manifest_for_modified_template(
+                folder,
+                LESSON_V11_MANIFEST,
+                custom,
+                LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx",
+            )
             template_result = run_script(
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
                 "--manifest",
-                str(LESSON_V11_MANIFEST),
+                str(template_manifest),
                 "--json",
             )
             self.assertNotEqual(template_result.returncode, 0)
@@ -2659,6 +2780,121 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "main table row count mismatch",
             )
 
+    def test_explicit_template_fingerprint_cannot_be_skipped_by_real_cli(self) -> None:
+        source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+        v11_template = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
+
+        def tamper_zip_member(path: Path) -> None:
+            temporary = path.with_suffix(path.suffix + ".tmp")
+            with zipfile.ZipFile(path, "r") as source_zip, zipfile.ZipFile(
+                temporary, "w", zipfile.ZIP_DEFLATED
+            ) as target_zip:
+                for info in source_zip.infolist():
+                    target_zip.writestr(info, source_zip.read(info.filename))
+                target_zip.writestr("qa/fingerprint-tamper.txt", b"fingerprint regression")
+            temporary.replace(path)
+
+        def run_generator(template: Path, manifest: Path, output: Path) -> subprocess.CompletedProcess[str]:
+            return run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--template",
+                str(template),
+                "--manifest",
+                str(manifest),
+                "--skip-template-validation",
+            )
+
+        def run_output_validator(template: Path, manifest: Path, output: Path) -> subprocess.CompletedProcess[str]:
+            return run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--template-path",
+                str(template),
+                "--manifest",
+                str(manifest),
+                "--skip-validation",
+            )
+
+        with tempfile.TemporaryDirectory(prefix="lesson-package-fingerprint-skips-") as temp_name:
+            folder = Path(temp_name)
+            tampered_template, tampered_manifest = write_lesson_manifest_package(
+                folder / "tampered",
+                LESSON_V11_MANIFEST,
+                v11_template,
+                "1.1.1",
+            )
+            manifest_data = yaml.safe_load(tampered_manifest.read_text(encoding="utf-8"))
+            expected_hash = manifest_data["fingerprint"]["sha256"]
+            tamper_zip_member(tampered_template)
+            self.assertNotEqual(file_sha256(tampered_template), expected_hash)
+
+            generate_output = folder / "generate-skip"
+            generate_result = run_generator(tampered_template, tampered_manifest, generate_output)
+            generate_diagnostic = (generate_result.stdout + generate_result.stderr).lower()
+            self.assertNotEqual(generate_result.returncode, 0)
+            self.assertIn("fingerprint mismatch", generate_diagnostic)
+            self.assertFalse(list(generate_output.glob("*.docx")))
+            generate_qa = generate_output / "qa-report.json"
+            if generate_qa.exists():
+                self.assertNotIn(json.loads(generate_qa.read_text(encoding="utf-8"))["status"], {"passed", "skipped"})
+
+            output_skip_dir = folder / "output-skip"
+            output_result = run_output_validator(tampered_template, tampered_manifest, output_skip_dir)
+            output_diagnostic = (output_result.stdout + output_result.stderr).lower()
+            self.assertNotEqual(output_result.returncode, 0)
+            self.assertIn("fingerprint mismatch", output_diagnostic)
+            output_qa = output_skip_dir / "qa-report.json"
+            self.assertFalse(output_qa.exists())
+
+            valid_template, valid_manifest = write_lesson_manifest_package(
+                folder / "valid",
+                LESSON_V11_MANIFEST,
+                v11_template,
+                "1.1.1",
+            )
+            valid_manifest_data = yaml.safe_load(valid_manifest.read_text(encoding="utf-8"))
+            self.assertEqual(file_sha256(valid_template), valid_manifest_data["fingerprint"]["sha256"])
+
+            valid_generate_output = folder / "valid-generate-skip"
+            valid_generate_result = run_generator(valid_template, valid_manifest, valid_generate_output)
+            self.assertEqual(
+                valid_generate_result.returncode,
+                0,
+                valid_generate_result.stdout + valid_generate_result.stderr,
+            )
+            valid_generate_report = json.loads(
+                (valid_generate_output / "qa-report.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(valid_generate_report["status"], "skipped")
+            self.assertIn(
+                "Template validation skipped by explicit flag.",
+                valid_generate_report["warnings"],
+            )
+            self.assertTrue(list(valid_generate_output.glob("*.docx")))
+
+            valid_output_skip_dir = folder / "valid-output-skip"
+            valid_output_result = run_output_validator(valid_template, valid_manifest, valid_output_skip_dir)
+            self.assertEqual(
+                valid_output_result.returncode,
+                0,
+                valid_output_result.stdout + valid_output_result.stderr,
+            )
+            valid_output_report = json.loads(
+                (valid_output_skip_dir / "qa-report.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(valid_output_report["status"], "skipped")
+            self.assertIn(
+                "Output validation skipped by explicit flag.",
+                valid_output_report["warnings"],
+            )
+
     def test_legacy_manifest_rejects_all_semantic_metadata_by_real_cli(self) -> None:
         source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
         canonical = LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
@@ -2882,12 +3118,18 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     custom = folder / f"custom-{label}.docx"
                     shutil.copy2(canonical, custom)
                     patch_docx_document_xml(custom, lambda root, value=invalid_id: set_hours_id(root, value))
+                    template_manifest = write_manifest_for_modified_template(
+                        folder,
+                        LESSON_V11_MANIFEST,
+                        custom,
+                        canonical,
+                    )
                     template_result = run_script(
                         LESSON / "scripts" / "validate_template.py",
                         "--template",
                         str(custom),
                         "--manifest",
-                        str(LESSON_V11_MANIFEST),
+                        str(template_manifest),
                         "--json",
                     )
                     self.assertNotEqual(template_result.returncode, 0)
