@@ -49,10 +49,11 @@ def find_soffice() -> str:
     raise RuntimeError("LibreOffice/soffice was not found; install LibreOffice or use Windows Excel COM for generation.")
 
 
-def convert_to_xlsx(source: Path, out_dir: Path, soffice: str) -> Path:
+def convert_to_format(source: Path, out_dir: Path, target_format: str, soffice: str) -> Path:
+    target_format = str(target_format).lower().lstrip(".")
     out_dir.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run(
-        [soffice, "--headless", "--convert-to", "xlsx", "--outdir", str(out_dir), str(source)],
+        [soffice, "--headless", "--convert-to", target_format, "--outdir", str(out_dir), str(source)],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -61,13 +62,28 @@ def convert_to_xlsx(source: Path, out_dir: Path, soffice: str) -> Path:
     )
     if proc.returncode != 0:
         raise RuntimeError(f"LibreOffice conversion failed: {proc.stdout}\n{proc.stderr}")
-    target = out_dir / f"{source.stem}.xlsx"
+    target = out_dir / f"{source.stem}.{target_format}"
     if target.exists():
         return target
     matches = sorted(out_dir.glob(f"{source.stem}.*"))
     if matches:
         return matches[0]
-    raise RuntimeError(f"LibreOffice did not create an XLSX file for {source}")
+    raise RuntimeError(f"LibreOffice did not create a {target_format.upper()} file for {source}")
+
+
+def convert_to_xlsx(source: Path, out_dir: Path, soffice: str) -> Path:
+    return convert_to_format(source, out_dir, "xlsx", soffice)
+
+
+def convert_to_xls(source: Path, out_dir: Path, soffice: str) -> Path:
+    return convert_to_format(source, out_dir, "xls", soffice)
+
+
+def controlled_roundtrip_xlsx(source_xls: Path, out_dir: Path, soffice: str) -> Path:
+    """Create the platform-specific XLS -> XLSX -> XLS -> XLSX font baseline."""
+    source_xlsx = convert_to_xlsx(source_xls, out_dir / "source-xlsx", soffice)
+    roundtrip_xls = convert_to_xls(source_xlsx, out_dir / "roundtrip-xls", soffice)
+    return convert_to_xlsx(roundtrip_xls, out_dir / "roundtrip-xlsx", soffice)
 
 
 _FONT_NAME_ALIASES = {
@@ -88,19 +104,6 @@ _FONT_NAME_ALIASES = {
     "dengxian": "dengxian",
     "等线": "dengxian",
 }
-
-_KNOWN_LIBREOFFICE_FALLBACK_NAMES = {
-    "dejavusans",
-    "dejavuserif",
-    "liberationsans",
-    "liberationserif",
-}
-_KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA = (134, 0.0, None)
-_KNOWN_LIBREOFFICE_FALLBACK_METADATA = {
-    (None, 2.0, None),
-    (None, 2, None),
-}
-
 
 def _font_name_signature(value: Any) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
@@ -420,41 +423,46 @@ def _signature_differences(
     return differences
 
 
-def _conversion_font_fallback_is_proven(
+def _font_signature_at_path(signature: dict[str, Any], path: str) -> tuple[Any, ...] | None:
+    match = re.fullmatch(
+        r"(target_cell_formats|writable_cell_formats)\.([A-Z]+\d+)\.font",
+        path,
+        flags=re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    cell_formats = signature.get(match.group(1))
+    if not isinstance(cell_formats, dict):
+        return None
+    cell_signature = cell_formats.get(match.group(2).upper())
+    if not isinstance(cell_signature, dict):
+        return None
+    font_signature = cell_signature.get("font")
+    return font_signature if isinstance(font_signature, tuple) else None
+
+
+def controlled_font_fallback_matches(
     expected: tuple[Any, ...],
     actual: tuple[Any, ...],
+    controlled: tuple[Any, ...] | None,
 ) -> bool:
-    """Recognize only the observed SimSun to LibreOffice fallback conversion."""
-    if _font_name_signature(expected[0]) != "simsun":
+    """Match only a complete font signature observed at the same controlled coordinate."""
+    if controlled is None or controlled == expected:
         return False
-    if _font_name_signature(actual[0]) not in _KNOWN_LIBREOFFICE_FALLBACK_NAMES:
-        return False
-    if tuple(expected[1:4]) != _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA:
-        return False
-    if tuple(actual[1:4]) not in _KNOWN_LIBREOFFICE_FALLBACK_METADATA:
-        return False
-    return len(expected) == len(actual) and expected[4:] == actual[4:]
+    return actual != expected and actual == controlled
 
 
-def _custom_font_fallback_is_proven(
+def _controlled_font_fallback_at_path(
     expected: tuple[Any, ...],
     actual: tuple[Any, ...],
     path: str,
-    manifest: dict[str, Any],
-    source_suffix: str,
+    controlled_signature: dict[str, Any] | None,
 ) -> bool:
-    """Allow conversion drift only for editable metadata in a real XLS round trip."""
-    if source_suffix.lower() != ".xls" or not _conversion_font_fallback_is_proven(expected, actual):
+    """Allow a font difference only when the same coordinate differs in the controlled baseline."""
+    if controlled_signature is None:
         return False
-    match = re.search(r"\.([A-Z]+\d+)\.font$", path, flags=re.IGNORECASE)
-    if match is None:
-        return False
-    writable_cells = {
-        str(cell).upper()
-        for cell in manifest.get("structure", {}).get("metadata", {}).values()
-        if cell
-    }
-    return match.group(1).upper() in writable_cells
+    controlled = _font_signature_at_path(controlled_signature, path)
+    return controlled_font_fallback_matches(expected, actual, controlled)
 
 
 def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
@@ -666,15 +674,23 @@ def validate_template(
                     canonical_workbook = load_workbook(canonical_xlsx, data_only=False)
                     canonical_signature = _workbook_signature(canonical_workbook, manifest)
                     custom_signature = _workbook_signature(workbook, manifest)
+                    controlled_signature = None
+                    if template.suffix.lower() == ".xls":
+                        controlled_xlsx = controlled_roundtrip_xlsx(
+                            canonical,
+                            Path(canonical_temp) / "controlled",
+                            find_soffice(),
+                        )
+                        controlled_workbook = load_workbook(controlled_xlsx, data_only=False)
+                        controlled_signature = _workbook_signature(controlled_workbook, manifest)
                     differences = _signature_differences(
                         canonical_signature,
                         custom_signature,
-                        font_matcher=lambda expected, actual, path: _custom_font_fallback_is_proven(
+                        font_matcher=lambda expected, actual, path: _controlled_font_fallback_at_path(
                             expected,
                             actual,
                             path,
-                            manifest,
-                            template.suffix,
+                            controlled_signature,
                         ),
                     )
                     if differences:

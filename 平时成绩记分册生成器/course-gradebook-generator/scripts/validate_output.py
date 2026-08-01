@@ -26,17 +26,15 @@ from package_common import (
     validate_input,
 )
 from validate_template import (
-    _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA,
-    _KNOWN_LIBREOFFICE_FALLBACK_METADATA,
-    _KNOWN_LIBREOFFICE_FALLBACK_NAMES,
     _cell_format_signature,
     _dimension_signature,
-    _font_name_signature,
     _font_signatures_match,
     _non_target_sheet_signature,
     _page_setup_signature,
     _protection_signature,
     _signature_differences,
+    controlled_font_fallback_matches,
+    controlled_roundtrip_xlsx,
     convert_to_xlsx,
     find_soffice,
 )
@@ -117,7 +115,7 @@ def _check_workbook_protection(
     errors: list[str],
     template_ws=None,
     template_workbook=None,
-    allow_conversion_fallback: bool = False,
+    controlled_template_ws=None,
 ) -> dict[str, Any]:
     structure = manifest["structure"]
     validation = manifest["validation"]
@@ -170,7 +168,7 @@ def _check_workbook_protection(
             template_ws,
             manifest,
             skill_enabled,
-            allow_conversion_fallback,
+            controlled_template_ws,
         )
         if template_ws is not None
         else []
@@ -265,31 +263,10 @@ def _format_signature_difference(actual: dict[str, Any], expected: dict[str, Any
     return ",".join(key for key in actual if actual.get(key) != expected.get(key))
 
 
-def _generated_font_fallback_is_proven(
-    expected: tuple[Any, ...],
-    actual: tuple[Any, ...],
-    allow_conversion_fallback: bool,
-) -> bool:
-    """Allow only the observed LibreOffice XLS conversion, never direct XLSX input."""
-    if not allow_conversion_fallback:
-        return False
-    if _font_name_signature(expected[0]) != "simsun":
-        return False
-    if _font_name_signature(actual[0]) not in _KNOWN_LIBREOFFICE_FALLBACK_NAMES:
-        return False
-    if tuple(expected[1:4]) != _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA:
-        return False
-    if tuple(actual[1:4]) not in _KNOWN_LIBREOFFICE_FALLBACK_METADATA:
-        return False
-    # The conversion may change only the font identity metadata; size, emphasis,
-    # underline, strike, vertical alignment, and color must remain identical.
-    return len(expected) == len(actual) and expected[4:] == actual[4:]
-
-
 def _output_cell_format_signatures_match(
     actual: dict[str, Any],
     expected: dict[str, Any],
-    allow_conversion_fallback: bool,
+    controlled_font: tuple[Any, ...] | None,
 ) -> bool:
     if set(actual) != set(expected):
         return False
@@ -297,10 +274,10 @@ def _output_cell_format_signatures_match(
         if key == "font":
             if _font_signatures_match(actual[key], expected[key]):
                 continue
-            if _generated_font_fallback_is_proven(
+            if controlled_font_fallback_matches(
                 expected[key],
                 actual[key],
-                allow_conversion_fallback,
+                controlled_font,
             ):
                 continue
             return False
@@ -356,7 +333,7 @@ def _target_sheet_format_errors(
     template_ws,
     manifest: dict[str, Any],
     skill_enabled: bool,
-    allow_conversion_fallback: bool,
+    controlled_template_ws=None,
 ) -> list[str]:
     structure = manifest["structure"]
     columns = structure["columns"]
@@ -388,11 +365,16 @@ def _target_sheet_format_errors(
                 continue
             actual_signature = _target_cell_format_signature(output_ws.cell(output_row, output_column))
             expected_signature = _target_cell_format_signature(template_ws.cell(source_row, output_column))
+            controlled_font = None
+            if controlled_template_ws is not None and source_row <= controlled_template_ws.max_row:
+                controlled_font = _target_cell_format_signature(
+                    controlled_template_ws.cell(source_row, output_column)
+                )["font"]
             address = f"{get_column_letter(output_column)}{output_row}"
             if not _output_cell_format_signatures_match(
                 actual_signature,
                 expected_signature,
-                allow_conversion_fallback,
+                controlled_font,
             ):
                 errors.append(
                     f"target sheet formatting mismatch at {address} "
@@ -636,6 +618,7 @@ def validate_output_dir(
                 raise RuntimeError("Generated XLS file is empty")
             with tempfile.TemporaryDirectory(prefix="gradebook-output-") as temp_name:
                 xlsx = path if path.suffix.lower() == ".xlsx" else convert_to_xlsx(path, Path(temp_name), find_soffice())
+                converted_from_xls = xlsx.resolve() != path.resolve()
                 formulas = load_workbook(xlsx, data_only=False)
                 values = load_workbook(xlsx, data_only=True)
                 selected_template = Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest)
@@ -645,6 +628,14 @@ def validate_output_dir(
                     else convert_to_xlsx(selected_template, Path(temp_name) / "template", find_soffice())
                 )
                 template_workbook = load_workbook(template_xlsx, data_only=False)
+                controlled_template_workbook = None
+                if converted_from_xls and selected_template.suffix.lower() == ".xls":
+                    controlled_template_xlsx = controlled_roundtrip_xlsx(
+                        selected_template,
+                        Path(temp_name) / "controlled-template",
+                        find_soffice(),
+                    )
+                    controlled_template_workbook = load_workbook(controlled_template_xlsx, data_only=False)
                 sheet_name = structure["worksheet"]
                 if sheet_name not in formulas.sheetnames:
                     errors.append(f"Missing worksheet: {sheet_name}")
@@ -652,6 +643,12 @@ def validate_output_dir(
                     ws_formula = formulas[sheet_name]
                     ws_values = values[sheet_name]
                     template_ws = template_workbook[sheet_name] if sheet_name in template_workbook.sheetnames else None
+                    controlled_template_ws = (
+                        controlled_template_workbook[sheet_name]
+                        if controlled_template_workbook is not None
+                        and sheet_name in controlled_template_workbook.sheetnames
+                        else None
+                    )
                     if template_ws is None:
                         errors.append(f"Missing worksheet in template: {sheet_name}")
                     elif not skill_enabled:
@@ -662,12 +659,25 @@ def validate_output_dir(
                             column_number(columns["skill_score"]),
                             2,
                         )
+                        if controlled_template_ws is not None:
+                            controlled_class_name_style = copy(controlled_template_ws[class_name_cell]._style)
+                            _delete_columns_for_signature(
+                                controlled_template_ws,
+                                column_number(columns["skill_score"]),
+                                2,
+                            )
+                            controlled_template_ws[class_name_cell]._style = copy(controlled_class_name_style)
                         template_ws[class_name_cell]._style = copy(class_name_style)
                         no_skill_total = structure["no_skill_total_column"]
                         template_ws.column_dimensions[no_skill_total].width = max(
                             template_ws.column_dimensions[no_skill_total].width or 0,
                             18,
                         )
+                        if controlled_template_ws is not None:
+                            controlled_template_ws.column_dimensions[no_skill_total].width = max(
+                                controlled_template_ws.column_dimensions[no_skill_total].width or 0,
+                                18,
+                            )
                     report["checks"]["structure"] = _check_workbook_protection(
                         ws_formula,
                         formulas,
@@ -676,7 +686,7 @@ def validate_output_dir(
                         errors,
                         template_ws,
                         template_workbook,
-                        path.suffix.lower() == ".xls",
+                        controlled_template_ws,
                     )
                     errors.extend(_scan_formula_errors(formulas, values))
 

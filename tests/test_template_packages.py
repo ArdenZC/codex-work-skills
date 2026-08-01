@@ -80,6 +80,79 @@ def soffice_path() -> str | None:
     return next((item for item in candidates if item and Path(item).exists()), None)
 
 
+def convert_with_soffice(source: Path, out_dir: Path, target_format: str) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [soffice_path(), "--headless", "--convert-to", target_format, "--outdir", str(out_dir), str(source)],
+        check=True,
+        capture_output=True,
+    )
+    target = out_dir / f"{source.stem}.{target_format}"
+    if not target.exists():
+        raise AssertionError(f"LibreOffice did not create {target}")
+    return target
+
+
+def xlsx_font_signature(path: Path, address: str) -> tuple[object, ...]:
+    workbook = load_workbook(path, data_only=False)
+    font = workbook["平时成绩"][address].font
+    color = font.color
+    color_signature = () if color is None else (
+        color.type,
+        color.rgb,
+        color.indexed,
+        color.auto,
+        color.theme,
+        color.tint,
+    )
+    return (
+        font.name,
+        font.charset,
+        font.family,
+        font.scheme,
+        font.sz,
+        bool(font.b),
+        bool(font.i),
+        font.u,
+        bool(font.strike),
+        bool(font.outline),
+        bool(font.shadow),
+        font.vertAlign,
+        color_signature,
+    )
+
+
+def find_roundtrip_font_tamper(
+    source_xlsx: Path,
+    controlled_baseline_xlsx: Path,
+    font_name: str,
+    candidates: tuple[str, ...],
+    work_dir: Path,
+    label: str,
+) -> tuple[Path, str]:
+    """Find a font-only XLS round trip that differs from the controlled baseline."""
+    work_dir.mkdir(parents=True, exist_ok=True)
+    for index, address in enumerate(candidates):
+        tampered_xlsx = work_dir / f"{label}-{index}.xlsx"
+        shutil.copy2(source_xlsx, tampered_xlsx)
+        patch_xlsx_cell_font(tampered_xlsx, address, font_name)
+        tampered_xls = convert_with_soffice(
+            tampered_xlsx,
+            work_dir / f"{label}-{index}-xls",
+            "xls",
+        )
+        final_xlsx = convert_with_soffice(
+            tampered_xls,
+            work_dir / f"{label}-{index}-final",
+            "xlsx",
+        )
+        if xlsx_font_signature(final_xlsx, address) != xlsx_font_signature(controlled_baseline_xlsx, address):
+            return tampered_xls, address
+    raise AssertionError(
+        f"{font_name} did not produce a distinct font signature in candidates {candidates}"
+    )
+
+
 def run_script(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         [str(PYTHON), str(script), *args],
@@ -1945,6 +2018,138 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertIn("target sheet formatting mismatch at C2", result.stderr)
             self.assertIn("target sheet formatting mismatch at O2", result.stderr)
             self.assertIn("font", result.stderr)
+
+    def test_output_validation_rejects_xls_roundtrip_font_fallback(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-output-xls-font-fallback-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, skill=True)
+            generated_dir = folder / "generated"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(generated_dir),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(generated_dir.glob("*.xls"))
+            generated_xlsx = convert_with_soffice(generated, folder / "generated-xlsx", "xlsx")
+
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            canonical_xlsx = convert_with_soffice(canonical, folder / "baseline-source", "xlsx")
+            controlled_baseline_xlsx = convert_with_soffice(
+                convert_with_soffice(canonical_xlsx, folder / "baseline-xls", "xls"),
+                folder / "baseline-final",
+                "xlsx",
+            )
+            protected_cells = (
+                "A1", "A3", "D3", "D4", "E4", "F4", "G4", "H4", "I4", "J4", "K4",
+                "C5", "D5", "E5", "M5", "Q5",
+            )
+            normalized = folder / "normalized.json"
+            normalized.write_text(
+                json.dumps(
+                    {
+                        "term": "2025-2026-2",
+                        "course": "软件测试实训",
+                        "teacher": "张老师",
+                        "class_name": "软件技术2401班",
+                        "weights": {"regular": 0.5, "theory": 0.3, "skill": 0.2},
+                        "students": [
+                            {"id": "240101001", "name": "学生1", "regular": 86.5, "theory": 88.0, "skill": 92.0, "total": 88.0},
+                            {"id": "240101002", "name": "学生2", "regular": 91.0, "theory": 90.0, "skill": 90.0, "total": 91.0},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            for index, font_name in enumerate(("DejaVu Sans", "Liberation Serif")):
+                with self.subTest(font=font_name):
+                    tampered_xls, address = find_roundtrip_font_tamper(
+                        generated_xlsx,
+                        controlled_baseline_xlsx,
+                        font_name,
+                        protected_cells,
+                        folder / f"tampered-{index}",
+                        f"output-{index}",
+                    )
+                    validation_dir = folder / f"validation-{index}"
+                    validation_dir.mkdir()
+                    validation_file = validation_dir / "tampered.xls"
+                    shutil.copy2(tampered_xls, validation_file)
+                    result = run_script(
+                        GRADE / "scripts" / "validate_output.py",
+                        "--input-json",
+                        str(normalized),
+                        "--output-dir",
+                        str(validation_dir),
+                        "--output-file",
+                        str(validation_file),
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(f"target sheet formatting mismatch at {address}", result.stderr)
+                    self.assertIn("font", result.stderr)
+
+    def test_custom_template_xls_roundtrip_rejects_protected_and_metadata_font_fallback(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-xls-font-fallback-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            canonical_xlsx = convert_with_soffice(canonical, folder / "baseline-source", "xlsx")
+            controlled_baseline_xlsx = convert_with_soffice(
+                convert_with_soffice(canonical_xlsx, folder / "baseline-xls", "xls"),
+                folder / "baseline-final",
+                "xlsx",
+            )
+            protected_cells = (
+                "A1", "A3", "D3", "D4", "E4", "F4", "G4", "H4", "I4", "J4", "K4",
+                "C5", "D5", "E5", "M5", "Q5",
+            )
+            metadata_cells = ("C2", "G2", "L2", "O2")
+            cases = (
+                ("protected-dejavu", "DejaVu Sans", protected_cells),
+                ("protected-liberation", "Liberation Serif", protected_cells),
+                ("metadata-dejavu", "DejaVu Sans", metadata_cells),
+                ("metadata-liberation", "Liberation Serif", metadata_cells),
+            )
+            for label, font_name, candidates in cases:
+                with self.subTest(case=label):
+                    tampered_xls, address = find_roundtrip_font_tamper(
+                        canonical_xlsx,
+                        controlled_baseline_xlsx,
+                        font_name,
+                        candidates,
+                        folder / label,
+                        label,
+                    )
+                    result = run_script(
+                        GRADE / "scripts" / "validate_template.py",
+                        "--template",
+                        str(tampered_xls),
+                        "--json",
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+                    self.assertIn(address, result.stdout)
+                    self.assertIn("font", result.stdout)
+
+    def test_python_generator_skill_xls_roundtrip_passes_font_guard(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-skill-font-baseline-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, skill=True)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "passed")
+            self.assertTrue(report["checks"]["skill_enabled"])
 
     def test_canonical_libreoffice_roundtrip_passes_font_guard(self) -> None:
         canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
