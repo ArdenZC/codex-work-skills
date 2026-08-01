@@ -792,20 +792,33 @@ def validate_template(
                             ]
                             if cell
                         }
-                        changed_writable_cells: set[str] = set()
+                        changed_writable_anchors: set[str] = set()
                         for address in writable_cells:
                             if canonical_ws[address].value != custom_ws[address].value:
-                                changed_writable_cells.add(address)
+                                changed_writable_anchors.add(address)
                                 for section_name in ("target_cell_formats", "writable_cell_formats"):
                                     controlled_signature[section_name][address] = (
                                         content_controlled_signature[section_name].get(address)
                                     )
+                        changed_writable_cells = set(changed_writable_anchors)
+                        for merged in canonical_ws.merged_cells.ranges:
+                            if merged.start_cell.coordinate not in changed_writable_anchors:
+                                continue
+                            changed_writable_cells.update(
+                                f"{get_column_letter(column)}{row}"
+                                for row, column in merged.cells
+                            )
+                        for address in changed_writable_cells - changed_writable_anchors:
+                            controlled_signature["target_cell_formats"][address] = (
+                                content_controlled_signature["target_cell_formats"].get(address)
+                            )
+                        unchanged_xls = canonical if actual_hash == expected_hash else static_controlled_xls
                         for section_name in ("target_cell_formats", "writable_cell_formats"):
                             for address in canonical_signature.get(section_name, {}):
                                 expected_xls = (
                                     content_controlled_xls
                                     if address in changed_writable_cells
-                                    else static_controlled_xls
+                                    else unchanged_xls
                                 )
                                 expected_font = xls_font_identity(expected_xls, sheet_name, address)
                                 actual_font = xls_font_identity(template, sheet_name, address)
