@@ -9,7 +9,7 @@
 ```text
 assets/
   <旧模板文件>                         # 兼容入口，不作为新代码的默认来源
-  templates/<template-id>/v1.0.0/
+  templates/<template-id>/<version>/
     template.<docx|xls>                 # 规范模板，唯一 canonical source
     manifest.yaml                        # 模板结构、字段和保护规则
     CHANGELOG.md
@@ -25,13 +25,13 @@ requirements.txt
 
 ## Manifest
 
-`manifest.yaml` 是模板坐标的唯一事实来源，至少声明：
+`manifest.yaml` 是模板结构和写入契约的唯一事实来源，至少声明：
 
 - `template.id`、`template.name`、`template.version`、`template.format`、`template.file`；
 - `generator.version`，记录当前生成器版本；
 - `generator.supported_major`，用于拒绝不兼容的模板大版本；
-- `structure`，包括工作表/主表、数据区、嵌套表、字段坐标、公式列和技能列开关；
-- `fields`，包括字段名称、位置、写入模式、允许的长度或数值范围；
+- `structure`，包括工作表/主表、数据区、嵌套表、保护布局和必要的兼容坐标；
+- `fields`，包括字段名称、语义写入目标、写入模式、允许的长度或数值范围；
 - `allowed_changes` 与 `protected`，说明生成器可以改什么、不能改什么；
 - `validation`，包括固定标签、行列数、公式、格式和输出检查项；
 - canonical template 的 `fingerprint.sha256`。
@@ -47,6 +47,12 @@ requirements.txt
 
 校验失败必须返回非零退出码，并在标准错误输出清晰原因。非阻断提醒放入 `warnings`，不能把警告伪装成成功校验。正常生成默认启用模板校验和输出校验；只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才能跳过。
 
+## Word 语义书签
+
+教案 `lesson-plan/v1.1.0` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。固定字段使用 `lp_` 前缀的业务名称，教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确且位置未改变。
+
+v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0 的可见内容和结构 XML 严格等价。校验器不会用坐标模式静默补写缺失书签。v1.0.x 仍可通过显式 `--manifest .../v1.0.0/manifest.yaml` 使用旧坐标模式，QA 报告会标记 `anchor_mode: legacy_coordinates`；v1.1.x 报告会记录 `anchor_mode: word_bookmark`、必需/保留数量以及缺失和重复锚点。
+
 ## 模板保护边界
 
 生成器只能写 manifest 中声明的字段，或按声明的行/列规则增删学生行和技能列。页边距、页眉页脚、合并单元格、固定标签、工作表名称、公式列、打印设置、样式和其他未声明结构均视为 protected。自定义模板可以通过旧的 `--template` 参数传入，但指纹不一致必须给出明确警告，结构不满足时仍然失败。
@@ -58,10 +64,10 @@ requirements.txt
 ## 兼容性
 
 - 原有 CLI 参数继续保留；新参数只做可选扩展。
-- DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式。
+- DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式；教案 v1.1 的正常写入必须以 Word 书签为入口。
 - `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。Windows COM 负责生成时保留 Excel 原生格式，但默认结构化 QA 仍调用 Python/LibreOffice 转换器；没有 LibreOffice 时只能显式跳过相应校验，报告会标记为 `skipped`。
 - 仓库内脚本不得依赖个人电脑上的临时工具目录或其他外部绝对路径。
-- 当前模板版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。
+- 当前模板版本：教案默认 `lesson-plan/v1.1.0`，兼容 `lesson-plan/v1.0.0`；记分册 `course-gradebook/v1.0.0`。
 - 默认校验命令：
 
   ```bash

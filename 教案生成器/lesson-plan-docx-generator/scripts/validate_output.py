@@ -14,19 +14,28 @@ from typing import Any
 from docx import Document
 from docx.oxml.ns import qn
 from docx.table import _Cell
+from docx.text.paragraph import Paragraph
 from lxml import etree
 
+from bookmark_utils import bookmark_location, bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark, validate_bookmark_inventory
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
     EVALUATION_MAX_POINTS,
+    bookmark_containers,
     evaluation_cell_values,
+    field_bookmark,
     field_spec,
     generated_lesson_fields,
+    implementation_bookmarks,
     implementation_cell_values,
+    is_semantic_manifest,
+    layout_manifest,
     load_manifest,
     manifest_template_path,
+    reflection_bookmarks,
     reflection_cell_values,
+    required_bookmarks,
     validate_composed_fields,
     validate_input,
 )
@@ -45,6 +54,18 @@ def cell_text(table, row_index: int, cell_index: int) -> str:
 
 def manifest_field_text(document, main_table, manifest: dict[str, Any], name: str) -> str:
     spec = field_spec(manifest, name)
+    if is_semantic_manifest(manifest):
+        bookmark_name = field_bookmark(manifest, name)
+        record = find_bookmark(document, bookmark_name)
+        if record is None:
+            raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} is missing")
+        cell_element = bookmark_parent_cell(document, record)
+        if cell_element is not None:
+            return _Cell(cell_element, document).text.strip()
+        paragraph_element = bookmark_parent_paragraph(document, record)
+        if paragraph_element is not None:
+            return Paragraph(paragraph_element, document).text.strip()
+        raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} has no writable container")
     if not all(key in spec for key in ("table", "row", "cell")):
         raise ValueError(f"Manifest field {name} is not a table-cell field")
     table_index = int(spec["table"])
@@ -190,6 +211,7 @@ def _title_format_signature(document, manifest: dict[str, Any]) -> dict[str, Any
 
 
 def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    manifest = layout_manifest(manifest)
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable, evaluation = _writable_main_table_cells(manifest)
 
@@ -280,6 +302,7 @@ def _direct_format_signature(cell) -> dict[str, Any]:
 
 
 def _writable_direct_format_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    manifest = layout_manifest(manifest)
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable, evaluation = _writable_main_table_cells(manifest)
     values: list[dict[str, Any]] = []
@@ -308,6 +331,7 @@ def _writable_direct_format_signature(document, manifest: dict[str, Any]) -> lis
 
 
 def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    manifest = layout_manifest(manifest)
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     _writable, evaluation = _writable_main_table_cells(manifest)
     if evaluation is None:
@@ -348,7 +372,8 @@ def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) ->
 
 
 def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
-    table = document.tables[int(manifest["structure"]["main_table"]["index"])]
+    layout = layout_manifest(manifest)
+    table = document.tables[int(layout["structure"]["main_table"]["index"])]
     rows = []
     for row in table.rows:
         rows.append(
@@ -361,7 +386,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "tablePr": _xml(table._tbl.tblPr) if table._tbl.tblPr is not None else "",
         "tblGrid": _xml(table._tbl.tblGrid) if table._tbl.tblGrid is not None else "",
         "rows": rows,
-        "evaluation_table": _evaluation_table_layout_signature(document, manifest),
+        "evaluation_table": _evaluation_table_layout_signature(document, layout),
         "sections": [
             {
                 "page_width": section.page_width.twips,
@@ -394,11 +419,11 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "styles": _xml(document.styles._element),
         "themes": _theme_signature(document),
         "settings_xml": _settings_xml(document),
-        "body_paragraphs": _body_paragraph_signature(document, manifest),
-        "title_format": _title_format_signature(document, manifest),
-        "protected_text": _protected_text_signature(document, manifest),
-        "writable_direct_formats": _writable_direct_format_signature(document, manifest),
-        "evaluation_writable_formats": _evaluation_writable_format_signature(document, manifest),
+        "body_paragraphs": _body_paragraph_signature(document, layout),
+        "title_format": _title_format_signature(document, layout),
+        "protected_text": _protected_text_signature(document, layout),
+        "writable_direct_formats": _writable_direct_format_signature(document, layout),
+        "evaluation_writable_formats": _evaluation_writable_format_signature(document, layout),
     }
 
 
@@ -464,7 +489,45 @@ def _validate_text_length(name: str, value: str, spec: dict[str, Any], errors: l
         errors.append(f"{name} exceeds manifest max_chars={max_chars}: {len(value)}")
 
 
-def _field_targets(document, table, spec: dict[str, Any]):
+def _field_targets(document, table, spec: dict[str, Any], name: str = "", manifest: dict[str, Any] | None = None):
+    if manifest is not None and is_semantic_manifest(manifest):
+        if spec.get("bookmark"):
+            bookmark_name = str(spec["bookmark"])
+            record = find_bookmark(document, bookmark_name)
+            if record is None:
+                return []
+            cell_element = bookmark_parent_cell(document, record)
+            if cell_element is not None:
+                cell = _Cell(cell_element, document)
+                return [(cell.text, len(cell.paragraphs))]
+            paragraph_element = bookmark_parent_paragraph(document, record)
+            if paragraph_element is not None:
+                return [(Paragraph(paragraph_element, document).text, 1)]
+            return []
+        if name == "implementation":
+            values = []
+            for group in implementation_bookmarks(manifest):
+                for bookmark_name in group:
+                    record = find_bookmark(document, bookmark_name)
+                    if record is None:
+                        continue
+                    cell_element = bookmark_parent_cell(document, record)
+                    if cell_element is not None:
+                        cell = _Cell(cell_element, document)
+                        values.append((cell.text, len(cell.paragraphs)))
+            return values
+        if name == "reflection":
+            values = []
+            for bookmark_name in reflection_bookmarks(manifest):
+                record = find_bookmark(document, bookmark_name)
+                if record is None:
+                    continue
+                cell_element = bookmark_parent_cell(document, record)
+                if cell_element is not None:
+                    cell = _Cell(cell_element, document)
+                    values.append((cell.text, len(cell.paragraphs)))
+            return values
+        return []
     if spec.get("target") == "document_paragraph" or "paragraph" in spec:
         index = int(spec.get("paragraph", -1))
         if 0 <= index < len(document.paragraphs):
@@ -567,6 +630,18 @@ def _base_qa_report(
         "files_checked": 0,
         "qa_report": str(report_path),
     }
+    if is_semantic_manifest(manifest):
+        report.update(
+            {
+                "anchor_mode": "word_bookmark",
+                "required_anchor_count": len(required_bookmarks(manifest)),
+                "preserved_anchor_count": 0,
+                "missing_anchors": [],
+                "duplicate_anchors": [],
+            }
+        )
+    else:
+        report["anchor_mode"] = "legacy_coordinates"
     return report
 
 
@@ -653,6 +728,7 @@ def validate_output_dir(
     course_expected = str(data["course_name"])
     total_hours = 0.0
     lesson_checks = []
+    anchor_results: list[dict[str, Any]] = []
     for index, (path, item) in enumerate(zip(files, lessons), start=1):
         item_errors: list[str] = []
         if not path.is_file() or path.stat().st_size == 0:
@@ -667,10 +743,26 @@ def validate_output_dir(
             lesson_checks.append({"file_index": index, "errors": item_errors})
             errors.extend(f"file {index}: {message}" for message in item_errors)
             continue
+        if is_semantic_manifest(manifest):
+            anchor_inventory = validate_bookmark_inventory(
+                document,
+                required_bookmarks(manifest),
+                bookmark_containers(manifest),
+            )
+            anchor_results.append(anchor_inventory)
+            if not anchor_inventory["valid"]:
+                item_errors.extend(
+                    f"semantic bookmark protection failed: {error}"
+                    for error in anchor_inventory["errors"]
+                )
         if len(document.tables) <= int(main_spec["index"]):
             item_errors.append("main table is missing")
             lesson_checks.append({"file_index": index, "errors": item_errors})
             errors.extend(f"file {index}: {message}" for message in item_errors)
+            continue
+        if is_semantic_manifest(manifest) and not anchor_inventory["valid"]:
+            errors.extend(f"file {index}: {message}" for message in item_errors)
+            lesson_checks.append({"file_index": index, "errors": item_errors, "fields_checked": []})
             continue
         table = document.tables[int(main_spec["index"])]
         canonical_template = manifest_template_path(manifest)
@@ -681,6 +773,14 @@ def validate_output_dir(
                 protected_layout_signature(canonical_document, manifest),
             ):
                 item_errors.append("protected DOCX layout changed")
+            if is_semantic_manifest(manifest) and anchor_inventory["valid"]:
+                location_changes = [
+                    name
+                    for name in required_bookmarks(manifest)
+                    if bookmark_location(document, name) != bookmark_location(canonical_document, name)
+                ]
+                if location_changes:
+                    item_errors.append("semantic bookmark location changed: " + ", ".join(location_changes))
         if len(table.rows) != int(main_spec["rows"]):
             item_errors.append(f"main table rows expected {main_spec['rows']}, got {len(table.rows)}")
         if len(table.columns) != int(main_spec["columns"]):
@@ -689,14 +789,13 @@ def validate_output_dir(
         expected_course = str(item.get("course_name") or data["course_name"])
         expected_major = str(item.get("major") or data.get("major", "软件技术"))
         expected_audience = str(item.get("audience") or data.get("audience", "高职二年级"))
-        field_values = {
-            "course_name": manifest_field_text(document, table, manifest, "course_name"),
-            "major": manifest_field_text(document, table, manifest, "major"),
-            "audience": manifest_field_text(document, table, manifest, "audience"),
-            "unit": manifest_field_text(document, table, manifest, "unit"),
-            "task": manifest_field_text(document, table, manifest, "task"),
-            "hours": manifest_field_text(document, table, manifest, "hours"),
-        }
+        field_values: dict[str, str] = {}
+        for field_name in ("course_name", "major", "audience", "unit", "task", "hours"):
+            try:
+                field_values[field_name] = manifest_field_text(document, table, manifest, field_name)
+            except (KeyError, ValueError, IndexError) as exc:
+                field_values[field_name] = ""
+                item_errors.append(f"semantic bookmark protection failed for {field_name}: {exc}")
         if field_values["course_name"] != expected_course:
             item_errors.append("course field mismatch")
         if field_values["major"] != expected_major:
@@ -715,7 +814,11 @@ def validate_output_dir(
             item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"),
         )
         for name, expected in generated.items():
-            actual = manifest_field_text(document, table, manifest, name)
+            try:
+                actual = manifest_field_text(document, table, manifest, name)
+            except (KeyError, ValueError, IndexError) as exc:
+                actual = ""
+                item_errors.append(f"semantic bookmark protection failed for {name}: {exc}")
             if actual != expected:
                 item_errors.append(f"{name} content mismatch")
         try:
@@ -729,44 +832,78 @@ def validate_output_dir(
         if not field_values["unit"].startswith("项目"):
             item_errors.append("unit is not projectized")
 
-        title_spec = field_spec(manifest, "title")
-        title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
         expected_title = f"{index} 《{expected_course}》教学单元设计：{item['task']}"
-        actual_title = document.paragraphs[title_index].text if 0 <= title_index < len(document.paragraphs) else ""
+        if is_semantic_manifest(manifest):
+            title_record = find_bookmark(document, field_bookmark(manifest, "title"))
+            title_element = bookmark_parent_paragraph(document, title_record) if title_record else None
+            actual_title = Paragraph(title_element, document).text if title_element is not None else ""
+        else:
+            title_spec = field_spec(manifest, "title")
+            title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+            actual_title = document.paragraphs[title_index].text if 0 <= title_index < len(document.paragraphs) else ""
         if actual_title != expected_title:
             item_errors.append("title field mismatch")
 
         for name, spec in manifest.get("fields", {}).items():
             if name in {"evaluation"}:
                 continue
-            for value, paragraph_count in _field_targets(document, table, spec):
+            for value, paragraph_count in _field_targets(document, table, spec, name, manifest):
                 _validate_text_length(name, value, spec, item_errors)
                 max_paragraphs = spec.get("max_paragraphs")
                 if max_paragraphs is not None and paragraph_count > int(max_paragraphs):
                     item_errors.append(f"{name} exceeds manifest max_paragraphs={max_paragraphs}: {paragraph_count}")
 
-        implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
-        for row_index, expected_values in zip(
-            implementation_rows,
-            implementation_cell_values(str(item["task"]), item.get("flows", [])),
-        ):
-            cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
-            for cell_index, expected_value in expected_values.items():
-                actual_value = cells[cell_index].text if cell_index < len(cells) else ""
-                expected_text = str(expected_value).rstrip("\r\n")
-                if actual_value != expected_text:
-                    item_errors.append(f"implementation cell mismatch at row {row_index} cell {cell_index}")
+        if is_semantic_manifest(manifest):
+            for bookmark_group, expected_values in zip(
+                implementation_bookmarks(manifest),
+                implementation_cell_values(str(item["task"]), item.get("flows", [])),
+            ):
+                for bookmark_name, expected_value in zip(bookmark_group, expected_values.values()):
+                    record = find_bookmark(document, bookmark_name)
+                    cell_element = bookmark_parent_cell(document, record) if record else None
+                    actual_value = _Cell(cell_element, document).text if cell_element is not None else ""
+                    expected_text = str(expected_value).rstrip("\r\n")
+                    if actual_value != expected_text:
+                        item_errors.append(f"implementation cell mismatch at bookmark {bookmark_name}")
+            for bookmark_name, expected_value in zip(
+                reflection_bookmarks(manifest),
+                reflection_cell_values(str(item["task"])),
+            ):
+                record = find_bookmark(document, bookmark_name)
+                cell_element = bookmark_parent_cell(document, record) if record else None
+                actual_value = _Cell(cell_element, document).text if cell_element is not None else ""
+                if actual_value != expected_value:
+                    item_errors.append(f"reflection cell mismatch at bookmark {bookmark_name}")
+        else:
+            implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
+            for row_index, expected_values in zip(
+                implementation_rows,
+                implementation_cell_values(str(item["task"]), item.get("flows", [])),
+            ):
+                cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
+                for cell_index, expected_value in expected_values.items():
+                    actual_value = cells[cell_index].text if cell_index < len(cells) else ""
+                    expected_text = str(expected_value).rstrip("\r\n")
+                    if actual_value != expected_text:
+                        item_errors.append(f"implementation cell mismatch at row {row_index} cell {cell_index}")
 
-        reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
-        for row_index, expected_value in zip(reflection_rows, reflection_cell_values(str(item["task"]))):
-            cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
-            actual_value = cells[2].text if len(cells) > 2 else ""
-            if actual_value != expected_value:
-                item_errors.append(f"reflection cell mismatch at row {row_index} cell 2")
+            reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
+            for row_index, expected_value in zip(reflection_rows, reflection_cell_values(str(item["task"]))):
+                cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
+                actual_value = cells[2].text if len(cells) > 2 else ""
+                if actual_value != expected_value:
+                    item_errors.append(f"reflection cell mismatch at row {row_index} cell 2")
 
         nested_spec = manifest["structure"]["evaluation_table"]
         try:
-            eval_cell = actual_cells(table.rows[int(nested_spec["row"])])[int(nested_spec["cell"])]
+            if is_semantic_manifest(manifest):
+                evaluation_record = find_bookmark(document, field_bookmark(manifest, "evaluation"))
+                evaluation_element = bookmark_parent_cell(document, evaluation_record) if evaluation_record else None
+                if evaluation_element is None:
+                    raise ValueError("evaluation parent bookmark is missing or not in a table cell")
+                eval_cell = _Cell(evaluation_element, document)
+            else:
+                eval_cell = actual_cells(table.rows[int(nested_spec["row"])])[int(nested_spec["cell"])]
             nested = eval_cell.tables[0]
             if len(nested.rows) != int(nested_spec["rows"]) or len(nested.columns) != int(nested_spec["columns"]):
                 item_errors.append("evaluation table structure changed")
@@ -798,6 +935,24 @@ def validate_output_dir(
         if item_errors:
             errors.extend(f"file {index}: {message}" for message in item_errors)
         lesson_checks.append({"file_index": index, "errors": item_errors, "fields_checked": sorted(field_values)})
+
+    if is_semantic_manifest(manifest):
+        missing_anchors = sorted({name for result in anchor_results for name in result["missing"]})
+        duplicate_anchors = sorted({name for result in anchor_results for name in result["duplicates"]})
+        report["preserved_anchor_count"] = min(
+            (result["preserved_count"] for result in anchor_results),
+            default=0,
+        )
+        report["missing_anchors"] = missing_anchors
+        report["duplicate_anchors"] = duplicate_anchors
+        checks["anchors"] = {
+            "mode": "word_bookmark",
+            "required": report["required_anchor_count"],
+            "preserved": report["preserved_anchor_count"],
+            "missing": missing_anchors,
+            "duplicates": duplicate_anchors,
+            "duplicate_ids": sorted({name for result in anchor_results for name in result["duplicate_ids"]}),
+        }
 
     expected_total = data.get("total_hours")
     if expected_total is not None:

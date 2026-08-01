@@ -11,8 +11,13 @@ from jsonschema import Draft202012Validator
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = (
     {
-        "name": "lesson-plan",
+        "name": "lesson-plan-v1.0.0",
         "manifest": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml",
+        "schema": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "schemas" / "lesson-plan-input.schema.json",
+    },
+    {
+        "name": "lesson-plan-v1.1.0",
+        "manifest": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml",
         "schema": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "schemas" / "lesson-plan-input.schema.json",
     },
     {

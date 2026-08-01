@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import shutil
 import subprocess
@@ -16,7 +17,6 @@ from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
-from docx.table import _Cell
 from lxml import etree
 from openpyxl import Workbook, load_workbook
 
@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 GRADE = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator"
 PYTHON = Path(sys.executable)
+LESSON_V10_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
+LESSON_V11_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
 
 
 _XLSX_NS = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
@@ -168,6 +170,67 @@ def run_script(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         check=False,
     )
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest().upper()
+
+
+def patch_docx_document_xml(path: Path, mutate) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as target:
+        for info in source.infolist():
+            data = source.read(info.filename)
+            if info.filename == "word/document.xml":
+                root = etree.fromstring(data)
+                mutate(root)
+                data = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+            target.writestr(info, data)
+    temporary.replace(path)
+
+
+def patch_bookmarked_text(path: Path, name: str, text: str) -> None:
+    """Change only text inside a semantic bookmark while preserving its boundaries."""
+    def mutate(root) -> None:
+        start = bookmark_start(root, name)
+        end = bookmark_end(root, start.get(qn("w:id")))
+        nodes = list(root.iter())
+        start_index = nodes.index(start)
+        end_index = nodes.index(end)
+        text_nodes = [node for node in nodes[start_index + 1:end_index] if node.tag == qn("w:t")]
+        if not text_nodes:
+            raise AssertionError(f"bookmark has no text node in test fixture: {name}")
+        text_nodes[0].text = text
+        for node in text_nodes[1:]:
+            node.text = ""
+
+    patch_docx_document_xml(path, mutate)
+
+
+def bookmark_start(root, name: str):
+    nodes = root.xpath(
+        ".//w:bookmarkStart[@w:name=$name]",
+        namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"},
+        name=name,
+    )
+    if not nodes:
+        raise AssertionError(f"bookmark not found in test fixture: {name}")
+    return nodes[0]
+
+
+def bookmark_end(root, bookmark_id: str):
+    nodes = root.xpath(
+        ".//w:bookmarkEnd[@w:id=$bookmark_id]",
+        namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"},
+        bookmark_id=bookmark_id,
+    )
+    if not nodes:
+        raise AssertionError(f"bookmark end not found in test fixture: {bookmark_id}")
+    return nodes[0]
 
 
 class LessonTemplatePackageTests(unittest.TestCase):
@@ -462,8 +525,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertEqual(document.tables[0].cell(0, 9).text.strip(), "高职三年级")
             self.assertIn("《接口测试实训》", document.paragraphs[0].text)
 
-            document.tables[0].cell(0, 5).text = "错误专业"
-            document.save(generated)
+            patch_bookmarked_text(generated, "lp_major", "错误专业")
             validation = run_script(
                 LESSON / "scripts" / "validate_output.py",
                 "--input-json",
@@ -564,6 +626,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -580,6 +644,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -596,6 +662,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -612,6 +680,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -631,6 +701,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -650,6 +722,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -671,6 +745,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(tampered),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -687,6 +763,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "validate_template.py",
                 "--template",
                 str(custom),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--json",
             )
             self.assertNotEqual(result.returncode, 0)
@@ -707,8 +785,11 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertEqual(len(list(output.glob("*.docx"))), 2)
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["template_id"], "lesson-plan")
-            self.assertEqual(report["template_version"], "1.0.0")
-            self.assertEqual(report["generator_version"], "1.0.0")
+            self.assertEqual(report["template_version"], "1.1.0")
+            self.assertEqual(report["generator_version"], "1.1.0")
+            self.assertEqual(report["anchor_mode"], "word_bookmark")
+            self.assertEqual(report["required_anchor_count"], 70)
+            self.assertEqual(report["preserved_anchor_count"], 70)
             self.assertEqual(report["engine"], "python-docx")
             self.assertFalse(report["custom_template"])
             self.assertEqual(report["validation_skipped"], [])
@@ -782,6 +863,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 LESSON / "scripts" / "generate_lesson_plans.py",
                 "--template",
                 str(LESSON / "assets" / "lesson-plan-template.docx"),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
                 "--tasks-json",
                 str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
                 "--output-dir",
@@ -879,9 +962,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             path = next(output.glob("*.docx"))
-            document = Document(path)
-            document.tables[0].cell(3, 1).paragraphs[0].text = "Linux操作系统应用残留"
-            document.save(path)
+            patch_bookmarked_text(path, "lp_student_base", "Linux操作系统应用残留")
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",
                 "--input-json",
@@ -1137,9 +1218,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             path = sorted(output.glob("*.docx"))[0]
-            document = Document(path)
-            document.tables[0].cell(4, 1).text = "被替换的教学内容"
-            document.save(path)
+            patch_bookmarked_text(path, "lp_teaching_content", "被替换的教学内容")
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",
                 "--input-json",
@@ -1164,9 +1243,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             path = sorted(output.glob("*.docx"))[0]
-            document = Document(path)
-            document.tables[0].cell(16, 1).text = "被替换的实施内容"
-            document.save(path)
+            patch_bookmarked_text(path, "lp_impl_before_class_preparation_content", "被替换的实施内容")
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",
                 "--input-json",
@@ -1191,11 +1268,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
             path = sorted(output.glob("*.docx"))[0]
-            document = Document(path)
-            ability_cell = _Cell(document.tables[0].rows[6]._tr.tc_lst[3], document.tables[0].rows[6]._parent)
-            ability_cell.text = "被替换的能力目标"
-            document.tables[0].cell(29, 2).text = "被替换的教学反思"
-            document.save(path)
+            patch_bookmarked_text(path, "lp_ability_goal", "被替换的能力目标")
+            patch_bookmarked_text(path, "lp_reflection_improvement", "被替换的教学反思")
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",
                 "--input-json",
@@ -1391,6 +1465,237 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("protected DOCX layout changed", result.stderr)
+
+    def test_v11_semantic_template_build_is_idempotent_and_preserves_v10_hash(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-semantic-build-") as temp_name:
+            folder = Path(temp_name)
+            first = folder / "template-first.docx"
+            second = folder / "template-second.docx"
+            result = run_script(
+                LESSON / "scripts" / "build_semantic_template.py",
+                "--output",
+                str(first),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            self.assertEqual(file_sha256(first), "83C65B6236A1AF17E8E8A44B18AD29FAA341C7A4982B5333CCE2B1FF5742F261")
+            self.assertEqual(
+                file_sha256(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"),
+                "11783108468204DD67C9F8EAA1543B67279361ECC842A8B37F8541BDD01D16D5",
+            )
+            result = run_script(
+                LESSON / "scripts" / "build_semantic_template.py",
+                "--source",
+                str(first),
+                "--output",
+                str(second),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            self.assertEqual(file_sha256(first), file_sha256(second))
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(first),
+                "--manifest",
+                str(LESSON_V11_MANIFEST),
+                "--json",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_v11_default_generation_preserves_every_semantic_anchor(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-semantic-inventory-") as temp_name:
+            output = Path(temp_name) / "output"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            sys.modules.pop("bookmark_utils", None)
+            sys.modules.pop("package_common", None)
+            sys.path.insert(0, str(LESSON / "scripts"))
+            from bookmark_utils import validate_bookmark_inventory
+            from package_common import bookmark_containers, load_manifest, required_bookmarks
+
+            manifest = load_manifest(LESSON_V11_MANIFEST)
+            for path in sorted(output.glob("*.docx")):
+                inventory = validate_bookmark_inventory(
+                    Document(path),
+                    required_bookmarks(manifest),
+                    bookmark_containers(manifest),
+                )
+                self.assertTrue(inventory["valid"], inventory["errors"])
+                self.assertEqual(inventory["required_count"], 70)
+                self.assertEqual(inventory["preserved_count"], 70)
+            generated = Document(sorted(output.glob("*.docx"))[0])
+            self.assertGreater(len(generated.tables[0].cell(4, 1).paragraphs), 1)
+            self.assertGreater(len(generated.tables[0].cell(19, 1).paragraphs), 1)
+
+    def test_v11_template_fault_injections_are_rejected_by_real_validator(self) -> None:
+        mutations = {}
+
+        def delete_bookmark(root):
+            start = bookmark_start(root, "lp_course_name")
+            end = bookmark_end(root, start.get(qn("w:id")))
+            start.getparent().remove(start)
+            end.getparent().remove(end)
+
+        def duplicate_bookmark(root):
+            start = bookmark_start(root, "lp_title")
+            end = bookmark_end(root, start.get(qn("w:id")))
+            new_id = str(max(int(node.get(qn("w:id"), "0")) for node in root.xpath(".//w:bookmarkStart | .//w:bookmarkEnd", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})) + 1)
+            new_start = etree.fromstring(etree.tostring(start))
+            new_end = etree.fromstring(etree.tostring(end))
+            new_start.set(qn("w:id"), new_id)
+            new_end.set(qn("w:id"), new_id)
+            start.getparent().append(new_start)
+            end.getparent().append(new_end)
+
+        def missing_end(root):
+            start = bookmark_start(root, "lp_hours")
+            bookmark_end(root, start.get(qn("w:id"))).getparent().remove(bookmark_end(root, start.get(qn("w:id"))))
+
+        def rename_bookmark(root):
+            bookmark_start(root, "lp_unit").set(qn("w:name"), "lp_unitt")
+
+        def move_bookmark(root, name: str, row: int, cell: int):
+            start = bookmark_start(root, name)
+            end = bookmark_end(root, start.get(qn("w:id")))
+            start.getparent().remove(start)
+            end.getparent().remove(end)
+            body = root.find(qn("w:body"))
+            table = next(node for node in body if node.tag == qn("w:tbl"))
+            rows = [node for node in table if node.tag == qn("w:tr")]
+            cells = [node for node in rows[row] if node.tag == qn("w:tc")]
+            paragraph = next(node for node in cells[cell] if node.tag == qn("w:p"))
+            ppr = paragraph.find(qn("w:pPr"))
+            paragraph.insert(list(paragraph).index(ppr) + 1 if ppr is not None else 0, start)
+            paragraph.append(end)
+
+        def wrong_cell(root):
+            move_bookmark(root, "lp_course_name", 0, 3)
+
+        def moved_evaluation(root):
+            move_bookmark(root, "lp_evaluation", 0, 1)
+
+        def fixed_label(root):
+            node = root.xpath(".//w:t[text()='课程名称']", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})[0]
+            node.text = "错误标签"
+
+        def fixed_format(root):
+            node = root.xpath(".//w:t[text()='课程名称']", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"})[0]
+            run = node.getparent().getparent()
+            rpr = run.find(qn("w:rPr"))
+            if rpr is None:
+                rpr = etree.Element(qn("w:rPr"))
+                run.insert(0, rpr)
+            rpr.append(etree.Element(qn("w:b")))
+
+        mutations.update(
+            {
+                "deleted": (delete_bookmark, "Semantic bookmark protection failed"),
+                "duplicate": (duplicate_bookmark, "Semantic bookmark protection failed"),
+                "missing-end": (missing_end, "Semantic bookmark protection failed"),
+                "typo": (rename_bookmark, "Semantic bookmark protection failed"),
+                "wrong-cell": (wrong_cell, "Semantic bookmark location changed"),
+                "evaluation-moved": (moved_evaluation, "Semantic bookmark location changed"),
+                "fixed-label": (fixed_label, "Semantic template changed visible content or structure"),
+                "fixed-format": (fixed_format, "Semantic template changed visible content or structure"),
+            }
+        )
+        for name, (mutate, expected_message) in mutations.items():
+            with self.subTest(fault=name), tempfile.TemporaryDirectory(prefix=f"lesson-package-semantic-{name}-") as temp_name:
+                custom = Path(temp_name) / "custom.docx"
+                shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", custom)
+                patch_docx_document_xml(custom, mutate)
+                result = run_script(
+                    LESSON / "scripts" / "validate_template.py",
+                    "--template",
+                    str(custom),
+                    "--manifest",
+                    str(LESSON_V11_MANIFEST),
+                    "--json",
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertIn(expected_message, result.stdout)
+
+    def test_v11_output_validator_rejects_deleted_or_rewritten_bookmarks(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-semantic-output-guard-") as temp_name:
+            folder = Path(temp_name)
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            pristine = folder / "pristine"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(pristine),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            for name in ("delete", "rewrite"):
+                with self.subTest(fault=name):
+                    case_dir = folder / name
+                    shutil.copytree(pristine, case_dir)
+                    first = sorted(case_dir.glob("*.docx"))[0]
+                    if name == "delete":
+                        def delete_both(root):
+                            start = bookmark_start(root, "lp_teaching_content")
+                            end = bookmark_end(root, start.get(qn("w:id")))
+                            start.getparent().remove(start)
+                            end.getparent().remove(end)
+                        patch_docx_document_xml(first, delete_both)
+                    else:
+                        def write_drops_anchor(path: Path):
+                            document = Document(path)
+                            document.tables[0].cell(0, 1).text = "被改写课程"
+                            document.save(path)
+                        write_drops_anchor(first)
+                    result = run_script(
+                        LESSON / "scripts" / "validate_output.py",
+                        "--input-json",
+                        str(source),
+                        "--output-dir",
+                        str(case_dir),
+                        "--manifest",
+                        str(LESSON_V11_MANIFEST),
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("semantic bookmark protection failed", result.stderr.lower())
+
+    def test_v11_missing_bookmarks_does_not_downgrade_and_v10_remains_explicitly_supported(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-semantic-no-downgrade-") as temp_name:
+            folder = Path(temp_name)
+            old_template = folder / "old-template.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", old_template)
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--template",
+                str(old_template),
+                "--manifest",
+                str(LESSON_V11_MANIFEST),
+                "--tasks-json",
+                str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
+                "--output-dir",
+                str(folder / "should-fail"),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Semantic bookmark protection failed", result.stderr)
+            legacy_output = folder / "legacy-output"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--template",
+                str(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"),
+                "--manifest",
+                str(LESSON_V10_MANIFEST),
+                "--tasks-json",
+                str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
+                "--output-dir",
+                str(legacy_output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            report = json.loads((legacy_output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["anchor_mode"], "legacy_coordinates")
 
 
 class GradebookTotalRuleTests(unittest.TestCase):

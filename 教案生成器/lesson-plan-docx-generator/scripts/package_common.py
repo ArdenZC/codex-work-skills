@@ -11,7 +11,7 @@ from jsonschema import Draft202012Validator
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
+DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 MAX_TEACHING_CONTENT_ITEMS = 8
 EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
@@ -38,6 +38,78 @@ def manifest_template_path(manifest: dict[str, Any]) -> Path:
     if not file_value:
         raise ValueError("Manifest is missing template.file")
     return (manifest_path.parent / str(file_value)).resolve()
+
+
+def is_semantic_manifest(manifest: dict[str, Any]) -> bool:
+    """Return whether the manifest uses the v1.1 semantic bookmark contract."""
+    return str(manifest.get("anchors", {}).get("mode", "")) == "word_bookmark"
+
+
+def base_manifest_path(manifest: dict[str, Any]) -> Path | None:
+    """Resolve the legacy layout manifest used as the v1.1 protected baseline."""
+    if not is_semantic_manifest(manifest):
+        return None
+    value = manifest.get("template", {}).get("base_manifest")
+    if not value:
+        raise ValueError("Semantic template manifest is missing template.base_manifest")
+    return (Path(manifest["_path"]).parent / str(value)).resolve()
+
+
+def layout_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Return the coordinate manifest used only for protected layout comparisons."""
+    reference = base_manifest_path(manifest)
+    return load_manifest(reference) if reference is not None else manifest
+
+
+def required_bookmarks(manifest: dict[str, Any]) -> list[str]:
+    if not is_semantic_manifest(manifest):
+        return []
+    values = manifest.get("anchors", {}).get("required", [])
+    if not isinstance(values, list):
+        raise ValueError("Semantic template manifest anchors.required must be a list")
+    return [str(value) for value in values]
+
+
+def bookmark_containers(manifest: dict[str, Any]) -> dict[str, str]:
+    if not is_semantic_manifest(manifest):
+        return {}
+    values = manifest.get("anchors", {}).get("containers", {})
+    if not isinstance(values, dict):
+        raise ValueError("Semantic template manifest anchors.containers must be a mapping")
+    return {str(name): str(container) for name, container in values.items()}
+
+
+def field_bookmark(manifest: dict[str, Any], name: str) -> str:
+    spec = field_spec(manifest, name)
+    value = spec.get("bookmark")
+    if not value:
+        raise ValueError(f"Semantic manifest field {name} is missing bookmark")
+    return str(value)
+
+
+def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
+    spec = field_spec(manifest, "implementation")
+    if spec.get("mode") != "anchored_cells":
+        return []
+    stages = spec.get("stages", [])
+    if not isinstance(stages, list):
+        raise ValueError("Semantic implementation field stages must be a list")
+    result = []
+    for index, stage in enumerate(stages, 1):
+        if not isinstance(stage, dict) or not isinstance(stage.get("bookmarks"), list):
+            raise ValueError(f"Semantic implementation stage {index} is missing bookmarks")
+        result.append([str(value) for value in stage["bookmarks"]])
+    return result
+
+
+def reflection_bookmarks(manifest: dict[str, Any]) -> list[str]:
+    spec = field_spec(manifest, "reflection")
+    if spec.get("mode") != "anchored_cells":
+        return []
+    values = spec.get("bookmarks", [])
+    if not isinstance(values, list):
+        raise ValueError("Semantic reflection field bookmarks must be a list")
+    return [str(value) for value in values]
 
 
 def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
@@ -348,10 +420,14 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
                     str(value),
                     implementation_spec,
                 )
-        reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
-        for row_index, value in zip(reflection_rows, reflection_cell_values(task)):
+        reflection_targets = (
+            reflection_bookmarks(manifest)
+            if is_semantic_manifest(manifest)
+            else [int(row) for row in manifest["fields"]["reflection"]["rows"]]
+        )
+        for row_index, value in zip(reflection_targets, reflection_cell_values(task)):
             _validate_composed_limit(
-                f"lessons[{index - 1}].reflection row {row_index} cell 2",
+                f"lessons[{index - 1}].reflection {row_index}",
                 value,
                 reflection_spec,
             )

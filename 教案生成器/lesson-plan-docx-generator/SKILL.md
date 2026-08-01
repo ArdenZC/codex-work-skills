@@ -22,7 +22,7 @@ If the user provides none of these, infer a projectized teaching plan from the c
 
 Require or infer:
 
-- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.0.0/template.docx` unless the user explicitly supplies a different template. `assets/lesson-plan-template.docx` remains a compatibility entry.
+- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.0/template.docx` unless the user explicitly supplies a different template. `assets/templates/lesson-plan/v1.0.0/template.docx` and `assets/lesson-plan-template.docx` remain explicit coordinate-mode compatibility entries.
 - `output_dir`: final DOCX folder. Back up an existing output folder before overwriting.
 - `course_name`: value for the title and `课程名称` cell.
 - `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
@@ -128,11 +128,11 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 
 ## Template Package
 
-- Manifest: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`
-- Canonical template: `assets/templates/lesson-plan/v1.0.0/template.docx`
-- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`, `assets/templates/lesson-plan/v1.0.0/CHANGELOG.md`
+- Manifest: `assets/templates/lesson-plan/v1.1.0/manifest.yaml`
+- Canonical template: `assets/templates/lesson-plan/v1.1.0/template.docx`
+- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.1.0/manifest.yaml`, `assets/templates/lesson-plan/v1.1.0/CHANGELOG.md`
 - Input schema: `schemas/lesson-plan-input.schema.json`
 - Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
 - QA output: `qa-report.json` in the generated output directory
 
-The package preserves the original single-paragraph replacement and multiline-cell writing modes. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.
+The package preserves the original single-paragraph replacement and multiline-cell writing modes. v1.1 writes through semantic Word bookmarks and verifies that every required anchor survives generation; v1.0 remains available when its manifest is explicitly selected. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.

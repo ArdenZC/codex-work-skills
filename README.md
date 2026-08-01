@@ -34,7 +34,7 @@
 输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案 `lesson-plan/v1.0.0`，记分册 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案默认使用 `lesson-plan/v1.1.0` 语义书签模板，同时保留 `lesson-plan/v1.0.0` 坐标兼容模式；记分册为 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
 
 模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
 
@@ -43,4 +43,4 @@ python scripts/validate_template.py --template <template> --manifest <manifest.y
 python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
 ```
 
-自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/v1.0.0/`，不应直接覆盖。
+自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖。教案 v1.1 模板只能使用 manifest 声明的 Word 书签写入，显式指定 v1.0 manifest 才使用 v1.0 坐标模式。

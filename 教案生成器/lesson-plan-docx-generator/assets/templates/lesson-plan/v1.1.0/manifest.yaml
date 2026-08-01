@@ -1,0 +1,249 @@
+template:
+  id: lesson-plan
+  name: 中文项目化课程教案模板
+  version: 1.1.0
+  format: docx
+  file: template.docx
+  base_manifest: ../v1.0.0/manifest.yaml
+  base_template: ../v1.0.0/template.docx
+generator:
+  version: 1.1.0
+  supported_major: 1
+anchors:
+  mode: word_bookmark
+  required:
+    - lp_title
+    - lp_course_name
+    - lp_major
+    - lp_audience
+    - lp_unit
+    - lp_task
+    - lp_hours
+    - lp_student_base
+    - lp_student_problems
+    - lp_student_strategy
+    - lp_teaching_content
+    - lp_quality_goal
+    - lp_knowledge_goal
+    - lp_ability_goal
+    - lp_key_content
+    - lp_key_strategy
+    - lp_difficult_content
+    - lp_difficult_strategy
+    - lp_teaching_methods
+    - lp_resources
+    - lp_references
+    - lp_evaluation
+    - lp_impl_before_class_preparation_stage
+    - lp_impl_before_class_preparation_content
+    - lp_impl_before_class_preparation_teacher_activity
+    - lp_impl_before_class_preparation_student_activity
+    - lp_impl_before_class_preparation_objective
+    - lp_impl_task_introduction_stage
+    - lp_impl_task_introduction_content
+    - lp_impl_task_introduction_teacher_activity
+    - lp_impl_task_introduction_student_activity
+    - lp_impl_task_introduction_objective
+    - lp_impl_operation_demonstration_stage
+    - lp_impl_operation_demonstration_content
+    - lp_impl_operation_demonstration_teacher_activity
+    - lp_impl_operation_demonstration_student_activity
+    - lp_impl_operation_demonstration_objective
+    - lp_impl_task_implementation_stage
+    - lp_impl_task_implementation_content
+    - lp_impl_task_implementation_teacher_activity
+    - lp_impl_task_implementation_student_activity
+    - lp_impl_task_implementation_objective
+    - lp_impl_task_extension_stage
+    - lp_impl_task_extension_content
+    - lp_impl_task_extension_teacher_activity
+    - lp_impl_task_extension_student_activity
+    - lp_impl_task_extension_objective
+    - lp_impl_project_practice_stage
+    - lp_impl_project_practice_content
+    - lp_impl_project_practice_teacher_activity
+    - lp_impl_project_practice_student_activity
+    - lp_impl_project_practice_objective
+    - lp_impl_peer_review_stage
+    - lp_impl_peer_review_content
+    - lp_impl_peer_review_teacher_activity
+    - lp_impl_peer_review_student_activity
+    - lp_impl_peer_review_objective
+    - lp_impl_lesson_summary_stage
+    - lp_impl_lesson_summary_content
+    - lp_impl_lesson_summary_teacher_activity
+    - lp_impl_lesson_summary_student_activity
+    - lp_impl_lesson_summary_objective
+    - lp_impl_after_class_improvement_stage
+    - lp_impl_after_class_improvement_content
+    - lp_impl_after_class_improvement_teacher_activity
+    - lp_impl_after_class_improvement_student_activity
+    - lp_impl_after_class_improvement_objective
+    - lp_reflection_summary
+    - lp_reflection_innovation
+    - lp_reflection_improvement
+  containers:
+    lp_title: document_paragraph
+    lp_course_name: cell
+    lp_major: cell
+    lp_audience: cell
+    lp_unit: cell
+    lp_task: cell
+    lp_hours: cell
+    lp_student_base: cell
+    lp_student_problems: cell
+    lp_student_strategy: cell
+    lp_teaching_content: cell
+    lp_quality_goal: cell
+    lp_knowledge_goal: cell
+    lp_ability_goal: cell
+    lp_key_content: cell
+    lp_key_strategy: cell
+    lp_difficult_content: cell
+    lp_difficult_strategy: cell
+    lp_teaching_methods: cell
+    lp_resources: cell
+    lp_references: cell
+    lp_evaluation: cell
+    lp_impl_before_class_preparation_stage: cell
+    lp_impl_before_class_preparation_content: cell
+    lp_impl_before_class_preparation_teacher_activity: cell
+    lp_impl_before_class_preparation_student_activity: cell
+    lp_impl_before_class_preparation_objective: cell
+    lp_impl_task_introduction_stage: cell
+    lp_impl_task_introduction_content: cell
+    lp_impl_task_introduction_teacher_activity: cell
+    lp_impl_task_introduction_student_activity: cell
+    lp_impl_task_introduction_objective: cell
+    lp_impl_operation_demonstration_stage: cell
+    lp_impl_operation_demonstration_content: cell
+    lp_impl_operation_demonstration_teacher_activity: cell
+    lp_impl_operation_demonstration_student_activity: cell
+    lp_impl_operation_demonstration_objective: cell
+    lp_impl_task_implementation_stage: cell
+    lp_impl_task_implementation_content: cell
+    lp_impl_task_implementation_teacher_activity: cell
+    lp_impl_task_implementation_student_activity: cell
+    lp_impl_task_implementation_objective: cell
+    lp_impl_task_extension_stage: cell
+    lp_impl_task_extension_content: cell
+    lp_impl_task_extension_teacher_activity: cell
+    lp_impl_task_extension_student_activity: cell
+    lp_impl_task_extension_objective: cell
+    lp_impl_project_practice_stage: cell
+    lp_impl_project_practice_content: cell
+    lp_impl_project_practice_teacher_activity: cell
+    lp_impl_project_practice_student_activity: cell
+    lp_impl_project_practice_objective: cell
+    lp_impl_peer_review_stage: cell
+    lp_impl_peer_review_content: cell
+    lp_impl_peer_review_teacher_activity: cell
+    lp_impl_peer_review_student_activity: cell
+    lp_impl_peer_review_objective: cell
+    lp_impl_lesson_summary_stage: cell
+    lp_impl_lesson_summary_content: cell
+    lp_impl_lesson_summary_teacher_activity: cell
+    lp_impl_lesson_summary_student_activity: cell
+    lp_impl_lesson_summary_objective: cell
+    lp_impl_after_class_improvement_stage: cell
+    lp_impl_after_class_improvement_content: cell
+    lp_impl_after_class_improvement_teacher_activity: cell
+    lp_impl_after_class_improvement_student_activity: cell
+    lp_impl_after_class_improvement_objective: cell
+    lp_reflection_summary: cell
+    lp_reflection_innovation: cell
+    lp_reflection_improvement: cell
+structure:
+  top_level_tables: 1
+  main_table:
+    index: 0
+    rows: 30
+    columns: 10
+  title:
+    paragraph: 0
+  evaluation_table:
+    table: 0
+    row: 12
+    cell: 1
+    rows: 14
+    columns: 4
+fields:
+  title: {target: document_paragraph, bookmark: lp_title, mode: replace_text_preserve_style, max_chars: 120}
+  course_name: {target: table_cell, bookmark: lp_course_name, mode: replace_single_paragraph, max_chars: 32, max_paragraphs: 1}
+  major: {target: table_cell, bookmark: lp_major, mode: replace_single_paragraph, max_chars: 32, max_paragraphs: 1}
+  audience: {target: table_cell, bookmark: lp_audience, mode: replace_single_paragraph, max_chars: 32, max_paragraphs: 1}
+  unit: {target: table_cell, bookmark: lp_unit, mode: replace_single_paragraph, max_chars: 60, max_paragraphs: 1}
+  task: {target: table_cell, bookmark: lp_task, mode: replace_single_paragraph, max_chars: 80, max_paragraphs: 1}
+  hours: {target: table_cell, bookmark: lp_hours, mode: replace_single_paragraph, max_chars: 12, max_paragraphs: 1}
+  student_base: {target: table_cell, bookmark: lp_student_base, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  student_problems: {target: table_cell, bookmark: lp_student_problems, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  student_strategy: {target: table_cell, bookmark: lp_student_strategy, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  teaching_content: {target: table_cell, bookmark: lp_teaching_content, mode: replace_paragraphs, max_chars: 1200, max_paragraphs: 10}
+  quality_goal: {target: table_cell, bookmark: lp_quality_goal, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  knowledge_goal: {target: table_cell, bookmark: lp_knowledge_goal, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  ability_goal: {target: table_cell, bookmark: lp_ability_goal, mode: replace_paragraphs, max_chars: 600, max_paragraphs: 5}
+  key_content: {target: table_cell, bookmark: lp_key_content, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  key_strategy: {target: table_cell, bookmark: lp_key_strategy, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  difficult_content: {target: table_cell, bookmark: lp_difficult_content, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  difficult_strategy: {target: table_cell, bookmark: lp_difficult_strategy, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  teaching_methods: {target: table_cell, bookmark: lp_teaching_methods, mode: replace_paragraphs, max_chars: 300, max_paragraphs: 4}
+  resources: {target: table_cell, bookmark: lp_resources, mode: replace_paragraphs, max_chars: 1000, max_paragraphs: 8}
+  references: {target: table_cell, bookmark: lp_references, mode: replace_paragraphs, max_chars: 700, max_paragraphs: 6}
+  implementation:
+    mode: anchored_cells
+    max_chars: 600
+    max_paragraphs: 6
+    stages:
+      - id: before_class_preparation
+        bookmarks: [lp_impl_before_class_preparation_stage, lp_impl_before_class_preparation_content, lp_impl_before_class_preparation_teacher_activity, lp_impl_before_class_preparation_student_activity, lp_impl_before_class_preparation_objective]
+      - id: task_introduction
+        bookmarks: [lp_impl_task_introduction_stage, lp_impl_task_introduction_content, lp_impl_task_introduction_teacher_activity, lp_impl_task_introduction_student_activity, lp_impl_task_introduction_objective]
+      - id: operation_demonstration
+        bookmarks: [lp_impl_operation_demonstration_stage, lp_impl_operation_demonstration_content, lp_impl_operation_demonstration_teacher_activity, lp_impl_operation_demonstration_student_activity, lp_impl_operation_demonstration_objective]
+      - id: task_implementation
+        bookmarks: [lp_impl_task_implementation_stage, lp_impl_task_implementation_content, lp_impl_task_implementation_teacher_activity, lp_impl_task_implementation_student_activity, lp_impl_task_implementation_objective]
+      - id: task_extension
+        bookmarks: [lp_impl_task_extension_stage, lp_impl_task_extension_content, lp_impl_task_extension_teacher_activity, lp_impl_task_extension_student_activity, lp_impl_task_extension_objective]
+      - id: project_practice
+        bookmarks: [lp_impl_project_practice_stage, lp_impl_project_practice_content, lp_impl_project_practice_teacher_activity, lp_impl_project_practice_student_activity, lp_impl_project_practice_objective]
+      - id: peer_review
+        bookmarks: [lp_impl_peer_review_stage, lp_impl_peer_review_content, lp_impl_peer_review_teacher_activity, lp_impl_peer_review_student_activity, lp_impl_peer_review_objective]
+      - id: lesson_summary
+        bookmarks: [lp_impl_lesson_summary_stage, lp_impl_lesson_summary_content, lp_impl_lesson_summary_teacher_activity, lp_impl_lesson_summary_student_activity, lp_impl_lesson_summary_objective]
+      - id: after_class_improvement
+        bookmarks: [lp_impl_after_class_improvement_stage, lp_impl_after_class_improvement_content, lp_impl_after_class_improvement_teacher_activity, lp_impl_after_class_improvement_student_activity, lp_impl_after_class_improvement_objective]
+  reflection:
+    mode: anchored_cells
+    max_chars: 400
+    max_paragraphs: 4
+    bookmarks: [lp_reflection_summary, lp_reflection_innovation, lp_reflection_improvement]
+  evaluation: {target: nested_table, bookmark: lp_evaluation, mode: nested_table, rows: 14, columns: 4, writable_rows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], writable_cells: [2, 3]}
+allowed_changes:
+  - title paragraph text and alignment inside lp_title
+  - declared lesson fields inside their semantic bookmarks
+  - evaluation score and remark cells in the nested evaluation table under lp_evaluation
+  - declared teaching implementation cells inside anchored_cells stages
+  - declared teaching reflection cells inside anchored_cells bookmarks
+protected:
+  - v1.0.0 visible document content and XML structure after removing bookmark boundaries
+  - page size and section margins
+  - headers, footers, relationships and embedded resources
+  - main table row and column count
+  - merged-cell topology and fixed label cells
+  - row heights, column widths and base styles
+  - evaluation table row and column count and layout XML
+  - all bookmark names, pairing, IDs and semantic containers
+validation:
+  required_labels: [课程名称, 授课专业, 授课对象, 单元名称, 任务名称, 学时, 学情分析, 教学内容, 教学目标, 教学重点, 教学难点, 教学策略, 教学资源, 参考文献, 教学评价, 教学实施, 教学反思]
+  forbidden_template_text: [Linux操作系统应用, 单元4：文件与目录管理, 任务12：文件的权限与压缩]
+  main_table_rows: 30
+  main_table_columns: 10
+  evaluation_rows: 14
+  evaluation_columns: 4
+  score_total: 100
+  require_docx_open: true
+  require_render_check: false
+fingerprint:
+  algorithm: sha256
+  sha256: 83C65B6236A1AF17E8E8A44B18AD29FAA341C7A4982B5333CCE2B1FF5742F261
+  value: 83C65B6236A1AF17E8E8A44B18AD29FAA341C7A4982B5333CCE2B1FF5742F261
