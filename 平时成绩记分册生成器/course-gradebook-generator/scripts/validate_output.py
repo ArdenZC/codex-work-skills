@@ -34,9 +34,11 @@ from validate_template import (
     _protection_signature,
     _signature_differences,
     controlled_font_fallback_matches,
-    controlled_roundtrip_xlsx,
+    controlled_font_reference_roundtrip_xlsx,
+    controlled_roundtrip_paths,
     convert_to_xlsx,
     find_soffice,
+    xls_font_identity,
 )
 
 
@@ -326,6 +328,44 @@ def _delete_columns_for_signature(ws, start_col: int, count: int) -> None:
                 end_row=max_row,
                 end_column=shifted_max,
             )
+
+
+def _controlled_output_font_workbook(
+    source_xlsx: Path,
+    reference_xlsx: Path,
+    output_ws,
+    template_ws,
+    manifest: dict[str, Any],
+    skill_enabled: bool,
+    out_dir: Path,
+    soffice: str,
+):
+    structure = manifest["structure"]
+    sheet_name = structure["worksheet"]
+    template_last_row = int(structure["template_last_data_row"])
+    style_source_row = int(structure["style_source_row"])
+    output_total_column = column_number(
+        structure["columns"]["total_score"] if skill_enabled else structure["no_skill_total_column"]
+    )
+    replacements: list[tuple[str, str, str]] = []
+    for output_row in range(1, output_ws.max_row + 1):
+        source_row = output_row if output_row <= template_last_row else style_source_row
+        if source_row > template_ws.max_row:
+            continue
+        for output_column in range(1, output_total_column + 1):
+            if output_column > template_ws.max_column:
+                continue
+            column = get_column_letter(output_column)
+            replacements.append((sheet_name, f"{column}{output_row}", f"{column}{source_row}"))
+    controlled_xlsx = controlled_font_reference_roundtrip_xlsx(
+        source_xlsx,
+        reference_xlsx,
+        replacements,
+        out_dir,
+        soffice,
+    )
+    controlled_xls = out_dir / "roundtrip-xls" / f"{source_xlsx.stem}.xls"
+    return load_workbook(controlled_xlsx, data_only=False), controlled_xls, replacements
 
 
 def _target_sheet_format_errors(
@@ -628,14 +668,6 @@ def validate_output_dir(
                     else convert_to_xlsx(selected_template, Path(temp_name) / "template", find_soffice())
                 )
                 template_workbook = load_workbook(template_xlsx, data_only=False)
-                controlled_template_workbook = None
-                if converted_from_xls and selected_template.suffix.lower() == ".xls":
-                    controlled_template_xlsx = controlled_roundtrip_xlsx(
-                        selected_template,
-                        Path(temp_name) / "controlled-template",
-                        find_soffice(),
-                    )
-                    controlled_template_workbook = load_workbook(controlled_template_xlsx, data_only=False)
                 sheet_name = structure["worksheet"]
                 if sheet_name not in formulas.sheetnames:
                     errors.append(f"Missing worksheet: {sheet_name}")
@@ -643,12 +675,7 @@ def validate_output_dir(
                     ws_formula = formulas[sheet_name]
                     ws_values = values[sheet_name]
                     template_ws = template_workbook[sheet_name] if sheet_name in template_workbook.sheetnames else None
-                    controlled_template_ws = (
-                        controlled_template_workbook[sheet_name]
-                        if controlled_template_workbook is not None
-                        and sheet_name in controlled_template_workbook.sheetnames
-                        else None
-                    )
+                    controlled_output_ws = None
                     if template_ws is None:
                         errors.append(f"Missing worksheet in template: {sheet_name}")
                     elif not skill_enabled:
@@ -659,25 +686,51 @@ def validate_output_dir(
                             column_number(columns["skill_score"]),
                             2,
                         )
-                        if controlled_template_ws is not None:
-                            controlled_class_name_style = copy(controlled_template_ws[class_name_cell]._style)
-                            _delete_columns_for_signature(
-                                controlled_template_ws,
-                                column_number(columns["skill_score"]),
-                                2,
-                            )
-                            controlled_template_ws[class_name_cell]._style = copy(controlled_class_name_style)
                         template_ws[class_name_cell]._style = copy(class_name_style)
                         no_skill_total = structure["no_skill_total_column"]
                         template_ws.column_dimensions[no_skill_total].width = max(
                             template_ws.column_dimensions[no_skill_total].width or 0,
                             18,
                         )
-                        if controlled_template_ws is not None:
-                            controlled_template_ws.column_dimensions[no_skill_total].width = max(
-                                controlled_template_ws.column_dimensions[no_skill_total].width or 0,
-                                18,
+                    if (
+                        template_ws is not None
+                        and converted_from_xls
+                        and selected_template.suffix.lower() == ".xls"
+                    ):
+                        controlled_reference_xlsx = Path(temp_name) / "controlled-reference-template.xlsx"
+                        template_workbook.save(controlled_reference_xlsx)
+                        static_controlled_xls, _ = controlled_roundtrip_paths(
+                            selected_template,
+                            Path(temp_name) / "static-controlled-template",
+                            find_soffice(),
+                        )
+                        (
+                            controlled_output_workbook,
+                            _controlled_output_xls,
+                            controlled_font_replacements,
+                        ) = _controlled_output_font_workbook(
+                            xlsx,
+                            controlled_reference_xlsx,
+                            ws_formula,
+                            template_ws,
+                            manifest,
+                            skill_enabled,
+                            Path(temp_name) / "controlled-output",
+                            find_soffice(),
+                        )
+                        if sheet_name in controlled_output_workbook.sheetnames:
+                            controlled_output_ws = controlled_output_workbook[sheet_name]
+                        for replacement_sheet, target_address, _ in controlled_font_replacements:
+                            actual_font = xls_font_identity(path, replacement_sheet, target_address)
+                            expected_font = xls_font_identity(
+                                static_controlled_xls,
+                                replacement_sheet,
+                                target_address,
                             )
+                            if actual_font is not None and expected_font is not None and actual_font != expected_font:
+                                errors.append(
+                                    f"target sheet formatting mismatch at {target_address} (font)"
+                                )
                     report["checks"]["structure"] = _check_workbook_protection(
                         ws_formula,
                         formulas,
@@ -686,7 +739,7 @@ def validate_output_dir(
                         errors,
                         template_ws,
                         template_workbook,
-                        controlled_template_ws,
+                        controlled_output_ws,
                     )
                     errors.extend(_scan_formula_errors(formulas, values))
 

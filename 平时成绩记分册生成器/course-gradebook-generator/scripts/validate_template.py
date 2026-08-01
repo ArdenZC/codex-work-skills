@@ -9,11 +9,13 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+from copy import copy
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from xlrd import open_workbook
 
 from package_common import DEFAULT_MANIFEST, column_number, ensure_supported_major, load_manifest, manifest_template_path
 
@@ -79,7 +81,7 @@ def convert_to_xls(source: Path, out_dir: Path, soffice: str) -> Path:
     return convert_to_format(source, out_dir, "xls", soffice)
 
 
-def controlled_roundtrip_xlsx(source_xls: Path, out_dir: Path, soffice: str) -> Path:
+def controlled_roundtrip_paths(source_xls: Path, out_dir: Path, soffice: str) -> tuple[Path, Path]:
     """Create the platform-specific template-to-output font baseline."""
     source_xlsx = convert_to_xlsx(source_xls, out_dir / "source-xlsx", soffice)
     # The generator loads the converted template with openpyxl and saves it
@@ -89,7 +91,54 @@ def controlled_roundtrip_xlsx(source_xls: Path, out_dir: Path, soffice: str) -> 
     normalized_xlsx.parent.mkdir(parents=True, exist_ok=True)
     load_workbook(source_xlsx, data_only=False).save(normalized_xlsx)
     roundtrip_xls = convert_to_xls(normalized_xlsx, out_dir / "roundtrip-xls", soffice)
+    return roundtrip_xls, convert_to_xlsx(roundtrip_xls, out_dir / "roundtrip-xlsx", soffice)
+
+
+def controlled_roundtrip_xlsx(source_xls: Path, out_dir: Path, soffice: str) -> Path:
+    return controlled_roundtrip_paths(source_xls, out_dir, soffice)[1]
+
+
+def controlled_font_reference_roundtrip_xlsx(
+    source_xlsx: Path,
+    reference_xlsx: Path,
+    replacements: list[tuple[str, str, str]],
+    out_dir: Path,
+    soffice: str,
+) -> Path:
+    """Round-trip content with canonical fonts restored at controlled coordinates."""
+    source_workbook = load_workbook(source_xlsx, data_only=False)
+    reference_workbook = load_workbook(reference_xlsx, data_only=False)
+    for sheet_name, target_address, reference_address in replacements:
+        if sheet_name not in source_workbook.sheetnames or sheet_name not in reference_workbook.sheetnames:
+            continue
+        target_ws = source_workbook[sheet_name]
+        reference_ws = reference_workbook[sheet_name]
+        if target_address in target_ws and reference_address in reference_ws:
+            target_ws[target_address].font = copy(reference_ws[reference_address].font)
+    normalized_xlsx = out_dir / "font-reference-xlsx" / source_xlsx.name
+    normalized_xlsx.parent.mkdir(parents=True, exist_ok=True)
+    source_workbook.save(normalized_xlsx)
+    roundtrip_xls = convert_to_xls(normalized_xlsx, out_dir / "roundtrip-xls", soffice)
     return convert_to_xlsx(roundtrip_xls, out_dir / "roundtrip-xlsx", soffice)
+
+
+def xls_font_identity(path: Path, sheet_name: str, address: str) -> tuple[Any, ...] | None:
+    """Read the source XLS font identity before LibreOffice conversion can normalize it."""
+    workbook = open_workbook(str(path), formatting_info=True)
+    sheet = workbook.sheet_by_name(sheet_name)
+    match = re.fullmatch(r"([A-Z]+)(\d+)", str(address).upper())
+    if match is None:
+        raise ValueError(f"Invalid XLS cell address: {address}")
+    column = column_number(match.group(1)) - 1
+    row = int(match.group(2)) - 1
+    if row < 0 or row >= sheet.nrows or column < 0 or column >= sheet.ncols:
+        return None
+    try:
+        xf = workbook.xf_list[sheet.cell_xf_index(row, column)]
+    except (IndexError, ValueError):
+        return None
+    font = workbook.font_list[xf.font_index]
+    return _font_name_signature(font.name), font.character_set, font.family
 
 
 _FONT_NAME_ALIASES = {
@@ -681,14 +730,63 @@ def validate_template(
                     canonical_signature = _workbook_signature(canonical_workbook, manifest)
                     custom_signature = _workbook_signature(workbook, manifest)
                     controlled_signature = None
+                    raw_font_differences: list[dict[str, Any]] = []
                     if template.suffix.lower() == ".xls":
-                        controlled_xlsx = controlled_roundtrip_xlsx(
+                        static_controlled_xls, static_controlled_xlsx = controlled_roundtrip_paths(
                             canonical,
+                            Path(canonical_temp) / "static-controlled",
+                            find_soffice(),
+                        )
+                        static_controlled_workbook = load_workbook(static_controlled_xlsx, data_only=False)
+                        static_controlled_signature = _workbook_signature(static_controlled_workbook, manifest)
+                        font_replacements = [
+                            (sheet_name, address, address)
+                            for section_name in ("target_cell_formats", "writable_cell_formats")
+                            for address in canonical_signature.get(section_name, {})
+                        ]
+                        controlled_xlsx = controlled_font_reference_roundtrip_xlsx(
+                            xlsx,
+                            canonical_xlsx,
+                            font_replacements,
                             Path(canonical_temp) / "controlled",
                             find_soffice(),
                         )
-                        controlled_workbook = load_workbook(controlled_xlsx, data_only=False)
-                        controlled_signature = _workbook_signature(controlled_workbook, manifest)
+                        content_controlled_workbook = load_workbook(controlled_xlsx, data_only=False)
+                        content_controlled_signature = _workbook_signature(content_controlled_workbook, manifest)
+                        controlled_signature = dict(static_controlled_signature)
+                        controlled_signature["target_cell_formats"] = dict(
+                            static_controlled_signature["target_cell_formats"]
+                        )
+                        controlled_signature["writable_cell_formats"] = dict(
+                            static_controlled_signature["writable_cell_formats"]
+                        )
+                        canonical_ws = canonical_workbook[sheet_name]
+                        custom_ws = workbook[sheet_name]
+                        writable_cells = {
+                            str(cell)
+                            for cell in [
+                                *manifest["structure"].get("metadata", {}).values(),
+                                *manifest["structure"].get("headers", {}).values(),
+                            ]
+                            if cell
+                        }
+                        for address in writable_cells:
+                            if canonical_ws[address].value != custom_ws[address].value:
+                                controlled_signature["writable_cell_formats"][address] = (
+                                    content_controlled_signature["writable_cell_formats"].get(address)
+                                )
+                        for section_name in ("target_cell_formats", "writable_cell_formats"):
+                            for address in canonical_signature.get(section_name, {}):
+                                expected_font = xls_font_identity(static_controlled_xls, sheet_name, address)
+                                actual_font = xls_font_identity(template, sheet_name, address)
+                                if actual_font is not None and expected_font is not None and actual_font != expected_font:
+                                    raw_font_differences.append(
+                                        {
+                                            "path": f"{section_name}.{address}.font",
+                                            "expected": expected_font,
+                                            "actual": actual_font,
+                                        }
+                                    )
                     differences = _signature_differences(
                         canonical_signature,
                         custom_signature,
@@ -699,6 +797,7 @@ def validate_template(
                             controlled_signature,
                         ),
                     )
+                    differences = raw_font_differences + differences
                     if differences:
                         report["checks"]["protected_signature_differences"] = differences[:20]
                         errors.append("Custom template changed protected workbook structure or formatting.")

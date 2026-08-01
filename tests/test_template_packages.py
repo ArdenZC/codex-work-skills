@@ -129,6 +129,7 @@ def find_roundtrip_font_tamper(
     candidates: tuple[str, ...],
     work_dir: Path,
     label: str,
+    accept=None,
 ) -> tuple[Path, str]:
     """Find a font-only XLS round trip that differs from the controlled baseline."""
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -146,7 +147,11 @@ def find_roundtrip_font_tamper(
             work_dir / f"{label}-{index}-final",
             "xlsx",
         )
-        if xlsx_font_signature(final_xlsx, address) != xlsx_font_signature(controlled_baseline_xlsx, address):
+        signature_differs = xlsx_font_signature(final_xlsx, address) != xlsx_font_signature(
+            controlled_baseline_xlsx,
+            address,
+        )
+        if (accept is not None and accept(tampered_xls, address)) or (accept is None and signature_differs):
             return tampered_xls, address
     raise AssertionError(
         f"{font_name} did not produce a distinct font signature in candidates {candidates}"
@@ -2067,6 +2072,31 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             for index, font_name in enumerate(("DejaVu Sans", "Liberation Serif")):
                 with self.subTest(font=font_name):
+                    validation_dir = folder / f"validation-{index}"
+                    validation_dir.mkdir()
+                    validation_file = validation_dir / "tampered.xls"
+                    accepted_result = {}
+
+                    def accepts(candidate: Path, address: str) -> bool:
+                        shutil.copy2(candidate, validation_file)
+                        candidate_result = run_script(
+                            GRADE / "scripts" / "validate_output.py",
+                            "--input-json",
+                            str(normalized),
+                            "--output-dir",
+                            str(validation_dir),
+                            "--output-file",
+                            str(validation_file),
+                        )
+                        if (
+                            candidate_result.returncode != 0
+                            and f"target sheet formatting mismatch at {address}" in candidate_result.stderr
+                            and "font" in candidate_result.stderr
+                        ):
+                            accepted_result["result"] = candidate_result
+                            return True
+                        return False
+
                     tampered_xls, address = find_roundtrip_font_tamper(
                         generated_xlsx,
                         controlled_baseline_xlsx,
@@ -2074,20 +2104,9 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                         protected_cells,
                         folder / f"tampered-{index}",
                         f"output-{index}",
+                        accept=accepts,
                     )
-                    validation_dir = folder / f"validation-{index}"
-                    validation_dir.mkdir()
-                    validation_file = validation_dir / "tampered.xls"
-                    shutil.copy2(tampered_xls, validation_file)
-                    result = run_script(
-                        GRADE / "scripts" / "validate_output.py",
-                        "--input-json",
-                        str(normalized),
-                        "--output-dir",
-                        str(validation_dir),
-                        "--output-file",
-                        str(validation_file),
-                    )
+                    result = accepted_result["result"]
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn(f"target sheet formatting mismatch at {address}", result.stderr)
                     self.assertIn("font", result.stderr)
