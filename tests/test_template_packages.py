@@ -236,6 +236,12 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "task": "任务" * 40,
                 "message": "title exceeds manifest max_chars=120",
             },
+            "generated_field": {
+                "task": "第一行\n第二行\n第三行\n第四行",
+                "flows": [],
+                "knowledge": ["知识点"],
+                "message": "ability_goal exceeds manifest max_paragraphs=5",
+            },
         }
         for name, case in cases.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory(prefix="lesson-package-composed-") as temp_name:
@@ -937,7 +943,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             path = sorted(output.glob("*.docx"))[0]
             document = Document(path)
             cell = document.tables[0].cell(4, 1)
-            for paragraph in cell.paragraphs:
+            for paragraph in cell.paragraphs[1:]:
                 if paragraph._p.pPr is not None:
                     paragraph._p.remove(paragraph._p.pPr)
                 for run in paragraph.runs:

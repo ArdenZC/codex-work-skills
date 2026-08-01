@@ -194,30 +194,32 @@ def _writable_main_table_cells(manifest: dict[str, Any]) -> tuple[set[tuple[int,
 
 
 def _normalized_direct_xml(element) -> str:
+    if element is None:
+        return ""
     if len(element) == 0 and not element.attrib and not (element.text or "").strip():
         return ""
     return _xml(element)
 
 
 def _direct_format_signature(cell) -> dict[str, Any]:
-    paragraph_values = [
-        _normalized_direct_xml(paragraph._p.pPr)
-        for paragraph in cell.paragraphs
-        if paragraph._p.pPr is not None
-    ]
-    run_values = [
-        _normalized_direct_xml(run._r.rPr)
-        for paragraph in cell.paragraphs
-        for run in paragraph.runs
-        if run._r.rPr is not None
-    ]
+    paragraphs = []
+    for paragraph in cell.paragraphs:
+        paragraph_value = _normalized_direct_xml(paragraph._p.pPr)
+        run_values = [
+            _normalized_direct_xml(run._r.rPr)
+            for run in paragraph.runs
+        ]
+        paragraphs.append({"paragraph": paragraph_value, "runs": run_values})
+    paragraph_values = [item["paragraph"] for item in paragraphs]
+    run_values = [run for item in paragraphs for run in item["runs"]]
     paragraph_formats = sorted({value for value in paragraph_values if value})
     run_formats = sorted({value for value in run_values if value})
     return {
+        "paragraphs": paragraphs,
         "paragraph_formats": paragraph_formats,
-        "paragraph_primary": next((value for value in paragraph_values if value), ""),
+        "paragraph_primary": paragraphs[0]["paragraph"] if paragraphs else "",
         "run_formats": run_formats,
-        "run_primary": next((value for value in run_values if value), ""),
+        "run_primary": paragraphs[0]["runs"][0] if paragraphs and paragraphs[0]["runs"] else "",
     }
 
 
@@ -326,7 +328,7 @@ def _protected_layout_matches(actual: dict[str, Any], expected: dict[str, Any]) 
     if expected_title.get("run_primary") and expected_title["run_primary"] not in actual_title.get("run_formats", []):
         return False
 
-    # Text replacement can collapse source runs/paragraphs, so output formats may be a subset of the template formats.
+    # Text replacement can collapse source runs/paragraphs, so compare each output paragraph with the source paragraph format.
     expected_by_coordinate = {
         (item["scope"], item.get("row"), item.get("cell")): item["format"]
         for item in expected_direct
@@ -337,14 +339,24 @@ def _protected_layout_matches(actual: dict[str, Any], expected: dict[str, Any]) 
         if expected_format is None:
             return False
         actual_format = item["format"]
-        if not set(actual_format["paragraph_formats"]).issubset(expected_format["paragraph_formats"]):
-            return False
-        if not set(actual_format["run_formats"]).issubset(expected_format["run_formats"]):
-            return False
-        if expected_format["paragraph_primary"] and expected_format["paragraph_primary"] not in actual_format["paragraph_formats"]:
-            return False
-        if expected_format["run_primary"] and expected_format["run_primary"] not in actual_format["run_formats"]:
-            return False
+        actual_paragraphs = actual_format.get("paragraphs", [])
+        expected_paragraphs = expected_format.get("paragraphs", [])
+        if not actual_paragraphs or not expected_paragraphs:
+            if actual_paragraphs != expected_paragraphs:
+                return False
+            continue
+        expected_paragraph = expected_paragraphs[0].get("paragraph", "")
+        expected_runs = expected_paragraphs[0].get("runs", [])
+        expected_run = expected_runs[0] if expected_runs else ""
+        for paragraph in actual_paragraphs:
+            if paragraph.get("paragraph", "") != expected_paragraph:
+                return False
+            actual_runs = paragraph.get("runs", [])
+            if expected_run:
+                if not actual_runs or any(run != expected_run for run in actual_runs):
+                    return False
+            elif any(actual_runs):
+                return False
     return True
 
 

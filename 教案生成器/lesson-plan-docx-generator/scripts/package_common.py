@@ -311,11 +311,9 @@ def _validate_composed_limit(label: str, value: str, spec: dict[str, Any]) -> No
 
 
 def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> None:
-    teaching_spec = field_spec(manifest, "teaching_content")
-    knowledge_goal_spec = field_spec(manifest, "knowledge_goal")
-    resources_spec = field_spec(manifest, "resources")
     implementation_spec = field_spec(manifest, "implementation")
     title_spec = field_spec(manifest, "title")
+    reflection_spec = field_spec(manifest, "reflection")
     for index, lesson in enumerate(data.get("lessons", []), start=1):
         if not isinstance(lesson, dict):
             continue
@@ -324,28 +322,19 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
         course = str(lesson.get("course_name") or data.get("course_name", ""))
         flows = [str(item) for item in lesson.get("flows", [])]
         knowledge = [str(item) for item in lesson.get("knowledge", [])]
-        composed = composed_lesson_fields(
+        generated = generated_lesson_fields(
             unit,
             task,
             flows,
             knowledge,
             lesson.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"),
         )
-        _validate_composed_limit(
-            f"lessons[{index - 1}].teaching_content",
-            composed["teaching_content"],
-            teaching_spec,
-        )
-        _validate_composed_limit(
-            f"lessons[{index - 1}].knowledge_goal",
-            composed["knowledge_goal"],
-            knowledge_goal_spec,
-        )
-        _validate_composed_limit(
-            f"lessons[{index - 1}].resources",
-            composed["resources"],
-            resources_spec,
-        )
+        for name, value in generated.items():
+            _validate_composed_limit(
+                f"lessons[{index - 1}].{name}",
+                value,
+                field_spec(manifest, name),
+            )
         hours_spec = field_spec(manifest, "hours")
         _validate_composed_limit(
             f"lessons[{index - 1}].hours",
@@ -359,5 +348,12 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
                     str(value),
                     implementation_spec,
                 )
+        reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
+        for row_index, value in zip(reflection_rows, reflection_cell_values(task)):
+            _validate_composed_limit(
+                f"lessons[{index - 1}].reflection row {row_index} cell 2",
+                value,
+                reflection_spec,
+            )
         title = f"{index} 《{course}》教学单元设计：{task}"
         _validate_composed_limit(f"lessons[{index - 1}].title", title, title_spec)
