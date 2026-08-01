@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +70,32 @@ def convert_to_xlsx(source: Path, out_dir: Path, soffice: str) -> Path:
     raise RuntimeError(f"LibreOffice did not create an XLSX file for {source}")
 
 
+_FONT_NAME_ALIASES = {
+    "simsun": "simsun",
+    "mssimsun": "simsun",
+    "宋体": "simsun",
+    "nsimsun": "nsimsun",
+    "新宋体": "nsimsun",
+    "simhei": "simhei",
+    "黑体": "simhei",
+    "microsoftyahei": "microsoftyahei",
+    "microsoftyaheiui": "microsoftyahei",
+    "微软雅黑": "microsoftyahei",
+    "kaiti": "kaiti",
+    "楷体": "kaiti",
+    "fangsong": "fangsong",
+    "仿宋": "fangsong",
+    "dengxian": "dengxian",
+    "等线": "dengxian",
+}
+
+
+def _font_name_signature(value: Any) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+    compact = re.sub(r"[\s_-]+", "", normalized)
+    return _FONT_NAME_ALIASES.get(compact, compact)
+
+
 def _cell_format_signature(cell) -> dict[str, Any]:
     def color_signature(color) -> tuple[Any, ...]:
         if color is None:
@@ -93,8 +121,12 @@ def _cell_format_signature(cell) -> dict[str, Any]:
     protection = cell.protection
     return {
         "number_format": cell.number_format,
-        # Font family and charset can be replaced by locale-specific fallbacks during XLS round trips.
+        # Keep font identity while normalizing common locale-specific aliases from XLS round trips.
         "font": (
+            _font_name_signature(font.name),
+            font.charset,
+            font.family,
+            font.scheme,
             font.sz,
             bool(font.b),
             bool(font.i),
@@ -443,6 +475,8 @@ def validate_template(
     actual_hash = sha256(template)
     canonical = manifest_template_path(manifest)
     is_canonical = template == canonical
+    if not is_canonical and not canonical.exists():
+        errors.append(f"Canonical template not found: {canonical}")
     report["checks"]["sha256"] = {"expected": expected_hash, "actual": actual_hash}
     if is_canonical and actual_hash != expected_hash:
         errors.append(f"Canonical template SHA-256 mismatch: expected {expected_hash}, got {actual_hash}")

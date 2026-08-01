@@ -715,6 +715,19 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Template not found", result.stdout)
 
+            missing_canonical = folder / "missing-canonical.yaml"
+            missing_canonical.write_text(manifest_text.replace("file: template.docx", "file: missing.docx", 1), encoding="utf-8")
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(template),
+                "--manifest",
+                str(missing_canonical),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Canonical template not found", result.stdout)
+
     def test_structure_breaking_docx_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-broken-") as temp_name:
             broken = Path(temp_name) / "broken.docx"
@@ -1646,6 +1659,32 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
 
+    def test_custom_template_rejects_protected_font_family_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-font-family-guard-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            xlsx = xlsx_dir / "template.xlsx"
+            workbook = load_workbook(xlsx)
+            changed_font = copy(workbook["平时成绩"]["A1"].font)
+            changed_font.name = "Arial"
+            workbook["平时成绩"]["A1"].font = changed_font
+            workbook.save(xlsx)
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(xlsx),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+
     def test_custom_template_rejects_print_header_footer_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-custom-print-header-guard-") as temp_name:
             folder = Path(temp_name)
@@ -1768,6 +1807,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             workbook = load_workbook(tampered_xlsx)
             tampered_font = copy(workbook["平时成绩"]["C5"].font)
             tampered_font.sz = (tampered_font.sz or 10) + 1
+            tampered_font.name = "Arial"
             workbook["平时成绩"]["C5"].font = tampered_font
             workbook["平时成绩"]["E4"] = "被篡改的常规项目"
             workbook["平时成绩"]["F2"] = "被篡改的受保护内容"
@@ -2020,6 +2060,19 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             result = run_script(GRADE / "scripts" / "validate_template.py", "--manifest", str(missing_template), "--json")
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Template not found", result.stdout)
+
+            missing_canonical = folder / "missing-canonical.yaml"
+            missing_canonical.write_text(manifest_text.replace("file: template.xls", "file: missing.xls", 1), encoding="utf-8")
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(template),
+                "--manifest",
+                str(missing_canonical),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Canonical template not found", result.stdout)
 
     def test_formula_error_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-formula-") as temp_name:

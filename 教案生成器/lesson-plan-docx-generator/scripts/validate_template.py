@@ -273,6 +273,8 @@ def validate_template(
     actual_hash = sha256(template)
     canonical = manifest_template_path(manifest)
     is_canonical = template == canonical
+    if not is_canonical and not canonical.exists():
+        errors.append(f"Canonical template not found: {canonical}")
     report["checks"]["sha256"] = {"expected": expected_hash, "actual": actual_hash}
     if is_canonical and actual_hash != expected_hash:
         errors.append(f"Canonical template SHA-256 mismatch: expected {expected_hash}, got {actual_hash}")
