@@ -152,7 +152,13 @@ def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[s
             if coordinate in writable or coordinate == evaluation:
                 continue
             values.append(
-                {"scope": "main", "row": row_index, "cell": cell_index, "text": _cell_text_signature(cell)}
+                {
+                    "scope": "main",
+                    "row": row_index,
+                    "cell": cell_index,
+                    "text": _cell_text_signature(cell),
+                    "format": _direct_format_signature(cell),
+                }
             )
 
     if evaluation is not None:
@@ -168,6 +174,7 @@ def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[s
                                 "row": row_index,
                                 "cell": cell_index,
                                 "text": _cell_text_signature(cell),
+                                "format": _direct_format_signature(cell),
                             }
                         )
     return values

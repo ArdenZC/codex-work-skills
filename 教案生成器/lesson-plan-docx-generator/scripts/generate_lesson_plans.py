@@ -161,8 +161,8 @@ def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):
     for r_idx, values in enumerate(evaluation_cell_values(target, seq), start=1):
         set_cell_text(table.cell(r_idx, 2), values[2], WD_ALIGN_PARAGRAPH.CENTER)
         set_cell_text(table.cell(r_idx, 3), values[3], WD_ALIGN_PARAGRAPH.CENTER)
-    for row in table.rows:
-        for c in row.cells:
+    for row in table.rows[1:]:
+        for c in row.cells[2:4]:
             for p in c.paragraphs:
                 for run in p.runs:
                     run.font.size = Pt(8)

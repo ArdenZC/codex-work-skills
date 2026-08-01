@@ -286,6 +286,23 @@ def _target_cell_format_signature(sheet) -> dict[str, dict[str, Any]]:
     }
 
 
+def _protected_target_values(sheet, manifest: dict[str, Any]) -> dict[str, Any]:
+    structure = manifest["structure"]
+    writable_cells = {
+        str(cell).upper()
+        for cell in [*structure.get("metadata", {}).values(), *structure.get("headers", {}).values()]
+        if cell
+    }
+    data_start_row = int(structure["data_start_row"])
+    total_column = column_number(structure["columns"]["total_score"])
+    return {
+        f"{get_column_letter(column)}{row}": sheet.cell(row, column).value
+        for row in range(1, data_start_row)
+        for column in range(1, total_column + 1)
+        if f"{get_column_letter(column)}{row}" not in writable_cells
+    }
+
+
 def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[str, Any]]:
     differences: list[dict[str, Any]] = []
     if isinstance(left, dict) and isinstance(right, dict):
@@ -358,6 +375,7 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
         "page_setup": _page_setup_signature(ws),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},
+        "protected_values": _protected_target_values(ws, manifest),
         "target_cell_formats": _target_cell_format_signature(ws),
         "writable_cell_formats": {
             cell: _cell_format_signature(ws[cell]) for cell in sorted(writable_cells)

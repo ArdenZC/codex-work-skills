@@ -346,31 +346,35 @@ def _target_protected_value_errors(output_ws, template_ws, manifest: dict[str, A
         for cell in [*structure.get("metadata", {}).values(), *structure.get("headers", {}).values()]
         if cell
     }
-    addresses = [structure.get("title_cell"), *structure.get("header_label_cells", {}).values()]
-    regular_start = column_number(structure["columns"]["regular_items_start"])
-    regular_end = column_number(structure["columns"]["regular_items_end"])
-    header_row = int(structure.get("header_row", 4))
-    addresses.extend(
-        f"{get_column_letter(column)}{header_row}"
-        for column in range(regular_start, regular_end + 1)
-    )
-    errors: list[str] = []
-    for address in dict.fromkeys(str(item).upper() for item in addresses if item):
-        if address in writable_cells:
-            continue
-        expected_address = address
-        if not skill_enabled:
-            expected_address = _shift_cell_address_after_delete(
+    if not skill_enabled:
+        class_name_cell = str(structure.get("metadata", {}).get("class_name", "")).upper()
+        shifted_writable_cells: set[str] = set()
+        for address in writable_cells:
+            if address == class_name_cell:
+                shifted_writable_cells.add(address)
+                continue
+            shifted = _shift_cell_address_after_delete(
                 address,
                 column_number(structure["columns"]["skill_score"]),
                 2,
             )
-            if expected_address is None:
+            if shifted is not None:
+                shifted_writable_cells.add(shifted)
+        writable_cells = shifted_writable_cells
+    data_start_row = int(structure["data_start_row"])
+    total_column = column_number(
+        structure["columns"]["total_score"] if skill_enabled else structure["no_skill_total_column"]
+    )
+    errors: list[str] = []
+    for row in range(1, data_start_row):
+        for column in range(1, total_column + 1):
+            address = f"{get_column_letter(column)}{row}"
+            if address in writable_cells:
                 continue
-        expected = _normalized_cell_value(template_ws[expected_address].value)
-        actual = _normalized_cell_value(output_ws[expected_address].value)
-        if actual != expected:
-            errors.append(f"target sheet protected value mismatch at {expected_address}")
+            expected = _normalized_cell_value(template_ws[address].value)
+            actual = _normalized_cell_value(output_ws[address].value)
+            if actual != expected:
+                errors.append(f"target sheet protected value mismatch at {address}")
     return errors
 
 
@@ -630,8 +634,8 @@ def validate_output_dir(
                             errors.append(f"{name} metadata mismatch")
 
                     expected_last_row = start_row + len(data["students"]) - 1
-                    if ws_values.max_row < expected_last_row:
-                        errors.append(f"Output student rows are short: expected through row {expected_last_row}, got {ws_values.max_row}")
+                    if ws_values.max_row != expected_last_row:
+                        errors.append(f"Output student row extent mismatch: expected through row {expected_last_row}, got {ws_values.max_row}")
                     output_max_col = column_number(total_column)
                     for extra_row in range(expected_last_row + 1, max(ws_values.max_row, expected_last_row) + 1):
                         if _row_has_content(ws_values, extra_row, output_max_col):

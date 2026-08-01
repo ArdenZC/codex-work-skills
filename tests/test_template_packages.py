@@ -841,6 +841,33 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("protected DOCX layout changed", result.stderr)
 
+    def test_output_validation_rejects_fixed_label_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-fixed-label-format-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            document.tables[0].cell(0, 0).paragraphs[0].runs[0].font.size = Pt(19)
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
     def test_output_validation_rejects_writable_direct_formatting_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-direct-format-guard-") as temp_name:
             folder = Path(temp_name)
@@ -1715,6 +1742,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             tampered_font.sz = (tampered_font.sz or 10) + 1
             workbook["平时成绩"]["C5"].font = tampered_font
             workbook["平时成绩"]["E4"] = "被篡改的常规项目"
+            workbook["平时成绩"]["F2"] = "被篡改的受保护内容"
             workbook["平时成绩"].page_margins.left = (workbook["平时成绩"].page_margins.left or 0) + 1
             workbook["平时成绩"].oddHeader.center.text = "被篡改的打印页眉"
             workbook.save(tampered_xlsx)
@@ -1758,7 +1786,58 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("target sheet formatting mismatch", result.stderr)
             self.assertIn("target sheet protected value mismatch at E4", result.stderr)
+            self.assertIn("target sheet protected value mismatch at F2", result.stderr)
             self.assertIn("target sheet print settings mismatch", result.stderr)
+
+    def test_output_validation_rejects_extra_blank_student_rows(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-extra-blank-row-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(output.glob("*.xls"))
+            xlsx_dir = folder / "tamper-xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(generated)],
+                check=True,
+                capture_output=True,
+            )
+            tampered_xlsx = xlsx_dir / f"{generated.stem}.xlsx"
+            workbook = load_workbook(tampered_xlsx)
+            sheet = workbook["平时成绩"]
+            for column in range(1, 16):
+                sheet.cell(7, column)._style = copy(sheet.cell(6, column)._style)
+            sheet.row_dimensions[7].height = sheet.row_dimensions[6].height
+            workbook.save(tampered_xlsx)
+            tampered_dir = folder / "tampered"
+            tampered_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(tampered_dir), str(tampered_xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            tampered = output / "tampered.xls"
+            shutil.copy2(tampered_dir / f"{generated.stem}.xls", tampered)
+            result = run_script(
+                GRADE / "scripts" / "validate_output.py",
+                "--input-json",
+                str(ROOT / "tests" / "fixtures" / "gradebook-input.json"),
+                "--output-dir",
+                str(output),
+                "--output-file",
+                str(tampered),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Output student row extent mismatch", result.stderr)
 
     def test_legacy_output_dir_with_multiple_candidates_fails_explicitly(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-multiple-candidates-") as temp_name:
