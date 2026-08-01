@@ -258,6 +258,46 @@ def _writable_direct_format_signature(document, manifest: dict[str, Any]) -> lis
     return values
 
 
+def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    table = document.tables[int(manifest["structure"]["main_table"]["index"])]
+    _writable, evaluation = _writable_main_table_cells(manifest)
+    if evaluation is None:
+        return []
+    parent = actual_cells(table.rows[evaluation[0]])[evaluation[1]]
+    nested = parent.tables[0] if parent.tables else None
+    if nested is None:
+        return []
+
+    def format_signature(cell) -> dict[str, Any]:
+        signature = _direct_format_signature(cell)
+        paragraphs = [
+            {
+                "paragraph": item["paragraph"],
+                "runs": [value for value in item["runs"] if value],
+            }
+            for item in signature["paragraphs"]
+        ]
+        run_values = [value for item in paragraphs for value in item["runs"]]
+        return {
+            "paragraphs": paragraphs,
+            "paragraph_formats": sorted({item["paragraph"] for item in paragraphs if item["paragraph"]}),
+            "paragraph_primary": paragraphs[0]["paragraph"] if paragraphs else "",
+            "run_formats": sorted(set(run_values)),
+            "run_primary": run_values[0] if run_values else "",
+        }
+
+    return [
+        {
+            "row": row_index,
+            "cell": cell_index,
+            "format": format_signature(cell),
+        }
+        for row_index, row in enumerate(nested.rows)
+        for cell_index, cell in enumerate(actual_cells(row))
+        if row_index > 0 and cell_index in (2, 3)
+    ]
+
+
 def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     rows = []
@@ -308,6 +348,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "title_format": _title_format_signature(document, manifest),
         "protected_text": _protected_text_signature(document, manifest),
         "writable_direct_formats": _writable_direct_format_signature(document, manifest),
+        "evaluation_writable_formats": _evaluation_writable_format_signature(document, manifest),
     }
 
 

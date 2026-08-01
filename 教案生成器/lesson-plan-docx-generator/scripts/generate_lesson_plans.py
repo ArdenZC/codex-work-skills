@@ -14,7 +14,6 @@ from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
-from docx.shared import Pt
 from docx.table import _Cell
 
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, evaluation_cell_values, ensure_supported_major, field_spec, generated_lesson_fields, implementation_cell_values, load_manifest, manifest_template_path, reflection_cell_values, validate_composed_fields, validate_input
@@ -159,13 +158,8 @@ def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):
     table = cell.tables[0] if cell.tables else cell.add_table(rows=14, cols=4)
     table.style = "Table Grid"
     for r_idx, values in enumerate(evaluation_cell_values(target, seq), start=1):
-        set_cell_text(table.cell(r_idx, 2), values[2], WD_ALIGN_PARAGRAPH.CENTER)
-        set_cell_text(table.cell(r_idx, 3), values[3], WD_ALIGN_PARAGRAPH.CENTER)
-    for row in table.rows[1:]:
-        for c in row.cells[2:4]:
-            for p in c.paragraphs:
-                for run in p.runs:
-                    run.font.size = Pt(8)
+        set_cell_text(table.cell(r_idx, 2), values[2])
+        set_cell_text(table.cell(r_idx, 3), values[3])
 
 
 def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict[str, Any], seq: int, manifest: dict[str, Any]) -> Path:

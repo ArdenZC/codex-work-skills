@@ -1098,6 +1098,34 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("evaluation cell mismatch", result.stderr)
 
+    def test_output_validation_rejects_evaluation_direct_formatting_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-evaluation-format-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            nested = document.tables[0].cell(12, 1).tables[0]
+            nested.cell(1, 2).paragraphs[0].runs[0].font.bold = True
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
 
 class GradebookTotalRuleTests(unittest.TestCase):
     def test_total_rule_matches_exactly_with_zero_and_nonzero_skill_weights(self) -> None:
@@ -1584,8 +1612,8 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(formatted_result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", formatted_result.stdout)
 
-    def test_custom_template_rejects_protected_target_cell_formatting(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="grade-package-custom-target-format-guard-") as temp_name:
+    def test_custom_template_rejects_protected_target_sheet_settings(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-target-protection-guard-") as temp_name:
             folder = Path(temp_name)
             canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
             xlsx_dir = folder / "xlsx"
@@ -1598,9 +1626,9 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             xlsx = xlsx_dir / "template.xlsx"
             workbook = load_workbook(xlsx)
             sheet = workbook["平时成绩"]
-            changed_font = copy(sheet["A1"].font)
-            changed_font.sz = (changed_font.sz or 11) + 1
-            sheet["A1"].font = changed_font
+            sheet.protection.sheet = True
+            sheet.protection.set_password("secret")
+            workbook.security.lockStructure = True
             workbook.save(xlsx)
             custom_dir = folder / "custom"
             custom_dir.mkdir()
@@ -1743,6 +1771,10 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             workbook["平时成绩"]["C5"].font = tampered_font
             workbook["平时成绩"]["E4"] = "被篡改的常规项目"
             workbook["平时成绩"]["F2"] = "被篡改的受保护内容"
+            workbook["平时成绩"]["D5"] = 101.5
+            workbook["平时成绩"].protection.sheet = True
+            workbook["平时成绩"].protection.set_password("secret")
+            workbook.security.lockStructure = True
             workbook["平时成绩"].page_margins.left = (workbook["平时成绩"].page_margins.left or 0) + 1
             workbook["平时成绩"].oddHeader.center.text = "被篡改的打印页眉"
             workbook.save(tampered_xlsx)
@@ -1788,6 +1820,9 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertIn("target sheet protected value mismatch at E4", result.stderr)
             self.assertIn("target sheet protected value mismatch at F2", result.stderr)
             self.assertIn("target sheet print settings mismatch", result.stderr)
+            self.assertIn("target sheet protection settings mismatch", result.stderr)
+            self.assertNotIn("101.5", result.stderr)
+            self.assertNotIn("101.5", (output / "qa-report.json").read_text(encoding="utf-8"))
 
     def test_output_validation_rejects_extra_blank_student_rows(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-extra-blank-row-") as temp_name:

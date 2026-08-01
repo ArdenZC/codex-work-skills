@@ -30,6 +30,7 @@ from validate_template import (
     _dimension_signature,
     _non_target_sheet_signature,
     _page_setup_signature,
+    _protection_signature,
     _signature_differences,
     convert_to_xlsx,
     find_soffice,
@@ -40,7 +41,7 @@ def _number(value: Any, label: str) -> float:
     try:
         return float(value)
     except (TypeError, ValueError) as exc:
-        raise ValueError(f"{label} is not numeric: {value!r}") from exc
+        raise ValueError(f"{label} is not numeric") from exc
 
 
 def _cell(ws, column: str, row: int):
@@ -109,6 +110,7 @@ def _check_workbook_protection(
     skill_enabled: bool,
     errors: list[str],
     template_ws=None,
+    template_workbook=None,
 ) -> dict[str, Any]:
     structure = manifest["structure"]
     validation = manifest["validation"]
@@ -139,6 +141,10 @@ def _check_workbook_protection(
         errors.append(f"Output freeze panes changed: expected {expected_freeze!r}, got {str(ws.freeze_panes or '')!r}")
     if template_ws is not None and _page_setup_signature(ws) != _page_setup_signature(template_ws):
         errors.append("target sheet print settings mismatch")
+    if template_ws is not None and _protection_signature(ws.protection) != _protection_signature(template_ws.protection):
+        errors.append("target sheet protection settings mismatch")
+    if template_workbook is not None and _protection_signature(workbook.security) != _protection_signature(template_workbook.security):
+        errors.append("workbook protection settings mismatch")
     expected_named_ranges = sorted(str(item) for item in validation.get("required_named_ranges", []))
     actual_named_ranges = sorted(str(name) for name in workbook.defined_names)
     if actual_named_ranges != expected_named_ranges:
@@ -593,7 +599,13 @@ def validate_output_dir(
                             18,
                         )
                     report["checks"]["structure"] = _check_workbook_protection(
-                        ws_formula, formulas, manifest, skill_enabled, errors, template_ws
+                        ws_formula,
+                        formulas,
+                        manifest,
+                        skill_enabled,
+                        errors,
+                        template_ws,
+                        template_workbook,
                     )
                     errors.extend(_scan_formula_errors(formulas, values))
 
@@ -664,14 +676,14 @@ def validate_output_dir(
                             row_errors.append("regular score count changed")
                         for score in regular_values:
                             if not 0 <= score <= 100 or not math.isclose(score * 2, round(score * 2), abs_tol=0.000001):
-                                row_errors.append(f"regular score is outside 0..100 or not a half-point: {score}")
+                                row_errors.append("regular score is outside 0..100 or not a half-point")
                         average = sum(regular_values) / len(regular_values)
                         if not math.isclose(average, float(student["regular"]), abs_tol=0.001):
                             row_errors.append("regular score average mismatch")
 
                         theory_value = _number(_cell(ws_values, columns["theory_score"], row).value, f"theory score {row}")
                         if not 0 <= theory_value <= 100:
-                            row_errors.append(f"theory score outside 0..100: {theory_value}")
+                            row_errors.append("theory score outside 0..100")
                         if not math.isclose(theory_value, float(student["theory"]), abs_tol=0.001):
                             row_errors.append("theory score mismatch")
                         expected_formulas = _expected_formulas(row, data["weights"], columns, skill_enabled, total_column)
@@ -692,7 +704,7 @@ def validate_output_dir(
                             if skill_enabled:
                                 skill_value = _number(_cell(ws_values, columns["skill_score"], row).value, f"skill score {row}")
                                 if not 0 <= skill_value <= 100:
-                                    row_errors.append(f"skill score outside 0..100: {skill_value}")
+                                    row_errors.append("skill score outside 0..100")
                                 if not math.isclose(skill_value, float(student["skill"]), abs_tol=0.001):
                                     row_errors.append("skill score mismatch")
                             output_total = calculate_expected_total(

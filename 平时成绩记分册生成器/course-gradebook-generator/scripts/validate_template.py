@@ -151,6 +151,21 @@ def _page_setup_value(value: Any) -> Any:
     return value
 
 
+def _protection_signature(protection) -> dict[str, Any]:
+    signature: dict[str, Any] = {}
+    for name in getattr(protection, "__attrs__", ()):
+        value = getattr(protection, name, None)
+        if any(token in name.lower() for token in ("password", "hash", "salt")):
+            present = value not in (None, "")
+            signature[name] = {
+                "present": present,
+                "digest": hashlib.sha256(str(value).encode("utf-8")).hexdigest() if present else "",
+            }
+        else:
+            signature[name] = value
+    return signature
+
+
 def _header_footer_item_signature(item) -> dict[str, dict[str, Any]]:
     return {
         side: {
@@ -275,6 +290,7 @@ def _non_target_sheet_signature(sheet) -> dict[str, Any]:
         "print_area": str(sheet.print_area or ""),
         "freeze_panes": str(sheet.freeze_panes or ""),
         "page_setup": _page_setup_signature(sheet),
+        "protection": _protection_signature(sheet.protection),
     }
 
 
@@ -374,6 +390,8 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
         "dimension": [ws.max_row, ws.max_column],
         "merged": sorted(str(item).upper() for item in ws.merged_cells.ranges),
         "page_setup": _page_setup_signature(ws),
+        "worksheet_protection": _protection_signature(ws.protection),
+        "workbook_protection": _protection_signature(workbook.security),
         "fixed_cells": {cell: ws[cell].value for cell in fixed_cells},
         "protected_values": _protected_target_values(ws, manifest),
         "target_cell_formats": _target_cell_format_signature(ws),
