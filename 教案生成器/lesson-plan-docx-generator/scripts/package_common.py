@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 
 from semantic_bookmarks import (
     FIXED_BOOKMARK_MAP,
+    IMPLEMENTATION_STAGES,
     implementation_bookmark_groups,
     managed_bookmark_names,
     reflection_bookmark_names,
@@ -42,6 +43,7 @@ def load_manifest(path: Path | str = DEFAULT_MANIFEST) -> dict[str, Any]:
     if not isinstance(manifest, dict):
         raise ValueError(f"Manifest must be a YAML object: {manifest_path}")
     manifest["_path"] = str(manifest_path)
+    validate_semantic_manifest_contract(manifest)
     return manifest
 
 
@@ -143,7 +145,119 @@ def resolve_template_package(
 
 def is_semantic_manifest(manifest: dict[str, Any]) -> bool:
     """Return whether the manifest uses the v1.1 semantic bookmark contract."""
-    return str(manifest.get("anchors", {}).get("mode", "")) == "word_bookmark"
+    template_info = manifest.get("template", {})
+    if not isinstance(template_info, dict):
+        template_info = {}
+    anchors = manifest.get("anchors")
+    mode = anchors.get("mode") if isinstance(anchors, dict) else None
+    return str(template_info.get("version", "")) == "1.1.0" or str(mode or "") == "word_bookmark"
+
+
+def _required_manifest_mapping(manifest: dict[str, Any], path: str) -> dict[str, Any]:
+    current: Any = manifest
+    for component in path.split("."):
+        if not isinstance(current, dict) or component not in current:
+            raise ValueError(f"Semantic manifest is missing {path}.")
+        current = current[component]
+    if not isinstance(current, dict):
+        raise ValueError(f"Semantic manifest {path} must be a mapping.")
+    return current
+
+
+def _required_manifest_value(mapping: dict[str, Any], path: str, key: str) -> Any:
+    if key not in mapping:
+        raise ValueError(f"Semantic manifest is missing {path}.{key}.")
+    return mapping[key]
+
+
+def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
+    """Require every v1.1 semantic contract field without applying defaults."""
+    if not is_semantic_manifest(manifest):
+        return
+
+    anchors = _required_manifest_mapping(manifest, "anchors")
+    mode = _required_manifest_value(anchors, "anchors", "mode")
+    if str(mode) != "word_bookmark":
+        raise ValueError("Semantic manifest anchors.mode must be word_bookmark.")
+
+    expected_names = managed_bookmark_names()
+    required = _required_manifest_value(anchors, "anchors", "required")
+    if not isinstance(required, list):
+        raise ValueError("Semantic manifest anchors.required must be a list.")
+    if [str(value) for value in required] != expected_names:
+        raise ValueError("Semantic manifest anchors.required does not match the managed definition.")
+
+    expected_containers = {name: "cell" for name in expected_names}
+    expected_containers[FIXED_BOOKMARK_MAP["title"]] = "document_paragraph"
+    containers = _required_manifest_value(anchors, "anchors", "containers")
+    if not isinstance(containers, dict):
+        raise ValueError("Semantic manifest anchors.containers must be a mapping.")
+    if {str(name): str(value) for name, value in containers.items()} != expected_containers:
+        raise ValueError("Semantic manifest anchors.containers does not match the managed definition.")
+
+    _required_manifest_mapping(manifest, "fields")
+    for field, expected_bookmark in FIXED_BOOKMARK_MAP.items():
+        spec = _required_manifest_mapping(manifest, f"fields.{field}")
+        _required_manifest_value(spec, f"fields.{field}", "target")
+        bookmark = _required_manifest_value(spec, f"fields.{field}", "bookmark")
+        _required_manifest_value(spec, f"fields.{field}", "mode")
+        if str(bookmark) != expected_bookmark:
+            raise ValueError(
+                f"Semantic manifest fields.{field}.bookmark does not match the managed definition."
+            )
+
+    implementation = _required_manifest_mapping(manifest, "fields.implementation")
+    implementation_mode = _required_manifest_value(implementation, "fields.implementation", "mode")
+    if str(implementation_mode) != "anchored_cells":
+        raise ValueError("Semantic manifest fields.implementation.mode must be anchored_cells.")
+    stages = _required_manifest_value(implementation, "fields.implementation", "stages")
+    if not isinstance(stages, list):
+        raise ValueError("Semantic manifest fields.implementation.stages must be a list.")
+    expected_stage_groups = implementation_bookmark_groups()
+    if len(stages) != len(IMPLEMENTATION_STAGES):
+        raise ValueError(
+            "Semantic manifest fields.implementation.stages count does not match the managed definition."
+        )
+    for index, (stage, expected, expected_bookmarks) in enumerate(
+        zip(stages, IMPLEMENTATION_STAGES, expected_stage_groups)
+    ):
+        path = f"fields.implementation.stages[{index}]"
+        if not isinstance(stage, dict):
+            raise ValueError(f"Semantic manifest {path} must be a mapping.")
+        stage_id, stage_code, _row = expected
+        stage_id_value = _required_manifest_value(stage, path, "id")
+        stage_code_value = _required_manifest_value(stage, path, "code")
+        bookmarks = _required_manifest_value(stage, path, "bookmarks")
+        if str(stage_id_value) != stage_id:
+            raise ValueError(
+                f"Semantic manifest stage id mismatch at index {index}: expected {stage_id}, got {stage_id_value}."
+            )
+        if str(stage_code_value) != stage_code:
+            raise ValueError(
+                f"Semantic manifest stage code mismatch at index {index}: expected {stage_code}, got {stage_code_value}."
+            )
+        if not isinstance(bookmarks, list):
+            raise ValueError(f"Semantic manifest {path}.bookmarks must be a list.")
+        if [str(value) for value in bookmarks] != expected_bookmarks:
+            raise ValueError(f"Semantic manifest {path}.bookmarks does not match the managed definition.")
+
+    reflection = _required_manifest_mapping(manifest, "fields.reflection")
+    reflection_mode = _required_manifest_value(reflection, "fields.reflection", "mode")
+    if str(reflection_mode) != "anchored_cells":
+        raise ValueError("Semantic manifest fields.reflection.mode must be anchored_cells.")
+    reflection_names = _required_manifest_value(reflection, "fields.reflection", "bookmarks")
+    if not isinstance(reflection_names, list):
+        raise ValueError("Semantic manifest fields.reflection.bookmarks must be a list.")
+    if [str(value) for value in reflection_names] != reflection_bookmark_names():
+        raise ValueError("Semantic manifest fields.reflection.bookmarks does not match the managed definition.")
+
+    evaluation = _required_manifest_mapping(manifest, "fields.evaluation")
+    evaluation_bookmark = _required_manifest_value(evaluation, "fields.evaluation", "bookmark")
+    evaluation_mode = _required_manifest_value(evaluation, "fields.evaluation", "mode")
+    if str(evaluation_bookmark) != FIXED_BOOKMARK_MAP["evaluation"]:
+        raise ValueError("Semantic manifest fields.evaluation.bookmark does not match the managed definition.")
+    if str(evaluation_mode) != "nested_table":
+        raise ValueError("Semantic manifest fields.evaluation.mode must be nested_table.")
 
 
 def base_manifest_path(manifest: dict[str, Any]) -> Path | None:
@@ -165,10 +279,9 @@ def layout_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
 def required_bookmarks(manifest: dict[str, Any]) -> list[str]:
     if not is_semantic_manifest(manifest):
         return []
+    validate_semantic_manifest_contract(manifest)
     expected = managed_bookmark_names()
-    values = manifest.get("anchors", {}).get("required", expected)
-    if not isinstance(values, list):
-        raise ValueError("Semantic template manifest anchors.required must be a list")
+    values = manifest["anchors"]["required"]
     declared = [str(value) for value in values]
     if declared != expected:
         raise ValueError("Semantic manifest anchors.required does not match the managed bookmark definition")
@@ -178,11 +291,10 @@ def required_bookmarks(manifest: dict[str, Any]) -> list[str]:
 def bookmark_containers(manifest: dict[str, Any]) -> dict[str, str]:
     if not is_semantic_manifest(manifest):
         return {}
+    validate_semantic_manifest_contract(manifest)
     expected = {name: "cell" for name in managed_bookmark_names()}
     expected[FIXED_BOOKMARK_MAP["title"]] = "document_paragraph"
-    values = manifest.get("anchors", {}).get("containers", expected)
-    if not isinstance(values, dict):
-        raise ValueError("Semantic template manifest anchors.containers must be a mapping")
+    values = manifest["anchors"]["containers"]
     declared = {str(name): str(container) for name, container in values.items()}
     if declared != expected:
         raise ValueError("Semantic manifest anchors.containers does not match the managed bookmark definition")
@@ -194,8 +306,12 @@ def field_bookmark(manifest: dict[str, Any], name: str) -> str:
     try:
         expected = FIXED_BOOKMARK_MAP[name]
     except KeyError as exc:
-        raise ValueError(f"Semantic manifest field {name} is missing bookmark")
-    value = spec.get("bookmark", expected)
+        raise ValueError(f"Semantic manifest field {name} is missing bookmark") from exc
+    if is_semantic_manifest(manifest):
+        validate_semantic_manifest_contract(manifest)
+    if "bookmark" not in spec:
+        raise ValueError(f"Semantic manifest is missing fields.{name}.bookmark.")
+    value = spec["bookmark"]
     if str(value) != expected:
         raise ValueError(f"Semantic manifest field {name} bookmark does not match the managed definition")
     return expected
@@ -203,15 +319,15 @@ def field_bookmark(manifest: dict[str, Any], name: str) -> str:
 
 def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
     spec = field_spec(manifest, "implementation")
+    if is_semantic_manifest(manifest):
+        validate_semantic_manifest_contract(manifest)
     if spec.get("mode") != "anchored_cells":
         return []
     expected = implementation_bookmark_groups()
-    stages = spec.get("stages", [])
-    if not isinstance(stages, list):
-        raise ValueError("Semantic implementation field stages must be a list")
+    stages = spec["stages"]
     result = []
     for index, stage in enumerate(stages, 1):
-        if not isinstance(stage, dict) or not isinstance(stage.get("bookmarks"), list):
+        if not isinstance(stage, dict) or not isinstance(stage["bookmarks"], list):
             raise ValueError(f"Semantic implementation stage {index} is missing bookmarks")
         result.append([str(value) for value in stage["bookmarks"]])
     if result != expected:
@@ -221,12 +337,12 @@ def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
 
 def reflection_bookmarks(manifest: dict[str, Any]) -> list[str]:
     spec = field_spec(manifest, "reflection")
+    if is_semantic_manifest(manifest):
+        validate_semantic_manifest_contract(manifest)
     if spec.get("mode") != "anchored_cells":
         return []
     expected = reflection_bookmark_names()
-    values = spec.get("bookmarks", expected)
-    if not isinstance(values, list):
-        raise ValueError("Semantic reflection field bookmarks must be a list")
+    values = spec["bookmarks"]
     declared = [str(value) for value in values]
     if declared != expected:
         raise ValueError("Semantic reflection bookmarks do not match the managed definition")

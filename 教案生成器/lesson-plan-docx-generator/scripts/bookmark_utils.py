@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+import re
 from typing import Any, Iterable
 
 from docx.oxml.ns import qn
@@ -14,6 +15,7 @@ W_BOOKMARK_START = qn("w:bookmarkStart")
 W_BOOKMARK_END = qn("w:bookmarkEnd")
 W_CELL = qn("w:tc")
 W_PARAGRAPH = qn("w:p")
+BOOKMARK_ID_PATTERN = re.compile(r"^[0-9]+$")
 
 
 @dataclass(frozen=True)
@@ -286,7 +288,7 @@ def validate_bookmark_inventory(
             record.bookmark_id
             for record in all_records
         }
-        if not bookmark_id.isdigit() or int(bookmark_id) < 0
+        if BOOKMARK_ID_PATTERN.fullmatch(bookmark_id) is None or int(bookmark_id) < 0
     )
     orphaned = sorted(
         f"{record.story}:{record.name or '<unnamed>'}#{record.bookmark_id}"
@@ -294,9 +296,9 @@ def validate_bookmark_inventory(
         if not record.paired
     )
     outside_main = sorted(
-        name
-        for name in set(named_all)
-        if name not in named_main
+        f"{record.story}:{record.name}"
+        for record in all_records
+        if record.name and record.story != "main"
     )
     main_by_name = {record.name: record for record in main_records if record.name and record.paired}
     missing = sorted(name for name in required if name not in main_by_name)
@@ -355,7 +357,10 @@ def validate_bookmark_inventory(
     if unexpected_names:
         errors.append("unexpected bookmark names: " + ", ".join(unexpected_names))
     if invalid_ids:
-        errors.append("bookmark IDs must be non-negative decimal integers: " + ", ".join(invalid_ids))
+        formatted = ", ".join(f'"{value}"' for value in invalid_ids)
+        errors.append(
+            "Bookmark ID must be an ASCII non-negative decimal integer: " + formatted
+        )
     if duplicate_ids:
         errors.append("bookmark IDs are not unique and paired: " + ", ".join(duplicate_ids))
     if orphaned:

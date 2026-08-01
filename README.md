@@ -43,4 +43,4 @@ python scripts/validate_template.py --template <template> --manifest <manifest.y
 python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
 ```
 
-自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖。教案 v1.1 模板只能使用 manifest 声明的 Word 书签写入，书签名称遵守 Word 40 字符安全规则并使用短阶段代码；`bookmarkStart`/`bookmarkEnd` 必须位于同一目标段落或物理单元格。canonical v1.0 模板和旧 `assets/lesson-plan-template.docx` 仅传 `--template` 时会自动解析为 `legacy_coordinates`，自定义模板仍必须提供匹配 manifest。
+自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖。教案 v1.1 模板只能使用 manifest 显式声明的 Word 书签写入，书签名称遵守 Word 40 字符安全规则并使用短阶段代码，书签 ID 只接受 ASCII 十进制数字；`bookmarkStart`/`bookmarkEnd` 必须位于同一目标段落或物理单元格，构建器还会扫描所有 header/footer story。canonical v1.0 模板和旧 `assets/lesson-plan-template.docx` 仅传 `--template` 时会自动解析为 `legacy_coordinates`，自定义模板仍必须提供匹配 manifest。
