@@ -80,6 +80,11 @@ def _xml(element) -> str:
     return etree.tostring(copy.deepcopy(element), encoding="unicode")
 
 
+def _settings_xml(document) -> str:
+    value = etree.tostring(copy.deepcopy(document.settings._element), encoding="unicode")
+    return value.encode("unicode_escape").decode("ascii")
+
+
 def _cell_text_signature(cell) -> list[Any]:
     values: list[Any] = [paragraph.text for paragraph in cell.paragraphs]
     for nested in cell.tables:
@@ -289,6 +294,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         ],
         "styles": _xml(document.styles._element),
         "themes": _theme_signature(document),
+        "settings_xml": _settings_xml(document),
         "body_paragraphs": _body_paragraph_signature(document, manifest),
         "title_format": _title_format_signature(document, manifest),
         "protected_text": _protected_text_signature(document, manifest),

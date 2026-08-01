@@ -507,6 +507,25 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected page, header, footer, or section settings", result.stdout)
 
+    def test_custom_lesson_template_rejects_document_settings_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-settings-guard-") as temp_name:
+            folder = Path(temp_name)
+            custom = folder / "custom.docx"
+            shutil.copy2(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx", custom)
+            document = Document(custom)
+            default_tab_stop = OxmlElement("w:defaultTabStop")
+            default_tab_stop.set(qn("w:val"), "240")
+            document.settings._element.append(default_tab_stop)
+            document.save(custom)
+            result = run_script(
+                LESSON / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected page, header, footer, or section settings", result.stdout)
+
     def test_custom_lesson_template_rejects_theme_definition_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-theme-guard-") as temp_name:
             folder = Path(temp_name)
@@ -862,6 +881,35 @@ class LessonTemplatePackageTests(unittest.TestCase):
             path = sorted(output.glob("*.docx"))[0]
             document = Document(path)
             document.paragraphs[0].runs[0].font.size = Pt(19)
+            document.save(path)
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
+    def test_output_validation_rejects_document_settings_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-settings-output-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            path = sorted(output.glob("*.docx"))[0]
+            document = Document(path)
+            character_spacing = OxmlElement("w:characterSpacingControl")
+            character_spacing.set(qn("w:val"), "doNotCompress")
+            document.settings._element.append(character_spacing)
             document.save(path)
             result = run_script(
                 LESSON / "scripts" / "validate_output.py",
@@ -1537,6 +1585,37 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
 
+    def test_custom_template_rejects_print_header_footer_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-print-header-guard-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            xlsx = xlsx_dir / "template.xlsx"
+            workbook = load_workbook(xlsx)
+            workbook["平时成绩"].oddHeader.center.text = "自定义打印页眉"
+            workbook.save(xlsx)
+            custom_dir = folder / "custom"
+            custom_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xls", "--outdir", str(custom_dir), str(xlsx)],
+                check=True,
+                capture_output=True,
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom_dir / "template.xls"),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+
     def test_custom_template_rejects_non_target_sheet_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-custom-non-target-") as temp_name:
             folder = Path(temp_name)
@@ -1631,6 +1710,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             workbook["平时成绩"]["C5"].font = tampered_font
             workbook["平时成绩"]["E4"] = "被篡改的常规项目"
             workbook["平时成绩"].page_margins.left = (workbook["平时成绩"].page_margins.left or 0) + 1
+            workbook["平时成绩"].oddHeader.center.text = "被篡改的打印页眉"
             workbook.save(tampered_xlsx)
             tampered_dir = folder / "tampered"
             tampered_dir.mkdir()

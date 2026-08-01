@@ -49,6 +49,11 @@ def _clear_text_nodes(element) -> None:
             node.text = ""
 
 
+def _settings_xml(document) -> str:
+    value = etree.tostring(copy.deepcopy(document.settings._element), encoding="unicode")
+    return value.encode("unicode_escape").decode("ascii")
+
+
 def _cell_signature(cell, writable: bool = False, evaluation: bool = False) -> str:
     cloned = copy.deepcopy(cell._tc)
     if writable:
@@ -182,6 +187,7 @@ def _section_signature(document) -> list[dict[str, Any]]:
                 "even_page_header_xml": etree.tostring(copy.deepcopy(section.even_page_header._element), encoding="unicode"),
                 "even_page_footer_xml": etree.tostring(copy.deepcopy(section.even_page_footer._element), encoding="unicode"),
                 "odd_and_even_pages_header_footer": bool(document.settings.odd_and_even_pages_header_footer),
+                "settings_xml": _settings_xml(document),
             }
         )
     return result

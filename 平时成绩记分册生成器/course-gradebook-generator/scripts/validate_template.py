@@ -151,6 +151,32 @@ def _page_setup_value(value: Any) -> Any:
     return value
 
 
+def _header_footer_item_signature(item) -> dict[str, dict[str, Any]]:
+    return {
+        side: {
+            name: getattr(getattr(item, side, None), name, None)
+            for name in ("text", "size", "font", "color")
+        }
+        for side in ("left", "center", "right")
+    }
+
+
+def _header_footer_signature(sheet) -> dict[str, Any]:
+    header_footer = sheet.HeaderFooter
+    return {
+        "flags": {
+            name: getattr(header_footer, name, None)
+            for name in ("differentOddEven", "differentFirst", "scaleWithDoc", "alignWithMargins")
+        },
+        "odd_header": _header_footer_item_signature(header_footer.oddHeader),
+        "odd_footer": _header_footer_item_signature(header_footer.oddFooter),
+        "even_header": _header_footer_item_signature(header_footer.evenHeader),
+        "even_footer": _header_footer_item_signature(header_footer.evenFooter),
+        "first_header": _header_footer_item_signature(header_footer.firstHeader),
+        "first_footer": _header_footer_item_signature(header_footer.firstFooter),
+    }
+
+
 def _page_setup_signature(sheet) -> dict[str, Any]:
     page_setup = sheet.page_setup
     margins = sheet.page_margins
@@ -196,6 +222,7 @@ def _page_setup_signature(sheet) -> dict[str, Any]:
         },
         "print_title_rows": str(sheet.print_title_rows or ""),
         "print_title_cols": str(sheet.print_title_cols or ""),
+        "header_footer": _header_footer_signature(sheet),
     }
 
 
