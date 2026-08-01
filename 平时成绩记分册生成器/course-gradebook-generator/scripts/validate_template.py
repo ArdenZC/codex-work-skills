@@ -88,12 +88,49 @@ _FONT_NAME_ALIASES = {
     "dengxian": "dengxian",
     "等线": "dengxian",
 }
+_CJK_FONT_NAMES = set(_FONT_NAME_ALIASES.values())
+_PLATFORM_CJK_FALLBACKS = {
+    "dejavusans",
+    "dejavuserif",
+    "liberationsans",
+    "liberationserif",
+}
 
 
 def _font_name_signature(value: Any) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
     compact = re.sub(r"[\s_-]+", "", normalized)
     return _FONT_NAME_ALIASES.get(compact, compact)
+
+
+def _font_metadata_signature(font, name: str) -> tuple[Any, ...]:
+    if name in _CJK_FONT_NAMES or name in _PLATFORM_CJK_FALLBACKS:
+        return "east-asian", "cjk", "cjk"
+    return font.charset, font.family, font.scheme
+
+
+def _font_signatures_match(left: tuple[Any, ...], right: tuple[Any, ...]) -> bool:
+    if len(left) != len(right):
+        return False
+    if left[0] == right[0]:
+        return left[1:] == right[1:]
+    left_fallback = left[0] in _PLATFORM_CJK_FALLBACKS
+    right_fallback = right[0] in _PLATFORM_CJK_FALLBACKS
+    left_cjk = left[0] in _CJK_FONT_NAMES
+    right_cjk = right[0] in _CJK_FONT_NAMES
+    return (left_fallback and right_cjk or right_fallback and left_cjk) and left[4:] == right[4:]
+
+
+def _cell_format_signatures_match(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    if set(left) != set(right):
+        return False
+    for key in left:
+        if key == "font":
+            if not _font_signatures_match(left[key], right[key]):
+                return False
+        elif left[key] != right[key]:
+            return False
+    return True
 
 
 def _cell_format_signature(cell) -> dict[str, Any]:
@@ -119,14 +156,16 @@ def _cell_format_signature(cell) -> dict[str, Any]:
     border = cell.border
     alignment = cell.alignment
     protection = cell.protection
+    font_name = _font_name_signature(font.name)
+    font_charset, font_family, font_scheme = _font_metadata_signature(font, font_name)
     return {
         "number_format": cell.number_format,
         # Keep font identity while normalizing common locale-specific aliases from XLS round trips.
         "font": (
-            _font_name_signature(font.name),
-            font.charset,
-            font.family,
-            font.scheme,
+            font_name,
+            font_charset,
+            font_family,
+            font_scheme,
             font.sz,
             bool(font.b),
             bool(font.i),
@@ -353,7 +392,10 @@ def _protected_target_values(sheet, manifest: dict[str, Any]) -> dict[str, Any]:
 
 def _signature_differences(left: Any, right: Any, path: str = "") -> list[dict[str, Any]]:
     differences: list[dict[str, Any]] = []
-    if isinstance(left, dict) and isinstance(right, dict):
+    if path.endswith(".font") and isinstance(left, tuple) and isinstance(right, tuple):
+        if not _font_signatures_match(left, right):
+            differences.append({"path": path, "expected": left, "actual": right})
+    elif isinstance(left, dict) and isinstance(right, dict):
         for key in sorted(set(left) | set(right), key=str):
             child_path = f"{path}.{key}" if path else str(key)
             if key not in left:
@@ -582,11 +624,9 @@ def validate_template(
                     canonical_workbook = load_workbook(canonical_xlsx, data_only=False)
                     canonical_signature = _workbook_signature(canonical_workbook, manifest)
                     custom_signature = _workbook_signature(workbook, manifest)
-                    if canonical_signature != custom_signature:
-                        report["checks"]["protected_signature_differences"] = _signature_differences(
-                            canonical_signature,
-                            custom_signature,
-                        )[:20]
+                    differences = _signature_differences(canonical_signature, custom_signature)
+                    if differences:
+                        report["checks"]["protected_signature_differences"] = differences[:20]
                         errors.append("Custom template changed protected workbook structure or formatting.")
     except TemplateValidationError:
         raise

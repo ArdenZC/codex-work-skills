@@ -26,6 +26,7 @@ from package_common import (
     validate_input,
 )
 from validate_template import (
+    _cell_format_signatures_match,
     _cell_format_signature,
     _dimension_signature,
     _non_target_sheet_signature,
@@ -96,8 +97,9 @@ def _non_target_sheet_format_errors(workbook, template_workbook, target_sheet: s
             continue
         expected = _non_target_sheet_signature(template_workbook[sheet.title])
         actual = _non_target_sheet_signature(sheet)
-        if expected != actual:
-            paths = ",".join(item["path"] for item in _signature_differences(expected, actual)[:3])
+        differences = _signature_differences(expected, actual)
+        if differences:
+            paths = ",".join(item["path"] for item in differences[:3])
             suffix = f" ({paths})" if paths else ""
             errors.append(f"Protected worksheet changed: {sheet.title}{suffix}")
     return errors
@@ -319,11 +321,9 @@ def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any]
                     f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row}"
                 )
                 continue
-            if _target_cell_format_signature(output_ws.cell(output_row, output_column)) != _target_cell_format_signature(
-                template_ws.cell(source_row, output_column)
-            ):
-                actual_signature = _target_cell_format_signature(output_ws.cell(output_row, output_column))
-                expected_signature = _target_cell_format_signature(template_ws.cell(source_row, output_column))
+            actual_signature = _target_cell_format_signature(output_ws.cell(output_row, output_column))
+            expected_signature = _target_cell_format_signature(template_ws.cell(source_row, output_column))
+            if not _cell_format_signatures_match(actual_signature, expected_signature):
                 errors.append(
                     f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row} "
                     f"({_format_signature_difference(actual_signature, expected_signature)})"
