@@ -1826,6 +1826,94 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("semantic bookmark protection failed", result.stderr.lower())
 
+    def test_v11_output_qa_report_keeps_anchor_summary_fields_consistent(self) -> None:
+        source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+        with tempfile.TemporaryDirectory(prefix="lesson-package-semantic-qa-summary-") as temp_name:
+            folder = Path(temp_name)
+            pristine = folder / "pristine"
+            generated = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(pristine),
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr or generated.stdout)
+
+            field_pairs = (
+                ("invalid_anchor_names", "invalid_names"),
+                ("unexpected_anchor_names", "unexpected_names"),
+                ("invalid_anchor_ids", "invalid_ids"),
+                ("anchor_boundary_errors", "boundary_errors"),
+            )
+
+            def assert_report_fields(report: dict, *, expected_field: str | None = None) -> None:
+                anchors = report["checks"]["anchors"]
+                for report_field, anchor_field in field_pairs:
+                    self.assertEqual(report[report_field], anchors[anchor_field], report_field)
+                if expected_field is not None:
+                    self.assertTrue(report[expected_field], expected_field)
+
+            success = folder / "success"
+            shutil.copytree(pristine, success)
+            success_result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(success),
+                "--manifest",
+                str(LESSON_V11_MANIFEST),
+            )
+            self.assertEqual(success_result.returncode, 0, success_result.stderr or success_result.stdout)
+            success_report = json.loads((success / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(success_report["status"], "passed")
+            assert_report_fields(success_report)
+            for report_field, _ in field_pairs:
+                self.assertEqual(success_report[report_field], [], report_field)
+
+            def invalid_id(root) -> None:
+                start = bookmark_start(root, "lp_hours")
+                end = bookmark_end(root, start.get(qn("w:id")))
+                start.set(qn("w:id"), "１２")
+                end.set(qn("w:id"), "１２")
+
+            def boundary_error(root) -> None:
+                move_bookmark_end_before_start(root, "lp_hours")
+
+            def invalid_name(root) -> None:
+                bookmark_start(root, "lp_unit").set(qn("w:name"), "lp-unit")
+
+            def unexpected_name(root) -> None:
+                add_story_bookmark(root, "lp_unknown", "999")
+
+            faults = (
+                ("invalid-id", invalid_id, "invalid_anchor_ids"),
+                ("boundary", boundary_error, "anchor_boundary_errors"),
+                ("invalid-name", invalid_name, "invalid_anchor_names"),
+                ("unexpected-name", unexpected_name, "unexpected_anchor_names"),
+            )
+            for label, mutate, expected_field in faults:
+                with self.subTest(fault=label):
+                    case_dir = folder / label
+                    shutil.copytree(pristine, case_dir)
+                    patch_docx_document_xml(sorted(case_dir.glob("*.docx"))[0], mutate)
+                    result = run_script(
+                        LESSON / "scripts" / "validate_output.py",
+                        "--input-json",
+                        str(source),
+                        "--output-dir",
+                        str(case_dir),
+                        "--manifest",
+                        str(LESSON_V11_MANIFEST),
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("semantic bookmark", result.stderr.lower())
+                    report_path = case_dir / "qa-report.json"
+                    self.assertTrue(report_path.exists())
+                    report = json.loads(report_path.read_text(encoding="utf-8"))
+                    assert_report_fields(report, expected_field=expected_field)
+
     def test_v11_missing_bookmarks_does_not_downgrade_and_v10_remains_explicitly_supported(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-semantic-no-downgrade-") as temp_name:
             folder = Path(temp_name)

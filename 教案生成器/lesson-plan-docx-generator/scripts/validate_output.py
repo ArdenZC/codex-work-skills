@@ -946,23 +946,32 @@ def validate_output_dir(
     if anchor_mode(manifest) == "word_bookmark":
         missing_anchors = sorted({name for result in anchor_results for name in result["missing"]})
         duplicate_anchors = sorted({name for result in anchor_results for name in result["duplicates"]})
+        duplicate_ids = sorted({name for result in anchor_results for name in result["duplicate_ids"]})
+        invalid_names = sorted({name for result in anchor_results for name in result["invalid_names"]})
+        unexpected_names = sorted({name for result in anchor_results for name in result["unexpected_names"]})
+        invalid_ids = sorted({name for result in anchor_results for name in result["invalid_ids"]})
+        boundary_errors = sorted({name for result in anchor_results for name in result["boundary_errors"]})
         report["preserved_anchor_count"] = min(
             (result["preserved_count"] for result in anchor_results),
             default=0,
         )
         report["missing_anchors"] = missing_anchors
         report["duplicate_anchors"] = duplicate_anchors
+        report["invalid_anchor_names"] = invalid_names
+        report["unexpected_anchor_names"] = unexpected_names
+        report["invalid_anchor_ids"] = invalid_ids
+        report["anchor_boundary_errors"] = boundary_errors
         checks["anchors"] = {
             "mode": anchor_mode(manifest),
             "required": report["required_anchor_count"],
             "preserved": report["preserved_anchor_count"],
             "missing": missing_anchors,
             "duplicates": duplicate_anchors,
-            "duplicate_ids": sorted({name for result in anchor_results for name in result["duplicate_ids"]}),
-            "invalid_names": sorted({name for result in anchor_results for name in result["invalid_names"]}),
-            "unexpected_names": sorted({name for result in anchor_results for name in result["unexpected_names"]}),
-            "invalid_ids": sorted({name for result in anchor_results for name in result["invalid_ids"]}),
-            "boundary_errors": sorted({name for result in anchor_results for name in result["boundary_errors"]}),
+            "duplicate_ids": duplicate_ids,
+            "invalid_names": invalid_names,
+            "unexpected_names": unexpected_names,
+            "invalid_ids": invalid_ids,
+            "boundary_errors": boundary_errors,
         }
 
     expected_total = data.get("total_hours")
