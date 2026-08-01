@@ -1872,7 +1872,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 capture_output=True,
             )
             custom = xlsx_dir / "template.xlsx"
-            patch_xlsx_cell_font(custom, "C5", font_name)
+            patch_xlsx_cell_font(custom, "C2", font_name)
             result = run_script(
                 GRADE / "scripts" / "validate_template.py",
                 "--template",
@@ -1881,7 +1881,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
-            self.assertIn("target_cell_formats.C5.font", result.stdout)
+            self.assertIn("target_cell_formats.C2.font", result.stdout)
 
     def test_custom_template_rejects_dejavu_fallback_for_simsun(self) -> None:
         self._assert_custom_template_rejects_font_fallback("DejaVu Sans")
@@ -1912,7 +1912,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 capture_output=True,
             )
             tampered = xlsx_dir / f"{generated.stem}.xlsx"
-            patch_xlsx_cell_font(tampered, "C5", "DejaVu Sans")
+            patch_xlsx_cell_font(tampered, "C2", "DejaVu Sans")
             patch_xlsx_cell_font(tampered, "O2", "Liberation Serif")
             normalized = folder / "normalized.json"
             normalized.write_text(
@@ -1942,7 +1942,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 str(tampered),
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("target sheet formatting mismatch at C5", result.stderr)
+            self.assertIn("target sheet formatting mismatch at C2", result.stderr)
             self.assertIn("target sheet formatting mismatch at O2", result.stderr)
             self.assertIn("font", result.stderr)
 
