@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 from xlrd import open_workbook
 
@@ -120,6 +121,32 @@ def controlled_font_reference_roundtrip_xlsx(
     source_workbook.save(normalized_xlsx)
     roundtrip_xls = convert_to_xls(normalized_xlsx, out_dir / "roundtrip-xls", soffice)
     return convert_to_xlsx(roundtrip_xls, out_dir / "roundtrip-xlsx", soffice)
+
+
+def controlled_content_roundtrip_paths(
+    reference_xlsx: Path,
+    content_xlsx: Path,
+    sheet_name: str,
+    out_dir: Path,
+    soffice: str,
+) -> tuple[Path, Path]:
+    """Round-trip canonical styles with the candidate workbook's cell contents."""
+    reference_workbook = load_workbook(reference_xlsx, data_only=False)
+    content_workbook = load_workbook(content_xlsx, data_only=False)
+    if sheet_name in reference_workbook.sheetnames and sheet_name in content_workbook.sheetnames:
+        reference_ws = reference_workbook[sheet_name]
+        content_ws = content_workbook[sheet_name]
+        for row in range(1, content_ws.max_row + 1):
+            for column in range(1, content_ws.max_column + 1):
+                target = reference_ws.cell(row, column)
+                if isinstance(target, MergedCell):
+                    continue
+                target.value = content_ws.cell(row, column).value
+    normalized_xlsx = out_dir / "content-xlsx" / reference_xlsx.name
+    normalized_xlsx.parent.mkdir(parents=True, exist_ok=True)
+    reference_workbook.save(normalized_xlsx)
+    roundtrip_xls = convert_to_xls(normalized_xlsx, out_dir / "roundtrip-xls", soffice)
+    return roundtrip_xls, convert_to_xlsx(roundtrip_xls, out_dir / "roundtrip-xlsx", soffice)
 
 
 def xls_font_identity(path: Path, sheet_name: str, address: str) -> tuple[Any, ...] | None:
@@ -739,19 +766,14 @@ def validate_template(
                         )
                         static_controlled_workbook = load_workbook(static_controlled_xlsx, data_only=False)
                         static_controlled_signature = _workbook_signature(static_controlled_workbook, manifest)
-                        font_replacements = [
-                            (sheet_name, address, address)
-                            for section_name in ("target_cell_formats", "writable_cell_formats")
-                            for address in canonical_signature.get(section_name, {})
-                        ]
-                        controlled_xlsx = controlled_font_reference_roundtrip_xlsx(
-                            xlsx,
+                        content_controlled_xls, content_controlled_xlsx = controlled_content_roundtrip_paths(
                             canonical_xlsx,
-                            font_replacements,
+                            xlsx,
+                            sheet_name,
                             Path(canonical_temp) / "controlled",
                             find_soffice(),
                         )
-                        content_controlled_workbook = load_workbook(controlled_xlsx, data_only=False)
+                        content_controlled_workbook = load_workbook(content_controlled_xlsx, data_only=False)
                         content_controlled_signature = _workbook_signature(content_controlled_workbook, manifest)
                         controlled_signature = dict(static_controlled_signature)
                         controlled_signature["target_cell_formats"] = dict(
@@ -770,14 +792,22 @@ def validate_template(
                             ]
                             if cell
                         }
+                        changed_writable_cells: set[str] = set()
                         for address in writable_cells:
                             if canonical_ws[address].value != custom_ws[address].value:
-                                controlled_signature["writable_cell_formats"][address] = (
-                                    content_controlled_signature["writable_cell_formats"].get(address)
-                                )
+                                changed_writable_cells.add(address)
+                                for section_name in ("target_cell_formats", "writable_cell_formats"):
+                                    controlled_signature[section_name][address] = (
+                                        content_controlled_signature[section_name].get(address)
+                                    )
                         for section_name in ("target_cell_formats", "writable_cell_formats"):
                             for address in canonical_signature.get(section_name, {}):
-                                expected_font = xls_font_identity(static_controlled_xls, sheet_name, address)
+                                expected_xls = (
+                                    content_controlled_xls
+                                    if address in changed_writable_cells
+                                    else static_controlled_xls
+                                )
+                                expected_font = xls_font_identity(expected_xls, sheet_name, address)
                                 actual_font = xls_font_identity(template, sheet_name, address)
                                 if actual_font is not None and expected_font is not None and actual_font != expected_font:
                                     raw_font_differences.append(

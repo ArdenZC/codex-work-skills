@@ -33,9 +33,8 @@ from validate_template import (
     _page_setup_signature,
     _protection_signature,
     _signature_differences,
+    controlled_content_roundtrip_paths,
     controlled_font_fallback_matches,
-    controlled_font_reference_roundtrip_xlsx,
-    controlled_roundtrip_paths,
     convert_to_xlsx,
     find_soffice,
     xls_font_identity,
@@ -357,14 +356,13 @@ def _controlled_output_font_workbook(
                 continue
             column = get_column_letter(output_column)
             replacements.append((sheet_name, f"{column}{output_row}", f"{column}{source_row}"))
-    controlled_xlsx = controlled_font_reference_roundtrip_xlsx(
-        source_xlsx,
+    controlled_xls, controlled_xlsx = controlled_content_roundtrip_paths(
         reference_xlsx,
-        replacements,
+        source_xlsx,
+        sheet_name,
         out_dir,
         soffice,
     )
-    controlled_xls = out_dir / "roundtrip-xls" / f"{source_xlsx.stem}.xls"
     return load_workbook(controlled_xlsx, data_only=False), controlled_xls, replacements
 
 
@@ -699,14 +697,9 @@ def validate_output_dir(
                     ):
                         controlled_reference_xlsx = Path(temp_name) / "controlled-reference-template.xlsx"
                         template_workbook.save(controlled_reference_xlsx)
-                        static_controlled_xls, _ = controlled_roundtrip_paths(
-                            selected_template,
-                            Path(temp_name) / "static-controlled-template",
-                            find_soffice(),
-                        )
                         (
                             controlled_output_workbook,
-                            _controlled_output_xls,
+                            controlled_output_xls,
                             controlled_font_replacements,
                         ) = _controlled_output_font_workbook(
                             xlsx,
@@ -723,7 +716,7 @@ def validate_output_dir(
                         for replacement_sheet, target_address, _ in controlled_font_replacements:
                             actual_font = xls_font_identity(path, replacement_sheet, target_address)
                             expected_font = xls_font_identity(
-                                static_controlled_xls,
+                                controlled_output_xls,
                                 replacement_sheet,
                                 target_address,
                             )
