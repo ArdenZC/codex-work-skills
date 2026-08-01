@@ -969,30 +969,52 @@ class LessonTemplatePackageTests(unittest.TestCase):
             folder = Path(temp_name)
             payload = {
                 "course_name": "软件测试实训",
-                "total_hours": 200,
+                "total_hours": 6,
                 "lessons": [
                     {
-                        "unit": f"项目{i + 1} 测试任务",
-                        "task": f"完成测试任务{i + 1}",
+                        "unit": f"项目{i + 1} 排序验证",
+                        "task": f"完成排序验证任务{i + 1}",
                         "hours": "2",
                         "flows": [],
                         "knowledge": [],
                         "score": 89.5,
                     }
-                    for i in range(100)
+                    for i in range(3)
                 ],
             }
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-            result = run_script(
+            generate_result = run_script(
                 LESSON / "scripts" / "generate_lesson_plans.py",
                 "--tasks-json",
                 str(source),
                 "--output-dir",
                 str(output),
             )
-            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            self.assertEqual(generate_result.returncode, 0, generate_result.stderr or generate_result.stdout)
+            generated = sorted(output.glob("*.docx"))
+            self.assertEqual(len(generated), 3)
+
+            temporary_names = []
+            for index, path in enumerate(generated):
+                temporary = output / f".sorting-rename-{index}.docx"
+                path.rename(temporary)
+                temporary_names.append(temporary)
+            for sequence, temporary in zip((2, 10, 100), temporary_names):
+                temporary.rename(output / f"教案{sequence}_排序验证.docx")
+
+            validate_result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(validate_result.returncode, 0, validate_result.stderr or validate_result.stdout)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "passed")
+            self.assertEqual(report["files_checked"], 3)
 
     def test_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-compat-qa-") as temp_name:
