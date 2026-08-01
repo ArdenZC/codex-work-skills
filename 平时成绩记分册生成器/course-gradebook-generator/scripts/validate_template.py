@@ -80,9 +80,15 @@ def convert_to_xls(source: Path, out_dir: Path, soffice: str) -> Path:
 
 
 def controlled_roundtrip_xlsx(source_xls: Path, out_dir: Path, soffice: str) -> Path:
-    """Create the platform-specific XLS -> XLSX -> XLS -> XLSX font baseline."""
+    """Create the platform-specific template-to-output font baseline."""
     source_xlsx = convert_to_xlsx(source_xls, out_dir / "source-xlsx", soffice)
-    roundtrip_xls = convert_to_xls(source_xlsx, out_dir / "roundtrip-xls", soffice)
+    # The generator loads the converted template with openpyxl and saves it
+    # before LibreOffice writes the final XLS. Reproduce that style pipeline so
+    # fallback signatures are measured against the actual supported conversion.
+    normalized_xlsx = out_dir / "openpyxl-xlsx" / source_xlsx.name
+    normalized_xlsx.parent.mkdir(parents=True, exist_ok=True)
+    load_workbook(source_xlsx, data_only=False).save(normalized_xlsx)
+    roundtrip_xls = convert_to_xls(normalized_xlsx, out_dir / "roundtrip-xls", soffice)
     return convert_to_xlsx(roundtrip_xls, out_dir / "roundtrip-xlsx", soffice)
 
 
