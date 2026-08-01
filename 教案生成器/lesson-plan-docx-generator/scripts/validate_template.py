@@ -14,8 +14,8 @@ from docx.oxml.ns import qn
 from docx.table import _Cell
 from lxml import etree
 
-from bookmark_utils import bookmark_location, validate_bookmark_inventory
-from package_common import DEFAULT_MANIFEST, bookmark_containers, base_manifest_path, ensure_supported_major, field_spec, is_semantic_manifest, layout_manifest, load_manifest, manifest_template_path, required_bookmarks
+from bookmark_utils import bookmark_boundary_locations, bookmark_location, validate_bookmark_inventory
+from package_common import DEFAULT_MANIFEST, bookmark_containers, base_manifest_path, ensure_supported_major, field_spec, is_semantic_manifest, layout_manifest, load_manifest, manifest_template_path, required_bookmarks, resolve_template_package
 
 
 class TemplateValidationError(RuntimeError):
@@ -398,9 +398,13 @@ def validate_template(
             "missing": inventory["missing"],
             "duplicates": inventory["duplicates"],
             "duplicate_ids": inventory["duplicate_ids"],
+            "invalid_names": inventory["invalid_names"],
+            "unexpected_names": inventory["unexpected_names"],
+            "invalid_ids": inventory["invalid_ids"],
             "orphaned": inventory["orphaned"],
             "outside_main": inventory["outside_main"],
             "container_errors": inventory["container_errors"],
+            "boundary_errors": inventory["boundary_errors"],
         }
         errors.extend(f"Semantic bookmark protection failed: {error}" for error in inventory["errors"])
 
@@ -428,7 +432,7 @@ def validate_template(
             location_changes = [
                 name
                 for name in required_bookmarks(manifest)
-                if bookmark_location(document, name) != bookmark_location(canonical_document, name)
+                if bookmark_boundary_locations(document, name) != bookmark_boundary_locations(canonical_document, name)
             ]
             if location_changes:
                 errors.append("Semantic bookmark location changed: " + ", ".join(location_changes))
@@ -447,14 +451,16 @@ def validate_template(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate the versioned DOCX lesson-plan template package.")
     parser.add_argument("--template", default="")
-    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--manifest", default="")
     parser.add_argument("--compatibility-template", default="")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
     try:
-        manifest = load_manifest(args.manifest)
-        template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
-        report = validate_template(template, args.manifest, args.compatibility_template or None)
+        template, manifest_path, manifest = resolve_template_package(
+            args.template or None,
+            args.manifest or None,
+        )
+        report = validate_template(template, manifest_path, args.compatibility_template or None)
     except TemplateValidationError as exc:
         report = exc.report
         if args.as_json:
@@ -468,7 +474,7 @@ def main() -> int:
     except Exception as exc:
         report = {
             "template": str(Path(args.template).expanduser().resolve()) if args.template else "",
-            "manifest": str(Path(args.manifest).expanduser().resolve()),
+            "manifest": str(Path(args.manifest).expanduser().resolve()) if args.manifest else str(DEFAULT_MANIFEST),
             "template_version": None,
             "errors": [str(exc)],
             "warnings": [],

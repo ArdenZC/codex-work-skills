@@ -18,7 +18,7 @@ from docx.text.paragraph import Paragraph
 from docx.table import _Cell
 
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, evaluation_cell_values, ensure_supported_major, field_bookmark, field_spec, generated_lesson_fields, implementation_bookmarks, implementation_cell_values, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, reflection_cell_values, validate_composed_fields, validate_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, evaluation_cell_values, ensure_supported_major, field_bookmark, field_spec, generated_lesson_fields, implementation_bookmarks, implementation_cell_values, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, reflection_cell_values, resolve_template_package, validate_composed_fields, validate_input
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -314,16 +314,11 @@ def main() -> None:
     parser.add_argument("--qa-report", default="")
     args = parser.parse_args()
 
-    manifest_path = Path(args.manifest).expanduser().resolve() if args.manifest else DEFAULT_MANIFEST
-    if not args.manifest and args.template:
-        template_hint = Path(args.template).expanduser().resolve()
-        if template_hint.parent.name == "v1.0.0":
-            legacy_manifest = template_hint.parent / "manifest.yaml"
-            if legacy_manifest.exists():
-                manifest_path = legacy_manifest
-    manifest = load_manifest(manifest_path)
+    template, manifest_path, manifest = resolve_template_package(
+        args.template or None,
+        args.manifest or None,
+    )
     ensure_supported_major(manifest)
-    template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
     if not template.exists():
         raise FileNotFoundError(f"Template not found: {template}")
     out_dir = Path(args.output_dir)

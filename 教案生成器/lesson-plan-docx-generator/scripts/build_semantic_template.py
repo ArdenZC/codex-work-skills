@@ -11,8 +11,19 @@ from typing import Any
 from docx import Document
 from lxml import etree
 
-from bookmark_utils import validate_bookmark_inventory
+from bookmark_utils import (
+    find_bookmark,
+    xml_location,
+    validate_bookmark_inventory,
+)
 from package_common import load_manifest
+from semantic_bookmarks import (
+    FIXED_BOOKMARKS,
+    IMPLEMENTATION_COLUMNS,
+    IMPLEMENTATION_STAGES,
+    REFLECTION_BOOKMARKS,
+    managed_bookmark_names,
+)
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
@@ -22,58 +33,6 @@ DEFAULT_OUTPUT = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" /
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS = {"w": W_NS}
-
-FIELD_BOOKMARKS = {
-    "title": "lp_title",
-    "course_name": "lp_course_name",
-    "major": "lp_major",
-    "audience": "lp_audience",
-    "unit": "lp_unit",
-    "task": "lp_task",
-    "hours": "lp_hours",
-    "student_base": "lp_student_base",
-    "student_problems": "lp_student_problems",
-    "student_strategy": "lp_student_strategy",
-    "teaching_content": "lp_teaching_content",
-    "quality_goal": "lp_quality_goal",
-    "knowledge_goal": "lp_knowledge_goal",
-    "ability_goal": "lp_ability_goal",
-    "key_content": "lp_key_content",
-    "key_strategy": "lp_key_strategy",
-    "difficult_content": "lp_difficult_content",
-    "difficult_strategy": "lp_difficult_strategy",
-    "teaching_methods": "lp_teaching_methods",
-    "resources": "lp_resources",
-    "references": "lp_references",
-    "evaluation": "lp_evaluation",
-}
-
-IMPLEMENTATION_STAGES = (
-    ("before_class_preparation", 16),
-    ("task_introduction", 18),
-    ("operation_demonstration", 19),
-    ("task_implementation", 20),
-    ("task_extension", 21),
-    ("project_practice", 22),
-    ("peer_review", 23),
-    ("lesson_summary", 24),
-    ("after_class_improvement", 26),
-)
-
-IMPLEMENTATION_COLUMNS = (
-    "stage",
-    "content",
-    "teacher_activity",
-    "student_activity",
-    "objective",
-)
-
-REFLECTION_BOOKMARKS = (
-    "lp_reflection_summary",
-    "lp_reflection_innovation",
-    "lp_reflection_improvement",
-)
-
 
 def _qn(local_name: str) -> str:
     return f"{{{W_NS}}}{local_name}"
@@ -151,7 +110,7 @@ def _add_bookmark(paragraph: etree._Element, name: str, bookmark_id: int, field:
 def _definitions(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
     fields = source_manifest.get("fields", {})
     definitions: list[dict[str, Any]] = []
-    for field, bookmark in FIELD_BOOKMARKS.items():
+    for field, bookmark in FIXED_BOOKMARKS:
         spec = fields.get(field)
         if not isinstance(spec, dict):
             raise ValueError(f"field '{field}' is missing from v1.0 source manifest")
@@ -168,22 +127,22 @@ def _definitions(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
                     "cell": int(spec["cell"]),
                 }
             )
-    for stage, row in IMPLEMENTATION_STAGES:
-        for column, cell in zip(IMPLEMENTATION_COLUMNS, range(5)):
+    for stage, stage_code, row in IMPLEMENTATION_STAGES:
+        for column, column_code, cell in IMPLEMENTATION_COLUMNS:
             definitions.append(
                 {
                     "field": f"implementation.{stage}.{column}",
-                    "name": f"lp_impl_{stage}_{column}",
+                    "name": f"lp_impl_{stage_code}_{column_code}",
                     "container": "cell",
                     "table": 0,
                     "row": row,
                     "cell": cell,
                 }
             )
-    for row, name in zip((27, 28, 29), REFLECTION_BOOKMARKS):
+    for field, name, row in REFLECTION_BOOKMARKS:
         definitions.append(
             {
-                "field": f"reflection.{row}",
+                "field": f"reflection.{field}",
                 "name": name,
                 "container": "cell",
                 "table": 0,
@@ -195,16 +154,68 @@ def _definitions(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _target_paragraph(body: etree._Element, definition: dict[str, Any]) -> etree._Element:
+    target = _target_container(body, definition)
+    if definition["container"] == "document_paragraph":
+        return target
+    return _first_paragraph(target, str(definition["field"]))
+
+
+def _target_container(body: etree._Element, definition: dict[str, Any]) -> etree._Element:
     if definition["container"] == "document_paragraph":
         return _body_paragraph(body, int(definition["paragraph"]))
-    cell = _table_cell(
+    return _table_cell(
         body,
         int(definition["table"]),
         int(definition["row"]),
         int(definition["cell"]),
         str(definition["field"]),
     )
-    return _first_paragraph(cell, str(definition["field"]))
+
+
+def _validate_semantic_positions(
+    root: etree._Element,
+    body: etree._Element,
+    definitions: list[dict[str, Any]],
+) -> None:
+    expected_containers = {item["name"]: item["container"] for item in definitions}
+    inventory = validate_bookmark_inventory(root, expected_containers, expected_containers)
+    if not inventory["valid"]:
+        raise ValueError("Semantic bookmark inventory is invalid: " + "; ".join(inventory["errors"]))
+
+    seen_locations: dict[tuple[str, tuple[tuple[str, int], ...]], str] = {}
+    for definition in definitions:
+        name = str(definition["name"])
+        record = find_bookmark(root, name)
+        if record is None:
+            raise ValueError(f"Bookmark {name} is missing while checking semantic position")
+        expected_container = str(definition["container"])
+        target = _target_container(body, definition)
+        expected_location = xml_location(body, target)
+        if expected_location is None:
+            raise ValueError(f"Unable to locate expected physical container for bookmark {name}")
+        location_key = (expected_container, expected_location)
+        previous = seen_locations.get(location_key)
+        if previous is not None:
+            raise ValueError(
+                f"Bookmarks {previous} and {name} resolve to the same physical {expected_container}"
+            )
+        seen_locations[location_key] = name
+        if expected_container == "cell":
+            actual_start = xml_location(body, record.start_parent_cell)
+            actual_end = xml_location(body, record.end_parent_cell)
+            if actual_start != expected_location or actual_end != expected_location:
+                raise ValueError(
+                    f"Bookmark {name} is in the wrong physical table cell: "
+                    f"expected {expected_location}, got start={actual_start}, end={actual_end}"
+                )
+        else:
+            actual_start = xml_location(body, record.start_parent_paragraph)
+            actual_end = xml_location(body, record.end_parent_paragraph)
+            if actual_start != expected_location or actual_end != expected_location:
+                raise ValueError(
+                    f"Bookmark {name} is in the wrong document paragraph: "
+                    f"expected {expected_location}, got start={actual_start}, end={actual_end}"
+                )
 
 
 def _write_package(source: Path, output: Path, document_xml: bytes) -> None:
@@ -234,6 +245,8 @@ def build(source: Path, output: Path, source_manifest: Path) -> list[str]:
     legacy_manifest = load_manifest(source_manifest)
     definitions = _definitions(legacy_manifest)
     required_names = [item["name"] for item in definitions]
+    if required_names != managed_bookmark_names():
+        raise ValueError("Semantic definition order does not match the managed bookmark definition")
 
     with zipfile.ZipFile(source, "r") as source_zip:
         try:
@@ -250,10 +263,7 @@ def build(source: Path, output: Path, source_manifest: Path) -> list[str]:
         missing = sorted(set(required_names) - expected_existing)
         if missing:
             raise ValueError("Source has a partial semantic bookmark set; missing: " + ", ".join(missing))
-        inventory_document = Document(str(source))
-        inventory = validate_bookmark_inventory(inventory_document, required_names)
-        if not inventory["valid"]:
-            raise ValueError("Existing semantic bookmark inventory is invalid: " + "; ".join(inventory["errors"]))
+        _validate_semantic_positions(root, _body(root), definitions)
         shutil.copy2(source, output)
         return required_names
     duplicates = sorted(name for name, count in counts.items() if count > 1)
@@ -273,9 +283,15 @@ def build(source: Path, output: Path, source_manifest: Path) -> list[str]:
         next_id += 1
         created.append(name)
 
+    _validate_semantic_positions(root, body, definitions)
+
     output_xml = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
     _write_package(source, output, output_xml)
-    inventory = validate_bookmark_inventory(Document(str(output)), required_names)
+    inventory = validate_bookmark_inventory(
+        Document(str(output)),
+        required_names,
+        {item["name"]: item["container"] for item in definitions},
+    )
     if not inventory["valid"]:
         raise ValueError("Built semantic bookmark inventory is invalid: " + "; ".join(inventory["errors"]))
     return created

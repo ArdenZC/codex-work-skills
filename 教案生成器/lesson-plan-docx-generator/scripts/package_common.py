@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
@@ -9,9 +10,21 @@ from typing import Any
 import yaml
 from jsonschema import Draft202012Validator
 
+from semantic_bookmarks import (
+    FIXED_BOOKMARK_MAP,
+    implementation_bookmark_groups,
+    managed_bookmark_names,
+    reflection_bookmark_names,
+)
+
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
+V10_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
+V11_MANIFEST = DEFAULT_MANIFEST
+V10_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
+V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
+LEGACY_TEMPLATE = SKILL_DIR / "assets" / "lesson-plan-template.docx"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 MAX_TEACHING_CONTENT_ITEMS = 8
 EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
@@ -40,6 +53,94 @@ def manifest_template_path(manifest: dict[str, Any]) -> Path:
     return (manifest_path.parent / str(file_value)).resolve()
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest().upper()
+
+
+def _known_template_version(path: Path) -> str | None:
+    path = path.expanduser().resolve()
+    known = ((V11_TEMPLATE, "1.1.0"), (V10_TEMPLATE, "1.0.0"), (LEGACY_TEMPLATE, "1.0.0"))
+    for candidate, version in known:
+        if path == candidate:
+            return version
+    if not path.exists():
+        return None
+    actual = _sha256(path)
+    for candidate, version in known:
+        if candidate.exists() and actual == _sha256(candidate):
+            return version
+    return None
+
+
+def _validate_package_identity(template: Path, manifest: dict[str, Any], *, explicit_manifest: bool) -> None:
+    template_info = manifest.get("template", {})
+    if template_info.get("id") != "lesson-plan":
+        raise ValueError("Manifest template.id must be lesson-plan")
+    if template_info.get("format") != "docx":
+        raise ValueError("Manifest template.format must be docx")
+    version = str(template_info.get("version", ""))
+    known_version = _known_template_version(template)
+    if known_version is not None and known_version != version:
+        raise ValueError(
+            f"Template/manifest mismatch: {template.name} is v{known_version}, manifest declares v{version}"
+        )
+    if explicit_manifest and not template.exists():
+        raise FileNotFoundError(f"Template not found: {template}")
+
+
+def resolve_template_package(
+    template_path: Path | str | None = None,
+    manifest_path: Path | str | None = None,
+) -> tuple[Path, Path, dict[str, Any]]:
+    """Resolve a lesson-plan template and manifest as one versioned package.
+
+    Canonical v1.0/v1.1 templates and the published v1.0 compatibility entry can
+    be selected by template alone. Arbitrary custom DOCX files require an
+    explicit matching manifest so semantic mode is never guessed.
+    """
+    template_value = str(template_path) if template_path else ""
+    manifest_value = str(manifest_path) if manifest_path else ""
+    if not template_value and not manifest_value:
+        resolved_manifest = V11_MANIFEST.resolve()
+        manifest = load_manifest(resolved_manifest)
+        template = manifest_template_path(manifest)
+        _validate_package_identity(template, manifest, explicit_manifest=False)
+        return template, resolved_manifest, manifest
+
+    if manifest_value:
+        resolved_manifest = Path(manifest_value).expanduser().resolve()
+        manifest = load_manifest(resolved_manifest)
+        ensure_supported_major(manifest)
+    else:
+        resolved_manifest = None
+        manifest = None
+
+    if template_value:
+        template = Path(template_value).expanduser().resolve()
+    elif manifest is not None:
+        template = manifest_template_path(manifest)
+    else:  # pragma: no cover - guarded by the first branch
+        raise ValueError("Unable to resolve lesson-plan template package")
+
+    if manifest is None:
+        known_version = _known_template_version(template)
+        if known_version == "1.1.0":
+            resolved_manifest = V11_MANIFEST.resolve()
+        elif known_version == "1.0.0":
+            resolved_manifest = V10_MANIFEST.resolve()
+        elif template.parent.name in {"v1.0.0", "v1.1.0"} and (template.parent / "manifest.yaml").exists():
+            resolved_manifest = (template.parent / "manifest.yaml").resolve()
+        else:
+            raise ValueError("Custom template requires a matching --manifest.")
+        manifest = load_manifest(resolved_manifest)
+    _validate_package_identity(template, manifest, explicit_manifest=bool(manifest_value))
+    return template, resolved_manifest, manifest
+
+
 def is_semantic_manifest(manifest: dict[str, Any]) -> bool:
     """Return whether the manifest uses the v1.1 semantic bookmark contract."""
     return str(manifest.get("anchors", {}).get("mode", "")) == "word_bookmark"
@@ -64,33 +165,47 @@ def layout_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
 def required_bookmarks(manifest: dict[str, Any]) -> list[str]:
     if not is_semantic_manifest(manifest):
         return []
-    values = manifest.get("anchors", {}).get("required", [])
+    expected = managed_bookmark_names()
+    values = manifest.get("anchors", {}).get("required", expected)
     if not isinstance(values, list):
         raise ValueError("Semantic template manifest anchors.required must be a list")
-    return [str(value) for value in values]
+    declared = [str(value) for value in values]
+    if declared != expected:
+        raise ValueError("Semantic manifest anchors.required does not match the managed bookmark definition")
+    return expected
 
 
 def bookmark_containers(manifest: dict[str, Any]) -> dict[str, str]:
     if not is_semantic_manifest(manifest):
         return {}
-    values = manifest.get("anchors", {}).get("containers", {})
+    expected = {name: "cell" for name in managed_bookmark_names()}
+    expected[FIXED_BOOKMARK_MAP["title"]] = "document_paragraph"
+    values = manifest.get("anchors", {}).get("containers", expected)
     if not isinstance(values, dict):
         raise ValueError("Semantic template manifest anchors.containers must be a mapping")
-    return {str(name): str(container) for name, container in values.items()}
+    declared = {str(name): str(container) for name, container in values.items()}
+    if declared != expected:
+        raise ValueError("Semantic manifest anchors.containers does not match the managed bookmark definition")
+    return expected
 
 
 def field_bookmark(manifest: dict[str, Any], name: str) -> str:
     spec = field_spec(manifest, name)
-    value = spec.get("bookmark")
-    if not value:
+    try:
+        expected = FIXED_BOOKMARK_MAP[name]
+    except KeyError as exc:
         raise ValueError(f"Semantic manifest field {name} is missing bookmark")
-    return str(value)
+    value = spec.get("bookmark", expected)
+    if str(value) != expected:
+        raise ValueError(f"Semantic manifest field {name} bookmark does not match the managed definition")
+    return expected
 
 
 def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
     spec = field_spec(manifest, "implementation")
     if spec.get("mode") != "anchored_cells":
         return []
+    expected = implementation_bookmark_groups()
     stages = spec.get("stages", [])
     if not isinstance(stages, list):
         raise ValueError("Semantic implementation field stages must be a list")
@@ -99,17 +214,23 @@ def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
         if not isinstance(stage, dict) or not isinstance(stage.get("bookmarks"), list):
             raise ValueError(f"Semantic implementation stage {index} is missing bookmarks")
         result.append([str(value) for value in stage["bookmarks"]])
-    return result
+    if result != expected:
+        raise ValueError("Semantic implementation bookmarks do not match the managed definition")
+    return expected
 
 
 def reflection_bookmarks(manifest: dict[str, Any]) -> list[str]:
     spec = field_spec(manifest, "reflection")
     if spec.get("mode") != "anchored_cells":
         return []
-    values = spec.get("bookmarks", [])
+    expected = reflection_bookmark_names()
+    values = spec.get("bookmarks", expected)
     if not isinstance(values, list):
         raise ValueError("Semantic reflection field bookmarks must be a list")
-    return [str(value) for value in values]
+    declared = [str(value) for value in values]
+    if declared != expected:
+        raise ValueError("Semantic reflection bookmarks do not match the managed definition")
+    return expected
 
 
 def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:

@@ -17,7 +17,7 @@ from docx.table import _Cell
 from docx.text.paragraph import Paragraph
 from lxml import etree
 
-from bookmark_utils import bookmark_location, bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark, validate_bookmark_inventory
+from bookmark_utils import bookmark_boundary_locations, bookmark_location, bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark, validate_bookmark_inventory
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
@@ -33,6 +33,7 @@ from package_common import (
     layout_manifest,
     load_manifest,
     manifest_template_path,
+    resolve_template_package,
     reflection_bookmarks,
     reflection_cell_values,
     required_bookmarks,
@@ -638,6 +639,10 @@ def _base_qa_report(
                 "preserved_anchor_count": 0,
                 "missing_anchors": [],
                 "duplicate_anchors": [],
+                "invalid_anchor_names": [],
+                "unexpected_anchor_names": [],
+                "invalid_anchor_ids": [],
+                "anchor_boundary_errors": [],
             }
         )
     else:
@@ -777,7 +782,7 @@ def validate_output_dir(
                 location_changes = [
                     name
                     for name in required_bookmarks(manifest)
-                    if bookmark_location(document, name) != bookmark_location(canonical_document, name)
+                    if bookmark_boundary_locations(document, name) != bookmark_boundary_locations(canonical_document, name)
                 ]
                 if location_changes:
                     item_errors.append("semantic bookmark location changed: " + ", ".join(location_changes))
@@ -952,6 +957,10 @@ def validate_output_dir(
             "missing": missing_anchors,
             "duplicates": duplicate_anchors,
             "duplicate_ids": sorted({name for result in anchor_results for name in result["duplicate_ids"]}),
+            "invalid_names": sorted({name for result in anchor_results for name in result["invalid_names"]}),
+            "unexpected_names": sorted({name for result in anchor_results for name in result["unexpected_names"]}),
+            "invalid_ids": sorted({name for result in anchor_results for name in result["invalid_ids"]}),
+            "boundary_errors": sorted({name for result in anchor_results for name in result["boundary_errors"]}),
         }
 
     expected_total = data.get("total_hours")
@@ -978,7 +987,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate generated lesson-plan DOCX files and write a QA report.")
     parser.add_argument("--input-json", required=True)
     parser.add_argument("--output-dir", required=True)
-    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--manifest", default="")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
     parser.add_argument("--template-path", default="")
@@ -989,8 +998,10 @@ def main() -> int:
     args = parser.parse_args()
     try:
         data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
-        manifest = load_manifest(args.manifest)
-        template_path = args.template_path or None
+        template_path, _manifest_path, manifest = resolve_template_package(
+            args.template_path or None,
+            args.manifest or None,
+        )
         custom_template = args.custom_template if args.custom_template else None
         if args.skip_validation:
             report = write_skipped_report(

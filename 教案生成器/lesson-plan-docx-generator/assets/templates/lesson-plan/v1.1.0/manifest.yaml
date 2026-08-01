@@ -34,51 +34,51 @@ anchors:
     - lp_resources
     - lp_references
     - lp_evaluation
-    - lp_impl_before_class_preparation_stage
-    - lp_impl_before_class_preparation_content
-    - lp_impl_before_class_preparation_teacher_activity
-    - lp_impl_before_class_preparation_student_activity
-    - lp_impl_before_class_preparation_objective
-    - lp_impl_task_introduction_stage
-    - lp_impl_task_introduction_content
-    - lp_impl_task_introduction_teacher_activity
-    - lp_impl_task_introduction_student_activity
-    - lp_impl_task_introduction_objective
-    - lp_impl_operation_demonstration_stage
-    - lp_impl_operation_demonstration_content
-    - lp_impl_operation_demonstration_teacher_activity
-    - lp_impl_operation_demonstration_student_activity
-    - lp_impl_operation_demonstration_objective
-    - lp_impl_task_implementation_stage
-    - lp_impl_task_implementation_content
-    - lp_impl_task_implementation_teacher_activity
-    - lp_impl_task_implementation_student_activity
-    - lp_impl_task_implementation_objective
-    - lp_impl_task_extension_stage
-    - lp_impl_task_extension_content
-    - lp_impl_task_extension_teacher_activity
-    - lp_impl_task_extension_student_activity
-    - lp_impl_task_extension_objective
-    - lp_impl_project_practice_stage
-    - lp_impl_project_practice_content
-    - lp_impl_project_practice_teacher_activity
-    - lp_impl_project_practice_student_activity
-    - lp_impl_project_practice_objective
-    - lp_impl_peer_review_stage
-    - lp_impl_peer_review_content
-    - lp_impl_peer_review_teacher_activity
-    - lp_impl_peer_review_student_activity
-    - lp_impl_peer_review_objective
-    - lp_impl_lesson_summary_stage
-    - lp_impl_lesson_summary_content
-    - lp_impl_lesson_summary_teacher_activity
-    - lp_impl_lesson_summary_student_activity
-    - lp_impl_lesson_summary_objective
-    - lp_impl_after_class_improvement_stage
-    - lp_impl_after_class_improvement_content
-    - lp_impl_after_class_improvement_teacher_activity
-    - lp_impl_after_class_improvement_student_activity
-    - lp_impl_after_class_improvement_objective
+    - lp_impl_prep_stage
+    - lp_impl_prep_content
+    - lp_impl_prep_teacher
+    - lp_impl_prep_student
+    - lp_impl_prep_goal
+    - lp_impl_intro_stage
+    - lp_impl_intro_content
+    - lp_impl_intro_teacher
+    - lp_impl_intro_student
+    - lp_impl_intro_goal
+    - lp_impl_demo_stage
+    - lp_impl_demo_content
+    - lp_impl_demo_teacher
+    - lp_impl_demo_student
+    - lp_impl_demo_goal
+    - lp_impl_exec_stage
+    - lp_impl_exec_content
+    - lp_impl_exec_teacher
+    - lp_impl_exec_student
+    - lp_impl_exec_goal
+    - lp_impl_extend_stage
+    - lp_impl_extend_content
+    - lp_impl_extend_teacher
+    - lp_impl_extend_student
+    - lp_impl_extend_goal
+    - lp_impl_practice_stage
+    - lp_impl_practice_content
+    - lp_impl_practice_teacher
+    - lp_impl_practice_student
+    - lp_impl_practice_goal
+    - lp_impl_peer_stage
+    - lp_impl_peer_content
+    - lp_impl_peer_teacher
+    - lp_impl_peer_student
+    - lp_impl_peer_goal
+    - lp_impl_summary_stage
+    - lp_impl_summary_content
+    - lp_impl_summary_teacher
+    - lp_impl_summary_student
+    - lp_impl_summary_goal
+    - lp_impl_improve_stage
+    - lp_impl_improve_content
+    - lp_impl_improve_teacher
+    - lp_impl_improve_student
+    - lp_impl_improve_goal
     - lp_reflection_summary
     - lp_reflection_innovation
     - lp_reflection_improvement
@@ -105,51 +105,51 @@ anchors:
     lp_resources: cell
     lp_references: cell
     lp_evaluation: cell
-    lp_impl_before_class_preparation_stage: cell
-    lp_impl_before_class_preparation_content: cell
-    lp_impl_before_class_preparation_teacher_activity: cell
-    lp_impl_before_class_preparation_student_activity: cell
-    lp_impl_before_class_preparation_objective: cell
-    lp_impl_task_introduction_stage: cell
-    lp_impl_task_introduction_content: cell
-    lp_impl_task_introduction_teacher_activity: cell
-    lp_impl_task_introduction_student_activity: cell
-    lp_impl_task_introduction_objective: cell
-    lp_impl_operation_demonstration_stage: cell
-    lp_impl_operation_demonstration_content: cell
-    lp_impl_operation_demonstration_teacher_activity: cell
-    lp_impl_operation_demonstration_student_activity: cell
-    lp_impl_operation_demonstration_objective: cell
-    lp_impl_task_implementation_stage: cell
-    lp_impl_task_implementation_content: cell
-    lp_impl_task_implementation_teacher_activity: cell
-    lp_impl_task_implementation_student_activity: cell
-    lp_impl_task_implementation_objective: cell
-    lp_impl_task_extension_stage: cell
-    lp_impl_task_extension_content: cell
-    lp_impl_task_extension_teacher_activity: cell
-    lp_impl_task_extension_student_activity: cell
-    lp_impl_task_extension_objective: cell
-    lp_impl_project_practice_stage: cell
-    lp_impl_project_practice_content: cell
-    lp_impl_project_practice_teacher_activity: cell
-    lp_impl_project_practice_student_activity: cell
-    lp_impl_project_practice_objective: cell
-    lp_impl_peer_review_stage: cell
-    lp_impl_peer_review_content: cell
-    lp_impl_peer_review_teacher_activity: cell
-    lp_impl_peer_review_student_activity: cell
-    lp_impl_peer_review_objective: cell
-    lp_impl_lesson_summary_stage: cell
-    lp_impl_lesson_summary_content: cell
-    lp_impl_lesson_summary_teacher_activity: cell
-    lp_impl_lesson_summary_student_activity: cell
-    lp_impl_lesson_summary_objective: cell
-    lp_impl_after_class_improvement_stage: cell
-    lp_impl_after_class_improvement_content: cell
-    lp_impl_after_class_improvement_teacher_activity: cell
-    lp_impl_after_class_improvement_student_activity: cell
-    lp_impl_after_class_improvement_objective: cell
+    lp_impl_prep_stage: cell
+    lp_impl_prep_content: cell
+    lp_impl_prep_teacher: cell
+    lp_impl_prep_student: cell
+    lp_impl_prep_goal: cell
+    lp_impl_intro_stage: cell
+    lp_impl_intro_content: cell
+    lp_impl_intro_teacher: cell
+    lp_impl_intro_student: cell
+    lp_impl_intro_goal: cell
+    lp_impl_demo_stage: cell
+    lp_impl_demo_content: cell
+    lp_impl_demo_teacher: cell
+    lp_impl_demo_student: cell
+    lp_impl_demo_goal: cell
+    lp_impl_exec_stage: cell
+    lp_impl_exec_content: cell
+    lp_impl_exec_teacher: cell
+    lp_impl_exec_student: cell
+    lp_impl_exec_goal: cell
+    lp_impl_extend_stage: cell
+    lp_impl_extend_content: cell
+    lp_impl_extend_teacher: cell
+    lp_impl_extend_student: cell
+    lp_impl_extend_goal: cell
+    lp_impl_practice_stage: cell
+    lp_impl_practice_content: cell
+    lp_impl_practice_teacher: cell
+    lp_impl_practice_student: cell
+    lp_impl_practice_goal: cell
+    lp_impl_peer_stage: cell
+    lp_impl_peer_content: cell
+    lp_impl_peer_teacher: cell
+    lp_impl_peer_student: cell
+    lp_impl_peer_goal: cell
+    lp_impl_summary_stage: cell
+    lp_impl_summary_content: cell
+    lp_impl_summary_teacher: cell
+    lp_impl_summary_student: cell
+    lp_impl_summary_goal: cell
+    lp_impl_improve_stage: cell
+    lp_impl_improve_content: cell
+    lp_impl_improve_teacher: cell
+    lp_impl_improve_student: cell
+    lp_impl_improve_goal: cell
     lp_reflection_summary: cell
     lp_reflection_innovation: cell
     lp_reflection_improvement: cell
@@ -195,23 +195,32 @@ fields:
     max_paragraphs: 6
     stages:
       - id: before_class_preparation
-        bookmarks: [lp_impl_before_class_preparation_stage, lp_impl_before_class_preparation_content, lp_impl_before_class_preparation_teacher_activity, lp_impl_before_class_preparation_student_activity, lp_impl_before_class_preparation_objective]
+        code: prep
+        bookmarks: [lp_impl_prep_stage, lp_impl_prep_content, lp_impl_prep_teacher, lp_impl_prep_student, lp_impl_prep_goal]
       - id: task_introduction
-        bookmarks: [lp_impl_task_introduction_stage, lp_impl_task_introduction_content, lp_impl_task_introduction_teacher_activity, lp_impl_task_introduction_student_activity, lp_impl_task_introduction_objective]
+        code: intro
+        bookmarks: [lp_impl_intro_stage, lp_impl_intro_content, lp_impl_intro_teacher, lp_impl_intro_student, lp_impl_intro_goal]
       - id: operation_demonstration
-        bookmarks: [lp_impl_operation_demonstration_stage, lp_impl_operation_demonstration_content, lp_impl_operation_demonstration_teacher_activity, lp_impl_operation_demonstration_student_activity, lp_impl_operation_demonstration_objective]
+        code: demo
+        bookmarks: [lp_impl_demo_stage, lp_impl_demo_content, lp_impl_demo_teacher, lp_impl_demo_student, lp_impl_demo_goal]
       - id: task_implementation
-        bookmarks: [lp_impl_task_implementation_stage, lp_impl_task_implementation_content, lp_impl_task_implementation_teacher_activity, lp_impl_task_implementation_student_activity, lp_impl_task_implementation_objective]
+        code: exec
+        bookmarks: [lp_impl_exec_stage, lp_impl_exec_content, lp_impl_exec_teacher, lp_impl_exec_student, lp_impl_exec_goal]
       - id: task_extension
-        bookmarks: [lp_impl_task_extension_stage, lp_impl_task_extension_content, lp_impl_task_extension_teacher_activity, lp_impl_task_extension_student_activity, lp_impl_task_extension_objective]
+        code: extend
+        bookmarks: [lp_impl_extend_stage, lp_impl_extend_content, lp_impl_extend_teacher, lp_impl_extend_student, lp_impl_extend_goal]
       - id: project_practice
-        bookmarks: [lp_impl_project_practice_stage, lp_impl_project_practice_content, lp_impl_project_practice_teacher_activity, lp_impl_project_practice_student_activity, lp_impl_project_practice_objective]
+        code: practice
+        bookmarks: [lp_impl_practice_stage, lp_impl_practice_content, lp_impl_practice_teacher, lp_impl_practice_student, lp_impl_practice_goal]
       - id: peer_review
-        bookmarks: [lp_impl_peer_review_stage, lp_impl_peer_review_content, lp_impl_peer_review_teacher_activity, lp_impl_peer_review_student_activity, lp_impl_peer_review_objective]
+        code: peer
+        bookmarks: [lp_impl_peer_stage, lp_impl_peer_content, lp_impl_peer_teacher, lp_impl_peer_student, lp_impl_peer_goal]
       - id: lesson_summary
-        bookmarks: [lp_impl_lesson_summary_stage, lp_impl_lesson_summary_content, lp_impl_lesson_summary_teacher_activity, lp_impl_lesson_summary_student_activity, lp_impl_lesson_summary_objective]
+        code: summary
+        bookmarks: [lp_impl_summary_stage, lp_impl_summary_content, lp_impl_summary_teacher, lp_impl_summary_student, lp_impl_summary_goal]
       - id: after_class_improvement
-        bookmarks: [lp_impl_after_class_improvement_stage, lp_impl_after_class_improvement_content, lp_impl_after_class_improvement_teacher_activity, lp_impl_after_class_improvement_student_activity, lp_impl_after_class_improvement_objective]
+        code: improve
+        bookmarks: [lp_impl_improve_stage, lp_impl_improve_content, lp_impl_improve_teacher, lp_impl_improve_student, lp_impl_improve_goal]
   reflection:
     mode: anchored_cells
     max_chars: 400
@@ -245,5 +254,5 @@ validation:
   require_render_check: false
 fingerprint:
   algorithm: sha256
-  sha256: 83C65B6236A1AF17E8E8A44B18AD29FAA341C7A4982B5333CCE2B1FF5742F261
-  value: 83C65B6236A1AF17E8E8A44B18AD29FAA341C7A4982B5333CCE2B1FF5742F261
+  sha256: 5139D6C0D48E6BA23991D4415BD1D7ED594913010B19DACC37415E946A65DE8B
+  value: 5139D6C0D48E6BA23991D4415BD1D7ED594913010B19DACC37415E946A65DE8B

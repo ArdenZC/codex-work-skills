@@ -49,13 +49,13 @@ requirements.txt
 
 ## Word 语义书签
 
-教案 `lesson-plan/v1.1.0` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。固定字段使用 `lp_` 前缀的业务名称，教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确且位置未改变。
+教案 `lesson-plan/v1.1.0` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。所有 managed semantic bookmark 必须匹配 `^[A-Za-z][A-Za-z0-9_]{0,39}$`，不使用中文、空格、连字符、点号、`_GoBack` 或超过 40 个字符的名称；教学实施区使用 `prep`、`intro`、`demo`、`exec`、`extend`、`practice`、`peer`、`summary`、`improve` 等短阶段代码。固定字段、教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确，且 start/end 的完整稳定边界位置未改变。
 
-v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0 的可见内容和结构 XML 严格等价。校验器不会用坐标模式静默补写缺失书签。v1.0.x 仍可通过显式 `--manifest .../v1.0.0/manifest.yaml` 使用旧坐标模式，QA 报告会标记 `anchor_mode: legacy_coordinates`；v1.1.x 报告会记录 `anchor_mode: word_bookmark`、必需/保留数量以及缺失和重复锚点。
+v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0 的可见内容和结构 XML 严格等价。校验器不会用坐标模式静默补写缺失书签。v1.0 canonical 模板和旧 compatibility entry 仅传 `--template` 时自动解析为对应的 v1.0 manifest，QA 报告会标记 `anchor_mode: legacy_coordinates`；v1.1.x 报告会记录 `anchor_mode: word_bookmark`、必需/保留数量以及缺失、重复、非法 ID 和边界错误。自定义模板必须显式提供匹配的 manifest。
 
 ## 模板保护边界
 
-生成器只能写 manifest 中声明的字段，或按声明的行/列规则增删学生行和技能列。页边距、页眉页脚、合并单元格、固定标签、工作表名称、公式列、打印设置、样式和其他未声明结构均视为 protected。自定义模板可以通过旧的 `--template` 参数传入，但指纹不一致必须给出明确警告，结构不满足时仍然失败。
+生成器只能写 manifest 中声明的字段，或按声明的行/列规则增删学生行和技能列。页边距、页眉页脚、合并单元格、固定标签、工作表名称、公式列、打印设置、样式和其他未声明结构均视为 protected。canonical 模板和旧 compatibility entry 可以通过 `--template` 参数自动解析；自定义模板必须同时传入匹配的 `--manifest`，指纹不一致必须给出明确警告，结构不满足时仍然失败。
 
 ## QA 报告
 
@@ -75,4 +75,4 @@ v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0
   python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
   ```
 
-- 自定义模板应同时提供匹配的 manifest；不建议直接修改内置 canonical 模板。
+- 自定义模板必须同时提供匹配的 manifest；不建议直接修改内置 canonical 模板。仅传 canonical v1.0 模板或旧 compatibility entry 时，解析器会自动选择 v1.0 manifest。

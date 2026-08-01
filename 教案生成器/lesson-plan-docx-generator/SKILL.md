@@ -22,7 +22,7 @@ If the user provides none of these, infer a projectized teaching plan from the c
 
 Require or infer:
 
-- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.0/template.docx` unless the user explicitly supplies a different template. `assets/templates/lesson-plan/v1.0.0/template.docx` and `assets/lesson-plan-template.docx` remain explicit coordinate-mode compatibility entries.
+- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.0/template.docx` unless the user explicitly supplies a different template. Supplying canonical `assets/templates/lesson-plan/v1.0.0/template.docx` or the old `assets/lesson-plan-template.docx` without `--manifest` automatically selects the v1.0 coordinate manifest; arbitrary custom templates require a matching `--manifest`.
 - `output_dir`: final DOCX folder. Back up an existing output folder before overwriting.
 - `course_name`: value for the title and `课程名称` cell.
 - `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
@@ -135,4 +135,4 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 - Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
 - QA output: `qa-report.json` in the generated output directory
 
-The package preserves the original single-paragraph replacement and multiline-cell writing modes. v1.1 writes through semantic Word bookmarks and verifies that every required anchor survives generation; v1.0 remains available when its manifest is explicitly selected. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.
+The package preserves the original single-paragraph replacement and multiline-cell writing modes. v1.1 writes through semantic Word bookmarks, uses Word-safe names no longer than 40 characters, and verifies complete start/end boundaries and physical containers after generation; v1.0 remains available through canonical or old compatibility template-only resolution as well as an explicit manifest. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.
