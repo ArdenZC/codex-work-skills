@@ -71,8 +71,9 @@ def validate_package(package: dict[str, Path | str]) -> str:
         scripts_path = str(LESSON_SCRIPTS)
         if scripts_path not in sys.path:
             sys.path.insert(0, scripts_path)
-        from package_common import validate_semantic_manifest_contract
+        from package_common import anchor_mode, validate_semantic_manifest_contract
 
+        anchor_mode(manifest)
         validate_semantic_manifest_contract(manifest)
     version = template_info.get("version")
     return f"{package['name']}: version={version} sha256={expected_hash} schema=valid"

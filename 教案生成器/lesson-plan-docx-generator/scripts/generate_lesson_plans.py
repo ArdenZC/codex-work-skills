@@ -129,27 +129,39 @@ def _semantic_target(document, manifest: dict[str, Any], name: str):
     if record is None:
         raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} is missing")
     spec = field_spec(manifest, name)
-    if spec.get("target") == "document_paragraph":
+    target = spec["target"]
+    if target == "document_paragraph":
         paragraph_element = bookmark_parent_paragraph(document, record)
         if paragraph_element is None:
             raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} is not in a document paragraph")
         return Paragraph(paragraph_element, document), record.end
-    cell_element = bookmark_parent_cell(document, record)
-    if cell_element is None:
-        raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} is not in a table cell")
-    return _Cell(cell_element, document), record.end
+    if target == "table_cell":
+        cell_element = bookmark_parent_cell(document, record)
+        if cell_element is None:
+            raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} is not in a table cell")
+        return _Cell(cell_element, document), record.end
+    if target == "nested_table":
+        raise ValueError(f"Semantic field {name} target nested_table requires the evaluation writer")
+    raise ValueError(f"Unsupported semantic field target for fields.{name}: {target}")
 
 
 def set_manifest_field(document, table, manifest: dict[str, Any], name: str, value: Any, align=None):
     spec = field_spec(manifest, name)
     if is_semantic_manifest(manifest):
         target, bookmark_end = _semantic_target(document, manifest, name)
+        mode = spec["mode"]
         if isinstance(target, Paragraph):
+            if mode != "replace_text_preserve_style":
+                raise ValueError(f"Unsupported semantic field mode for fields.{name}: {mode}")
             set_paragraph_text(target, value, align, bookmark_end=bookmark_end)
             return
-        writer = set_cell_multiline if spec.get("mode") in {"replace_paragraphs", "replace_multiline"} else set_cell_text
-        writer(target, value, align, bookmark_end=bookmark_end)
-        return
+        if mode == "replace_single_paragraph":
+            set_cell_text(target, value, align, bookmark_end=bookmark_end)
+            return
+        if mode == "replace_paragraphs":
+            set_cell_multiline(target, value, align, bookmark_end=bookmark_end)
+            return
+        raise ValueError(f"Unsupported semantic field mode for fields.{name}: {mode}")
     if "table" not in spec or "row" not in spec or "cell" not in spec:
         raise ValueError(f"Field {name} is not a single table-cell field")
     target_table = table if int(spec["table"]) == 0 else table._parent.tables[int(spec["table"])]

@@ -420,9 +420,9 @@ def validate_template(
 
     if is_semantic_manifest(manifest):
         reference = canonical
-        if is_canonical:
-            base_value = manifest.get("template", {}).get("base_template")
-            reference = (Path(manifest["_path"]).parent / str(base_value)).resolve() if base_value else Path()
+        base_value = manifest.get("template", {}).get("base_template")
+        if base_value:
+            reference = (Path(manifest["_path"]).parent / str(base_value)).resolve()
         if not reference.exists():
             errors.append(f"Semantic template reference not found: {reference}")
         elif not _docx_equivalent_without_bookmarks(template, reference):

@@ -22,6 +22,7 @@ from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
     EVALUATION_MAX_POINTS,
+    anchor_mode,
     bookmark_containers,
     evaluation_cell_values,
     field_bookmark,
@@ -631,10 +632,11 @@ def _base_qa_report(
         "files_checked": 0,
         "qa_report": str(report_path),
     }
-    if is_semantic_manifest(manifest):
+    current_anchor_mode = anchor_mode(manifest)
+    if current_anchor_mode == "word_bookmark":
         report.update(
             {
-                "anchor_mode": "word_bookmark",
+                "anchor_mode": current_anchor_mode,
                 "required_anchor_count": len(required_bookmarks(manifest)),
                 "preserved_anchor_count": 0,
                 "missing_anchors": [],
@@ -646,7 +648,7 @@ def _base_qa_report(
             }
         )
     else:
-        report["anchor_mode"] = "legacy_coordinates"
+        report["anchor_mode"] = current_anchor_mode
     return report
 
 
@@ -941,7 +943,7 @@ def validate_output_dir(
             errors.extend(f"file {index}: {message}" for message in item_errors)
         lesson_checks.append({"file_index": index, "errors": item_errors, "fields_checked": sorted(field_values)})
 
-    if is_semantic_manifest(manifest):
+    if anchor_mode(manifest) == "word_bookmark":
         missing_anchors = sorted({name for result in anchor_results for name in result["missing"]})
         duplicate_anchors = sorted({name for result in anchor_results for name in result["duplicates"]})
         report["preserved_anchor_count"] = min(
@@ -951,7 +953,7 @@ def validate_output_dir(
         report["missing_anchors"] = missing_anchors
         report["duplicate_anchors"] = duplicate_anchors
         checks["anchors"] = {
-            "mode": "word_bookmark",
+            "mode": anchor_mode(manifest),
             "required": report["required_anchor_count"],
             "preserved": report["preserved_anchor_count"],
             "missing": missing_anchors,

@@ -65,11 +65,154 @@ FIXED_BOOKMARK_MAP = dict(FIXED_BOOKMARKS)
 REFLECTION_BOOKMARK_MAP = {field: name for field, name, _row in REFLECTION_BOOKMARKS}
 
 
+SEMANTIC_FIELD_CONTRACTS = {
+    "title": {
+        "bookmark": FIXED_BOOKMARK_MAP["title"],
+        "target": "document_paragraph",
+        "mode": "replace_text_preserve_style",
+        "container": "document_paragraph",
+    },
+    "course_name": {
+        "bookmark": FIXED_BOOKMARK_MAP["course_name"],
+        "target": "table_cell",
+        "mode": "replace_single_paragraph",
+        "container": "cell",
+    },
+    "major": {
+        "bookmark": FIXED_BOOKMARK_MAP["major"],
+        "target": "table_cell",
+        "mode": "replace_single_paragraph",
+        "container": "cell",
+    },
+    "audience": {
+        "bookmark": FIXED_BOOKMARK_MAP["audience"],
+        "target": "table_cell",
+        "mode": "replace_single_paragraph",
+        "container": "cell",
+    },
+    "unit": {
+        "bookmark": FIXED_BOOKMARK_MAP["unit"],
+        "target": "table_cell",
+        "mode": "replace_single_paragraph",
+        "container": "cell",
+    },
+    "task": {
+        "bookmark": FIXED_BOOKMARK_MAP["task"],
+        "target": "table_cell",
+        "mode": "replace_single_paragraph",
+        "container": "cell",
+    },
+    "hours": {
+        "bookmark": FIXED_BOOKMARK_MAP["hours"],
+        "target": "table_cell",
+        "mode": "replace_single_paragraph",
+        "container": "cell",
+    },
+    "student_base": {
+        "bookmark": FIXED_BOOKMARK_MAP["student_base"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "student_problems": {
+        "bookmark": FIXED_BOOKMARK_MAP["student_problems"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "student_strategy": {
+        "bookmark": FIXED_BOOKMARK_MAP["student_strategy"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "teaching_content": {
+        "bookmark": FIXED_BOOKMARK_MAP["teaching_content"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "quality_goal": {
+        "bookmark": FIXED_BOOKMARK_MAP["quality_goal"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "knowledge_goal": {
+        "bookmark": FIXED_BOOKMARK_MAP["knowledge_goal"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "ability_goal": {
+        "bookmark": FIXED_BOOKMARK_MAP["ability_goal"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "key_content": {
+        "bookmark": FIXED_BOOKMARK_MAP["key_content"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "key_strategy": {
+        "bookmark": FIXED_BOOKMARK_MAP["key_strategy"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "difficult_content": {
+        "bookmark": FIXED_BOOKMARK_MAP["difficult_content"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "difficult_strategy": {
+        "bookmark": FIXED_BOOKMARK_MAP["difficult_strategy"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "teaching_methods": {
+        "bookmark": FIXED_BOOKMARK_MAP["teaching_methods"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "resources": {
+        "bookmark": FIXED_BOOKMARK_MAP["resources"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "references": {
+        "bookmark": FIXED_BOOKMARK_MAP["references"],
+        "target": "table_cell",
+        "mode": "replace_paragraphs",
+        "container": "cell",
+    },
+    "evaluation": {
+        "bookmark": FIXED_BOOKMARK_MAP["evaluation"],
+        "target": "nested_table",
+        "mode": "nested_table",
+        "container": "cell",
+    },
+}
+
+
 def fixed_bookmark(field: str) -> str:
     try:
         return FIXED_BOOKMARK_MAP[field]
     except KeyError as exc:
         raise KeyError(f"Unknown semantic fixed field: {field}") from exc
+
+
+def semantic_field_contract(field: str) -> dict[str, str]:
+    try:
+        return dict(SEMANTIC_FIELD_CONTRACTS[field])
+    except KeyError as exc:
+        raise KeyError(f"Unknown semantic field: {field}") from exc
 
 
 def reflection_bookmark(field: str) -> str:

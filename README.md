@@ -34,7 +34,7 @@
 输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。当前版本：教案默认使用 `lesson-plan/v1.1.0` 语义书签模板，同时保留 `lesson-plan/v1.0.0` 坐标兼容模式；记分册为 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；其他 `1.x` minor 当前拒绝，版本与 `anchors.mode` 不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明 semantic contract，固定字段的 `target`、`bookmark`、`mode` 和 `container` 必须匹配定义，未知 target/mode 不会降级处理。当前默认使用 `lesson-plan/v1.1.0`，同时保留 `lesson-plan/v1.0.0` 坐标兼容模式；记分册为 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
 
 模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
 

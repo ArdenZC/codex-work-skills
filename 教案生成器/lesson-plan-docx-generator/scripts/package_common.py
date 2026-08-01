@@ -11,8 +11,8 @@ import yaml
 from jsonschema import Draft202012Validator
 
 from semantic_bookmarks import (
-    FIXED_BOOKMARK_MAP,
     IMPLEMENTATION_STAGES,
+    SEMANTIC_FIELD_CONTRACTS,
     implementation_bookmark_groups,
     managed_bookmark_names,
     reflection_bookmark_names,
@@ -27,6 +27,9 @@ V10_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "
 V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
 LEGACY_TEMPLATE = SKILL_DIR / "assets" / "lesson-plan-template.docx"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
+SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+LEGACY_ANCHOR_MODE = "legacy_coordinates"
+SEMANTIC_ANCHOR_MODE = "word_bookmark"
 MAX_TEACHING_CONTENT_ITEMS = 8
 EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
 EVALUATION_REMARKS = [
@@ -145,12 +148,63 @@ def resolve_template_package(
 
 def is_semantic_manifest(manifest: dict[str, Any]) -> bool:
     """Return whether the manifest uses the v1.1 semantic bookmark contract."""
-    template_info = manifest.get("template", {})
-    if not isinstance(template_info, dict):
-        template_info = {}
+    return anchor_mode(manifest) == SEMANTIC_ANCHOR_MODE
+
+
+def parse_template_version(manifest: dict[str, Any]) -> tuple[int, int, int]:
+    template_info = manifest.get("template")
+    version = template_info.get("version") if isinstance(template_info, dict) else None
+    if not isinstance(version, str) or SEMVER_PATTERN.fullmatch(version) is None:
+        raise ValueError(
+            f"Invalid template.version {version!r}; expected MAJOR.MINOR.PATCH using ASCII digits without leading zeros."
+        )
+    return tuple(int(part) for part in version.split("."))
+
+
+def expected_anchor_mode(manifest: dict[str, Any]) -> str:
+    major, minor, patch = parse_template_version(manifest)
+    if major != 1:
+        raise ValueError(
+            f"Unsupported template major version {major}.{minor}.{patch}; generator supports major 1."
+        )
+    if minor == 0:
+        return LEGACY_ANCHOR_MODE
+    if minor == 1:
+        return SEMANTIC_ANCHOR_MODE
+    raise ValueError(f"Unsupported lesson-plan template minor version {major}.{minor}.x.")
+
+
+def anchor_mode(manifest: dict[str, Any]) -> str:
+    expected = expected_anchor_mode(manifest)
     anchors = manifest.get("anchors")
-    mode = anchors.get("mode") if isinstance(anchors, dict) else None
-    return str(template_info.get("version", "")) == "1.1.0" or str(mode or "") == "word_bookmark"
+    declared = anchors.get("mode") if isinstance(anchors, dict) else None
+    version = manifest["template"]["version"]
+    if expected == SEMANTIC_ANCHOR_MODE and declared != SEMANTIC_ANCHOR_MODE:
+        actual = "<missing>" if declared is None else str(declared)
+        raise ValueError(
+            f"Semantic anchor mode mismatch for template.version {version}: "
+            f"expected anchors.mode={SEMANTIC_ANCHOR_MODE}; got {actual}."
+        )
+    if expected == LEGACY_ANCHOR_MODE:
+        if declared not in {None, LEGACY_ANCHOR_MODE}:
+            raise ValueError(
+                f"Legacy anchor mode mismatch for template.version {version}: "
+                f"expected anchors.mode={LEGACY_ANCHOR_MODE} or no semantic anchors; got {declared}."
+            )
+        semantic_anchor_metadata = isinstance(anchors, dict) and any(
+            key in anchors for key in ("required", "containers")
+        )
+        fields = manifest.get("fields")
+        semantic_field_metadata = isinstance(fields, dict) and any(
+            isinstance(fields.get(name), dict) and "bookmark" in fields[name]
+            for name in SEMANTIC_FIELD_CONTRACTS
+        )
+        if semantic_anchor_metadata or semantic_field_metadata:
+            raise ValueError(
+                f"Legacy anchor mode mismatch for template.version {version}: "
+                "1.0.x must not declare semantic bookmark metadata."
+            )
+    return expected
 
 
 def _required_manifest_mapping(manifest: dict[str, Any], path: str) -> dict[str, Any]:
@@ -172,7 +226,7 @@ def _required_manifest_value(mapping: dict[str, Any], path: str, key: str) -> An
 
 def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
     """Require every v1.1 semantic contract field without applying defaults."""
-    if not is_semantic_manifest(manifest):
+    if anchor_mode(manifest) != SEMANTIC_ANCHOR_MODE:
         return
 
     anchors = _required_manifest_mapping(manifest, "anchors")
@@ -187,8 +241,13 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
     if [str(value) for value in required] != expected_names:
         raise ValueError("Semantic manifest anchors.required does not match the managed definition.")
 
-    expected_containers = {name: "cell" for name in expected_names}
-    expected_containers[FIXED_BOOKMARK_MAP["title"]] = "document_paragraph"
+    expected_containers = {
+        contract["bookmark"]: contract["container"]
+        for contract in SEMANTIC_FIELD_CONTRACTS.values()
+    }
+    expected_containers.update(
+        {name: "cell" for name in expected_names if name not in expected_containers}
+    )
     containers = _required_manifest_value(anchors, "anchors", "containers")
     if not isinstance(containers, dict):
         raise ValueError("Semantic manifest anchors.containers must be a mapping.")
@@ -196,15 +255,13 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
         raise ValueError("Semantic manifest anchors.containers does not match the managed definition.")
 
     _required_manifest_mapping(manifest, "fields")
-    for field, expected_bookmark in FIXED_BOOKMARK_MAP.items():
+    for field, contract in SEMANTIC_FIELD_CONTRACTS.items():
         spec = _required_manifest_mapping(manifest, f"fields.{field}")
-        _required_manifest_value(spec, f"fields.{field}", "target")
-        bookmark = _required_manifest_value(spec, f"fields.{field}", "bookmark")
-        _required_manifest_value(spec, f"fields.{field}", "mode")
-        if str(bookmark) != expected_bookmark:
-            raise ValueError(
-                f"Semantic manifest fields.{field}.bookmark does not match the managed definition."
-            )
+        for key in ("target", "bookmark", "mode"):
+            value = _required_manifest_value(spec, f"fields.{field}", key)
+            expected = contract[key]
+            if str(value) != expected:
+                raise ValueError(f"Semantic manifest fields.{field}.{key} must be {expected}; got {value}.")
 
     implementation = _required_manifest_mapping(manifest, "fields.implementation")
     implementation_mode = _required_manifest_value(implementation, "fields.implementation", "mode")
@@ -251,15 +308,6 @@ def validate_semantic_manifest_contract(manifest: dict[str, Any]) -> None:
     if [str(value) for value in reflection_names] != reflection_bookmark_names():
         raise ValueError("Semantic manifest fields.reflection.bookmarks does not match the managed definition.")
 
-    evaluation = _required_manifest_mapping(manifest, "fields.evaluation")
-    evaluation_bookmark = _required_manifest_value(evaluation, "fields.evaluation", "bookmark")
-    evaluation_mode = _required_manifest_value(evaluation, "fields.evaluation", "mode")
-    if str(evaluation_bookmark) != FIXED_BOOKMARK_MAP["evaluation"]:
-        raise ValueError("Semantic manifest fields.evaluation.bookmark does not match the managed definition.")
-    if str(evaluation_mode) != "nested_table":
-        raise ValueError("Semantic manifest fields.evaluation.mode must be nested_table.")
-
-
 def base_manifest_path(manifest: dict[str, Any]) -> Path | None:
     """Resolve the legacy layout manifest used as the v1.1 protected baseline."""
     if not is_semantic_manifest(manifest):
@@ -277,7 +325,7 @@ def layout_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
 
 
 def required_bookmarks(manifest: dict[str, Any]) -> list[str]:
-    if not is_semantic_manifest(manifest):
+    if anchor_mode(manifest) != SEMANTIC_ANCHOR_MODE:
         return []
     validate_semantic_manifest_contract(manifest)
     expected = managed_bookmark_names()
@@ -289,11 +337,14 @@ def required_bookmarks(manifest: dict[str, Any]) -> list[str]:
 
 
 def bookmark_containers(manifest: dict[str, Any]) -> dict[str, str]:
-    if not is_semantic_manifest(manifest):
+    if anchor_mode(manifest) != SEMANTIC_ANCHOR_MODE:
         return {}
     validate_semantic_manifest_contract(manifest)
-    expected = {name: "cell" for name in managed_bookmark_names()}
-    expected[FIXED_BOOKMARK_MAP["title"]] = "document_paragraph"
+    expected = {
+        contract["bookmark"]: contract["container"]
+        for contract in SEMANTIC_FIELD_CONTRACTS.values()
+    }
+    expected.update({name: "cell" for name in managed_bookmark_names() if name not in expected})
     values = manifest["anchors"]["containers"]
     declared = {str(name): str(container) for name, container in values.items()}
     if declared != expected:
@@ -303,11 +354,11 @@ def bookmark_containers(manifest: dict[str, Any]) -> dict[str, str]:
 
 def field_bookmark(manifest: dict[str, Any], name: str) -> str:
     spec = field_spec(manifest, name)
-    try:
-        expected = FIXED_BOOKMARK_MAP[name]
-    except KeyError as exc:
-        raise ValueError(f"Semantic manifest field {name} is missing bookmark") from exc
-    if is_semantic_manifest(manifest):
+    contract = SEMANTIC_FIELD_CONTRACTS.get(name)
+    if contract is None:
+        raise ValueError(f"Semantic manifest field {name} is missing bookmark")
+    expected = contract["bookmark"]
+    if anchor_mode(manifest) == SEMANTIC_ANCHOR_MODE:
         validate_semantic_manifest_contract(manifest)
     if "bookmark" not in spec:
         raise ValueError(f"Semantic manifest is missing fields.{name}.bookmark.")
@@ -319,7 +370,7 @@ def field_bookmark(manifest: dict[str, Any], name: str) -> str:
 
 def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
     spec = field_spec(manifest, "implementation")
-    if is_semantic_manifest(manifest):
+    if anchor_mode(manifest) == SEMANTIC_ANCHOR_MODE:
         validate_semantic_manifest_contract(manifest)
     if spec.get("mode") != "anchored_cells":
         return []
@@ -337,7 +388,7 @@ def implementation_bookmarks(manifest: dict[str, Any]) -> list[list[str]]:
 
 def reflection_bookmarks(manifest: dict[str, Any]) -> list[str]:
     spec = field_spec(manifest, "reflection")
-    if is_semantic_manifest(manifest):
+    if anchor_mode(manifest) == SEMANTIC_ANCHOR_MODE:
         validate_semantic_manifest_contract(manifest)
     if spec.get("mode") != "anchored_cells":
         return []
@@ -415,15 +466,12 @@ def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEM
 
 
 def ensure_supported_major(manifest: dict[str, Any]) -> None:
-    version = str(manifest.get("template", {}).get("version", ""))
+    major, _minor, _patch = parse_template_version(manifest)
     supported = manifest.get("generator", {}).get("supported_major")
-    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+    supported_text = str(supported) if isinstance(supported, (str, int)) and not isinstance(supported, bool) else ""
+    if re.fullmatch(r"(0|[1-9][0-9]*)", supported_text) is None:
         raise ValueError("Manifest must declare a semantic template version and generator.supported_major")
-    try:
-        major = int(version.split(".", 1)[0])
-        supported_major = int(supported)
-    except (ValueError, TypeError, AttributeError) as exc:
-        raise ValueError("Manifest must declare a semantic template version and generator.supported_major") from exc
+    supported_major = int(supported_text)
     if major != supported_major:
         raise ValueError(f"Unsupported template major version {major}; generator supports {supported_major}")
 
