@@ -26,9 +26,10 @@ from package_common import (
     validate_input,
 )
 from validate_template import (
-    _cell_format_signatures_match,
     _cell_format_signature,
     _dimension_signature,
+    _font_name_signature,
+    _font_signatures_match,
     _non_target_sheet_signature,
     _page_setup_signature,
     _protection_signature,
@@ -250,6 +251,66 @@ def _format_signature_difference(actual: dict[str, Any], expected: dict[str, Any
     return ",".join(key for key in actual if actual.get(key) != expected.get(key))
 
 
+_KNOWN_LIBREOFFICE_ZERO_SKILL_FALLBACKS = {
+    "dejavusans",
+    "dejavuserif",
+    "liberationsans",
+    "liberationserif",
+}
+_KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA = (134, 0.0, None)
+_KNOWN_LIBREOFFICE_FALLBACK_METADATA = {
+    (None, 2.0, None),
+    (None, 2, None),
+}
+
+
+def _generated_font_fallback_is_proven(
+    expected: tuple[Any, ...],
+    actual: tuple[Any, ...],
+    cell_address: str,
+    manifest: dict[str, Any],
+    skill_enabled: bool,
+) -> bool:
+    """Allow only the observed LibreOffice zero-skill class-name conversion."""
+    if skill_enabled:
+        return False
+    class_name_cell = str(manifest["structure"]["metadata"]["class_name"]).upper()
+    if str(cell_address).upper() != class_name_cell:
+        return False
+    if _font_name_signature(expected[0]) != "simsun":
+        return False
+    if _font_name_signature(actual[0]) not in _KNOWN_LIBREOFFICE_ZERO_SKILL_FALLBACKS:
+        return False
+    if tuple(expected[1:4]) != _KNOWN_LIBREOFFICE_CJK_SOURCE_METADATA:
+        return False
+    if tuple(actual[1:4]) not in _KNOWN_LIBREOFFICE_FALLBACK_METADATA:
+        return False
+    # The conversion may change only the font identity metadata; size, emphasis,
+    # underline, strike, vertical alignment, and color must remain identical.
+    return len(expected) == len(actual) and expected[4:] == actual[4:]
+
+
+def _output_cell_format_signatures_match(
+    actual: dict[str, Any],
+    expected: dict[str, Any],
+    cell_address: str,
+    manifest: dict[str, Any],
+    skill_enabled: bool,
+) -> bool:
+    if set(actual) != set(expected):
+        return False
+    for key in actual:
+        if key == "font":
+            if _font_signatures_match(actual[key], expected[key]):
+                continue
+            if _generated_font_fallback_is_proven(expected[key], actual[key], cell_address, manifest, skill_enabled):
+                continue
+            return False
+        if actual[key] != expected[key]:
+            return False
+    return True
+
+
 def _shift_column_after_delete(column: int, start: int, count: int) -> int | None:
     if column < start:
         return column
@@ -323,9 +384,16 @@ def _target_sheet_format_errors(output_ws, template_ws, manifest: dict[str, Any]
                 continue
             actual_signature = _target_cell_format_signature(output_ws.cell(output_row, output_column))
             expected_signature = _target_cell_format_signature(template_ws.cell(source_row, output_column))
-            if not _cell_format_signatures_match(actual_signature, expected_signature):
+            address = f"{get_column_letter(output_column)}{output_row}"
+            if not _output_cell_format_signatures_match(
+                actual_signature,
+                expected_signature,
+                address,
+                manifest,
+                skill_enabled,
+            ):
                 errors.append(
-                    f"target sheet formatting mismatch at {get_column_letter(output_column)}{output_row} "
+                    f"target sheet formatting mismatch at {address} "
                     f"({_format_signature_difference(actual_signature, expected_signature)})"
                 )
     return errors[:20]
@@ -565,7 +633,7 @@ def validate_output_dir(
             if path.stat().st_size == 0:
                 raise RuntimeError("Generated XLS file is empty")
             with tempfile.TemporaryDirectory(prefix="gradebook-output-") as temp_name:
-                xlsx = convert_to_xlsx(path, Path(temp_name), find_soffice())
+                xlsx = path if path.suffix.lower() == ".xlsx" else convert_to_xlsx(path, Path(temp_name), find_soffice())
                 formulas = load_workbook(xlsx, data_only=False)
                 values = load_workbook(xlsx, data_only=True)
                 selected_template = Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest)

@@ -57,7 +57,7 @@ fields:
     cells: [2]
     max_chars: 400
     max_paragraphs: 4
-  evaluation: {target: nested_table, table: 0, row: 12, cell: 1, mode: nested_table, rows: 14, columns: 4}
+  evaluation: {target: nested_table, table: 0, row: 12, cell: 1, mode: nested_table, rows: 14, columns: 4, writable_rows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], writable_cells: [2, 3]}
 allowed_changes:
   - title paragraph text and alignment
   - declared lesson fields in the main table

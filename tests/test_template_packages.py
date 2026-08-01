@@ -17,6 +17,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.table import _Cell
+from lxml import etree
 from openpyxl import Workbook, load_workbook
 
 
@@ -24,6 +25,50 @@ ROOT = Path(__file__).resolve().parents[1]
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 GRADE = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator"
 PYTHON = Path(sys.executable)
+
+
+_XLSX_NS = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+
+
+def patch_xlsx_cell_font(path: Path, address: str, font_name: str) -> None:
+    """Clone one cell style and change only its font name in the XLSX package."""
+    with zipfile.ZipFile(path, "r") as source:
+        sheet = etree.fromstring(source.read("xl/worksheets/sheet1.xml"))
+        styles = etree.fromstring(source.read("xl/styles.xml"))
+        cell = sheet.xpath(f".//main:c[@r='{address}']", namespaces=_XLSX_NS)[0]
+        cell_xfs = styles.xpath(".//main:cellXfs/main:xf", namespaces=_XLSX_NS)
+        fonts = styles.xpath(".//main:fonts/main:font", namespaces=_XLSX_NS)
+        style_index = int(cell.get("s", "0"))
+        source_xf = cell_xfs[style_index]
+        font_index = int(source_xf.get("fontId", "0"))
+        changed_font = etree.fromstring(etree.tostring(fonts[font_index]))
+        font_node = changed_font.find("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}name")
+        if font_node is None:
+            font_node = etree.Element("{http://schemas.openxmlformats.org/spreadsheetml/2006/main}name")
+            changed_font.insert(0, font_node)
+        font_node.set("val", font_name)
+        fonts_parent = styles.xpath(".//main:fonts", namespaces=_XLSX_NS)[0]
+        fonts_parent.append(changed_font)
+        new_font_index = len(fonts)
+        changed_xf = etree.fromstring(etree.tostring(source_xf))
+        changed_xf.set("fontId", str(new_font_index))
+        xfs_parent = styles.xpath(".//main:cellXfs", namespaces=_XLSX_NS)[0]
+        xfs_parent.append(changed_xf)
+        cell.set("s", str(len(cell_xfs)))
+        fonts_parent.set("count", str(len(fonts) + 1))
+        xfs_parent.set("count", str(len(cell_xfs) + 1))
+        sheet_bytes = etree.tostring(sheet, xml_declaration=True, encoding="UTF-8", standalone=True)
+        styles_bytes = etree.tostring(styles, xml_declaration=True, encoding="UTF-8", standalone=True)
+        temp_path = path.with_suffix(path.suffix + ".tmp")
+        with zipfile.ZipFile(temp_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for info in source.infolist():
+                data = source.read(info.filename)
+                if info.filename == "xl/worksheets/sheet1.xml":
+                    data = sheet_bytes
+                elif info.filename == "xl/styles.xml":
+                    data = styles_bytes
+                target.writestr(info, data)
+    temp_path.replace(path)
 
 
 def soffice_path() -> str | None:
@@ -1140,6 +1185,136 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertIn("protected DOCX layout changed", result.stderr)
 
 
+    def test_output_validation_rejects_evaluation_layout_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-evaluation-layout-") as temp_name:
+            folder = Path(temp_name)
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            pristine_dir = folder / "pristine"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(pristine_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            pristine_files = sorted(pristine_dir.glob("*.docx"))
+            self.assertEqual(len(pristine_files), 2)
+
+            def child(parent, tag):
+                node = parent.find(qn(tag))
+                if node is None:
+                    node = OxmlElement(tag)
+                    parent.append(node)
+                return node
+
+            def change_column_width(nested):
+                grid_column = nested._tbl.tblGrid.findall(qn("w:gridCol"))[1]
+                grid_column.set(qn("w:w"), str(int(grid_column.get(qn("w:w"), "0")) + 120))
+
+            def change_row_height(nested):
+                tr_pr = nested.rows[1]._tr.get_or_add_trPr()
+                height = child(tr_pr, "w:trHeight")
+                height.set(qn("w:val"), "1440")
+                height.set(qn("w:hRule"), "atLeast")
+
+            def change_table_border(nested):
+                borders = child(nested._tbl.tblPr, "w:tblBorders")
+                top = child(borders, "w:top")
+                top.set(qn("w:val"), "double")
+                top.set(qn("w:sz"), "16")
+
+            def change_score_shading(nested):
+                shading = child(nested.cell(1, 2)._tc.get_or_add_tcPr(), "w:shd")
+                shading.set(qn("w:fill"), "FFFF00")
+
+            def change_vertical_alignment(nested):
+                vertical = child(nested.cell(1, 2)._tc.get_or_add_tcPr(), "w:vAlign")
+                vertical.set(qn("w:val"), "top")
+
+            def change_cell_margin(nested):
+                margins = child(nested.cell(1, 2)._tc.get_or_add_tcPr(), "w:tcMar")
+                top = child(margins, "w:top")
+                top.set(qn("w:w"), "240")
+                top.set(qn("w:type"), "dxa")
+
+            def change_table_style(nested):
+                style = child(nested._tbl.tblPr, "w:tblStyle")
+                style.set(qn("w:val"), "LightShadingAccent1")
+
+            mutations = {
+                "column-width": change_column_width,
+                "row-height": change_row_height,
+                "table-border": change_table_border,
+                "score-shading": change_score_shading,
+                "vertical-alignment": change_vertical_alignment,
+                "cell-margin": change_cell_margin,
+                "table-style": change_table_style,
+            }
+            for name, mutate in mutations.items():
+                with self.subTest(layout=name):
+                    case_dir = folder / name
+                    case_dir.mkdir()
+                    case_files = []
+                    for pristine in pristine_files:
+                        case_file = case_dir / pristine.name
+                        shutil.copy2(pristine, case_file)
+                        case_files.append(case_file)
+                    document = Document(case_files[0])
+                    nested = document.tables[0].cell(12, 1).tables[0]
+                    original_text = [[cell.text for cell in row.cells] for row in nested.rows]
+                    self.assertEqual((len(nested.rows), len(nested.columns)), (14, 4))
+                    mutate(nested)
+                    self.assertEqual([[cell.text for cell in row.cells] for row in nested.rows], original_text)
+                    document.save(case_files[0])
+                    result = run_script(
+                        LESSON / "scripts" / "validate_output.py",
+                        "--input-json",
+                        str(source),
+                        "--output-dir",
+                        str(case_dir),
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("protected DOCX layout changed", result.stderr)
+
+    def test_output_validation_rejects_evaluation_merge_structure_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-evaluation-merge-") as temp_name:
+            folder = Path(temp_name)
+            source = ROOT / "tests" / "fixtures" / "lesson-plan-input.json"
+            pristine_dir = folder / "pristine"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(pristine_dir),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            pristine_files = sorted(pristine_dir.glob("*.docx"))
+            case_dir = folder / "merge"
+            case_dir.mkdir()
+            case_files = []
+            for pristine in pristine_files:
+                case_file = case_dir / pristine.name
+                shutil.copy2(pristine, case_file)
+                case_files.append(case_file)
+            document = Document(case_files[0])
+            nested = document.tables[0].cell(12, 1).tables[0]
+            grid_span = OxmlElement("w:gridSpan")
+            grid_span.set(qn("w:val"), "2")
+            nested.cell(1, 0)._tc.get_or_add_tcPr().append(grid_span)
+            document.save(case_files[0])
+            result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(case_dir),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("protected DOCX layout changed", result.stderr)
+
+
 class GradebookTotalRuleTests(unittest.TestCase):
     def test_total_rule_matches_exactly_with_zero_and_nonzero_skill_weights(self) -> None:
         sys.modules.pop("package_common", None)
@@ -1684,6 +1859,102 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+
+    def _assert_custom_template_rejects_font_fallback(self, font_name: str) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-custom-font-fallback-") as temp_name:
+            folder = Path(temp_name)
+            canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(canonical)],
+                check=True,
+                capture_output=True,
+            )
+            custom = xlsx_dir / "template.xlsx"
+            patch_xlsx_cell_font(custom, "A1", font_name)
+            result = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom),
+                "--json",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Custom template changed protected workbook structure or formatting", result.stdout)
+            self.assertIn("target_cell_formats.A1.font", result.stdout)
+
+    def test_custom_template_rejects_dejavu_fallback_for_simsun(self) -> None:
+        self._assert_custom_template_rejects_font_fallback("DejaVu Sans")
+
+    def test_custom_template_rejects_liberation_fallback_for_simsun(self) -> None:
+        self._assert_custom_template_rejects_font_fallback("Liberation Serif")
+
+    def test_output_validation_rejects_protected_font_fallback(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-output-font-fallback-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder)
+            generated_dir = folder / "generated"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(generated_dir),
+                "--skip-output-validation",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            generated = next(generated_dir.glob("*.xls"))
+            xlsx_dir = folder / "xlsx"
+            xlsx_dir.mkdir()
+            subprocess.run(
+                [soffice_path(), "--headless", "--convert-to", "xlsx", "--outdir", str(xlsx_dir), str(generated)],
+                check=True,
+                capture_output=True,
+            )
+            tampered = xlsx_dir / f"{generated.stem}.xlsx"
+            patch_xlsx_cell_font(tampered, "C5", "DejaVu Sans")
+            patch_xlsx_cell_font(tampered, "O2", "Liberation Serif")
+            normalized = folder / "normalized.json"
+            normalized.write_text(
+                json.dumps(
+                    {
+                        "term": "2025-2026-2",
+                        "course": "软件测试实训",
+                        "teacher": "张老师",
+                        "class_name": "软件技术2401班",
+                        "weights": {"regular": 0.6, "theory": 0.4, "skill": 0.0},
+                        "students": [
+                            {"id": "240101001", "name": "学生1", "regular": 86.5, "theory": 88.0, "skill": 0.0, "total": 87.0},
+                            {"id": "240101002", "name": "学生2", "regular": 91.0, "theory": 90.0, "skill": 0.0, "total": 91.0},
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            result = run_script(
+                GRADE / "scripts" / "validate_output.py",
+                "--input-json",
+                str(normalized),
+                "--output-dir",
+                str(xlsx_dir),
+                "--output-file",
+                str(tampered),
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("target sheet formatting mismatch at C5", result.stderr)
+            self.assertIn("target sheet formatting mismatch at O2", result.stderr)
+            self.assertIn("font", result.stderr)
+
+    def test_canonical_libreoffice_roundtrip_passes_font_guard(self) -> None:
+        canonical = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+        result = run_script(
+            GRADE / "scripts" / "validate_template.py",
+            "--template",
+            str(canonical),
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
 
     def test_custom_template_rejects_print_header_footer_changes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-custom-print-header-guard-") as temp_name:

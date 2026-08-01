@@ -77,12 +77,13 @@ def set_paragraph_text(paragraph, text, align=None, source_run=None):
         paragraph.alignment = align
 
 
-def set_cell_text(cell, text, align=None):
+def set_cell_text(cell, text, align=None, preserve_cell_layout=False):
     paragraph = cell.paragraphs[0] if cell.paragraphs else cell.add_paragraph()
     set_paragraph_text(paragraph, text, align)
     for extra in list(cell.paragraphs)[1:]:
         extra._element.getparent().remove(extra._element)
-    cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
+    if not preserve_cell_layout:
+        cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
 
 def set_cell_multiline(cell, text, align=None):
@@ -156,10 +157,9 @@ def lesson_filename(seq: int, unit: str, task: str) -> str:
 
 def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):
     table = cell.tables[0] if cell.tables else cell.add_table(rows=14, cols=4)
-    table.style = "Table Grid"
     for r_idx, values in enumerate(evaluation_cell_values(target, seq), start=1):
-        set_cell_text(table.cell(r_idx, 2), values[2])
-        set_cell_text(table.cell(r_idx, 3), values[3])
+        set_cell_text(table.cell(r_idx, 2), values[2], preserve_cell_layout=True)
+        set_cell_text(table.cell(r_idx, 3), values[3], preserve_cell_layout=True)
 
 
 def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict[str, Any], seq: int, manifest: dict[str, Any]) -> Path:

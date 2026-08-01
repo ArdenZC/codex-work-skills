@@ -88,37 +88,19 @@ _FONT_NAME_ALIASES = {
     "dengxian": "dengxian",
     "等线": "dengxian",
 }
-_CJK_FONT_NAMES = set(_FONT_NAME_ALIASES.values())
-_PLATFORM_CJK_FALLBACKS = {
-    "dejavusans",
-    "dejavuserif",
-    "liberationsans",
-    "liberationserif",
-}
-
-
 def _font_name_signature(value: Any) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
     compact = re.sub(r"[\s_-]+", "", normalized)
     return _FONT_NAME_ALIASES.get(compact, compact)
 
 
-def _font_metadata_signature(font, name: str) -> tuple[Any, ...]:
-    if name in _CJK_FONT_NAMES or name in _PLATFORM_CJK_FALLBACKS:
-        return "east-asian", "cjk", "cjk"
+def _font_metadata_signature(font) -> tuple[Any, ...]:
     return font.charset, font.family, font.scheme
 
 
 def _font_signatures_match(left: tuple[Any, ...], right: tuple[Any, ...]) -> bool:
-    if len(left) != len(right):
-        return False
-    if left[0] == right[0]:
-        return left[1:] == right[1:]
-    left_fallback = left[0] in _PLATFORM_CJK_FALLBACKS
-    right_fallback = right[0] in _PLATFORM_CJK_FALLBACKS
-    left_cjk = left[0] in _CJK_FONT_NAMES
-    right_cjk = right[0] in _CJK_FONT_NAMES
-    return (left_fallback and right_cjk or right_fallback and left_cjk) and left[4:] == right[4:]
+    """Compare the complete font identity, including the declared family name."""
+    return len(left) == len(right) and left == right
 
 
 def _cell_format_signatures_match(left: dict[str, Any], right: dict[str, Any]) -> bool:
@@ -157,7 +139,7 @@ def _cell_format_signature(cell) -> dict[str, Any]:
     alignment = cell.alignment
     protection = cell.protection
     font_name = _font_name_signature(font.name)
-    font_charset, font_family, font_scheme = _font_metadata_signature(font, font_name)
+    font_charset, font_family, font_scheme = _font_metadata_signature(font)
     return {
         "number_format": cell.number_format,
         # Keep font identity while normalizing common locale-specific aliases from XLS round trips.

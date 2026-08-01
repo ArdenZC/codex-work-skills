@@ -49,23 +49,43 @@ def _clear_text_nodes(element) -> None:
             node.text = ""
 
 
+def _evaluation_writable_coordinates(manifest: dict[str, Any]) -> tuple[set[int], set[int]]:
+    structure = manifest["structure"]["evaluation_table"]
+    spec = manifest.get("fields", {}).get("evaluation", {})
+    rows = {int(row) for row in spec.get("writable_rows", [])}
+    cells = {int(cell) for cell in spec.get("writable_cells", [])}
+    if not rows:
+        rows = set(range(1, int(structure["rows"])))
+    if not cells:
+        cells = {2, 3}
+    return rows, cells
+
+
 def _settings_xml(document) -> str:
     value = etree.tostring(copy.deepcopy(document.settings._element), encoding="unicode")
     return value.encode("unicode_escape").decode("ascii")
 
 
-def _cell_signature(cell, writable: bool = False, evaluation: bool = False) -> str:
+def _cell_signature(
+    cell,
+    writable: bool = False,
+    evaluation: bool = False,
+    evaluation_writable_rows: set[int] | None = None,
+    evaluation_writable_cells: set[int] | None = None,
+) -> str:
     cloned = copy.deepcopy(cell._tc)
     if writable:
         _clear_text_nodes(cloned)
     elif evaluation:
+        writable_rows = evaluation_writable_rows or set(range(1, 14))
+        writable_cells = evaluation_writable_cells or {2, 3}
         for nested_table in cloned.iter(qn("w:tbl")):
             rows = [child for child in nested_table if child.tag == qn("w:tr")]
             for row_index, row in enumerate(rows):
-                if row_index == 0:
+                if row_index not in writable_rows:
                     continue
                 nested_cells = [child for child in row if child.tag == qn("w:tc")]
-                for cell_index in (2, 3):
+                for cell_index in writable_cells:
                     if cell_index < len(nested_cells):
                         _clear_text_nodes(nested_cells[cell_index])
     return etree.tostring(cloned, encoding="unicode")
@@ -142,6 +162,7 @@ def _title_format_signature(document, manifest: dict[str, Any]) -> dict[str, Any
 def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable_cells, evaluation_cell = _writable_main_table_cells(manifest)
+    evaluation_writable_rows, evaluation_writable_cells = _evaluation_writable_coordinates(manifest)
     rows = []
     for row_index, row in enumerate(table.rows):
         cells = []
@@ -151,6 +172,8 @@ def _main_table_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
                     cell,
                     writable=(row_index, cell_index) in writable_cells,
                     evaluation=evaluation_cell == (row_index, cell_index),
+                    evaluation_writable_rows=evaluation_writable_rows,
+                    evaluation_writable_cells=evaluation_writable_cells,
                 )
             )
         rows.append({"tr": _xml_without_text(row._tr), "cells": cells})

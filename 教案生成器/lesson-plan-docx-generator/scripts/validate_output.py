@@ -80,6 +80,54 @@ def _xml(element) -> str:
     return etree.tostring(copy.deepcopy(element), encoding="unicode")
 
 
+def _canonical_xml(element) -> str:
+    if element is None:
+        return ""
+    return etree.tostring(copy.deepcopy(element), method="c14n", with_comments=False).decode("utf-8")
+
+
+def _evaluation_writable_coordinates(manifest: dict[str, Any]) -> tuple[set[int], set[int]]:
+    structure = manifest["structure"]["evaluation_table"]
+    spec = manifest.get("fields", {}).get("evaluation", {})
+    rows = {int(row) for row in spec.get("writable_rows", [])}
+    cells = {int(cell) for cell in spec.get("writable_cells", [])}
+    if not rows:
+        rows = set(range(1, int(structure["rows"])))
+    if not cells:
+        cells = {2, 3}
+    return rows, cells
+
+
+def _evaluation_table(document, manifest: dict[str, Any]):
+    main = document.tables[int(manifest["structure"]["main_table"]["index"])]
+    spec = manifest["structure"]["evaluation_table"]
+    parent = actual_cells(main.rows[int(spec["row"])])[int(spec["cell"])]
+    return parent.tables[0] if parent.tables else None
+
+
+def _evaluation_table_layout_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
+    """Sign only nested-table layout XML; declared score/remark text is excluded."""
+    nested = _evaluation_table(document, manifest)
+    if nested is None:
+        return {"tblPr": "", "tblGrid": "", "rows": []}
+    rows = []
+    for row in nested.rows:
+        rows.append(
+            {
+                "trPr": _canonical_xml(row._tr.trPr),
+                "cells": [
+                    {"tcPr": _canonical_xml(cell._tc.tcPr)}
+                    for cell in actual_cells(row)
+                ],
+            }
+        )
+    return {
+        "tblPr": _canonical_xml(nested._tbl.tblPr),
+        "tblGrid": _canonical_xml(nested._tbl.tblGrid),
+        "rows": rows,
+    }
+
+
 def _settings_xml(document) -> str:
     value = etree.tostring(copy.deepcopy(document.settings._element), encoding="unicode")
     return value.encode("unicode_escape").decode("ascii")
@@ -165,9 +213,10 @@ def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[s
         parent = actual_cells(table.rows[evaluation[0]])[evaluation[1]]
         nested = parent.tables[0] if parent.tables else None
         if nested is not None:
+            writable_rows, writable_cells = _evaluation_writable_coordinates(manifest)
             for row_index, row in enumerate(nested.rows):
                 for cell_index, cell in enumerate(actual_cells(row)):
-                    if row_index == 0 or cell_index in (0, 1):
+                    if row_index not in writable_rows or cell_index not in writable_cells:
                         values.append(
                             {
                                 "scope": "evaluation",
@@ -263,10 +312,10 @@ def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) ->
     _writable, evaluation = _writable_main_table_cells(manifest)
     if evaluation is None:
         return []
-    parent = actual_cells(table.rows[evaluation[0]])[evaluation[1]]
-    nested = parent.tables[0] if parent.tables else None
+    nested = _evaluation_table(document, manifest)
     if nested is None:
         return []
+    writable_rows, writable_cells = _evaluation_writable_coordinates(manifest)
 
     def format_signature(cell) -> dict[str, Any]:
         signature = _direct_format_signature(cell)
@@ -294,7 +343,7 @@ def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) ->
         }
         for row_index, row in enumerate(nested.rows)
         for cell_index, cell in enumerate(actual_cells(row))
-        if row_index > 0 and cell_index in (2, 3)
+        if row_index in writable_rows and cell_index in writable_cells
     ]
 
 
@@ -312,6 +361,7 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "tablePr": _xml(table._tbl.tblPr) if table._tbl.tblPr is not None else "",
         "tblGrid": _xml(table._tbl.tblGrid) if table._tbl.tblGrid is not None else "",
         "rows": rows,
+        "evaluation_table": _evaluation_table_layout_signature(document, manifest),
         "sections": [
             {
                 "page_width": section.page_width.twips,
