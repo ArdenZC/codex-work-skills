@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import math
+import os
 import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -247,9 +248,14 @@ def validate_named_range_manifest_contract(manifest: dict[str, Any]) -> None:
         raise ValueError("v1.1 generator.supported_major is protected")
     generator_version = str(generator.get("version") or "")
     template_version = str(template.get("version") or "")
-    if not re.fullmatch(r"1\.1\.[0-9]+", generator_version, flags=re.ASCII):
-        raise ValueError("v1.1 generator.version must be an ASCII 1.1.x semantic version")
-    if generator_version.split(".")[:2] != template_version.split(".")[:2]:
+    try:
+        generator_semver = parse_template_version(generator_version)
+        template_semver = parse_template_version(template_version)
+    except ValueError as exc:
+        raise ValueError(
+            "v1.1 generator.version must be an ASCII semantic version without leading zeros"
+        ) from exc
+    if generator_semver[:2] != template_semver[:2]:
         raise ValueError("v1.1 generator.version must use the same major and minor as template.version")
 
     anchors = manifest.get("anchors")
@@ -320,6 +326,74 @@ def sha256_file(path: Path | str) -> str:
 
 def _path_key(path: Path | str) -> str:
     return str(Path(path).expanduser().resolve()).casefold()
+
+
+def _path_is_within(path: Path | str, root: Path | str) -> bool:
+    """Compare resolved paths with filesystem boundaries, not string prefixes."""
+    path_key = os.path.normcase(str(Path(path).expanduser().resolve()))
+    root_key = os.path.normcase(str(Path(root).expanduser().resolve()))
+    try:
+        return os.path.commonpath((path_key, root_key)) == root_key
+    except ValueError:
+        return False
+
+
+def _manifest_reference_path(manifest: dict[str, Any], key: str) -> Path | None:
+    value = manifest.get("template", {}).get(key)
+    if value in (None, ""):
+        return None
+    manifest_path = manifest.get("_path")
+    if manifest_path:
+        return (Path(manifest_path).expanduser().resolve().parent / str(value)).resolve()
+    return Path(str(value)).expanduser().resolve()
+
+
+def protected_template_package_paths(
+    manifest: dict[str, Any],
+    *,
+    selected_template: Path | str | None = None,
+    schema_path: Path | str | None = None,
+) -> set[Path]:
+    """Return every file that output or QA commits must never overwrite."""
+    paths: set[Path] = set()
+
+    def add(path: Path | str | None) -> None:
+        if path not in (None, ""):
+            paths.add(Path(path).expanduser().resolve())
+
+    add(selected_template)
+    manifest_path = manifest.get("_path")
+    add(manifest_path)
+    if manifest_path:
+        add(manifest_template_path(manifest))
+    add(_manifest_reference_path(manifest, "base_template"))
+    add(_manifest_reference_path(manifest, "base_manifest"))
+    add(schema_path)
+    add(V10_TEMPLATE)
+    add(V10_MANIFEST)
+    add(V11_TEMPLATE)
+    add(V11_MANIFEST)
+    add(V10_COMPATIBILITY_TEMPLATE)
+    return paths
+
+
+def protected_template_package_directories(
+    manifest: dict[str, Any],
+    *,
+    selected_template: Path | str | None = None,
+    schema_path: Path | str | None = None,
+) -> set[Path]:
+    """Return package roots whose contents must not receive generated files."""
+    paths = protected_template_package_paths(
+        manifest,
+        selected_template=selected_template,
+        schema_path=schema_path,
+    )
+    directories = {path.parent.resolve() for path in paths}
+    manifest_path = manifest.get("_path")
+    if manifest_path:
+        directories.add(Path(manifest_path).expanduser().resolve().parent)
+    return directories
 
 
 def validate_fingerprint_contract(manifest: dict[str, Any]) -> tuple[str, str]:
@@ -407,6 +481,7 @@ def validate_output_paths(
     source_paths: list[Path | str] | None = None,
     template_path: Path | str | None = None,
     manifest_path: Path | str | None = None,
+    manifest: dict[str, Any] | None = None,
     schema_path: Path | str | None = None,
     qa_paths: list[Path | str] | None = None,
 ) -> Path:
@@ -414,25 +489,43 @@ def validate_output_paths(
     out_dir = Path(output_dir).expanduser().resolve()
     if out_dir.exists() and not out_dir.is_dir():
         raise ValueError(f"Output directory is not a directory: {out_dir}")
-    package_dirs = {
-        V10_PACKAGE_DIR.resolve(),
-        V11_PACKAGE_DIR.resolve(),
-        V10_COMPATIBILITY_TEMPLATE.resolve().parent,
-    }
-    out_key = _path_key(out_dir)
+    if manifest is None and manifest_path:
+        manifest = load_manifest(manifest_path)
+    package_dirs = (
+        protected_template_package_directories(
+            manifest,
+            selected_template=template_path,
+            schema_path=schema_path,
+        )
+        if manifest is not None
+        else {
+            V10_PACKAGE_DIR.resolve(),
+            V11_PACKAGE_DIR.resolve(),
+            V10_COMPATIBILITY_TEMPLATE.resolve().parent,
+        }
+    )
     for package_dir in package_dirs:
-        package_key = _path_key(package_dir)
-        if out_key == package_key or out_key.startswith(package_key + "\\") or out_key.startswith(package_key + "/"):
-            raise ValueError(f"Output directory must not be inside a template package directory: {out_dir}")
+        if _path_is_within(out_dir, package_dir):
+            raise ValueError(f"Output directory must not be inside the selected template package: {out_dir}")
 
-    forbidden = {
-        _path_key(path)
-        for path in (source_paths or [])
-        + ([template_path] if template_path else [])
-        + ([manifest_path] if manifest_path else [])
-        + ([schema_path] if schema_path else [])
-        + [V10_TEMPLATE, V11_TEMPLATE, V10_COMPATIBILITY_TEMPLATE]
-    }
+    forbidden: dict[str, str] = {}
+    for path in source_paths or []:
+        forbidden[_path_key(path)] = "source"
+    if template_path:
+        forbidden[_path_key(template_path)] = "selected_template"
+    if schema_path:
+        forbidden[_path_key(schema_path)] = "schema"
+    if manifest is not None:
+        for path in protected_template_package_paths(
+            manifest,
+            selected_template=template_path,
+            schema_path=schema_path,
+        ):
+            forbidden.setdefault(_path_key(path), "declared_template_package")
+    else:
+        for path in (manifest_path, V10_TEMPLATE, V10_MANIFEST, V11_TEMPLATE, V11_MANIFEST, V10_COMPATIBILITY_TEMPLATE):
+            if path:
+                forbidden.setdefault(_path_key(path), "declared_template_package")
     normalized_final_paths: list[Path] = []
     for final in final_paths:
         target = Path(final).expanduser()
@@ -448,11 +541,14 @@ def validate_output_paths(
             raise ValueError(f"Output file path is a directory: {target}")
         if target.suffix.lower() != ".xls":
             raise ValueError(f"Output file must use the .xls extension: {target}")
-        if _path_key(target) in forbidden:
-            if source_paths and _path_key(target) in {_path_key(path) for path in source_paths}:
+        forbidden_kind = forbidden.get(_path_key(target))
+        if forbidden_kind:
+            if forbidden_kind == "source":
                 raise ValueError("Output file must not overwrite the source workbook.")
-            if template_path and _path_key(target) == _path_key(template_path):
+            if forbidden_kind == "selected_template":
                 raise ValueError("Output file must not overwrite the template file.")
+            if forbidden_kind == "declared_template_package":
+                raise ValueError("Output file must not overwrite a declared template package file.")
             raise ValueError("Output file must not overwrite an input or template package file.")
     final_keys = [_path_key(path) for path in normalized_final_paths]
     if len(final_keys) != len(set(final_keys)):
@@ -467,7 +563,12 @@ def validate_output_paths(
             raise ValueError(f"QA report path is a directory: {qa_path}")
         if _path_key(qa_path) in final_key_set:
             raise ValueError("QA report must not overwrite a generated XLS output.")
-        if _path_key(qa_path) in forbidden:
+        forbidden_kind = forbidden.get(_path_key(qa_path))
+        if forbidden_kind == "declared_template_package":
+            raise ValueError("QA report must not overwrite a declared template package file.")
+        if forbidden_kind == "selected_template":
+            raise ValueError("QA report must not overwrite the template file.")
+        if forbidden_kind:
             raise ValueError("QA report must not overwrite an input or template package file.")
     qa_keys = [_path_key(path) for path in qa_paths or []]
     if len(qa_keys) != len(set(qa_keys)):

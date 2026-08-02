@@ -149,7 +149,20 @@ function Resolve-SourceFiles([string]$path) {
 }
 
 function Normalize-Path([string]$path) {
-  return [System.IO.Path]::GetFullPath($path)
+  $full = [System.IO.Path]::GetFullPath($path)
+  $suffix = New-Object System.Collections.Generic.List[string]
+  $probe = $full
+  while (-not (Test-Path -LiteralPath $probe) -and $probe -ne [System.IO.Path]::GetPathRoot($probe)) {
+    $leaf = Split-Path -Leaf $probe
+    if ($leaf) { $suffix.Insert(0, $leaf) }
+    $probe = Split-Path -Parent $probe
+  }
+  if (Test-Path -LiteralPath $probe) {
+    $resolved = (Resolve-Path -LiteralPath $probe).Path
+    foreach ($part in $suffix) { $resolved = Join-Path $resolved $part }
+    return [System.IO.Path]::GetFullPath($resolved)
+  }
+  return $full
 }
 
 function Path-Key([string]$path) {
@@ -162,28 +175,37 @@ function Assert-OutputPathsSafe($sourceItems, [string]$directory, [string[]]$fin
     throw "Output directory is not a directory: $directory"
   }
   $skillDir = Split-Path -Parent $PSScriptRoot
-  $packageDirs = @(
-    (Join-Path $skillDir 'assets\templates\course-gradebook\v1.0.0'),
-    (Join-Path $skillDir 'assets\templates\course-gradebook\v1.1.0'),
-    (Join-Path $skillDir 'assets\平时成绩记分册模板.xls' | Split-Path -Parent)
-  ) | ForEach-Object { Normalize-Path $_ }
+  $packageDirs = @($ManifestData.protected_package_directories) |
+    Where-Object { $_ } |
+    ForEach-Object { Normalize-Path ([string]$_) }
+  if ($packageDirs.Count -eq 0) {
+    $packageDirs = @(
+      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.0.0'),
+      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.1.0'),
+      (Join-Path $skillDir 'assets\平时成绩记分册模板.xls' | Split-Path -Parent)
+    ) | ForEach-Object { Normalize-Path $_ }
+  }
+  $packageDirs += Normalize-Path (Split-Path -Parent $SchemaPath)
   foreach ($packageDir in $packageDirs) {
     $packageKey = (Path-Key $packageDir).TrimEnd('\')
     if ($outputKey -eq $packageKey -or $outputKey.StartsWith($packageKey + '\')) {
-      throw "Output directory must not be inside a template package directory: $directory"
+      throw "Output directory must not be inside the selected template package: $directory"
     }
   }
-  $forbidden = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
-  foreach ($source in $sourceItems) { $null = $forbidden.Add((Path-Key $source.FullName)) }
-  foreach ($path in @(
-      $TemplatePath,
-      $ManifestPath,
-      $SchemaPath,
-      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.0.0\template.xls'),
-      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.1.0\template.xls'),
-      (Join-Path $skillDir 'assets\平时成绩记分册模板.xls')
-    )) {
-    $null = $forbidden.Add((Path-Key $path))
+  $sourceKeys = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+  $forbiddenKinds = @{}
+  foreach ($source in $sourceItems) {
+    $sourceKey = Path-Key $source.FullName
+    $null = $sourceKeys.Add($sourceKey)
+    $forbiddenKinds[$sourceKey] = 'source'
+  }
+  if ($TemplatePath) { $forbiddenKinds[(Path-Key $TemplatePath)] = 'selected_template' }
+  if ($SchemaPath) { $forbiddenKinds[(Path-Key $SchemaPath)] = 'schema' }
+  foreach ($path in @($ManifestData.protected_package_paths)) {
+    if ($path) {
+      $key = Path-Key ([string]$path)
+      if (-not $forbiddenKinds.ContainsKey($key)) { $forbiddenKinds[$key] = 'declared_template_package' }
+    }
   }
   $finalKeys = @()
   foreach ($finalPath in $finalPaths) {
@@ -199,12 +221,16 @@ function Assert-OutputPathsSafe($sourceItems, [string]$directory, [string[]]$fin
     if ([System.IO.Path]::GetExtension($target).ToLowerInvariant() -ne '.xls') {
       throw "Output file must use the .xls extension: $target"
     }
-    if ($forbidden.Contains((Path-Key $target))) {
-      if ($sourceItems.FullName -contains $target) {
+    $forbiddenKind = $forbiddenKinds[$targetKey]
+    if ($null -ne $forbiddenKind) {
+      if ($forbiddenKind -eq 'source' -or $sourceKeys.Contains($targetKey)) {
         throw 'Output file must not overwrite the source workbook.'
       }
-      if ((Path-Key $TemplatePath) -eq (Path-Key $target)) {
+      if ($forbiddenKind -eq 'selected_template') {
         throw 'Output file must not overwrite the template file.'
+      }
+      if ($forbiddenKind -eq 'declared_template_package') {
+        throw 'Output file must not overwrite a declared template package file.'
       }
       throw 'Output file must not overwrite an input or template package file.'
     }
@@ -226,7 +252,14 @@ function Assert-OutputPathsSafe($sourceItems, [string]$directory, [string[]]$fin
     if ((Test-Path -LiteralPath $qaPath) -and (Test-Path -LiteralPath $qaPath -PathType Container)) {
       throw "QA report path is a directory: $qaPath"
     }
-    if ($forbidden.Contains($qaKey)) {
+    $forbiddenKind = $forbiddenKinds[$qaKey]
+    if ($null -ne $forbiddenKind) {
+      if ($forbiddenKind -eq 'declared_template_package') {
+        throw 'QA report must not overwrite a declared template package file.'
+      }
+      if ($forbiddenKind -eq 'selected_template') {
+        throw 'QA report must not overwrite the template file.'
+      }
       throw 'QA report must not overwrite an input or template package file.'
     }
     $qaKeys += $qaKey
@@ -249,9 +282,12 @@ function Remove-RunTemporaryFiles() {
   $RunTemporaryFiles.Clear()
 }
 
-function Move-AtomicFile([string]$staged, [string]$destination) {
+function Move-AtomicFile([string]$staged, [string]$destination, [string]$replaceBackup) {
   if (Test-Path -LiteralPath $destination -PathType Leaf) {
-    [System.IO.File]::Replace($staged, $destination, $null, $true)
+    if (Test-Path -LiteralPath $replaceBackup) {
+      Remove-Item -LiteralPath $replaceBackup -Force
+    }
+    [System.IO.File]::Replace($staged, $destination, $replaceBackup, $true)
   } else {
     [System.IO.File]::Move($staged, $destination)
   }
@@ -274,6 +310,8 @@ function Commit-OutputAndQaAtomically(
   $stagedQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.tmp')
   $backupXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.bak')
   $backupQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.bak')
+  $replaceBackupXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.replace.bak')
+  $replaceBackupQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.replace.bak')
   $oldXls = Test-Path -LiteralPath $finalPath -PathType Leaf
   $oldQa = Test-Path -LiteralPath $qaPath -PathType Leaf
   $replacedXls = $false
@@ -283,9 +321,9 @@ function Commit-OutputAndQaAtomically(
     Copy-Item -LiteralPath $qaCandidate -Destination $stagedQa -Force
     if ($oldXls) { Copy-Item -LiteralPath $finalPath -Destination $backupXls -Force }
     if ($oldQa) { Copy-Item -LiteralPath $qaPath -Destination $backupQa -Force }
-    Move-AtomicFile $stagedXls $finalPath
+    Move-AtomicFile $stagedXls $finalPath $replaceBackupXls
     $replacedXls = $true
-    Move-AtomicFile $stagedQa $qaPath
+    Move-AtomicFile $stagedQa $qaPath $replaceBackupQa
     $replacedQa = $true
   } catch {
     if ($replacedXls) {
@@ -298,7 +336,7 @@ function Commit-OutputAndQaAtomically(
     }
     throw
   } finally {
-    foreach ($path in @($stagedXls, $stagedQa, $backupXls, $backupQa)) {
+    foreach ($path in @($stagedXls, $stagedQa, $backupXls, $backupQa, $replaceBackupXls, $replaceBackupQa)) {
       if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
     }
   }
@@ -1101,19 +1139,20 @@ if ($OutputFile) {
   $OutputFile = [System.IO.Path]::GetFullPath($OutputFile)
   $OutputDir = Split-Path -Parent $OutputFile
 }
+$OutputDir = Normalize-Path $OutputDir
 $finalPaths = @()
 foreach ($source in $sources) {
   $classCode = Split-Path -Leaf (Split-Path -Parent $source.FullName)
   if (-not $classCode -or $classCode -eq '.') {
     $classCode = [System.IO.Path]::GetFileNameWithoutExtension($source.FullName)
   }
-  $finalPaths += if ($OutputFile) { $OutputFile } else { Join-Path $OutputDir ("{0}-平时成绩记分册.xls" -f $classCode) }
+  $finalPaths += if ($OutputFile) { Normalize-Path $OutputFile } else { Normalize-Path (Join-Path $OutputDir ("{0}-平时成绩记分册.xls" -f $classCode)) }
 }
 $qaPaths = @()
 foreach ($finalPath in $finalPaths) {
-  if ($QaReportPath) { $qaPaths += $QaReportPath }
-  elseif ($finalPaths.Count -eq 1) { $qaPaths += (Join-Path $OutputDir 'qa-report.json') }
-  else { $qaPaths += (Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalPath)) + '.qa-report.json')) }
+  if ($QaReportPath) { $qaPaths += Normalize-Path $QaReportPath }
+  elseif ($finalPaths.Count -eq 1) { $qaPaths += Normalize-Path (Join-Path $OutputDir 'qa-report.json') }
+  else { $qaPaths += Normalize-Path (Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalPath)) + '.qa-report.json')) }
 }
 Assert-OutputPathsSafe $sources $OutputDir $finalPaths $qaPaths
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
@@ -1169,7 +1208,14 @@ try {
     $normalizedJsonPath = Join-Path $validationDir 'normalized-input.json'
     $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
     $qaCandidate = Join-Path $validationDir 'qa-report.json'
-    $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir, '--output-file', $validationFile, '--qa-report', $qaCandidate) + $validationArgs
+    $runArgs = @(
+      '--input-json', $normalizedJsonPath,
+      '--output-dir', $validationDir,
+      '--output-file', $validationFile,
+      '--qa-report', $qaCandidate,
+      '--final-output', $finalPath,
+      '--final-qa', $qaPaths[$index]
+    ) + $validationArgs
     if ($SkipOutputValidation) { $runArgs += '--skip-validation' }
     & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
     if ($LASTEXITCODE -ne 0) {

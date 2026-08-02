@@ -5,10 +5,12 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import shutil
 import subprocess
 import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +38,54 @@ from xls_named_range_utils import (
     normalize_xls_summary_information,
     validate_xls_named_range_inventory,
 )
+
+
+def replace_directory_atomically(stage: Path, output_dir: Path) -> None:
+    """Exchange a fully validated package directory with rollback on failure."""
+    stage = stage.expanduser().resolve()
+    output_dir = output_dir.expanduser().resolve()
+    if not stage.is_dir():
+        raise RuntimeError(f"Directory swap stage is not a directory: {stage}")
+    if stage.parent != output_dir.parent:
+        raise RuntimeError("Directory swap stage and output must share the same parent directory")
+    if output_dir.exists() and not output_dir.is_dir():
+        raise RuntimeError(f"Directory swap output is not a directory: {output_dir}")
+
+    backup = output_dir.parent / f".{output_dir.name}.{uuid.uuid4().hex}.backup"
+    moved_old = False
+    try:
+        if output_dir.exists():
+            os.replace(str(output_dir), str(backup))
+            moved_old = True
+        if os.environ.get("GRADEBOOK_TEST_FAIL_DIRECTORY_SWAP") == "1":
+            raise OSError("Injected directory swap failure")
+        os.replace(str(stage), str(output_dir))
+    except Exception as exc:
+        restore_error = None
+        if moved_old:
+            try:
+                if output_dir.exists():
+                    if output_dir.is_dir():
+                        shutil.rmtree(output_dir)
+                    else:
+                        output_dir.unlink()
+                os.replace(str(backup), str(output_dir))
+            except Exception as restore_exc:
+                restore_error = restore_exc
+        if restore_error is not None:
+            raise RuntimeError(
+                f"Directory swap failed: {exc}; restoring previous package failed: {restore_error}"
+            ) from exc
+        raise RuntimeError(f"Directory swap failed: {exc}") from exc
+    else:
+        if moved_old:
+            try:
+                shutil.rmtree(backup)
+            except Exception as cleanup_exc:
+                raise RuntimeError(f"Directory swap succeeded but backup cleanup failed: {cleanup_exc}") from cleanup_exc
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
 
 
 def _workbook_layout_signature(workbook) -> dict[str, Any]:
@@ -359,10 +409,14 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
             shutil.copy2(changelog, stage / "CHANGELOG.md")
         else:
             (stage / "CHANGELOG.md").write_text("# 1.1.0\n\n- Add workbook-level managed named ranges.\n", encoding="utf-8")
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
         output_dir.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(stage), str(output_dir))
+        exchange_stage = output_dir.parent / f".{output_dir.name}.{uuid.uuid4().hex}.stage"
+        try:
+            shutil.copytree(stage, exchange_stage)
+            replace_directory_atomically(exchange_stage, output_dir)
+        finally:
+            if exchange_stage.exists():
+                shutil.rmtree(exchange_stage)
         return {
             "output": str(output_dir),
             "template_sha256": template_sha,

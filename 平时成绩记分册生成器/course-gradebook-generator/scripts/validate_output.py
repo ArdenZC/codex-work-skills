@@ -843,8 +843,23 @@ def _base_qa_report(
     }
 
 
-def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
-    report_path = Path(report["qa_report"])
+def finalize_qa_report_paths(
+    report: dict[str, Any],
+    *,
+    final_output: Path | str,
+    final_qa: Path | str,
+) -> dict[str, Any]:
+    """Replace candidate-only path metadata before the final atomic commit."""
+    final_output_path = Path(final_output).expanduser().resolve()
+    final_qa_path = Path(final_qa).expanduser().resolve()
+    report["output_dir"] = str(final_output_path.parent)
+    report["output_file"] = final_output_path.name
+    report["qa_report"] = str(final_qa_path)
+    return report
+
+
+def _write_qa_report(report: dict[str, Any], report_path: Path | str | None = None) -> dict[str, Any]:
+    report_path = Path(report_path or report["qa_report"])
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
@@ -872,6 +887,7 @@ def _basic_output_file_checks(
             source_paths=source_paths,
             template_path=template_path,
             manifest_path=manifest.get("_path"),
+            manifest=manifest,
             schema_path=schema_path,
         )
     except ValueError as exc:
@@ -998,6 +1014,7 @@ def validate_output_raw_runtime(
             source_paths=source_paths,
             template_path=template_path,
             manifest_path=manifest.get("_path"),
+            manifest=manifest,
         )
     except ValueError as exc:
         errors.append(str(exc))
@@ -1084,6 +1101,7 @@ def validate_output_dir(
             source_paths=source_paths,
             template_path=template_path,
             manifest_path=manifest.get("_path"),
+            manifest=manifest,
             schema_path=schema_path,
         )
     except ValueError as exc:
@@ -1498,6 +1516,8 @@ def main() -> int:
     parser.add_argument("--manifest", default="")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
+    parser.add_argument("--final-output", default="", help="Final output path to record in QA metadata")
+    parser.add_argument("--final-qa", default="", help="Final QA report path to record in QA metadata")
     parser.add_argument("--template-path", default="")
     parser.add_argument("--source-file", action="append", default=[])
     parser.add_argument("--custom-template", action="store_true")
@@ -1556,6 +1576,16 @@ def main() -> int:
                 output_file=args.output_file or None,
                 source_paths=args.source_file,
             )
+        if bool(args.final_output) != bool(args.final_qa):
+            raise ValueError("--final-output and --final-qa must be provided together")
+        if args.final_output and args.final_qa:
+            report = finalize_qa_report_paths(
+                report,
+                final_output=args.final_output,
+                final_qa=args.final_qa,
+            )
+            qa_candidate = args.qa_report or str(Path(args.output_dir).expanduser().resolve() / "qa-report.json")
+            _write_qa_report(report, qa_candidate)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

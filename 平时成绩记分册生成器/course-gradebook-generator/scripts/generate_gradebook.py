@@ -53,7 +53,12 @@ from package_common import (
     validate_output_paths,
     validate_source_totals,
 )
-from validate_output import validate_output_dir, validate_output_raw_runtime, write_skipped_report
+from validate_output import (
+    finalize_qa_report_paths,
+    validate_output_dir,
+    validate_output_raw_runtime,
+    write_skipped_report,
+)
 from validate_template import validate_named_range_runtime_raw, validate_template
 
 
@@ -890,6 +895,7 @@ def main() -> int:
         source_paths=[Path(source) for source in sources],
         template_path=template,
         manifest_path=package.manifest_path,
+        manifest=manifest,
         schema_path=Path(args.schema).expanduser().resolve(),
         qa_paths=qa_paths,
     )
@@ -962,7 +968,15 @@ def main() -> int:
                     warnings=template_warnings,
                 )
             qa_candidate = run_dir / f"qa-{index}.json"
-            shutil.copy2(Path(report["qa_report"]), qa_candidate)
+            report = finalize_qa_report_paths(
+                report,
+                final_output=final_path,
+                final_qa=qa_path,
+            )
+            qa_candidate.write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
             commit_output_and_qa_atomically(candidate, final_path, qa_candidate, qa_path)
             result["output"] = str(final_path)
             result.pop("candidate", None)

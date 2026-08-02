@@ -9,3 +9,4 @@
 - v1.0 使用 legacy coordinates 并删除未使用学生行；v1.1 使用 workbook-level `gb_` named ranges，48 人以内保留到第 52 行，超出容量时精确扩展到最后一名学生，`gb_template_row` 固定为第 5 行。
 - Windows 以 Excel COM 生成，Python `xlrd`/`olefile` raw XLS preflight 不可跳过；LibreOffice 只用于完整 round-trip、格式和渲染 QA，双 skip 时 COM 不强制要求 LibreOffice。
 - 生成必须先写候选文件，再做 raw 检查和 QA，最后原子替换 XLS 与 QA；失败不得覆盖旧输出或删除无关 XLS。skip QA 仍检查真实非空 XLS 和 v1.1 named-range inventory。
+- 目录事务交换故障注入仅供测试使用：测试环境可设置 `GRADEBOOK_TEST_FAIL_DIRECTORY_SWAP=1`，正常运行不要设置。
