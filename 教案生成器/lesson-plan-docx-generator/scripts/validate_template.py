@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,8 @@ from docx.oxml.ns import qn
 from docx.table import _Cell
 from lxml import etree
 
-from package_common import DEFAULT_MANIFEST, ensure_supported_major, field_spec, load_manifest, manifest_template_path
+from bookmark_utils import bookmark_boundary_locations, bookmark_location, validate_bookmark_inventory
+from package_common import DEFAULT_MANIFEST, bookmark_containers, base_manifest_path, ensure_supported_major, field_spec, is_semantic_manifest, layout_manifest, load_manifest, manifest_template_path, required_bookmarks, resolve_template_package, validate_template_fingerprint, validate_template_package_identity
 
 
 class TemplateValidationError(RuntimeError):
@@ -229,6 +231,8 @@ def _all_text(document) -> str:
 
 
 def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[str]) -> None:
+    if is_semantic_manifest(manifest):
+        return
     table_count = len(document.tables)
     for name, spec in manifest.get("fields", {}).items():
         if spec.get("target") == "document_paragraph" or "paragraph" in spec:
@@ -265,6 +269,32 @@ def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[st
             errors.append(f"Field {name} points to missing cell {cell_index} in row {row_index}")
 
 
+def _document_xml_without_bookmarks(path: Path) -> bytes:
+    with zipfile.ZipFile(path, "r") as package:
+        root = etree.fromstring(package.read("word/document.xml"))
+    word_namespace = qn("w:body").split("}", 1)[0][1:]
+    for node in list(root.xpath(".//w:bookmarkStart | .//w:bookmarkEnd", namespaces={"w": word_namespace})):
+        parent = node.getparent()
+        if parent is not None:
+            parent.remove(node)
+    return etree.tostring(root, method="c14n", with_comments=False)
+
+
+def _docx_equivalent_without_bookmarks(actual: Path, reference: Path) -> bool:
+    with zipfile.ZipFile(actual, "r") as actual_zip, zipfile.ZipFile(reference, "r") as reference_zip:
+        actual_names = set(actual_zip.namelist())
+        reference_names = set(reference_zip.namelist())
+        names = actual_names | reference_names
+        for name in names:
+            if name == "word/document.xml":
+                if _document_xml_without_bookmarks(actual) != _document_xml_without_bookmarks(reference):
+                    return False
+                continue
+            if name not in actual_names or name not in reference_names or actual_zip.read(name) != reference_zip.read(name):
+                return False
+    return True
+
+
 def validate_template(
     template_path: Path | str,
     manifest_path: Path | str = DEFAULT_MANIFEST,
@@ -291,6 +321,18 @@ def validate_template(
     if not template.exists():
         errors.append(f"Template not found: {template}")
         raise TemplateValidationError(report)
+
+    try:
+        validate_template_package_identity(
+            template,
+            manifest,
+            explicit_manifest=True,
+            explicit_template=True,
+            check_fingerprint=False,
+        )
+        validate_template_fingerprint(template, manifest)
+    except (FileNotFoundError, ValueError) as exc:
+        errors.append(str(exc))
 
     expected_hash = str(manifest.get("fingerprint", {}).get("sha256", "")).upper()
     actual_hash = sha256(template)
@@ -356,6 +398,28 @@ def validate_template(
     except (IndexError, KeyError, TypeError) as exc:
         errors.append(f"Evaluation table coordinate is invalid: {exc}")
 
+    if is_semantic_manifest(manifest):
+        inventory = validate_bookmark_inventory(
+            document,
+            required_bookmarks(manifest),
+            bookmark_containers(manifest),
+        )
+        report["checks"]["bookmarks"] = {
+            "required_count": inventory["required_count"],
+            "actual_count": inventory["main_count"],
+            "missing": inventory["missing"],
+            "duplicates": inventory["duplicates"],
+            "duplicate_ids": inventory["duplicate_ids"],
+            "invalid_names": inventory["invalid_names"],
+            "unexpected_names": inventory["unexpected_names"],
+            "invalid_ids": inventory["invalid_ids"],
+            "orphaned": inventory["orphaned"],
+            "outside_main": inventory["outside_main"],
+            "container_errors": inventory["container_errors"],
+            "boundary_errors": inventory["boundary_errors"],
+        }
+        errors.extend(f"Semantic bookmark protection failed: {error}" for error in inventory["errors"])
+
     labels = manifest.get("validation", {}).get("required_labels", [])
     document_text = _all_text(document)
     missing_labels = [label for label in labels if label not in document_text]
@@ -366,7 +430,25 @@ def validate_template(
     document_sections = _section_signature(document)
     report["checks"]["sections"] = document_sections
 
-    if canonical.exists() and not is_canonical:
+    if is_semantic_manifest(manifest):
+        reference = canonical
+        base_value = manifest.get("template", {}).get("base_template")
+        if base_value:
+            reference = (Path(manifest["_path"]).parent / str(base_value)).resolve()
+        if not reference.exists():
+            errors.append(f"Semantic template reference not found: {reference}")
+        elif not _docx_equivalent_without_bookmarks(template, reference):
+            errors.append("Semantic template changed visible content or structure relative to the protected baseline.")
+        if not is_canonical and canonical.exists() and inventory["valid"]:
+            canonical_document = Document(str(canonical))
+            location_changes = [
+                name
+                for name in required_bookmarks(manifest)
+                if bookmark_boundary_locations(document, name) != bookmark_boundary_locations(canonical_document, name)
+            ]
+            if location_changes:
+                errors.append("Semantic bookmark location changed: " + ", ".join(location_changes))
+    elif canonical.exists() and not is_canonical:
         canonical_doc = Document(str(canonical))
         if _main_table_signature(canonical_doc, manifest) != _main_table_signature(document, manifest):
             errors.append("Custom template changed protected main-table structure or formatting.")
@@ -381,14 +463,16 @@ def validate_template(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate the versioned DOCX lesson-plan template package.")
     parser.add_argument("--template", default="")
-    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--manifest", default="")
     parser.add_argument("--compatibility-template", default="")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
     try:
-        manifest = load_manifest(args.manifest)
-        template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
-        report = validate_template(template, args.manifest, args.compatibility_template or None)
+        template, manifest_path, manifest = resolve_template_package(
+            args.template or None,
+            args.manifest or None,
+        )
+        report = validate_template(template, manifest_path, args.compatibility_template or None)
     except TemplateValidationError as exc:
         report = exc.report
         if args.as_json:
@@ -402,7 +486,7 @@ def main() -> int:
     except Exception as exc:
         report = {
             "template": str(Path(args.template).expanduser().resolve()) if args.template else "",
-            "manifest": str(Path(args.manifest).expanduser().resolve()),
+            "manifest": str(Path(args.manifest).expanduser().resolve()) if args.manifest else str(DEFAULT_MANIFEST),
             "template_version": None,
             "errors": [str(exc)],
             "warnings": [],

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import yaml
@@ -9,10 +10,16 @@ from jsonschema import Draft202012Validator
 
 
 ROOT = Path(__file__).resolve().parents[1]
+LESSON_SCRIPTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "scripts"
 PACKAGES = (
     {
-        "name": "lesson-plan",
+        "name": "lesson-plan-v1.0.0",
         "manifest": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml",
+        "schema": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "schemas" / "lesson-plan-input.schema.json",
+    },
+    {
+        "name": "lesson-plan-v1.1.0",
+        "manifest": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml",
         "schema": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "schemas" / "lesson-plan-input.schema.json",
     },
     {
@@ -60,6 +67,17 @@ def validate_package(package: dict[str, Path | str]) -> str:
     with schema_path.open("r", encoding="utf-8") as stream:
         schema = json.load(stream)
     Draft202012Validator.check_schema(schema)
+    if package["name"].startswith("lesson-plan-"):
+        scripts_path = str(LESSON_SCRIPTS)
+        if scripts_path not in sys.path:
+            sys.path.insert(0, scripts_path)
+        from package_common import anchor_mode, validate_legacy_manifest_contract, validate_semantic_manifest_contract
+
+        mode = anchor_mode(manifest)
+        if mode == "legacy_coordinates":
+            validate_legacy_manifest_contract(manifest)
+        else:
+            validate_semantic_manifest_contract(manifest)
     version = template_info.get("version")
     return f"{package['name']}: version={version} sha256={expected_hash} schema=valid"
 

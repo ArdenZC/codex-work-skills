@@ -22,7 +22,7 @@ If the user provides none of these, infer a projectized teaching plan from the c
 
 Require or infer:
 
-- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.0.0/template.docx` unless the user explicitly supplies a different template. `assets/lesson-plan-template.docx` remains a compatibility entry.
+- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.0/template.docx` unless the user explicitly supplies a different template. Supplying canonical `assets/templates/lesson-plan/v1.0.0/template.docx` or the old `assets/lesson-plan-template.docx` without `--manifest` automatically selects the v1.0 coordinate manifest; arbitrary custom templates require a matching `--manifest`.
 - `output_dir`: final DOCX folder. Back up an existing output folder before overwriting.
 - `course_name`: value for the title and `课程名称` cell.
 - `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
@@ -128,11 +128,11 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 
 ## Template Package
 
-- Manifest: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`
-- Canonical template: `assets/templates/lesson-plan/v1.0.0/template.docx`
-- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.0.0/manifest.yaml`, `assets/templates/lesson-plan/v1.0.0/CHANGELOG.md`
+- Manifest: `assets/templates/lesson-plan/v1.1.0/manifest.yaml`
+- Canonical template: `assets/templates/lesson-plan/v1.1.0/template.docx`
+- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.1.0/manifest.yaml`, `assets/templates/lesson-plan/v1.1.0/CHANGELOG.md`
 - Input schema: `schemas/lesson-plan-input.schema.json`
 - Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
 - QA output: `qa-report.json` in the generated output directory
 
-The package preserves the original single-paragraph replacement and multiline-cell writing modes. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.
+The package preserves the original single-paragraph replacement and multiline-cell writing modes. The lesson-plan version matrix is strict: `1.0.x` uses `legacy_coordinates`, `1.1.x` uses `word_bookmark`, and other `1.x` minor versions are rejected. v1.1 writes through semantic Word bookmarks, uses Word-safe names no longer than 40 characters, accepts only ASCII decimal bookmark IDs, and verifies complete start/end boundaries, every header/footer story, and physical containers after generation; v1.1 manifest contract fields must be explicit and are never silently defaulted. Fixed semantic fields, implementation, reflection, stages, and evaluation use closed allowed-key contracts, so extra coordinate or bookmark keys fail before DOCX creation. Legacy v1.0 manifests allow only the canonical coordinate contract and optional `anchors.mode: legacy_coordinates`; semantic `required`, `containers`, `bookmark`, `stages`, and mixed locator metadata are rejected. v1.0 remains available through canonical or old compatibility template-only resolution as well as an explicit manifest. When a manifest is explicit, canonical and compatibility paths must match the declared version; custom templates must use the manifest's actual file path and SHA-256 fingerprint, and ordinary file copies need no ZIP metadata mutation. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.
