@@ -22,7 +22,13 @@ from named_range_utils import (
     set_named_range_from_location,
     validate_named_range_inventory,
 )
-from package_common import V10_MANIFEST, V10_TEMPLATE, V11_PACKAGE_DIR, sha256_file
+from package_common import (
+    V10_MANIFEST,
+    V10_TEMPLATE,
+    V11_PACKAGE_DIR,
+    sha256_file,
+    validate_canonical_baselines,
+)
 from validate_template import convert_to_format, find_soffice
 from xls_named_range_utils import (
     compare_xls_and_xlsx_named_ranges,
@@ -35,6 +41,9 @@ from xls_named_range_utils import (
 def _workbook_layout_signature(workbook) -> dict[str, Any]:
     def cell_signature(cell) -> tuple[Any, ...]:
         return (cell.coordinate, cell.value, cell.data_type, cell.style_id, cell.number_format)
+
+    def dimension_signature(value) -> float | None:
+        return None if value is None else round(float(value), 0)
 
     return {
         "sheetnames": list(workbook.sheetnames),
@@ -49,11 +58,11 @@ def _workbook_layout_signature(workbook) -> dict[str, Any]:
                 ],
                 "merged": sorted(str(item).upper() for item in sheet.merged_cells.ranges),
                 "column_dimensions": sorted(
-                    (str(key), value.width, bool(value.hidden), int(value.outlineLevel), bool(value.collapsed))
+                    (str(key), dimension_signature(value.width), bool(value.hidden), int(value.outlineLevel), bool(value.collapsed))
                     for key, value in sheet.column_dimensions.items()
                 ),
                 "row_dimensions": sorted(
-                    (str(key), value.height, bool(value.hidden), int(value.outlineLevel), bool(value.collapsed))
+                    (str(key), dimension_signature(value.height), bool(value.hidden), int(value.outlineLevel), bool(value.collapsed))
                     for key, value in sheet.row_dimensions.items()
                     if value.height is not None or value.hidden or value.outlineLevel or value.collapsed
                 ),
@@ -81,6 +90,13 @@ def _workbook_layout_signature(workbook) -> dict[str, Any]:
             }
             for sheet in workbook.worksheets
         },
+        "workbook_protection": (
+            bool(getattr(workbook.security, "lockStructure", False)),
+            bool(getattr(workbook.security, "lockWindows", False)),
+            bool(getattr(workbook.security, "lockRevision", False)),
+            str(getattr(workbook.security, "workbookPassword", "") or ""),
+            str(getattr(workbook.security, "revisionsPassword", "") or ""),
+        ),
     }
 
 
@@ -95,6 +111,25 @@ def _convert(soffice: str, source: Path, output_dir: Path, target: str) -> Path:
     return convert_to_format(source, output_dir, target, soffice)
 
 
+def _assert_fixed_v10_baseline(
+    source_xlsx: Path,
+    canonical_xlsx: Path,
+    soffice: str,
+    source: Path,
+    temp: Path,
+) -> None:
+    if _workbook_layout_signature(load_workbook(source_xlsx, data_only=False)) != _workbook_layout_signature(
+        load_workbook(canonical_xlsx, data_only=False)
+    ):
+        raise RuntimeError(
+            "Named-range build rejected a source whose protected layout or formatting differs from canonical v1.0"
+        )
+    source_pdf = _convert(soffice, source, temp / "source-pdf", "pdf")
+    canonical_pdf = _convert(soffice, V10_TEMPLATE, temp / "canonical-pdf", "pdf")
+    if _pdf_signature(source_pdf)[0] != _pdf_signature(canonical_pdf)[0]:
+        raise RuntimeError("Named-range build rejected a source whose PDF page layout differs from canonical v1.0")
+
+
 def _build_named_workbook(source_xlsx: Path, target_xlsx: Path, expected_locations) -> None:
     workbook = load_workbook(source_xlsx, data_only=False)
     for name in required_names("with_skill"):
@@ -102,10 +137,19 @@ def _build_named_workbook(source_xlsx: Path, target_xlsx: Path, expected_locatio
     workbook.save(target_xlsx)
 
 
-def _write_manifest(source_manifest: Path, target_manifest: Path, template_sha: str) -> None:
+def _write_manifest(
+    source_manifest: Path,
+    target_manifest: Path,
+    template_sha: str,
+    *,
+    baseline_prefix: str | None = None,
+) -> None:
     manifest = yaml.safe_load(source_manifest.read_text(encoding="utf-8")) or {}
     manifest["fingerprint"]["sha256"] = template_sha
     manifest["fingerprint"]["value"] = template_sha
+    if baseline_prefix:
+        manifest["template"]["base_manifest"] = f"{baseline_prefix}/manifest.yaml"
+        manifest["template"]["base_template"] = f"{baseline_prefix}/template.xls"
     target_manifest.write_text(
         yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
@@ -151,6 +195,7 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         raise RuntimeError(f"Source template not found: {source}")
     if output_dir.exists() and not force:
         raise RuntimeError(f"Refusing to overwrite existing output package: {output_dir}; use --force explicitly")
+    validate_canonical_baselines(require_v11=True)
     soffice = find_soffice()
     source_manifest = source.parent / "manifest.yaml"
     if not source_manifest.exists():
@@ -172,6 +217,8 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
             "with_skill",
         )
         source_xlsx = _convert(soffice, source, temp / "source-xlsx", "xlsx")
+        canonical_xlsx = _convert(soffice, V10_TEMPLATE, temp / "canonical-xlsx", "xlsx")
+        _assert_fixed_v10_baseline(source_xlsx, canonical_xlsx, soffice, source, temp)
         source_xlsx_inventory = validate_named_range_inventory(
             load_workbook(source_xlsx, data_only=False),
             manifest_data["anchors"],
@@ -230,11 +277,6 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
                     + "; ".join(sorted(set(source_errors)))
                 )
             source_named_state = "v1.1 canonical"
-        baseline_normalized = temp / "baseline-normalized.xlsx"
-        load_workbook(source_xlsx, data_only=False).save(baseline_normalized)
-        baseline_xls = _convert(soffice, baseline_normalized, temp / "baseline-xls", "xls")
-        baseline_roundtrip_xlsx = _convert(soffice, baseline_xls, temp / "baseline-roundtrip-xlsx", "xlsx")
-
         named_xlsx = temp / "named-ranges.xlsx"
         if source_named_state == "v1.0 seed":
             _build_named_workbook(source_xlsx, named_xlsx, expected_locations)
@@ -282,23 +324,14 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         differences.extend(compare_named_range_inventories(xls_inventory, xlsx_inventory, required_names("with_skill")))
         if differences:
             raise RuntimeError("Raw XLS and round-trip XLSX named-range inventories differ: " + "; ".join(sorted(set(differences))))
-        protected_layout_reference = (
-            baseline_roundtrip_xlsx
-            if source_named_state == "v1.0 seed"
-            else source_xlsx
-        )
-        if _workbook_layout_signature(load_workbook(protected_layout_reference, data_only=False)) != _workbook_layout_signature(
+        if _workbook_layout_signature(load_workbook(canonical_xlsx, data_only=False)) != _workbook_layout_signature(
             load_workbook(named_roundtrip_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range build changed protected workbook layout or formatting")
 
-        baseline_pdf = _convert(soffice, baseline_xls, temp / "baseline-pdf", "pdf")
+        baseline_pdf = _convert(soffice, V10_TEMPLATE, temp / "baseline-pdf", "pdf")
         named_pdf = _convert(soffice, named_xls, temp / "named-pdf", "pdf")
-        if source_named_state == "v1.1 canonical":
-            # The staged template is the validated source byte-for-byte; no
-            # second workbook transformation is introduced to compare here.
-            baseline_pdf = named_pdf
-        if _pdf_signature(baseline_pdf) != _pdf_signature(named_pdf):
+        if _pdf_signature(baseline_pdf)[0] != _pdf_signature(named_pdf)[0]:
             raise RuntimeError(
                 f"Named-range build changed PDF rendering: baseline={_pdf_signature(baseline_pdf)}, named={_pdf_signature(named_pdf)}"
             )
@@ -308,7 +341,19 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         staged_template = stage / "template.xls"
         shutil.copy2(named_xls, staged_template)
         template_sha = sha256_file(staged_template)
-        _write_manifest(manifest_source, stage / "manifest.yaml", template_sha)
+        custom_output_package = output_dir.resolve() != V11_PACKAGE_DIR.resolve()
+        baseline_prefix = "baseline-v1.0.0" if custom_output_package else None
+        _write_manifest(
+            manifest_source,
+            stage / "manifest.yaml",
+            template_sha,
+            baseline_prefix=baseline_prefix,
+        )
+        if custom_output_package:
+            baseline_stage = stage / baseline_prefix
+            baseline_stage.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(V10_MANIFEST, baseline_stage / "manifest.yaml")
+            shutil.copy2(V10_TEMPLATE, baseline_stage / "template.xls")
         changelog = manifest_source.parent / "CHANGELOG.md"
         if changelog.exists():
             shutil.copy2(changelog, stage / "CHANGELOG.md")
@@ -321,7 +366,7 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         return {
             "output": str(output_dir),
             "template_sha256": template_sha,
-            "v10_template_sha256": sha256_file(source),
+            "v10_template_sha256": sha256_file(V10_TEMPLATE),
             "named_range_count": len(xls_inventory["locations"]),
             "pdf_signature": _pdf_signature(named_pdf),
         }

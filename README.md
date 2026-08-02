@@ -24,6 +24,10 @@
 
 在任一 skill 目录运行 scripts/install_adapters.py 可以把适配规则安装到目标项目；默认不会覆盖已有规则文件。
 
+成绩册的两个版本有明确边界：v1.0 使用 legacy coordinates，按输入人数删除未使用学生行；v1.1 使用 workbook-level `gb_` named ranges，48 人以内保留到第 52 行，超过模板容量时精确扩展到最后一名学生，`gb_template_row` 始终指向第 5 行。Windows 路径以 Excel COM 作为生成引擎，Python 的 `xlrd`/`olefile` 原始 XLS preflight 在任何 skip 参数下都不可跳过；LibreOffice 只用于完整 round-trip、格式和渲染 QA。Windows 同时显式跳过模板和输出 QA 时，不强制要求 LibreOffice。
+
+成绩册生成采用候选文件事务：临时生成 → 不可跳过的 raw runtime 检查 → 可选完整 QA 或真实文件基础检查 → XLS 与 QA 原子替换。任一步失败都保留既有正式文件和输出目录中的无关 XLS，只清理本次运行的临时文件；skip QA 仍必须确认输出是非空 `.xls`，v1.1 还必须通过原始 named-range inventory。
+
 ## 模板包标准
 
 文档和表格生成器使用版本化模板包。每个包的 canonical template、`manifest.yaml`、输入 schema、模板/输出校验器和 `CHANGELOG.md` 都随 skill 分发；旧模板路径继续保留为兼容入口，并由 SHA-256 校验防止两份模板分叉。

@@ -68,17 +68,21 @@ v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0
 
 成绩册 `course-gradebook/v1.1.0` 使用 24 个 `gb_` 前缀的 workbook-level named ranges 作为唯一生产写入契约。Python/openpyxl、Windows Excel COM、模板校验和输出 QA 共用 `named_range_contracts.py` 与 manifest；v1.1 不允许静默退回坐标写入。无技能成绩变体移除 `gb_header_skill`、`gb_skill_score_col` 和 `gb_skill_weighted_col`，保留 21 个名称；学生数超过 48 时，数据区域名称扩展到实际末行，`gb_template_row` 仍固定为第 5 行样式来源。模板校验同时读取原始 BIFF `.xls` 和 LibreOffice 回转 `.xlsx`，并比较名称、作用域、目标工作表、地址、形状和关系。
 
+容量规则必须由输出校验按固定基线计算：v1.0 使用 legacy coordinates，并删除未使用学生行；v1.1 在 48 人以内保留至第 52 行，超过 48 人时所有动态数据名称统一扩展至 `data_start_row + student_count - 1`，`gb_template_row` 仍为第 5 行。输出自身的当前末行不能被用作预期值。
+
 成绩册 `course-gradebook/v1.0.0` 以及 `assets/平时成绩记分册模板.xls` 继续使用 legacy 坐标模式。v1.1 manifest 的 `anchors`、`fields`、`layout` 和变体契约必须封闭且完整，不能夹带 v1.0 坐标结构；自定义模板必须提供匹配 manifest 和 fingerprint。生成器在显式 skip 参数生效前仍强制检查 fingerprint；QA 报告同时提供顶层命名区域诊断和 `checks.named_ranges`，两者必须保持一致。构建器会固定 BIFF 非业务元数据，以便从 v1.0 canonical 模板确定性生成相同的 v1.1 `.xls` 包。
 
 ## QA 报告
 
 每次生成都应在输出目录生成 QA 报告，至少包含 `template_id`、`template_version`、`generator_version`、`status`、`checks`、`errors` 和 `warnings`，并记录实际 `template_path`、`custom_template`、`engine`、`validation_skipped`。完整校验通过时 `status` 为 `passed`；显式跳过任一校验时为 `skipped`，不能用警告伪装成完整通过。报告只记录校验元数据、行号、数量和错误类别，不写入学生姓名、学号或其他原始输入内容。报告不替代进程退出码：有阻断错误时进程必须返回非零。
 
+生成与 QA 使用同一事务边界：候选 XLS 先完成不可跳过的 raw BIFF 可打开性、命名区域 scope/name/目标/shape/relationship 和 canonical 位置检查，再按参数执行完整 QA 或基础 skip QA，最后才原子替换正式 XLS 和 `qa-report.json`。失败不得覆盖旧正式文件或删除无关 XLS。skip QA 仍检查文件存在、普通文件、输出目录内、扩展名、非空和 v1.1 raw named-range inventory。
+
 ## 兼容性
 
 - 原有 CLI 参数继续保留；新参数只做可选扩展。
 - DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式；教案 v1.1 的正常写入必须以 Word 书签为入口。
-- `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。Windows COM 负责生成时保留 Excel 原生格式，但默认结构化 QA 仍调用 Python/LibreOffice 转换器；没有 LibreOffice 时只能显式跳过相应校验，报告会标记为 `skipped`。
+- `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。Windows COM 是生成引擎，Python 的 `xlrd`/`olefile` 负责不可跳过的 raw XLS preflight；LibreOffice 只用于完整 round-trip、格式和渲染 QA。Windows 同时显式跳过模板和输出 QA 时，不强制要求 LibreOffice；报告会标记为 `skipped`。
 - 仓库内脚本不得依赖个人电脑上的临时工具目录或其他外部绝对路径。
 - 当前模板版本：教案默认 `lesson-plan/v1.1.0`，兼容 `lesson-plan/v1.0.0`；记分册默认 `course-gradebook/v1.1.0`，兼容 `course-gradebook/v1.0.0` 和旧 `assets/平时成绩记分册模板.xls`。
 - 默认校验命令：

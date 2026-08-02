@@ -27,12 +27,16 @@ from named_range_utils import (
 from package_common import (
     DEFAULT_MANIFEST,
     V10_MANIFEST,
+    V10_TEMPLATE,
+    V11_TEMPLATE,
     anchor_mode,
+    canonical_template_for_mode,
     column_number,
     ensure_supported_major,
     load_manifest,
     manifest_template_path,
     resolve_template_package,
+    validate_canonical_baselines,
     validate_template_package_identity,
     validate_manifest_contract,
 )
@@ -73,6 +77,15 @@ def find_soffice() -> str:
 def convert_to_format(source: Path, out_dir: Path, target_format: str, soffice: str) -> Path:
     target_format = str(target_format).lower().lstrip(".")
     out_dir.mkdir(parents=True, exist_ok=True)
+    expected = out_dir / f"{source.stem}.{target_format}"
+    existing_candidates = sorted(
+        path for path in out_dir.iterdir() if path.is_file() and path.stem == source.stem
+    )
+    if existing_candidates:
+        raise RuntimeError(
+            f"LibreOffice conversion output directory is not fresh for source={source} target={target_format}: "
+            f"{[str(path) for path in existing_candidates]}"
+        )
     proc = subprocess.run(
         [soffice, "--headless", "--convert-to", target_format, "--outdir", str(out_dir), str(source)],
         capture_output=True,
@@ -82,14 +95,23 @@ def convert_to_format(source: Path, out_dir: Path, target_format: str, soffice: 
         timeout=120,
     )
     if proc.returncode != 0:
-        raise RuntimeError(f"LibreOffice conversion failed: {proc.stdout}\n{proc.stderr}")
-    target = out_dir / f"{source.stem}.{target_format}"
-    if target.exists():
-        return target
-    matches = sorted(out_dir.glob(f"{source.stem}.*"))
-    if matches:
-        return matches[0]
-    raise RuntimeError(f"LibreOffice did not create a {target_format.upper()} file for {source}")
+        raise RuntimeError(
+            f"LibreOffice conversion failed for source={source} expected={expected}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    matches = sorted(path for path in out_dir.iterdir() if path.is_file() and path.stem == source.stem)
+    if len(matches) != 1 or matches[0] != expected or not expected.is_file():
+        raise RuntimeError(
+            f"LibreOffice conversion did not produce exactly the expected {target_format.upper()} output "
+            f"for source={source} expected={expected} candidates={[str(path) for path in matches]}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    if expected.stat().st_size <= 0:
+        raise RuntimeError(
+            f"LibreOffice produced an empty output for source={source} expected={expected}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    return expected
 
 
 def convert_to_xlsx(source: Path, out_dir: Path, soffice: str) -> Path:
@@ -660,6 +682,7 @@ def _named_range_checks(
     errors.extend(xls_inventory["errors"])
     errors.extend(compare_xls_and_xlsx_named_ranges(xls_inventory, xlsx_inventory, required_names(variant)))
     errors.extend(compare_named_range_inventories(xls_inventory, xlsx_inventory, required_names(variant)))
+    validate_canonical_baselines(require_v11=False)
     base_manifest = load_manifest(V10_MANIFEST)
     expected_locations = expected_named_range_locations(base_manifest["structure"], variant)
     expected_inventory = {
@@ -726,111 +749,127 @@ def _named_range_checks(
         "anchor_mode": "excel_named_range",
     }
 
-    base_template_value = manifest.get("template", {}).get("base_template")
-    if base_template_value:
-        base_template = (Path(manifest["_path"]).parent / str(base_template_value)).resolve()
-        if base_template.exists():
-            base_xlsx = convert_to_xlsx(base_template, temp_dir / "base-template", find_soffice())
-            base_workbook = load_workbook(base_xlsx, data_only=False)
-            expected_signature = _workbook_signature(base_workbook, base_manifest)
-            actual_signature = _workbook_signature(workbook, base_manifest)
-            expected_signature.pop("named_ranges", None)
-            actual_signature.pop("named_ranges", None)
-            differences = _signature_differences(expected_signature, actual_signature)
-            if differences:
-                report["checks"]["protected_signature_differences"] = differences[:20]
-                errors.append("Named-range template changed protected workbook structure or formatting.")
+    base_xlsx = convert_to_xlsx(V10_TEMPLATE, temp_dir / "base-template", find_soffice())
+    base_workbook = load_workbook(base_xlsx, data_only=False)
+    expected_signature = _workbook_signature(base_workbook, base_manifest)
+    actual_signature = _workbook_signature(workbook, base_manifest)
+    expected_signature.pop("named_ranges", None)
+    actual_signature.pop("named_ranges", None)
+    differences = _signature_differences(expected_signature, actual_signature)
+    if differences:
+        report["checks"]["protected_signature_differences"] = differences[:20]
+        errors.append("Named-range template changed protected workbook structure or formatting.")
+
+
+def _runtime_report(template: Path, manifest_path: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "template": str(template),
+        "manifest": str(manifest_path),
+        "template_version": manifest.get("template", {}).get("version"),
+        "status": "failed",
+        "errors": [],
+        "warnings": [],
+        "checks": {},
+    }
+
+
+def _runtime_expected_inventory() -> dict[str, Any]:
+    validate_canonical_baselines(require_v11=False)
+    base_manifest = load_manifest(V10_MANIFEST)
+    expected_locations = expected_named_range_locations(base_manifest["structure"], "with_skill")
+    return {"locations": {name: location.to_dict() for name, location in expected_locations.items()}}
+
+
+def _raise_runtime_report(report: dict[str, Any], errors: list[str]) -> None:
+    if errors:
+        report["errors"] = sorted(set(f"Named-range runtime preflight: {error}" for error in errors))
+        raise TemplateValidationError(report)
+
+
+def _validate_runtime_manifest(template: Path, manifest_path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    manifest = load_manifest(manifest_path)
+    ensure_supported_major(manifest)
+    if validate_manifest_contract(manifest) != "excel_named_range":
+        raise ValueError("Named-range runtime preflight requires a v1.1 excel_named_range manifest")
+    validate_canonical_baselines(require_v11=True)
+    actual_hash = validate_template_package_identity(template, manifest)
+    if template.suffix.lower() != ".xls":
+        raise ValueError("Named-range runtime preflight requires an original .xls template")
+    return manifest, {"expected": manifest["fingerprint"]["sha256"], "actual": actual_hash}
+
+
+def validate_named_range_runtime_raw(
+    template_path: Path | str,
+    manifest_path: Path | str = DEFAULT_MANIFEST,
+) -> dict[str, Any]:
+    """Run the non-skippable BIFF-only name safety contract."""
+    template = Path(template_path).expanduser().resolve()
+    manifest_file = Path(manifest_path).expanduser().resolve()
+    manifest, fingerprint = _validate_runtime_manifest(template, manifest_file)
+    report = _runtime_report(template, manifest_file, manifest)
+    report["checks"]["sha256"] = fingerprint
+    inventory = validate_xls_named_range_inventory(template, manifest["anchors"], "with_skill")
+    expected_inventory = _runtime_expected_inventory()
+    report["checks"]["named_ranges_xls"] = inventory
+    report["checks"]["expected_named_range_locations"] = expected_inventory["locations"]
+    errors = list(inventory["errors"])
+    errors.extend(compare_named_range_inventories(expected_inventory, inventory, required_names("with_skill")))
+    report["checks"]["named_range_count"] = len(required_names("with_skill"))
+    report["checks"]["runtime_contract"] = {
+        "scope": "workbook",
+        "regular_item_count": manifest["validation"]["regular_item_count"],
+        "regular_items_width": 8,
+        "required_variant": "with_skill",
+        "forbidden_variant_names": [],
+    }
+    _raise_runtime_report(report, errors)
+    report["status"] = "passed"
+    return report
+
+
+def validate_named_range_runtime_roundtrip(
+    template_path: Path | str,
+    manifest_path: Path | str = DEFAULT_MANIFEST,
+    raw_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run the optional LibreOffice XLS->XLSX consistency checks."""
+    template = Path(template_path).expanduser().resolve()
+    manifest_file = Path(manifest_path).expanduser().resolve()
+    if raw_report is None:
+        raw_report = validate_named_range_runtime_raw(template, manifest_file)
+    manifest, fingerprint = _validate_runtime_manifest(template, manifest_file)
+    report = _runtime_report(template, manifest_file, manifest)
+    report["checks"]["sha256"] = fingerprint
+    report["checks"]["named_ranges_xls"] = raw_report["checks"]["named_ranges_xls"]
+    expected_inventory = _runtime_expected_inventory()
+    report["checks"]["expected_named_range_locations"] = expected_inventory["locations"]
+    errors: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="gradebook-named-runtime-roundtrip-") as temp_name:
+        xlsx = convert_to_xlsx(template, Path(temp_name) / "roundtrip-xlsx", find_soffice())
+        workbook = load_workbook(xlsx, data_only=False)
+        xlsx_inventory = validate_named_range_inventory(workbook, manifest["anchors"], "with_skill")
+        report["checks"]["named_ranges_xlsx"] = xlsx_inventory
+        errors.extend(xlsx_inventory["errors"])
+        errors.extend(compare_xls_and_xlsx_named_ranges(
+            raw_report["checks"]["named_ranges_xls"], xlsx_inventory, required_names("with_skill")
+        ))
+        errors.extend(compare_named_range_inventories(
+            raw_report["checks"]["named_ranges_xls"], xlsx_inventory, required_names("with_skill")
+        ))
+        errors.extend(compare_named_range_inventories(expected_inventory, xlsx_inventory, required_names("with_skill")))
+    report["checks"]["named_range_count"] = len(required_names("with_skill"))
+    _raise_runtime_report(report, errors)
+    report["status"] = "passed"
+    return report
 
 
 def validate_named_range_runtime(
     template_path: Path | str,
     manifest_path: Path | str = DEFAULT_MANIFEST,
 ) -> dict[str, Any]:
-    """Run the non-skippable name-safety checks used before COM writes.
-
-    This intentionally validates only the raw BIFF names, the LibreOffice
-    round-trip names, their exact destinations, and their structural
-    relationships. Formatting, fonts, rendering, and protected-layout checks
-    belong to the full template validation path.
-    """
-    template = Path(template_path).expanduser().resolve()
-    manifest = load_manifest(manifest_path)
-    errors: list[str] = []
-    report: dict[str, Any] = {
-        "template": str(template),
-        "manifest": str(Path(manifest_path).expanduser().resolve()),
-        "template_version": manifest.get("template", {}).get("version"),
-        "status": "failed",
-        "errors": errors,
-        "warnings": [],
-        "checks": {},
-    }
-    ensure_supported_major(manifest)
-    if validate_manifest_contract(manifest) != "excel_named_range":
-        raise ValueError("Named-range runtime preflight requires a v1.1 excel_named_range manifest")
-    actual_hash = validate_template_package_identity(template, manifest)
-    report["checks"]["sha256"] = {
-        "expected": manifest.get("fingerprint", {}).get("sha256"),
-        "actual": actual_hash,
-    }
-    if template.suffix.lower() != ".xls":
-        raise ValueError("Named-range runtime preflight requires an original .xls template")
-
-    with tempfile.TemporaryDirectory(prefix="gradebook-named-runtime-") as temp_name:
-        temp_dir = Path(temp_name)
-        xlsx = convert_to_xlsx(template, temp_dir / "roundtrip-xlsx", find_soffice())
-        workbook = load_workbook(xlsx, data_only=False)
-        xls_inventory = validate_xls_named_range_inventory(
-            template,
-            manifest["anchors"],
-            "with_skill",
-        )
-        xlsx_inventory = validate_named_range_inventory(
-            workbook,
-            manifest["anchors"],
-            "with_skill",
-        )
-        report["checks"]["named_ranges_xls"] = xls_inventory
-        report["checks"]["named_ranges_xlsx"] = xlsx_inventory
-        errors.extend(xls_inventory["errors"])
-        errors.extend(xlsx_inventory["errors"])
-        errors.extend(
-            compare_xls_and_xlsx_named_ranges(
-                xls_inventory,
-                xlsx_inventory,
-                required_names("with_skill"),
-            )
-        )
-        errors.extend(
-            compare_named_range_inventories(
-                xls_inventory,
-                xlsx_inventory,
-                required_names("with_skill"),
-            )
-        )
-        base_manifest = load_manifest(V10_MANIFEST)
-        expected_locations = expected_named_range_locations(base_manifest["structure"], "with_skill")
-        expected_inventory = {
-            "locations": {
-                name: location.to_dict() for name, location in expected_locations.items()
-            }
-        }
-        report["checks"]["expected_named_range_locations"] = expected_inventory["locations"]
-        for inventory in (xls_inventory, xlsx_inventory):
-            errors.extend(
-                compare_named_range_inventories(
-                    expected_inventory,
-                    inventory,
-                    required_names("with_skill"),
-                )
-            )
-
-    if errors:
-        report["errors"] = sorted(set(f"Named-range runtime preflight: {error}" for error in errors))
-        raise TemplateValidationError(report)
-    report["status"] = "passed"
-    report["checks"]["named_range_count"] = len(required_names("with_skill"))
-    return report
+    """Run raw and LibreOffice round-trip runtime checks."""
+    raw_report = validate_named_range_runtime_raw(template_path, manifest_path)
+    return validate_named_range_runtime_roundtrip(template_path, manifest_path, raw_report)
 
 
 def validate_template(
@@ -865,7 +904,12 @@ def validate_template(
 
     expected_hash = str(manifest.get("fingerprint", {}).get("sha256") or manifest.get("fingerprint", {}).get("value", "")).upper()
     actual_hash = sha256(template)
-    canonical = manifest_template_path(manifest)
+    try:
+        canonical = canonical_template_for_mode(mode)
+        validate_canonical_baselines(require_v11=mode == "excel_named_range")
+    except ValueError as exc:
+        errors.append(str(exc))
+        canonical = manifest_template_path(manifest)
     is_canonical = template == canonical
     if not is_canonical and not canonical.exists():
         errors.append(f"Canonical template not found: {canonical}")
@@ -1094,12 +1138,19 @@ def main() -> int:
         action="store_true",
         help="Run the non-skippable v1.1 named-range safety checks without full formatting validation.",
     )
+    parser.add_argument(
+        "--named-range-runtime-raw",
+        action="store_true",
+        help="Run the non-skippable raw BIFF named-range safety checks without LibreOffice.",
+    )
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
     try:
         package = resolve_template_package(args.template or None, args.manifest or None)
         manifest = package.manifest
-        if args.named_range_runtime_preflight:
+        if args.named_range_runtime_raw:
+            report = validate_named_range_runtime_raw(package.template_path, package.manifest_path)
+        elif args.named_range_runtime_preflight:
             report = validate_named_range_runtime(package.template_path, package.manifest_path)
         elif args.identity_only:
             actual = validate_template_package_identity(package.template_path, manifest)

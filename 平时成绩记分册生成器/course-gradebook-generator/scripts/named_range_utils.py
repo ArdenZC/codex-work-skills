@@ -303,7 +303,7 @@ def _validate_relationships(locations: dict[str, NamedRangeLocation], errors: li
             or template_row.min_col != table.min_col
             or template_row.max_col != table.max_col
         ):
-            _add_unique(errors, "gb_template_row must equal the first row of gb_data_table")
+            _add_unique(errors, "Named range gb_template_row must equal the first row of gb_data_table")
     data_columns = (
         "gb_serial_col",
         "gb_student_id_col",
@@ -322,13 +322,13 @@ def _validate_relationships(locations: dict[str, NamedRangeLocation], errors: li
             if location is None:
                 continue
             if location.min_row != table.min_row or location.max_row != table.max_row:
-                _add_unique(errors, f"{name} must use the same data rows as gb_data_table")
+                _add_unique(errors, f"Named range {name} must use the same data rows as gb_data_table")
             if location.min_col < table.min_col or location.max_col > table.max_col:
-                _add_unique(errors, f"{name} must be contained in gb_data_table")
+                _add_unique(errors, f"Named range {name} must be contained in gb_data_table")
         regular = locations.get("gb_regular_items")
         weighted = locations.get("gb_regular_weighted_col")
         if regular and weighted and regular.max_col + 1 != weighted.min_col:
-            _add_unique(errors, "gb_regular_items must be immediately before gb_regular_weighted_col")
+            _add_unique(errors, "Named range gb_regular_items must be immediately before gb_regular_weighted_col")
     physical = Counter(
         (location.sheet, location.min_row, location.min_col, location.max_row, location.max_col)
         for location in locations.values()

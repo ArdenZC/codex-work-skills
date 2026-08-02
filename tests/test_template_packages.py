@@ -3434,6 +3434,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
         theory_pct: float | None = None,
         skill_pct: float | None = None,
     ) -> Path:
+        folder.mkdir(parents=True, exist_ok=True)
         xlsx = folder / "课程成绩单.xlsx"
         workbook = Workbook()
         sheet = workbook.active
@@ -4621,6 +4622,43 @@ class GradebookTemplatePackageTests(unittest.TestCase):
         valid = yaml.safe_load(GRADE_V11_MANIFEST.read_text(encoding="utf-8"))
         validate_manifest_contract(valid)
 
+        regular_count_fault = deepcopy(valid)
+        regular_count_fault["validation"]["regular_item_count"] = 7
+        with self.assertRaisesRegex(ValueError, "closed generator contract"):
+            validate_manifest_contract(regular_count_fault)
+
+        with tempfile.TemporaryDirectory(prefix="grade-package-regular-count-cli-") as temp_name:
+            folder = Path(temp_name)
+            source_folder = folder / "source"
+            source_folder.mkdir()
+            source = self.make_source(source_folder, skill=True)
+            custom_template, custom_manifest = write_gradebook_manifest(
+                folder / "custom",
+                GRADE_V11_MANIFEST,
+                GRADE_V11_TEMPLATE,
+            )
+            manifest_data = yaml.safe_load(custom_manifest.read_text(encoding="utf-8"))
+            manifest_data["validation"]["regular_item_count"] = 7
+            custom_manifest.write_text(
+                yaml.safe_dump(manifest_data, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--template",
+                str(custom_template),
+                "--manifest",
+                str(custom_manifest),
+                "--output-dir",
+                str(folder / "output"),
+                "--skip-template-validation",
+                "--skip-output-validation",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("closed generator contract", (result.stdout + result.stderr).lower())
+
         missing_required = deepcopy(valid)
         missing_required["anchors"]["required"] = list(missing_required["anchors"]["required"][:-1])
         with self.assertRaisesRegex(ValueError, "anchors.required"):
@@ -5023,8 +5061,10 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             )
             self.assertNotEqual(offset_result.returncode, 0)
             offset_diagnostic = offset_result.stdout + offset_result.stderr
-            self.assertIn("out of bounds", offset_diagnostic.lower())
-            self.assertIn("gb_regular_items", offset_diagnostic.lower())
+            self.assertTrue(
+                "regular_item_count" in offset_diagnostic.lower()
+                or "closed generator contract" in offset_diagnostic.lower()
+            )
             self.assertFalse(offset_output.exists() and list(offset_output.glob("*.xls")))
 
     def test_named_range_output_fault_reports_use_consistent_top_level_fields(self) -> None:
@@ -5217,6 +5257,147 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             self.assertEqual(report["status"], "skipped")
             self.assertEqual(report["validation_skipped"], ["template", "output"])
 
+    def test_python_output_path_collisions_are_rejected_before_generation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-python-path-safety-") as temp_name:
+            folder = Path(temp_name)
+            source_folder = folder / "source"
+            source_folder.mkdir()
+            source = self.make_source(source_folder, skill=True)
+            collision_cases = (
+                ("source", source, source.parent),
+                ("template", GRADE_V11_TEMPLATE, folder / "template-output"),
+                ("canonical-v10", GRADE_V10_TEMPLATE, folder / "v10-output"),
+                ("compatibility", GRADE / "assets" / "平时成绩记分册模板.xls", folder / "compat-output"),
+            )
+            protected_hashes = {path: file_sha256(path) for _, path, _ in collision_cases}
+            for label, target, output_dir in collision_cases:
+                result = run_script(
+                    GRADE / "scripts" / "generate_gradebook.py",
+                    "--source",
+                    str(source),
+                    "--output-dir",
+                    str(output_dir),
+                    "--output-file",
+                    str(target),
+                    "--skip-template-validation",
+                    "--skip-output-validation",
+                )
+                self.assertNotEqual(result.returncode, 0, label)
+                self.assertTrue(
+                    any(fragment in (result.stdout + result.stderr).lower() for fragment in ("must not", "inside --output-dir")),
+                    result.stdout + result.stderr,
+                )
+            for path, digest in protected_hashes.items():
+                self.assertEqual(file_sha256(path), digest)
+
+    def test_com_output_collisions_and_failure_cleanup_are_real(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Excel COM is only available on Windows")
+        probe = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "$excel = New-Object -ComObject Excel.Application; $excel.Quit(); [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null",
+            ],
+            cwd=ROOT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
+        if probe.returncode != 0:
+            self.skipTest("Microsoft Excel COM is unavailable on this machine")
+
+        with tempfile.TemporaryDirectory(prefix="grade-package-com-safety-") as temp_name:
+            folder = Path(temp_name)
+            source_folder = folder / "source"
+            source_folder.mkdir()
+            source = self.make_source(source_folder, skill=True)
+            env = os.environ.copy()
+            env["CODEX_PYTHON"] = str(PYTHON)
+
+            def run_com(*args: str) -> subprocess.CompletedProcess[str]:
+                return subprocess.run(
+                    [
+                        "powershell",
+                        "-NoProfile",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-File",
+                        str(GRADE / "scripts" / "generate_gradebook.ps1"),
+                        "-SourcePath",
+                        str(source),
+                        "-SkipTemplateValidation",
+                        "-SkipOutputValidation",
+                        *args,
+                    ],
+                    cwd=ROOT,
+                    env=env,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    capture_output=True,
+                    check=False,
+                )
+
+            collision_cases = (
+                ("source", source, source.parent),
+                ("template", GRADE_V11_TEMPLATE, folder / "template-output"),
+                ("canonical-v10", GRADE_V10_TEMPLATE, folder / "v10-output"),
+                ("compatibility", GRADE / "assets" / "平时成绩记分册模板.xls", folder / "compat-output"),
+            )
+            protected_hashes = {path: file_sha256(path) for _, path, _ in collision_cases}
+            for label, target, output_dir in collision_cases:
+                result = run_com("-OutputDir", str(output_dir), "-OutputFile", str(target))
+                self.assertNotEqual(result.returncode, 0, label)
+                self.assertIn("must not", (result.stdout + result.stderr).lower(), label)
+            for path, digest in protected_hashes.items():
+                self.assertEqual(file_sha256(path), digest)
+
+            failure_source_folder = folder / "failure-source"
+            failure_source_folder.mkdir()
+            failure_source = self.make_source(failure_source_folder, skill=True, total_delta=1.0)
+            output = folder / "failure-output"
+            output.mkdir()
+            old_output = output / "failure-source-平时成绩记分册.xls"
+            unrelated_a = output / "unrelated-a.xls"
+            unrelated_b = output / "unrelated-b.xls"
+            old_output.write_bytes(b"old-formal-output")
+            shutil.copy2(GRADE_V10_TEMPLATE, unrelated_a)
+            shutil.copy2(GRADE_V10_TEMPLATE, unrelated_b)
+            old_hash = file_sha256(old_output)
+            unrelated_hashes = {path: file_sha256(path) for path in (unrelated_a, unrelated_b)}
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(GRADE / "scripts" / "generate_gradebook.ps1"),
+                    "-SourcePath",
+                    str(failure_source),
+                    "-OutputDir",
+                    str(output),
+                    "-SkipTemplateValidation",
+                    "-SkipOutputValidation",
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(file_sha256(old_output), old_hash)
+            for path, digest in unrelated_hashes.items():
+                self.assertEqual(file_sha256(path), digest)
+            self.assertEqual(list(output.glob(".*.tmp")), [])
+
     def test_regular_score_boundaries_are_exact(self) -> None:
         sys.modules.pop("generate_gradebook", None)
         sys.path.insert(0, str(GRADE / "scripts"))
@@ -5395,6 +5576,340 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             }, ensure_ascii=False), encoding="utf-8")
             result = run_script(GRADE / "scripts" / "validate_output.py", "--input-json", str(input_json), "--output-dir", str(output))
             self.assertNotEqual(result.returncode, 0)
+
+    def test_python_double_skip_runs_raw_preflight_before_candidate_creation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-python-raw-skip-") as temp_name:
+            folder = Path(temp_name)
+            tampered = tamper_xls_named_range(
+                folder,
+                GRADE_V11_TEMPLATE,
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'平时成绩'!$C$1"),
+                "raw-location",
+            )
+            custom_template, custom_manifest = write_gradebook_manifest(
+                folder / "custom",
+                GRADE_V11_MANIFEST,
+                tampered,
+            )
+            source = self.make_source(folder, skill=True)
+            output = folder / "output"
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--template",
+                str(custom_template),
+                "--manifest",
+                str(custom_manifest),
+                "--output-dir",
+                str(output),
+                "--skip-template-validation",
+                "--skip-output-validation",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            diagnostic = result.stdout + result.stderr
+            self.assertIn("runtime preflight", diagnostic.lower())
+            self.assertIn("gb_term", diagnostic)
+            self.assertFalse(output.exists() and list(output.glob("*.xls")))
+
+    def test_skip_validation_requires_real_output_and_raw_named_ranges(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-skip-truth-") as temp_name:
+            folder = Path(temp_name)
+            input_json = folder / "input.json"
+            input_json.write_text(
+                json.dumps(gradebook_normalized_input(skill=True), ensure_ascii=False),
+                encoding="utf-8",
+            )
+
+            def run_skip(output_dir: Path, output_file: Path) -> subprocess.CompletedProcess[str]:
+                return run_script(
+                    GRADE / "scripts" / "validate_output.py",
+                    "--input-json",
+                    str(input_json),
+                    "--output-dir",
+                    str(output_dir),
+                    "--output-file",
+                    str(output_file),
+                    "--manifest",
+                    str(GRADE_V11_MANIFEST),
+                    "--template-path",
+                    str(GRADE_V11_TEMPLATE),
+                    "--skip-validation",
+                )
+
+            missing_dir = folder / "missing"
+            missing = run_skip(missing_dir, missing_dir / "missing.xls")
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertTrue((missing_dir / "qa-report.json").exists())
+            self.assertIn("not found", (missing_dir / "qa-report.json").read_text(encoding="utf-8"))
+
+            empty_dir = folder / "empty"
+            empty_dir.mkdir()
+            empty_file = empty_dir / "empty.xls"
+            empty_file.write_bytes(b"")
+            empty = run_skip(empty_dir, empty_file)
+            self.assertNotEqual(empty.returncode, 0)
+            self.assertIn("empty", (empty_dir / "qa-report.json").read_text(encoding="utf-8").lower())
+
+            directory_dir = folder / "directory"
+            directory_dir.mkdir()
+            directory_file = directory_dir / "directory.xls"
+            directory_file.mkdir()
+            directory = run_skip(directory_dir, directory_file)
+            self.assertNotEqual(directory.returncode, 0)
+            self.assertIn("not a file", (directory_dir / "qa-report.json").read_text(encoding="utf-8"))
+
+            outside_dir = folder / "outside-check"
+            outside_dir.mkdir()
+            outside = run_skip(outside_dir, folder / "outside.xls")
+            self.assertNotEqual(outside.returncode, 0)
+            self.assertIn("inside --output-dir", outside.stderr)
+
+            (folder / "pristine-source").mkdir()
+            source = self.make_source(folder / "pristine-source", skill=True)
+            generated_dir = folder / "pristine"
+            generated = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(generated_dir),
+                "--skip-output-validation",
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr or generated.stdout)
+            pristine = next(generated_dir.glob("*.xls"))
+            for label, mutate, expected in (
+                ("missing-names", lambda path: patch_xlsx_named_range(path, "gb_term", remove=True), ("missing managed named range",)),
+                ("broken-name", lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="#REF!"), ("broken", "absolute worksheet rectangle")),
+            ):
+                candidate_dir = folder / label
+                candidate_dir.mkdir()
+                candidate = tamper_xls_named_range(candidate_dir, pristine, mutate, label)
+                validation = run_skip(candidate_dir, candidate)
+                self.assertNotEqual(validation.returncode, 0)
+                report = json.loads((candidate_dir / "qa-report.json").read_text(encoding="utf-8"))
+                self.assertEqual(report["status"], "failed")
+                diagnostic = (validation.stdout + validation.stderr).lower()
+                self.assertTrue(any(fragment in diagnostic for fragment in expected), diagnostic)
+
+    def test_builder_uses_fixed_canonical_v10_baseline_for_layout_faults(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-builder-baseline-") as temp_name:
+            folder = Path(temp_name)
+
+            def tamper_xls(source: Path, label: str, mutate) -> Path:
+                xlsx = convert_with_soffice(source, folder / f"{label}-xlsx", "xlsx")
+                workbook = load_workbook(xlsx)
+                mutate(workbook)
+                workbook.save(xlsx)
+                return convert_with_soffice(xlsx, folder / f"{label}-xls", "xls")
+
+            from openpyxl.styles import Side
+
+            def change_font(workbook) -> None:
+                cell = workbook["平时成绩"]["C2"]
+                font = copy(cell.font)
+                font.name = "Arial"
+                cell.font = font
+
+            def change_border(workbook) -> None:
+                cell = workbook["平时成绩"]["E4"]
+                border = copy(cell.border)
+                border.bottom = Side(style="thick")
+                cell.border = border
+
+            faults = (
+                ("title", lambda workbook: setattr(workbook["平时成绩"]["A1"], "value", "被篡改标题")),
+                ("font", change_font),
+                ("border", change_border),
+                (
+                    "width",
+                    lambda workbook: setattr(
+                        workbook["平时成绩"].column_dimensions["A"],
+                        "width",
+                        workbook["平时成绩"].column_dimensions["A"].width + 4,
+                    ),
+                ),
+                ("orientation", lambda workbook: setattr(workbook["平时成绩"].page_setup, "orientation", "portrait")),
+                ("non-target", lambda workbook: setattr(workbook["Sheet1"]["A1"], "value", "被篡改非目标工作表")),
+                ("protection", lambda workbook: setattr(workbook["平时成绩"].protection, "sheet", True)),
+            )
+            for label, mutate in faults:
+                tampered = tamper_xls(GRADE_V10_TEMPLATE, label, mutate)
+                output = folder / f"rejected-{label}"
+                result = run_script(
+                    GRADE / "scripts" / "build_named_range_template.py",
+                    "--source",
+                    str(tampered),
+                    "--output-dir",
+                    str(output),
+                    "--force",
+                )
+                self.assertNotEqual(result.returncode, 0, label)
+                self.assertIn("canonical v1.0", (result.stdout + result.stderr).lower(), label)
+                self.assertFalse((output / "template.xls").exists(), label)
+
+            v11_tampered = tamper_xls(GRADE_V11_TEMPLATE, "v11-title", lambda workbook: setattr(workbook["平时成绩"]["A1"], "value", "被篡改标题"))
+            v11_output = folder / "rejected-v11-title"
+            v11_result = run_script(
+                GRADE / "scripts" / "build_named_range_template.py",
+                "--source",
+                str(v11_tampered),
+                "--output-dir",
+                str(v11_output),
+                "--force",
+            )
+            self.assertNotEqual(v11_result.returncode, 0)
+            self.assertIn("canonical v1.0", (v11_result.stdout + v11_result.stderr).lower())
+
+    def test_named_range_capacity_faults_are_rejected_and_exact_100_passes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-capacity-faults-") as temp_name:
+            folder = Path(temp_name)
+
+            def input_file(path: Path, skill: bool, count: int) -> Path:
+                path.write_text(json.dumps(gradebook_normalized_input(skill=skill, count=count), ensure_ascii=False), encoding="utf-8")
+                return path
+
+            def ranges_for(variant: str, last_row: int) -> dict[str, str]:
+                if variant == "with_skill":
+                    return {
+                        "gb_data_table": f"'平时成绩'!$A$5:$Q${last_row}",
+                        "gb_serial_col": f"'平时成绩'!$A$5:$A${last_row}",
+                        "gb_student_id_col": f"'平时成绩'!$B$5:$B${last_row}",
+                        "gb_student_name_col": f"'平时成绩'!$C$5:$C${last_row}",
+                        "gb_regular_items": f"'平时成绩'!$D$5:$K${last_row}",
+                        "gb_regular_weighted_col": f"'平时成绩'!$L$5:$L${last_row}",
+                        "gb_theory_score_col": f"'平时成绩'!$M$5:$M${last_row}",
+                        "gb_theory_weighted_col": f"'平时成绩'!$N$5:$N${last_row}",
+                        "gb_skill_score_col": f"'平时成绩'!$O$5:$O${last_row}",
+                        "gb_skill_weighted_col": f"'平时成绩'!$P$5:$P${last_row}",
+                        "gb_total_score_col": f"'平时成绩'!$Q$5:$Q${last_row}",
+                    }
+                return {
+                    "gb_data_table": f"'平时成绩'!$A$5:$O${last_row}",
+                    "gb_serial_col": f"'平时成绩'!$A$5:$A${last_row}",
+                    "gb_student_id_col": f"'平时成绩'!$B$5:$B${last_row}",
+                    "gb_student_name_col": f"'平时成绩'!$C$5:$C${last_row}",
+                    "gb_regular_items": f"'平时成绩'!$D$5:$K${last_row}",
+                    "gb_regular_weighted_col": f"'平时成绩'!$L$5:$L${last_row}",
+                    "gb_theory_score_col": f"'平时成绩'!$M$5:$M${last_row}",
+                    "gb_theory_weighted_col": f"'平时成绩'!$N$5:$N${last_row}",
+                    "gb_total_score_col": f"'平时成绩'!$O$5:$O${last_row}",
+                }
+
+            def validate_fault(label: str, source_output: Path, data: Path, mutate) -> None:
+                candidate_dir = folder / label
+                candidate_dir.mkdir()
+                candidate = tamper_xls_named_range(candidate_dir, source_output, mutate, label)
+                result = run_script(
+                    GRADE / "scripts" / "validate_output.py",
+                    "--input-json",
+                    str(data),
+                    "--output-dir",
+                    str(candidate_dir),
+                    "--output-file",
+                    str(candidate),
+                    "--manifest",
+                    str(GRADE_V11_MANIFEST),
+                    "--template-path",
+                    str(GRADE_V11_TEMPLATE),
+                )
+                self.assertNotEqual(result.returncode, 0, label)
+                self.assertIn("named range", (result.stdout + result.stderr).lower(), label)
+
+            source2 = self.make_source(folder / "source2", skill=True, count=2)
+            output2 = folder / "output2"
+            generated2 = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source2),
+                "--output-dir",
+                str(output2),
+                "--skip-output-validation",
+            )
+            self.assertEqual(generated2.returncode, 0, generated2.stderr or generated2.stdout)
+            output2_file = next(output2.glob("*.xls"))
+            input2 = input_file(folder / "input2.json", True, 2)
+            expanded2 = ranges_for("with_skill", 100)
+            validate_fault(
+                "expand-2-to-100",
+                output2_file,
+                input2,
+                lambda path: [patch_xlsx_named_range(path, name, attr_text=address) for name, address in expanded2.items()],
+            )
+            validate_fault(
+                "single-column-extra-row",
+                output2_file,
+                input2,
+                lambda path: patch_xlsx_named_range(path, "gb_theory_score_col", attr_text="'平时成绩'!$M$5:$M$53"),
+            )
+
+            source49 = self.make_source(folder / "source49", skill=False, count=49)
+            output49 = folder / "output49"
+            generated49 = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source49),
+                "--output-dir",
+                str(output49),
+                "--skip-output-validation",
+            )
+            self.assertEqual(generated49.returncode, 0, generated49.stderr or generated49.stdout)
+            output49_file = next(output49.glob("*.xls"))
+            input49 = input_file(folder / "input49.json", False, 49)
+            expanded49 = ranges_for("without_skill", 80)
+            validate_fault(
+                "expand-49-to-80",
+                output49_file,
+                input49,
+                lambda path: [patch_xlsx_named_range(path, name, attr_text=address) for name, address in expanded49.items()],
+            )
+            validate_fault(
+                "table-one-row-short",
+                output49_file,
+                input49,
+                lambda path: patch_xlsx_named_range(path, "gb_data_table", attr_text="'平时成绩'!$A$5:$O$52"),
+            )
+
+            for skill in (False, True):
+                source100 = self.make_source(folder / ("source100-skill" if skill else "source100-no-skill"), skill=skill, count=100)
+                output100 = folder / ("output100-skill" if skill else "output100-no-skill")
+                generated100 = run_script(
+                    GRADE / "scripts" / "generate_gradebook.py",
+                    "--source",
+                    str(source100),
+                    "--output-dir",
+                    str(output100),
+                )
+                self.assertEqual(generated100.returncode, 0, generated100.stderr or generated100.stdout)
+                report = json.loads((output100 / "qa-report.json").read_text(encoding="utf-8"))
+                self.assertEqual(report["status"], "passed")
+                self.assertEqual(report["checks"]["named_ranges"]["xlsx"]["locations"]["gb_data_table"]["max_row"], 104)
+
+    def test_python_failure_preserves_existing_output_and_unrelated_xls(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-python-atomic-") as temp_name:
+            folder = Path(temp_name)
+            source = self.make_source(folder, total_delta=1.0)
+            output = folder / "output"
+            output.mkdir()
+            old_output = output / f"{folder.name}-平时成绩记分册.xls"
+            old_output.write_bytes(b"old-formal-output")
+            unrelated = output / "unrelated.xls"
+            unrelated.write_bytes(b"unrelated")
+            old_hash = file_sha256(old_output)
+            unrelated_hash = file_sha256(unrelated)
+            result = run_script(
+                GRADE / "scripts" / "generate_gradebook.py",
+                "--source",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--skip-template-validation",
+                "--skip-output-validation",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(file_sha256(old_output), old_hash)
+            self.assertEqual(file_sha256(unrelated), unrelated_hash)
+            self.assertEqual(list(output.glob("*.tmp")), [])
 
 
 if __name__ == "__main__":

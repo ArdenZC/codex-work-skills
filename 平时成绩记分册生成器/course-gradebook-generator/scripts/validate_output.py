@@ -13,6 +13,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from xlrd import open_workbook
 
 from package_common import (
     DEFAULT_MANIFEST,
@@ -26,6 +27,8 @@ from package_common import (
     percentage_label,
     resolve_template_package,
     source_total_matches,
+    validate_canonical_baselines,
+    validate_output_paths,
     validate_input,
     validate_template_package_identity,
 )
@@ -672,6 +675,79 @@ def _compare_named_output_to_template(
     return sorted(set(differences))
 
 
+_NAMED_DYNAMIC_DATA_NAMES = (
+    "gb_data_table",
+    "gb_serial_col",
+    "gb_student_id_col",
+    "gb_student_name_col",
+    "gb_regular_items",
+    "gb_regular_weighted_col",
+    "gb_theory_score_col",
+    "gb_theory_weighted_col",
+    "gb_skill_score_col",
+    "gb_skill_weighted_col",
+    "gb_total_score_col",
+)
+
+
+def _named_capacity_errors(
+    inventory: dict[str, Any],
+    variant: str,
+    expected_last_row: int,
+    expected_template_row: int,
+) -> list[str]:
+    errors: list[str] = []
+    locations = inventory.get("locations", {})
+    for name in _NAMED_DYNAMIC_DATA_NAMES:
+        if name not in required_names(variant):
+            continue
+        location = locations.get(name)
+        if location is None:
+            continue
+        if int(location["max_row"]) != expected_last_row:
+            errors.append(
+                f"Named range {name} must end at row {expected_last_row}, got {location['max_row']}"
+            )
+    template_row = locations.get("gb_template_row")
+    if template_row is not None and (
+        int(template_row["min_row"]) != expected_template_row
+        or int(template_row["max_row"]) != expected_template_row
+    ):
+        errors.append(
+            f"Named range gb_template_row must remain row {expected_template_row}, "
+            f"got {template_row['min_row']}:{template_row['max_row']}"
+        )
+    return sorted(set(errors))
+
+
+def _raw_runtime_location_errors(inventory: dict[str, Any], variant: str) -> list[str]:
+    expected_locations = expected_named_range_locations(load_manifest(V10_MANIFEST)["structure"], variant)
+    actual_locations = inventory.get("locations", {})
+    dynamic_names = set(_NAMED_DYNAMIC_DATA_NAMES)
+    errors: list[str] = []
+    for name in required_names(variant):
+        expected = expected_locations.get(name)
+        actual = actual_locations.get(name)
+        if expected is None or actual is None:
+            continue
+        if (
+            actual["sheet"] != expected.sheet
+            or int(actual["min_row"]) != expected.min_row
+            or int(actual["min_col"]) != expected.min_col
+            or int(actual["max_col"]) != expected.max_col
+        ):
+            errors.append(
+                f"Named range {name} is not at the canonical location: expected "
+                f"{expected.sheet}!{expected.address}, got {actual.get('sheet')}!{actual.get('address')}"
+            )
+        if name in dynamic_names and int(actual["max_row"]) < expected.max_row:
+            errors.append(
+                f"Named range {name} ends before the canonical template capacity: "
+                f"expected at least row {expected.max_row}, got {actual['max_row']}"
+            )
+    return sorted(set(errors))
+
+
 def _base_qa_report(
     out_dir: Path,
     manifest: dict[str, Any],
@@ -774,6 +850,64 @@ def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+def _basic_output_file_checks(
+    out_dir: Path,
+    selected_file: Path | None,
+    manifest: dict[str, Any],
+    *,
+    template_path: Path | str | None,
+    source_paths: list[Path | str] | None,
+    schema_path: Path | str,
+    report: dict[str, Any],
+) -> list[str]:
+    """Perform the minimum truthful checks required by a skipped QA path."""
+    errors: list[str] = []
+    if selected_file is None:
+        errors.append("Skipped output validation requires exactly one generated XLS file")
+        return errors
+    try:
+        validate_output_paths(
+            out_dir,
+            [selected_file],
+            source_paths=source_paths,
+            template_path=template_path,
+            manifest_path=manifest.get("_path"),
+            schema_path=schema_path,
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
+    if not selected_file.exists():
+        errors.append(f"Generated XLS file not found: {selected_file.name}")
+        return errors
+    if not selected_file.is_file():
+        errors.append(f"Generated XLS path is not a file: {selected_file.name}")
+        return errors
+    if selected_file.suffix.lower() != ".xls":
+        errors.append(f"Generated output must use the .xls extension: {selected_file.name}")
+    elif selected_file.stat().st_size <= 0:
+        errors.append(f"Generated XLS file is empty: {selected_file.name}")
+    else:
+        try:
+            open_workbook(str(selected_file), formatting_info=False)
+        except Exception as exc:
+            errors.append(f"Generated XLS file could not be opened as raw BIFF: {exc}")
+    if errors:
+        return errors
+    if anchor_mode(manifest) == "excel_named_range":
+        variant = "with_skill" if float(report.get("_input_weights", {}).get("skill", 0)) > 0.000001 else "without_skill"
+        inventory = validate_xls_named_range_inventory(selected_file, manifest["anchors"], variant)
+        report["checks"]["named_ranges"] = {
+            **report["checks"].get("named_ranges", {}),
+            "variant": variant,
+            "xls": inventory,
+        }
+        report["checks"]["named_ranges"]["xlsx"] = None
+        named_summary = _set_named_range_qa(report, inventory, None, variant)
+        report["checks"]["named_ranges"]["xls"] = inventory
+        errors.extend(named_summary["errors"])
+    return sorted(set(errors))
+
+
 def write_skipped_report(
     output_dir: Path | str,
     data: dict[str, Any],
@@ -786,6 +920,7 @@ def write_skipped_report(
     engine: str | None = None,
     template_validation: bool = True,
     output_file: Path | str | None = None,
+    source_paths: list[Path | str] | None = None,
     warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
@@ -806,10 +941,91 @@ def write_skipped_report(
         False,
         warnings,
     )
-    report["status"] = "skipped"
     report["checks"]["file_count"] = {"expected": 1, "actual": len(files)}
-    report["files_checked"] = len(files)
+    effective_file = selected_file if selected_file is not None else (files[0] if len(files) == 1 else None)
+    report["files_checked"] = 1 if effective_file is not None else len(files)
+    if effective_file is not None:
+        try:
+            report["output_file"] = effective_file.resolve().relative_to(out_dir).as_posix()
+        except ValueError:
+            report["output_file"] = effective_file.name
+    report["_input_weights"] = data.get("weights", {})
+    errors = _basic_output_file_checks(
+        out_dir,
+        effective_file,
+        manifest,
+        template_path=template_path,
+        source_paths=source_paths,
+        schema_path=schema_path,
+        report=report,
+    )
+    report.pop("_input_weights", None)
+    if errors:
+        report["errors"].extend(errors)
+        return _raise_after_qa_write(report, errors)
+    report["status"] = "skipped"
     return _write_qa_report(report)
+
+
+def _raise_after_qa_write(report: dict[str, Any], errors: list[str]) -> dict[str, Any]:
+    report["status"] = "failed"
+    report["errors"] = sorted(set(report.get("errors", []) + errors))
+    _write_qa_report(report)
+    raise RuntimeError("Skipped output validation failed: " + "; ".join(errors[:8]))
+
+
+def validate_output_raw_runtime(
+    output_dir: Path | str,
+    manifest: dict[str, Any],
+    *,
+    output_file: Path | str | None = None,
+    template_path: Path | str | None = None,
+    variant: str | None = None,
+    source_paths: list[Path | str] | None = None,
+) -> dict[str, Any]:
+    """Validate a saved candidate's raw XLS safety contract without LO QA."""
+    if anchor_mode(manifest) == "excel_named_range":
+        validate_canonical_baselines(require_v11=True)
+    out_dir = Path(output_dir).expanduser().resolve()
+    selected = _resolve_output_file(out_dir, output_file)
+    files = [selected] if selected is not None else sorted(out_dir.glob("*.xls"))
+    errors: list[str] = []
+    effective = selected if selected is not None else (files[0] if len(files) == 1 else None)
+    try:
+        validate_output_paths(
+            out_dir,
+            [effective] if effective is not None else [],
+            source_paths=source_paths,
+            template_path=template_path,
+            manifest_path=manifest.get("_path"),
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
+    if effective is None:
+        errors.append(f"Raw runtime preflight requires exactly one XLS output; found {len(files)}")
+    elif not effective.is_file():
+        errors.append(f"Raw runtime preflight output is not a file: {effective}")
+    elif effective.suffix.lower() != ".xls" or effective.stat().st_size <= 0:
+        errors.append(f"Raw runtime preflight output must be a non-empty .xls file: {effective}")
+    else:
+        try:
+            open_workbook(str(effective), formatting_info=False)
+        except Exception as exc:
+            errors.append(f"Raw runtime preflight could not open XLS as raw BIFF: {exc}")
+    inventory = None
+    if not errors and anchor_mode(manifest) == "excel_named_range":
+        selected_variant = variant or "with_skill"
+        inventory = validate_xls_named_range_inventory(effective, manifest["anchors"], selected_variant)
+        errors.extend(inventory["errors"])
+        errors.extend(_raw_runtime_location_errors(inventory, selected_variant))
+    if errors:
+        raise RuntimeError("Raw output runtime preflight failed: " + "; ".join(sorted(set(errors))))
+    return {
+        "status": "passed",
+        "files_checked": 1,
+        "variant": variant,
+        "inventory": inventory,
+    }
 
 
 def _resolve_output_file(out_dir: Path, output_file: Path | str | None) -> Path | None:
@@ -839,6 +1055,7 @@ def validate_output_dir(
     template_validation: bool = True,
     output_validation: bool = True,
     output_file: Path | str | None = None,
+    source_paths: list[Path | str] | None = None,
     extra_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
@@ -859,6 +1076,18 @@ def validate_output_dir(
         extra_warnings,
     )
     errors: list[str] = report["errors"]
+    effective_file = selected_file if selected_file is not None else (files[0] if len(files) == 1 else None)
+    try:
+        validate_output_paths(
+            out_dir,
+            [effective_file] if effective_file is not None else [],
+            source_paths=source_paths,
+            template_path=template_path,
+            manifest_path=manifest.get("_path"),
+            schema_path=schema_path,
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
     if selected_file is None and len(files) != 1:
         errors.append(f"Expected one generated XLS file, got {len(files)}")
     path = None
@@ -1005,9 +1234,31 @@ def validate_output_dir(
                                     named_variant,
                                 )
                                 structure = runtime_manifest["structure"]
-                                structure["output_capacity_last_row"] = int(
-                                    output_named_xlsx["locations"]["gb_data_table"]["max_row"]
+                                template_capacity_end = int(
+                                    structure["template_last_data_row"]
                                 )
+                                expected_last_row = max(
+                                    template_capacity_end,
+                                    int(structure["data_start_row"]) + len(data["students"]) - 1,
+                                )
+                                structure["output_capacity_last_row"] = expected_last_row
+                                errors.extend(
+                                    _named_capacity_errors(
+                                        output_named_xlsx,
+                                        named_variant,
+                                        expected_last_row,
+                                        int(structure["data_start_row"]),
+                                    )
+                                )
+                                if output_named_xls is not None:
+                                    errors.extend(
+                                        _named_capacity_errors(
+                                            output_named_xls,
+                                            named_variant,
+                                            expected_last_row,
+                                            int(structure["data_start_row"]),
+                                        )
+                                    )
                                 columns = structure["columns"]
                                 start_row = int(structure["data_start_row"])
                                 total_column = columns["total_score"]
@@ -1241,25 +1492,42 @@ def validate_output_dir(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate a generated XLS gradebook and write a QA report.")
-    parser.add_argument("--input-json", required=True)
+    parser.add_argument("--input-json", required=False, default="")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--output-file", default="")
     parser.add_argument("--manifest", default="")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
     parser.add_argument("--template-path", default="")
+    parser.add_argument("--source-file", action="append", default=[])
     parser.add_argument("--custom-template", action="store_true")
     parser.add_argument("--engine", default="")
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
+    parser.add_argument("--raw-runtime-preflight", action="store_true")
+    parser.add_argument("--variant", choices=("with_skill", "without_skill"), default="")
     args = parser.parse_args()
     try:
-        data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
         package = resolve_template_package(args.template_path or None, args.manifest or None)
         manifest = package.manifest
+        validate_canonical_baselines(require_v11=anchor_mode(manifest) == "excel_named_range")
         validate_template_package_identity(package.template_path, manifest)
         template_path = package.template_path
         custom_template = args.custom_template if args.custom_template else None
+        if args.raw_runtime_preflight:
+            result = validate_output_raw_runtime(
+                args.output_dir,
+                manifest,
+                output_file=args.output_file or None,
+                template_path=template_path,
+                variant=args.variant or None,
+                source_paths=args.source_file,
+            )
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if not args.input_json:
+            raise ValueError("--input-json is required unless --raw-runtime-preflight is used")
+        data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
         if args.skip_validation:
             report = write_skipped_report(
                 args.output_dir,
@@ -1272,6 +1540,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 output_file=args.output_file or None,
+                source_paths=args.source_file,
             )
         else:
             report = validate_output_dir(
@@ -1285,6 +1554,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 output_file=args.output_file or None,
+                source_paths=args.source_file,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

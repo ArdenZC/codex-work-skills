@@ -18,12 +18,14 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from copy import copy
 from pathlib import Path
 
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
+from xlrd import open_workbook
 
 from named_range_contracts import variant_for_skill
 from named_range_utils import (
@@ -48,10 +50,11 @@ from package_common import (
     validate_manifest_contract,
     validate_template_package_identity,
     validate_input,
+    validate_output_paths,
     validate_source_totals,
 )
-from validate_output import validate_output_dir, write_skipped_report
-from validate_template import validate_template
+from validate_output import validate_output_dir, validate_output_raw_runtime, write_skipped_report
+from validate_template import validate_named_range_runtime_raw, validate_template
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -80,18 +83,131 @@ def find_soffice() -> str:
 
 def convert_with_soffice(soffice: str, source: Path, out_dir: Path, target: str) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
+    ext = target.split(":")[0].lower().lstrip(".")
+    expected = out_dir / f"{source.stem}.{ext}"
+    existing_candidates = sorted(
+        path for path in out_dir.iterdir() if path.is_file() and path.stem == source.stem
+    )
+    if existing_candidates:
+        raise RuntimeError(
+            f"LibreOffice conversion output directory is not fresh for source={source} target={ext}: "
+            f"{[str(path) for path in existing_candidates]}"
+        )
     cmd = [soffice, "--headless", "--convert-to", target, "--outdir", str(out_dir), str(source)]
     proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
     if proc.returncode != 0:
-        raise RuntimeError(f"LibreOffice conversion failed: {' '.join(cmd)}\n{proc.stdout}\n{proc.stderr}")
-    ext = target.split(":")[0].lower()
-    output = out_dir / f"{source.stem}.{ext}"
-    if not output.exists():
-        matches = sorted(out_dir.glob(f"{source.stem}.*"))
-        if matches:
-            return matches[-1]
-        raise RuntimeError(f"LibreOffice did not create expected output for {source}")
-    return output
+        raise RuntimeError(
+            f"LibreOffice conversion failed for source={source} expected={expected}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    matches = sorted(path for path in out_dir.iterdir() if path.is_file() and path.stem == source.stem)
+    if len(matches) != 1 or matches[0] != expected or not expected.is_file():
+        raise RuntimeError(
+            f"LibreOffice conversion did not produce exactly the expected {ext.upper()} output "
+            f"for source={source} expected={expected} candidates={[str(path) for path in matches]}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    if expected.stat().st_size <= 0:
+        raise RuntimeError(
+            f"LibreOffice produced an empty output for source={source} expected={expected}\n"
+            f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
+        )
+    return expected
+
+
+def _final_output_path(source_xls: Path, output_dir: Path, output_file: Path | None = None) -> Path:
+    if output_file is not None:
+        return output_file.expanduser().resolve()
+    class_code = source_xls.parent.name or source_xls.stem
+    return (output_dir / f"{class_code}-平时成绩记分册.xls").resolve()
+
+
+def _validate_raw_candidate(path: Path, manifest: dict, variant: str | None = None) -> None:
+    if not path.is_file() or path.suffix.lower() != ".xls" or path.stat().st_size <= 0:
+        raise RuntimeError(f"Generated XLS candidate is missing, invalid, or empty: {path}")
+    if anchor_mode(manifest) == "excel_named_range":
+        selected_variant = variant or "with_skill"
+        try:
+            validate_output_raw_runtime(
+                path.parent,
+                manifest,
+                output_file=path,
+                variant=selected_variant,
+            )
+        except RuntimeError as exc:
+            raise NamedRangeError(str(exc)) from exc
+    else:
+        try:
+            open_workbook(str(path), formatting_info=False)
+        except Exception as exc:
+            raise RuntimeError(f"Generated XLS raw open check failed: {path}: {exc}") from exc
+
+
+def commit_output_atomically(candidate: Path, final_path: Path) -> None:
+    """Commit one candidate with a same-filesystem atomic replace."""
+    candidate = candidate.expanduser().resolve()
+    final_path = final_path.expanduser().resolve()
+    if not candidate.is_file():
+        raise RuntimeError(f"Output candidate does not exist: {candidate}")
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    staging = final_path.parent / f".{final_path.name}.{uuid.uuid4().hex}.tmp"
+    try:
+        shutil.copy2(candidate, staging)
+        os.replace(staging, final_path)
+    finally:
+        if staging.exists():
+            staging.unlink()
+
+
+def commit_output_and_qa_atomically(
+    candidate: Path,
+    final_path: Path,
+    qa_candidate: Path,
+    qa_path: Path,
+) -> None:
+    """Commit XLS and its QA report, rolling both back if either replace fails."""
+    candidate = candidate.expanduser().resolve()
+    final_path = final_path.expanduser().resolve()
+    qa_candidate = qa_candidate.expanduser().resolve()
+    qa_path = qa_path.expanduser().resolve()
+    final_path.parent.mkdir(parents=True, exist_ok=True)
+    qa_path.parent.mkdir(parents=True, exist_ok=True)
+    token = uuid.uuid4().hex
+    staged_xls = final_path.parent / f".{final_path.name}.{token}.tmp"
+    staged_qa = qa_path.parent / f".{qa_path.name}.{token}.tmp"
+    backup_xls = final_path.parent / f".{final_path.name}.{token}.bak"
+    backup_qa = qa_path.parent / f".{qa_path.name}.{token}.bak"
+    old_xls = final_path.is_file()
+    old_qa = qa_path.is_file()
+    replaced_xls = False
+    replaced_qa = False
+    try:
+        shutil.copy2(candidate, staged_xls)
+        shutil.copy2(qa_candidate, staged_qa)
+        if old_xls:
+            shutil.copy2(final_path, backup_xls)
+        if old_qa:
+            shutil.copy2(qa_path, backup_qa)
+        os.replace(staged_xls, final_path)
+        replaced_xls = True
+        os.replace(staged_qa, qa_path)
+        replaced_qa = True
+    except Exception:
+        if replaced_xls:
+            if old_xls:
+                os.replace(backup_xls, final_path)
+            elif final_path.exists():
+                final_path.unlink()
+        if replaced_qa:
+            if old_qa:
+                os.replace(backup_qa, qa_path)
+            elif qa_path.exists():
+                qa_path.unlink()
+        raise
+    finally:
+        for path in (staged_xls, staged_qa, backup_xls, backup_qa):
+            if path.exists():
+                path.unlink()
 
 
 def cell_text(value) -> str:
@@ -327,7 +443,17 @@ def _set_address(ws, address: str, value) -> None:
     set_value(ws, int(column.group(2)), column_number(column.group(1)), value)
 
 
-def build_one_legacy(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str, manifest: dict, schema_path: Path) -> dict:
+def build_one_legacy(
+    source_xls: Path,
+    template_xls: Path,
+    output_dir: Path,
+    soffice: str,
+    manifest: dict,
+    schema_path: Path,
+    *,
+    candidate_dir: Path | None = None,
+    final_path: Path | None = None,
+) -> dict:
     with tempfile.TemporaryDirectory(prefix="gradebook_") as tmp_name:
         tmp = Path(tmp_name)
         source_xlsx = convert_with_soffice(soffice, source_xls, tmp / "source", "xlsx")
@@ -439,19 +565,20 @@ def build_one_legacy(source_xls: Path, template_xls: Path, output_dir: Path, sof
         if first_extra <= template_last_row:
             ws.delete_rows(first_extra, template_last_row - first_extra + 1)
 
-        output_dir.mkdir(parents=True, exist_ok=True)
         temp_xlsx = tmp / f"{class_code}-平时成绩记分册.xlsx"
         wb.save(temp_xlsx)
-        converted = convert_with_soffice(soffice, temp_xlsx, output_dir, "xls")
-        final_path = output_dir / f"{class_code}-平时成绩记分册.xls"
-        if converted.resolve() != final_path.resolve():
-            if final_path.exists():
-                final_path.unlink()
-            converted.replace(final_path)
+        converted = convert_with_soffice(soffice, temp_xlsx, tmp / "output-xls", "xls")
+        _validate_raw_candidate(converted, manifest)
+        final_path = final_path or _final_output_path(source_xls, output_dir)
+        candidate_root = candidate_dir or (tmp / "candidate")
+        candidate_root.mkdir(parents=True, exist_ok=True)
+        candidate = candidate_root / f"{uuid.uuid4().hex}-{final_path.name}"
+        shutil.copy2(converted, candidate)
 
         return {
             "source": str(source_xls),
             "output": str(final_path),
+            "candidate": str(candidate),
             "count": len(students),
             "course": meta["course"],
             "class_name": meta["class_name"],
@@ -501,6 +628,9 @@ def build_one_named_ranges(
     soffice: str,
     manifest: dict,
     schema_path: Path,
+    *,
+    candidate_dir: Path | None = None,
+    final_path: Path | None = None,
 ) -> dict:
     """Build v1.1 output exclusively from the workbook-level name contract."""
     with tempfile.TemporaryDirectory(prefix="gradebook-named-") as tmp_name:
@@ -638,21 +768,19 @@ def build_one_named_ranges(
                     f"{theory_score}{row}*{theory_pct},0)"
                 )
 
-        output_dir.mkdir(parents=True, exist_ok=True)
         temp_xlsx = tmp / f"{class_code}-平时成绩记分册.xlsx"
         workbook.save(temp_xlsx)
-        converted = convert_with_soffice(soffice, temp_xlsx, output_dir, "xls")
-        final_path = output_dir / f"{class_code}-平时成绩记分册.xls"
-        if converted.resolve() != final_path.resolve():
-            if final_path.exists():
-                final_path.unlink()
-            converted.replace(final_path)
-        raw_inventory = validate_xls_named_range_inventory(final_path, manifest["anchors"], variant)
-        if raw_inventory["errors"]:
-            raise NamedRangeError("Generated XLS named-range inventory is invalid: " + "; ".join(raw_inventory["errors"]))
+        converted = convert_with_soffice(soffice, temp_xlsx, tmp / "output-xls", "xls")
+        _validate_raw_candidate(converted, manifest, variant)
+        final_path = final_path or _final_output_path(source_xls, output_dir)
+        candidate_root = candidate_dir or (tmp / "candidate")
+        candidate_root.mkdir(parents=True, exist_ok=True)
+        candidate = candidate_root / f"{uuid.uuid4().hex}-{final_path.name}"
+        shutil.copy2(converted, candidate)
         return {
             "source": str(source_xls),
             "output": str(final_path),
+            "candidate": str(candidate),
             "count": len(students),
             "course": meta["course"],
             "class_name": meta["class_name"],
@@ -668,11 +796,39 @@ def build_one_named_ranges(
         }
 
 
-def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str, manifest: dict, schema_path: Path) -> dict:
+def build_one(
+    source_xls: Path,
+    template_xls: Path,
+    output_dir: Path,
+    soffice: str,
+    manifest: dict,
+    schema_path: Path,
+    *,
+    candidate_dir: Path | None = None,
+    final_path: Path | None = None,
+) -> dict:
     mode = anchor_mode(manifest)
     if mode == "excel_named_range":
-        return build_one_named_ranges(source_xls, template_xls, output_dir, soffice, manifest, schema_path)
-    return build_one_legacy(source_xls, template_xls, output_dir, soffice, manifest, schema_path)
+        return build_one_named_ranges(
+            source_xls,
+            template_xls,
+            output_dir,
+            soffice,
+            manifest,
+            schema_path,
+            candidate_dir=candidate_dir,
+            final_path=final_path,
+        )
+    return build_one_legacy(
+        source_xls,
+        template_xls,
+        output_dir,
+        soffice,
+        manifest,
+        schema_path,
+        candidate_dir=candidate_dir,
+        final_path=final_path,
+    )
 
 
 def resolve_sources(source_path: Path) -> list[Path]:
@@ -696,6 +852,7 @@ def main() -> int:
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
     parser.add_argument("--qa-report", default="", help="QA report path")
+    parser.add_argument("--output-file", default="", help="Explicit output .xls path; only valid for one source")
     args = parser.parse_args()
 
     package = resolve_template_package(args.template or None, args.manifest or None)
@@ -708,6 +865,40 @@ def main() -> int:
         raise RuntimeError(f"Template not found: {template}")
     validate_template_package_identity(template, manifest)
     output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else sources[0].parent / "平时成绩记分册_生成"
+    if args.qa_report and len(sources) != 1:
+        raise RuntimeError("--qa-report can only be used when exactly one source workbook is selected")
+    if args.output_file and len(sources) != 1:
+        raise RuntimeError("--output-file can only be used when exactly one source workbook is selected")
+    explicit_output = None
+    if args.output_file:
+        explicit_output = Path(args.output_file).expanduser()
+        if not explicit_output.is_absolute():
+            explicit_output = output_dir / explicit_output
+        explicit_output = explicit_output.resolve()
+    final_paths = [_final_output_path(source, output_dir, explicit_output) for source in sources]
+    qa_paths = []
+    for final_path in final_paths:
+        if args.qa_report:
+            qa_paths.append(Path(args.qa_report).expanduser().resolve())
+        elif len(final_paths) == 1:
+            qa_paths.append(output_dir / "qa-report.json")
+        else:
+            qa_paths.append(output_dir / f"{final_path.stem}.qa-report.json")
+    validate_output_paths(
+        output_dir,
+        final_paths,
+        source_paths=[Path(source) for source in sources],
+        template_path=template,
+        manifest_path=package.manifest_path,
+        schema_path=Path(args.schema).expanduser().resolve(),
+        qa_paths=qa_paths,
+    )
+    mode = anchor_mode(manifest)
+    if mode == "excel_named_range":
+        # This is intentionally outside both skip branches and does not use
+        # LibreOffice. It must run before any candidate workbook is written.
+        validate_named_range_runtime_raw(template, package.manifest_path)
+
     soffice = find_soffice()
     template_warnings: list[str] = []
     if not args.skip_template_validation:
@@ -716,84 +907,73 @@ def main() -> int:
         for warning in template_warnings:
             print(f"WARNING: {warning}")
     schema_path = Path(args.schema).expanduser().resolve()
-    results = [build_one(source, template, output_dir, soffice, manifest, schema_path) for source in sources]
-    if not args.skip_output_validation:
-        if len(results) == 1:
-            qa_path = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
-            report = validate_output_dir(
+    with tempfile.TemporaryDirectory(prefix="gradebook-run-") as run_name:
+        run_dir = Path(run_name)
+        candidate_dir = run_dir / "candidates"
+        results = []
+        for index, (source, final_path, qa_path) in enumerate(zip(sources, final_paths, qa_paths)):
+            result = build_one(
+                source,
+                template,
                 output_dir,
-                results[0]["normalized_input"],
+                soffice,
                 manifest,
-                qa_path,
                 schema_path,
-                template_path=template,
-                custom_template=bool(args.template),
-                engine=results[0]["engine"],
-                template_validation=not args.skip_template_validation,
-                output_file=results[0]["output"],
-                extra_warnings=template_warnings,
+                candidate_dir=candidate_dir,
+                final_path=final_path,
             )
-            action = "skipped validation" if report["status"] == "skipped" else "validated"
-            print(f"{action} files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={report['qa_report']}")
-        else:
-            print("WARNING: batch output validation is performed per generated file")
-            for result in results:
-                output_path = Path(result["output"])
-                with tempfile.TemporaryDirectory(prefix="gradebook-validate-") as validation_dir:
-                    validation_root = Path(validation_dir)
-                    validation_copy = validation_root / output_path.name
-                    shutil.copy2(output_path, validation_copy)
-                    validate_output_dir(
-                        validation_root,
-                        result["normalized_input"],
-                        manifest,
-                        output_dir / f"{output_path.stem}.qa-report.json",
-                        schema_path,
-                        template_path=template,
-                        custom_template=bool(args.template),
-                        engine=result["engine"],
-                        template_validation=not args.skip_template_validation,
-                        output_file=validation_copy,
-                        extra_warnings=template_warnings,
-                    )
-    else:
-        if len(results) == 1:
-            qa_path = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
-            report = write_skipped_report(
-                output_dir,
-                results[0]["normalized_input"],
-                manifest,
-                qa_path,
-                schema_path,
-                template_path=template,
-                custom_template=bool(args.template),
-                engine=results[0]["engine"],
-                template_validation=not args.skip_template_validation,
-                output_file=results[0]["output"],
-                warnings=template_warnings,
-            )
-            print(f"WARNING: output validation skipped; qa={report['qa_report']}")
-        else:
-            for result in results:
-                output_path = Path(result["output"])
-                report = write_skipped_report(
-                    output_dir,
+            final_path = Path(result["output"])
+            candidate = Path(result["candidate"])
+            validation_root = run_dir / f"validation-{index}"
+            validation_root.mkdir(parents=True, exist_ok=True)
+            validation_copy = validation_root / final_path.name
+            shutil.copy2(candidate, validation_copy)
+            input_json = validation_root / "normalized-input.json"
+            input_json.write_text(json.dumps(result["normalized_input"], ensure_ascii=False), encoding="utf-8")
+            qa_inside = validation_root / "qa-report.json"
+            if not args.skip_output_validation:
+                report = validate_output_dir(
+                    validation_root,
                     result["normalized_input"],
                     manifest,
-                    output_dir / f"{output_path.stem}.qa-report.json",
+                    qa_inside,
                     schema_path,
                     template_path=template,
                     custom_template=bool(args.template),
                     engine=result["engine"],
                     template_validation=not args.skip_template_validation,
-                    output_file=output_path,
+                    output_file=validation_copy,
+                    source_paths=[source],
+                    extra_warnings=template_warnings,
+                )
+            else:
+                report = write_skipped_report(
+                    validation_root,
+                    result["normalized_input"],
+                    manifest,
+                    qa_inside,
+                    schema_path,
+                    template_path=template,
+                    custom_template=bool(args.template),
+                    engine=result["engine"],
+                    template_validation=not args.skip_template_validation,
+                    output_file=validation_copy,
+                    source_paths=[source],
                     warnings=template_warnings,
                 )
-            print("WARNING: output validation skipped; QA reports were written with status=skipped")
-    for result in results:
-        result.pop("normalized_input", None)
-    payload = results[0] if len(results) == 1 else results
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+            qa_candidate = run_dir / f"qa-{index}.json"
+            shutil.copy2(Path(report["qa_report"]), qa_candidate)
+            commit_output_and_qa_atomically(candidate, final_path, qa_candidate, qa_path)
+            result["output"] = str(final_path)
+            result.pop("candidate", None)
+            results.append(result)
+            action = "skipped validation" if report["status"] == "skipped" else "validated"
+            print(f"{action} files={report['checks']['file_count']['actual']} students={len(report['checks'].get('students', []))} qa={qa_path}")
+
+        for result in results:
+            result.pop("normalized_input", None)
+        payload = results[0] if len(results) == 1 else results
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 

@@ -49,12 +49,15 @@ $ManifestJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-mani
 $manifestArgs = @('--output', $ManifestJsonPath)
 if ($ManifestPath) { $manifestArgs += @('--manifest', $ManifestPath) }
 if ($TemplatePath) { $manifestArgs += @('--template', $TemplatePath) }
-& $PythonCommand $ManifestToJson @manifestArgs
-if ($LASTEXITCODE -ne 0) {
-  throw 'Could not resolve the gradebook template package manifest and fingerprint.'
+try {
+  & $PythonCommand $ManifestToJson @manifestArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Could not resolve the gradebook template package manifest and fingerprint.'
+  }
+  $ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
+} finally {
+  Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
 }
-$ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
-Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
 $ManifestPath = [string]$ManifestData.manifest_path
 
 function Assert-ManifestCompatibility($manifest) {
@@ -115,9 +118,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 if ([string]$ManifestData.anchor_mode -eq 'excel_named_range') {
-  & $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --named-range-runtime-preflight --template $TemplatePath --manifest $ManifestPath
+  # Full validation remains available through --named-range-runtime-preflight;
+  # the COM generation boundary intentionally uses the raw-only variant.
+  & $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --named-range-runtime-raw --template $TemplatePath --manifest $ManifestPath
   if ($LASTEXITCODE -ne 0) {
-    throw "Named-range runtime preflight failed before COM output creation: $TemplatePath"
+    throw "Named-range raw runtime preflight failed before COM output creation: $TemplatePath"
   }
 }
 
@@ -141,6 +146,162 @@ function Resolve-SourceFiles([string]$path) {
     return @((Get-Item -LiteralPath $candidate))
   }
   return @($item)
+}
+
+function Normalize-Path([string]$path) {
+  return [System.IO.Path]::GetFullPath($path)
+}
+
+function Path-Key([string]$path) {
+  return (Normalize-Path $path).ToLowerInvariant()
+}
+
+function Assert-OutputPathsSafe($sourceItems, [string]$directory, [string[]]$finalPaths, [string[]]$qaPaths) {
+  $outputKey = Path-Key $directory
+  if ((Test-Path -LiteralPath $directory) -and -not (Test-Path -LiteralPath $directory -PathType Container)) {
+    throw "Output directory is not a directory: $directory"
+  }
+  $skillDir = Split-Path -Parent $PSScriptRoot
+  $packageDirs = @(
+    (Join-Path $skillDir 'assets\templates\course-gradebook\v1.0.0'),
+    (Join-Path $skillDir 'assets\templates\course-gradebook\v1.1.0'),
+    (Join-Path $skillDir 'assets\平时成绩记分册模板.xls' | Split-Path -Parent)
+  ) | ForEach-Object { Normalize-Path $_ }
+  foreach ($packageDir in $packageDirs) {
+    $packageKey = (Path-Key $packageDir).TrimEnd('\')
+    if ($outputKey -eq $packageKey -or $outputKey.StartsWith($packageKey + '\')) {
+      throw "Output directory must not be inside a template package directory: $directory"
+    }
+  }
+  $forbidden = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($source in $sourceItems) { $null = $forbidden.Add((Path-Key $source.FullName)) }
+  foreach ($path in @(
+      $TemplatePath,
+      $ManifestPath,
+      $SchemaPath,
+      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.0.0\template.xls'),
+      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.1.0\template.xls'),
+      (Join-Path $skillDir 'assets\平时成绩记分册模板.xls')
+    )) {
+    $null = $forbidden.Add((Path-Key $path))
+  }
+  $finalKeys = @()
+  foreach ($finalPath in $finalPaths) {
+    $target = Normalize-Path $finalPath
+    $directoryKey = (Path-Key $directory).TrimEnd('\')
+    $targetKey = Path-Key $target
+    if (-not $targetKey.StartsWith($directoryKey + '\')) {
+      throw "Output file must be inside OutputDir: $target"
+    }
+    if ((Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $target -PathType Container)) {
+      throw "Output file path is a directory: $target"
+    }
+    if ([System.IO.Path]::GetExtension($target).ToLowerInvariant() -ne '.xls') {
+      throw "Output file must use the .xls extension: $target"
+    }
+    if ($forbidden.Contains((Path-Key $target))) {
+      if ($sourceItems.FullName -contains $target) {
+        throw 'Output file must not overwrite the source workbook.'
+      }
+      if ((Path-Key $TemplatePath) -eq (Path-Key $target)) {
+        throw 'Output file must not overwrite the template file.'
+      }
+      throw 'Output file must not overwrite an input or template package file.'
+    }
+    if ($finalKeys -contains $targetKey) {
+      throw "Output file paths must be unique: $target"
+    }
+    $finalKeys += $targetKey
+  }
+  $qaKeys = @()
+  foreach ($qaPath in $qaPaths) {
+    if (-not $qaPath) { continue }
+    $qaKey = Path-Key $qaPath
+    if ($finalKeys -contains $qaKey) {
+      throw 'QA report must not overwrite a generated XLS output.'
+    }
+    if ($qaKeys -contains $qaKey) {
+      throw "QA report paths must be unique: $qaPath"
+    }
+    if ((Test-Path -LiteralPath $qaPath) -and (Test-Path -LiteralPath $qaPath -PathType Container)) {
+      throw "QA report path is a directory: $qaPath"
+    }
+    if ($forbidden.Contains($qaKey)) {
+      throw 'QA report must not overwrite an input or template package file.'
+    }
+    $qaKeys += $qaKey
+  }
+}
+
+$RunTemporaryFiles = New-Object System.Collections.Generic.List[string]
+
+function Track-RunTemporary([string]$path) {
+  if ($path) { $RunTemporaryFiles.Add((Normalize-Path $path)) }
+  return $path
+}
+
+function Remove-RunTemporaryFiles() {
+  foreach ($path in @($RunTemporaryFiles | Sort-Object Length -Descending)) {
+    if (Test-Path -LiteralPath $path) {
+      Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+  $RunTemporaryFiles.Clear()
+}
+
+function Move-AtomicFile([string]$staged, [string]$destination) {
+  if (Test-Path -LiteralPath $destination -PathType Leaf) {
+    [System.IO.File]::Replace($staged, $destination, $null, $true)
+  } else {
+    [System.IO.File]::Move($staged, $destination)
+  }
+}
+
+function Commit-OutputAndQaAtomically(
+  [string]$candidate,
+  [string]$finalPath,
+  [string]$qaCandidate,
+  [string]$qaPath
+) {
+  if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw "Output candidate does not exist: $candidate" }
+  if (-not (Test-Path -LiteralPath $qaCandidate -PathType Leaf)) { throw "QA candidate does not exist: $qaCandidate" }
+  $finalParent = Split-Path -Parent $finalPath
+  $qaParent = Split-Path -Parent $qaPath
+  New-Item -ItemType Directory -Path $finalParent -Force | Out-Null
+  New-Item -ItemType Directory -Path $qaParent -Force | Out-Null
+  $token = [guid]::NewGuid().ToString('N')
+  $stagedXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.tmp')
+  $stagedQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.tmp')
+  $backupXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.bak')
+  $backupQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.bak')
+  $oldXls = Test-Path -LiteralPath $finalPath -PathType Leaf
+  $oldQa = Test-Path -LiteralPath $qaPath -PathType Leaf
+  $replacedXls = $false
+  $replacedQa = $false
+  try {
+    Copy-Item -LiteralPath $candidate -Destination $stagedXls -Force
+    Copy-Item -LiteralPath $qaCandidate -Destination $stagedQa -Force
+    if ($oldXls) { Copy-Item -LiteralPath $finalPath -Destination $backupXls -Force }
+    if ($oldQa) { Copy-Item -LiteralPath $qaPath -Destination $backupQa -Force }
+    Move-AtomicFile $stagedXls $finalPath
+    $replacedXls = $true
+    Move-AtomicFile $stagedQa $qaPath
+    $replacedQa = $true
+  } catch {
+    if ($replacedXls) {
+      if ($oldXls) { Copy-Item -LiteralPath $backupXls -Destination $finalPath -Force }
+      elseif (Test-Path -LiteralPath $finalPath) { Remove-Item -LiteralPath $finalPath -Force -ErrorAction SilentlyContinue }
+    }
+    if ($replacedQa) {
+      if ($oldQa) { Copy-Item -LiteralPath $backupQa -Destination $qaPath -Force }
+      elseif (Test-Path -LiteralPath $qaPath) { Remove-Item -LiteralPath $qaPath -Force -ErrorAction SilentlyContinue }
+    }
+    throw
+  } finally {
+    foreach ($path in @($stagedXls, $stagedQa, $backupXls, $backupQa)) {
+      if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
+    }
+  }
 }
 
 function To-Number($value) {
@@ -609,9 +770,10 @@ function Update-ManagedNamesForCapacity($workbook, $ranges, [int]$lastRow) {
   }
 }
 
-function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $normalizedInput) {
-  Copy-Item -LiteralPath $TemplatePath -Destination $outPath -Force
-  $wb = $excel.Workbooks.Open($outPath)
+function Build-One-NamedRange($excel, [string]$candidatePath, [string]$finalPath, [string]$sourceFile, $meta, $students, $normalizedInput) {
+  Copy-Item -LiteralPath $TemplatePath -Destination $candidatePath -Force
+  $wb = $excel.Workbooks.Open($candidatePath)
+  $buildSucceeded = $false
   try {
     $wb.CheckCompatibility = $false
     $hasSkill = $meta.SkillPct -gt 0.000001
@@ -692,7 +854,7 @@ function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $norma
     $regularPct = FormulaNumber $meta.RegularPct
     $theoryPct = FormulaNumber $meta.TheoryPct
     $skillPct = FormulaNumber $meta.SkillPct
-    $classCode = Split-Path -Leaf (Split-Path -Parent $outPath)
+    $classCode = Split-Path -Leaf (Split-Path -Parent $sourceFile)
     for ($i = 0; $i -lt $students.Count; $i++) {
       $student = $students[$i]
       $r = $dataStart + $i
@@ -717,12 +879,14 @@ function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $norma
     }
     $wb.Application.CalculateFullRebuild()
     $wb.Save()
+    $buildSucceeded = $true
   } finally {
-    $wb.Close($true)
+    $wb.Close($buildSucceeded)
   }
   return [pscustomobject]@{
     Source = ''
-    Output = $outPath
+    Output = $candidatePath
+    FinalOutput = $finalPath
     Count = $students.Count
     Course = $meta.CourseName
     ClassName = $meta.ClassName
@@ -750,7 +914,7 @@ function Set-Formula($sheet, [int]$row, [int]$col, [string]$formula) {
   $sheet.Range((CellAddress $row $col)).Formula = $formula
 }
 
-function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [string]$outputFile = "") {
+function Build-One($excel, [string]$sourceFile, [string]$candidatePath, [string]$finalPath) {
   $srcWb = $excel.Workbooks.Open($sourceFile, 0, $true)
   try {
     $srcSheet = $srcWb.Worksheets.Item(1)
@@ -785,21 +949,16 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $srcWb.Close($false)
   }
 
-  $classCode = Split-Path -Leaf (Split-Path -Parent $sourceFile)
-  if (-not $classCode -or $classCode -eq '.') {
-    $classCode = [System.IO.Path]::GetFileNameWithoutExtension($sourceFile)
-  }
-  $outPath = if ($outputFile) { $outputFile } else { Join-Path $outputDirectory ("{0}-平时成绩记分册.xls" -f $classCode) }
-  $outParent = Split-Path -Parent $outPath
-  if ($outParent) { New-Item -ItemType Directory -Path $outParent -Force | Out-Null }
+  $outPath = $candidatePath
   if ([string]$ManifestData.anchor_mode -eq 'excel_named_range') {
-    $namedResult = @(Build-One-NamedRange $excel $outPath $meta $students $normalizedInput)[-1]
+    $namedResult = @(Build-One-NamedRange $excel $candidatePath $finalPath $sourceFile $meta $students $normalizedInput)[-1]
     $namedResult.Source = $sourceFile
     return $namedResult
   }
   Copy-Item -LiteralPath $TemplatePath -Destination $outPath -Force
 
   $wb = $excel.Workbooks.Open($outPath)
+  $buildSucceeded = $false
   try {
     $wb.CheckCompatibility = $false
     $structure = $ManifestData.structure
@@ -907,13 +1066,15 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     }
     $excel.CalculateFullRebuild()
     $wb.Save()
+    $buildSucceeded = $true
   } finally {
-    $wb.Close($true)
+    $wb.Close($buildSucceeded)
   }
 
   [pscustomobject]@{
     Source = $sourceFile
-    Output = $outPath
+    Output = $candidatePath
+    FinalOutput = $finalPath
     Count = $students.Count
     Course = $meta.CourseName
     ClassName = $meta.ClassName
@@ -924,14 +1085,6 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     Engine = 'excel-com'
     NormalizedInput = $normalizedInput
   }
-}
-
-function Remove-OfficialGeneratedOutputs([string]$directory) {
-  if (-not (Test-Path -LiteralPath $directory)) { return }
-  $sourcePaths = @($sources | ForEach-Object { [System.IO.Path]::GetFullPath($_.FullName) })
-  Get-ChildItem -LiteralPath $directory -Filter '*.xls' -File -ErrorAction SilentlyContinue |
-    Where-Object { $sourcePaths -notcontains [System.IO.Path]::GetFullPath($_.FullName) } |
-    Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 $sources = Resolve-SourceFiles $SourcePath
@@ -948,33 +1101,56 @@ if ($OutputFile) {
   $OutputFile = [System.IO.Path]::GetFullPath($OutputFile)
   $OutputDir = Split-Path -Parent $OutputFile
 }
+$finalPaths = @()
+foreach ($source in $sources) {
+  $classCode = Split-Path -Leaf (Split-Path -Parent $source.FullName)
+  if (-not $classCode -or $classCode -eq '.') {
+    $classCode = [System.IO.Path]::GetFileNameWithoutExtension($source.FullName)
+  }
+  $finalPaths += if ($OutputFile) { $OutputFile } else { Join-Path $OutputDir ("{0}-平时成绩记分册.xls" -f $classCode) }
+}
+$qaPaths = @()
+foreach ($finalPath in $finalPaths) {
+  if ($QaReportPath) { $qaPaths += $QaReportPath }
+  elseif ($finalPaths.Count -eq 1) { $qaPaths += (Join-Path $OutputDir 'qa-report.json') }
+  else { $qaPaths += (Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalPath)) + '.qa-report.json')) }
+}
+Assert-OutputPathsSafe $sources $OutputDir $finalPaths $qaPaths
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 
-$excel = New-Object -ComObject Excel.Application
-$excel.Visible = $false
-$excel.DisplayAlerts = $false
-$excel.AskToUpdateLinks = $false
+$runRoot = Track-RunTemporary (Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-com-run-" + [guid]::NewGuid().ToString('N')))
+New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 $results = @()
 try {
-  foreach ($source in $sources) {
-    $buildOutputFile = if ($OutputFile) { $OutputFile } else { '' }
-    $builtValues = @(Build-One $excel $source.FullName $OutputDir $buildOutputFile)
-    foreach ($builtValue in $builtValues) {
-      if ($null -ne $builtValue -and $null -ne $builtValue.PSObject.Properties['Output']) {
-        $results += $builtValue
-      }
+  $excel = New-Object -ComObject Excel.Application
+  $excel.Visible = $false
+  $excel.DisplayAlerts = $false
+  $excel.AskToUpdateLinks = $false
+  try {
+    for ($index = 0; $index -lt $sources.Count; $index++) {
+      $source = $sources[$index]
+      $candidateDir = Join-Path $runRoot ("candidate-{0}" -f $index)
+      New-Item -ItemType Directory -Path $candidateDir -Force | Out-Null
+      $candidatePath = Join-Path $candidateDir (([guid]::NewGuid().ToString('N')) + '-' + (Split-Path -Leaf $finalPaths[$index]))
+      $built = @(Build-One $excel $source.FullName $candidatePath $finalPaths[$index])[-1]
+      $results += $built
+      $rawArgs = @(
+        '--raw-runtime-preflight',
+        '--output-dir', $candidateDir,
+        '--output-file', $candidatePath,
+        '--manifest', $ManifestPath,
+        '--template-path', $TemplatePath,
+        '--engine', 'excel-com'
+      )
+      if ($built.NamedRangeVariant) { $rawArgs += @('--variant', [string]$built.NamedRangeVariant) }
+      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @rawArgs
+      if ($LASTEXITCODE -ne 0) { throw "Raw output runtime preflight failed: $candidatePath" }
     }
+  } finally {
+    $excel.Quit()
+    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
   }
-} catch {
-  Remove-OfficialGeneratedOutputs $OutputDir
-  throw
-} finally {
-  $excel.Quit()
-  [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
-}
 
-$normalizedJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-input-" + [guid]::NewGuid().ToString('N') + '.json')
-try {
   $validationArgs = @(
     '--manifest', $ManifestPath,
     '--schema', $SchemaPath,
@@ -983,54 +1159,30 @@ try {
   )
   if ($TemplateWasProvided) { $validationArgs += '--custom-template' }
   if ($SkipTemplateValidation) { $validationArgs += '--skip-template-validation' }
-  if (-not $SkipOutputValidation) {
-    if ($results.Count -ne 1) {
-      Write-Warning 'Batch output validation uses one temporary validation directory per generated workbook.'
-      foreach ($result in $results) {
-        $validationDir = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-validation-" + [guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Directory -Path $validationDir -Force | Out-Null
-        try {
-          $validationFile = Join-Path $validationDir (Split-Path -Leaf $result.Output)
-          Copy-Item -LiteralPath $result.Output -Destination $validationFile -Force
-          $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-          $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir, '--output-file', $validationFile) + $validationArgs
-          & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-          if ($LASTEXITCODE -ne 0) { throw "Output validation failed: $($result.Output)" }
-        } finally {
-          Remove-Item -LiteralPath $validationDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
-      }
-    } else {
-      $results[0].NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-      $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $results[0].Output, '--qa-report', $qaPath) + $validationArgs
-      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-      if ($LASTEXITCODE -ne 0) { throw 'Output validation failed.' }
+  for ($index = 0; $index -lt $results.Count; $index++) {
+    $result = $results[$index]
+    $finalPath = [string]$finalPaths[$index]
+    $validationDir = Join-Path $runRoot ("validation-{0}" -f $index)
+    New-Item -ItemType Directory -Path $validationDir -Force | Out-Null
+    $validationFile = Join-Path $validationDir (Split-Path -Leaf $finalPath)
+    Copy-Item -LiteralPath $result.Output -Destination $validationFile -Force
+    $normalizedJsonPath = Join-Path $validationDir 'normalized-input.json'
+    $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
+    $qaCandidate = Join-Path $validationDir 'qa-report.json'
+    $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir, '--output-file', $validationFile, '--qa-report', $qaCandidate) + $validationArgs
+    if ($SkipOutputValidation) { $runArgs += '--skip-validation' }
+    & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
+    if ($LASTEXITCODE -ne 0) {
+      if ($SkipOutputValidation) { throw "Could not write skipped QA report: $($result.Output)" }
+      throw "Output validation failed: $($result.Output)"
     }
-  } else {
-    if ($results.Count -ne 1) {
-      foreach ($result in $results) {
-        $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-        $qaPath = Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($result.Output)) + '.qa-report.json')
-        $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $result.Output, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
-        & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-        if ($LASTEXITCODE -ne 0) { throw "Could not write skipped QA report: $($result.Output)" }
-      }
-    } else {
-      $result = $results[0]
-      $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-      $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $result.Output, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
-      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-      if ($LASTEXITCODE -ne 0) { throw 'Could not write skipped QA report.' }
-    }
-    Write-Warning 'Output validation skipped; QA report status is skipped.'
+    Commit-OutputAndQaAtomically $result.Output $finalPath $qaCandidate $qaPaths[$index]
+    $result.Output = $finalPath
+    $result.PSObject.Properties.Remove('FinalOutput')
+    if ($SkipOutputValidation) { Write-Warning 'Output validation skipped; QA report status is skipped.' }
   }
-} catch {
-  Remove-OfficialGeneratedOutputs $OutputDir
-  throw
 } finally {
-  Remove-Item -LiteralPath $normalizedJsonPath -Force -ErrorAction SilentlyContinue
+  Remove-RunTemporaryFiles
 }
 
 foreach ($result in $results) {

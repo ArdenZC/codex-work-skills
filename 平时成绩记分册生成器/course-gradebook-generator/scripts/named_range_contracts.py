@@ -137,6 +137,77 @@ V11_LAYOUT_CONTRACT: dict[str, Any] = {
     },
 }
 
+# These contracts describe metadata that changes how the generator reads or
+# protects a workbook.  They deliberately live beside the managed-name
+# contract so a patch manifest cannot silently redefine generator behavior.
+V11_TEMPLATE_KEYS = frozenset({
+    "id",
+    "name",
+    "version",
+    "format",
+    "file",
+    "base_manifest",
+    "base_template",
+})
+V11_TEMPLATE_STATIC = {
+    "id": "course-gradebook",
+    "name": "湖北职业技术学院学生平时成绩登记表",
+    "format": "xls",
+}
+V11_GENERATOR_CONTRACT = {
+    "version": "1.1.0",
+    "supported_major": 1,
+}
+V11_SOURCE_CONTRACT = {
+    "metadata_line2_cell": "A2",
+    "metadata_line3_cell": "A3",
+    "header_row": 4,
+    "data_start_row": 5,
+    "headers": {
+        "student_id": "学号",
+        "student_name": "姓名",
+        "regular": "平时成绩",
+        "theory": "理论成绩",
+        "skill": "技能成绩",
+        "total": "总成绩",
+    },
+}
+V11_VALIDATION_CONTRACT = {
+    "required_headers": ["序号", "学号", "姓名", "平时成绩(20%)", "理论成绩(50%)", "总评\n成绩"],
+    "template_data_rows": 48,
+    "regular_item_count": 8,
+    "require_formula_columns": True,
+    "require_student_id_text": True,
+    "require_xls_open": True,
+    "expected_print_area": "",
+    "require_print_area": False,
+    "page_orientation": "landscape",
+    "expected_freeze_panes": None,
+    "required_named_ranges": list(MANAGED_NAMES),
+    "required_data_validations": 0,
+    "required_conditional_formats": 0,
+    "require_no_formula_errors": True,
+}
+V11_ALLOWED_CHANGES = [
+    "named ranges declared under fields and layout",
+    "student rows within gb_data_table through the generated last row",
+    "regular score cells, theory score, optional skill score and declared formula ranges",
+    "deletion of the two skill columns when weights.skill is zero",
+]
+V11_PROTECTED = [
+    "workbook sheet names and non-target sheets",
+    "merged ranges, page setup, print settings, widths, heights and base styles",
+    "header labels except declared percentage text",
+    "formulas and number formats outside declared output columns",
+    "student ID text format",
+]
+
+V10_TEMPLATE_STATIC = {
+    "id": "course-gradebook",
+    "name": "湖北职业技术学院学生平时成绩登记表",
+    "format": "xls",
+}
+
 
 def v11_variant_contracts() -> dict[str, dict[str, list[str]]]:
     return {
