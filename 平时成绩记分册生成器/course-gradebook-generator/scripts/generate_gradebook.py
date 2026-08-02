@@ -25,15 +25,28 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 
+from named_range_contracts import variant_for_skill
+from named_range_utils import (
+    NamedRangeError,
+    rebuild_named_ranges_after_column_delete,
+    update_named_ranges_for_capacity,
+    validate_named_range_inventory,
+    variant_locations,
+)
+from xls_named_range_utils import validate_xls_named_range_inventory
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
+    anchor_mode,
     cell_address,
     column_number,
     ensure_supported_major,
     load_manifest,
     manifest_template_path,
     percentage_label,
+    resolve_template_package,
+    validate_manifest_contract,
+    validate_template_package_identity,
     validate_input,
     validate_source_totals,
 )
@@ -43,7 +56,7 @@ from validate_template import validate_template
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SKILL_DIR = SCRIPT_DIR.parent
-DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
+DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "course-gradebook" / "v1.1.0" / "template.xls"
 
 
 def find_soffice() -> str:
@@ -314,7 +327,7 @@ def _set_address(ws, address: str, value) -> None:
     set_value(ws, int(column.group(2)), column_number(column.group(1)), value)
 
 
-def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str, manifest: dict, schema_path: Path) -> dict:
+def build_one_legacy(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str, manifest: dict, schema_path: Path) -> dict:
     with tempfile.TemporaryDirectory(prefix="gradebook_") as tmp_name:
         tmp = Path(tmp_name)
         source_xlsx = convert_with_soffice(soffice, source_xls, tmp / "source", "xlsx")
@@ -452,6 +465,216 @@ def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: s
         }
 
 
+def _named_cell(ws, location: dict[str, int]):
+    return ws.cell(location["min_row"], location["min_col"])
+
+
+def _named_output_cell(workbook, locations: dict, name: str, row_offset: int = 0, col_offset: int = 0):
+    location = locations[name]
+    row = location.min_row + row_offset
+    col = location.min_col + col_offset
+    if row > location.max_row or col > location.max_col:
+        raise NamedRangeError(
+            f"Write offset {row_offset},{col_offset} is outside managed name {name} at {location.address}"
+        )
+    return workbook[location.sheet].cell(row, col)
+
+
+def _clear_named_output_range(workbook, locations: dict, name: str) -> None:
+    location = locations[name]
+    sheet = workbook[location.sheet]
+    for row in range(location.min_row, location.max_row + 1):
+        for col in range(location.min_col, location.max_col + 1):
+            sheet.cell(row, col).value = None
+
+
+def _named_col_letter(location: dict[str, int]) -> str:
+    if location["min_col"] != location["max_col"]:
+        raise NamedRangeError(f"Expected a single named column, got {location['address']}")
+    return get_column_letter(location["min_col"])
+
+
+def build_one_named_ranges(
+    source_xls: Path,
+    template_xls: Path,
+    output_dir: Path,
+    soffice: str,
+    manifest: dict,
+    schema_path: Path,
+) -> dict:
+    """Build v1.1 output exclusively from the workbook-level name contract."""
+    with tempfile.TemporaryDirectory(prefix="gradebook-named-") as tmp_name:
+        tmp = Path(tmp_name)
+        source_xlsx = convert_with_soffice(soffice, source_xls, tmp / "source", "xlsx")
+        template_xlsx = convert_with_soffice(soffice, template_xls, tmp / "template", "xlsx")
+
+        src_wb = load_workbook(source_xlsx, data_only=True)
+        src_ws = src_wb.worksheets[0]
+        meta = read_meta(src_ws, manifest)
+        students = read_students(src_ws, manifest)
+        normalized = {
+            "term": meta["term"],
+            "course": meta["course"],
+            "teacher": meta["teacher"],
+            "class_name": meta["class_name"],
+            "weights": {
+                "regular": meta["regular_pct"],
+                "theory": meta["theory_pct"],
+                "skill": meta["skill_pct"],
+            },
+            "students": students,
+        }
+        validate_input(normalized, schema_path)
+        validate_source_totals(students, normalized["weights"])
+
+        workbook = load_workbook(template_xlsx, data_only=False)
+        template_inventory = validate_named_range_inventory(workbook, manifest["anchors"], "with_skill")
+        if template_inventory["errors"]:
+            raise NamedRangeError("v1.1 template named-range inventory is invalid: " + "; ".join(template_inventory["errors"]))
+        has_skill = meta["skill_pct"] > 0.000001
+        variant = variant_for_skill(has_skill)
+        locations = variant_locations(workbook, "with_skill")
+        table = locations["gb_data_table"]
+        sheet_name = table.sheet
+        ws = workbook[sheet_name]
+        class_name_cell = _named_cell(ws, locations["gb_class_name"].to_dict())
+        class_name_style = copy(class_name_cell._style)
+        if not has_skill:
+            skill_start = locations["gb_skill_score_col"].min_col
+            delete_columns_preserving_merges(ws, skill_start, 2)
+            ws.cell(locations["gb_class_name"].min_row, skill_start)._style = copy(class_name_style)
+            rebuild_named_ranges_after_column_delete(workbook, skill_start, 2, variant)
+        locations = variant_locations(workbook, variant)
+        table = locations["gb_data_table"]
+        data_start = table.min_row
+        template_last_row = table.max_row
+        style_source_row = locations["gb_template_row"].min_row
+        total_col = locations["gb_total_score_col"].min_col
+        regular_items = locations["gb_regular_items"]
+        regular_item_count = int(manifest["validation"]["regular_item_count"])
+        if regular_items.width != regular_item_count:
+            raise NamedRangeError(
+                f"Named range gb_regular_items has {regular_items.width} columns; expected {regular_item_count}"
+            )
+        existing_rows = template_last_row - data_start + 1
+        if len(students) > existing_rows:
+            needed = len(students) - existing_rows
+            ws.insert_rows(template_last_row + 1, needed)
+            for row in range(template_last_row + 1, template_last_row + needed + 1):
+                copy_row_style(ws, style_source_row, row, table.max_col)
+            template_last_row += needed
+        update_named_ranges_for_capacity(workbook, variant, template_last_row)
+        locations = variant_locations(workbook, variant)
+        table = locations["gb_data_table"]
+
+        _clear_named_output_range(workbook, locations, "gb_data_table")
+
+        metadata_values = {
+            "gb_term": meta["term"],
+            "gb_course": meta["course"],
+            "gb_teacher": meta["teacher"],
+            "gb_class_name": meta["class_name"],
+        }
+        for name, value in metadata_values.items():
+            _named_output_cell(workbook, locations, name).value = value
+        _named_output_cell(workbook, locations, "gb_header_regular").value = (
+            f"平时成绩({percentage_label(meta['regular_pct'])}%)"
+        )
+        _named_output_cell(workbook, locations, "gb_header_theory").value = (
+            f"理论成绩({percentage_label(meta['theory_pct'])}%)"
+        )
+        if has_skill:
+            _named_output_cell(workbook, locations, "gb_header_skill").value = (
+                f"技能成绩（{percentage_label(meta['skill_pct'])}%）"
+            )
+        else:
+            ws.column_dimensions[get_column_letter(locations["gb_total_score_col"].min_col)].width = max(
+                ws.column_dimensions[get_column_letter(locations["gb_total_score_col"].min_col)].width or 0,
+                18,
+            )
+
+        regular_pct = formula_number(meta["regular_pct"])
+        theory_pct = formula_number(meta["theory_pct"])
+        skill_pct = formula_number(meta["skill_pct"])
+        class_code = source_xls.parent.name or source_xls.stem
+        regular_start_col = locations["gb_regular_items"].min_col
+        regular_end_col = locations["gb_regular_items"].max_col
+
+        for idx, student in enumerate(students):
+            row = data_start + idx
+            scores = generate_regular_scores(
+                student["regular"], f"{class_code}|{student['id']}|{student['regular']}", regular_item_count
+            )
+            _named_output_cell(workbook, locations, "gb_serial_col", idx).value = idx + 1
+            student_id_cell = _named_output_cell(workbook, locations, "gb_student_id_col", idx)
+            student_id_cell.value = student["id"]
+            student_id_cell.number_format = "@"
+            _named_output_cell(workbook, locations, "gb_student_name_col", idx).value = student["name"]
+            for offset, score in enumerate(scores):
+                _named_output_cell(workbook, locations, "gb_regular_items", idx, offset).value = score
+            regular_start = get_column_letter(regular_start_col)
+            regular_end = get_column_letter(regular_end_col)
+            theory_score = _named_col_letter(locations["gb_theory_score_col"].to_dict())
+            _named_output_cell(workbook, locations, "gb_regular_weighted_col", idx).value = (
+                f"=AVERAGE({regular_start}{row}:{regular_end}{row})*{regular_pct}"
+            )
+            _named_output_cell(workbook, locations, "gb_theory_score_col", idx).value = student["theory"]
+            _named_output_cell(workbook, locations, "gb_theory_weighted_col", idx).value = (
+                f"={theory_score}{row}*{theory_pct}"
+            )
+            if has_skill:
+                skill_score = _named_col_letter(locations["gb_skill_score_col"].to_dict())
+                _named_output_cell(workbook, locations, "gb_skill_score_col", idx).value = student["skill"]
+                _named_output_cell(workbook, locations, "gb_skill_weighted_col", idx).value = (
+                    f"={skill_score}{row}*{skill_pct}"
+                )
+                _named_output_cell(workbook, locations, "gb_total_score_col", idx).value = (
+                    f"=ROUND(AVERAGE({regular_start}{row}:{regular_end}{row})*{regular_pct}+"
+                    f"{theory_score}{row}*{theory_pct}+{skill_score}{row}*{skill_pct},0)"
+                )
+            else:
+                _named_output_cell(workbook, locations, "gb_total_score_col", idx).value = (
+                    f"=ROUND(AVERAGE({regular_start}{row}:{regular_end}{row})*{regular_pct}+"
+                    f"{theory_score}{row}*{theory_pct},0)"
+                )
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        temp_xlsx = tmp / f"{class_code}-平时成绩记分册.xlsx"
+        workbook.save(temp_xlsx)
+        converted = convert_with_soffice(soffice, temp_xlsx, output_dir, "xls")
+        final_path = output_dir / f"{class_code}-平时成绩记分册.xls"
+        if converted.resolve() != final_path.resolve():
+            if final_path.exists():
+                final_path.unlink()
+            converted.replace(final_path)
+        raw_inventory = validate_xls_named_range_inventory(final_path, manifest["anchors"], variant)
+        if raw_inventory["errors"]:
+            raise NamedRangeError("Generated XLS named-range inventory is invalid: " + "; ".join(raw_inventory["errors"]))
+        return {
+            "source": str(source_xls),
+            "output": str(final_path),
+            "count": len(students),
+            "course": meta["course"],
+            "class_name": meta["class_name"],
+            "has_skill": has_skill,
+            "named_range_variant": variant,
+            "named_range_capacity_end": template_last_row,
+            "regular_pct": meta["regular_pct"],
+            "theory_pct": meta["theory_pct"],
+            "skill_pct": meta["skill_pct"],
+            "engine": "libreoffice-openpyxl",
+            "platform": platform.system(),
+            "normalized_input": normalized,
+        }
+
+
+def build_one(source_xls: Path, template_xls: Path, output_dir: Path, soffice: str, manifest: dict, schema_path: Path) -> dict:
+    mode = anchor_mode(manifest)
+    if mode == "excel_named_range":
+        return build_one_named_ranges(source_xls, template_xls, output_dir, soffice, manifest, schema_path)
+    return build_one_legacy(source_xls, template_xls, output_dir, soffice, manifest, schema_path)
+
+
 def resolve_sources(source_path: Path) -> list[Path]:
     if not source_path.exists():
         raise RuntimeError(f"Source path not found: {source_path}. Provide 课程成绩单.xls or a folder containing it.")
@@ -468,24 +691,27 @@ def main() -> int:
     parser.add_argument("--source", required=True, help="课程成绩单.xls path or a folder containing it")
     parser.add_argument("--output-dir", default="", help="Output directory")
     parser.add_argument("--template", default="", help="Template .xls path")
-    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST), help="Versioned template manifest path")
+    parser.add_argument("--manifest", default="", help="Versioned template manifest path")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA), help="Normalized input schema path")
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
     parser.add_argument("--qa-report", default="", help="QA report path")
     args = parser.parse_args()
 
-    manifest = load_manifest(args.manifest)
+    package = resolve_template_package(args.template or None, args.manifest or None)
+    manifest = package.manifest
     ensure_supported_major(manifest)
+    validate_manifest_contract(manifest)
     sources = resolve_sources(Path(args.source).expanduser().resolve())
-    template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
+    template = package.template_path
     if not template.exists():
         raise RuntimeError(f"Template not found: {template}")
+    validate_template_package_identity(template, manifest)
     output_dir = Path(args.output_dir).expanduser().resolve() if args.output_dir else sources[0].parent / "平时成绩记分册_生成"
     soffice = find_soffice()
     template_warnings: list[str] = []
     if not args.skip_template_validation:
-        template_report = validate_template(template, args.manifest)
+        template_report = validate_template(template, package.manifest_path)
         template_warnings = template_report.get("warnings", [])
         for warning in template_warnings:
             print(f"WARNING: {warning}")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 LESSON_SCRIPTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "scripts"
+GRADE_SCRIPTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "scripts"
 PACKAGES = (
     {
         "name": "lesson-plan-v1.0.0",
@@ -23,8 +25,13 @@ PACKAGES = (
         "schema": ROOT / "教案生成器" / "lesson-plan-docx-generator" / "schemas" / "lesson-plan-input.schema.json",
     },
     {
-        "name": "course-gradebook",
+        "name": "course-gradebook-v1.0.0",
         "manifest": ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "manifest.yaml",
+        "schema": ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "schemas" / "gradebook-input.schema.json",
+    },
+    {
+        "name": "course-gradebook-v1.1.0",
+        "manifest": ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "assets" / "templates" / "course-gradebook" / "v1.1.0" / "manifest.yaml",
         "schema": ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "schemas" / "gradebook-input.schema.json",
     },
 )
@@ -69,8 +76,10 @@ def validate_package(package: dict[str, Path | str]) -> str:
     Draft202012Validator.check_schema(schema)
     if package["name"].startswith("lesson-plan-"):
         scripts_path = str(LESSON_SCRIPTS)
-        if scripts_path not in sys.path:
-            sys.path.insert(0, scripts_path)
+        if scripts_path in sys.path:
+            sys.path.remove(scripts_path)
+        sys.path.insert(0, scripts_path)
+        sys.modules.pop("package_common", None)
         from package_common import anchor_mode, validate_legacy_manifest_contract, validate_semantic_manifest_contract
 
         mode = anchor_mode(manifest)
@@ -78,6 +87,30 @@ def validate_package(package: dict[str, Path | str]) -> str:
             validate_legacy_manifest_contract(manifest)
         else:
             validate_semantic_manifest_contract(manifest)
+    if package["name"].startswith("course-gradebook-"):
+        scripts_path = str(GRADE_SCRIPTS)
+        if scripts_path in sys.path:
+            sys.path.remove(scripts_path)
+        sys.path.insert(0, scripts_path)
+        for module_name in ("package_common", "named_range_contracts", "named_range_utils", "xls_named_range_utils"):
+            sys.modules.pop(module_name, None)
+        from package_common import validate_manifest_contract
+
+        validate_manifest_contract(manifest)
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(GRADE_SCRIPTS / "validate_template.py"),
+                "--template",
+                str(canonical),
+                "--manifest",
+                str(manifest_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            raise ValueError(f"{package['name']}: template validator failed: {result.stderr or result.stdout}")
     version = template_info.get("version")
     return f"{package['name']}: version={version} sha256={expected_hash} schema=valid"
 

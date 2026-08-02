@@ -37,7 +37,7 @@ requirements.txt
 - canonical template 的 `fingerprint.sha256`。
 - `validation` 中的禁止残留文字、长度/段落限制和是否要求渲染检查。
 
-版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。教案模板的版本—定位模式矩阵固定为 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
+版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。版本—定位模式矩阵固定为：教案 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；成绩册 `1.0.x = legacy_coordinates`、`1.1.x = excel_named_range`。其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
 
 ### 模板身份与指纹
 
@@ -64,6 +64,12 @@ v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0
 
 生成器只能写 manifest 中声明的字段，或按声明的行/列规则增删学生行和技能列。页边距、页眉页脚、合并单元格、固定标签、工作表名称、公式列、打印设置、样式和其他未声明结构均视为 protected。canonical 模板和旧 compatibility entry 可以通过 `--template` 参数自动解析；自定义模板必须同时传入匹配的 `--manifest`，指纹不一致必须作为明确错误报告，结构不满足时仍然失败。
 
+### Excel 命名区域
+
+成绩册 `course-gradebook/v1.1.0` 使用 24 个 `gb_` 前缀的 workbook-level named ranges 作为唯一生产写入契约。Python/openpyxl、Windows Excel COM、模板校验和输出 QA 共用 `named_range_contracts.py` 与 manifest；v1.1 不允许静默退回坐标写入。无技能成绩变体移除 `gb_header_skill`、`gb_skill_score_col` 和 `gb_skill_weighted_col`，保留 21 个名称；学生数超过 48 时，数据区域名称扩展到实际末行，`gb_template_row` 仍固定为第 5 行样式来源。模板校验同时读取原始 BIFF `.xls` 和 LibreOffice 回转 `.xlsx`，并比较名称、作用域、目标工作表、地址、形状和关系。
+
+成绩册 `course-gradebook/v1.0.0` 以及 `assets/平时成绩记分册模板.xls` 继续使用 legacy 坐标模式。v1.1 manifest 的 `anchors`、`fields`、`layout` 和变体契约必须封闭且完整，不能夹带 v1.0 坐标结构；自定义模板必须提供匹配 manifest 和 fingerprint。生成器在显式 skip 参数生效前仍强制检查 fingerprint；QA 报告同时提供顶层命名区域诊断和 `checks.named_ranges`，两者必须保持一致。构建器会固定 BIFF 非业务元数据，以便从 v1.0 canonical 模板确定性生成相同的 v1.1 `.xls` 包。
+
 ## QA 报告
 
 每次生成都应在输出目录生成 QA 报告，至少包含 `template_id`、`template_version`、`generator_version`、`status`、`checks`、`errors` 和 `warnings`，并记录实际 `template_path`、`custom_template`、`engine`、`validation_skipped`。完整校验通过时 `status` 为 `passed`；显式跳过任一校验时为 `skipped`，不能用警告伪装成完整通过。报告只记录校验元数据、行号、数量和错误类别，不写入学生姓名、学号或其他原始输入内容。报告不替代进程退出码：有阻断错误时进程必须返回非零。
@@ -74,7 +80,7 @@ v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0
 - DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式；教案 v1.1 的正常写入必须以 Word 书签为入口。
 - `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。Windows COM 负责生成时保留 Excel 原生格式，但默认结构化 QA 仍调用 Python/LibreOffice 转换器；没有 LibreOffice 时只能显式跳过相应校验，报告会标记为 `skipped`。
 - 仓库内脚本不得依赖个人电脑上的临时工具目录或其他外部绝对路径。
-- 当前模板版本：教案默认 `lesson-plan/v1.1.0`，兼容 `lesson-plan/v1.0.0`；记分册 `course-gradebook/v1.0.0`。
+- 当前模板版本：教案默认 `lesson-plan/v1.1.0`，兼容 `lesson-plan/v1.0.0`；记分册默认 `course-gradebook/v1.1.0`，兼容 `course-gradebook/v1.0.0` 和旧 `assets/平时成绩记分册模板.xls`。
 - 默认校验命令：
 
   ```bash

@@ -12,7 +12,7 @@
 
 ## 模型和平台
 
-DeepSeek、Claude、GLM、Gemini、OpenAI 等模型都可以理解源表和选择命令。Windows 优先使用 Excel COM 的 PowerShell 脚本；macOS/Linux 使用 Python、openpyxl 和 LibreOffice/soffice。输出逻辑不依赖某一模型 API。
+DeepSeek、Claude、GLM、Gemini、OpenAI 等模型都可以理解源表和选择命令。Windows 优先使用 Excel COM 的 PowerShell 脚本；macOS/Linux 使用 Python、openpyxl 和 LibreOffice/soffice。两条 v1.1 路径共用 manifest 和 `gb_` named-range contract，不依赖某一模型 API，也不允许静默退回坐标写入。
 
 ## 使用限制
 

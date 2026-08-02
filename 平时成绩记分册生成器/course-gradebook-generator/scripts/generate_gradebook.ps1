@@ -29,9 +29,6 @@
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $ManifestPath) {
-  $ManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\templates\course-gradebook\v1.0.0\manifest.yaml'
-}
 if (-not $SchemaPath) {
   $SchemaPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'schemas\gradebook-input.schema.json'
 }
@@ -49,12 +46,16 @@ function Get-PythonCommand() {
 $PythonCommand = Get-PythonCommand
 $ManifestToJson = Join-Path $PSScriptRoot 'manifest_to_json.py'
 $ManifestJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-manifest-" + [guid]::NewGuid().ToString('N') + '.json')
-& $PythonCommand $ManifestToJson --manifest $ManifestPath --output $ManifestJsonPath
+$manifestArgs = @('--output', $ManifestJsonPath)
+if ($ManifestPath) { $manifestArgs += @('--manifest', $ManifestPath) }
+if ($TemplatePath) { $manifestArgs += @('--template', $TemplatePath) }
+& $PythonCommand $ManifestToJson @manifestArgs
 if ($LASTEXITCODE -ne 0) {
-  throw "Could not parse manifest: $ManifestPath"
+  throw 'Could not resolve the gradebook template package manifest and fingerprint.'
 }
 $ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
 Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
+$ManifestPath = [string]$ManifestData.manifest_path
 
 function Assert-ManifestCompatibility($manifest) {
   $version = [string]$manifest.template.version
@@ -71,17 +72,31 @@ function Assert-ManifestCompatibility($manifest) {
   if ($major -ne $supportedMajor) {
     throw "Unsupported template major version $major; generator supports $supportedMajor"
   }
+  if ([string]$manifest.anchor_mode -notin @('legacy_coordinates', 'excel_named_range')) {
+    throw "Unsupported gradebook anchor mode: $($manifest.anchor_mode)"
+  }
+  if ($version -match '^1\.0\.' -and [string]$manifest.anchor_mode -ne 'legacy_coordinates') {
+    throw 'Template version 1.0.x must use legacy_coordinates.'
+  }
+  if ($version -match '^1\.1\.' -and [string]$manifest.anchor_mode -ne 'excel_named_range') {
+    throw 'Template version 1.1.x must use excel_named_range.'
+  }
 }
 
 Assert-ManifestCompatibility $ManifestData
 
 $TemplateWasProvided = [bool]$TemplatePath
 if (-not $TemplatePath) {
-  $TemplatePath = Join-Path (Split-Path -Parent $ManifestPath) $ManifestData.template.file
+  $TemplatePath = [string]$ManifestData.template_path
 }
 
 if (-not (Test-Path -LiteralPath $TemplatePath)) {
   throw "Template not found: $TemplatePath"
+}
+
+& $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --identity-only --template $TemplatePath --manifest $ManifestPath
+if ($LASTEXITCODE -ne 0) {
+  throw "Template fingerprint validation failed before generation: $TemplatePath"
 }
 
 if (-not $SkipTemplateValidation) {
@@ -319,6 +334,318 @@ function ColumnToNumber([string]$column) {
   return $value
 }
 
+function ColumnLetter([int]$column) {
+  if ($column -le 0) { throw "Invalid Excel column number: $column" }
+  $name = ''
+  $n = $column
+  while ($n -gt 0) {
+    $rem = ($n - 1) % 26
+    $name = [char](65 + $rem) + $name
+    $n = [Math]::Floor(($n - 1) / 26)
+  }
+  return $name
+}
+
+function Get-ManagedNameObject($workbook, [string]$name) {
+  try {
+    return $workbook.Names.Item($name)
+  } catch {
+    throw "Missing workbook-level managed name: $name"
+  }
+}
+
+function Get-ManagedRangeLocation($workbook, [string]$name) {
+  $nameObject = Get-ManagedNameObject $workbook $name
+  if ([bool]$nameObject.Visible -eq $false) {
+    throw "Managed name must be visible: $name"
+  }
+  $refersTo = [string]$nameObject.RefersTo
+  if (-not $refersTo -or $refersTo.Contains('#REF!') -or $refersTo.Contains('[') -or $refersTo.Contains(',')) {
+    throw "Managed name has a broken or non-contiguous reference: $name"
+  }
+  try {
+    $range = $nameObject.RefersToRange
+  } catch {
+    throw "Managed name does not refer to a worksheet range: $name"
+  }
+  if ($null -eq $range -or [int]$range.Areas.Count -ne 1) {
+    throw "Managed name must refer to one worksheet rectangle: $name"
+  }
+  if ([string]$range.Parent.Name -ne [string]$workbook.Worksheets.Item([string]$range.Parent.Name).Name) {
+    throw "Managed name targets an invalid worksheet: $name"
+  }
+  return [pscustomobject]@{
+    Name = $name
+    Sheet = [string]$range.Parent.Name
+    MinRow = [int]$range.Row
+    MinCol = [int]$range.Column
+    MaxRow = [int]$range.Row + [int]$range.Rows.Count - 1
+    MaxCol = [int]$range.Column + [int]$range.Columns.Count - 1
+  }
+}
+
+function Get-ManagedRange($workbook, [string]$name) {
+  $nameObject = Get-ManagedNameObject $workbook $name
+  try {
+    $range = $nameObject.RefersToRange
+  } catch {
+    throw "Managed name does not refer to a worksheet range: $name"
+  }
+  if ($null -eq $range -or [int]$range.Areas.Count -ne 1) {
+    throw "Managed name must refer to one worksheet rectangle: $name"
+  }
+  return ,$range
+}
+
+function Set-ManagedCellValue($ranges, [string]$name, $value) {
+  $range = $ranges[[string]$name]
+  if ($null -eq $range -or [int]$range.Cells.Count -ne 1) {
+    throw "Managed name must target one cell for a scalar write: $name"
+  }
+  try {
+    if ($value -is [string]) { $null = $range.Value2 = [string]$value } else { $null = $range.Value = $value }
+  } catch { throw "Named scalar write failed for $name (value type $($value.GetType().FullName)): $($_.Exception.Message)" }
+}
+
+function Set-ManagedOffsetValue($ranges, [string]$name, [int]$rowOffset, [int]$colOffset, $value) {
+  $range = $ranges[[string]$name]
+  if ($null -eq $range) { throw "Missing managed write range: $name" }
+  $cell = $range.Cells.Item($rowOffset + 1, $colOffset + 1)
+  try {
+    if ($value -is [string]) { $null = $cell.Value2 = [string]$value } else { $null = $cell.Value = $value }
+  } catch { throw "Named value write failed for $name at offset $rowOffset,$colOffset (value type $($value.GetType().FullName)): $($_.Exception.Message)" }
+}
+
+function Set-ManagedOffsetFormula($ranges, [string]$name, [int]$rowOffset, [int]$colOffset, [string]$formula) {
+  $range = $ranges[[string]$name]
+  if ($null -eq $range) { throw "Missing managed formula range: $name" }
+  $cell = $range.Cells.Item($rowOffset + 1, $colOffset + 1)
+  try { $null = $cell.Formula = $formula } catch { throw "Named formula write failed for $name at offset $rowOffset,${colOffset}: $($_.Exception.Message)" }
+}
+
+function Get-ManagedRanges($workbook, [string]$variant) {
+  $required = if ($variant -eq 'with_skill') {
+    @($ManifestData.anchors.variants.with_skill.required)
+  } else {
+    @($ManifestData.anchors.variants.without_skill.required)
+  }
+  $locations = @{}
+  foreach ($name in $required) {
+    $locations[[string]$name] = Get-ManagedRangeLocation $workbook ([string]$name)
+  }
+  $forbidden = if ($variant -eq 'with_skill') {
+    @($ManifestData.anchors.variants.with_skill.forbidden)
+  } else {
+    @($ManifestData.anchors.variants.without_skill.forbidden)
+  }
+  foreach ($name in $forbidden) {
+    try {
+      $null = $workbook.Names.Item([string]$name)
+      throw "Forbidden managed name still exists for $variant variant: $name"
+    } catch [System.Runtime.InteropServices.COMException] {
+      # A missing forbidden name is the expected variant state.
+    }
+  }
+  return $locations
+}
+
+function Set-ManagedWorkbookName($workbook, [string]$name, $location) {
+  try {
+    $workbook.Names.Item($name).Delete()
+  } catch {
+    # The name may not exist yet.
+  }
+  $sheet = $workbook.Worksheets.Item([string]$location.Sheet)
+  $first = $sheet.Cells.Item([int]$location.MinRow, [int]$location.MinCol).Address($true, $true)
+  $last = $sheet.Cells.Item([int]$location.MaxRow, [int]$location.MaxCol).Address($true, $true)
+  $refersTo = "='$($location.Sheet)'!$first"
+  if ($first -ne $last) { $refersTo = "='$($location.Sheet)'!$first`:$last" }
+  $null = $workbook.Names.Add($name, $refersTo)
+}
+
+function Shift-ManagedLocationAfterDelete($location, [int]$startCol, [int]$count) {
+  $endCol = $startCol + $count - 1
+  if ($location.MaxCol -lt $startCol) { return $location }
+  if ($location.MinCol -gt $endCol) {
+    $location.MinCol -= $count
+    $location.MaxCol -= $count
+    return $location
+  }
+  if ($location.MinCol -ge $startCol -and $location.MaxCol -le $endCol) {
+    $location.MinCol = $startCol
+    $location.MaxCol = $startCol
+    return $location
+  }
+  if ($location.MinCol -lt $startCol -and $location.MaxCol -gt $endCol) {
+    $location.MaxCol -= $count
+    return $location
+  }
+  if ($location.MinCol -lt $startCol -and $location.MaxCol -le $endCol) {
+    $location.MaxCol = $startCol - 1
+    return $location
+  }
+  if ($location.MinCol -ge $startCol -and $location.MaxCol -gt $endCol) {
+    $location.MinCol = $startCol
+    $location.MaxCol -= $count
+    return $location
+  }
+  throw "Could not shift managed name $($location.Name) after deleting columns."
+}
+
+function Rebuild-ManagedNamesAfterColumnDelete($workbook, $original, [int]$startCol, [int]$count) {
+  $required = @($ManifestData.anchors.variants.without_skill.required)
+  $removed = @($ManifestData.anchors.variants.without_skill.forbidden)
+  foreach ($name in $removed) {
+    try { $workbook.Names.Item([string]$name).Delete() } catch { }
+  }
+  foreach ($name in $required) {
+    $location = $original[[string]$name]
+    if ($null -eq $location) { throw "Missing pre-delete location for managed name: $name" }
+    $shifted = Shift-ManagedLocationAfterDelete $location $startCol $count
+    Set-ManagedWorkbookName $workbook ([string]$name) $shifted
+  }
+}
+
+function Update-ManagedNamesForCapacity($workbook, $ranges, [int]$lastRow) {
+  $dataNames = @(
+    'gb_data_table', 'gb_serial_col', 'gb_student_id_col', 'gb_student_name_col',
+    'gb_regular_items', 'gb_regular_weighted_col', 'gb_theory_score_col',
+    'gb_theory_weighted_col', 'gb_skill_score_col', 'gb_skill_weighted_col',
+    'gb_total_score_col'
+  )
+  foreach ($name in @($ManifestData.anchors.variants.with_skill.required, $ManifestData.anchors.variants.without_skill.required) | Select-Object -Unique) {
+    if (-not $ranges.ContainsKey([string]$name)) { continue }
+    $location = $ranges[[string]$name]
+    if ($dataNames -contains [string]$name) { $location.MaxRow = $lastRow }
+    Set-ManagedWorkbookName $workbook ([string]$name) $location
+  }
+}
+
+function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $normalizedInput) {
+  Copy-Item -LiteralPath $TemplatePath -Destination $outPath -Force
+  $wb = $excel.Workbooks.Open($outPath)
+  try {
+    $wb.CheckCompatibility = $false
+    $hasSkill = $meta.SkillPct -gt 0.000001
+    $variant = if ($hasSkill) { 'with_skill' } else { 'without_skill' }
+    $original = Get-ManagedRanges $wb 'with_skill'
+    $ws = $wb.Worksheets.Item([string]$original['gb_data_table'].Sheet)
+    if (-not $hasSkill) {
+      $skillStart = [int]$original['gb_skill_score_col'].MinCol
+      $skillRange = "$(ColumnLetter $skillStart):$(ColumnLetter ($skillStart + 1))"
+      $null = $ws.Range($skillRange).EntireColumn.Delete()
+      Rebuild-ManagedNamesAfterColumnDelete $wb $original $skillStart 2
+    }
+    $ranges = Get-ManagedRanges $wb $variant
+    $table = $ranges['gb_data_table']
+    $dataStart = [int]$table.MinRow
+    $templateLastDataRow = [int]$table.MaxRow
+    $styleSourceRow = [int]$ranges['gb_template_row'].MinRow
+    if ($students.Count -gt ($templateLastDataRow - $dataStart + 1)) {
+      $needed = $students.Count - ($templateLastDataRow - $dataStart + 1)
+      for ($i = 0; $i -lt $needed; $i++) {
+        $insertAt = $templateLastDataRow + 1
+        $null = $ws.Rows.Item($styleSourceRow).Copy()
+        $null = $ws.Rows.Item($insertAt).Insert(-4121)
+        $templateLastDataRow++
+      }
+      Update-ManagedNamesForCapacity $wb $ranges $templateLastDataRow
+      $ranges = Get-ManagedRanges $wb $variant
+      $table = $ranges['gb_data_table']
+    }
+
+    $tableRange = $ws.Range(
+      (CellAddress ([int]$table.MinRow) ([int]$table.MinCol)),
+      (CellAddress ([int]$table.MaxRow) ([int]$table.MaxCol))
+    )
+    $writeRanges = @{}
+    $writeNames = if ($hasSkill) {
+      @($ManifestData.anchors.variants.with_skill.required)
+    } else {
+      @($ManifestData.anchors.variants.without_skill.required)
+    }
+    foreach ($name in $writeNames) {
+      $writeRanges[[string]$name] = Get-ManagedRange $wb ([string]$name)
+    }
+    if ($null -eq $writeRanges['gb_data_table']) { throw 'Missing managed write range: gb_data_table' }
+    $writeRanges['gb_data_table'].ClearContents()
+    Set-ManagedCellValue $writeRanges 'gb_term' $meta.Term
+    Set-ManagedCellValue $writeRanges 'gb_course' $meta.CourseName
+    Set-ManagedCellValue $writeRanges 'gb_teacher' $meta.Teacher
+    Set-ManagedCellValue $writeRanges 'gb_class_name' $meta.ClassName
+    Set-ManagedCellValue $writeRanges 'gb_header_regular' ('平时成绩({0}%)' -f (Format-Percentage-Label $meta.RegularPct))
+    Set-ManagedCellValue $writeRanges 'gb_header_theory' ('理论成绩({0}%)' -f (Format-Percentage-Label $meta.TheoryPct))
+    if ($hasSkill) {
+      Set-ManagedCellValue $writeRanges 'gb_header_skill' ('技能成绩（{0}%）' -f (Format-Percentage-Label $meta.SkillPct))
+    } else {
+      # Excel's native width is converted to a slightly larger LibreOffice width;
+      # 17.45 round-trips to the same protected width as the Python path's 18.
+      $null = $ws.Columns.Item((ColumnLetter ([int]$ranges['gb_total_score_col'].MinCol))).ColumnWidth = 17.45
+    }
+
+    $serialCol = [int]$ranges['gb_serial_col'].MinCol
+    $studentIdCol = [int]$ranges['gb_student_id_col'].MinCol
+    $studentNameCol = [int]$ranges['gb_student_name_col'].MinCol
+    $regularStartCol = [int]$ranges['gb_regular_items'].MinCol
+    $regularEndCol = [int]$ranges['gb_regular_items'].MaxCol
+    $regularWeightedCol = [int]$ranges['gb_regular_weighted_col'].MinCol
+    $theoryScoreCol = [int]$ranges['gb_theory_score_col'].MinCol
+    $theoryWeightedCol = [int]$ranges['gb_theory_weighted_col'].MinCol
+    $skillScoreCol = if ($hasSkill) { [int]$ranges['gb_skill_score_col'].MinCol } else { 0 }
+    $skillWeightedCol = if ($hasSkill) { [int]$ranges['gb_skill_weighted_col'].MinCol } else { 0 }
+    $totalCol = [int]$ranges['gb_total_score_col'].MinCol
+    $regularStartLetter = ColumnLetter $regularStartCol
+    $regularEndLetter = ColumnLetter $regularEndCol
+    $theoryScoreLetter = ColumnLetter $theoryScoreCol
+    $skillScoreLetter = if ($hasSkill) { ColumnLetter $skillScoreCol } else { '' }
+    $regularPct = FormulaNumber $meta.RegularPct
+    $theoryPct = FormulaNumber $meta.TheoryPct
+    $skillPct = FormulaNumber $meta.SkillPct
+    $classCode = Split-Path -Leaf (Split-Path -Parent $outPath)
+    for ($i = 0; $i -lt $students.Count; $i++) {
+      $student = $students[$i]
+      $r = $dataStart + $i
+      $scores = Generate-RegularScores $student.Regular ("$classCode|$($student.Id)|$($student.Regular)") ([int]$ManifestData.validation.regular_item_count)
+      Set-ManagedOffsetValue $writeRanges 'gb_serial_col' $i 0 ([double]($i + 1))
+      Set-ManagedOffsetValue $writeRanges 'gb_student_id_col' $i 0 $student.Id
+      $null = $writeRanges['gb_student_id_col'].Cells.Item($i + 1, 1).NumberFormatLocal = '@'
+      Set-ManagedOffsetValue $writeRanges 'gb_student_name_col' $i 0 $student.Name
+      for ($j = 0; $j -lt $scores.Count; $j++) {
+        Set-ManagedOffsetValue $writeRanges 'gb_regular_items' $i $j ([double]$scores[$j])
+      }
+      Set-ManagedOffsetFormula $writeRanges 'gb_regular_weighted_col' $i 0 ("=AVERAGE({0}{1}:{2}{1})*{3}" -f $regularStartLetter, $r, $regularEndLetter, $regularPct)
+      Set-ManagedOffsetValue $writeRanges 'gb_theory_score_col' $i 0 ([System.Convert]::ToDouble($student.Theory))
+      Set-ManagedOffsetFormula $writeRanges 'gb_theory_weighted_col' $i 0 ("={0}{1}*{2}" -f $theoryScoreLetter, $r, $theoryPct)
+      if ($hasSkill) {
+        Set-ManagedOffsetValue $writeRanges 'gb_skill_score_col' $i 0 ([System.Convert]::ToDouble($student.Skill))
+        Set-ManagedOffsetFormula $writeRanges 'gb_skill_weighted_col' $i 0 ("={0}{1}*{2}" -f $skillScoreLetter, $r, $skillPct)
+        Set-ManagedOffsetFormula $writeRanges 'gb_total_score_col' $i 0 ("=ROUND(AVERAGE({0}{1}:{2}{1})*{3}+{4}{1}*{5}+{6}{1}*{7},0)" -f $regularStartLetter, $r, $regularEndLetter, $regularPct, $theoryScoreLetter, $theoryPct, $skillScoreLetter, $skillPct)
+      } else {
+        Set-ManagedOffsetFormula $writeRanges 'gb_total_score_col' $i 0 ("=ROUND(AVERAGE({0}{1}:{2}{1})*{3}+{4}{1}*{5},0)" -f $regularStartLetter, $r, $regularEndLetter, $regularPct, $theoryScoreLetter, $theoryPct)
+      }
+    }
+    $wb.Application.CalculateFullRebuild()
+    $wb.Save()
+  } finally {
+    $wb.Close($true)
+  }
+  return [pscustomobject]@{
+    Source = ''
+    Output = $outPath
+    Count = $students.Count
+    Course = $meta.CourseName
+    ClassName = $meta.ClassName
+    HasSkill = $hasSkill
+    NamedRangeVariant = $variant
+    NamedRangeCapacityEnd = $templateLastDataRow
+    RegularPct = $meta.RegularPct
+    TheoryPct = $meta.TheoryPct
+    SkillPct = $meta.SkillPct
+    Engine = 'excel-com'
+    NormalizedInput = $normalizedInput
+  }
+}
+
 function Set-Value($sheet, [int]$row, [int]$col, $value) {
   $addr = CellAddress $row $col
   if ($value -is [string]) {
@@ -374,6 +701,11 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
   $outPath = if ($outputFile) { $outputFile } else { Join-Path $outputDirectory ("{0}-平时成绩记分册.xls" -f $classCode) }
   $outParent = Split-Path -Parent $outPath
   if ($outParent) { New-Item -ItemType Directory -Path $outParent -Force | Out-Null }
+  if ([string]$ManifestData.anchor_mode -eq 'excel_named_range') {
+    $namedResult = @(Build-One-NamedRange $excel $outPath $meta $students $normalizedInput)[-1]
+    $namedResult.Source = $sourceFile
+    return $namedResult
+  }
   Copy-Item -LiteralPath $TemplatePath -Destination $outPath -Force
 
   $wb = $excel.Workbooks.Open($outPath)

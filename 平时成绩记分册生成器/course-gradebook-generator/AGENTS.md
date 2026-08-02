@@ -8,6 +8,7 @@
 2. 优先使用 Windows 的 scripts/generate_gradebook.ps1；没有 Excel COM 或使用 macOS/Linux 时使用 scripts/generate_gradebook.py 和 LibreOffice/soffice。
 3. 生成后校验学生行数、学号和姓名顺序、8 次平时成绩平均值、总评、公式错误，以及技能成绩比例为 0% 时的列删除。
 4. 保留内置模板的样式、边框、公式和 xls 格式；输出目录需要用户明确或按脚本默认值处理。
+5. 默认 v1.1 使用 workbook-level `gb_` named ranges；不得把 v1.1 写入降级为硬编码坐标。v1.0 canonical 和旧兼容入口才使用 legacy 坐标模式。
 
 ## 平台与模型
 

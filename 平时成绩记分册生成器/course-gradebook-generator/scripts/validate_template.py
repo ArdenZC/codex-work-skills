@@ -18,7 +18,21 @@ from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 from xlrd import open_workbook
 
-from package_common import DEFAULT_MANIFEST, column_number, ensure_supported_major, load_manifest, manifest_template_path
+from named_range_contracts import required_names
+from named_range_utils import compare_named_range_inventories, validate_named_range_inventory
+from package_common import (
+    DEFAULT_MANIFEST,
+    V10_MANIFEST,
+    anchor_mode,
+    column_number,
+    ensure_supported_major,
+    load_manifest,
+    manifest_template_path,
+    resolve_template_package,
+    validate_template_package_identity,
+    validate_manifest_contract,
+)
+from xls_named_range_utils import compare_xls_and_xlsx_named_ranges, validate_xls_named_range_inventory
 
 
 class TemplateValidationError(RuntimeError):
@@ -620,6 +634,95 @@ def _workbook_signature(workbook, manifest: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _named_range_checks(
+    template: Path,
+    workbook,
+    manifest: dict[str, Any],
+    temp_dir: Path,
+    report: dict[str, Any],
+    errors: list[str],
+) -> None:
+    """Validate both the original BIFF names and the converted workbook names."""
+    variant = "with_skill"
+    contract = manifest["anchors"]
+    xlsx_inventory = validate_named_range_inventory(workbook, contract, variant)
+    report["checks"]["named_ranges_xlsx"] = xlsx_inventory
+    errors.extend(xlsx_inventory["errors"])
+    if template.suffix.lower() != ".xls":
+        errors.append("v1.1 named-range templates must be original .xls files")
+        return
+    xls_inventory = validate_xls_named_range_inventory(template, contract, variant)
+    report["checks"]["named_ranges_xls"] = xls_inventory
+    errors.extend(xls_inventory["errors"])
+    errors.extend(compare_xls_and_xlsx_named_ranges(xls_inventory, xlsx_inventory, required_names(variant)))
+    errors.extend(compare_named_range_inventories(xls_inventory, xlsx_inventory, required_names(variant)))
+
+    locations = xlsx_inventory["locations"]
+    sheet_name = locations["gb_data_table"]["sheet"] if "gb_data_table" in locations else ""
+    if not sheet_name or sheet_name not in workbook.sheetnames:
+        return
+    ws = workbook[sheet_name]
+    header_names = (
+        "gb_header_serial",
+        "gb_header_student_id",
+        "gb_header_student_name",
+        "gb_header_regular",
+        "gb_header_theory",
+        "gb_header_total",
+    )
+    expected_headers = manifest["validation"]["required_headers"]
+    for name, expected in zip(header_names, expected_headers):
+        location = locations.get(name)
+        if location is None:
+            continue
+        actual = ws.cell(location["min_row"], location["min_col"]).value
+        expected_text = str(expected)
+        if "(" in expected_text and expected_text.endswith(")"):
+            expected_text = expected_text.split("(", 1)[0]
+        if expected_text not in str(actual):
+            errors.append(f"Missing required header fragment {expected!r}; got {actual!r}")
+    formula_names = manifest["fields"]["formula_columns_with_skill"]["names"]
+    style_row = locations["gb_template_row"]["min_row"]
+    for name in formula_names:
+        location = locations.get(name)
+        if location is None:
+            continue
+        cell = ws.cell(style_row, location["min_col"])
+        if not isinstance(cell.value, str) or not cell.value.startswith("="):
+            errors.append(f"Expected formula in named range {name} template row")
+    student_id = locations.get("gb_student_id_col")
+    if student_id is not None:
+        if ws.cell(style_row, student_id["min_col"]).number_format != "@":
+            errors.append("Student ID named column must be text formatted")
+    expected_orientation = manifest["validation"].get("page_orientation", "landscape")
+    if ws.page_setup.orientation != expected_orientation:
+        errors.append(f"Template page orientation changed: {ws.page_setup.orientation}")
+    report["checks"]["structure"] = {
+        "sheets": workbook.sheetnames,
+        "rows": ws.max_row,
+        "columns": ws.max_column,
+        "merged_count": len(ws.merged_cells.ranges),
+        "expected_total_column": locations.get("gb_total_score_col", {}).get("max_col"),
+        "anchor_mode": "excel_named_range",
+    }
+
+    base_template_value = manifest.get("template", {}).get("base_template")
+    if base_template_value:
+        base_template = (Path(manifest["_path"]).parent / str(base_template_value)).resolve()
+        if base_template.exists():
+            base_xlsx = convert_to_xlsx(base_template, temp_dir / "base-template", find_soffice())
+            base_workbook = load_workbook(base_xlsx, data_only=False)
+            base_manifest = load_manifest(V10_MANIFEST)
+            expected_signature = _workbook_signature(base_workbook, base_manifest)
+            actual_signature = _workbook_signature(workbook, base_manifest)
+            expected_signature.pop("named_ranges", None)
+            actual_signature.pop("named_ranges", None)
+            differences = _signature_differences(expected_signature, actual_signature)
+            if differences:
+                report["checks"]["protected_signature_differences"] = differences[:20]
+                errors.append("Named-range template changed protected workbook structure or formatting.")
+
+
 def validate_template(
     template_path: Path | str,
     manifest_path: Path | str = DEFAULT_MANIFEST,
@@ -641,6 +744,11 @@ def validate_template(
         ensure_supported_major(manifest)
     except ValueError as exc:
         errors.append(str(exc))
+    try:
+        mode = validate_manifest_contract(manifest)
+    except ValueError as exc:
+        mode = ""
+        errors.append(str(exc))
     if not template.exists():
         errors.append(f"Template not found: {template}")
         raise TemplateValidationError(report)
@@ -652,12 +760,8 @@ def validate_template(
     if not is_canonical and not canonical.exists():
         errors.append(f"Canonical template not found: {canonical}")
     report["checks"]["sha256"] = {"expected": expected_hash, "actual": actual_hash}
-    if is_canonical and actual_hash != expected_hash:
-        errors.append(f"Canonical template SHA-256 mismatch: expected {expected_hash}, got {actual_hash}")
-    elif not is_canonical and actual_hash != expected_hash:
-        warnings.append(
-            f"Custom template fingerprint differs from the {manifest.get('template', {}).get('version')} canonical template."
-        )
+    if actual_hash != expected_hash:
+        errors.append(f"Template fingerprint mismatch: expected {expected_hash}, got {actual_hash}")
 
     if compatibility_template is None:
         entries = manifest.get("template", {}).get("compatibility_entries", [])
@@ -672,6 +776,21 @@ def validate_template(
                 errors.append(f"Compatibility template diverges from canonical template: {compat}")
         else:
             warnings.append(f"Compatibility template entry is missing: {compat}")
+
+    if mode == "excel_named_range":
+        try:
+            with tempfile.TemporaryDirectory(prefix="gradebook-named-template-") as temp_name:
+                xlsx = convert_to_xlsx(template, Path(temp_name), find_soffice())
+                workbook = load_workbook(xlsx, data_only=False)
+                report["checks"]["workbook_open"] = True
+                _named_range_checks(template, workbook, manifest, Path(temp_name), report, errors)
+        except TemplateValidationError:
+            raise
+        except Exception as exc:
+            errors.append(f"XLS named-range template could not be opened or inspected: {exc}")
+        if errors:
+            raise TemplateValidationError(report)
+        return report
 
     try:
         with tempfile.TemporaryDirectory(prefix="gradebook-template-") as temp_name:
@@ -857,14 +976,26 @@ def validate_template(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate the versioned XLS course-gradebook template package.")
     parser.add_argument("--template", default="")
-    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--manifest", default="")
     parser.add_argument("--compatibility-template", default="")
+    parser.add_argument("--identity-only", action="store_true", help="Only verify the template fingerprint and manifest contract.")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
     try:
-        manifest = load_manifest(args.manifest)
-        template = Path(args.template).expanduser().resolve() if args.template else manifest_template_path(manifest)
-        report = validate_template(template, args.manifest, args.compatibility_template or None)
+        package = resolve_template_package(args.template or None, args.manifest or None)
+        manifest = package.manifest
+        if args.identity_only:
+            actual = validate_template_package_identity(package.template_path, manifest)
+            report = {
+                "template": str(package.template_path),
+                "manifest": str(package.manifest_path),
+                "template_version": manifest.get("template", {}).get("version"),
+                "errors": [],
+                "warnings": [],
+                "checks": {"sha256": {"expected": manifest.get("fingerprint", {}).get("sha256"), "actual": actual}},
+            }
+        else:
+            report = validate_template(package.template_path, package.manifest_path, args.compatibility_template or None)
     except TemplateValidationError as exc:
         report = exc.report
         if args.as_json:
@@ -878,7 +1009,7 @@ def main() -> int:
     except Exception as exc:
         report = {
             "template": str(Path(args.template).expanduser().resolve()) if args.template else "",
-            "manifest": str(Path(args.manifest).expanduser().resolve()),
+            "manifest": str(Path(args.manifest).expanduser().resolve()) if args.manifest else "",
             "template_version": None,
             "errors": [str(exc)],
             "warnings": [],
@@ -892,7 +1023,10 @@ def main() -> int:
     if args.as_json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
-        print(f"validated template={template} version={report['template_version']} sha256={report['checks']['sha256']['actual']}")
+        print(
+            f"validated template={package.template_path} version={report['template_version']} "
+            f"sha256={report['checks']['sha256']['actual']}"
+        )
     return 0
 
 
