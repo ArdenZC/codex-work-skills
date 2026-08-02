@@ -232,6 +232,7 @@ def validate_xls_named_range_inventory(
         set(
             [f"Missing managed named range: {name}" for name in report["missing"]]
             + [f"Duplicate managed named range: {name}" for name in report["duplicate"]]
+            + [f"Invalid managed named range: {name}" for name in report["invalid_names"]]
             + [f"Unexpected managed named range: {name}" for name in report["unexpected"]]
             + report["scope_errors"]
             + report["broken"]

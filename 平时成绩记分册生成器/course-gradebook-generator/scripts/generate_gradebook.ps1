@@ -513,7 +513,11 @@ function Update-ManagedNamesForCapacity($workbook, $ranges, [int]$lastRow) {
     'gb_theory_weighted_col', 'gb_skill_score_col', 'gb_skill_weighted_col',
     'gb_total_score_col'
   )
-  foreach ($name in @($ManifestData.anchors.variants.with_skill.required, $ManifestData.anchors.variants.without_skill.required) | Select-Object -Unique) {
+  $allNames = @(
+    $ManifestData.anchors.variants.with_skill.required
+    $ManifestData.anchors.variants.without_skill.required
+  ) | ForEach-Object { [string]$_ } | Select-Object -Unique
+  foreach ($name in $allNames) {
     if (-not $ranges.ContainsKey([string]$name)) { continue }
     $location = $ranges[[string]$name]
     if ($dataNames -contains [string]$name) { $location.MaxRow = $lastRow }
@@ -717,8 +721,15 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $hasSkill = $meta.SkillPct -gt 0.000001
     $skillStartCol = ColumnToNumber ([string]$columns.skill_score)
     $skillWeightedCol = ColumnToNumber ([string]$columns.skill_weighted)
+    $legacyMetadataVerticalBorder = $null
     if (-not $hasSkill) {
-      $null = $ws.Columns.Item("$($columns.skill_score):$($columns.skill_weighted)").Delete()
+      $sourceBorder = $ws.Range("$($columns.theory_weighted)2").Borders.Item(10)
+      $legacyMetadataVerticalBorder = [ordered]@{
+        LineStyle = $sourceBorder.LineStyle
+        Weight = $sourceBorder.Weight
+        Color = $sourceBorder.Color
+      }
+      $null = $ws.Range("$($columns.skill_score):$($columns.skill_weighted)").EntireColumn.Delete()
     }
 
     $dataStart = [int]$structure.data_start_row
@@ -760,7 +771,20 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     if ($hasSkill) {
       $ws.Range([string]$structure.headers.skill).Value2 = ('技能成绩（{0}%）' -f (Format-Percentage-Label $meta.SkillPct))
     } else {
-      $ws.Columns.Item([string]$structure.no_skill_total_column).ColumnWidth = 18
+      # 17.45 round-trips through LibreOffice to the protected width 18.0.
+      $null = $ws.Columns.Item([string]$structure.no_skill_total_column).ColumnWidth = 17.45
+      $verticalBorder = $ws.Range(
+        "$($columns.theory_score)2:$($structure.no_skill_total_column)2"
+      ).Borders.Item(11)
+      $null = $verticalBorder.LineStyle = $legacyMetadataVerticalBorder.LineStyle
+      $null = $verticalBorder.Weight = $legacyMetadataVerticalBorder.Weight
+      $null = $verticalBorder.Color = $legacyMetadataVerticalBorder.Color
+      $horizontalBorder = $ws.Range(
+        "$($columns.theory_score)2:$($columns.theory_weighted)3"
+      ).Borders.Item(12)
+      $null = $horizontalBorder.LineStyle = $legacyMetadataVerticalBorder.LineStyle
+      $null = $horizontalBorder.Weight = $legacyMetadataVerticalBorder.Weight
+      $null = $horizontalBorder.Color = $legacyMetadataVerticalBorder.Color
     }
 
     $regularPct = FormulaNumber $meta.RegularPct
@@ -790,14 +814,6 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
       }
     }
 
-    $ws.Range("$($columns.regular_weighted)${dataStart}:$($columns.regular_weighted)${templateLastDataRow}").NumberFormatLocal = '0.0_ '
-    $ws.Range("$($columns.theory_weighted)${dataStart}:$($columns.theory_weighted)${templateLastDataRow}").NumberFormatLocal = '0.0_ '
-    if ($hasSkill) {
-      $ws.Range("$($columns.skill_weighted)${dataStart}:$($columns.skill_weighted)${templateLastDataRow}").NumberFormatLocal = '0.0_ '
-      $ws.Range("$($columns.total_score)${dataStart}:$($columns.total_score)${templateLastDataRow}").NumberFormatLocal = '0_ '
-    } else {
-      $ws.Range("$($structure.no_skill_total_column)${dataStart}:$($structure.no_skill_total_column)${templateLastDataRow}").NumberFormatLocal = '0_ '
-    }
     $firstExtraRow = $dataStart + $students.Count
     if ($firstExtraRow -le $templateLastDataRow) {
       $null = $ws.Range("${firstCol}${firstExtraRow}:${firstCol}${templateLastDataRow}").EntireRow.Delete()

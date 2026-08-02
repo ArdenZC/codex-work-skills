@@ -4635,6 +4635,70 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             ("hidden", lambda path: patch_xlsx_named_range(path, "gb_term", hidden=True), "hidden"),
             ("local-scope", lambda path: patch_xlsx_named_range(path, "gb_term", local_sheet_id=0), "workbook scoped"),
             ("broken", lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="#REF!"), "broken"),
+            (
+                "external",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'[external.xlsx]Sheet1'!$A$1"),
+                "broken",
+            ),
+            (
+                "constant",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="42"),
+                "worksheet range",
+            ),
+            (
+                "formula",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="SUM('平时成绩'!$A$1)"),
+                "invalid A1",
+            ),
+            (
+                "union",
+                lambda path: patch_xlsx_named_range(
+                    path,
+                    "gb_term",
+                    attr_text="'平时成绩'!$A$1,'平时成绩'!$B$1",
+                ),
+                "broken",
+            ),
+            (
+                "wrong-sheet",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'Sheet1'!$A$1"),
+                "one worksheet",
+            ),
+            (
+                "wrong-destination",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'平时成绩'!$Z$1"),
+                "gb_term",
+            ),
+            (
+                "merged-cell-not-top-left",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'平时成绩'!$D$2"),
+                "top-left",
+            ),
+            (
+                "cell-two-columns",
+                lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'平时成绩'!$C$2:$D$2"),
+                "single cell",
+            ),
+            (
+                "regular-seven-columns",
+                lambda path: patch_xlsx_named_range(path, "gb_regular_items", attr_text="'平时成绩'!$D$5:$J$52"),
+                "8 columns",
+            ),
+            (
+                "duplicate-physical-destination",
+                lambda path: patch_xlsx_named_range(path, "gb_course", attr_text="'平时成绩'!$C$2"),
+                "share one physical destination",
+            ),
+            (
+                "template-row-mismatch",
+                lambda path: patch_xlsx_named_range(path, "gb_template_row", attr_text="'平时成绩'!$A$6:$Q$6"),
+                "gb_template_row",
+            ),
+            (
+                "data-row-mismatch",
+                lambda path: patch_xlsx_named_range(path, "gb_theory_score_col", attr_text="'平时成绩'!$M$6:$M$52"),
+                "same data rows",
+            ),
         )
         for label, mutate, expected_error in faults:
             with self.subTest(fault=label), tempfile.TemporaryDirectory(prefix=f"grade-package-name-fault-{label}-") as temp_name:
@@ -4676,6 +4740,15 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 ("broken_named_ranges", "missing_named_ranges", "shape_errors", "destination_errors"),
             ),
             ("unknown", lambda path: patch_xlsx_named_range(path, "gb_unknown", attr_text="'平时成绩'!$A$1"), "unexpected_named_ranges"),
+            (
+                "without-skill-variant-residual",
+                lambda path: patch_xlsx_named_range(
+                    path,
+                    "gb_skill_score_col",
+                    attr_text="'平时成绩'!$O$5:$O$52",
+                ),
+                "unexpected_named_ranges",
+            ),
         )
         for label, mutate, field in faults:
             with self.subTest(fault=label), tempfile.TemporaryDirectory(prefix=f"grade-package-output-name-fault-{label}-") as temp_name:

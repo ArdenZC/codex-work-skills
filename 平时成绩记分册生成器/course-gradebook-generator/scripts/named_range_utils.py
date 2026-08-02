@@ -119,7 +119,20 @@ def _location_from_defined_name(workbook, defined: DefinedName) -> NamedRangeLoc
         raise NamedRangeError(f"Named range {name} has an invalid destination: {address!r}", "shape")
     if sheet not in workbook.sheetnames:
         raise NamedRangeError(f"Named range {name} targets missing worksheet {sheet!r}", "destination")
-    return NamedRangeLocation(name, "workbook", sheet, min_row, min_col, max_row, max_col)
+    location = NamedRangeLocation(name, "workbook", sheet, min_row, min_col, max_row, max_col)
+    if location.width == 1 and location.height == 1:
+        for merged in workbook[sheet].merged_cells.ranges:
+            if (
+                merged.min_row <= min_row <= merged.max_row
+                and merged.min_col <= min_col <= merged.max_col
+            ):
+                if (min_row, min_col) != (merged.min_row, merged.min_col):
+                    raise NamedRangeError(
+                        f"Named range {name} must target the top-left cell of merged range {merged}",
+                        "shape",
+                    )
+                break
+    return location
 
 
 def resolve_named_range(workbook, name: str) -> NamedRangeLocation:
@@ -161,6 +174,88 @@ def _contract_for(contract: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
     if isinstance(definitions, list):
         return {str(name): dict(NAMED_RANGE_CONTRACTS[str(name)]) for name in definitions}
     return {str(name): dict(value) for name, value in definitions.items()}
+
+
+def _column_number(column: str) -> int:
+    value = 0
+    for char in str(column).upper():
+        if not "A" <= char <= "Z":
+            raise ValueError(f"Invalid Excel column: {column}")
+        value = value * 26 + ord(char) - ord("A") + 1
+    return value
+
+
+def expected_named_range_locations(
+    legacy_structure: dict[str, Any],
+    variant: str,
+) -> dict[str, NamedRangeLocation]:
+    """Derive the v1.1 initial layout from the protected v1.0 coordinate contract."""
+    sheet = str(legacy_structure["worksheet"])
+    start_row = int(legacy_structure["data_start_row"])
+    end_row = int(legacy_structure["template_last_data_row"])
+    columns = legacy_structure["columns"]
+
+    def cell(name: str, address: str) -> NamedRangeLocation:
+        match = re.fullmatch(r"([A-Z]+)(\d+)", str(address).upper())
+        if match is None:
+            raise ValueError(f"Invalid legacy cell address for {name}: {address}")
+        column = _column_number(match.group(1))
+        row = int(match.group(2))
+        return NamedRangeLocation(name, "workbook", sheet, row, column, row, column)
+
+    def rect(name: str, min_col: str, max_col: str, min_row: int = start_row, max_row: int = end_row) -> NamedRangeLocation:
+        return NamedRangeLocation(
+            name,
+            "workbook",
+            sheet,
+            min_row,
+            _column_number(min_col),
+            max_row,
+            _column_number(max_col),
+        )
+
+    locations = {
+        "gb_title": cell("gb_title", legacy_structure["title_cell"]),
+        "gb_term": cell("gb_term", legacy_structure["metadata"]["term"]),
+        "gb_course": cell("gb_course", legacy_structure["metadata"]["course"]),
+        "gb_teacher": cell("gb_teacher", legacy_structure["metadata"]["teacher"]),
+        "gb_class_name": cell("gb_class_name", legacy_structure["metadata"]["class_name"]),
+        "gb_header_serial": cell("gb_header_serial", legacy_structure["header_label_cells"]["serial"]),
+        "gb_header_student_id": cell("gb_header_student_id", legacy_structure["header_label_cells"]["student_id"]),
+        "gb_header_student_name": cell("gb_header_student_name", legacy_structure["header_label_cells"]["student_name"]),
+        "gb_header_regular": cell("gb_header_regular", legacy_structure["header_label_cells"]["regular"]),
+        "gb_header_theory": cell("gb_header_theory", legacy_structure["header_label_cells"]["theory"]),
+        "gb_header_total": cell("gb_header_total", legacy_structure["header_label_cells"]["total"]),
+        "gb_data_table": rect("gb_data_table", columns["serial"], columns["total_score"]),
+        "gb_template_row": rect(
+            "gb_template_row",
+            columns["serial"],
+            columns["total_score"],
+            start_row,
+            start_row,
+        ),
+        "gb_serial_col": rect("gb_serial_col", columns["serial"], columns["serial"]),
+        "gb_student_id_col": rect("gb_student_id_col", columns["student_id"], columns["student_id"]),
+        "gb_student_name_col": rect("gb_student_name_col", columns["student_name"], columns["student_name"]),
+        "gb_regular_items": rect("gb_regular_items", columns["regular_items_start"], columns["regular_items_end"]),
+        "gb_regular_weighted_col": rect("gb_regular_weighted_col", columns["regular_weighted"], columns["regular_weighted"]),
+        "gb_theory_score_col": rect("gb_theory_score_col", columns["theory_score"], columns["theory_score"]),
+        "gb_theory_weighted_col": rect("gb_theory_weighted_col", columns["theory_weighted"], columns["theory_weighted"]),
+        "gb_skill_score_col": rect("gb_skill_score_col", columns["skill_score"], columns["skill_score"]),
+        "gb_skill_weighted_col": rect("gb_skill_weighted_col", columns["skill_weighted"], columns["skill_weighted"]),
+        "gb_total_score_col": rect("gb_total_score_col", columns["total_score"], columns["total_score"]),
+    }
+    if variant == "without_skill":
+        total_column = str(legacy_structure["no_skill_total_column"])
+        locations["gb_header_total"] = rect("gb_header_total", total_column, total_column, 3, 3)
+        locations["gb_data_table"] = rect("gb_data_table", columns["serial"], total_column)
+        locations["gb_template_row"] = rect("gb_template_row", columns["serial"], total_column, start_row, start_row)
+        locations["gb_total_score_col"] = rect("gb_total_score_col", total_column, total_column)
+        for name in ("gb_header_skill", "gb_skill_score_col", "gb_skill_weighted_col"):
+            locations.pop(name, None)
+    else:
+        locations["gb_header_skill"] = cell("gb_header_skill", legacy_structure["headers"]["skill"])
+    return {name: locations[name] for name in required_names(variant)}
 
 
 def _expected_for_variant(contract: dict[str, Any] | None, variant: str) -> tuple[str, ...]:

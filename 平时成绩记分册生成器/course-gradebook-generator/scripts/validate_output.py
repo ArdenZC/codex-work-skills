@@ -17,6 +17,7 @@ from openpyxl.utils import get_column_letter
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
+    V10_MANIFEST,
     anchor_mode,
     calculate_expected_total,
     column_number,
@@ -29,7 +30,11 @@ from package_common import (
     validate_template_package_identity,
 )
 from named_range_contracts import required_names
-from named_range_utils import validate_named_range_inventory
+from named_range_utils import (
+    compare_named_range_inventories,
+    expected_named_range_locations,
+    validate_named_range_inventory,
+)
 from xls_named_range_utils import (
     compare_xls_and_xlsx_named_ranges,
     validate_xls_named_range_inventory,
@@ -946,6 +951,22 @@ def validate_output_dir(
                         if template_named_with_skill["errors"]:
                             errors.extend(template_named_with_skill["errors"])
                         else:
+                            expected_locations = expected_named_range_locations(
+                                load_manifest(V10_MANIFEST)["structure"],
+                                "with_skill",
+                            )
+                            expected_inventory = {
+                                "locations": {
+                                    name: location.to_dict()
+                                    for name, location in expected_locations.items()
+                                }
+                            }
+                            template_layout_errors = compare_named_range_inventories(
+                                expected_inventory,
+                                template_named_with_skill,
+                                required_names("with_skill"),
+                            )
+                            errors.extend(template_layout_errors)
                             skill_start = int(template_named_with_skill["locations"]["gb_skill_score_col"]["min_col"])
                             class_name_cell = _named_location_address(
                                 template_named_with_skill["locations"]["gb_class_name"]

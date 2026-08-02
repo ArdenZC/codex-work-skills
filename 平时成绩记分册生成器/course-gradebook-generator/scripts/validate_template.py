@@ -19,7 +19,11 @@ from openpyxl.utils import get_column_letter
 from xlrd import open_workbook
 
 from named_range_contracts import required_names
-from named_range_utils import compare_named_range_inventories, validate_named_range_inventory
+from named_range_utils import (
+    compare_named_range_inventories,
+    expected_named_range_locations,
+    validate_named_range_inventory,
+)
 from package_common import (
     DEFAULT_MANIFEST,
     V10_MANIFEST,
@@ -656,6 +660,22 @@ def _named_range_checks(
     errors.extend(xls_inventory["errors"])
     errors.extend(compare_xls_and_xlsx_named_ranges(xls_inventory, xlsx_inventory, required_names(variant)))
     errors.extend(compare_named_range_inventories(xls_inventory, xlsx_inventory, required_names(variant)))
+    base_manifest = load_manifest(V10_MANIFEST)
+    expected_locations = expected_named_range_locations(base_manifest["structure"], variant)
+    expected_inventory = {
+        "locations": {
+            name: location.to_dict() for name, location in expected_locations.items()
+        }
+    }
+    report["checks"]["expected_named_range_locations"] = expected_inventory["locations"]
+    for inventory in (xls_inventory, xlsx_inventory):
+        errors.extend(
+            compare_named_range_inventories(
+                expected_inventory,
+                inventory,
+                required_names(variant),
+            )
+        )
 
     locations = xlsx_inventory["locations"]
     sheet_name = locations["gb_data_table"]["sheet"] if "gb_data_table" in locations else ""
@@ -712,7 +732,6 @@ def _named_range_checks(
         if base_template.exists():
             base_xlsx = convert_to_xlsx(base_template, temp_dir / "base-template", find_soffice())
             base_workbook = load_workbook(base_xlsx, data_only=False)
-            base_manifest = load_manifest(V10_MANIFEST)
             expected_signature = _workbook_signature(base_workbook, base_manifest)
             actual_signature = _workbook_signature(workbook, base_manifest)
             expected_signature.pop("named_ranges", None)
