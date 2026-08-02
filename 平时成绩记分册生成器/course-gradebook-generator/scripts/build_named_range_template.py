@@ -18,10 +18,11 @@ from openpyxl import load_workbook
 from named_range_contracts import required_names
 from named_range_utils import (
     compare_named_range_inventories,
-    set_named_range,
+    expected_named_range_locations,
+    set_named_range_from_location,
     validate_named_range_inventory,
 )
-from package_common import V10_TEMPLATE, V11_PACKAGE_DIR, sha256_file
+from package_common import V10_MANIFEST, V10_TEMPLATE, V11_PACKAGE_DIR, sha256_file
 from validate_template import convert_to_format, find_soffice
 from xls_named_range_utils import (
     compare_xls_and_xlsx_named_ranges,
@@ -94,38 +95,10 @@ def _convert(soffice: str, source: Path, output_dir: Path, target: str) -> Path:
     return convert_to_format(source, output_dir, target, soffice)
 
 
-def _build_named_workbook(source_xlsx: Path, target_xlsx: Path) -> None:
+def _build_named_workbook(source_xlsx: Path, target_xlsx: Path, expected_locations) -> None:
     workbook = load_workbook(source_xlsx, data_only=False)
-    sheet_name = workbook.sheetnames[0]
-    locations = {
-        "gb_title": (1, 1, 1, 1),
-        "gb_term": (2, 3, 2, 3),
-        "gb_course": (2, 7, 2, 7),
-        "gb_teacher": (2, 12, 2, 12),
-        "gb_class_name": (2, 15, 2, 15),
-        "gb_header_serial": (3, 1, 3, 1),
-        "gb_header_student_id": (3, 2, 3, 2),
-        "gb_header_student_name": (3, 3, 3, 3),
-        "gb_header_regular": (3, 4, 3, 4),
-        "gb_header_theory": (3, 13, 3, 13),
-        "gb_header_skill": (3, 15, 3, 15),
-        "gb_header_total": (3, 17, 3, 17),
-        "gb_data_table": (5, 1, 52, 17),
-        "gb_template_row": (5, 1, 5, 17),
-        "gb_serial_col": (5, 1, 52, 1),
-        "gb_student_id_col": (5, 2, 52, 2),
-        "gb_student_name_col": (5, 3, 52, 3),
-        "gb_regular_items": (5, 4, 52, 11),
-        "gb_regular_weighted_col": (5, 12, 52, 12),
-        "gb_theory_score_col": (5, 13, 52, 13),
-        "gb_theory_weighted_col": (5, 14, 52, 14),
-        "gb_skill_score_col": (5, 15, 52, 15),
-        "gb_skill_weighted_col": (5, 16, 52, 16),
-        "gb_total_score_col": (5, 17, 52, 17),
-    }
     for name in required_names("with_skill"):
-        min_row, min_col, max_row, max_col = locations[name]
-        set_named_range(workbook, name, sheet_name, min_row, min_col, max_row, max_col)
+        set_named_range_from_location(workbook, expected_locations[name])
     workbook.save(target_xlsx)
 
 
@@ -137,6 +110,38 @@ def _write_manifest(source_manifest: Path, target_manifest: Path, template_sha: 
         yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
+
+
+def _inventory_has_managed_names(inventory: dict[str, Any]) -> bool:
+    return bool(
+        inventory.get("locations")
+        or inventory.get("duplicate")
+        or inventory.get("invalid_names")
+        or inventory.get("unexpected")
+        or inventory.get("scope_errors")
+        or inventory.get("broken")
+        or inventory.get("destination_errors")
+        or inventory.get("shape_errors")
+        or inventory.get("relationship_errors")
+    )
+
+
+def _validate_complete_named_inventory(
+    label: str,
+    inventory: dict[str, Any],
+    expected_inventory: dict[str, Any],
+) -> list[str]:
+    errors = list(inventory.get("errors", []))
+    errors.extend(
+        compare_named_range_inventories(
+            expected_inventory,
+            inventory,
+            required_names("with_skill"),
+        )
+    )
+    if errors:
+        return [f"{label}: {error}" for error in sorted(set(errors))]
+    return []
 
 
 def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[str, Any]:
@@ -152,18 +157,97 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         source_manifest = source.parent.parent / "v1.1.0" / "manifest.yaml"
     with tempfile.TemporaryDirectory(prefix="gradebook-named-template-") as temp_name:
         temp = Path(temp_name)
+        source_manifest_v11 = V11_PACKAGE_DIR / "manifest.yaml"
+        manifest_data = yaml.safe_load(source_manifest_v11.read_text(encoding="utf-8")) or {}
+        base_manifest = yaml.safe_load(V10_MANIFEST.read_text(encoding="utf-8")) or {}
+        expected_locations = expected_named_range_locations(base_manifest["structure"], "with_skill")
+        expected_inventory = {
+            "locations": {
+                name: location.to_dict() for name, location in expected_locations.items()
+            }
+        }
+        source_xls_inventory = validate_xls_named_range_inventory(
+            source,
+            manifest_data["anchors"],
+            "with_skill",
+        )
         source_xlsx = _convert(soffice, source, temp / "source-xlsx", "xlsx")
+        source_xlsx_inventory = validate_named_range_inventory(
+            load_workbook(source_xlsx, data_only=False),
+            manifest_data["anchors"],
+            "with_skill",
+        )
+        source_has_names = _inventory_has_managed_names(source_xls_inventory)
+        source_xlsx_has_names = _inventory_has_managed_names(source_xlsx_inventory)
+        if not source_has_names and not source_xlsx_has_names:
+            source_named_state = "v1.0 seed"
+        elif not source_has_names or not source_xlsx_has_names:
+            raise RuntimeError(
+                "Named-range build rejected a partial managed-name inventory: "
+                "raw XLS and round-trip XLSX do not contain the same managed-name state"
+            )
+        else:
+            expected_count = len(required_names("with_skill"))
+            if (
+                source_xls_inventory.get("actual_count") != expected_count
+                or source_xlsx_inventory.get("actual_count") != expected_count
+            ):
+                raise RuntimeError(
+                    "Named-range build rejected a partial managed-name inventory: "
+                    f"expected {expected_count} complete names, got "
+                    f"raw={source_xls_inventory.get('actual_count')}, "
+                    f"roundtrip={source_xlsx_inventory.get('actual_count')}"
+                )
+            source_errors = _validate_complete_named_inventory(
+                "source XLS",
+                source_xls_inventory,
+                expected_inventory,
+            )
+            source_errors.extend(
+                _validate_complete_named_inventory(
+                    "source round-trip XLSX",
+                    source_xlsx_inventory,
+                    expected_inventory,
+                )
+            )
+            source_errors.extend(
+                compare_xls_and_xlsx_named_ranges(
+                    source_xls_inventory,
+                    source_xlsx_inventory,
+                    required_names("with_skill"),
+                )
+            )
+            source_errors.extend(
+                compare_named_range_inventories(
+                    source_xls_inventory,
+                    source_xlsx_inventory,
+                    required_names("with_skill"),
+                )
+            )
+            if source_errors:
+                raise RuntimeError(
+                    "Named-range build rejected an invalid managed-name inventory: "
+                    + "; ".join(sorted(set(source_errors)))
+                )
+            source_named_state = "v1.1 canonical"
         baseline_normalized = temp / "baseline-normalized.xlsx"
         load_workbook(source_xlsx, data_only=False).save(baseline_normalized)
         baseline_xls = _convert(soffice, baseline_normalized, temp / "baseline-xls", "xls")
         baseline_roundtrip_xlsx = _convert(soffice, baseline_xls, temp / "baseline-roundtrip-xlsx", "xlsx")
 
         named_xlsx = temp / "named-ranges.xlsx"
-        _build_named_workbook(source_xlsx, named_xlsx)
-        named_xls = _convert(soffice, named_xlsx, temp / "named-xls", "xls")
-        normalize_libreoffice_print_title_records(named_xls)
-        normalize_xls_summary_information(named_xls)
-        named_roundtrip_xlsx = _convert(soffice, named_xls, temp / "named-roundtrip-xlsx", "xlsx")
+        if source_named_state == "v1.0 seed":
+            _build_named_workbook(source_xlsx, named_xlsx, expected_locations)
+            named_xls = _convert(soffice, named_xlsx, temp / "named-xls", "xls")
+            normalize_libreoffice_print_title_records(named_xls)
+            normalize_xls_summary_information(named_xls)
+            named_roundtrip_xlsx = _convert(soffice, named_xls, temp / "named-roundtrip-xlsx", "xlsx")
+        else:
+            # A complete v1.1 source is already a canonical semantic package.
+            # Validate its raw and round-trip inventories, then preserve its
+            # bytes instead of silently rewriting names through LibreOffice.
+            named_xls = source
+            named_roundtrip_xlsx = _convert(soffice, named_xls, temp / "named-roundtrip-xlsx", "xlsx")
 
         package_manifest = output_dir / "manifest.yaml"
         source_v11_manifest = V11_PACKAGE_DIR / "manifest.yaml"
@@ -177,17 +261,43 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         xls_inventory = validate_xls_named_range_inventory(named_xls, manifest_data["anchors"], "with_skill")
         if xlsx_inventory["errors"] or xls_inventory["errors"]:
             raise RuntimeError("Named range build failed: " + "; ".join(xlsx_inventory["errors"] + xls_inventory["errors"]))
+        expected_differences = compare_named_range_inventories(
+            expected_inventory,
+            xls_inventory,
+            required_names("with_skill"),
+        )
+        expected_differences.extend(
+            compare_named_range_inventories(
+                expected_inventory,
+                xlsx_inventory,
+                required_names("with_skill"),
+            )
+        )
+        if expected_differences:
+            raise RuntimeError(
+                "Named range build changed the canonical managed destinations: "
+                + "; ".join(sorted(set(expected_differences)))
+            )
         differences = compare_xls_and_xlsx_named_ranges(xls_inventory, xlsx_inventory, required_names("with_skill"))
         differences.extend(compare_named_range_inventories(xls_inventory, xlsx_inventory, required_names("with_skill")))
         if differences:
             raise RuntimeError("Raw XLS and round-trip XLSX named-range inventories differ: " + "; ".join(sorted(set(differences))))
-        if _workbook_layout_signature(load_workbook(baseline_roundtrip_xlsx, data_only=False)) != _workbook_layout_signature(
+        protected_layout_reference = (
+            baseline_roundtrip_xlsx
+            if source_named_state == "v1.0 seed"
+            else source_xlsx
+        )
+        if _workbook_layout_signature(load_workbook(protected_layout_reference, data_only=False)) != _workbook_layout_signature(
             load_workbook(named_roundtrip_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range build changed protected workbook layout or formatting")
 
         baseline_pdf = _convert(soffice, baseline_xls, temp / "baseline-pdf", "pdf")
         named_pdf = _convert(soffice, named_xls, temp / "named-pdf", "pdf")
+        if source_named_state == "v1.1 canonical":
+            # The staged template is the validated source byte-for-byte; no
+            # second workbook transformation is introduced to compare here.
+            baseline_pdf = named_pdf
         if _pdf_signature(baseline_pdf) != _pdf_signature(named_pdf):
             raise RuntimeError(
                 f"Named-range build changed PDF rendering: baseline={_pdf_signature(baseline_pdf)}, named={_pdf_signature(named_pdf)}"

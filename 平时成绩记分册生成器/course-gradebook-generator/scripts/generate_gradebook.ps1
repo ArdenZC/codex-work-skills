@@ -59,18 +59,33 @@ $ManifestPath = [string]$ManifestData.manifest_path
 
 function Assert-ManifestCompatibility($manifest) {
   $version = [string]$manifest.template.version
-  $supported = $manifest.generator.supported_major
-  if (-not $version -or $version -notmatch '^\d+\.\d+\.\d+$' -or $null -eq $supported) {
-    throw 'Manifest must declare a semantic template version and generator.supported_major'
+  if (-not $version -or $version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    throw 'Manifest must declare an ASCII semantic template version without leading zeros'
   }
   try {
     [int]$major = $version.Split('.')[0]
-    [int]$supportedMajor = $supported
+    [int]$minor = $version.Split('.')[1]
   } catch {
-    throw 'Manifest must declare a semantic template version and generator.supported_major'
+    throw 'Manifest must declare an ASCII semantic template version without leading zeros'
   }
+  $supportedMajor = 1
+  $supportedMinors = @(0, 1)
   if ($major -ne $supportedMajor) {
-    throw "Unsupported template major version $major; generator supports $supportedMajor"
+    throw "Unsupported template major version $major; supported major is $supportedMajor"
+  }
+  if ($minor -notin $supportedMinors) {
+    throw "Unsupported template minor version $minor; supported minors are 0 and 1"
+  }
+  if ($null -eq $manifest.generator.supported_major) {
+    throw 'Manifest must declare generator.supported_major'
+  }
+  try {
+    [int]$declaredMajor = $manifest.generator.supported_major
+  } catch {
+    throw 'Manifest generator.supported_major must be an integer'
+  }
+  if ($declaredMajor -ne $supportedMajor) {
+    throw "Manifest generator.supported_major must remain $supportedMajor; it does not define support"
   }
   if ([string]$manifest.anchor_mode -notin @('legacy_coordinates', 'excel_named_range')) {
     throw "Unsupported gradebook anchor mode: $($manifest.anchor_mode)"
@@ -97,6 +112,13 @@ if (-not (Test-Path -LiteralPath $TemplatePath)) {
 & $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --identity-only --template $TemplatePath --manifest $ManifestPath
 if ($LASTEXITCODE -ne 0) {
   throw "Template fingerprint validation failed before generation: $TemplatePath"
+}
+
+if ([string]$ManifestData.anchor_mode -eq 'excel_named_range') {
+  & $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --named-range-runtime-preflight --template $TemplatePath --manifest $ManifestPath
+  if ($LASTEXITCODE -ne 0) {
+    throw "Named-range runtime preflight failed before COM output creation: $TemplatePath"
+  }
 }
 
 if (-not $SkipTemplateValidation) {
@@ -410,6 +432,14 @@ function Set-ManagedCellValue($ranges, [string]$name, $value) {
 function Set-ManagedOffsetValue($ranges, [string]$name, [int]$rowOffset, [int]$colOffset, $value) {
   $range = $ranges[[string]$name]
   if ($null -eq $range) { throw "Missing managed write range: $name" }
+  if ($rowOffset -lt 0 -or $colOffset -lt 0) {
+    throw "Named value write offset must be non-negative for ${name}: requested row=$rowOffset, col=$colOffset"
+  }
+  $rowCount = [int]$range.Rows.Count
+  $colCount = [int]$range.Columns.Count
+  if ($rowOffset -ge $rowCount -or $colOffset -ge $colCount) {
+    throw "Named value write offset out of bounds for ${name}: requested row=$rowOffset, col=$colOffset, range rows=$rowCount, cols=$colCount"
+  }
   $cell = $range.Cells.Item($rowOffset + 1, $colOffset + 1)
   try {
     if ($value -is [string]) { $null = $cell.Value2 = [string]$value } else { $null = $cell.Value = $value }
@@ -419,6 +449,14 @@ function Set-ManagedOffsetValue($ranges, [string]$name, [int]$rowOffset, [int]$c
 function Set-ManagedOffsetFormula($ranges, [string]$name, [int]$rowOffset, [int]$colOffset, [string]$formula) {
   $range = $ranges[[string]$name]
   if ($null -eq $range) { throw "Missing managed formula range: $name" }
+  if ($rowOffset -lt 0 -or $colOffset -lt 0) {
+    throw "Named formula write offset must be non-negative for ${name}: requested row=$rowOffset, col=$colOffset"
+  }
+  $rowCount = [int]$range.Rows.Count
+  $colCount = [int]$range.Columns.Count
+  if ($rowOffset -ge $rowCount -or $colOffset -ge $colCount) {
+    throw "Named formula write offset out of bounds for ${name}: requested row=$rowOffset, col=$colOffset, range rows=$rowCount, cols=$colCount"
+  }
   $cell = $range.Cells.Item($rowOffset + 1, $colOffset + 1)
   try { $null = $cell.Formula = $formula } catch { throw "Named formula write failed for $name at offset $rowOffset,${colOffset}: $($_.Exception.Message)" }
 }
@@ -447,6 +485,52 @@ function Get-ManagedRanges($workbook, [string]$variant) {
     }
   }
   return $locations
+}
+
+function Assert-ManagedRuntimeContract($workbook, [string]$variant, $locations) {
+  $required = if ($variant -eq 'with_skill') {
+    @($ManifestData.anchors.variants.with_skill.required)
+  } else {
+    @($ManifestData.anchors.variants.without_skill.required)
+  }
+  $seen = @{}
+  foreach ($name in $required) {
+    $location = $locations[[string]$name]
+    if ($null -eq $location) { throw "Missing runtime managed location: $name" }
+    $physicalKey = "{0}|{1}|{2}|{3}|{4}" -f $location.Sheet, $location.MinRow, $location.MinCol, $location.MaxRow, $location.MaxCol
+    if ($seen.ContainsKey($physicalKey)) {
+      throw "Managed named ranges share one physical destination at ${physicalKey}: $($seen[$physicalKey]), $name"
+    }
+    $seen[$physicalKey] = [string]$name
+  }
+  $table = $locations['gb_data_table']
+  $templateRow = $locations['gb_template_row']
+  if ($null -eq $table -or $null -eq $templateRow) { throw 'Runtime managed contract is missing the data table or template row' }
+  if ($templateRow.MinRow -ne $table.MinRow -or $templateRow.MinCol -ne $table.MinCol -or $templateRow.MaxCol -ne $table.MaxCol) {
+    throw 'gb_template_row must equal the first row of gb_data_table at runtime'
+  }
+  $regular = $locations['gb_regular_items']
+  if ($null -eq $regular -or ($regular.MaxCol - $regular.MinCol + 1) -ne 8) {
+    throw 'gb_regular_items must contain exactly 8 columns at runtime'
+  }
+  $dataNames = @(
+    'gb_serial_col', 'gb_student_id_col', 'gb_student_name_col', 'gb_regular_items',
+    'gb_regular_weighted_col', 'gb_theory_score_col', 'gb_theory_weighted_col', 'gb_total_score_col'
+  )
+  if ($variant -eq 'with_skill') { $dataNames += @('gb_skill_score_col', 'gb_skill_weighted_col') }
+  foreach ($name in $dataNames) {
+    $location = $locations[[string]$name]
+    if ($null -eq $location) { throw "Runtime managed contract is missing data range: $name" }
+    if ($location.MinRow -ne $table.MinRow -or $location.MaxRow -ne $table.MaxRow) {
+      throw "$name must use the same data rows as gb_data_table at runtime"
+    }
+    if ($location.MinCol -lt $table.MinCol -or $location.MaxCol -gt $table.MaxCol) {
+      throw "$name must be contained in gb_data_table at runtime"
+    }
+  }
+  if ($regular.MaxCol + 1 -ne $locations['gb_regular_weighted_col'].MinCol) {
+    throw 'gb_regular_items must be immediately before gb_regular_weighted_col at runtime'
+  }
 }
 
 function Set-ManagedWorkbookName($workbook, [string]$name, $location) {
@@ -533,6 +617,7 @@ function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $norma
     $hasSkill = $meta.SkillPct -gt 0.000001
     $variant = if ($hasSkill) { 'with_skill' } else { 'without_skill' }
     $original = Get-ManagedRanges $wb 'with_skill'
+    Assert-ManagedRuntimeContract $wb 'with_skill' $original
     $ws = $wb.Worksheets.Item([string]$original['gb_data_table'].Sheet)
     if (-not $hasSkill) {
       $skillStart = [int]$original['gb_skill_score_col'].MinCol
@@ -541,6 +626,7 @@ function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $norma
       Rebuild-ManagedNamesAfterColumnDelete $wb $original $skillStart 2
     }
     $ranges = Get-ManagedRanges $wb $variant
+    Assert-ManagedRuntimeContract $wb $variant $ranges
     $table = $ranges['gb_data_table']
     $dataStart = [int]$table.MinRow
     $templateLastDataRow = [int]$table.MaxRow
@@ -555,6 +641,7 @@ function Build-One-NamedRange($excel, [string]$outPath, $meta, $students, $norma
       }
       Update-ManagedNamesForCapacity $wb $ranges $templateLastDataRow
       $ranges = Get-ManagedRanges $wb $variant
+      Assert-ManagedRuntimeContract $wb $variant $ranges
       $table = $ranges['gb_data_table']
     }
 
@@ -839,6 +926,14 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
   }
 }
 
+function Remove-OfficialGeneratedOutputs([string]$directory) {
+  if (-not (Test-Path -LiteralPath $directory)) { return }
+  $sourcePaths = @($sources | ForEach-Object { [System.IO.Path]::GetFullPath($_.FullName) })
+  Get-ChildItem -LiteralPath $directory -Filter '*.xls' -File -ErrorAction SilentlyContinue |
+    Where-Object { $sourcePaths -notcontains [System.IO.Path]::GetFullPath($_.FullName) } |
+    Remove-Item -Force -ErrorAction SilentlyContinue
+}
+
 $sources = Resolve-SourceFiles $SourcePath
 if (-not $OutputDir) {
   $OutputDir = Join-Path (Split-Path -Parent $sources[0].FullName) '平时成绩记分册_生成'
@@ -870,6 +965,9 @@ try {
       }
     }
   }
+} catch {
+  Remove-OfficialGeneratedOutputs $OutputDir
+  throw
 } finally {
   $excel.Quit()
   [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
@@ -928,6 +1026,9 @@ try {
     }
     Write-Warning 'Output validation skipped; QA report status is skipped.'
   }
+} catch {
+  Remove-OfficialGeneratedOutputs $OutputDir
+  throw
 } finally {
   Remove-Item -LiteralPath $normalizedJsonPath -Force -ErrorAction SilentlyContinue
 }

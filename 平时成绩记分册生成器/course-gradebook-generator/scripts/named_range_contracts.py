@@ -7,6 +7,8 @@ from typing import Any
 
 NAMED_RANGE_MODE = "excel_named_range"
 MANAGED_NAME_PREFIX = "gb_"
+SUPPORTED_TEMPLATE_MAJOR = 1
+SUPPORTED_TEMPLATE_MINORS = frozenset({0, 1})
 
 
 NAMED_RANGE_CONTRACTS: dict[str, dict[str, Any]] = {
@@ -46,6 +48,104 @@ WITHOUT_SKILL_REMOVED_NAMES = (
 WITHOUT_SKILL_REQUIRED_NAMES = tuple(
     name for name in MANAGED_NAMES if name not in WITHOUT_SKILL_REMOVED_NAMES
 )
+
+
+# v1.1 semantic fields are deliberately closed.  Keep this mapping independent
+# from the YAML so a manifest cannot redefine what a field means.
+V11_FIELD_CONTRACTS: dict[str, dict[str, Any]] = {
+    "term": {
+        "target": "named_range",
+        "name": "gb_term",
+        "mode": "replace_value",
+        "max_chars": 32,
+    },
+    "course": {
+        "target": "named_range",
+        "name": "gb_course",
+        "mode": "replace_value",
+        "max_chars": 64,
+    },
+    "teacher": {
+        "target": "named_range",
+        "name": "gb_teacher",
+        "mode": "replace_value",
+        "max_chars": 32,
+    },
+    "class_name": {
+        "target": "named_range",
+        "name": "gb_class_name",
+        "mode": "replace_value",
+        "max_chars": 64,
+    },
+    "student_id": {
+        "target": "named_range",
+        "name": "gb_student_id_col",
+        "mode": "text",
+        "pattern": r"^\d{8,}$",
+    },
+    "regular_scores": {
+        "target": "named_range",
+        "name": "gb_regular_items",
+        "mode": "decimal_half",
+        "average_matches": "students.regular",
+    },
+    "theory_score": {
+        "target": "named_range",
+        "name": "gb_theory_score_col",
+        "mode": "number",
+    },
+    "skill_score": {
+        "target": "named_range",
+        "name": "gb_skill_score_col",
+        "mode": "number",
+        "optional_when": "weights.skill == 0",
+    },
+    "formula_columns_with_skill": {
+        "names": [
+            "gb_regular_weighted_col",
+            "gb_theory_weighted_col",
+            "gb_skill_weighted_col",
+            "gb_total_score_col",
+        ],
+        "mode": "formula",
+    },
+    "formula_columns_without_skill": {
+        "names": [
+            "gb_regular_weighted_col",
+            "gb_theory_weighted_col",
+            "gb_total_score_col",
+        ],
+        "mode": "formula",
+    },
+}
+
+V11_LAYOUT_CONTRACT: dict[str, Any] = {
+    "worksheet_from": "gb_data_table",
+    "data_table": "gb_data_table",
+    "template_row": "gb_template_row",
+    "columns": {
+        "serial": "gb_serial_col",
+        "student_id": "gb_student_id_col",
+        "student_name": "gb_student_name_col",
+        "regular_items": "gb_regular_items",
+        "regular_weighted": "gb_regular_weighted_col",
+        "theory_score": "gb_theory_score_col",
+        "theory_weighted": "gb_theory_weighted_col",
+        "skill_score": "gb_skill_score_col",
+        "skill_weighted": "gb_skill_weighted_col",
+        "total_score": "gb_total_score_col",
+    },
+}
+
+
+def v11_variant_contracts() -> dict[str, dict[str, list[str]]]:
+    return {
+        "with_skill": {"required": list(WITH_SKILL_REQUIRED_NAMES), "forbidden": []},
+        "without_skill": {
+            "required": list(WITHOUT_SKILL_REQUIRED_NAMES),
+            "forbidden": list(WITHOUT_SKILL_REMOVED_NAMES),
+        },
+    }
 
 
 def required_names(variant: str) -> tuple[str, ...]:

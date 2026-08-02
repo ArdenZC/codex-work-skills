@@ -12,6 +12,8 @@ from typing import Any
 import yaml
 from jsonschema import Draft202012Validator
 
+from named_range_contracts import SUPPORTED_TEMPLATE_MAJOR, SUPPORTED_TEMPLATE_MINORS
+
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 V10_PACKAGE_DIR = SKILL_DIR / "assets" / "templates" / "course-gradebook" / "v1.0.0"
@@ -96,9 +98,13 @@ def manifest_template_path(manifest: dict[str, Any]) -> Path:
 
 def parse_template_version(version: Any) -> tuple[int, int, int]:
     text = str(version or "")
-    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", text)
+    match = re.fullmatch(
+        r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)",
+        text,
+        flags=re.ASCII,
+    )
     if match is None:
-        raise ValueError("Manifest must declare a semantic template version")
+        raise ValueError("Manifest must declare an ASCII semantic template version without leading zeros")
     return tuple(int(part) for part in match.groups())
 
 
@@ -109,27 +115,103 @@ def anchor_mode(manifest_or_version: dict[str, Any] | str) -> str:
         else manifest_or_version
     )
     _, minor, _ = parse_template_version(version)
+    if minor not in SUPPORTED_TEMPLATE_MINORS:
+        raise ValueError(
+            f"Unsupported template minor version {minor}; supported minors are {sorted(SUPPORTED_TEMPLATE_MINORS)}"
+        )
     if minor == 0:
         return "legacy_coordinates"
     if minor == 1:
         return "excel_named_range"
-    raise ValueError(f"Unsupported template minor version {minor}; supported minors are 0 and 1")
+    raise ValueError(f"Unsupported template minor version {minor}")
 
 
 def validate_legacy_manifest_contract(manifest: dict[str, Any]) -> None:
     if "anchors" in manifest or "layout" in manifest:
         raise ValueError("Legacy v1.0 manifest must not declare named-range metadata")
+    keys = set(manifest) - {"_path"}
+    expected_top_level = {
+        "template",
+        "generator",
+        "structure",
+        "fields",
+        "allowed_changes",
+        "protected",
+        "validation",
+        "fingerprint",
+    }
+    if keys != expected_top_level:
+        unknown = sorted(keys - expected_top_level)
+        missing = sorted(expected_top_level - keys)
+        detail = f"unknown keys {unknown}" if unknown else f"missing keys {missing}"
+        raise ValueError(f"Legacy v1.0 manifest has an invalid closed contract: {detail}")
     structure = manifest.get("structure")
     if not isinstance(structure, dict) or not structure.get("metadata") or not structure.get("columns"):
         raise ValueError("Legacy v1.0 manifest must declare coordinate structure.metadata and structure.columns")
+    expected_fields = {
+        "term": {"target": "C2", "mode": "replace_value", "max_chars": 32},
+        "course": {"target": "G2", "mode": "replace_value", "max_chars": 64},
+        "teacher": {"target": "L2", "mode": "replace_value", "max_chars": 32},
+        "class_name": {"target": "O2", "mode": "replace_value", "max_chars": 64},
+        "student_id": {"column": "B", "mode": "text", "pattern": r"^\d{8,}$"},
+        "regular_scores": {
+            "columns": ["D", "E", "F", "G", "H", "I", "J", "K"],
+            "mode": "decimal_half",
+            "average_matches": "students.regular",
+        },
+        "theory_score": {"column": "M", "mode": "number"},
+        "skill_score": {"column": "O", "mode": "number", "optional_when": "weights.skill == 0"},
+        "formula_columns_with_skill": {"columns": ["L", "N", "P", "Q"], "mode": "formula"},
+        "formula_columns_without_skill": {"columns": ["L", "N", "O"], "mode": "formula"},
+    }
+    fields = manifest.get("fields")
+    if not isinstance(fields, dict) or set(fields) != set(expected_fields):
+        raise ValueError("Legacy v1.0 fields must use the closed coordinate contract")
+    for field_name, expected in expected_fields.items():
+        if fields.get(field_name) != expected:
+            raise ValueError(
+                f"Legacy v1.0 field {field_name} contains named-range or coordinate metadata outside its contract"
+            )
+    validation = manifest.get("validation")
+    if not isinstance(validation, dict) or validation.get("required_named_ranges") != []:
+        raise ValueError("Legacy v1.0 validation.required_named_ranges must remain an empty list")
 
 
 def validate_named_range_manifest_contract(manifest: dict[str, Any]) -> None:
-    from named_range_contracts import MANAGED_NAMES, NAMED_RANGE_CONTRACTS, NAMED_RANGE_MODE, required_names, removed_names
+    from named_range_contracts import (
+        MANAGED_NAMES,
+        NAMED_RANGE_CONTRACTS,
+        NAMED_RANGE_MODE,
+        V11_FIELD_CONTRACTS,
+        V11_LAYOUT_CONTRACT,
+        required_names,
+        v11_variant_contracts,
+    )
+
+    expected_top_level = {
+        "template",
+        "generator",
+        "structure",
+        "anchors",
+        "fields",
+        "layout",
+        "allowed_changes",
+        "protected",
+        "validation",
+        "fingerprint",
+    }
+    keys = set(manifest) - {"_path"}
+    if keys != expected_top_level:
+        unknown = sorted(keys - expected_top_level)
+        missing = sorted(expected_top_level - keys)
+        detail = f"unknown keys {unknown}" if unknown else f"missing keys {missing}"
+        raise ValueError(f"v1.1 manifest has an invalid closed contract: {detail}")
 
     anchors = manifest.get("anchors")
     if not isinstance(anchors, dict) or anchors.get("mode") != NAMED_RANGE_MODE or anchors.get("scope") != "workbook":
         raise ValueError("v1.1 manifest must declare anchors.mode=excel_named_range and workbook scope")
+    if set(anchors) != {"mode", "scope", "required", "definitions", "variants"}:
+        raise ValueError("v1.1 anchors must contain exactly mode, scope, required, definitions, and variants")
     if tuple(anchors.get("required", ())) != MANAGED_NAMES:
         raise ValueError("v1.1 manifest anchors.required must list the complete managed contract")
     definitions = anchors.get("definitions")
@@ -139,68 +221,37 @@ def validate_named_range_manifest_contract(manifest: dict[str, Any]) -> None:
         if definitions.get(name) != expected:
             raise ValueError(f"v1.1 manifest definition mismatch for managed name {name}")
     variants = anchors.get("variants")
-    if not isinstance(variants, dict):
+    expected_variants = v11_variant_contracts()
+    if not isinstance(variants, dict) or set(variants) != set(expected_variants):
         raise ValueError("v1.1 manifest must declare with_skill and without_skill named-range variants")
     for variant in ("with_skill", "without_skill"):
         data = variants.get(variant)
-        if not isinstance(data, dict):
+        if not isinstance(data, dict) or set(data) != {"required", "forbidden"}:
             raise ValueError(f"v1.1 manifest is missing named-range variant {variant}")
-        if tuple(data.get("required", ())) != required_names(variant):
+        if data != expected_variants[variant]:
             raise ValueError(f"v1.1 manifest required names mismatch for {variant}")
-        if tuple(data.get("forbidden", ())) != removed_names(variant):
-            raise ValueError(f"v1.1 manifest forbidden names mismatch for {variant}")
     structure = manifest.get("structure")
     if not isinstance(structure, dict) or set(structure) != {"source"}:
         raise ValueError("v1.1 manifest structure may contain only the external-input source contract")
     layout = manifest.get("layout")
-    if not isinstance(layout, dict):
-        raise ValueError("v1.1 manifest must declare a named-range layout")
-    expected_layout_keys = {
-        "worksheet_from",
-        "data_table",
-        "template_row",
-        "columns",
-    }
-    if set(layout) != expected_layout_keys or layout.get("worksheet_from") != "gb_data_table":
-        raise ValueError("v1.1 manifest layout is incomplete or must derive the worksheet from gb_data_table")
-    layout_columns = layout.get("columns")
-    expected_layout_columns = {
-        "serial",
-        "student_id",
-        "student_name",
-        "regular_items",
-        "regular_weighted",
-        "theory_score",
-        "theory_weighted",
-        "skill_score",
-        "skill_weighted",
-        "total_score",
-    }
-    if (
-        not isinstance(layout_columns, dict)
-        or set(layout_columns) != expected_layout_columns
-        or set(layout_columns.values()) - set(NAMED_RANGE_CONTRACTS)
-        or layout.get("data_table") != "gb_data_table"
-        or layout.get("template_row") != "gb_template_row"
-    ):
-        raise ValueError("v1.1 manifest layout must map every output coordinate to a managed named range")
-    for field_name, field in (manifest.get("fields") or {}).items():
-        if not isinstance(field, dict):
-            raise ValueError(f"Manifest field {field_name} must be an object")
-        target = field.get("target")
-        if target == "named_range":
-            names = [field.get("name")] if field.get("name") else field.get("names", [])
-            if not names or set(names) - set(NAMED_RANGE_CONTRACTS):
-                raise ValueError(f"Manifest field {field_name} references an unknown managed name")
-        elif field_name not in {"formula_columns_with_skill", "formula_columns_without_skill"}:
-            raise ValueError(f"v1.1 manifest field {field_name} must target a named range")
+    if layout != V11_LAYOUT_CONTRACT:
+        raise ValueError(
+            "v1.1 manifest layout must map every output coordinate and exactly match the managed semantic layout contract"
+        )
+    fields = manifest.get("fields")
+    if not isinstance(fields, dict) or set(fields) != set(V11_FIELD_CONTRACTS):
+        raise ValueError("v1.1 manifest fields must exactly match the closed semantic field contract")
+    for field_name, expected in V11_FIELD_CONTRACTS.items():
+        if fields.get(field_name) != expected:
+            raise ValueError(f"v1.1 manifest field contract mismatch for {field_name}")
     validation = manifest.get("validation", {})
-    required = tuple(validation.get("required_named_ranges", ()))
-    if required and required != required_names("with_skill"):
+    required = tuple(validation.get("required_named_ranges", ())) if isinstance(validation, dict) else ()
+    if required != required_names("with_skill"):
         raise ValueError("v1.1 validation.required_named_ranges must list the complete managed contract")
 
 
 def validate_manifest_contract(manifest: dict[str, Any]) -> str:
+    ensure_supported_major(manifest)
     mode = anchor_mode(manifest)
     if mode == "legacy_coordinates":
         validate_legacy_manifest_contract(manifest)
@@ -302,17 +353,27 @@ def validate_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEM
 
 
 def ensure_supported_major(manifest: dict[str, Any]) -> None:
-    version = str(manifest.get("template", {}).get("version", ""))
-    supported = manifest.get("generator", {}).get("supported_major")
-    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
-        raise ValueError("Manifest must declare a semantic template version and generator.supported_major")
+    version = manifest.get("template", {}).get("version", "")
+    major, minor, _ = parse_template_version(version)
+    if major != SUPPORTED_TEMPLATE_MAJOR:
+        raise ValueError(
+            f"Unsupported template major version {major}; supported major is {SUPPORTED_TEMPLATE_MAJOR}"
+        )
+    if minor not in SUPPORTED_TEMPLATE_MINORS:
+        raise ValueError(
+            f"Unsupported template minor version {minor}; supported minors are {sorted(SUPPORTED_TEMPLATE_MINORS)}"
+        )
+    declared = manifest.get("generator", {}).get("supported_major")
+    if declared is None:
+        raise ValueError("Manifest must declare generator.supported_major")
     try:
-        major = int(version.split(".", 1)[0])
-        supported_major = int(supported)
-    except (ValueError, TypeError, AttributeError) as exc:
-        raise ValueError("Manifest must declare a semantic template version and generator.supported_major") from exc
-    if major != supported_major:
-        raise ValueError(f"Unsupported template major version {major}; generator supports {supported_major}")
+        declared_major = int(declared)
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Manifest generator.supported_major must be an integer") from exc
+    if declared_major != SUPPORTED_TEMPLATE_MAJOR:
+        raise ValueError(
+            f"Manifest generator.supported_major must remain {SUPPORTED_TEMPLATE_MAJOR}; it does not define support"
+        )
 
 
 def column_number(column: str) -> int:

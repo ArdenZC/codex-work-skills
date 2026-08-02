@@ -3400,6 +3400,10 @@ class GradebookPowerShellContractTests(unittest.TestCase):
         self.assertIn("Rebuild-ManagedNamesAfterColumnDelete", script)
         self.assertIn("Set-ManagedWorkbookName", script)
         self.assertIn("--identity-only", script)
+        self.assertIn("--named-range-runtime-preflight", script)
+        self.assertIn("Assert-ManagedRuntimeContract", script)
+        self.assertIn("Named value write offset out of bounds", script)
+        self.assertIn("Named formula write offset out of bounds", script)
         self.assertNotIn("abs_tol=1.0", script)
 
     def test_local_com_integration_script_is_repeatable_and_has_skip_boundary(self) -> None:
@@ -4555,6 +4559,59 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 "v1.1 builder must reproduce a byte-stable canonical XLS package",
             )
 
+    def test_named_range_builder_preserves_complete_v11_source_and_rejects_partial_or_wrong_sources(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-named-builder-contract-") as temp_name:
+            folder = Path(temp_name)
+            preserved = folder / "preserved"
+            result = run_script(
+                GRADE / "scripts" / "build_named_range_template.py",
+                "--source",
+                str(GRADE_V11_TEMPLATE),
+                "--output-dir",
+                str(preserved),
+                "--force",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            self.assertEqual(file_sha256(preserved / "template.xls"), file_sha256(GRADE_V11_TEMPLATE))
+
+            faults = (
+                (
+                    "partial",
+                    lambda path: patch_xlsx_named_range(path, "gb_term", remove=True),
+                    "partial managed-name inventory",
+                ),
+                (
+                    "wrong-destination",
+                    lambda path: patch_xlsx_named_range(path, "gb_term", attr_text="'平时成绩'!$A$1"),
+                    "invalid managed-name inventory",
+                ),
+                (
+                    "regular-seven",
+                    lambda path: patch_xlsx_named_range(path, "gb_regular_items", attr_text="'平时成绩'!$D$5:$J$52"),
+                    "8 columns",
+                ),
+                (
+                    "duplicate-physical",
+                    lambda path: patch_xlsx_named_range(path, "gb_course", attr_text="'平时成绩'!$C$2"),
+                    "share one physical destination",
+                ),
+            )
+            for label, mutate, expected_error in faults:
+                with self.subTest(builder_fault=label):
+                    tampered = tamper_xls_named_range(folder, GRADE_V11_TEMPLATE, mutate, f"builder-{label}")
+                    output = folder / f"rejected-{label}"
+                    rejected = run_script(
+                        GRADE / "scripts" / "build_named_range_template.py",
+                        "--source",
+                        str(tampered),
+                        "--output-dir",
+                        str(output),
+                        "--force",
+                    )
+                    self.assertNotEqual(rejected.returncode, 0)
+                    self.assertIn(expected_error.lower(), (rejected.stdout + rejected.stderr).lower())
+                    self.assertFalse((output / "template.xls").exists())
+
     def test_named_range_manifest_contract_is_closed_and_minor_matrix_is_strict(self) -> None:
         sys.modules.pop("package_common", None)
         sys.modules.pop("named_range_contracts", None)
@@ -4588,6 +4645,72 @@ class GradebookTemplatePackageTests(unittest.TestCase):
         legacy_with_named_metadata["anchors"] = {"mode": "excel_named_range"}
         with self.assertRaisesRegex(ValueError, "must not declare named-range"):
             validate_manifest_contract(legacy_with_named_metadata)
+
+        semantic_faults = (
+            ("swapped-term", lambda manifest: manifest["fields"]["term"].update(name="gb_course")),
+            ("swapped-teacher", lambda manifest: manifest["fields"]["teacher"].update(name="gb_term")),
+            (
+                "swapped-formula-names",
+                lambda manifest: manifest["fields"]["formula_columns_with_skill"].update(
+                    names=["gb_regular_weighted_col", "gb_theory_weighted_col", "gb_total_score_col", "gb_skill_weighted_col"]
+                ),
+            ),
+            ("wrong-mode", lambda manifest: manifest["fields"]["regular_scores"].update(mode="number")),
+            ("extra-field-attribute", lambda manifest: manifest["fields"]["term"].update(extra="reject")),
+            ("missing-field-attribute", lambda manifest: manifest["fields"]["term"].pop("max_chars")),
+            ("unknown-field-key", lambda manifest: manifest["fields"].update(unknown={"target": "named_range"})),
+            (
+                "swapped-serial",
+                lambda manifest: manifest["layout"]["columns"].update(serial="gb_teacher"),
+            ),
+            (
+                "duplicate-semantic-target",
+                lambda manifest: manifest["layout"]["columns"].update(student_id="gb_teacher"),
+            ),
+            (
+                "variant-contract",
+                lambda manifest: manifest["anchors"]["variants"]["without_skill"]["forbidden"].clear(),
+            ),
+        )
+        for label, mutate in semantic_faults:
+            with self.subTest(contract_fault=label):
+                candidate = deepcopy(valid)
+                mutate(candidate)
+                with self.assertRaisesRegex(ValueError, "(contract|layout|variant|field|names|semantic)"):
+                    validate_manifest_contract(candidate)
+
+        version_faults = (
+            ("major-from-manifest", "2.0.0", 2),
+            ("major-with-declared-support", "2.1.0", 2),
+            ("unsupported-minor", "1.2.0", 1),
+            ("leading-zero-major", "01.1.0", 1),
+            ("leading-zero-minor", "1.01.0", 1),
+            ("leading-zero-patch", "1.1.00", 1),
+            ("unicode-digits", "１.１.０", 1),
+        )
+        for label, version, declared_major in version_faults:
+            with self.subTest(version_fault=label):
+                candidate = deepcopy(valid)
+                candidate["template"]["version"] = version
+                candidate["generator"]["supported_major"] = declared_major
+                with self.assertRaisesRegex(ValueError, "(semantic|Unsupported template)"):
+                    validate_manifest_contract(candidate)
+
+        legacy_faults = (
+            ("field-name", lambda manifest: manifest["fields"]["term"].update(name="gb_term")),
+            ("formula-names", lambda manifest: manifest["fields"]["formula_columns_with_skill"].update(names=["gb_total_score_col"])),
+            ("required-named-ranges", lambda manifest: manifest["validation"].update(required_named_ranges=["gb_term"])),
+            ("variants", lambda manifest: manifest.update(variants={"with_skill": {}})),
+            ("definitions", lambda manifest: manifest.update(definitions={"gb_term": {}})),
+            ("layout", lambda manifest: manifest.update(layout={"data_table": "gb_data_table"})),
+        )
+        legacy = yaml.safe_load(GRADE_V10_MANIFEST.read_text(encoding="utf-8"))
+        for label, mutate in legacy_faults:
+            with self.subTest(legacy_fault=label):
+                candidate = deepcopy(legacy)
+                mutate(candidate)
+                with self.assertRaisesRegex(ValueError, "(Legacy v1.0|named-range|contract)"):
+                    validate_manifest_contract(candidate)
 
     def test_named_range_variants_and_dynamic_capacity_are_real_outputs(self) -> None:
         cases = ((False, 1, 52, 21), (True, 48, 52, 24), (False, 49, 53, 21), (True, 100, 104, 24))
@@ -4719,6 +4842,190 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                     any(expected.lower() in diagnostic.lower() for expected in expected_errors),
                     diagnostic,
                 )
+
+    def test_named_range_runtime_preflight_rejects_matching_fingerprint_faults(self) -> None:
+        faults = (
+            (
+                "regular-seven-columns",
+                lambda path: patch_xlsx_named_range(path, "gb_regular_items", attr_text="'平时成绩'!$D$5:$J$52"),
+                "8 columns",
+            ),
+            (
+                "template-row-mismatch",
+                lambda path: patch_xlsx_named_range(path, "gb_template_row", attr_text="'平时成绩'!$A$6:$Q$6"),
+                "gb_template_row",
+            ),
+            (
+                "data-row-mismatch",
+                lambda path: patch_xlsx_named_range(path, "gb_theory_score_col", attr_text="'平时成绩'!$M$6:$M$52"),
+                "same data rows",
+            ),
+            (
+                "duplicate-physical-destination",
+                lambda path: patch_xlsx_named_range(path, "gb_course", attr_text="'平时成绩'!$C$2"),
+                "share one physical destination",
+            ),
+        )
+        for label, mutate, expected_error in faults:
+            with self.subTest(runtime_fault=label), tempfile.TemporaryDirectory(
+                prefix=f"grade-package-runtime-fault-{label}-"
+            ) as temp_name:
+                folder = Path(temp_name)
+                tampered = tamper_xls_named_range(folder, GRADE_V11_TEMPLATE, mutate, f"runtime-{label}")
+                custom_template, custom_manifest = write_gradebook_manifest(
+                    folder / "custom",
+                    GRADE_V11_MANIFEST,
+                    GRADE_V11_TEMPLATE,
+                )
+                shutil.copy2(tampered, custom_template)
+                manifest = yaml.safe_load(custom_manifest.read_text(encoding="utf-8"))
+                digest = file_sha256(custom_template)
+                manifest["fingerprint"]["sha256"] = digest
+                manifest["fingerprint"]["value"] = digest
+                custom_manifest.write_text(
+                    yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
+                    encoding="utf-8",
+                )
+                result = run_script(
+                    GRADE / "scripts" / "validate_template.py",
+                    "--template",
+                    str(custom_template),
+                    "--manifest",
+                    str(custom_manifest),
+                    "--named-range-runtime-preflight",
+                    "--json",
+                )
+                self.assertNotEqual(result.returncode, 0)
+                diagnostic = result.stdout + result.stderr
+                self.assertIn("runtime preflight", diagnostic.lower())
+                self.assertIn(expected_error.lower(), diagnostic.lower())
+
+    def test_com_named_range_runtime_preflight_cannot_be_skipped_by_either_flag(self) -> None:
+        if os.name != "nt":
+            self.skipTest("Excel COM is only available on Windows")
+        probe = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "$excel = New-Object -ComObject Excel.Application; $excel.Quit(); [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null",
+            ],
+            cwd=ROOT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
+        if probe.returncode != 0:
+            self.skipTest("Microsoft Excel COM is unavailable on this machine")
+        with tempfile.TemporaryDirectory(prefix="grade-package-com-runtime-preflight-") as temp_name:
+            folder = Path(temp_name)
+            tampered = tamper_xls_named_range(
+                folder,
+                GRADE_V11_TEMPLATE,
+                lambda path: patch_xlsx_named_range(
+                    path,
+                    "gb_regular_items",
+                    attr_text="'平时成绩'!$D$5:$J$52",
+                ),
+                "com-regular-seven",
+            )
+            custom_template, custom_manifest = write_gradebook_manifest(
+                folder / "custom",
+                GRADE_V11_MANIFEST,
+                GRADE_V11_TEMPLATE,
+            )
+            shutil.copy2(tampered, custom_template)
+            manifest = yaml.safe_load(custom_manifest.read_text(encoding="utf-8"))
+            digest = file_sha256(custom_template)
+            manifest["fingerprint"]["sha256"] = digest
+            manifest["fingerprint"]["value"] = digest
+            custom_manifest.write_text(
+                yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            source = self.make_source(folder, skill=True)
+            output = folder / "com-output"
+            env = os.environ.copy()
+            env["CODEX_PYTHON"] = str(PYTHON)
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(GRADE / "scripts" / "generate_gradebook.ps1"),
+                    "-SourcePath",
+                    str(source),
+                    "-OutputDir",
+                    str(output),
+                    "-TemplatePath",
+                    str(custom_template),
+                    "-ManifestPath",
+                    str(custom_manifest),
+                    "-SkipTemplateValidation",
+                    "-SkipOutputValidation",
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            diagnostic = result.stdout + result.stderr
+            self.assertIn("runtime preflight", diagnostic.lower())
+            self.assertIn("8 columns", diagnostic.lower())
+            self.assertFalse(output.exists() and list(output.glob("*.xls")))
+
+            offset_template, offset_manifest = write_gradebook_manifest(
+                folder / "offset-custom",
+                GRADE_V11_MANIFEST,
+                GRADE_V11_TEMPLATE,
+            )
+            offset_data = yaml.safe_load(offset_manifest.read_text(encoding="utf-8"))
+            offset_data["validation"]["regular_item_count"] = 9
+            offset_manifest.write_text(
+                yaml.safe_dump(offset_data, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            offset_output = folder / "offset-output"
+            offset_result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(GRADE / "scripts" / "generate_gradebook.ps1"),
+                    "-SourcePath",
+                    str(source),
+                    "-OutputDir",
+                    str(offset_output),
+                    "-TemplatePath",
+                    str(offset_template),
+                    "-ManifestPath",
+                    str(offset_manifest),
+                    "-SkipTemplateValidation",
+                    "-SkipOutputValidation",
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(offset_result.returncode, 0)
+            offset_diagnostic = offset_result.stdout + offset_result.stderr
+            self.assertIn("out of bounds", offset_diagnostic.lower())
+            self.assertIn("gb_regular_items", offset_diagnostic.lower())
+            self.assertFalse(offset_output.exists() and list(offset_output.glob("*.xls")))
 
     def test_named_range_output_fault_reports_use_consistent_top_level_fields(self) -> None:
         fields = (

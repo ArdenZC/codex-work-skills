@@ -742,6 +742,97 @@ def _named_range_checks(
                 errors.append("Named-range template changed protected workbook structure or formatting.")
 
 
+def validate_named_range_runtime(
+    template_path: Path | str,
+    manifest_path: Path | str = DEFAULT_MANIFEST,
+) -> dict[str, Any]:
+    """Run the non-skippable name-safety checks used before COM writes.
+
+    This intentionally validates only the raw BIFF names, the LibreOffice
+    round-trip names, their exact destinations, and their structural
+    relationships. Formatting, fonts, rendering, and protected-layout checks
+    belong to the full template validation path.
+    """
+    template = Path(template_path).expanduser().resolve()
+    manifest = load_manifest(manifest_path)
+    errors: list[str] = []
+    report: dict[str, Any] = {
+        "template": str(template),
+        "manifest": str(Path(manifest_path).expanduser().resolve()),
+        "template_version": manifest.get("template", {}).get("version"),
+        "status": "failed",
+        "errors": errors,
+        "warnings": [],
+        "checks": {},
+    }
+    ensure_supported_major(manifest)
+    if validate_manifest_contract(manifest) != "excel_named_range":
+        raise ValueError("Named-range runtime preflight requires a v1.1 excel_named_range manifest")
+    actual_hash = validate_template_package_identity(template, manifest)
+    report["checks"]["sha256"] = {
+        "expected": manifest.get("fingerprint", {}).get("sha256"),
+        "actual": actual_hash,
+    }
+    if template.suffix.lower() != ".xls":
+        raise ValueError("Named-range runtime preflight requires an original .xls template")
+
+    with tempfile.TemporaryDirectory(prefix="gradebook-named-runtime-") as temp_name:
+        temp_dir = Path(temp_name)
+        xlsx = convert_to_xlsx(template, temp_dir / "roundtrip-xlsx", find_soffice())
+        workbook = load_workbook(xlsx, data_only=False)
+        xls_inventory = validate_xls_named_range_inventory(
+            template,
+            manifest["anchors"],
+            "with_skill",
+        )
+        xlsx_inventory = validate_named_range_inventory(
+            workbook,
+            manifest["anchors"],
+            "with_skill",
+        )
+        report["checks"]["named_ranges_xls"] = xls_inventory
+        report["checks"]["named_ranges_xlsx"] = xlsx_inventory
+        errors.extend(xls_inventory["errors"])
+        errors.extend(xlsx_inventory["errors"])
+        errors.extend(
+            compare_xls_and_xlsx_named_ranges(
+                xls_inventory,
+                xlsx_inventory,
+                required_names("with_skill"),
+            )
+        )
+        errors.extend(
+            compare_named_range_inventories(
+                xls_inventory,
+                xlsx_inventory,
+                required_names("with_skill"),
+            )
+        )
+        base_manifest = load_manifest(V10_MANIFEST)
+        expected_locations = expected_named_range_locations(base_manifest["structure"], "with_skill")
+        expected_inventory = {
+            "locations": {
+                name: location.to_dict() for name, location in expected_locations.items()
+            }
+        }
+        report["checks"]["expected_named_range_locations"] = expected_inventory["locations"]
+        for inventory in (xls_inventory, xlsx_inventory):
+            errors.extend(
+                compare_named_range_inventories(
+                    expected_inventory,
+                    inventory,
+                    required_names("with_skill"),
+                )
+            )
+
+    if errors:
+        report["errors"] = sorted(set(f"Named-range runtime preflight: {error}" for error in errors))
+        raise TemplateValidationError(report)
+    report["status"] = "passed"
+    report["checks"]["named_range_count"] = len(required_names("with_skill"))
+    return report
+
+
 def validate_template(
     template_path: Path | str,
     manifest_path: Path | str = DEFAULT_MANIFEST,
@@ -998,12 +1089,19 @@ def main() -> int:
     parser.add_argument("--manifest", default="")
     parser.add_argument("--compatibility-template", default="")
     parser.add_argument("--identity-only", action="store_true", help="Only verify the template fingerprint and manifest contract.")
+    parser.add_argument(
+        "--named-range-runtime-preflight",
+        action="store_true",
+        help="Run the non-skippable v1.1 named-range safety checks without full formatting validation.",
+    )
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args()
     try:
         package = resolve_template_package(args.template or None, args.manifest or None)
         manifest = package.manifest
-        if args.identity_only:
+        if args.named_range_runtime_preflight:
+            report = validate_named_range_runtime(package.template_path, package.manifest_path)
+        elif args.identity_only:
             actual = validate_template_package_identity(package.template_path, manifest)
             report = {
                 "template": str(package.template_path),
