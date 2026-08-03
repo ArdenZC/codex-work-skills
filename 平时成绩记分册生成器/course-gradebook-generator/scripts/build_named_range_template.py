@@ -89,6 +89,39 @@ def replace_directory_atomically(stage: Path, output_dir: Path) -> None:
             shutil.rmtree(stage)
 
 
+def _is_same_or_ancestor(container: Path, target: Path) -> bool:
+    container = container.expanduser().resolve()
+    target = target.expanduser().resolve()
+    try:
+        target.relative_to(container)
+        return True
+    except ValueError:
+        return False
+
+
+def _paths_overlap(left: Path, right: Path) -> bool:
+    return _is_same_or_ancestor(left, right) or _is_same_or_ancestor(right, left)
+
+
+def _assert_safe_builder_output_directory(source: Path, output_dir: Path) -> None:
+    source_package = source.parent.resolve()
+    canonical_v10_package = V10_TEMPLATE.parent.resolve()
+    canonical_v11_package = V11_PACKAGE_DIR.resolve()
+
+    if _paths_overlap(output_dir, source_package):
+        raise RuntimeError(
+            "Output package directory must not overlap the source template package."
+        )
+    if _paths_overlap(output_dir, canonical_v10_package):
+        raise RuntimeError(
+            "Output package directory must not overlap the canonical v1.0 package."
+        )
+    if output_dir != canonical_v11_package and _paths_overlap(output_dir, canonical_v11_package):
+        raise RuntimeError(
+            "Output package directory must not contain or be nested inside the canonical v1.1 package."
+        )
+
+
 def _workbook_layout_signature(workbook) -> dict[str, Any]:
     def cell_signature(cell) -> tuple[Any, ...]:
         return (cell.coordinate, cell.value, cell.data_type, cell.style_id, cell.number_format)
@@ -237,6 +270,7 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
     output_dir = output_dir.expanduser().resolve()
     if not source.exists():
         raise RuntimeError(f"Source template not found: {source}")
+    _assert_safe_builder_output_directory(source, output_dir)
     if output_dir.exists() and not force:
         raise RuntimeError(f"Refusing to overwrite existing output package: {output_dir}; use --force explicitly")
     validate_canonical_baselines(require_v11=True)

@@ -4715,6 +4715,141 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                     self.assertIn(expected_error.lower(), (rejected.stdout + rejected.stderr).lower())
                     self.assertFalse((output / "template.xls").exists())
 
+    def test_named_range_builder_rejects_overlapping_packages_before_soffice(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-builder-path-safety-") as temp_name:
+            folder = Path(temp_name)
+            gradebook_copy = folder / "course-gradebook-generator"
+            shutil.copytree(
+                GRADE,
+                gradebook_copy,
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+            )
+            template_root = gradebook_copy / "assets" / "templates"
+            package_root = template_root / "course-gradebook"
+            v10_package = package_root / "v1.0.0"
+            v11_package = package_root / "v1.1.0"
+            v10_template = v10_package / "template.xls"
+            v11_template = v11_package / "template.xls"
+            builder = gradebook_copy / "scripts" / "build_named_range_template.py"
+
+            custom_parent = folder / "custom-tree"
+            custom_package = custom_parent / "input-package"
+            shutil.copytree(v10_package, custom_package)
+            custom_template = custom_package / "template.xls"
+            canonical_hashes = package_file_hashes(template_root)
+            custom_hashes = package_file_hashes(custom_parent)
+            blocked_soffice_env = os.environ.copy()
+            blocked_soffice_env["PATH"] = str(folder / "no-soffice")
+
+            def exchange_artifacts(root: Path) -> list[Path]:
+                return sorted(
+                    path
+                    for path in root.rglob("*")
+                    if path.name.endswith((".stage", ".backup"))
+                )
+
+            def reject(label: str, source: Path, output: Path, expected: str) -> None:
+                result = run_script(
+                    builder,
+                    "--source",
+                    str(source),
+                    "--output-dir",
+                    str(output),
+                    "--force",
+                    env=blocked_soffice_env,
+                )
+                diagnostic = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0, label)
+                self.assertIn(expected.lower(), diagnostic.lower(), diagnostic)
+                self.assertEqual(package_file_hashes(template_root), canonical_hashes, label)
+                self.assertEqual(package_file_hashes(custom_parent), custom_hashes, label)
+                self.assertEqual(exchange_artifacts(folder), [], label)
+
+            reject(
+                "canonical-v10-in-place",
+                v10_template,
+                v10_package,
+                "source template package",
+            )
+            reject(
+                "canonical-common-parent",
+                v10_template,
+                package_root,
+                "source template package",
+            )
+            reject(
+                "canonical-higher-parent",
+                v10_template,
+                template_root,
+                "source template package",
+            )
+            reject(
+                "canonical-v10-with-custom-source",
+                custom_template,
+                v10_package,
+                "canonical v1.0 package",
+            )
+            reject(
+                "canonical-v11-nested",
+                custom_template,
+                v11_package / "subpackage",
+                "canonical v1.1 package",
+            )
+            reject(
+                "custom-source-in-place",
+                custom_template,
+                custom_package,
+                "source template package",
+            )
+            reject(
+                "custom-source-descendant",
+                custom_template,
+                custom_package / "generated-v1.1",
+                "source template package",
+            )
+            reject(
+                "custom-source-ancestor",
+                custom_template,
+                custom_parent,
+                "source template package",
+            )
+
+            canonical_v10_hash = file_sha256(v10_template)
+            canonical_v11_hash = file_sha256(v11_template)
+            canonical_rebuild = run_script(
+                builder,
+                "--source",
+                str(v10_template),
+                "--output-dir",
+                str(v11_package),
+                "--force",
+            )
+            self.assertEqual(canonical_rebuild.returncode, 0, canonical_rebuild.stderr or canonical_rebuild.stdout)
+            canonical_payload = yaml.safe_load(canonical_rebuild.stdout)
+            self.assertEqual(canonical_payload["named_range_count"], 24)
+            self.assertEqual(file_sha256(v10_template), canonical_v10_hash)
+            self.assertEqual(file_sha256(v11_template), canonical_v11_hash)
+            rebuilt_manifest = yaml.safe_load((v11_package / "manifest.yaml").read_text(encoding="utf-8"))
+            self.assertEqual(rebuilt_manifest["fingerprint"]["sha256"], file_sha256(v11_template))
+            self.assertEqual(exchange_artifacts(folder), [])
+
+            sibling_output = folder / "sibling-output-package"
+            sibling_build = run_script(
+                builder,
+                "--source",
+                str(custom_template),
+                "--output-dir",
+                str(sibling_output),
+                "--force",
+            )
+            self.assertEqual(sibling_build.returncode, 0, sibling_build.stderr or sibling_build.stdout)
+            sibling_payload = yaml.safe_load(sibling_build.stdout)
+            self.assertEqual(sibling_payload["named_range_count"], 24)
+            sibling_manifest = yaml.safe_load((sibling_output / "manifest.yaml").read_text(encoding="utf-8"))
+            self.assertEqual(sibling_manifest["fingerprint"]["sha256"], file_sha256(sibling_output / "template.xls"))
+            self.assertEqual(package_file_hashes(custom_parent), custom_hashes)
+            self.assertEqual(exchange_artifacts(folder), [])
+
     def test_controlled_v11_baseline_handles_roundtrip_normalization_and_protected_tamper(self) -> None:
         with tempfile.TemporaryDirectory(prefix="grade-package-controlled-baseline-") as temp_name:
             folder = Path(temp_name)
