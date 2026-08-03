@@ -1055,11 +1055,12 @@ def validate_template(
                         content_controlled_workbook = load_workbook(content_controlled_xlsx, data_only=False)
                         content_controlled_signature = _workbook_signature(content_controlled_workbook, manifest)
                         controlled_signature = content_controlled_signature
+                        canonical_raw_hash = sha256(canonical)
                         for section_name in ("target_cell_formats", "writable_cell_formats"):
                             for address in canonical_signature.get(section_name, {}):
                                 expected_xls = (
                                     canonical
-                                    if actual_hash == expected_hash
+                                    if actual_hash == canonical_raw_hash
                                     else content_controlled_xls
                                 )
                                 expected_font = xls_font_identity(expected_xls, sheet_name, address)
