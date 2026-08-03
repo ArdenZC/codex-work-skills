@@ -749,28 +749,17 @@ def _named_range_checks(
         "anchor_mode": "excel_named_range",
     }
 
-    from named_range_template_baseline import (
-        build_controlled_v11_baseline,
-        build_controlled_v11_candidate_roundtrip,
-    )
+    from named_range_template_baseline import build_controlled_v11_baseline
 
     controlled_baseline = build_controlled_v11_baseline(
         temp_dir / "controlled-v11-baseline",
         find_soffice(),
     )
-    controlled_candidate = build_controlled_v11_candidate_roundtrip(
-        template,
-        temp_dir / "controlled-v11-candidate",
-        find_soffice(),
-    )
     expected_signature = _workbook_signature(
-        controlled_baseline.comparison_workbook,
+        controlled_baseline.controlled_workbook,
         base_manifest,
     )
-    actual_signature = _workbook_signature(
-        controlled_candidate.controlled_workbook,
-        base_manifest,
-    )
+    actual_signature = _workbook_signature(workbook, base_manifest)
     expected_signature.pop("named_ranges", None)
     actual_signature.pop("named_ranges", None)
     differences = _signature_differences(expected_signature, actual_signature)

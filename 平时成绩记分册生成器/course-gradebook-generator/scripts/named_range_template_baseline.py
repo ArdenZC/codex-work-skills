@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import math
+import shutil
+import struct
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import olefile
 from openpyxl import load_workbook
 
 from named_range_contracts import required_names
@@ -35,11 +39,6 @@ class ControlledV11Baseline:
     raw_xls_inventory: dict[str, Any]
     xlsx_inventory: dict[str, Any]
     expected_locations: dict[str, Any]
-    comparison_v11_xls: Path
-    comparison_v11_xlsx: Path
-    comparison_workbook: Any
-    comparison_raw_xls_inventory: dict[str, Any]
-    comparison_xlsx_inventory: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -55,6 +54,169 @@ class ControlledV11Roundtrip:
 
 _BASELINE_CACHE: dict[tuple[str, str], ControlledV11Baseline] = {}
 _CANDIDATE_CACHE: dict[tuple[str, str, str], ControlledV11Roundtrip] = {}
+
+
+def _biff_records(data: bytes):
+    position = 0
+    while position + 4 <= len(data):
+        record_type, record_length = struct.unpack_from("<HH", data, position)
+        end = position + 4 + record_length
+        if end > len(data):
+            raise RuntimeError(
+                f"BIFF record is truncated at offset {position}: type={record_type} length={record_length}"
+            )
+        yield position, record_type, data[position:end]
+        position = end
+    if position != len(data):
+        raise RuntimeError(f"BIFF stream has {len(data) - position} trailing bytes")
+
+
+def _biff_name_from_record(record: bytes) -> str:
+    payload = record[4:]
+    if len(payload) < 15:
+        raise RuntimeError("BIFF NAME record is truncated before its name")
+    name_length = int(payload[3])
+    name_end = 15 + name_length
+    if name_end > len(payload):
+        raise RuntimeError("BIFF NAME record has a truncated name")
+    return payload[15:name_end].decode("latin1")
+
+
+def _regular_sector_chain(start_sector: int, fat: list[int]) -> list[int]:
+    chain: list[int] = []
+    sector = start_sector
+    while sector not in (olefile.ENDOFCHAIN, olefile.FREESECT):
+        if sector < 0 or sector >= len(fat) or sector in chain:
+            raise RuntimeError(f"Invalid OLE sector chain at sector {sector}")
+        chain.append(sector)
+        sector = fat[sector]
+    if sector != olefile.ENDOFCHAIN:
+        raise RuntimeError("OLE stream chain ended at a free sector")
+    return chain
+
+
+def _fat_sector_ids(file_bytes: bytearray, sector_size: int) -> list[int]:
+    fat_sector_count = struct.unpack_from("<I", file_bytes, 44)[0]
+    result: list[int] = []
+    for index in range(109):
+        sector = struct.unpack_from("<I", file_bytes, 76 + index * 4)[0]
+        if sector != olefile.FREESECT:
+            result.append(sector)
+    if len(result) != fat_sector_count:
+        raise RuntimeError(
+            f"OLE DIFAT lists {len(result)} FAT sectors, header declares {fat_sector_count}"
+        )
+    if not result:
+        raise RuntimeError("OLE file has no FAT sector")
+    return result
+
+
+def materialize_stable_v11_xls(
+    canonical_v10_xls: Path,
+    controlled_v11_xls: Path,
+    output_xls: Path,
+) -> Path:
+    """Add managed names while preserving canonical v1.0 BIFF formatting records.
+
+    LibreOffice's XLS exporter quantizes some column and page properties on
+    each platform. The committed v1.1 package therefore uses the v1.0
+    workbook stream as its protected source and imports only the validated
+    managed NAME records produced by the controlled builder. BoundSheet
+    offsets and the compound-file stream chain are updated explicitly.
+    """
+    canonical_v10_xls = Path(canonical_v10_xls).expanduser().resolve()
+    controlled_v11_xls = Path(controlled_v11_xls).expanduser().resolve()
+    output_xls = Path(output_xls).expanduser().resolve()
+    if output_xls in (canonical_v10_xls, controlled_v11_xls):
+        raise RuntimeError("Stable v1.1 output must be a new file")
+    with olefile.OleFileIO(str(canonical_v10_xls)) as canonical_ole:
+        canonical_stream = canonical_ole.openstream("Workbook").read()
+        canonical_fat = list(canonical_ole.fat)
+        canonical_entry = next(
+            entry for entry in canonical_ole.direntries if entry and entry.name == "Workbook"
+        )
+        canonical_chain = _regular_sector_chain(canonical_entry.isectStart, canonical_fat)
+        canonical_dir_chain = _regular_sector_chain(canonical_ole.first_dir_sector, canonical_fat)
+        sector_size = int(canonical_ole.sector_size)
+    with olefile.OleFileIO(str(controlled_v11_xls)) as controlled_ole:
+        controlled_stream = controlled_ole.openstream("Workbook").read()
+
+    managed_records = [
+        record
+        for _, record_type, record in _biff_records(controlled_stream)
+        if record_type == 0x0018 and _biff_name_from_record(record).startswith("gb_")
+    ]
+    expected_names = set(required_names("with_skill"))
+    actual_names = {_biff_name_from_record(record) for record in managed_records}
+    if actual_names != expected_names or len(managed_records) != len(expected_names):
+        raise RuntimeError(
+            "Controlled v1.1 NAME records do not match the managed contract: "
+            f"expected={sorted(expected_names)} actual={sorted(actual_names)}"
+        )
+
+    inserted_records = b"".join(managed_records)
+    canonical_stream_mutable = bytearray(canonical_stream)
+    first_global_eof = next(
+        position for position, record_type, _ in _biff_records(canonical_stream) if record_type == 0x000A
+    )
+    for position, record_type, _ in _biff_records(canonical_stream):
+        if record_type != 0x0085 or position >= first_global_eof:
+            continue
+        sheet_offset = struct.unpack_from("<I", canonical_stream_mutable, position + 4)[0]
+        struct.pack_into(
+            "<I",
+            canonical_stream_mutable,
+            position + 4,
+            sheet_offset + len(inserted_records),
+        )
+    stable_stream = (
+        bytes(canonical_stream_mutable[:first_global_eof])
+        + inserted_records
+        + bytes(canonical_stream_mutable[first_global_eof:])
+    )
+    required_sector_count = math.ceil(len(stable_stream) / sector_size)
+    extra_sector_count = max(0, required_sector_count - len(canonical_chain))
+
+    output_xls.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(canonical_v10_xls, output_xls)
+    file_bytes = bytearray(output_xls.read_bytes())
+    existing_sector_count = len(canonical_fat)
+    appended_sector_ids = list(
+        range(existing_sector_count, existing_sector_count + extra_sector_count)
+    )
+    fat_sector_ids = _fat_sector_ids(file_bytes, sector_size)
+    fat_entries_per_sector = sector_size // 4
+    if appended_sector_ids and appended_sector_ids[-1] >= len(fat_sector_ids) * fat_entries_per_sector:
+        raise RuntimeError("Stable v1.1 OLE output requires an additional FAT sector")
+    file_bytes.extend(b"\x00" * extra_sector_count * sector_size)
+    output_chain = canonical_chain + appended_sector_ids
+    padded_stream = stable_stream + b"\x00" * (len(output_chain) * sector_size - len(stable_stream))
+    for index, sector in enumerate(output_chain):
+        start = (sector + 1) * sector_size
+        file_bytes[start:start + sector_size] = padded_stream[
+            index * sector_size:(index + 1) * sector_size
+        ]
+
+    def set_fat_entry(sector: int, value: int) -> None:
+        fat_sector = fat_sector_ids[sector // fat_entries_per_sector]
+        offset = (fat_sector + 1) * sector_size + (sector % fat_entries_per_sector) * 4
+        struct.pack_into("<I", file_bytes, offset, value)
+
+    if appended_sector_ids:
+        set_fat_entry(canonical_chain[-1], appended_sector_ids[0])
+        for left, right in zip(appended_sector_ids, appended_sector_ids[1:]):
+            set_fat_entry(left, right)
+        set_fat_entry(appended_sector_ids[-1], olefile.ENDOFCHAIN)
+
+    directory_entry_index = canonical_entry.sid
+    directory_sector = canonical_dir_chain[directory_entry_index // (sector_size // 128)]
+    directory_offset = (
+        (directory_sector + 1) * sector_size
+        + (directory_entry_index % (sector_size // 128)) * 128
+    )
+    struct.pack_into("<Q", file_bytes, directory_offset + 120, len(stable_stream))
+    output_xls.write_bytes(file_bytes)
+    return output_xls
 
 
 def _inventory_errors(
@@ -207,22 +369,6 @@ def build_controlled_v11_baseline(
         expected_inventory,
     )
 
-    # The committed v1.1 XLS was itself produced by a LibreOffice/openpyxl
-    # round trip before the validator opens it. Give the canonical baseline
-    # the same post-build history so comparison remains tied to the canonical
-    # v1.0 source rather than to platform-specific global ignores.
-    comparison_v11_xls, comparison_v11_xlsx, comparison_workbook = _roundtrip_xlsx_with_openpyxl(
-        controlled_xlsx,
-        temp_dir / "controlled-v11-comparison",
-        soffice,
-    )
-    comparison_raw_xls_inventory, comparison_xlsx_inventory = _validated_v11_inventory_pair(
-        comparison_v11_xls,
-        comparison_workbook,
-        v11_manifest,
-        expected_inventory,
-    )
-
     baseline = ControlledV11Baseline(
         controlled_v11_xls=controlled_xls,
         controlled_v11_xlsx=controlled_xlsx,
@@ -230,11 +376,6 @@ def build_controlled_v11_baseline(
         raw_xls_inventory=raw_xls_inventory,
         xlsx_inventory=xlsx_inventory,
         expected_locations=expected_locations,
-        comparison_v11_xls=comparison_v11_xls,
-        comparison_v11_xlsx=comparison_v11_xlsx,
-        comparison_workbook=comparison_workbook,
-        comparison_raw_xls_inventory=comparison_raw_xls_inventory,
-        comparison_xlsx_inventory=comparison_xlsx_inventory,
     )
     _BASELINE_CACHE[cache_key] = baseline
     return baseline

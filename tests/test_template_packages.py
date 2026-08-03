@@ -4728,10 +4728,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             if scripts_path in sys.path:
                 sys.path.remove(scripts_path)
             sys.path.insert(0, scripts_path)
-            from named_range_template_baseline import (
-                build_controlled_v11_baseline,
-                build_controlled_v11_candidate_roundtrip,
-            )
+            from named_range_template_baseline import build_controlled_v11_baseline
             from package_common import load_manifest
             from validate_template import _signature_differences, _workbook_signature
 
@@ -4784,22 +4781,12 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 str(soffice),
             )
             controlled_signature = _workbook_signature(
-                controlled.comparison_workbook,
+                controlled.controlled_workbook,
                 base_manifest,
             )
             controlled_signature.pop("named_ranges", None)
-            controlled_candidate = build_controlled_v11_candidate_roundtrip(
-                GRADE_V11_TEMPLATE,
-                folder / "controlled-candidate",
-                str(soffice),
-            )
-            controlled_candidate_signature = _workbook_signature(
-                controlled_candidate.controlled_workbook,
-                base_manifest,
-            )
-            controlled_candidate_signature.pop("named_ranges", None)
             self.assertEqual(
-                _signature_differences(controlled_signature, controlled_candidate_signature),
+                _signature_differences(controlled_signature, committed_signature),
                 [],
             )
 

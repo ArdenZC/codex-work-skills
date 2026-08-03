@@ -32,6 +32,7 @@ from package_common import (
 from named_range_template_baseline import (
     build_controlled_v11_baseline,
     build_controlled_v11_candidate_roundtrip,
+    materialize_stable_v11_xls,
 )
 from validate_template import controlled_roundtrip_paths, convert_to_format, find_soffice
 from xls_named_range_utils import (
@@ -324,8 +325,16 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
                 )
             source_named_state = "v1.1 canonical"
         if source_named_state == "v1.0 seed":
-            named_xls = controlled_baseline.controlled_v11_xls
-            named_roundtrip_xlsx = controlled_baseline.controlled_v11_xlsx
+            named_xls = materialize_stable_v11_xls(
+                V10_TEMPLATE,
+                controlled_baseline.controlled_v11_xls,
+                temp / "stable-v11" / "template.xls",
+            )
+            named_roundtrip_xlsx = build_controlled_v11_candidate_roundtrip(
+                named_xls,
+                temp / "stable-v11-roundtrip",
+                soffice,
+            ).controlled_xlsx
         else:
             # A complete v1.1 source is already a canonical semantic package.
             # Validate its raw and round-trip inventories, then preserve its
@@ -379,7 +388,7 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
             load_workbook(controlled_baseline.controlled_v11_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range build changed protected workbook layout or formatting")
-        if _workbook_layout_signature(load_workbook(controlled_baseline.comparison_v11_xlsx, data_only=False)) != _workbook_layout_signature(
+        if _workbook_layout_signature(load_workbook(controlled_baseline.controlled_v11_xlsx, data_only=False)) != _workbook_layout_signature(
             load_workbook(named_roundtrip_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range template differs from the controlled v1.1 baseline")
