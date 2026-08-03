@@ -1173,6 +1173,15 @@ def main() -> int:
                 print(f"ERROR: {error}", file=sys.stderr)
             for warning in report.get("warnings", []):
                 print(f"WARNING: {warning}", file=sys.stderr)
+            differences = report.get("checks", {}).get("protected_signature_differences", [])
+            if differences:
+                print("PROTECTED_SIGNATURE_DIFFERENCES:", file=sys.stderr)
+                for difference in differences[:10]:
+                    print(
+                        "  "
+                        + json.dumps(difference, ensure_ascii=False, sort_keys=True),
+                        file=sys.stderr,
+                    )
         return 1
     except Exception as exc:
         report = {

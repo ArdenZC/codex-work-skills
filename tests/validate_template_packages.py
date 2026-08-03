@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import platform
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -43,6 +45,80 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest().upper()
+
+
+def _libreoffice_version() -> str:
+    candidates = [
+        shutil.which("soffice"),
+        shutil.which("libreoffice"),
+        shutil.which("soffice.com"),
+        r"C:\Program Files\LibreOffice\program\soffice.com",
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        "/usr/bin/libreoffice",
+        "/usr/local/bin/libreoffice",
+    ]
+    for candidate in candidates:
+        if not candidate or not Path(candidate).exists():
+            continue
+        try:
+            result = subprocess.run(
+                [candidate, "--version"],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return f"<version lookup failed: {exc}>"
+        output = (result.stdout or result.stderr).strip()
+        return output.splitlines()[0] if output else f"<exit {result.returncode}>"
+    return "<not found>"
+
+
+def _validator_failure_diagnostics(result: subprocess.CompletedProcess[str]) -> str:
+    environment = {
+        "platform": platform.platform(),
+        "python": sys.version,
+        "libreoffice": _libreoffice_version(),
+    }
+    try:
+        import openpyxl
+
+        environment["openpyxl"] = openpyxl.__version__
+    except Exception as exc:
+        environment["openpyxl"] = f"<import failed: {exc}>"
+
+    try:
+        report = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return (
+            "validator output was not valid JSON\n"
+            f"environment={json.dumps(environment, ensure_ascii=False)}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+
+    checks = report.get("checks", {}) if isinstance(report, dict) else {}
+    protected = checks.get("protected_signature_differences", [])
+    if not isinstance(protected, list):
+        protected = [protected]
+    diagnostics = {
+        "environment": environment,
+        "errors": report.get("errors", []) if isinstance(report, dict) else [],
+        "protected_signature_differences": protected[:50],
+        "named_ranges_xls_errors": (
+            checks.get("named_ranges_xls", {}).get("errors", [])
+            if isinstance(checks.get("named_ranges_xls", {}), dict)
+            else []
+        ),
+        "named_ranges_xlsx_errors": (
+            checks.get("named_ranges_xlsx", {}).get("errors", [])
+            if isinstance(checks.get("named_ranges_xlsx", {}), dict)
+            else []
+        ),
+    }
+    return json.dumps(diagnostics, ensure_ascii=False, indent=2)
 
 
 def validate_package(package: dict[str, Path | str]) -> str:
@@ -105,12 +181,16 @@ def validate_package(package: dict[str, Path | str]) -> str:
                 str(canonical),
                 "--manifest",
                 str(manifest_path),
+                "--json",
             ],
             capture_output=True,
             text=True,
         )
         if result.returncode != 0:
-            raise ValueError(f"{package['name']}: template validator failed: {result.stderr or result.stdout}")
+            raise ValueError(
+                f"{package['name']}: template validator failed:\n"
+                f"{_validator_failure_diagnostics(result)}"
+            )
     version = template_info.get("version")
     return f"{package['name']}: version={version} sha256={expected_hash} schema=valid"
 
