@@ -6,24 +6,41 @@ import math
 import re
 import sys
 import tempfile
-from copy import copy
+from copy import copy, deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from xlrd import open_workbook
 
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
+    V10_MANIFEST,
+    anchor_mode,
     calculate_expected_total,
     column_number,
     load_manifest,
     manifest_template_path,
     percentage_label,
+    resolve_template_package,
     source_total_matches,
+    validate_canonical_baselines,
+    validate_output_paths,
     validate_input,
+    validate_template_package_identity,
+)
+from named_range_contracts import required_names
+from named_range_utils import (
+    compare_named_range_inventories,
+    expected_named_range_locations,
+    validate_named_range_inventory,
+)
+from xls_named_range_utils import (
+    compare_xls_and_xlsx_named_ranges,
+    validate_xls_named_range_inventory,
 )
 from validate_template import (
     _cell_format_signature,
@@ -245,6 +262,14 @@ def _dimension_signature_for_row(sheet, row: int) -> tuple[Any, ...]:
     )
 
 
+def _dimension_signatures_match(actual: tuple[Any, ...], expected: tuple[Any, ...]) -> bool:
+    if len(actual) != len(expected) or actual[1:] != expected[1:]:
+        return False
+    if actual[0] is None or expected[0] is None:
+        return actual[0] == expected[0]
+    return math.isclose(float(actual[0]), float(expected[0]), abs_tol=0.1)
+
+
 def _target_cell_format_signature(cell) -> dict[str, Any]:
     signature = _cell_format_signature(cell)
     alignment = list(signature["alignment"])
@@ -383,7 +408,7 @@ def _target_sheet_format_errors(
     for output_column in range(1, output_total_column + 1):
         expected_dimension = _dimension_signature_for_column(template_ws, output_column)
         actual_dimension = _dimension_signature_for_column(output_ws, output_column)
-        if expected_dimension != actual_dimension:
+        if not _dimension_signatures_match(actual_dimension, expected_dimension):
             errors.append(
                 f"target sheet formatting mismatch in column {get_column_letter(output_column)}"
             )
@@ -393,7 +418,10 @@ def _target_sheet_format_errors(
         if source_row > template_ws.max_row:
             errors.append(f"target sheet formatting mismatch in row {output_row}")
             continue
-        if _dimension_signature_for_row(output_ws, output_row) != _dimension_signature_for_row(template_ws, source_row):
+        if not _dimension_signatures_match(
+            _dimension_signature_for_row(output_ws, output_row),
+            _dimension_signature_for_row(template_ws, source_row),
+        ):
             errors.append(f"target sheet formatting mismatch in row {output_row}")
         for output_column in range(1, output_total_column + 1):
             if output_column > template_ws.max_column:
@@ -474,6 +502,252 @@ def _target_protected_value_errors(output_ws, template_ws, manifest: dict[str, A
     return errors
 
 
+def _named_location_address(location: dict[str, Any]) -> str:
+    start = f"{get_column_letter(int(location['min_col']))}{int(location['min_row'])}"
+    end = f"{get_column_letter(int(location['max_col']))}{int(location['max_row'])}"
+    return start if start == end else f"{start}:{end}"
+
+
+def _named_column(location: dict[str, Any]) -> str:
+    if int(location["min_col"]) != int(location["max_col"]):
+        raise ValueError(f"Named range is not a single column: {_named_location_address(location)}")
+    return get_column_letter(int(location["min_col"]))
+
+
+def _named_runtime_manifest(
+    manifest: dict[str, Any],
+    workbook,
+    variant: str,
+) -> dict[str, Any]:
+    """Build the coordinate view used by the old QA checks from actual names.
+
+    v1.1 manifests deliberately contain no output coordinates. This derived view
+    is scoped to one validation call and is populated from the protected template
+    workbook, so production writes and QA expectations remain name-driven.
+    """
+    inventory = validate_named_range_inventory(workbook, manifest["anchors"], variant)
+    if inventory["errors"]:
+        raise ValueError("Named-range template inventory is invalid: " + "; ".join(inventory["errors"]))
+    locations = inventory["locations"]
+    table = locations["gb_data_table"]
+    sheet_name = table["sheet"]
+    ws = workbook[sheet_name]
+    columns = {
+        "serial": _named_column(locations["gb_serial_col"]),
+        "student_id": _named_column(locations["gb_student_id_col"]),
+        "student_name": _named_column(locations["gb_student_name_col"]),
+        "regular_items_start": get_column_letter(int(locations["gb_regular_items"]["min_col"])),
+        "regular_items_end": get_column_letter(int(locations["gb_regular_items"]["max_col"])),
+        "regular_weighted": _named_column(locations["gb_regular_weighted_col"]),
+        "theory_score": _named_column(locations["gb_theory_score_col"]),
+        "theory_weighted": _named_column(locations["gb_theory_weighted_col"]),
+        "skill_score": _named_column(locations.get("gb_skill_score_col", locations["gb_total_score_col"])),
+        "skill_weighted": _named_column(locations.get("gb_skill_weighted_col", locations["gb_total_score_col"])),
+        "total_score": _named_column(locations["gb_total_score_col"]),
+    }
+    structure = {
+        "worksheet": sheet_name,
+        "title_cell": _named_location_address(locations["gb_title"]),
+        "metadata": {
+            "term": _named_location_address(locations["gb_term"]),
+            "course": _named_location_address(locations["gb_course"]),
+            "teacher": _named_location_address(locations["gb_teacher"]),
+            "class_name": _named_location_address(locations["gb_class_name"]),
+        },
+        "headers": {
+            "regular": _named_location_address(locations["gb_header_regular"]),
+            "theory": _named_location_address(locations["gb_header_theory"]),
+            **({"skill": _named_location_address(locations["gb_header_skill"])} if "gb_header_skill" in locations else {}),
+        },
+        "header_label_cells": {
+            "serial": _named_location_address(locations["gb_header_serial"]),
+            "student_id": _named_location_address(locations["gb_header_student_id"]),
+            "student_name": _named_location_address(locations["gb_header_student_name"]),
+            "regular": _named_location_address(locations["gb_header_regular"]),
+            "theory": _named_location_address(locations["gb_header_theory"]),
+            "total": _named_location_address(locations["gb_header_total"]),
+        },
+        "header_row": int(locations["gb_header_serial"]["min_row"]),
+        "data_start_row": int(table["min_row"]),
+        "template_last_data_row": int(table["max_row"]),
+        "style_source_row": int(locations["gb_template_row"]["min_row"]),
+        "columns": columns,
+        "no_skill_total_column": columns["total_score"],
+        "required_sheets": list(workbook.sheetnames),
+        "required_sheet_states": {sheet.title: sheet.sheet_state for sheet in workbook.worksheets},
+        "required_merged_ranges": sorted(str(item).upper() for item in ws.merged_cells.ranges),
+        "required_merged_ranges_without_skill": sorted(str(item).upper() for item in ws.merged_cells.ranges),
+    }
+    runtime = deepcopy(manifest)
+    runtime["structure"] = structure
+    runtime["validation"] = deepcopy(manifest.get("validation", {}))
+    runtime["validation"]["required_named_ranges"] = sorted(str(name) for name in workbook.defined_names)
+    return runtime
+
+
+def _set_named_range_qa(
+    report: dict[str, Any],
+    xlsx_inventory: dict[str, Any],
+    xls_inventory: dict[str, Any] | None,
+    variant: str,
+    comparison_errors: list[str] | None = None,
+) -> dict[str, Any]:
+    inventories = [xlsx_inventory] + ([xls_inventory] if xls_inventory is not None else [])
+
+    def values(key: str) -> list[str]:
+        return sorted({str(value) for inventory in inventories for value in inventory.get(key, [])})
+
+    required_count = len(required_names(variant))
+    preserved_count = min(int(inventory.get("actual_count", 0)) for inventory in inventories)
+    named = {
+        "variant": variant,
+        "required_named_range_count": required_count,
+        "preserved_named_range_count": preserved_count,
+        "missing_named_ranges": values("missing"),
+        "duplicate_named_ranges": values("duplicate"),
+        "invalid_named_range_names": values("invalid_names"),
+        "unexpected_named_ranges": values("unexpected"),
+        "scope_errors": values("scope_errors"),
+        "broken_named_ranges": values("broken"),
+        "destination_errors": values("destination_errors"),
+        "shape_errors": values("shape_errors"),
+        "relationship_errors": values("relationship_errors"),
+        "comparison_errors": sorted(set(comparison_errors or [])),
+    }
+    named["errors"] = sorted(
+        set(
+            [f"Missing managed named range: {name}" for name in named["missing_named_ranges"]]
+            + [f"Duplicate managed named range: {name}" for name in named["duplicate_named_ranges"]]
+            + [f"Invalid managed named range: {name}" for name in named["invalid_named_range_names"]]
+            + [f"Unexpected managed named range: {name}" for name in named["unexpected_named_ranges"]]
+            + named["scope_errors"]
+            + named["broken_named_ranges"]
+            + named["destination_errors"]
+            + named["shape_errors"]
+            + named["relationship_errors"]
+            + named["comparison_errors"]
+        )
+    )
+    report.update({key: value for key, value in named.items() if key != "variant"})
+    report["named_range_variant"] = variant
+    report["checks"]["named_ranges"] = {
+        **named,
+        "xlsx": xlsx_inventory,
+        "xls": xls_inventory,
+    }
+    return named
+
+
+def _compare_named_output_to_template(
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    names: list[str] | tuple[str, ...],
+) -> list[str]:
+    """Compare protected destinations while allowing data capacity to grow."""
+    capacity_names = {
+        "gb_data_table",
+        "gb_serial_col",
+        "gb_student_id_col",
+        "gb_student_name_col",
+        "gb_regular_items",
+        "gb_regular_weighted_col",
+        "gb_theory_score_col",
+        "gb_theory_weighted_col",
+        "gb_skill_score_col",
+        "gb_skill_weighted_col",
+        "gb_total_score_col",
+    }
+    differences: list[str] = []
+    for name in sorted(names):
+        left = expected.get("locations", {}).get(name)
+        right = actual.get("locations", {}).get(name)
+        if left is None or right is None:
+            continue
+        same_prefix = tuple(left[key] for key in ("scope", "sheet", "min_row", "min_col", "max_col")) == tuple(
+            right[key] for key in ("scope", "sheet", "min_row", "min_col", "max_col")
+        )
+        capacity_ok = name in capacity_names and int(right["max_row"]) >= int(left["max_row"])
+        if not same_prefix or not capacity_ok and int(left["max_row"]) != int(right["max_row"]):
+            differences.append(
+                f"Named range destination mismatch for {name}: expected {left.get('sheet')}!{left.get('address')}, "
+                f"got {right.get('sheet')}!{right.get('address')}"
+            )
+    return sorted(set(differences))
+
+
+_NAMED_DYNAMIC_DATA_NAMES = (
+    "gb_data_table",
+    "gb_serial_col",
+    "gb_student_id_col",
+    "gb_student_name_col",
+    "gb_regular_items",
+    "gb_regular_weighted_col",
+    "gb_theory_score_col",
+    "gb_theory_weighted_col",
+    "gb_skill_score_col",
+    "gb_skill_weighted_col",
+    "gb_total_score_col",
+)
+
+
+def _named_capacity_errors(
+    inventory: dict[str, Any],
+    variant: str,
+    expected_last_row: int,
+    expected_template_row: int,
+) -> list[str]:
+    errors: list[str] = []
+    locations = inventory.get("locations", {})
+    for name in _NAMED_DYNAMIC_DATA_NAMES:
+        if name not in required_names(variant):
+            continue
+        location = locations.get(name)
+        if location is None:
+            continue
+        if int(location["max_row"]) != expected_last_row:
+            errors.append(
+                f"Named range {name} must end at row {expected_last_row}, got {location['max_row']}"
+            )
+    template_row = locations.get("gb_template_row")
+    if template_row is not None and (
+        int(template_row["min_row"]) != expected_template_row
+        or int(template_row["max_row"]) != expected_template_row
+    ):
+        errors.append(
+            f"Named range gb_template_row must remain row {expected_template_row}, "
+            f"got {template_row['min_row']}:{template_row['max_row']}"
+        )
+    return sorted(set(errors))
+
+
+def _raw_runtime_location_errors(inventory: dict[str, Any], variant: str) -> list[str]:
+    expected_locations = expected_named_range_locations(load_manifest(V10_MANIFEST)["structure"], variant)
+    actual_locations = inventory.get("locations", {})
+    dynamic_names = set(_NAMED_DYNAMIC_DATA_NAMES)
+    errors: list[str] = []
+    for name in required_names(variant):
+        expected = expected_locations.get(name)
+        actual = actual_locations.get(name)
+        if expected is None or actual is None:
+            continue
+        if (
+            actual["sheet"] != expected.sheet
+            or int(actual["min_row"]) != expected.min_row
+            or int(actual["min_col"]) != expected.min_col
+            or int(actual["max_col"]) != expected.max_col
+        ):
+            errors.append(
+                f"Named range {name} is not at the canonical location: expected "
+                f"{expected.sheet}!{expected.address}, got {actual.get('sheet')}!{actual.get('address')}"
+            )
+        if name in dynamic_names and int(actual["max_row"]) < expected.max_row:
+            errors.append(
+                f"Named range {name} ends before the canonical template capacity: "
+                f"expected at least row {expected.max_row}, got {actual['max_row']}"
+            )
+    return sorted(set(errors))
+
+
 def _base_qa_report(
     out_dir: Path,
     manifest: dict[str, Any],
@@ -519,6 +793,8 @@ def _base_qa_report(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "template_id": manifest.get("template", {}).get("id"),
         "template_version": manifest.get("template", {}).get("version"),
+        "anchor_mode": anchor_mode(manifest),
+        "named_range_variant": None,
         "generator_version": manifest.get("generator", {}).get("version"),
         "template_sha256": manifest.get("fingerprint", {}).get("sha256") or manifest.get("fingerprint", {}).get("value"),
         "template_path": str(selected_template),
@@ -530,17 +806,122 @@ def _base_qa_report(
         "output_file": output_label,
         "errors": [],
         "warnings": warnings,
-        "checks": {"validation": validation},
+        "checks": {
+            "validation": validation,
+            "named_ranges": {
+                "variant": None,
+                "required_named_range_count": 0,
+                "preserved_named_range_count": 0,
+                "missing_named_ranges": [],
+                "duplicate_named_ranges": [],
+                "invalid_named_range_names": [],
+                "unexpected_named_ranges": [],
+                "scope_errors": [],
+                "broken_named_ranges": [],
+                "destination_errors": [],
+                "shape_errors": [],
+                "relationship_errors": [],
+                "comparison_errors": [],
+                "errors": [],
+                "xlsx": None,
+                "xls": None,
+            },
+        },
+        "required_named_range_count": 0,
+        "preserved_named_range_count": 0,
+        "missing_named_ranges": [],
+        "duplicate_named_ranges": [],
+        "invalid_named_range_names": [],
+        "unexpected_named_ranges": [],
+        "scope_errors": [],
+        "broken_named_ranges": [],
+        "destination_errors": [],
+        "shape_errors": [],
+        "relationship_errors": [],
         "files_checked": 0,
         "qa_report": str(report_path),
     }
 
 
-def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
-    report_path = Path(report["qa_report"])
+def finalize_qa_report_paths(
+    report: dict[str, Any],
+    *,
+    final_output: Path | str,
+    final_qa: Path | str,
+) -> dict[str, Any]:
+    """Replace candidate-only path metadata before the final atomic commit."""
+    final_output_path = Path(final_output).expanduser().resolve()
+    final_qa_path = Path(final_qa).expanduser().resolve()
+    report["output_dir"] = str(final_output_path.parent)
+    report["output_file"] = final_output_path.name
+    report["qa_report"] = str(final_qa_path)
+    return report
+
+
+def _write_qa_report(report: dict[str, Any], report_path: Path | str | None = None) -> dict[str, Any]:
+    report_path = Path(report_path or report["qa_report"])
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
+
+
+def _basic_output_file_checks(
+    out_dir: Path,
+    selected_file: Path | None,
+    manifest: dict[str, Any],
+    *,
+    template_path: Path | str | None,
+    source_paths: list[Path | str] | None,
+    schema_path: Path | str,
+    report: dict[str, Any],
+) -> list[str]:
+    """Perform the minimum truthful checks required by a skipped QA path."""
+    errors: list[str] = []
+    if selected_file is None:
+        errors.append("Skipped output validation requires exactly one generated XLS file")
+        return errors
+    try:
+        validate_output_paths(
+            out_dir,
+            [selected_file],
+            source_paths=source_paths,
+            template_path=template_path,
+            manifest_path=manifest.get("_path"),
+            manifest=manifest,
+            schema_path=schema_path,
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
+    if not selected_file.exists():
+        errors.append(f"Generated XLS file not found: {selected_file.name}")
+        return errors
+    if not selected_file.is_file():
+        errors.append(f"Generated XLS path is not a file: {selected_file.name}")
+        return errors
+    if selected_file.suffix.lower() != ".xls":
+        errors.append(f"Generated output must use the .xls extension: {selected_file.name}")
+    elif selected_file.stat().st_size <= 0:
+        errors.append(f"Generated XLS file is empty: {selected_file.name}")
+    else:
+        try:
+            open_workbook(str(selected_file), formatting_info=False)
+        except Exception as exc:
+            errors.append(f"Generated XLS file could not be opened as raw BIFF: {exc}")
+    if errors:
+        return errors
+    if anchor_mode(manifest) == "excel_named_range":
+        variant = "with_skill" if float(report.get("_input_weights", {}).get("skill", 0)) > 0.000001 else "without_skill"
+        inventory = validate_xls_named_range_inventory(selected_file, manifest["anchors"], variant)
+        report["checks"]["named_ranges"] = {
+            **report["checks"].get("named_ranges", {}),
+            "variant": variant,
+            "xls": inventory,
+        }
+        report["checks"]["named_ranges"]["xlsx"] = None
+        named_summary = _set_named_range_qa(report, inventory, None, variant)
+        report["checks"]["named_ranges"]["xls"] = inventory
+        errors.extend(named_summary["errors"])
+    return sorted(set(errors))
 
 
 def write_skipped_report(
@@ -555,6 +936,7 @@ def write_skipped_report(
     engine: str | None = None,
     template_validation: bool = True,
     output_file: Path | str | None = None,
+    source_paths: list[Path | str] | None = None,
     warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
@@ -575,10 +957,92 @@ def write_skipped_report(
         False,
         warnings,
     )
-    report["status"] = "skipped"
     report["checks"]["file_count"] = {"expected": 1, "actual": len(files)}
-    report["files_checked"] = len(files)
+    effective_file = selected_file if selected_file is not None else (files[0] if len(files) == 1 else None)
+    report["files_checked"] = 1 if effective_file is not None else len(files)
+    if effective_file is not None:
+        try:
+            report["output_file"] = effective_file.resolve().relative_to(out_dir).as_posix()
+        except ValueError:
+            report["output_file"] = effective_file.name
+    report["_input_weights"] = data.get("weights", {})
+    errors = _basic_output_file_checks(
+        out_dir,
+        effective_file,
+        manifest,
+        template_path=template_path,
+        source_paths=source_paths,
+        schema_path=schema_path,
+        report=report,
+    )
+    report.pop("_input_weights", None)
+    if errors:
+        report["errors"].extend(errors)
+        return _raise_after_qa_write(report, errors)
+    report["status"] = "skipped"
     return _write_qa_report(report)
+
+
+def _raise_after_qa_write(report: dict[str, Any], errors: list[str]) -> dict[str, Any]:
+    report["status"] = "failed"
+    report["errors"] = sorted(set(report.get("errors", []) + errors))
+    _write_qa_report(report)
+    raise RuntimeError("Skipped output validation failed: " + "; ".join(errors[:8]))
+
+
+def validate_output_raw_runtime(
+    output_dir: Path | str,
+    manifest: dict[str, Any],
+    *,
+    output_file: Path | str | None = None,
+    template_path: Path | str | None = None,
+    variant: str | None = None,
+    source_paths: list[Path | str] | None = None,
+) -> dict[str, Any]:
+    """Validate a saved candidate's raw XLS safety contract without LO QA."""
+    if anchor_mode(manifest) == "excel_named_range":
+        validate_canonical_baselines(require_v11=True)
+    out_dir = Path(output_dir).expanduser().resolve()
+    selected = _resolve_output_file(out_dir, output_file)
+    files = [selected] if selected is not None else sorted(out_dir.glob("*.xls"))
+    errors: list[str] = []
+    effective = selected if selected is not None else (files[0] if len(files) == 1 else None)
+    try:
+        validate_output_paths(
+            out_dir,
+            [effective] if effective is not None else [],
+            source_paths=source_paths,
+            template_path=template_path,
+            manifest_path=manifest.get("_path"),
+            manifest=manifest,
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
+    if effective is None:
+        errors.append(f"Raw runtime preflight requires exactly one XLS output; found {len(files)}")
+    elif not effective.is_file():
+        errors.append(f"Raw runtime preflight output is not a file: {effective}")
+    elif effective.suffix.lower() != ".xls" or effective.stat().st_size <= 0:
+        errors.append(f"Raw runtime preflight output must be a non-empty .xls file: {effective}")
+    else:
+        try:
+            open_workbook(str(effective), formatting_info=False)
+        except Exception as exc:
+            errors.append(f"Raw runtime preflight could not open XLS as raw BIFF: {exc}")
+    inventory = None
+    if not errors and anchor_mode(manifest) == "excel_named_range":
+        selected_variant = variant or "with_skill"
+        inventory = validate_xls_named_range_inventory(effective, manifest["anchors"], selected_variant)
+        errors.extend(inventory["errors"])
+        errors.extend(_raw_runtime_location_errors(inventory, selected_variant))
+    if errors:
+        raise RuntimeError("Raw output runtime preflight failed: " + "; ".join(sorted(set(errors))))
+    return {
+        "status": "passed",
+        "files_checked": 1,
+        "variant": variant,
+        "inventory": inventory,
+    }
 
 
 def _resolve_output_file(out_dir: Path, output_file: Path | str | None) -> Path | None:
@@ -608,6 +1072,7 @@ def validate_output_dir(
     template_validation: bool = True,
     output_validation: bool = True,
     output_file: Path | str | None = None,
+    source_paths: list[Path | str] | None = None,
     extra_warnings: list[str] | None = None,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
@@ -628,6 +1093,19 @@ def validate_output_dir(
         extra_warnings,
     )
     errors: list[str] = report["errors"]
+    effective_file = selected_file if selected_file is not None else (files[0] if len(files) == 1 else None)
+    try:
+        validate_output_paths(
+            out_dir,
+            [effective_file] if effective_file is not None else [],
+            source_paths=source_paths,
+            template_path=template_path,
+            manifest_path=manifest.get("_path"),
+            manifest=manifest,
+            schema_path=schema_path,
+        )
+    except ValueError as exc:
+        errors.append(str(exc))
     if selected_file is None and len(files) != 1:
         errors.append(f"Expected one generated XLS file, got {len(files)}")
     path = None
@@ -641,16 +1119,25 @@ def validate_output_dir(
     elif len(files) == 1:
         path = files[0]
     if path is not None:
-        structure = manifest["structure"]
-        columns = structure["columns"]
-        start_row = int(structure["data_start_row"])
+        mode = anchor_mode(manifest)
+        named_mode = mode == "excel_named_range"
         skill_enabled = float(data["weights"]["skill"]) > 0.000001
-        total_column = columns["total_score"] if skill_enabled else structure["no_skill_total_column"]
-        formula_columns = (
-            manifest["fields"]["formula_columns_with_skill"]["columns"]
-            if skill_enabled
-            else manifest["fields"]["formula_columns_without_skill"]["columns"]
-        )
+        if named_mode:
+            structure: dict[str, Any] = {}
+            columns: dict[str, str] = {}
+            start_row = 0
+            total_column = ""
+            formula_columns: list[str] = []
+        else:
+            structure = manifest["structure"]
+            columns = structure["columns"]
+            start_row = int(structure["data_start_row"])
+            total_column = columns["total_score"] if skill_enabled else structure["no_skill_total_column"]
+            formula_columns = (
+                manifest["fields"]["formula_columns_with_skill"]["columns"]
+                if skill_enabled
+                else manifest["fields"]["formula_columns_without_skill"]["columns"]
+            )
         try:
             if path.stat().st_size == 0:
                 raise RuntimeError("Generated XLS file is empty")
@@ -666,7 +1153,33 @@ def validate_output_dir(
                     else convert_to_xlsx(selected_template, Path(temp_name) / "template", find_soffice())
                 )
                 template_workbook = load_workbook(template_xlsx, data_only=False)
-                sheet_name = structure["worksheet"]
+                named_variant = "with_skill" if skill_enabled else "without_skill"
+                output_named_xlsx = None
+                output_named_xls = None
+                named_template_inventory = None
+                runtime_manifest = manifest
+                if named_mode:
+                    output_named_xlsx = validate_named_range_inventory(
+                        formulas,
+                        manifest["anchors"],
+                        named_variant,
+                    )
+                    if path.suffix.lower() == ".xls":
+                        output_named_xls = validate_xls_named_range_inventory(
+                            path,
+                            manifest["anchors"],
+                            named_variant,
+                        )
+                    named_summary = _set_named_range_qa(
+                        report,
+                        output_named_xlsx,
+                        output_named_xls,
+                        named_variant,
+                    )
+                    errors.extend(named_summary["errors"])
+                    sheet_name = output_named_xlsx.get("locations", {}).get("gb_data_table", {}).get("sheet", "")
+                else:
+                    sheet_name = structure["worksheet"]
                 if sheet_name not in formulas.sheetnames:
                     errors.append(f"Missing worksheet: {sheet_name}")
                 else:
@@ -676,6 +1189,123 @@ def validate_output_dir(
                     controlled_output_ws = None
                     if template_ws is None:
                         errors.append(f"Missing worksheet in template: {sheet_name}")
+                    elif named_mode:
+                        template_named_with_skill = validate_named_range_inventory(
+                            template_workbook,
+                            manifest["anchors"],
+                            "with_skill",
+                        )
+                        if template_named_with_skill["errors"]:
+                            errors.extend(template_named_with_skill["errors"])
+                        else:
+                            expected_locations = expected_named_range_locations(
+                                load_manifest(V10_MANIFEST)["structure"],
+                                "with_skill",
+                            )
+                            expected_inventory = {
+                                "locations": {
+                                    name: location.to_dict()
+                                    for name, location in expected_locations.items()
+                                }
+                            }
+                            template_layout_errors = compare_named_range_inventories(
+                                expected_inventory,
+                                template_named_with_skill,
+                                required_names("with_skill"),
+                            )
+                            errors.extend(template_layout_errors)
+                            skill_start = int(template_named_with_skill["locations"]["gb_skill_score_col"]["min_col"])
+                            class_name_cell = _named_location_address(
+                                template_named_with_skill["locations"]["gb_class_name"]
+                            )
+                            class_name_style = copy(template_ws[class_name_cell]._style)
+                            if not skill_enabled:
+                                _delete_columns_for_signature(template_ws, skill_start, 2)
+                                template_ws.cell(
+                                    int(template_named_with_skill["locations"]["gb_class_name"]["min_row"]),
+                                    skill_start,
+                                )._style = copy(class_name_style)
+                                from named_range_utils import rebuild_named_ranges_after_column_delete
+
+                                rebuild_named_ranges_after_column_delete(
+                                    template_workbook,
+                                    skill_start,
+                                    2,
+                                    named_variant,
+                                )
+                                no_skill_total = get_column_letter(skill_start)
+                                template_ws.column_dimensions[no_skill_total].width = max(
+                                    template_ws.column_dimensions[no_skill_total].width or 0,
+                                    18,
+                                )
+                            named_template_inventory = validate_named_range_inventory(
+                                template_workbook,
+                                manifest["anchors"],
+                                named_variant,
+                            )
+                            if named_template_inventory["errors"]:
+                                errors.extend(named_template_inventory["errors"])
+                            else:
+                                runtime_manifest = _named_runtime_manifest(
+                                    manifest,
+                                    template_workbook,
+                                    named_variant,
+                                )
+                                structure = runtime_manifest["structure"]
+                                template_capacity_end = int(
+                                    structure["template_last_data_row"]
+                                )
+                                expected_last_row = max(
+                                    template_capacity_end,
+                                    int(structure["data_start_row"]) + len(data["students"]) - 1,
+                                )
+                                structure["output_capacity_last_row"] = expected_last_row
+                                errors.extend(
+                                    _named_capacity_errors(
+                                        output_named_xlsx,
+                                        named_variant,
+                                        expected_last_row,
+                                        int(structure["data_start_row"]),
+                                    )
+                                )
+                                if output_named_xls is not None:
+                                    errors.extend(
+                                        _named_capacity_errors(
+                                            output_named_xls,
+                                            named_variant,
+                                            expected_last_row,
+                                            int(structure["data_start_row"]),
+                                        )
+                                    )
+                                columns = structure["columns"]
+                                start_row = int(structure["data_start_row"])
+                                total_column = columns["total_score"]
+                                formula_columns = (
+                                    [columns["regular_weighted"], columns["theory_weighted"], columns["skill_weighted"], columns["total_score"]]
+                                    if skill_enabled
+                                    else [columns["regular_weighted"], columns["theory_weighted"], columns["total_score"]]
+                                )
+                                template_comparison = _compare_named_output_to_template(
+                                    named_template_inventory,
+                                    output_named_xlsx,
+                                    required_names(named_variant),
+                                )
+                                if output_named_xls is not None:
+                                    template_comparison.extend(
+                                        compare_xls_and_xlsx_named_ranges(
+                                            output_named_xls,
+                                            output_named_xlsx,
+                                            required_names(named_variant),
+                                        )
+                                    )
+                                named_summary = _set_named_range_qa(
+                                    report,
+                                    output_named_xlsx,
+                                    output_named_xls,
+                                    named_variant,
+                                    template_comparison,
+                                )
+                                errors.extend(named_summary["errors"])
                     elif not skill_enabled:
                         class_name_cell = structure["metadata"]["class_name"]
                         class_name_style = copy(template_ws[class_name_cell]._style)
@@ -706,7 +1336,7 @@ def validate_output_dir(
                             controlled_reference_xlsx,
                             ws_formula,
                             template_ws,
-                            manifest,
+                            runtime_manifest,
                             skill_enabled,
                             Path(temp_name) / "controlled-output",
                             find_soffice(),
@@ -727,7 +1357,7 @@ def validate_output_dir(
                     report["checks"]["structure"] = _check_workbook_protection(
                         ws_formula,
                         formulas,
-                        manifest,
+                        runtime_manifest,
                         skill_enabled,
                         errors,
                         template_ws,
@@ -756,9 +1386,11 @@ def validate_output_dir(
                         if skill_header != expected_skill_header:
                             errors.append(f"skill header mismatch: expected {expected_skill_header!r}, got {skill_header!r}")
                     else:
-                        for cell in ("O3", "P3", "Q3", "O4", "P4", "Q4"):
-                            if "技能成绩" in str(ws_values[cell].value or ""):
-                                errors.append(f"skill header remains after zero-skill column removal: {cell}")
+                        for row in (3, 4):
+                            for column in range(1, column_number(total_column) + 1):
+                                cell = f"{get_column_letter(column)}{row}"
+                                if "技能成绩" in str(ws_values[cell].value or ""):
+                                    errors.append(f"skill header remains after zero-skill column removal: {cell}")
 
                     expected_meta = {
                         "term": data["term"],
@@ -773,10 +1405,22 @@ def validate_output_dir(
                             errors.append(f"{name} metadata mismatch")
 
                     expected_last_row = start_row + len(data["students"]) - 1
-                    if ws_values.max_row != expected_last_row:
+                    capacity_last_row = int(
+                        structure.get(
+                            "output_capacity_last_row",
+                            structure.get("template_last_data_row", expected_last_row),
+                        )
+                    )
+                    if named_mode:
+                        if ws_values.max_row != capacity_last_row:
+                            errors.append(
+                                f"Output named-range capacity mismatch: expected through row {capacity_last_row}, got {ws_values.max_row}"
+                            )
+                    elif ws_values.max_row != expected_last_row:
                         errors.append(f"Output student row extent mismatch: expected through row {expected_last_row}, got {ws_values.max_row}")
                     output_max_col = column_number(total_column)
-                    for extra_row in range(expected_last_row + 1, max(ws_values.max_row, expected_last_row) + 1):
+                    extra_end = capacity_last_row if named_mode else max(ws_values.max_row, expected_last_row)
+                    for extra_row in range(expected_last_row + 1, extra_end + 1):
                         if _row_has_content(ws_values, extra_row, output_max_col):
                             errors.append(f"Unexpected non-empty student row after expected data: {extra_row}")
 
@@ -866,23 +1510,44 @@ def validate_output_dir(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate a generated XLS gradebook and write a QA report.")
-    parser.add_argument("--input-json", required=True)
+    parser.add_argument("--input-json", required=False, default="")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--output-file", default="")
-    parser.add_argument("--manifest", default=str(DEFAULT_MANIFEST))
+    parser.add_argument("--manifest", default="")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--qa-report", default="")
+    parser.add_argument("--final-output", default="", help="Final output path to record in QA metadata")
+    parser.add_argument("--final-qa", default="", help="Final QA report path to record in QA metadata")
     parser.add_argument("--template-path", default="")
+    parser.add_argument("--source-file", action="append", default=[])
     parser.add_argument("--custom-template", action="store_true")
     parser.add_argument("--engine", default="")
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
+    parser.add_argument("--raw-runtime-preflight", action="store_true")
+    parser.add_argument("--variant", choices=("with_skill", "without_skill"), default="")
     args = parser.parse_args()
     try:
-        data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
-        manifest = load_manifest(args.manifest)
-        template_path = args.template_path or None
+        package = resolve_template_package(args.template_path or None, args.manifest or None)
+        manifest = package.manifest
+        validate_canonical_baselines(require_v11=anchor_mode(manifest) == "excel_named_range")
+        validate_template_package_identity(package.template_path, manifest)
+        template_path = package.template_path
         custom_template = args.custom_template if args.custom_template else None
+        if args.raw_runtime_preflight:
+            result = validate_output_raw_runtime(
+                args.output_dir,
+                manifest,
+                output_file=args.output_file or None,
+                template_path=template_path,
+                variant=args.variant or None,
+                source_paths=args.source_file,
+            )
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        if not args.input_json:
+            raise ValueError("--input-json is required unless --raw-runtime-preflight is used")
+        data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
         if args.skip_validation:
             report = write_skipped_report(
                 args.output_dir,
@@ -895,6 +1560,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 output_file=args.output_file or None,
+                source_paths=args.source_file,
             )
         else:
             report = validate_output_dir(
@@ -908,7 +1574,18 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 output_file=args.output_file or None,
+                source_paths=args.source_file,
             )
+        if bool(args.final_output) != bool(args.final_qa):
+            raise ValueError("--final-output and --final-qa must be provided together")
+        if args.final_output and args.final_qa:
+            report = finalize_qa_report_paths(
+                report,
+                final_output=args.final_output,
+                final_qa=args.final_qa,
+            )
+            qa_candidate = args.qa_report or str(Path(args.output_dir).expanduser().resolve() / "qa-report.json")
+            _write_qa_report(report, qa_candidate)
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

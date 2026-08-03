@@ -29,9 +29,6 @@
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $ManifestPath) {
-  $ManifestPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'assets\templates\course-gradebook\v1.0.0\manifest.yaml'
-}
 if (-not $SchemaPath) {
   $SchemaPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'schemas\gradebook-input.schema.json'
 }
@@ -49,27 +46,58 @@ function Get-PythonCommand() {
 $PythonCommand = Get-PythonCommand
 $ManifestToJson = Join-Path $PSScriptRoot 'manifest_to_json.py'
 $ManifestJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-manifest-" + [guid]::NewGuid().ToString('N') + '.json')
-& $PythonCommand $ManifestToJson --manifest $ManifestPath --output $ManifestJsonPath
-if ($LASTEXITCODE -ne 0) {
-  throw "Could not parse manifest: $ManifestPath"
+$manifestArgs = @('--output', $ManifestJsonPath)
+if ($ManifestPath) { $manifestArgs += @('--manifest', $ManifestPath) }
+if ($TemplatePath) { $manifestArgs += @('--template', $TemplatePath) }
+try {
+  & $PythonCommand $ManifestToJson @manifestArgs
+  if ($LASTEXITCODE -ne 0) {
+    throw 'Could not resolve the gradebook template package manifest and fingerprint.'
+  }
+  $ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
+} finally {
+  Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
 }
-$ManifestData = (Get-Content -LiteralPath $ManifestJsonPath -Raw -Encoding UTF8) | ConvertFrom-Json
-Remove-Item -LiteralPath $ManifestJsonPath -Force -ErrorAction SilentlyContinue
+$ManifestPath = [string]$ManifestData.manifest_path
 
 function Assert-ManifestCompatibility($manifest) {
   $version = [string]$manifest.template.version
-  $supported = $manifest.generator.supported_major
-  if (-not $version -or $version -notmatch '^\d+\.\d+\.\d+$' -or $null -eq $supported) {
-    throw 'Manifest must declare a semantic template version and generator.supported_major'
+  if (-not $version -or $version -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+    throw 'Manifest must declare an ASCII semantic template version without leading zeros'
   }
   try {
     [int]$major = $version.Split('.')[0]
-    [int]$supportedMajor = $supported
+    [int]$minor = $version.Split('.')[1]
   } catch {
-    throw 'Manifest must declare a semantic template version and generator.supported_major'
+    throw 'Manifest must declare an ASCII semantic template version without leading zeros'
   }
+  $supportedMajor = 1
+  $supportedMinors = @(0, 1)
   if ($major -ne $supportedMajor) {
-    throw "Unsupported template major version $major; generator supports $supportedMajor"
+    throw "Unsupported template major version $major; supported major is $supportedMajor"
+  }
+  if ($minor -notin $supportedMinors) {
+    throw "Unsupported template minor version $minor; supported minors are 0 and 1"
+  }
+  if ($null -eq $manifest.generator.supported_major) {
+    throw 'Manifest must declare generator.supported_major'
+  }
+  try {
+    [int]$declaredMajor = $manifest.generator.supported_major
+  } catch {
+    throw 'Manifest generator.supported_major must be an integer'
+  }
+  if ($declaredMajor -ne $supportedMajor) {
+    throw "Manifest generator.supported_major must remain $supportedMajor; it does not define support"
+  }
+  if ([string]$manifest.anchor_mode -notin @('legacy_coordinates', 'excel_named_range')) {
+    throw "Unsupported gradebook anchor mode: $($manifest.anchor_mode)"
+  }
+  if ($version -match '^1\.0\.' -and [string]$manifest.anchor_mode -ne 'legacy_coordinates') {
+    throw 'Template version 1.0.x must use legacy_coordinates.'
+  }
+  if ($version -match '^1\.1\.' -and [string]$manifest.anchor_mode -ne 'excel_named_range') {
+    throw 'Template version 1.1.x must use excel_named_range.'
   }
 }
 
@@ -77,11 +105,25 @@ Assert-ManifestCompatibility $ManifestData
 
 $TemplateWasProvided = [bool]$TemplatePath
 if (-not $TemplatePath) {
-  $TemplatePath = Join-Path (Split-Path -Parent $ManifestPath) $ManifestData.template.file
+  $TemplatePath = [string]$ManifestData.template_path
 }
 
 if (-not (Test-Path -LiteralPath $TemplatePath)) {
   throw "Template not found: $TemplatePath"
+}
+
+& $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --identity-only --template $TemplatePath --manifest $ManifestPath
+if ($LASTEXITCODE -ne 0) {
+  throw "Template fingerprint validation failed before generation: $TemplatePath"
+}
+
+if ([string]$ManifestData.anchor_mode -eq 'excel_named_range') {
+  # Full validation remains available through --named-range-runtime-preflight;
+  # the COM generation boundary intentionally uses the raw-only variant.
+  & $PythonCommand (Join-Path $PSScriptRoot 'validate_template.py') --named-range-runtime-raw --template $TemplatePath --manifest $ManifestPath
+  if ($LASTEXITCODE -ne 0) {
+    throw "Named-range raw runtime preflight failed before COM output creation: $TemplatePath"
+  }
 }
 
 if (-not $SkipTemplateValidation) {
@@ -104,6 +146,200 @@ function Resolve-SourceFiles([string]$path) {
     return @((Get-Item -LiteralPath $candidate))
   }
   return @($item)
+}
+
+function Normalize-Path([string]$path) {
+  $full = [System.IO.Path]::GetFullPath($path)
+  $suffix = New-Object System.Collections.Generic.List[string]
+  $probe = $full
+  while (-not (Test-Path -LiteralPath $probe) -and $probe -ne [System.IO.Path]::GetPathRoot($probe)) {
+    $leaf = Split-Path -Leaf $probe
+    if ($leaf) { $suffix.Insert(0, $leaf) }
+    $probe = Split-Path -Parent $probe
+  }
+  if (Test-Path -LiteralPath $probe) {
+    $resolved = (Resolve-Path -LiteralPath $probe).Path
+    foreach ($part in $suffix) { $resolved = Join-Path $resolved $part }
+    return [System.IO.Path]::GetFullPath($resolved)
+  }
+  return $full
+}
+
+function Path-Key([string]$path) {
+  return (Normalize-Path $path).ToLowerInvariant()
+}
+
+function Assert-OutputPathsSafe($sourceItems, [string]$directory, [string[]]$finalPaths, [string[]]$qaPaths) {
+  $outputKey = Path-Key $directory
+  if ((Test-Path -LiteralPath $directory) -and -not (Test-Path -LiteralPath $directory -PathType Container)) {
+    throw "Output directory is not a directory: $directory"
+  }
+  $skillDir = Split-Path -Parent $PSScriptRoot
+  $packageDirs = @($ManifestData.protected_package_directories) |
+    Where-Object { $_ } |
+    ForEach-Object { Normalize-Path ([string]$_) }
+  if ($packageDirs.Count -eq 0) {
+    $packageDirs = @(
+      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.0.0'),
+      (Join-Path $skillDir 'assets\templates\course-gradebook\v1.1.0'),
+      (Join-Path $skillDir 'assets\平时成绩记分册模板.xls' | Split-Path -Parent)
+    ) | ForEach-Object { Normalize-Path $_ }
+  }
+  $packageDirs += Normalize-Path (Split-Path -Parent $SchemaPath)
+  foreach ($packageDir in $packageDirs) {
+    $packageKey = (Path-Key $packageDir).TrimEnd('\')
+    if ($outputKey -eq $packageKey -or $outputKey.StartsWith($packageKey + '\')) {
+      throw "Output directory must not be inside the selected template package: $directory"
+    }
+  }
+  $sourceKeys = New-Object System.Collections.Generic.HashSet[string] ([System.StringComparer]::OrdinalIgnoreCase)
+  $forbiddenKinds = @{}
+  foreach ($source in $sourceItems) {
+    $sourceKey = Path-Key $source.FullName
+    $null = $sourceKeys.Add($sourceKey)
+    $forbiddenKinds[$sourceKey] = 'source'
+  }
+  if ($TemplatePath) { $forbiddenKinds[(Path-Key $TemplatePath)] = 'selected_template' }
+  if ($SchemaPath) { $forbiddenKinds[(Path-Key $SchemaPath)] = 'schema' }
+  foreach ($path in @($ManifestData.protected_package_paths)) {
+    if ($path) {
+      $key = Path-Key ([string]$path)
+      if (-not $forbiddenKinds.ContainsKey($key)) { $forbiddenKinds[$key] = 'declared_template_package' }
+    }
+  }
+  $finalKeys = @()
+  foreach ($finalPath in $finalPaths) {
+    $target = Normalize-Path $finalPath
+    $directoryKey = (Path-Key $directory).TrimEnd('\')
+    $targetKey = Path-Key $target
+    if (-not $targetKey.StartsWith($directoryKey + '\')) {
+      throw "Output file must be inside OutputDir: $target"
+    }
+    if ((Test-Path -LiteralPath $target) -and (Test-Path -LiteralPath $target -PathType Container)) {
+      throw "Output file path is a directory: $target"
+    }
+    if ([System.IO.Path]::GetExtension($target).ToLowerInvariant() -ne '.xls') {
+      throw "Output file must use the .xls extension: $target"
+    }
+    $forbiddenKind = $forbiddenKinds[$targetKey]
+    if ($null -ne $forbiddenKind) {
+      if ($forbiddenKind -eq 'source' -or $sourceKeys.Contains($targetKey)) {
+        throw 'Output file must not overwrite the source workbook.'
+      }
+      if ($forbiddenKind -eq 'selected_template') {
+        throw 'Output file must not overwrite the template file.'
+      }
+      if ($forbiddenKind -eq 'declared_template_package') {
+        throw 'Output file must not overwrite a declared template package file.'
+      }
+      throw 'Output file must not overwrite an input or template package file.'
+    }
+    if ($finalKeys -contains $targetKey) {
+      throw "Output file paths must be unique: $target"
+    }
+    $finalKeys += $targetKey
+  }
+  $qaKeys = @()
+  foreach ($qaPath in $qaPaths) {
+    if (-not $qaPath) { continue }
+    $qaKey = Path-Key $qaPath
+    if ($finalKeys -contains $qaKey) {
+      throw 'QA report must not overwrite a generated XLS output.'
+    }
+    if ($qaKeys -contains $qaKey) {
+      throw "QA report paths must be unique: $qaPath"
+    }
+    if ((Test-Path -LiteralPath $qaPath) -and (Test-Path -LiteralPath $qaPath -PathType Container)) {
+      throw "QA report path is a directory: $qaPath"
+    }
+    $forbiddenKind = $forbiddenKinds[$qaKey]
+    if ($null -ne $forbiddenKind) {
+      if ($forbiddenKind -eq 'declared_template_package') {
+        throw 'QA report must not overwrite a declared template package file.'
+      }
+      if ($forbiddenKind -eq 'selected_template') {
+        throw 'QA report must not overwrite the template file.'
+      }
+      throw 'QA report must not overwrite an input or template package file.'
+    }
+    $qaKeys += $qaKey
+  }
+}
+
+$RunTemporaryFiles = New-Object System.Collections.Generic.List[string]
+
+function Track-RunTemporary([string]$path) {
+  if ($path) { $RunTemporaryFiles.Add((Normalize-Path $path)) }
+  return $path
+}
+
+function Remove-RunTemporaryFiles() {
+  foreach ($path in @($RunTemporaryFiles | Sort-Object Length -Descending)) {
+    if (Test-Path -LiteralPath $path) {
+      Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
+    }
+  }
+  $RunTemporaryFiles.Clear()
+}
+
+function Move-AtomicFile([string]$staged, [string]$destination, [string]$replaceBackup) {
+  if (Test-Path -LiteralPath $destination -PathType Leaf) {
+    if (Test-Path -LiteralPath $replaceBackup) {
+      Remove-Item -LiteralPath $replaceBackup -Force
+    }
+    [System.IO.File]::Replace($staged, $destination, $replaceBackup, $true)
+  } else {
+    [System.IO.File]::Move($staged, $destination)
+  }
+}
+
+function Commit-OutputAndQaAtomically(
+  [string]$candidate,
+  [string]$finalPath,
+  [string]$qaCandidate,
+  [string]$qaPath
+) {
+  if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { throw "Output candidate does not exist: $candidate" }
+  if (-not (Test-Path -LiteralPath $qaCandidate -PathType Leaf)) { throw "QA candidate does not exist: $qaCandidate" }
+  $finalParent = Split-Path -Parent $finalPath
+  $qaParent = Split-Path -Parent $qaPath
+  New-Item -ItemType Directory -Path $finalParent -Force | Out-Null
+  New-Item -ItemType Directory -Path $qaParent -Force | Out-Null
+  $token = [guid]::NewGuid().ToString('N')
+  $stagedXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.tmp')
+  $stagedQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.tmp')
+  $backupXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.bak')
+  $backupQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.bak')
+  $replaceBackupXls = Join-Path $finalParent ('.' + (Split-Path -Leaf $finalPath) + '.' + $token + '.replace.bak')
+  $replaceBackupQa = Join-Path $qaParent ('.' + (Split-Path -Leaf $qaPath) + '.' + $token + '.replace.bak')
+  $oldXls = Test-Path -LiteralPath $finalPath -PathType Leaf
+  $oldQa = Test-Path -LiteralPath $qaPath -PathType Leaf
+  $replacedXls = $false
+  $replacedQa = $false
+  try {
+    Copy-Item -LiteralPath $candidate -Destination $stagedXls -Force
+    Copy-Item -LiteralPath $qaCandidate -Destination $stagedQa -Force
+    if ($oldXls) { Copy-Item -LiteralPath $finalPath -Destination $backupXls -Force }
+    if ($oldQa) { Copy-Item -LiteralPath $qaPath -Destination $backupQa -Force }
+    Move-AtomicFile $stagedXls $finalPath $replaceBackupXls
+    $replacedXls = $true
+    Move-AtomicFile $stagedQa $qaPath $replaceBackupQa
+    $replacedQa = $true
+  } catch {
+    if ($replacedXls) {
+      if ($oldXls) { Copy-Item -LiteralPath $backupXls -Destination $finalPath -Force }
+      elseif (Test-Path -LiteralPath $finalPath) { Remove-Item -LiteralPath $finalPath -Force -ErrorAction SilentlyContinue }
+    }
+    if ($replacedQa) {
+      if ($oldQa) { Copy-Item -LiteralPath $backupQa -Destination $qaPath -Force }
+      elseif (Test-Path -LiteralPath $qaPath) { Remove-Item -LiteralPath $qaPath -Force -ErrorAction SilentlyContinue }
+    }
+    throw
+  } finally {
+    foreach ($path in @($stagedXls, $stagedQa, $backupXls, $backupQa, $replaceBackupXls, $replaceBackupQa)) {
+      if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
+    }
+  }
 }
 
 function To-Number($value) {
@@ -319,6 +555,390 @@ function ColumnToNumber([string]$column) {
   return $value
 }
 
+function ColumnLetter([int]$column) {
+  if ($column -le 0) { throw "Invalid Excel column number: $column" }
+  $name = ''
+  $n = $column
+  while ($n -gt 0) {
+    $rem = ($n - 1) % 26
+    $name = [char](65 + $rem) + $name
+    $n = [Math]::Floor(($n - 1) / 26)
+  }
+  return $name
+}
+
+function Get-ManagedNameObject($workbook, [string]$name) {
+  try {
+    return $workbook.Names.Item($name)
+  } catch {
+    throw "Missing workbook-level managed name: $name"
+  }
+}
+
+function Get-ManagedRangeLocation($workbook, [string]$name) {
+  $nameObject = Get-ManagedNameObject $workbook $name
+  if ([bool]$nameObject.Visible -eq $false) {
+    throw "Managed name must be visible: $name"
+  }
+  $refersTo = [string]$nameObject.RefersTo
+  if (-not $refersTo -or $refersTo.Contains('#REF!') -or $refersTo.Contains('[') -or $refersTo.Contains(',')) {
+    throw "Managed name has a broken or non-contiguous reference: $name"
+  }
+  try {
+    $range = $nameObject.RefersToRange
+  } catch {
+    throw "Managed name does not refer to a worksheet range: $name"
+  }
+  if ($null -eq $range -or [int]$range.Areas.Count -ne 1) {
+    throw "Managed name must refer to one worksheet rectangle: $name"
+  }
+  if ([string]$range.Parent.Name -ne [string]$workbook.Worksheets.Item([string]$range.Parent.Name).Name) {
+    throw "Managed name targets an invalid worksheet: $name"
+  }
+  return [pscustomobject]@{
+    Name = $name
+    Sheet = [string]$range.Parent.Name
+    MinRow = [int]$range.Row
+    MinCol = [int]$range.Column
+    MaxRow = [int]$range.Row + [int]$range.Rows.Count - 1
+    MaxCol = [int]$range.Column + [int]$range.Columns.Count - 1
+  }
+}
+
+function Get-ManagedRange($workbook, [string]$name) {
+  $nameObject = Get-ManagedNameObject $workbook $name
+  try {
+    $range = $nameObject.RefersToRange
+  } catch {
+    throw "Managed name does not refer to a worksheet range: $name"
+  }
+  if ($null -eq $range -or [int]$range.Areas.Count -ne 1) {
+    throw "Managed name must refer to one worksheet rectangle: $name"
+  }
+  return ,$range
+}
+
+function Set-ManagedCellValue($ranges, [string]$name, $value) {
+  $range = $ranges[[string]$name]
+  if ($null -eq $range -or [int]$range.Cells.Count -ne 1) {
+    throw "Managed name must target one cell for a scalar write: $name"
+  }
+  try {
+    if ($value -is [string]) { $null = $range.Value2 = [string]$value } else { $null = $range.Value = $value }
+  } catch { throw "Named scalar write failed for $name (value type $($value.GetType().FullName)): $($_.Exception.Message)" }
+}
+
+function Set-ManagedOffsetValue($ranges, [string]$name, [int]$rowOffset, [int]$colOffset, $value) {
+  $range = $ranges[[string]$name]
+  if ($null -eq $range) { throw "Missing managed write range: $name" }
+  if ($rowOffset -lt 0 -or $colOffset -lt 0) {
+    throw "Named value write offset must be non-negative for ${name}: requested row=$rowOffset, col=$colOffset"
+  }
+  $rowCount = [int]$range.Rows.Count
+  $colCount = [int]$range.Columns.Count
+  if ($rowOffset -ge $rowCount -or $colOffset -ge $colCount) {
+    throw "Named value write offset out of bounds for ${name}: requested row=$rowOffset, col=$colOffset, range rows=$rowCount, cols=$colCount"
+  }
+  $cell = $range.Cells.Item($rowOffset + 1, $colOffset + 1)
+  try {
+    if ($value -is [string]) { $null = $cell.Value2 = [string]$value } else { $null = $cell.Value = $value }
+  } catch { throw "Named value write failed for $name at offset $rowOffset,$colOffset (value type $($value.GetType().FullName)): $($_.Exception.Message)" }
+}
+
+function Set-ManagedOffsetFormula($ranges, [string]$name, [int]$rowOffset, [int]$colOffset, [string]$formula) {
+  $range = $ranges[[string]$name]
+  if ($null -eq $range) { throw "Missing managed formula range: $name" }
+  if ($rowOffset -lt 0 -or $colOffset -lt 0) {
+    throw "Named formula write offset must be non-negative for ${name}: requested row=$rowOffset, col=$colOffset"
+  }
+  $rowCount = [int]$range.Rows.Count
+  $colCount = [int]$range.Columns.Count
+  if ($rowOffset -ge $rowCount -or $colOffset -ge $colCount) {
+    throw "Named formula write offset out of bounds for ${name}: requested row=$rowOffset, col=$colOffset, range rows=$rowCount, cols=$colCount"
+  }
+  $cell = $range.Cells.Item($rowOffset + 1, $colOffset + 1)
+  try { $null = $cell.Formula = $formula } catch { throw "Named formula write failed for $name at offset $rowOffset,${colOffset}: $($_.Exception.Message)" }
+}
+
+function Get-ManagedRanges($workbook, [string]$variant) {
+  $required = if ($variant -eq 'with_skill') {
+    @($ManifestData.anchors.variants.with_skill.required)
+  } else {
+    @($ManifestData.anchors.variants.without_skill.required)
+  }
+  $locations = @{}
+  foreach ($name in $required) {
+    $locations[[string]$name] = Get-ManagedRangeLocation $workbook ([string]$name)
+  }
+  $forbidden = if ($variant -eq 'with_skill') {
+    @($ManifestData.anchors.variants.with_skill.forbidden)
+  } else {
+    @($ManifestData.anchors.variants.without_skill.forbidden)
+  }
+  foreach ($name in $forbidden) {
+    try {
+      $null = $workbook.Names.Item([string]$name)
+      throw "Forbidden managed name still exists for $variant variant: $name"
+    } catch [System.Runtime.InteropServices.COMException] {
+      # A missing forbidden name is the expected variant state.
+    }
+  }
+  return $locations
+}
+
+function Assert-ManagedRuntimeContract($workbook, [string]$variant, $locations) {
+  $required = if ($variant -eq 'with_skill') {
+    @($ManifestData.anchors.variants.with_skill.required)
+  } else {
+    @($ManifestData.anchors.variants.without_skill.required)
+  }
+  $seen = @{}
+  foreach ($name in $required) {
+    $location = $locations[[string]$name]
+    if ($null -eq $location) { throw "Missing runtime managed location: $name" }
+    $physicalKey = "{0}|{1}|{2}|{3}|{4}" -f $location.Sheet, $location.MinRow, $location.MinCol, $location.MaxRow, $location.MaxCol
+    if ($seen.ContainsKey($physicalKey)) {
+      throw "Managed named ranges share one physical destination at ${physicalKey}: $($seen[$physicalKey]), $name"
+    }
+    $seen[$physicalKey] = [string]$name
+  }
+  $table = $locations['gb_data_table']
+  $templateRow = $locations['gb_template_row']
+  if ($null -eq $table -or $null -eq $templateRow) { throw 'Runtime managed contract is missing the data table or template row' }
+  if ($templateRow.MinRow -ne $table.MinRow -or $templateRow.MinCol -ne $table.MinCol -or $templateRow.MaxCol -ne $table.MaxCol) {
+    throw 'gb_template_row must equal the first row of gb_data_table at runtime'
+  }
+  $regular = $locations['gb_regular_items']
+  if ($null -eq $regular -or ($regular.MaxCol - $regular.MinCol + 1) -ne 8) {
+    throw 'gb_regular_items must contain exactly 8 columns at runtime'
+  }
+  $dataNames = @(
+    'gb_serial_col', 'gb_student_id_col', 'gb_student_name_col', 'gb_regular_items',
+    'gb_regular_weighted_col', 'gb_theory_score_col', 'gb_theory_weighted_col', 'gb_total_score_col'
+  )
+  if ($variant -eq 'with_skill') { $dataNames += @('gb_skill_score_col', 'gb_skill_weighted_col') }
+  foreach ($name in $dataNames) {
+    $location = $locations[[string]$name]
+    if ($null -eq $location) { throw "Runtime managed contract is missing data range: $name" }
+    if ($location.MinRow -ne $table.MinRow -or $location.MaxRow -ne $table.MaxRow) {
+      throw "$name must use the same data rows as gb_data_table at runtime"
+    }
+    if ($location.MinCol -lt $table.MinCol -or $location.MaxCol -gt $table.MaxCol) {
+      throw "$name must be contained in gb_data_table at runtime"
+    }
+  }
+  if ($regular.MaxCol + 1 -ne $locations['gb_regular_weighted_col'].MinCol) {
+    throw 'gb_regular_items must be immediately before gb_regular_weighted_col at runtime'
+  }
+}
+
+function Set-ManagedWorkbookName($workbook, [string]$name, $location) {
+  try {
+    $workbook.Names.Item($name).Delete()
+  } catch {
+    # The name may not exist yet.
+  }
+  $sheet = $workbook.Worksheets.Item([string]$location.Sheet)
+  $first = $sheet.Cells.Item([int]$location.MinRow, [int]$location.MinCol).Address($true, $true)
+  $last = $sheet.Cells.Item([int]$location.MaxRow, [int]$location.MaxCol).Address($true, $true)
+  $refersTo = "='$($location.Sheet)'!$first"
+  if ($first -ne $last) { $refersTo = "='$($location.Sheet)'!$first`:$last" }
+  $null = $workbook.Names.Add($name, $refersTo)
+}
+
+function Shift-ManagedLocationAfterDelete($location, [int]$startCol, [int]$count) {
+  $endCol = $startCol + $count - 1
+  if ($location.MaxCol -lt $startCol) { return $location }
+  if ($location.MinCol -gt $endCol) {
+    $location.MinCol -= $count
+    $location.MaxCol -= $count
+    return $location
+  }
+  if ($location.MinCol -ge $startCol -and $location.MaxCol -le $endCol) {
+    $location.MinCol = $startCol
+    $location.MaxCol = $startCol
+    return $location
+  }
+  if ($location.MinCol -lt $startCol -and $location.MaxCol -gt $endCol) {
+    $location.MaxCol -= $count
+    return $location
+  }
+  if ($location.MinCol -lt $startCol -and $location.MaxCol -le $endCol) {
+    $location.MaxCol = $startCol - 1
+    return $location
+  }
+  if ($location.MinCol -ge $startCol -and $location.MaxCol -gt $endCol) {
+    $location.MinCol = $startCol
+    $location.MaxCol -= $count
+    return $location
+  }
+  throw "Could not shift managed name $($location.Name) after deleting columns."
+}
+
+function Rebuild-ManagedNamesAfterColumnDelete($workbook, $original, [int]$startCol, [int]$count) {
+  $required = @($ManifestData.anchors.variants.without_skill.required)
+  $removed = @($ManifestData.anchors.variants.without_skill.forbidden)
+  foreach ($name in $removed) {
+    try { $workbook.Names.Item([string]$name).Delete() } catch { }
+  }
+  foreach ($name in $required) {
+    $location = $original[[string]$name]
+    if ($null -eq $location) { throw "Missing pre-delete location for managed name: $name" }
+    $shifted = Shift-ManagedLocationAfterDelete $location $startCol $count
+    Set-ManagedWorkbookName $workbook ([string]$name) $shifted
+  }
+}
+
+function Update-ManagedNamesForCapacity($workbook, $ranges, [int]$lastRow) {
+  $dataNames = @(
+    'gb_data_table', 'gb_serial_col', 'gb_student_id_col', 'gb_student_name_col',
+    'gb_regular_items', 'gb_regular_weighted_col', 'gb_theory_score_col',
+    'gb_theory_weighted_col', 'gb_skill_score_col', 'gb_skill_weighted_col',
+    'gb_total_score_col'
+  )
+  $allNames = @(
+    $ManifestData.anchors.variants.with_skill.required
+    $ManifestData.anchors.variants.without_skill.required
+  ) | ForEach-Object { [string]$_ } | Select-Object -Unique
+  foreach ($name in $allNames) {
+    if (-not $ranges.ContainsKey([string]$name)) { continue }
+    $location = $ranges[[string]$name]
+    if ($dataNames -contains [string]$name) { $location.MaxRow = $lastRow }
+    Set-ManagedWorkbookName $workbook ([string]$name) $location
+  }
+}
+
+function Build-One-NamedRange($excel, [string]$candidatePath, [string]$finalPath, [string]$sourceFile, $meta, $students, $normalizedInput) {
+  Copy-Item -LiteralPath $TemplatePath -Destination $candidatePath -Force
+  $wb = $excel.Workbooks.Open($candidatePath)
+  $buildSucceeded = $false
+  try {
+    $wb.CheckCompatibility = $false
+    $hasSkill = $meta.SkillPct -gt 0.000001
+    $variant = if ($hasSkill) { 'with_skill' } else { 'without_skill' }
+    $original = Get-ManagedRanges $wb 'with_skill'
+    Assert-ManagedRuntimeContract $wb 'with_skill' $original
+    $ws = $wb.Worksheets.Item([string]$original['gb_data_table'].Sheet)
+    if (-not $hasSkill) {
+      $skillStart = [int]$original['gb_skill_score_col'].MinCol
+      $skillRange = "$(ColumnLetter $skillStart):$(ColumnLetter ($skillStart + 1))"
+      $null = $ws.Range($skillRange).EntireColumn.Delete()
+      Rebuild-ManagedNamesAfterColumnDelete $wb $original $skillStart 2
+    }
+    $ranges = Get-ManagedRanges $wb $variant
+    Assert-ManagedRuntimeContract $wb $variant $ranges
+    $table = $ranges['gb_data_table']
+    $dataStart = [int]$table.MinRow
+    $templateLastDataRow = [int]$table.MaxRow
+    $styleSourceRow = [int]$ranges['gb_template_row'].MinRow
+    if ($students.Count -gt ($templateLastDataRow - $dataStart + 1)) {
+      $needed = $students.Count - ($templateLastDataRow - $dataStart + 1)
+      for ($i = 0; $i -lt $needed; $i++) {
+        $insertAt = $templateLastDataRow + 1
+        $null = $ws.Rows.Item($styleSourceRow).Copy()
+        $null = $ws.Rows.Item($insertAt).Insert(-4121)
+        $templateLastDataRow++
+      }
+      Update-ManagedNamesForCapacity $wb $ranges $templateLastDataRow
+      $ranges = Get-ManagedRanges $wb $variant
+      Assert-ManagedRuntimeContract $wb $variant $ranges
+      $table = $ranges['gb_data_table']
+    }
+
+    $tableRange = $ws.Range(
+      (CellAddress ([int]$table.MinRow) ([int]$table.MinCol)),
+      (CellAddress ([int]$table.MaxRow) ([int]$table.MaxCol))
+    )
+    $writeRanges = @{}
+    $writeNames = if ($hasSkill) {
+      @($ManifestData.anchors.variants.with_skill.required)
+    } else {
+      @($ManifestData.anchors.variants.without_skill.required)
+    }
+    foreach ($name in $writeNames) {
+      $writeRanges[[string]$name] = Get-ManagedRange $wb ([string]$name)
+    }
+    if ($null -eq $writeRanges['gb_data_table']) { throw 'Missing managed write range: gb_data_table' }
+    $writeRanges['gb_data_table'].ClearContents()
+    Set-ManagedCellValue $writeRanges 'gb_term' $meta.Term
+    Set-ManagedCellValue $writeRanges 'gb_course' $meta.CourseName
+    Set-ManagedCellValue $writeRanges 'gb_teacher' $meta.Teacher
+    Set-ManagedCellValue $writeRanges 'gb_class_name' $meta.ClassName
+    Set-ManagedCellValue $writeRanges 'gb_header_regular' ('平时成绩({0}%)' -f (Format-Percentage-Label $meta.RegularPct))
+    Set-ManagedCellValue $writeRanges 'gb_header_theory' ('理论成绩({0}%)' -f (Format-Percentage-Label $meta.TheoryPct))
+    if ($hasSkill) {
+      Set-ManagedCellValue $writeRanges 'gb_header_skill' ('技能成绩（{0}%）' -f (Format-Percentage-Label $meta.SkillPct))
+    } else {
+      # Excel's native width is converted to a slightly larger LibreOffice width;
+      # 17.45 round-trips to the same protected width as the Python path's 18.
+      $null = $ws.Columns.Item((ColumnLetter ([int]$ranges['gb_total_score_col'].MinCol))).ColumnWidth = 17.45
+    }
+
+    $serialCol = [int]$ranges['gb_serial_col'].MinCol
+    $studentIdCol = [int]$ranges['gb_student_id_col'].MinCol
+    $studentNameCol = [int]$ranges['gb_student_name_col'].MinCol
+    $regularStartCol = [int]$ranges['gb_regular_items'].MinCol
+    $regularEndCol = [int]$ranges['gb_regular_items'].MaxCol
+    $regularWeightedCol = [int]$ranges['gb_regular_weighted_col'].MinCol
+    $theoryScoreCol = [int]$ranges['gb_theory_score_col'].MinCol
+    $theoryWeightedCol = [int]$ranges['gb_theory_weighted_col'].MinCol
+    $skillScoreCol = if ($hasSkill) { [int]$ranges['gb_skill_score_col'].MinCol } else { 0 }
+    $skillWeightedCol = if ($hasSkill) { [int]$ranges['gb_skill_weighted_col'].MinCol } else { 0 }
+    $totalCol = [int]$ranges['gb_total_score_col'].MinCol
+    $regularStartLetter = ColumnLetter $regularStartCol
+    $regularEndLetter = ColumnLetter $regularEndCol
+    $theoryScoreLetter = ColumnLetter $theoryScoreCol
+    $skillScoreLetter = if ($hasSkill) { ColumnLetter $skillScoreCol } else { '' }
+    $regularPct = FormulaNumber $meta.RegularPct
+    $theoryPct = FormulaNumber $meta.TheoryPct
+    $skillPct = FormulaNumber $meta.SkillPct
+    $classCode = Split-Path -Leaf (Split-Path -Parent $sourceFile)
+    for ($i = 0; $i -lt $students.Count; $i++) {
+      $student = $students[$i]
+      $r = $dataStart + $i
+      $scores = Generate-RegularScores $student.Regular ("$classCode|$($student.Id)|$($student.Regular)") ([int]$ManifestData.validation.regular_item_count)
+      Set-ManagedOffsetValue $writeRanges 'gb_serial_col' $i 0 ([double]($i + 1))
+      Set-ManagedOffsetValue $writeRanges 'gb_student_id_col' $i 0 $student.Id
+      $null = $writeRanges['gb_student_id_col'].Cells.Item($i + 1, 1).NumberFormatLocal = '@'
+      Set-ManagedOffsetValue $writeRanges 'gb_student_name_col' $i 0 $student.Name
+      for ($j = 0; $j -lt $scores.Count; $j++) {
+        Set-ManagedOffsetValue $writeRanges 'gb_regular_items' $i $j ([double]$scores[$j])
+      }
+      Set-ManagedOffsetFormula $writeRanges 'gb_regular_weighted_col' $i 0 ("=AVERAGE({0}{1}:{2}{1})*{3}" -f $regularStartLetter, $r, $regularEndLetter, $regularPct)
+      Set-ManagedOffsetValue $writeRanges 'gb_theory_score_col' $i 0 ([System.Convert]::ToDouble($student.Theory))
+      Set-ManagedOffsetFormula $writeRanges 'gb_theory_weighted_col' $i 0 ("={0}{1}*{2}" -f $theoryScoreLetter, $r, $theoryPct)
+      if ($hasSkill) {
+        Set-ManagedOffsetValue $writeRanges 'gb_skill_score_col' $i 0 ([System.Convert]::ToDouble($student.Skill))
+        Set-ManagedOffsetFormula $writeRanges 'gb_skill_weighted_col' $i 0 ("={0}{1}*{2}" -f $skillScoreLetter, $r, $skillPct)
+        Set-ManagedOffsetFormula $writeRanges 'gb_total_score_col' $i 0 ("=ROUND(AVERAGE({0}{1}:{2}{1})*{3}+{4}{1}*{5}+{6}{1}*{7},0)" -f $regularStartLetter, $r, $regularEndLetter, $regularPct, $theoryScoreLetter, $theoryPct, $skillScoreLetter, $skillPct)
+      } else {
+        Set-ManagedOffsetFormula $writeRanges 'gb_total_score_col' $i 0 ("=ROUND(AVERAGE({0}{1}:{2}{1})*{3}+{4}{1}*{5},0)" -f $regularStartLetter, $r, $regularEndLetter, $regularPct, $theoryScoreLetter, $theoryPct)
+      }
+    }
+    $wb.Application.CalculateFullRebuild()
+    $wb.Save()
+    $buildSucceeded = $true
+  } finally {
+    $wb.Close($buildSucceeded)
+  }
+  return [pscustomobject]@{
+    Source = ''
+    Output = $candidatePath
+    FinalOutput = $finalPath
+    Count = $students.Count
+    Course = $meta.CourseName
+    ClassName = $meta.ClassName
+    HasSkill = $hasSkill
+    NamedRangeVariant = $variant
+    NamedRangeCapacityEnd = $templateLastDataRow
+    RegularPct = $meta.RegularPct
+    TheoryPct = $meta.TheoryPct
+    SkillPct = $meta.SkillPct
+    Engine = 'excel-com'
+    NormalizedInput = $normalizedInput
+  }
+}
+
 function Set-Value($sheet, [int]$row, [int]$col, $value) {
   $addr = CellAddress $row $col
   if ($value -is [string]) {
@@ -332,7 +952,7 @@ function Set-Formula($sheet, [int]$row, [int]$col, [string]$formula) {
   $sheet.Range((CellAddress $row $col)).Formula = $formula
 }
 
-function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [string]$outputFile = "") {
+function Build-One($excel, [string]$sourceFile, [string]$candidatePath, [string]$finalPath) {
   $srcWb = $excel.Workbooks.Open($sourceFile, 0, $true)
   try {
     $srcSheet = $srcWb.Worksheets.Item(1)
@@ -367,16 +987,16 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $srcWb.Close($false)
   }
 
-  $classCode = Split-Path -Leaf (Split-Path -Parent $sourceFile)
-  if (-not $classCode -or $classCode -eq '.') {
-    $classCode = [System.IO.Path]::GetFileNameWithoutExtension($sourceFile)
+  $outPath = $candidatePath
+  if ([string]$ManifestData.anchor_mode -eq 'excel_named_range') {
+    $namedResult = @(Build-One-NamedRange $excel $candidatePath $finalPath $sourceFile $meta $students $normalizedInput)[-1]
+    $namedResult.Source = $sourceFile
+    return $namedResult
   }
-  $outPath = if ($outputFile) { $outputFile } else { Join-Path $outputDirectory ("{0}-平时成绩记分册.xls" -f $classCode) }
-  $outParent = Split-Path -Parent $outPath
-  if ($outParent) { New-Item -ItemType Directory -Path $outParent -Force | Out-Null }
   Copy-Item -LiteralPath $TemplatePath -Destination $outPath -Force
 
   $wb = $excel.Workbooks.Open($outPath)
+  $buildSucceeded = $false
   try {
     $wb.CheckCompatibility = $false
     $structure = $ManifestData.structure
@@ -385,8 +1005,15 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     $hasSkill = $meta.SkillPct -gt 0.000001
     $skillStartCol = ColumnToNumber ([string]$columns.skill_score)
     $skillWeightedCol = ColumnToNumber ([string]$columns.skill_weighted)
+    $legacyMetadataVerticalBorder = $null
     if (-not $hasSkill) {
-      $null = $ws.Columns.Item("$($columns.skill_score):$($columns.skill_weighted)").Delete()
+      $sourceBorder = $ws.Range("$($columns.theory_weighted)2").Borders.Item(10)
+      $legacyMetadataVerticalBorder = [ordered]@{
+        LineStyle = $sourceBorder.LineStyle
+        Weight = $sourceBorder.Weight
+        Color = $sourceBorder.Color
+      }
+      $null = $ws.Range("$($columns.skill_score):$($columns.skill_weighted)").EntireColumn.Delete()
     }
 
     $dataStart = [int]$structure.data_start_row
@@ -428,7 +1055,20 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
     if ($hasSkill) {
       $ws.Range([string]$structure.headers.skill).Value2 = ('技能成绩（{0}%）' -f (Format-Percentage-Label $meta.SkillPct))
     } else {
-      $ws.Columns.Item([string]$structure.no_skill_total_column).ColumnWidth = 18
+      # 17.45 round-trips through LibreOffice to the protected width 18.0.
+      $null = $ws.Columns.Item([string]$structure.no_skill_total_column).ColumnWidth = 17.45
+      $verticalBorder = $ws.Range(
+        "$($columns.theory_score)2:$($structure.no_skill_total_column)2"
+      ).Borders.Item(11)
+      $null = $verticalBorder.LineStyle = $legacyMetadataVerticalBorder.LineStyle
+      $null = $verticalBorder.Weight = $legacyMetadataVerticalBorder.Weight
+      $null = $verticalBorder.Color = $legacyMetadataVerticalBorder.Color
+      $horizontalBorder = $ws.Range(
+        "$($columns.theory_score)2:$($columns.theory_weighted)3"
+      ).Borders.Item(12)
+      $null = $horizontalBorder.LineStyle = $legacyMetadataVerticalBorder.LineStyle
+      $null = $horizontalBorder.Weight = $legacyMetadataVerticalBorder.Weight
+      $null = $horizontalBorder.Color = $legacyMetadataVerticalBorder.Color
     }
 
     $regularPct = FormulaNumber $meta.RegularPct
@@ -458,27 +1098,21 @@ function Build-One($excel, [string]$sourceFile, [string]$outputDirectory, [strin
       }
     }
 
-    $ws.Range("$($columns.regular_weighted)${dataStart}:$($columns.regular_weighted)${templateLastDataRow}").NumberFormatLocal = '0.0_ '
-    $ws.Range("$($columns.theory_weighted)${dataStart}:$($columns.theory_weighted)${templateLastDataRow}").NumberFormatLocal = '0.0_ '
-    if ($hasSkill) {
-      $ws.Range("$($columns.skill_weighted)${dataStart}:$($columns.skill_weighted)${templateLastDataRow}").NumberFormatLocal = '0.0_ '
-      $ws.Range("$($columns.total_score)${dataStart}:$($columns.total_score)${templateLastDataRow}").NumberFormatLocal = '0_ '
-    } else {
-      $ws.Range("$($structure.no_skill_total_column)${dataStart}:$($structure.no_skill_total_column)${templateLastDataRow}").NumberFormatLocal = '0_ '
-    }
     $firstExtraRow = $dataStart + $students.Count
     if ($firstExtraRow -le $templateLastDataRow) {
       $null = $ws.Range("${firstCol}${firstExtraRow}:${firstCol}${templateLastDataRow}").EntireRow.Delete()
     }
     $excel.CalculateFullRebuild()
     $wb.Save()
+    $buildSucceeded = $true
   } finally {
-    $wb.Close($true)
+    $wb.Close($buildSucceeded)
   }
 
   [pscustomobject]@{
     Source = $sourceFile
-    Output = $outPath
+    Output = $candidatePath
+    FinalOutput = $finalPath
     Count = $students.Count
     Course = $meta.CourseName
     ClassName = $meta.ClassName
@@ -505,30 +1139,57 @@ if ($OutputFile) {
   $OutputFile = [System.IO.Path]::GetFullPath($OutputFile)
   $OutputDir = Split-Path -Parent $OutputFile
 }
+$OutputDir = Normalize-Path $OutputDir
+$finalPaths = @()
+foreach ($source in $sources) {
+  $classCode = Split-Path -Leaf (Split-Path -Parent $source.FullName)
+  if (-not $classCode -or $classCode -eq '.') {
+    $classCode = [System.IO.Path]::GetFileNameWithoutExtension($source.FullName)
+  }
+  $finalPaths += if ($OutputFile) { Normalize-Path $OutputFile } else { Normalize-Path (Join-Path $OutputDir ("{0}-平时成绩记分册.xls" -f $classCode)) }
+}
+$qaPaths = @()
+foreach ($finalPath in $finalPaths) {
+  if ($QaReportPath) { $qaPaths += Normalize-Path $QaReportPath }
+  elseif ($finalPaths.Count -eq 1) { $qaPaths += Normalize-Path (Join-Path $OutputDir 'qa-report.json') }
+  else { $qaPaths += Normalize-Path (Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($finalPath)) + '.qa-report.json')) }
+}
+Assert-OutputPathsSafe $sources $OutputDir $finalPaths $qaPaths
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 
-$excel = New-Object -ComObject Excel.Application
-$excel.Visible = $false
-$excel.DisplayAlerts = $false
-$excel.AskToUpdateLinks = $false
+$runRoot = Track-RunTemporary (Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-com-run-" + [guid]::NewGuid().ToString('N')))
+New-Item -ItemType Directory -Path $runRoot -Force | Out-Null
 $results = @()
 try {
-  foreach ($source in $sources) {
-    $buildOutputFile = if ($OutputFile) { $OutputFile } else { '' }
-    $builtValues = @(Build-One $excel $source.FullName $OutputDir $buildOutputFile)
-    foreach ($builtValue in $builtValues) {
-      if ($null -ne $builtValue -and $null -ne $builtValue.PSObject.Properties['Output']) {
-        $results += $builtValue
-      }
+  $excel = New-Object -ComObject Excel.Application
+  $excel.Visible = $false
+  $excel.DisplayAlerts = $false
+  $excel.AskToUpdateLinks = $false
+  try {
+    for ($index = 0; $index -lt $sources.Count; $index++) {
+      $source = $sources[$index]
+      $candidateDir = Join-Path $runRoot ("candidate-{0}" -f $index)
+      New-Item -ItemType Directory -Path $candidateDir -Force | Out-Null
+      $candidatePath = Join-Path $candidateDir (([guid]::NewGuid().ToString('N')) + '-' + (Split-Path -Leaf $finalPaths[$index]))
+      $built = @(Build-One $excel $source.FullName $candidatePath $finalPaths[$index])[-1]
+      $results += $built
+      $rawArgs = @(
+        '--raw-runtime-preflight',
+        '--output-dir', $candidateDir,
+        '--output-file', $candidatePath,
+        '--manifest', $ManifestPath,
+        '--template-path', $TemplatePath,
+        '--engine', 'excel-com'
+      )
+      if ($built.NamedRangeVariant) { $rawArgs += @('--variant', [string]$built.NamedRangeVariant) }
+      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @rawArgs
+      if ($LASTEXITCODE -ne 0) { throw "Raw output runtime preflight failed: $candidatePath" }
     }
+  } finally {
+    $excel.Quit()
+    [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
   }
-} finally {
-  $excel.Quit()
-  [System.Runtime.Interopservices.Marshal]::ReleaseComObject($excel) | Out-Null
-}
 
-$normalizedJsonPath = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-input-" + [guid]::NewGuid().ToString('N') + '.json')
-try {
   $validationArgs = @(
     '--manifest', $ManifestPath,
     '--schema', $SchemaPath,
@@ -537,51 +1198,37 @@ try {
   )
   if ($TemplateWasProvided) { $validationArgs += '--custom-template' }
   if ($SkipTemplateValidation) { $validationArgs += '--skip-template-validation' }
-  if (-not $SkipOutputValidation) {
-    if ($results.Count -ne 1) {
-      Write-Warning 'Batch output validation uses one temporary validation directory per generated workbook.'
-      foreach ($result in $results) {
-        $validationDir = Join-Path ([System.IO.Path]::GetTempPath()) ("gradebook-validation-" + [guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Directory -Path $validationDir -Force | Out-Null
-        try {
-          $validationFile = Join-Path $validationDir (Split-Path -Leaf $result.Output)
-          Copy-Item -LiteralPath $result.Output -Destination $validationFile -Force
-          $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-          $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $validationDir, '--output-file', $validationFile) + $validationArgs
-          & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-          if ($LASTEXITCODE -ne 0) { throw "Output validation failed: $($result.Output)" }
-        } finally {
-          Remove-Item -LiteralPath $validationDir -Recurse -Force -ErrorAction SilentlyContinue
-        }
-      }
-    } else {
-      $results[0].NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-      $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $results[0].Output, '--qa-report', $qaPath) + $validationArgs
-      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-      if ($LASTEXITCODE -ne 0) { throw 'Output validation failed.' }
+  for ($index = 0; $index -lt $results.Count; $index++) {
+    $result = $results[$index]
+    $finalPath = [string]$finalPaths[$index]
+    $validationDir = Join-Path $runRoot ("validation-{0}" -f $index)
+    New-Item -ItemType Directory -Path $validationDir -Force | Out-Null
+    $validationFile = Join-Path $validationDir (Split-Path -Leaf $finalPath)
+    Copy-Item -LiteralPath $result.Output -Destination $validationFile -Force
+    $normalizedJsonPath = Join-Path $validationDir 'normalized-input.json'
+    $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
+    $qaCandidate = Join-Path $validationDir 'qa-report.json'
+    $runArgs = @(
+      '--input-json', $normalizedJsonPath,
+      '--output-dir', $validationDir,
+      '--output-file', $validationFile,
+      '--qa-report', $qaCandidate,
+      '--final-output', $finalPath,
+      '--final-qa', $qaPaths[$index]
+    ) + $validationArgs
+    if ($SkipOutputValidation) { $runArgs += '--skip-validation' }
+    & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
+    if ($LASTEXITCODE -ne 0) {
+      if ($SkipOutputValidation) { throw "Could not write skipped QA report: $($result.Output)" }
+      throw "Output validation failed: $($result.Output)"
     }
-  } else {
-    if ($results.Count -ne 1) {
-      foreach ($result in $results) {
-        $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-        $qaPath = Join-Path $OutputDir (([System.IO.Path]::GetFileNameWithoutExtension($result.Output)) + '.qa-report.json')
-        $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $result.Output, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
-        & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-        if ($LASTEXITCODE -ne 0) { throw "Could not write skipped QA report: $($result.Output)" }
-      }
-    } else {
-      $result = $results[0]
-      $result.NormalizedInput | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $normalizedJsonPath -Encoding UTF8
-      $qaPath = if ($QaReportPath) { $QaReportPath } else { Join-Path $OutputDir 'qa-report.json' }
-      $runArgs = @('--input-json', $normalizedJsonPath, '--output-dir', $OutputDir, '--output-file', $result.Output, '--qa-report', $qaPath, '--skip-validation') + $validationArgs
-      & $PythonCommand (Join-Path $PSScriptRoot 'validate_output.py') @runArgs
-      if ($LASTEXITCODE -ne 0) { throw 'Could not write skipped QA report.' }
-    }
-    Write-Warning 'Output validation skipped; QA report status is skipped.'
+    Commit-OutputAndQaAtomically $result.Output $finalPath $qaCandidate $qaPaths[$index]
+    $result.Output = $finalPath
+    $result.PSObject.Properties.Remove('FinalOutput')
+    if ($SkipOutputValidation) { Write-Warning 'Output validation skipped; QA report status is skipped.' }
   }
 } finally {
-  Remove-Item -LiteralPath $normalizedJsonPath -Force -ErrorAction SilentlyContinue
+  Remove-RunTemporaryFiles
 }
 
 foreach ($result in $results) {

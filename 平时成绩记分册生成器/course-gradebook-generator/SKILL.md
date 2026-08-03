@@ -13,20 +13,21 @@ If the user has not provided a source workbook, remind them that this skill need
 
 ## Platform Support
 
-- Windows: prefer `scripts/generate_gradebook.ps1`, which uses Microsoft Excel COM and preserves the legacy `.xls` template most faithfully.
+- Windows: prefer `scripts/generate_gradebook.ps1`, which uses Microsoft Excel COM as the generation engine and writes through the v1.1 workbook-level named-range contract while preserving the native `.xls` template.
 - macOS/Linux: use `scripts/generate_gradebook.py`, which requires Python 3, `openpyxl`, and LibreOffice/soffice. It converts `.xls` through LibreOffice, edits the workbook, then converts back to `.xls`.
 - If LibreOffice is missing on macOS/Linux, tell the user to install LibreOffice before running the generator.
 
 ## Bundled Resources
 
-- Canonical template: `assets/templates/course-gradebook/v1.0.0/template.xls`
-- Compatibility template entry: `assets/平时成绩记分册模板.xls`
-- Manifest and changelog: `assets/templates/course-gradebook/v1.0.0/manifest.yaml`, `assets/templates/course-gradebook/v1.0.0/CHANGELOG.md`
+- Default canonical template: `assets/templates/course-gradebook/v1.1.0/template.xls`
+- Legacy canonical template: `assets/templates/course-gradebook/v1.0.0/template.xls`
+- Compatibility template entry: `assets/平时成绩记分册模板.xls` (v1.0 legacy coordinates)
+- Manifest and changelog: `assets/templates/course-gradebook/v1.1.0/manifest.yaml`, `assets/templates/course-gradebook/v1.1.0/CHANGELOG.md`
 - Input schema: `schemas/gradebook-input.schema.json`
 - Windows generator: `scripts/generate_gradebook.ps1`
 - Cross-platform generator: `scripts/generate_gradebook.py`
 
-Use Excel COM on Windows to preserve legacy `.xls` formatting. Use the cross-platform Python/LibreOffice path on macOS/Linux or when Excel COM is unavailable.
+Use Excel COM on Windows and Python/LibreOffice on macOS/Linux or when Excel COM is unavailable. Windows raw safety preflight uses Python `xlrd`/`olefile` and cannot be bypassed by either skip flag; LibreOffice is only needed for full round-trip, formatting, and rendering QA. When Windows receives both skip flags, it does not require LibreOffice. Both v1.1 paths use the same 24 managed workbook-level names from `named_range_contracts.py`; the v1.0 and compatibility paths remain explicit legacy-coordinate modes. v1.1 has no silent coordinate fallback.
 
 
 ## Multi-Agent Use
@@ -70,6 +71,7 @@ Read 多Agent兼容说明.md for the compatibility matrix and platform-specific 
    - Confirm 总评 equals source 总成绩.
    - Confirm no visible Excel errors such as `#REF!` or `#VALUE!`.
    - Confirm 技能成绩 columns are deleted when 技能成绩比例 is `0%`; otherwise keep 技能成绩 and 折合 columns.
+   - For v1.1, confirm the QA report has `anchor_mode: excel_named_range`, the expected 21-name or 24-name variant, and matching top-level and `checks.named_ranges` diagnostics.
 
 4. Preview when layout changed or when columns were deleted.
    - Export the first sheet to PDF/PNG with Excel COM if practical.
@@ -98,9 +100,12 @@ Read 多Agent兼容说明.md for the compatibility matrix and platform-specific 
   - Ensure the average of all 8 values equals the source 平时成绩 exactly.
 - Write formulas for 折合 and 总评 using the source score proportions.
 - If 技能成绩比例 is `0%`, delete the 技能成绩 and 技能折合 columns from the output.
+- v1.1 output writes use workbook-level names such as `gb_term`, `gb_data_table`, `gb_regular_items`, and the declared formula columns; do not replace them with hard-coded output coordinates.
+- For up to 48 students, preserve the template capacity through row 52; for larger classes, extend data names to the generated last row while keeping `gb_template_row` at row 5.
+- v1.0 uses legacy coordinates and deletes unused student rows. v1.1 keeps rows through 52 for up to 48 students, extends every dynamic data name to the exact last student row above capacity, and keeps `gb_template_row` at row 5.
 
 ## Template Package Workflow
 
-Both generators follow `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告`. The Python path reads `manifest.yaml` directly. The Windows Excel COM path uses the bundled `manifest_to_json.py` bridge, so worksheet names, metadata cells, student rows, score columns, formula columns, the manifest-defined regular-item count, and the zero-skill column switch come from the same manifest. Normal generation writes `qa-report.json`; the report includes template/generator versions, actual template path, custom-template flag, engine, validation status, checks, errors, warnings, and skipped checks without copying student identifiers or raw scores. `--manifest`, `--schema`, `--skip-template-validation`, `--skip-output-validation`, `--qa-report`, and `--output-file` are optional additions to the original CLI; skipped validation still writes a report with `status=skipped`. When `--output-file` is supplied, only that file is checked; legacy directory-only validation explicitly fails when multiple `.xls` candidates exist.
+Both generators follow `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 临时候选 → raw runtime 检查 → 完整或 skip QA → XLS/QA 原子替换`. The Python path reads `manifest.yaml` directly. The Windows Excel COM path uses the bundled `manifest_to_json.py` bridge, so the same named-range contract, worksheet names, metadata fields, student rows, score columns, formula columns, regular-item count, and zero-skill column switch come from the same manifest. Template and output validation inspect both raw BIFF `.xls` names and round-trip `.xlsx` names. Normal generation writes `qa-report.json`; the report includes template/generator versions, anchor mode, named-range variant, actual template path, custom-template flag, engine, validation status, checks, errors, warnings, and skipped checks without copying student identifiers or raw scores. `--manifest`, `--schema`, `--skip-template-validation`, `--skip-output-validation`, `--qa-report`, and `--output-file` are optional additions to the original CLI; fingerprint and raw runtime validation still run before either skip path, and skipped validation still checks a real non-empty `.xls` and writes `status=skipped`. Candidate failure preserves existing formal outputs and unrelated XLS files. When `--output-file` is supplied, only that file is checked; legacy directory-only validation explicitly fails when multiple `.xls` candidates exist.
 
-Install Python dependencies from `requirements.txt`. The Windows COM path requires Microsoft Excel and uses Python/LibreOffice for default structural QA; the cross-platform path requires LibreOffice/soffice for `.xls` conversion. No external absolute tool path is a formal dependency.
+Install Python dependencies from `requirements.txt`. The Windows COM path requires Microsoft Excel plus Python `xlrd`/`olefile` for the non-skippable raw XLS preflight; LibreOffice is required only when full structural, round-trip, format, or rendering QA is requested. The cross-platform path requires LibreOffice/soffice for `.xls` conversion. `olefile` is also used by the versioned template builder to normalize raw BIFF metadata and is installed from the same requirements file. No external absolute tool path is a formal dependency.

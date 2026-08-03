@@ -24,6 +24,10 @@
 
 在任一 skill 目录运行 scripts/install_adapters.py 可以把适配规则安装到目标项目；默认不会覆盖已有规则文件。
 
+成绩册的两个版本有明确边界：v1.0 使用 legacy coordinates，按输入人数删除未使用学生行；v1.1 使用 workbook-level `gb_` named ranges，48 人以内保留到第 52 行，超过模板容量时精确扩展到最后一名学生，`gb_template_row` 始终指向第 5 行。Windows 路径以 Excel COM 作为生成引擎，Python 的 `xlrd`/`olefile` 原始 XLS preflight 在任何 skip 参数下都不可跳过；LibreOffice 只用于完整 round-trip、格式和渲染 QA。Windows 同时显式跳过模板和输出 QA 时，不强制要求 LibreOffice。
+
+成绩册生成采用候选文件事务：临时生成 → 不可跳过的 raw runtime 检查 → 可选完整 QA 或真实文件基础检查 → XLS 与 QA 原子替换。任一步失败都保留既有正式文件和输出目录中的无关 XLS，只清理本次运行的临时文件；skip QA 仍必须确认输出是非空 `.xls`，v1.1 还必须通过原始 named-range inventory。
+
 ## 模板包标准
 
 文档和表格生成器使用版本化模板包。每个包的 canonical template、`manifest.yaml`、输入 schema、模板/输出校验器和 `CHANGELOG.md` 都随 skill 分发；旧模板路径继续保留为兼容入口，并由 SHA-256 校验防止两份模板分叉。
@@ -34,7 +38,7 @@
 输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；其他 `1.x` minor 当前拒绝，版本与 `anchors.mode` 不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明 semantic contract，固定字段的 `target`、`bookmark`、`mode` 和 `container` 必须匹配定义，unknown key、未知 target/mode 不会降级处理；legacy `1.0.x` 也不得夹带 semantic anchors、bookmarks、stages 或其他 semantic 定位字段。当前默认使用 `lesson-plan/v1.1.0`，同时保留 `lesson-plan/v1.0.0` 坐标兼容模式；记分册为 `course-gradebook/v1.0.0`。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；成绩册模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `excel_named_range`；其他 `1.x` minor 当前拒绝，版本与定位模式不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明对应的 semantic contract，unknown key、未知 target/mode 不会降级处理；legacy `1.0.x` 也不得夹带 semantic 定位字段。当前默认使用 `lesson-plan/v1.1.0` 和 `course-gradebook/v1.1.0`，两者均保留 v1.0 兼容路径。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
 
 模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
 
