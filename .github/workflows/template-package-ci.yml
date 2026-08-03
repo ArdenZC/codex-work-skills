@@ -8,6 +8,7 @@ on:
       - "tests/**"
       - "教案生成器/**"
       - "平时成绩记分册生成器/**"
+      - "tools/**"
       - "README.md"
       - "requirements*.txt"
   push:
@@ -20,6 +21,7 @@ on:
       - "tests/**"
       - "教案生成器/**"
       - "平时成绩记分册生成器/**"
+      - "tools/**"
       - "README.md"
       - "requirements*.txt"
   workflow_dispatch:
@@ -87,7 +89,7 @@ jobs:
         run: python "tests/validate_template_packages.py"
 
       - name: Compile Python sources
-        run: python -m compileall -q "教案生成器" "平时成绩记分册生成器" "tests"
+        run: python -m compileall -q "教案生成器" "平时成绩记分册生成器" "tools" "tests"
 
       - name: Run root template package regression tests
         run: python -m unittest discover -s "tests" -p "test_*.py" -v

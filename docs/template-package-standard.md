@@ -23,6 +23,8 @@ requirements.txt
 
 旧模板路径必须保留，且只能作为兼容入口。兼容入口与当前 canonical template 的 SHA-256 必须一致；如果两者发生分歧，校验器报错，不允许静默选择其中一份。
 
+模板包生命周期由仓库根目录的 `tools/template_package.py` 统一处理。工具从 `**/assets/templates/*/*/manifest.yaml` 自动发现包，不维护人工同步的 registry；它只读取 manifest 和包文件，不启动 LibreOffice。`scaffold` 复制 canonical 基线并生成工作包，`validate` 执行通用身份检查和所属 Skill 的真实模板校验，`promote` 在完整校验和仓库级校验通过后原子安装新 canonical patch，`archive` 生成可复现的 ZIP、SHA-256 sidecar 和结构化元数据。已有 canonical、默认入口、兼容入口和 manifest 不会被这些命令静默覆盖。
+
 ## Manifest
 
 `manifest.yaml` 是模板结构和写入契约的唯一事实来源，至少声明：
