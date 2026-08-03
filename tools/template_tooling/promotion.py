@@ -71,6 +71,24 @@ def _validation_error(report: dict[str, Any]) -> str:
     return details
 
 
+def assert_tree_matches_snapshot(path: Path, expected: dict[str, str], *, phase: str) -> None:
+    """Require byte-for-byte equality with the immutable promotion snapshot."""
+    actual = tree_fingerprints(path)
+    if actual == expected:
+        return
+    added = sorted(set(actual) - set(expected))
+    removed = sorted(set(expected) - set(actual))
+    changed = sorted(
+        name
+        for name in set(actual) & set(expected)
+        if actual[name] != expected[name]
+    )
+    raise TemplateToolError(
+        f"{phase} changed immutable promotion content; "
+        f"added={added[:20]}; removed={removed[:20]}; changed={changed[:20]}"
+    )
+
+
 def _mutate_source_after_snapshot(source: Path) -> None:
     """Test-only TOCTOU hook; production invocations never set this variable."""
     if os.environ.get("TEMPLATE_TOOL_TEST_MUTATE_SOURCE_AFTER_SNAPSHOT") != "1":
@@ -122,8 +140,7 @@ def promote_package(package_dir: Path, root: Path, *, dry_run: bool = False) -> 
         validation = validate_package_path(snapshot, root, identity_only=False)
         if not validation_succeeded(validation):
             raise TemplateToolError(f"full template validation failed: {_validation_error(validation)}")
-        if tree_fingerprints(snapshot) != snapshot_fingerprints:
-            raise TemplateToolError("promotion snapshot changed during validation")
+        assert_tree_matches_snapshot(snapshot, snapshot_fingerprints, phase="snapshot validation")
 
         target = _canonical_target(package, canonical)
         canonical_root = target.parent
@@ -151,16 +168,17 @@ def promote_package(package_dir: Path, root: Path, *, dry_run: bool = False) -> 
         try:
             canonical_root.mkdir(parents=True, exist_ok=True)
             copy_tree_no_symlinks(snapshot, stage_package)
-            if tree_fingerprints(stage_package) != snapshot_fingerprints:
-                raise TemplateToolError("promotion stage does not match immutable snapshot")
+            assert_tree_matches_snapshot(stage_package, snapshot_fingerprints, phase="stage before validation")
             stage_validation = validate_package_path(stage_package, root, identity_only=False)
             result["stage_validation"] = stage_validation
             if not validation_succeeded(stage_validation):
                 raise TemplateToolError(f"stage full template validation failed: {_validation_error(stage_validation)}")
+            assert_tree_matches_snapshot(stage_package, snapshot_fingerprints, phase="stage validation")
             if target.exists() or target.is_symlink():
                 raise TemplateToolError(f"canonical target appeared during promotion: {target}")
             stage_package.replace(target)
             installed = True
+            assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="target installation")
 
             target_validation = validate_package_path(target, root, identity_only=False)
             result["target_validation"] = target_validation
@@ -168,13 +186,26 @@ def promote_package(package_dir: Path, root: Path, *, dry_run: bool = False) -> 
                 raise TemplateToolError(f"final canonical target validation failed: {_validation_error(target_validation)}")
             if not target_validation.get("full_validation") or target_validation.get("validation_scope") != "package":
                 raise TemplateToolError("final canonical target validation did not report package full_validation=true")
+            assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="target validation")
 
             repo_validation = _run_repo_validator(root)
             result["repo_validation"] = repo_validation
+            assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="repository validation")
             if repo_validation["exit_code"] != 0:
-                details = (repo_validation.get("stderr") or repo_validation.get("stdout") or "").strip()
+                details = "\n".join(
+                    part
+                    for part in (
+                        f"stdout:\n{str(repo_validation.get('stdout') or '').strip()}" if repo_validation.get("stdout") else "",
+                        f"stderr:\n{str(repo_validation.get('stderr') or '').strip()}" if repo_validation.get("stderr") else "",
+                    )
+                    if part
+                )
                 suffix = f": {details}" if details else ""
-                raise TemplateToolError(f"repository-wide validator failed after promotion{suffix}")
+                raise TemplateToolError(
+                    f"repository-wide validator failed after promotion "
+                    f"(exit code {repo_validation['exit_code']}){suffix}"
+                )
+            assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="promotion final")
             result["status"] = "passed"
             return result
         except Exception as exc:

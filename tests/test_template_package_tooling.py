@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -244,9 +245,18 @@ class TemplatePackageToolingTests(unittest.TestCase):
             (external / "manifest.yaml").write_text(
                 yaml.safe_dump(external_manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
             )
+            external_scripts = external.parent / "scripts"
+            external_scripts.mkdir()
+            (external_scripts / "validate_template.py").write_text(
+                "from pathlib import Path\n"
+                "Path(__file__).resolve().parent.parent.joinpath('MALICIOUS_VALIDATOR_EXECUTED').write_text('executed')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
             ambiguous = self.run_tool("validate", "--package", external, "--json", root=root)
             self.assertNotEqual(ambiguous.returncode, 0)
             self.assertIn("ambiguous", ambiguous.stdout)
+            self.assertFalse((external.parent / "MALICIOUS_VALIDATOR_EXECUTED").exists())
             canonical = self.run_tool("validate", "--package", package, "--json", root=root)
             self.assertEqual(canonical.returncode, 0, canonical.stdout + canonical.stderr)
 
@@ -283,6 +293,40 @@ class TemplatePackageToolingTests(unittest.TestCase):
             failed_payload = self.json_result(failed)
             self.assertEqual(failed_payload["validator"]["exit_code"], 7)
             self.assertIn("fixture validator failed", failed_payload["validator"]["stderr"])
+
+    def test_external_validator_is_not_executed_for_validate_or_archive(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            external_root = root / "external-workspace"
+            external_package = external_root / "package" / "v1.0.1"
+            external_package.parent.mkdir(parents=True)
+            shutil.copytree(base, external_package)
+            manifest_path = external_package / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["version"] = "1.0.1"
+            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            external_scripts = external_root / "scripts"
+            external_scripts.mkdir()
+            (external_scripts / "validate_template.py").write_text(
+                "from pathlib import Path\n"
+                "Path(__file__).resolve().parent.parent.joinpath('MALICIOUS_VALIDATOR_EXECUTED').write_text('executed')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+
+            validated = self.run_tool("validate", "--package", external_package, "--json", root=root)
+            self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            payload = self.json_result(validated)
+            self.assertEqual(payload["status"], "passed")
+            self.assertNotIn("external-workspace", json.dumps(payload["validator"]["command"], ensure_ascii=False))
+            self.assertFalse((external_root / "MALICIOUS_VALIDATOR_EXECUTED").exists())
+
+            archived = self.run_tool(
+                "archive", "--package", external_package, "--output-dir", root / "dist-external", "--json", root=root
+            )
+            self.assertEqual(archived.returncode, 0, archived.stdout + archived.stderr)
+            self.assertFalse((external_root / "MALICIOUS_VALIDATOR_EXECUTED").exists())
 
     def test_validate_rejects_tampered_fingerprint_before_validator(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -522,7 +566,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 root=root,
             )
             self.assertNotEqual(protected.returncode, 0)
-            self.assertIn("scaffold report overlaps protected path", protected.stdout)
+            self.assertIn("scaffold report must be in the output package sibling directory", protected.stdout)
             first = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
             )
@@ -546,6 +590,54 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertNotEqual(failed_commit.returncode, 0)
             self.assertIn("injected scaffold report commit failure", failed_commit.stdout)
             self.assertFalse((root / "work" / "demo-template" / "1.0.3").exists())
+
+    def test_scaffold_report_must_be_output_sibling_and_never_source_directory(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, template = self.make_fixture_repo(root)
+            before = sha256(template)
+            output_parent = root / "work" / "demo-template"
+            invalid_reports = [
+                root / "report.json",
+                root / "docs" / "report.json",
+                root / "tools" / "report.json",
+                root / "tests" / "report.json",
+                skill / "scripts" / "report.json",
+                output_parent / "1.0.1" / "report.json",
+                output_parent / "1.0.2" / ".." / "other-dir" / "report.json",
+                output_parent / "report.txt",
+            ]
+            for index, report in enumerate(invalid_reports, start=1):
+                with self.subTest(report=report):
+                    output = output_parent / f"1.0.{index}"
+                    failed = self.run_tool(
+                        "scaffold",
+                        "--base-package", base,
+                        "--version", f"1.0.{index}",
+                        "--output-dir", output,
+                        "--report-path", report,
+                        "--json",
+                        root=root,
+                    )
+                    self.assertNotEqual(failed.returncode, 0)
+                    self.assertIn("report", failed.stdout.lower())
+                    self.assertFalse(output.exists())
+                    self.assertEqual(sha256(template), before)
+                    self.assertFalse(any(path.name.endswith(".stage") for path in output_parent.rglob("*")))
+
+            allowed_output = output_parent / "1.0.20"
+            allowed_report = output_parent / "scaffold-report-explicit.json"
+            allowed = self.run_tool(
+                "scaffold",
+                "--base-package", base,
+                "--version", "1.0.20",
+                "--output-dir", allowed_output,
+                "--report-path", allowed_report,
+                "--json",
+                root=root,
+            )
+            self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
+            self.assertTrue(allowed_report.is_file())
 
     def test_scaffold_generator_version_is_strict_ascii_semver(self) -> None:
         invalid = ("1.1.01", "01.1.1", "１.１.１", "v1.1.1", "latest", "")
@@ -640,6 +732,11 @@ class TemplatePackageToolingTests(unittest.TestCase):
             )
             self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
             original = (source / "template.txt").read_bytes()
+            original_tree = {
+                path.relative_to(source).as_posix(): sha256(path)
+                for path in source.rglob("*")
+                if path.is_file()
+            }
             promoted = self.run_tool(
                 "promote", "--package", source, "--json", root=root,
                 env={"TEMPLATE_TOOL_TEST_MUTATE_SOURCE_AFTER_SNAPSHOT": "1"},
@@ -647,8 +744,71 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual(promoted.returncode, 0, promoted.stdout + promoted.stderr)
             target = root / "技能工具" / "demo-skill" / "assets" / "templates" / "demo-template" / "v1.0.1"
             self.assertEqual((target / "template.txt").read_bytes(), original)
+            target_tree = {
+                path.relative_to(target).as_posix(): sha256(path)
+                for path in target.rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(target_tree, original_tree)
             self.assertNotEqual((source / "template.txt").read_bytes(), original)
             self.assertEqual(self.json_result(promoted)["target_validation"]["validation_scope"], "package")
+
+    def test_promote_rolls_back_when_target_validator_mutates_target_after_success(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, _ = self.make_fixture_repo(root)
+            self.make_repo_validator(root)
+            source = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            (skill / "mutate-target").write_text("enabled\n", encoding="utf-8")
+            (skill / "scripts" / "validate_template.py").write_text(
+                "from pathlib import Path\n"
+                "import sys\n"
+                "manifest = Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
+                "skill = Path(__file__).resolve().parent.parent\n"
+                "if (skill / 'mutate-target').exists() and manifest.parent.name == 'v1.0.1':\n"
+                "    (manifest.parent / 'validator-output.txt').write_text('unexpected\\n', encoding='utf-8')\n"
+                "print('fixture validator passed')\n",
+                encoding="utf-8",
+            )
+            before = sha256(base / "template.txt")
+            failed = self.run_tool("promote", "--package", source, "--json", root=root)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("target validation changed immutable promotion content", failed.stdout)
+            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
+            self.assertFalse(target.exists())
+            self.assertEqual(sha256(base / "template.txt"), before)
+            self.assertFalse(any(path.name.endswith(".stage") for path in target.parent.iterdir()))
+
+    def test_promote_rolls_back_when_repository_validator_mutates_target_after_success(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, _ = self.make_fixture_repo(root)
+            self.make_repo_validator(root)
+            source = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            (root / "tests" / "validate_template_packages.py").write_text(
+                "from pathlib import Path\n"
+                "root = Path(__file__).resolve().parents[1]\n"
+                "target = next(root.glob('**/assets/templates/demo-template/v1.0.1'))\n"
+                "(target / 'repo-output.txt').write_text('unexpected\\n', encoding='utf-8')\n"
+                "print('repository validator passed')\n",
+                encoding="utf-8",
+            )
+            before = sha256(base / "template.txt")
+            failed = self.run_tool("promote", "--package", source, "--json", root=root)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("repository validation changed immutable promotion content", failed.stdout)
+            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
+            self.assertFalse(target.exists())
+            self.assertEqual(sha256(base / "template.txt"), before)
+            self.assertFalse(any(path.name.endswith(".stage") for path in target.parent.iterdir()))
 
     def test_promote_canonical_only_failure_is_caught_after_stage_and_target_validation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -880,6 +1040,90 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(self.json_result(result)["dry_run"])
             self.assertFalse(output.exists())
+
+    def test_real_lesson_and_gradebook_archive_sha_are_cross_checked_four_ways(self) -> None:
+        packages = (
+            (
+                "lesson-plan",
+                ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0",
+                "lesson-plan-1.1.0",
+            ),
+            (
+                "course-gradebook",
+                ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "assets" / "templates" / "course-gradebook" / "v1.1.0",
+                "course-gradebook-1.1.0",
+            ),
+        )
+        with tempfile.TemporaryDirectory(prefix="template-archive-sha-") as directory:
+            root = Path(directory)
+            for template_id, package, stem in packages:
+                with self.subTest(template_id=template_id):
+                    shas: list[str] = []
+                    for index in (1, 2):
+                        output = root / f"{template_id}-{index}"
+                        result = self.run_tool(
+                            "archive", "--package", package, "--output-dir", output, "--json", root=ROOT
+                        )
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        payload = self.json_result(result)
+                        archive_path = output / f"{stem}.zip"
+                        sidecar_path = output / f"{stem}.zip.sha256"
+                        metadata_path = output / f"{stem}.metadata.json"
+                        cli_sha = payload["archive_sha256"]
+                        sidecar_sha = sidecar_path.read_text(encoding="ascii").split()[0]
+                        metadata_sha = json.loads(metadata_path.read_text(encoding="utf-8"))["archive_sha256"]
+                        actual_sha = sha256(archive_path)
+                        for value in (cli_sha, sidecar_sha, metadata_sha, actual_sha):
+                            self.assertIsInstance(value, str)
+                            self.assertRegex(value, r"^[0-9A-F]{64}$")
+                        self.assertEqual(cli_sha, sidecar_sha)
+                        self.assertEqual(cli_sha, metadata_sha)
+                        self.assertEqual(cli_sha, actual_sha)
+                        shas.append(cli_sha)
+                    self.assertEqual(shas[0], shas[1])
+
+    def test_repository_validator_reports_complete_validator_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, _ = self.make_fixture_repo(root)
+            (skill / "scripts" / "validate_template.py").write_text(
+                "import sys\n"
+                "print('specific validator stdout diagnostic')\n"
+                "print('specific validator stderr diagnostic', file=sys.stderr)\n"
+                "raise SystemExit(7)\n",
+                encoding="utf-8",
+            )
+            failed = self.run_repo_validator(root)
+            self.assertNotEqual(failed.returncode, 0)
+            combined = failed.stdout + failed.stderr
+            self.assertIn("demo-template 1.0.0", combined)
+            self.assertIn("validator exit_code: 7", combined)
+            self.assertIn("specific validator stdout diagnostic", combined)
+            self.assertIn("specific validator stderr diagnostic", combined)
+            self.assertIn("validation_scope: package", combined)
+
+    def test_promote_preserves_repository_validator_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            self.make_repo_validator(root)
+            source = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            (root / "tests" / "validate_template_packages.py").write_text(
+                "import sys\n"
+                "print('specific repository stdout diagnostic')\n"
+                "print('specific repository stderr diagnostic', file=sys.stderr)\n"
+                "raise SystemExit(7)\n",
+                encoding="utf-8",
+            )
+            failed = self.run_tool("promote", "--package", source, "--json", root=root)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("exit code 7", failed.stdout)
+            self.assertIn("specific repository stdout diagnostic", failed.stdout)
+            self.assertIn("specific repository stderr diagnostic", failed.stdout)
 
 
 if __name__ == "__main__":

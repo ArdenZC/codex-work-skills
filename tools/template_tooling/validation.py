@@ -12,7 +12,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from .discovery import discover_packages, find_validator_for_package, owner_skill_root
+from .discovery import discover_packages, find_validator_for_package, owner_skill_root, trusted_validator_for_package
 from .manifest import (
     inspect_manifest_package,
     load_manifest,
@@ -241,6 +241,20 @@ def _run_validator(
         report["status"] = "failed"
         report["errors"].append("owner validator is unavailable")
         return report
+    try:
+        if validation_scope == "package":
+            trusted_validator_for_package(package, root)
+        elif (
+            temporary_root is None
+            or package.validator.is_symlink()
+            or not package.validator.is_file()
+            or not is_within(package.validator, temporary_root)
+        ):
+            raise TemplateToolError("isolated validator is not inside the disposable validation workspace")
+    except (OSError, TemplateToolError) as exc:
+        report["status"] = "failed"
+        report["errors"].append(f"untrusted owner validator: {exc}")
+        return report
     command = [
         sys.executable,
         str(package.validator),
@@ -307,6 +321,12 @@ def validate_package_path(package_dir: Path, root: Path, *, identity_only: bool 
         report["status"] = "failed"
         report["errors"].append("owner validator is unavailable")
         return report
+    try:
+        trusted_validator_for_package(package, root)
+    except (OSError, TemplateToolError) as exc:
+        report["status"] = "failed"
+        report["errors"].append(f"untrusted owner validator: {exc}")
+        return report
 
     isolated = None
     temporary_root: Path | None = None
@@ -345,6 +365,7 @@ def validate_package_with_owner(
     root: Path,
     owner_validator: Path,
     *,
+    trusted_root: Path | None = None,
     timeout: int = 900,
 ) -> dict[str, Any]:
     """Validate an extracted package with the already-resolved owner validator."""
@@ -356,6 +377,15 @@ def validate_package_with_owner(
     )
     report = identity_report(package, root)
     if package.errors:
+        return report
+    try:
+        if trusted_root is not None:
+            trusted_validator_for_package(package, trusted_root)
+        elif owner_validator.is_symlink() or not owner_validator.is_file() or not is_within(owner_validator, root):
+            raise TemplateToolError("owner validator is not a trusted regular file")
+    except (OSError, TemplateToolError) as exc:
+        report["status"] = "failed"
+        report["errors"].append(f"untrusted owner validator: {exc}")
         return report
     isolated = None
     temporary_root: Path | None = None

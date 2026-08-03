@@ -23,6 +23,7 @@ from .paths import (
     remove_path_or_raise,
     require_no_overlap,
     tree_fingerprints,
+    validate_windows_component,
 )
 from .validation import validate_package_path, validation_succeeded
 
@@ -139,7 +140,8 @@ def _find_base(base_dir: Path, root: Path) -> TemplatePackage:
 
 
 def _report_path(output_dir: Path, explicit: Path | None, template_id: str, version: str) -> Path:
-    return (explicit or (output_dir.parent / f"scaffold-report-{template_id}-{version}.json")).resolve(strict=False)
+    path = explicit or (output_dir.parent / f"scaffold-report-{template_id}-{version}.json")
+    return path.expanduser().absolute()
 
 
 def _protected_report_paths(root: Path, base: TemplatePackage, canonical: list[TemplatePackage], dependencies: list[tuple[Path, Path]], output_dir: Path) -> list[Path]:
@@ -212,6 +214,11 @@ def scaffold_package(
     require_no_overlap(output_dir, protected, label="scaffold output")
     dependencies = _dependency_plan(base, output_dir)
     report = _report_path(output_dir, report_path, base.template_id, version)
+    if report.parent.resolve(strict=False) != output_dir.parent.resolve(strict=False):
+        raise TemplateToolError("scaffold report must be in the output package sibling directory")
+    if report.suffix.casefold() != ".json":
+        raise TemplateToolError("scaffold report filename must use the .json suffix")
+    validate_windows_component(report.name, label="scaffold report filename")
     all_canonical = [item for item in all_packages if item.is_canonical]
     for protected_path in _protected_report_paths(root, base, all_canonical, dependencies, output_dir):
         if paths_overlap(report, protected_path):

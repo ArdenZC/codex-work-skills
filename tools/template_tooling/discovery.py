@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 import re
+import stat
 
 from .manifest import inspect_manifest_package, load_manifest
 from .models import TemplatePackage, TemplateToolError, parse_semver
@@ -13,6 +14,47 @@ from .paths import is_within, repo_root, safe_relative
 
 def skill_root_for_validator(validator: Path) -> Path:
     return validator.resolve().parent.parent
+
+
+def canonical_skill_root_for_package(package_dir: Path, root: Path) -> Path | None:
+    """Return the owning skill root only for an in-repository package shape."""
+    package = package_dir.resolve(strict=False)
+    repository = root.resolve()
+    if package_dir.is_symlink() or not is_within(package, repository):
+        return None
+    templates_root = package.parent.parent
+    if templates_root.name != "templates" or templates_root.parent.name != "assets":
+        return None
+    skill_root = templates_root.parent.parent
+    if not is_within(skill_root, repository):
+        return None
+    return skill_root
+
+
+def _regular_local_file(path: Path, root: Path) -> Path | None:
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        if not stat.S_ISREG(path.stat(follow_symlinks=False).st_mode):
+            return None
+    except OSError:
+        return None
+    resolved = path.resolve(strict=False)
+    if not is_within(resolved, root):
+        return None
+    return resolved
+
+
+def trusted_local_validator_for_canonical_package(package_dir: Path, root: Path) -> Path | None:
+    """Resolve only the validator owned by a canonical in-repository Skill."""
+    skill_root = canonical_skill_root_for_package(package_dir, root)
+    if skill_root is None:
+        return None
+    candidate = skill_root / "scripts" / "validate_template.py"
+    resolved = _regular_local_file(candidate, root.resolve())
+    if resolved is None or resolved.parent != (skill_root / "scripts").resolve():
+        return None
+    return resolved
 
 
 SCHEMA_BY_TEMPLATE_ID = {
@@ -49,14 +91,6 @@ def schema_path_for_package(package: TemplatePackage) -> Path:
     return candidate
 
 
-def _validator_for_manifest(manifest_path: Path) -> Path | None:
-    for ancestor in (manifest_path.parent, *manifest_path.parent.parents):
-        candidate = ancestor / "scripts" / "validate_template.py"
-        if candidate.is_file():
-            return candidate.resolve()
-    return None
-
-
 def _default_markers(skill_root: Path, template_id: str, version: str) -> bool:
     marker_pattern = re.compile(
         r"(?:default[^\n;；]*?|默认使用[^\n;；]*?|built-in[^\n;；]*?)"
@@ -81,22 +115,6 @@ def _default_markers(skill_root: Path, template_id: str, version: str) -> bool:
     return False
 
 
-def _canonical_package_shape(package_dir: Path, validator: Path | None) -> tuple[bool, Path | None]:
-    if validator is None:
-        return False, None
-    resolved = package_dir.resolve()
-    try:
-        templates_root = resolved.parents[1]
-    except IndexError:
-        return False, None
-    if templates_root.name != "templates" or templates_root.parent.name != "assets":
-        return False, None
-    if resolved.parent.parent != templates_root:
-        return False, None
-    skill_root = skill_root_for_validator(validator)
-    return is_within(templates_root, skill_root / "assets" / "templates"), skill_root
-
-
 def _scan_manifest_paths(root: Path) -> list[Path]:
     if not root.is_dir():
         raise TemplateToolError(f"repository root does not exist: {root}")
@@ -113,8 +131,9 @@ def discover_packages(root: Path | None = None) -> list[TemplatePackage]:
     root = (root or repo_root()).resolve()
     packages: list[TemplatePackage] = []
     for manifest_path in _scan_manifest_paths(root):
-        validator = _validator_for_manifest(manifest_path)
-        is_canonical, skill_root = _canonical_package_shape(manifest_path.parent, validator)
+        skill_root = canonical_skill_root_for_package(manifest_path.parent, root)
+        is_canonical = skill_root is not None
+        validator = trusted_local_validator_for_canonical_package(manifest_path.parent, root) if is_canonical else None
         try:
             preliminary = load_manifest(manifest_path)
             template = preliminary.get("template", {})
@@ -155,21 +174,22 @@ def discover_packages(root: Path | None = None) -> list[TemplatePackage]:
 
 
 def find_validator_for_package(package_dir: Path, root: Path | None = None, *, template_id: str | None = None, format_name: str | None = None) -> Path | None:
-    manifest_path = package_dir / "manifest.yaml"
-    local = _validator_for_manifest(manifest_path)
-    if local is not None:
-        return local
     root = (root or repo_root()).resolve()
+    local_shape = canonical_skill_root_for_package(package_dir, root)
+    local = trusted_local_validator_for_canonical_package(package_dir, root)
+    if local_shape is not None:
+        return local
     candidates: list[Path] = []
     for package in discover_packages(root):
-        if package.validator is None:
+        if not package.is_canonical or package.validator is None:
             continue
         if template_id and package.template_id != template_id:
             continue
         if format_name and package.format != format_name:
             continue
-        if package.validator not in candidates:
-            candidates.append(package.validator)
+        trusted = trusted_local_validator_for_canonical_package(package.package_dir, root)
+        if trusted is not None and trusted not in candidates:
+            candidates.append(trusted)
     if len(candidates) == 1:
         return candidates[0]
     if not candidates:
@@ -178,6 +198,39 @@ def find_validator_for_package(package_dir: Path, root: Path | None = None, *, t
         "owner validator is ambiguous; pass a package within a skill template tree: "
         + ", ".join(path.as_posix() for path in candidates)
     )
+
+
+def trusted_validator_for_package(package: TemplatePackage, root: Path) -> Path:
+    """Re-check the resolved validator immediately before execution."""
+    if package.validator is None:
+        raise TemplateToolError("owner validator is unavailable")
+    raw_validator = package.validator
+    resolved_validator = _regular_local_file(raw_validator, root.resolve())
+    if resolved_validator is None:
+        raise TemplateToolError(f"owner validator is not a trusted regular file: {raw_validator}")
+
+    local_validator = trusted_local_validator_for_canonical_package(package.package_dir, root)
+    if local_validator is not None:
+        if resolved_validator != local_validator:
+            raise TemplateToolError("canonical package validator is outside its owning Skill")
+        return local_validator
+
+    candidates: list[Path] = []
+    for candidate in discover_packages(root):
+        if not candidate.is_canonical or candidate.template_id != package.template_id or candidate.format != package.format:
+            continue
+        trusted = trusted_local_validator_for_canonical_package(candidate.package_dir, root)
+        if trusted is not None and trusted not in candidates:
+            candidates.append(trusted)
+    if len(candidates) != 1:
+        if not candidates:
+            raise TemplateToolError("no trusted canonical owner validator was found")
+        raise TemplateToolError(
+            "owner validator is ambiguous: " + ", ".join(path.as_posix() for path in candidates)
+        )
+    if resolved_validator != candidates[0]:
+        raise TemplateToolError("resolved validator is not the trusted canonical owner validator")
+    return candidates[0]
 
 
 def find_discovered_package(path: Path, root: Path | None = None) -> TemplatePackage:

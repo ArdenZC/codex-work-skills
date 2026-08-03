@@ -118,7 +118,7 @@ def _run(args: argparse.Namespace) -> tuple[int, Any]:
             generator_version=args.generator_version,
             allow_unsupported_minor=args.allow_unsupported_minor,
             dry_run=args.dry_run,
-            report_path=resolve_path(args.report_path) if args.report_path else None,
+            report_path=(Path(args.report_path).expanduser().absolute() if args.report_path else None),
         )
         return 0, result
     if args.command == "validate":

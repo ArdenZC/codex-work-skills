@@ -6,7 +6,7 @@
 - 教案生成器：教案生成器/lesson-plan-docx-generator
 - 平时成绩记分册生成器：平时成绩记分册生成器/course-gradebook-generator
 
-模板包维护工具位于 `tools/template_package.py`，动态从 manifest 发现全部包，并统一执行 discover、scaffold、validate、promote、archive。模板包变更应先使用它的 identity/full validation；外部包验证只能在系统临时隔离 Skill 树执行，Promote 必须经过不可变 snapshot、stage、最终 target 和动态仓库校验，Archive 必须包含依赖闭包并在解压后复验。报告、snapshot、stage、backup 或归档产物不得写入受保护目录或提交到仓库。
+模板包维护工具位于 `tools/template_package.py`，动态从 manifest 发现全部包，并统一执行 discover、scaffold、validate、promote、archive。模板包变更应先使用它的 identity/full validation；external 包不能自带或覆盖 validator，只能使用仓库 canonical Skill 的受信任 owner，ambiguous owner 必须失败。外部包验证只能在系统临时隔离 Skill 树执行，Promote 必须经过不可变 snapshot、stage、最终 target 和动态仓库校验，并在每个阶段确认全树字节与 snapshot 一致；validator 或 repo validator 产生任何包内文件都必须回滚。Scaffold report 只能位于工作包目录同级，Archive 必须包含依赖闭包并在解压后复验。报告、snapshot、stage、backup 或归档产物不得写入受保护目录或提交到仓库。
 
 所有 skill 都遵循同一原则：模型负责理解用户资料，技能内置脚本负责稳定生成最终文件；资料不足时按各 skill 的默认规则处理，但不能伪造用户未提供的源数据。生成后执行技能自己的校验步骤，并报告实际结果。
 

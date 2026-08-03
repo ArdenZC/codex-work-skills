@@ -20,6 +20,42 @@ from template_tooling.models import TemplateToolError, parse_semver  # noqa: E40
 from template_tooling.validation import validate_package_path, validation_succeeded  # noqa: E402
 
 
+def _clip_diagnostic(value: object, limit: int = 6000) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - len("\n[truncated]"))].rstrip() + "\n[truncated]"
+
+
+def _format_validation_failure(package, validation: dict, *, max_chars: int = 12000) -> str:
+    package_info = validation.get("package") or {}
+    validator = validation.get("validator") or {}
+    command = validator.get("command") or []
+    if isinstance(command, list):
+        command_text = json.dumps(command, ensure_ascii=False)
+    else:
+        command_text = str(command)
+    errors = validation.get("errors") or []
+    if not isinstance(errors, list):
+        errors = [errors]
+    lines = [
+        f"package: {package_info.get('id', package.template_id)} {package_info.get('version', package.version)}",
+        f"manifest: {package_info.get('manifest', package.manifest_path)}",
+        f"template: {package_info.get('template', package.template_path)}",
+        f"validation_scope: {validation.get('validation_scope', '<not-run>')}",
+        f"validator command: {command_text}",
+        f"validator exit_code: {validator.get('exit_code', '<not-run>')}",
+        "errors: " + "; ".join(str(error) for error in errors),
+        "stderr:\n" + _clip_diagnostic(validator.get("stderr")),
+        "stdout:\n" + _clip_diagnostic(validator.get("stdout")),
+    ]
+    text = "\n".join(lines)
+    if len(text) <= max_chars:
+        return text
+    marker = "\n[truncated]"
+    return text[: max(0, max_chars - len(marker))].rstrip() + marker
+
+
 def _validate_legacy_descriptor(package: dict[str, Path | str]) -> str:
     """Keep the old helper shape for manifest-contract regression tests.
 
@@ -80,10 +116,7 @@ def validate_package(package, root: Path | None = None) -> str:
     Draft202012Validator.check_schema(schema)
     validation = validate_package_path(package.package_dir, root, identity_only=False)
     if not validation_succeeded(validation):
-        raise ValueError(
-            f"{package.template_id} {package.version}: template validator failed: "
-            + "; ".join(str(item) for item in validation.get("errors", []))
-        )
+        raise ValueError(f"template validator failed:\n{_format_validation_failure(package, validation)}")
     if not validation.get("full_validation") or validation.get("status") != "passed":
         raise ValueError(f"{package.template_id} {package.version}: validator did not report a complete pass")
     expected_hash = package.fingerprint

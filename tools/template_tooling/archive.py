@@ -211,6 +211,7 @@ def _verify_archive(
     metadata: dict[str, Any],
     package: TemplatePackage,
     expected_archive_sha: str,
+    trusted_root: Path,
 ) -> None:
     expected_names = [str(record["path"]) for record in file_records]
     expected_hashes = {str(record["path"]): str(record["sha256"]) for record in file_records}
@@ -245,7 +246,12 @@ def _verify_archive(
         if extracted_entry.errors:
             raise TemplateToolError("extracted entry package identity failed: " + "; ".join(extracted_entry.errors))
         _verify_extracted_dependency_closure(extracted_entry, extracted, package.validator)
-        validation = validate_package_with_owner(entry_dir, extracted, package.validator)
+        validation = validate_package_with_owner(
+            entry_dir,
+            extracted,
+            package.validator,
+            trusted_root=trusted_root,
+        )
         if not validation_succeeded(validation) or not validation.get("full_validation"):
             raise TemplateToolError(
                 "extracted archive full validation failed: " + "; ".join(validation.get("errors", []))
@@ -310,7 +316,6 @@ def archive_package(package_dir: Path, output_dir: Path, root: Path, *, dry_run:
         for name, path in files
     ]
     target_prefix = prefix_by_package[package.package_dir.resolve()]
-    target_template = f"{target_prefix}/{package.template_path.relative_to(package.package_dir).as_posix()}"
     metadata_base: dict[str, Any] = {
         "schema_version": METADATA_SCHEMA_VERSION,
         "tool_version": TOOL_VERSION,
@@ -368,7 +373,7 @@ def archive_package(package_dir: Path, output_dir: Path, root: Path, *, dry_run:
         archive_sha = _archive_sha(temporary_archive)
         metadata = dict(metadata_base)
         metadata["archive_sha256"] = archive_sha
-        _verify_archive(temporary_archive, file_records, metadata, package, archive_sha)
+        _verify_archive(temporary_archive, file_records, metadata, package, archive_sha, root)
         result["archive_sha256"] = archive_sha
         atomic_write_text(temporary_sidecar, f"{archive_sha}  {archive_name}\n", encoding="ascii")
         atomic_write_text(temporary_metadata, json.dumps(metadata, ensure_ascii=False, indent=2) + "\n")
