@@ -749,6 +749,12 @@ def _named_range_checks(
         "anchor_mode": "excel_named_range",
     }
 
+    # Inventory, header, and formula failures already reject the package. Do
+    # not spend another LibreOffice round-trip building a protected baseline
+    # when the semantic contract has already failed.
+    if errors:
+        return
+
     from named_range_template_baseline import build_controlled_v11_baseline
 
     controlled_baseline = build_controlled_v11_baseline(
@@ -1039,13 +1045,6 @@ def validate_template(
                     controlled_signature = None
                     raw_font_differences: list[dict[str, Any]] = []
                     if template.suffix.lower() == ".xls":
-                        static_controlled_xls, static_controlled_xlsx = controlled_roundtrip_paths(
-                            canonical,
-                            Path(canonical_temp) / "static-controlled",
-                            find_soffice(),
-                        )
-                        static_controlled_workbook = load_workbook(static_controlled_xlsx, data_only=False)
-                        static_controlled_signature = _workbook_signature(static_controlled_workbook, manifest)
                         content_controlled_xls, content_controlled_xlsx = controlled_content_roundtrip_paths(
                             canonical_xlsx,
                             xlsx,
@@ -1055,51 +1054,10 @@ def validate_template(
                         )
                         content_controlled_workbook = load_workbook(content_controlled_xlsx, data_only=False)
                         content_controlled_signature = _workbook_signature(content_controlled_workbook, manifest)
-                        controlled_signature = dict(static_controlled_signature)
-                        controlled_signature["target_cell_formats"] = dict(
-                            static_controlled_signature["target_cell_formats"]
-                        )
-                        controlled_signature["writable_cell_formats"] = dict(
-                            static_controlled_signature["writable_cell_formats"]
-                        )
-                        canonical_ws = canonical_workbook[sheet_name]
-                        custom_ws = workbook[sheet_name]
-                        writable_cells = {
-                            str(cell)
-                            for cell in [
-                                *manifest["structure"].get("metadata", {}).values(),
-                                *manifest["structure"].get("headers", {}).values(),
-                            ]
-                            if cell
-                        }
-                        changed_writable_anchors: set[str] = set()
-                        for address in writable_cells:
-                            if canonical_ws[address].value != custom_ws[address].value:
-                                changed_writable_anchors.add(address)
-                                for section_name in ("target_cell_formats", "writable_cell_formats"):
-                                    controlled_signature[section_name][address] = (
-                                        content_controlled_signature[section_name].get(address)
-                                    )
-                        changed_writable_cells = set(changed_writable_anchors)
-                        for merged in canonical_ws.merged_cells.ranges:
-                            if merged.start_cell.coordinate not in changed_writable_anchors:
-                                continue
-                            changed_writable_cells.update(
-                                f"{get_column_letter(column)}{row}"
-                                for row, column in merged.cells
-                            )
-                        for address in changed_writable_cells - changed_writable_anchors:
-                            controlled_signature["target_cell_formats"][address] = (
-                                content_controlled_signature["target_cell_formats"].get(address)
-                            )
-                        unchanged_xls = canonical if actual_hash == expected_hash else static_controlled_xls
+                        controlled_signature = content_controlled_signature
                         for section_name in ("target_cell_formats", "writable_cell_formats"):
                             for address in canonical_signature.get(section_name, {}):
-                                expected_xls = (
-                                    content_controlled_xls
-                                    if address in changed_writable_cells
-                                    else unchanged_xls
-                                )
+                                expected_xls = content_controlled_xls
                                 expected_font = xls_font_identity(expected_xls, sheet_name, address)
                                 actual_font = xls_font_identity(template, sheet_name, address)
                                 if actual_font is not None and expected_font is not None and actual_font != expected_font:

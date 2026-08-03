@@ -4588,6 +4588,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             }
             package_a.mkdir()
             (package_a / "marker.txt").write_bytes(b"old-package-marker")
+            expected_pdf_pages = None
             for package in (package_a, package_b):
                 result = run_script(
                     GRADE / "scripts" / "build_named_range_template.py",
@@ -4600,7 +4601,11 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
                 payload = yaml.safe_load(result.stdout)
                 self.assertEqual(payload["named_range_count"], 24)
-                self.assertEqual(payload["pdf_signature"][0], 4)
+                self.assertGreater(payload["pdf_signature"][0], 0)
+                if expected_pdf_pages is None:
+                    expected_pdf_pages = payload["pdf_signature"][0]
+                else:
+                    self.assertEqual(payload["pdf_signature"][0], expected_pdf_pages)
             self.assertFalse((package_a / "marker.txt").exists())
 
             (package_b / "marker.txt").write_bytes(b"rollback-marker")

@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import math
+import hashlib
+import json
+import os
 import shutil
 import struct
+import subprocess
+import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import olefile
+import openpyxl
 from openpyxl import load_workbook
 
 from named_range_contracts import required_names
@@ -54,6 +61,39 @@ class ControlledV11Roundtrip:
 
 _BASELINE_CACHE: dict[tuple[str, str], ControlledV11Baseline] = {}
 _CANDIDATE_CACHE: dict[tuple[str, str, str], ControlledV11Roundtrip] = {}
+_CONTROLLED_CACHE_VERSION = "controlled-v11-cache-v2"
+
+
+def _controlled_cache_key(soffice: str) -> str:
+    digest = hashlib.sha256()
+    digest.update(_CONTROLLED_CACHE_VERSION.encode("ascii"))
+    digest.update(str(openpyxl.__version__).encode("ascii"))
+    for path in (Path(__file__), V10_TEMPLATE, V10_MANIFEST, V11_MANIFEST):
+        digest.update(str(path.resolve()).encode("utf-8"))
+        digest.update(path.read_bytes())
+    try:
+        version = subprocess.run(
+            [soffice, "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=20,
+            check=False,
+        )
+        digest.update((version.stdout + version.stderr).encode("utf-8"))
+    except (OSError, subprocess.SubprocessError):
+        digest.update(str(soffice).encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _controlled_cache_root(soffice: str) -> Path:
+    return (
+        Path(tempfile.gettempdir())
+        / "codex-work-skills-gradebook"
+        / "controlled-v11"
+        / _controlled_cache_key(soffice)
+    )
 
 
 def _biff_records(data: bytes):
@@ -317,25 +357,55 @@ def _roundtrip_xlsx_with_openpyxl(
     return controlled_xls, controlled_xlsx, load_workbook(controlled_xlsx, data_only=False)
 
 
+def _baseline_from_directory(
+    root: Path,
+    expected_inventory: dict[str, Any],
+    expected_locations: dict[str, Any],
+) -> ControlledV11Baseline | None:
+    if not (root / ".complete").is_file():
+        return None
+    controlled_xls = root / "v11-controlled-xls" / "template.xls"
+    controlled_xlsx = root / "v11-controlled-roundtrip-xlsx" / "template.xlsx"
+    if not controlled_xls.is_file() or not controlled_xlsx.is_file():
+        return None
+    try:
+        v11_manifest = load_manifest(V11_MANIFEST)
+        controlled_workbook = load_workbook(controlled_xlsx, data_only=False)
+        raw_xls_inventory, xlsx_inventory = _validated_v11_inventory_pair(
+            controlled_xls,
+            controlled_workbook,
+            v11_manifest,
+            expected_inventory,
+        )
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+        return None
+    return ControlledV11Baseline(
+        controlled_v11_xls=controlled_xls,
+        controlled_v11_xlsx=controlled_xlsx,
+        controlled_workbook=controlled_workbook,
+        raw_xls_inventory=raw_xls_inventory,
+        xlsx_inventory=xlsx_inventory,
+        expected_locations=expected_locations,
+    )
+
+
 def build_controlled_v11_baseline(
     temp_dir: Path,
     soffice: str,
 ) -> ControlledV11Baseline:
     """Create a v1.1 workbook from canonical v1.0 in the current environment.
 
-    The cache is scoped to the caller's temporary directory. This keeps all
-    artifacts disposable while ensuring repeated comparisons in one process do
-    not start another LibreOffice conversion pipeline.
+    A validated cache is shared by independent CLI processes for the same
+    canonical inputs, LibreOffice, and Python dependency versions. This keeps
+    repeated comparisons from starting another LibreOffice conversion pipeline.
     """
-    temp_dir = Path(temp_dir).expanduser().resolve()
-    cache_key = (str(temp_dir), str(soffice))
+    shared_root = _controlled_cache_root(soffice)
+    cache_key = (str(shared_root), str(soffice))
     cached = _BASELINE_CACHE.get(cache_key)
     if cached is not None:
         return cached
 
-    temp_dir.mkdir(parents=True, exist_ok=True)
     base_manifest = load_manifest(V10_MANIFEST)
-    v11_manifest = load_manifest(V11_MANIFEST)
     variant = "with_skill"
     expected_locations = expected_named_range_locations(base_manifest["structure"], variant)
     expected_inventory = {
@@ -344,39 +414,53 @@ def build_controlled_v11_baseline(
         }
     }
 
-    source_xlsx = convert_to_xlsx(V10_TEMPLATE, temp_dir / "v10-source-xlsx", soffice)
-    named_xlsx = temp_dir / "v11-controlled-source" / "template.xlsx"
-    named_xlsx.parent.mkdir(parents=True, exist_ok=True)
-    workbook = load_workbook(source_xlsx, data_only=False)
-    for name in required_names(variant):
-        set_named_range_from_location(workbook, expected_locations[name])
-    workbook.save(named_xlsx)
+    cached = _baseline_from_directory(shared_root, expected_inventory, expected_locations)
+    if cached is not None:
+        _BASELINE_CACHE[cache_key] = cached
+        return cached
 
-    controlled_xls = convert_to_xls(named_xlsx, temp_dir / "v11-controlled-xls", soffice)
-    normalize_libreoffice_print_title_records(controlled_xls)
-    normalize_xls_summary_information(controlled_xls)
-    controlled_xlsx = convert_to_xlsx(
-        controlled_xls,
-        temp_dir / "v11-controlled-roundtrip-xlsx",
-        soffice,
-    )
-    controlled_workbook = load_workbook(controlled_xlsx, data_only=False)
+    shared_root.parent.mkdir(parents=True, exist_ok=True)
+    stage = shared_root.parent / f".{shared_root.name}.{uuid.uuid4().hex}.stage"
+    stage.mkdir(parents=True, exist_ok=False)
+    try:
+        source_xlsx = convert_to_xlsx(V10_TEMPLATE, stage / "v10-source-xlsx", soffice)
+        named_xlsx = stage / "v11-controlled-source" / "template.xlsx"
+        named_xlsx.parent.mkdir(parents=True, exist_ok=True)
+        workbook = load_workbook(source_xlsx, data_only=False)
+        for name in required_names(variant):
+            set_named_range_from_location(workbook, expected_locations[name])
+        workbook.save(named_xlsx)
 
-    raw_xls_inventory, xlsx_inventory = _validated_v11_inventory_pair(
-        controlled_xls,
-        controlled_workbook,
-        v11_manifest,
-        expected_inventory,
-    )
+        controlled_xls = convert_to_xls(named_xlsx, stage / "v11-controlled-xls", soffice)
+        normalize_libreoffice_print_title_records(controlled_xls)
+        normalize_xls_summary_information(controlled_xls)
+        controlled_xlsx = convert_to_xlsx(
+            controlled_xls,
+            stage / "v11-controlled-roundtrip-xlsx",
+            soffice,
+        )
+        (stage / ".complete").write_text(
+            json.dumps(
+                {
+                    "canonical_template": str(V10_TEMPLATE.resolve()),
+                    "openpyxl": openpyxl.__version__,
+                    "cache_version": _CONTROLLED_CACHE_VERSION,
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        try:
+            os.replace(str(stage), str(shared_root))
+        except FileExistsError:
+            shutil.rmtree(stage, ignore_errors=True)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage, ignore_errors=True)
 
-    baseline = ControlledV11Baseline(
-        controlled_v11_xls=controlled_xls,
-        controlled_v11_xlsx=controlled_xlsx,
-        controlled_workbook=controlled_workbook,
-        raw_xls_inventory=raw_xls_inventory,
-        xlsx_inventory=xlsx_inventory,
-        expected_locations=expected_locations,
-    )
+    baseline = _baseline_from_directory(shared_root, expected_inventory, expected_locations)
+    if baseline is None:
+        raise RuntimeError("Controlled v1.1 baseline cache was not materialized correctly")
     _BASELINE_CACHE[cache_key] = baseline
     return baseline
 
