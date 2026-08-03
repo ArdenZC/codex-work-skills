@@ -1057,7 +1057,11 @@ def validate_template(
                         controlled_signature = content_controlled_signature
                         for section_name in ("target_cell_formats", "writable_cell_formats"):
                             for address in canonical_signature.get(section_name, {}):
-                                expected_xls = content_controlled_xls
+                                expected_xls = (
+                                    canonical
+                                    if actual_hash == expected_hash
+                                    else content_controlled_xls
+                                )
                                 expected_font = xls_font_identity(expected_xls, sheet_name, address)
                                 actual_font = xls_font_identity(template, sheet_name, address)
                                 if actual_font is not None and expected_font is not None and actual_font != expected_font:
