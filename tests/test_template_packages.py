@@ -4728,7 +4728,10 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             if scripts_path in sys.path:
                 sys.path.remove(scripts_path)
             sys.path.insert(0, scripts_path)
-            from named_range_template_baseline import build_controlled_v11_baseline
+            from named_range_template_baseline import (
+                build_controlled_v11_baseline,
+                build_controlled_v11_candidate_roundtrip,
+            )
             from package_common import load_manifest
             from validate_template import _signature_differences, _workbook_signature
 
@@ -4781,16 +4784,26 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                 str(soffice),
             )
             controlled_signature = _workbook_signature(
-                controlled.controlled_workbook,
+                controlled.comparison_workbook,
                 base_manifest,
             )
             controlled_signature.pop("named_ranges", None)
+            controlled_candidate = build_controlled_v11_candidate_roundtrip(
+                GRADE_V11_TEMPLATE,
+                folder / "controlled-candidate",
+                str(soffice),
+            )
+            controlled_candidate_signature = _workbook_signature(
+                controlled_candidate.controlled_workbook,
+                base_manifest,
+            )
+            controlled_candidate_signature.pop("named_ranges", None)
             self.assertEqual(
-                _signature_differences(controlled_signature, committed_signature),
+                _signature_differences(controlled_signature, controlled_candidate_signature),
                 [],
             )
 
-            tampered_xlsx = folder / "tampered-font.xlsx"
+            tampered_xlsx = folder / "tampered-column-width.xlsx"
             shutil.copy2(committed_xlsx, tampered_xlsx)
             tampered_workbook = load_workbook(tampered_xlsx, data_only=False)
             tampered_sheet = tampered_workbook[base_manifest["structure"]["worksheet"]]
@@ -4801,7 +4814,7 @@ class GradebookTemplatePackageTests(unittest.TestCase):
             tampered_workbook.save(tampered_xlsx)
             tampered_xls = convert_with_soffice(
                 tampered_xlsx,
-                folder / "tampered-font-xls",
+                folder / "tampered-column-width-xls",
                 "xls",
             )
             custom_template, custom_manifest = write_gradebook_manifest(

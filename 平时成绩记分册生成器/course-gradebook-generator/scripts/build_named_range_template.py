@@ -29,7 +29,10 @@ from package_common import (
     sha256_file,
     validate_canonical_baselines,
 )
-from named_range_template_baseline import build_controlled_v11_baseline
+from named_range_template_baseline import (
+    build_controlled_v11_baseline,
+    build_controlled_v11_candidate_roundtrip,
+)
 from validate_template import controlled_roundtrip_paths, convert_to_format, find_soffice
 from xls_named_range_utils import (
     compare_xls_and_xlsx_named_ranges,
@@ -328,7 +331,11 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
             # Validate its raw and round-trip inventories, then preserve its
             # bytes instead of silently rewriting names through LibreOffice.
             named_xls = source
-            named_roundtrip_xlsx = _convert(soffice, named_xls, temp / "named-roundtrip-xlsx", "xlsx")
+            named_roundtrip_xlsx = build_controlled_v11_candidate_roundtrip(
+                named_xls,
+                temp / "controlled-v11-candidate",
+                soffice,
+            ).controlled_xlsx
 
         package_manifest = output_dir / "manifest.yaml"
         source_v11_manifest = V11_PACKAGE_DIR / "manifest.yaml"
@@ -372,7 +379,7 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
             load_workbook(controlled_baseline.controlled_v11_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range build changed protected workbook layout or formatting")
-        if _workbook_layout_signature(load_workbook(controlled_baseline.controlled_v11_xlsx, data_only=False)) != _workbook_layout_signature(
+        if _workbook_layout_signature(load_workbook(controlled_baseline.comparison_v11_xlsx, data_only=False)) != _workbook_layout_signature(
             load_workbook(named_roundtrip_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range template differs from the controlled v1.1 baseline")
