@@ -7,12 +7,46 @@ from pathlib import Path
 import re
 
 from .manifest import inspect_manifest_package, load_manifest
-from .models import TemplatePackage, TemplateToolError
-from .paths import is_within, repo_root
+from .models import TemplatePackage, TemplateToolError, parse_semver
+from .paths import is_within, repo_root, safe_relative
 
 
 def skill_root_for_validator(validator: Path) -> Path:
     return validator.resolve().parent.parent
+
+
+SCHEMA_BY_TEMPLATE_ID = {
+    "lesson-plan": "lesson-plan-input.schema.json",
+    "course-gradebook": "gradebook-input.schema.json",
+}
+
+
+def owner_skill_root(package: TemplatePackage) -> Path:
+    if package.validator is None:
+        raise TemplateToolError(f"owner validator is unavailable for {package.package_dir}")
+    return skill_root_for_validator(package.validator)
+
+
+def schema_path_for_package(package: TemplatePackage) -> Path:
+    """Resolve a package schema from its owner skill and closed id mapping."""
+    owner = owner_skill_root(package)
+    raw = package.manifest.get("schema") or package.manifest.get("input_schema")
+    if raw:
+        relative = safe_relative(str(raw), label="manifest schema")
+        candidate = (owner / relative).resolve(strict=False)
+    else:
+        filename = SCHEMA_BY_TEMPLATE_ID.get(package.template_id)
+        if filename is None:
+            raise TemplateToolError(
+                f"cannot determine input schema for template id {package.template_id!r}; "
+                "declare manifest.schema"
+            )
+        candidate = owner / "schemas" / filename
+    if not is_within(candidate, owner):
+        raise TemplateToolError(f"manifest schema escapes owner skill: {candidate}")
+    if not candidate.is_file():
+        raise TemplateToolError(f"input schema was not found: {candidate}")
+    return candidate
 
 
 def _validator_for_manifest(manifest_path: Path) -> Path | None:
@@ -110,7 +144,14 @@ def discover_packages(root: Path | None = None) -> list[TemplatePackage]:
         locations = ", ".join(item.package_dir.as_posix() for item in duplicates)
         for package in duplicates:
             package.errors.append(f"duplicate template id/version {identity[0]} {identity[1]}: {locations}")
-    return packages
+    def sort_key(package: TemplatePackage) -> tuple[str, tuple[int, int, int], str]:
+        try:
+            version = parse_semver(package.version).as_tuple()
+        except TemplateToolError:
+            version = (2**31 - 1, 2**31 - 1, 2**31 - 1)
+        return package.template_id, version, package.package_dir.as_posix().casefold()
+
+    return sorted(packages, key=sort_key)
 
 
 def find_validator_for_package(package_dir: Path, root: Path | None = None, *, template_id: str | None = None, format_name: str | None = None) -> Path | None:

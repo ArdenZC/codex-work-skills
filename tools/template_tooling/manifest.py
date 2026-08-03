@@ -10,7 +10,7 @@ from typing import Any
 import yaml
 
 from .models import SemVer, TemplatePackage, TemplateToolError, package_dir_matches_version, parse_semver
-from .paths import ensure_no_parent_escape, safe_relative
+from .paths import ensure_no_parent_escape, safe_relative, validate_windows_component
 
 
 FINGERPRINT_RE = re.compile(r"^[0-9A-Fa-f]{64}$")
@@ -45,8 +45,10 @@ def manifest_identity(manifest: dict[str, Any], path: Path) -> tuple[str, str, s
     template_file = template.get("file")
     if not isinstance(template_id, str) or not template_id.strip():
         raise TemplateToolError(f"manifest template.id is required: {path}")
-    if any(separator in template_id for separator in ("/", "\\")) or template_id in {".", ".."}:
-        raise TemplateToolError(f"manifest template.id contains an unsafe path component: {template_id!r}")
+    try:
+        validate_windows_component(template_id, label="manifest template.id")
+    except TemplateToolError as exc:
+        raise TemplateToolError(str(exc)) from exc
     if not isinstance(format_name, str) or not format_name.strip():
         raise TemplateToolError(f"manifest template.format is required: {path}")
     semver = parse_semver(version)
@@ -61,11 +63,24 @@ def manifest_fingerprint(manifest: dict[str, Any], path: Path) -> str:
     fingerprint = manifest.get("fingerprint")
     if not isinstance(fingerprint, dict):
         raise TemplateToolError(f"manifest fingerprint section is required: {path}")
-    values = [fingerprint.get("sha256"), fingerprint.get("value")]
-    supplied = next((value for value in values if value is not None), None)
-    if not isinstance(supplied, str) or not FINGERPRINT_RE.fullmatch(supplied):
-        raise TemplateToolError(f"manifest fingerprint must be a 64-character hexadecimal SHA-256: {path}")
-    return supplied.upper()
+    unsupported = sorted(set(fingerprint) - {"algorithm", "sha256", "value"})
+    if unsupported:
+        raise TemplateToolError(f"fingerprint contains unsupported keys: {unsupported}")
+    if fingerprint.get("algorithm") != "sha256":
+        raise TemplateToolError("fingerprint.algorithm must be sha256")
+    if "sha256" not in fingerprint:
+        raise TemplateToolError("fingerprint.sha256 is required")
+    if "value" not in fingerprint:
+        raise TemplateToolError("fingerprint.value is required")
+    sha_value = fingerprint.get("sha256")
+    value = fingerprint.get("value")
+    if not isinstance(sha_value, str) or not FINGERPRINT_RE.fullmatch(sha_value):
+        raise TemplateToolError("fingerprint.sha256 must be a 64-character hexadecimal SHA-256")
+    if not isinstance(value, str) or not FINGERPRINT_RE.fullmatch(value):
+        raise TemplateToolError("fingerprint.value must be a 64-character hexadecimal SHA-256")
+    if sha_value.upper() != value.upper():
+        raise TemplateToolError("fingerprint.sha256 and fingerprint.value must match")
+    return sha_value.upper()
 
 
 def manifest_reference(manifest: dict[str, Any], key: str, manifest_path: Path) -> Path | None:

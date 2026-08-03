@@ -23,7 +23,7 @@ requirements.txt
 
 旧模板路径必须保留，且只能作为兼容入口。兼容入口与当前 canonical template 的 SHA-256 必须一致；如果两者发生分歧，校验器报错，不允许静默选择其中一份。
 
-模板包生命周期由仓库根目录的 `tools/template_package.py` 统一处理。工具从 `**/assets/templates/*/*/manifest.yaml` 自动发现包，不维护人工同步的 registry；它只读取 manifest 和包文件，不启动 LibreOffice。`scaffold` 复制 canonical 基线并生成工作包，`validate` 执行通用身份检查和所属 Skill 的真实模板校验，`promote` 在完整校验和仓库级校验通过后原子安装新 canonical patch，`archive` 生成可复现的 ZIP、SHA-256 sidecar 和结构化元数据。已有 canonical、默认入口、兼容入口和 manifest 不会被这些命令静默覆盖。
+模板包生命周期由仓库根目录的 `tools/template_package.py` 统一处理。工具从 `**/assets/templates/*/*/manifest.yaml` 动态发现包，不维护人工同步的 registry；仓库级校验器同样按 discovery 结果验证所有 canonical 包、输入 schema 和 owner Skill validator。工具只读取 manifest 和包文件，不启动 LibreOffice。`scaffold` 先完整验证 canonical 基线并生成包外原子 report，`validate` 对外部包在系统临时隔离 Skill 树执行真实模板校验，`promote` 在不可变 snapshot、stage、最终 target 和动态仓库校验都通过后原子安装，`archive` 生成可复现的自包含 ZIP、SHA-256 sidecar 和结构化元数据。已有 canonical、默认入口、兼容入口和 manifest 不会被这些命令静默覆盖。
 
 ## Manifest
 
@@ -36,10 +36,10 @@ requirements.txt
 - `fields`，包括字段名称、语义写入目标、写入模式、允许的长度或数值范围；
 - `allowed_changes` 与 `protected`，说明生成器可以改什么、不能改什么；
 - `validation`，包括固定标签、行列数、公式、格式和输出检查项；
-- canonical template 的 `fingerprint.sha256`。
+- `fingerprint` 必须严格包含 `algorithm: sha256`、`sha256`、`value` 三个键；两个 hash 必须相同并匹配 canonical template 的实际 SHA-256，不能添加未知 fingerprint 键。
 - `validation` 中的禁止残留文字、长度/段落限制和是否要求渲染检查。
 
-版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。版本—定位模式矩阵固定为：教案 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；成绩册 `1.0.x = legacy_coordinates`、`1.1.x = excel_named_range`。其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
+版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。`scaffold --generator-version` 也必须使用同一 semver 解析器，并且 major 必须等于 manifest 的 `generator.supported_major`。版本—定位模式矩阵固定为：教案 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；成绩册 `1.0.x = legacy_coordinates`、`1.1.x = excel_named_range`。其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
 
 ### 模板身份与指纹
 

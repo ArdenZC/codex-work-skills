@@ -4,16 +4,27 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import shutil
 import uuid
 from pathlib import Path
 from typing import Any
 
-from .discovery import discover_packages
+from .discovery import discover_packages, owner_skill_root
 from .manifest import load_manifest, manifest_reference, package_template_path, sha256_file
 from .models import TemplatePackage, TemplateToolError, package_dir_matches_version, parse_semver
-from .paths import display_path, is_within, paths_overlap, require_no_overlap
+from .paths import (
+    atomic_write_text,
+    copy_tree_no_symlinks,
+    display_path,
+    is_within,
+    paths_overlap,
+    remove_path_or_raise,
+    require_no_overlap,
+    tree_fingerprints,
+)
+from .validation import validate_package_path, validation_succeeded
 
 
 UNSUPPORTED_MINOR_REASON = "Template minor is not supported by the current generator contract."
@@ -86,34 +97,11 @@ def _without_mutable_manifest_fields(manifest: dict[str, Any], *, generator_vers
 
 
 def _copy_tree_no_symlinks(source: Path, destination: Path) -> list[Path]:
-    if source.is_symlink():
-        raise TemplateToolError(f"refusing to copy symlinked package: {source}")
-    created: list[Path] = []
-    destination.mkdir(parents=True, exist_ok=False)
-    created.append(destination)
-    for source_path in sorted(source.rglob("*"), key=lambda item: item.as_posix().lower()):
-        relative = source_path.relative_to(source)
-        target = destination / relative
-        if source_path.is_symlink():
-            raise TemplateToolError(f"refusing to copy symlinked package entry: {source_path}")
-        if source_path.is_dir():
-            target.mkdir()
-            created.append(target)
-        elif source_path.is_file():
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, target)
-            created.append(target)
-    return created
+    return copy_tree_no_symlinks(source, destination)
 
 
 def _tree_fingerprints(root: Path) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for path in sorted(root.rglob("*"), key=lambda item: item.as_posix().lower()):
-        if path.is_symlink():
-            raise TemplateToolError(f"symlink is not allowed in package comparison: {path}")
-        if path.is_file():
-            result[path.relative_to(root).as_posix()] = sha256_file(path)
-    return result
+    return tree_fingerprints(root)
 
 
 def _dependency_plan(base: TemplatePackage, output_dir: Path) -> list[tuple[Path, Path]]:
@@ -142,12 +130,39 @@ def _find_base(base_dir: Path, root: Path) -> TemplatePackage:
             if not package.is_canonical or package.errors:
                 detail = "; ".join(package.errors) or "package is not canonical"
                 raise TemplateToolError(f"base package is not a valid canonical package: {detail}")
+            validation = validate_package_path(package.package_dir, root, identity_only=False)
+            if not validation_succeeded(validation):
+                detail = "; ".join(validation.get("errors", []))
+                raise TemplateToolError(f"base package full validation failed: {detail}")
             return package
     raise TemplateToolError(f"base package was not discovered: {base_dir}")
 
 
-def _report_path(output_dir: Path, explicit: Path | None) -> Path:
-    return (explicit or (output_dir.parent / "scaffold-report.json")).resolve(strict=False)
+def _report_path(output_dir: Path, explicit: Path | None, template_id: str, version: str) -> Path:
+    return (explicit or (output_dir.parent / f"scaffold-report-{template_id}-{version}.json")).resolve(strict=False)
+
+
+def _protected_report_paths(root: Path, base: TemplatePackage, canonical: list[TemplatePackage], dependencies: list[tuple[Path, Path]], output_dir: Path) -> list[Path]:
+    protected: list[Path] = [
+        root / "tools",
+        root / "tests",
+        root / ".github",
+        base.package_dir,
+        output_dir,
+    ]
+    for package in canonical:
+        protected.append(package.package_dir)
+        if package.validator is not None:
+            owner = owner_skill_root(package)
+            protected.extend((owner / "assets" / "templates", owner / "assets" / "templates" / package.template_id))
+    for source, destination in dependencies:
+        protected.extend((source, destination))
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.name == "manifest.yaml" or path.name.endswith(".schema.json") or path.suffix.lower() in {".docx", ".xls", ".xlsx"}:
+            protected.append(path)
+    return protected
 
 
 def scaffold_package(
@@ -161,7 +176,16 @@ def scaffold_package(
     dry_run: bool = False,
     report_path: Path | None = None,
 ) -> dict[str, Any]:
+    if generator_version is not None:
+        generator_semver = parse_semver(generator_version)
+    else:
+        generator_semver = None
     base = _find_base(base_dir, root)
+    supported_major = base.manifest.get("generator", {}).get("supported_major")
+    if generator_semver is not None and generator_semver.major != supported_major:
+        raise TemplateToolError(
+            f"generator version major {generator_semver.major} does not match generator.supported_major {supported_major}"
+        )
     target_version = parse_semver(version)
     base_version = base.semver
     if target_version <= base_version:
@@ -186,15 +210,17 @@ def scaffold_package(
         canonical_roots.append(skill_root / "assets" / "templates" / base.template_id)
     protected = [base.package_dir, *[item.package_dir for item in canonical_same_id], *canonical_roots]
     require_no_overlap(output_dir, protected, label="scaffold output")
-    report = _report_path(output_dir, report_path)
-    if paths_overlap(report, output_dir):
-        raise TemplateToolError("scaffold report must be outside the template package")
+    dependencies = _dependency_plan(base, output_dir)
+    report = _report_path(output_dir, report_path, base.template_id, version)
+    all_canonical = [item for item in all_packages if item.is_canonical]
+    for protected_path in _protected_report_paths(root, base, all_canonical, dependencies, output_dir):
+        if paths_overlap(report, protected_path):
+            raise TemplateToolError(f"scaffold report overlaps protected path: {report} <> {protected_path}")
     if output_dir.exists() or output_dir.is_symlink():
         raise TemplateToolError(f"scaffold output already exists: {output_dir}")
     if report.exists() or report.is_symlink():
         raise TemplateToolError(f"scaffold report already exists: {report}")
 
-    dependencies = _dependency_plan(base, output_dir)
     for source, destination in dependencies:
         if destination.exists() or destination.is_symlink():
             if not destination.is_dir() or _tree_fingerprints(source) != _tree_fingerprints(destination):
@@ -221,6 +247,8 @@ def scaffold_package(
         "base_package": display_path(base.package_dir, root),
         "base_version": base.version,
         "base_sha256": base.fingerprint,
+        "base_validation": {"status": "passed", "full_validation": True, "validation_scope": "package"},
+        "owner_skill": display_path(owner_skill_root(base), root) if base.validator is not None else None,
         "version": version,
         "template_sha256": new_template_sha,
         "changed_manifest_fields": ["template.version", "fingerprint.sha256", "fingerprint.value"]
@@ -281,19 +309,26 @@ def scaffold_package(
             staged_item.replace(destination)
             moved.append(destination)
 
-        report.parent.mkdir(parents=True, exist_ok=True)
-        report.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        if os.environ.get("TEMPLATE_TOOL_TEST_FAIL_REPORT_COMMIT") == "1":
+            raise OSError("injected scaffold report commit failure")
+        atomic_write_text(report, json.dumps(report_data, ensure_ascii=False, indent=2) + "\n")
         report_written = True
-    except Exception:
+    except Exception as exc:
+        rollback_errors: list[str] = []
         if report_written or report.is_file() or report.is_symlink():
-            report.unlink(missing_ok=True)
+            try:
+                remove_path_or_raise(report)
+            except Exception as rollback_error:
+                rollback_errors.append(f"report cleanup failed: {rollback_error}")
         for destination in reversed(moved):
-            if destination.is_dir() and not destination.is_symlink():
-                shutil.rmtree(destination, ignore_errors=True)
-            elif destination.exists() or destination.is_symlink():
-                destination.unlink(missing_ok=True)
+            try:
+                remove_path_or_raise(destination)
+            except Exception as rollback_error:
+                rollback_errors.append(f"rollback failed for {destination}: {rollback_error}")
+        if rollback_errors:
+            raise TemplateToolError(f"scaffold transaction failed: {exc}; {'; '.join(rollback_errors)}") from exc
         raise
     finally:
         if stage.exists():
-            shutil.rmtree(stage, ignore_errors=True)
+            remove_path_or_raise(stage)
     return report_data

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import time
 import zipfile
 from pathlib import Path
 
@@ -30,7 +31,15 @@ def sha256(path: Path) -> str:
 class TemplatePackageToolingTests(unittest.TestCase):
     maxDiff = None
 
-    def run_tool(self, *arguments: str | Path, root: Path = ROOT) -> subprocess.CompletedProcess[str]:
+    def run_tool(
+        self,
+        *arguments: str | Path,
+        root: Path = ROOT,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        child_env = os.environ.copy()
+        if env:
+            child_env.update(env)
         return subprocess.run(
             [str(PYTHON), str(TOOL), "--repo-root", str(root), *[str(argument) for argument in arguments]],
             cwd=ROOT,
@@ -38,6 +47,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=child_env,
         )
 
     def json_result(self, result: subprocess.CompletedProcess[str]) -> dict:
@@ -72,6 +82,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             },
             "generator": {"version": "1.0.0", "supported_major": 1},
             "fingerprint": {"algorithm": "sha256", "sha256": digest, "value": digest},
+            "schema": "schemas/demo.schema.json",
         }
         (package / "manifest.yaml").write_text(
             yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
@@ -81,6 +92,9 @@ class TemplatePackageToolingTests(unittest.TestCase):
             (package / "CHANGELOG.md").write_text("# Fixture\n", encoding="utf-8")
         scripts = skill_root / "scripts"
         scripts.mkdir(exist_ok=True)
+        schemas = skill_root / "schemas"
+        schemas.mkdir(exist_ok=True)
+        (schemas / "demo.schema.json").write_text('{"type": "object"}\n', encoding="utf-8")
         (scripts / "validate_template.py").write_text(
             "from pathlib import Path\n"
             "import sys\n"
@@ -106,6 +120,29 @@ class TemplatePackageToolingTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def run_repo_validator(self, root: Path) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [str(PYTHON), str(ROOT / "tests" / "validate_template_packages.py"), "--repo-root", str(root)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+    def make_dependent_fixture_repo(self, root: Path) -> tuple[Path, Path, Path]:
+        skill, base, template = self.make_fixture_repo(root)
+        target = base.parent / "v1.1.0"
+        shutil.copytree(base, target)
+        target_manifest = yaml.safe_load((target / "manifest.yaml").read_text(encoding="utf-8"))
+        target_manifest["template"]["version"] = "1.1.0"
+        target_manifest["template"]["base_manifest"] = "../v1.0.0/manifest.yaml"
+        target_manifest["template"]["base_template"] = "../v1.0.0/template.txt"
+        (target / "manifest.yaml").write_text(
+            yaml.safe_dump(target_manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
+        )
+        return skill, target, target / "template.txt"
+
     def test_discover_current_four_packages_without_libreoffice(self) -> None:
         result = self.run_tool("discover", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -120,6 +157,98 @@ class TemplatePackageToolingTests(unittest.TestCase):
         defaults = {(item["id"], item["version"]) for item in payload["packages"] if item["is_default"]}
         self.assertEqual(defaults, {("lesson-plan", "1.1.0"), ("course-gradebook", "1.1.0")})
         self.assertEqual(payload["errors"], [])
+
+    def test_dynamic_repository_validator_discovers_and_validates_new_canonical_patch(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            first = self.run_repo_validator(root)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertIn("Validated 1 canonical template packages.", first.stdout)
+            patch = base.parent / "v1.0.1"
+            shutil.copytree(base, patch)
+            manifest_path = patch / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["version"] = "1.0.1"
+            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            second = self.run_repo_validator(root)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertIn("Validated 2 canonical template packages.", second.stdout)
+
+    def test_dynamic_repository_validator_catches_new_patch_validator_failure(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, _ = self.make_fixture_repo(root)
+            patch = base.parent / "v1.0.1"
+            shutil.copytree(base, patch)
+            manifest_path = patch / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["version"] = "1.0.1"
+            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            (skill / "validator-fail-v101").write_text("fail\n", encoding="utf-8")
+            (skill / "scripts" / "validate_template.py").write_text(
+                "from pathlib import Path\n"
+                "import sys\n"
+                "manifest = Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
+                "if manifest.parent.name == 'v1.0.1' and (Path(__file__).resolve().parent.parent / 'validator-fail-v101').exists():\n"
+                "    print('patch validator failed', file=sys.stderr)\n"
+                "    raise SystemExit(7)\n"
+                "print('fixture validator passed')\n",
+                encoding="utf-8",
+            )
+            failed = self.run_repo_validator(root)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("template validator failed", failed.stdout)
+            self.assertIn("1.0.1", failed.stdout)
+
+    def test_fingerprint_contract_rejects_all_incomplete_or_ambiguous_forms(self) -> None:
+        mutations = {
+            "algorithm": lambda value: value.update(algorithm="SHA256"),
+            "missing_algorithm": lambda value: value.pop("algorithm"),
+            "missing_sha256": lambda value: value.pop("sha256"),
+            "missing_value": lambda value: value.pop("value"),
+            "mismatch": lambda value: value.update(value="0" * 64),
+            "unicode": lambda value: value.update(sha256="０" * 64, value="０" * 64),
+            "short": lambda value: value.update(sha256="0" * 63, value="0" * 63),
+            "long": lambda value: value.update(sha256="0" * 65, value="0" * 65),
+            "unknown": lambda value: value.update(extra="not allowed"),
+        }
+        for label, mutate in mutations.items():
+            with self.subTest(label=label), tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+                root = Path(directory)
+                _, package, _ = self.make_fixture_repo(root)
+                manifest_path = package / "manifest.yaml"
+                manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+                mutate(manifest["fingerprint"])
+                manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+                result = self.run_tool("discover", "--json", root=root)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("fingerprint", result.stdout)
+
+    def test_external_package_rejects_ambiguous_owner_but_canonical_path_uses_local_owner(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            second_skill = root / "另一个技能" / "demo-skill"
+            second_package = second_skill / "assets" / "templates" / "demo-template" / "v1.0.0"
+            second_package.parent.mkdir(parents=True)
+            shutil.copytree(package, second_package)
+            second_scripts = second_skill / "scripts"
+            second_scripts.mkdir(parents=True)
+            shutil.copy2(skill / "scripts" / "validate_template.py", second_scripts / "validate_template.py")
+            external = root / "external" / "v1.0.1"
+            external.parent.mkdir()
+            shutil.copytree(package, external)
+            external_manifest = yaml.safe_load((external / "manifest.yaml").read_text(encoding="utf-8"))
+            external_manifest["template"]["version"] = "1.0.1"
+            (external / "manifest.yaml").write_text(
+                yaml.safe_dump(external_manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
+            )
+            ambiguous = self.run_tool("validate", "--package", external, "--json", root=root)
+            self.assertNotEqual(ambiguous.returncode, 0)
+            self.assertIn("ambiguous", ambiguous.stdout)
+            canonical = self.run_tool("validate", "--package", package, "--json", root=root)
+            self.assertEqual(canonical.returncode, 0, canonical.stdout + canonical.stderr)
 
     def test_identity_only_validates_all_current_packages_without_full_pass_claim(self) -> None:
         packages = [
@@ -170,6 +299,53 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual(payload["status"], "failed")
             self.assertTrue(any("fingerprint mismatch" in error for error in payload["errors"]))
             self.assertIsNone(payload["validator"])
+
+    def test_external_validation_uses_only_system_temp_and_leaves_canonical_tree_untouched(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            output = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            before = sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
+            validated = self.run_tool("validate", "--package", output, "--json", root=root)
+            self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            report = self.json_result(validated)
+            self.assertEqual(report["validation_scope"], "isolated_temp")
+            after = sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
+            self.assertEqual(before, after)
+            self.assertFalse(any(".template-tool-validation-" in path.name for path in root.rglob("*")))
+
+    def test_two_external_validations_can_run_concurrently_without_canonical_shadow(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            outputs = []
+            for version in ("1.0.1", "1.0.2"):
+                output = root / "work" / "demo-template" / version
+                result = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", version, "--output-dir", output, "--json", root=root
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                outputs.append(output)
+            processes = [
+                subprocess.Popen(
+                    [str(PYTHON), str(TOOL), "--repo-root", str(root), "validate", "--package", str(output), "--json"],
+                    cwd=ROOT,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                for output in outputs
+            ]
+            results = [process.communicate(timeout=120) for process in processes]
+            for stdout, stderr in results:
+                self.assertIn('"status": "passed"', stdout, stdout + stderr)
+            self.assertFalse(any(".template-tool-validation-" in path.name for path in root.rglob("*")))
 
     def test_discover_rejects_duplicate_identity_and_invalid_manifest(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -230,7 +406,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             errors = "\n".join(error for item in payload["errors"] for error in item["errors"])
             self.assertIn("does not equal manifest version", errors)
             self.assertIn("template file does not exist", errors)
-            self.assertIn("fingerprint must be a 64-character", errors)
+            self.assertIn("fingerprint.sha256 must be a 64-character", errors)
             self.assertIn("owner validator scripts/validate_template.py was not found", errors)
 
     def test_scaffold_patch_updates_only_declared_manifest_fields_and_passes_real_validation(self) -> None:
@@ -253,8 +429,8 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertTrue(report["promotable"])
             self.assertTrue(output.is_dir())
             self.assertTrue((workspace / "v1.0.0" / "manifest.yaml").is_file())
-            self.assertFalse((output / "scaffold-report.json").exists())
-            self.assertTrue((workspace / "scaffold-report.json").is_file())
+            self.assertFalse((output / "scaffold-report-lesson-plan-1.1.1.json").exists())
+            self.assertTrue((workspace / "scaffold-report-lesson-plan-1.1.1.json").is_file())
             original = yaml.safe_load((base / "manifest.yaml").read_text(encoding="utf-8"))
             generated = yaml.safe_load((output / "manifest.yaml").read_text(encoding="utf-8"))
             self.assertEqual(generated["generator"], original["generator"])
@@ -279,12 +455,12 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 "--output-dir",
                 generator_output,
                 "--generator-version",
-                "9.9.9",
+                "1.1.2",
                 "--json",
             )
             self.assertEqual(generated_scaffold.returncode, 0, generated_scaffold.stderr)
             generated_override = yaml.safe_load((generator_output / "manifest.yaml").read_text(encoding="utf-8"))
-            self.assertEqual(generated_override["generator"]["version"], "9.9.9")
+            self.assertEqual(generated_override["generator"]["version"], "1.1.2")
 
     def test_scaffold_unsupported_minor_requires_opt_in_and_is_not_promotable(self) -> None:
         base = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0"
@@ -312,6 +488,85 @@ class TemplatePackageToolingTests(unittest.TestCase):
             report = self.json_result(result)
             self.assertFalse(report["promotable"])
             self.assertEqual(report["reason"], "Template minor is not supported by the current generator contract.")
+
+    def test_scaffold_requires_base_full_validation_before_creating_any_output(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, template = self.make_fixture_repo(root)
+            (skill / "validator-fail").write_text("fail\n", encoding="utf-8")
+            output = root / "work" / "demo-template" / "1.0.1"
+            before = sha256(template)
+            failed = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("base package full validation failed", failed.stdout)
+            self.assertFalse(output.exists())
+            self.assertFalse(output.parent.exists())
+            self.assertFalse(any(path.name.startswith("scaffold-report-") for path in root.rglob("*.json")))
+            self.assertEqual(sha256(template), before)
+            self.assertFalse(any(".stage" in path.name for path in root.rglob("*")))
+
+    def test_scaffold_rejects_protected_report_paths_and_uses_unique_atomic_reports(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            output = root / "work" / "demo-template" / "1.0.1"
+            protected = self.run_tool(
+                "scaffold",
+                "--base-package", base,
+                "--version", "1.0.1",
+                "--output-dir", output,
+                "--report-path", base / "new-report.json",
+                "--json",
+                root=root,
+            )
+            self.assertNotEqual(protected.returncode, 0)
+            self.assertIn("scaffold report overlaps protected path", protected.stdout)
+            first = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
+            )
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            output2 = root / "work" / "demo-template" / "1.0.2"
+            second = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.2", "--output-dir", output2, "--json", root=root
+            )
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            self.assertTrue((output.parent / "scaffold-report-demo-template-1.0.1.json").is_file())
+            self.assertTrue((output2.parent / "scaffold-report-demo-template-1.0.2.json").is_file())
+            failed_commit = self.run_tool(
+                "scaffold",
+                "--base-package", base,
+                "--version", "1.0.3",
+                "--output-dir", root / "work" / "demo-template" / "1.0.3",
+                "--json",
+                root=root,
+                env={"TEMPLATE_TOOL_TEST_FAIL_REPORT_COMMIT": "1"},
+            )
+            self.assertNotEqual(failed_commit.returncode, 0)
+            self.assertIn("injected scaffold report commit failure", failed_commit.stdout)
+            self.assertFalse((root / "work" / "demo-template" / "1.0.3").exists())
+
+    def test_scaffold_generator_version_is_strict_ascii_semver(self) -> None:
+        invalid = ("1.1.01", "01.1.1", "１.１.１", "v1.1.1", "latest", "")
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            for index, value in enumerate(invalid, start=1):
+                with self.subTest(value=value):
+                    output = root / "invalid" / f"1.0.{index}"
+                    result = self.run_tool(
+                        "scaffold",
+                        "--base-package", base,
+                        "--version", f"1.0.{index}",
+                        "--output-dir", output,
+                        "--generator-version", value,
+                        "--json",
+                        root=root,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("semantic version", result.stdout)
+                    self.assertFalse(output.exists())
 
     def test_scaffold_dry_run_and_overlap_do_not_mutate(self) -> None:
         base = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0"
@@ -374,6 +629,75 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertFalse(any("stage" in path.name or "backup" in path.name for path in target.parent.iterdir()))
 
+    def test_promote_uses_immutable_snapshot_when_source_changes_after_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            self.make_repo_validator(root)
+            source = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            original = (source / "template.txt").read_bytes()
+            promoted = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_MUTATE_SOURCE_AFTER_SNAPSHOT": "1"},
+            )
+            self.assertEqual(promoted.returncode, 0, promoted.stdout + promoted.stderr)
+            target = root / "技能工具" / "demo-skill" / "assets" / "templates" / "demo-template" / "v1.0.1"
+            self.assertEqual((target / "template.txt").read_bytes(), original)
+            self.assertNotEqual((source / "template.txt").read_bytes(), original)
+            self.assertEqual(self.json_result(promoted)["target_validation"]["validation_scope"], "package")
+
+    def test_promote_canonical_only_failure_is_caught_after_stage_and_target_validation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, _ = self.make_fixture_repo(root)
+            self.make_repo_validator(root)
+            (skill / "scripts" / "validate_template.py").write_text(
+                "from pathlib import Path\n"
+                "import sys\n"
+                "if (Path(__file__).resolve().parent.parent / 'canonical-only-fail').exists() and Path(sys.argv[sys.argv.index('--manifest') + 1]).parent.name == 'v1.0.1':\n"
+                "    print('canonical target validator failed', file=sys.stderr)\n"
+                "    raise SystemExit(11)\n"
+                "print('fixture validator passed')\n",
+                encoding="utf-8",
+            )
+            source = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            before = sha256(base / "template.txt")
+            (skill / "canonical-only-fail").write_text("fail\n", encoding="utf-8")
+            failed = self.run_tool("promote", "--package", source, "--json", root=root)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("final canonical target validation failed", failed.stdout)
+            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
+            self.assertFalse(target.exists())
+            self.assertEqual(sha256(base / "template.txt"), before)
+            self.assertFalse(any(path.name.endswith(".stage") for path in target.parent.iterdir()))
+
+    def test_promote_reports_double_error_when_target_rollback_is_injected_to_fail(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            self.make_repo_validator(root)
+            (root / "repo-fail").write_text("fail\n", encoding="utf-8")
+            source = root / "work" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_FAIL_ROLLBACK": "1"},
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn("repository-wide validator failed", failed.stdout)
+            self.assertIn("target rollback failed", failed.stdout)
+
     def test_promote_rejects_unsupported_minor_and_validator_failure_without_install(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
@@ -407,6 +731,86 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertNotEqual(failed.returncode, 0)
             self.assertFalse((skill / "assets" / "templates" / "demo-template" / "v1.0.1").exists())
 
+    def test_archive_contains_dependency_closure_and_is_valid_after_extraction(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, _ = self.make_dependent_fixture_repo(root)
+            first_dir = root / "dist-a"
+            second_dir = root / "dist-b"
+            first = self.run_tool("archive", "--package", package, "--output-dir", first_dir, "--json", root=root)
+            second = self.run_tool("archive", "--package", package, "--output-dir", second_dir, "--json", root=root)
+            self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+            self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+            first_payload = self.json_result(first)
+            second_payload = self.json_result(second)
+            self.assertEqual(first_payload["archive_sha256"], second_payload["archive_sha256"])
+            archive_path = first_dir / "demo-template-1.1.0.zip"
+            with zipfile.ZipFile(archive_path) as archive:
+                names = archive.namelist()
+                self.assertIn("demo-template/v1.0.0/manifest.yaml", names)
+                self.assertIn("demo-template/v1.1.0/manifest.yaml", names)
+                self.assertEqual(names, sorted(names, key=lambda value: (value.casefold(), value)))
+            metadata_path = first_dir / "demo-template-1.1.0.metadata.json"
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["entry_package"], "demo-template/v1.1.0")
+            self.assertEqual({item["version"] for item in metadata["packages"]}, {"1.0.0", "1.1.0"})
+            self.assertFalse((first_dir / "demo-template-1.1.0.zip.json").exists())
+
+    def test_archive_rejects_missing_bad_and_cyclic_dependencies(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, _ = self.make_dependent_fixture_repo(root)
+            base = package.parent / "v1.0.0"
+            (base / "manifest.yaml").unlink()
+            missing = self.run_tool("archive", "--package", package, "--output-dir", root / "missing-dist", "--json", root=root)
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn("dependency", missing.stdout)
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, _ = self.make_dependent_fixture_repo(root)
+            base = package.parent / "v1.0.0"
+            manifest = yaml.safe_load((base / "manifest.yaml").read_text(encoding="utf-8"))
+            manifest["fingerprint"]["sha256"] = "0" * 64
+            manifest["fingerprint"]["value"] = "0" * 64
+            (base / "manifest.yaml").write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            bad = self.run_tool("archive", "--package", package, "--output-dir", root / "bad-dist", "--json", root=root)
+            self.assertNotEqual(bad.returncode, 0)
+            self.assertIn("fingerprint", bad.stdout)
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, _ = self.make_dependent_fixture_repo(root)
+            base = package.parent / "v1.0.0"
+            manifest = yaml.safe_load((base / "manifest.yaml").read_text(encoding="utf-8"))
+            manifest["template"]["base_manifest"] = "../v1.1.0/manifest.yaml"
+            manifest["template"]["base_template"] = "../v1.1.0/template.txt"
+            (base / "manifest.yaml").write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            cycle = self.run_tool("archive", "--package", package, "--output-dir", root / "cycle-dist", "--json", root=root)
+            self.assertNotEqual(cycle.returncode, 0)
+            self.assertIn("cycle", cycle.stdout)
+
+    def test_archive_rejects_portability_collisions_and_commit_failure_cleans_all_outputs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, _ = self.make_fixture_repo(root)
+            from tools.template_tooling.archive import _assert_unique_portable_names, _validate_archive_name
+
+            for names in (["A.txt", "a.txt"], ["A\u030a.txt", "Å.txt"], ["CON.txt"], ["trailing."]):
+                with self.subTest(names=names):
+                    with self.assertRaises(Exception):
+                        _assert_unique_portable_names(list(names))
+            self.assertEqual(_validate_archive_name("模板/合法.txt"), "模板/合法.txt")
+            failed = self.run_tool(
+                "archive", "--package", package, "--output-dir", root / "commit-failure", "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_FAIL_ARCHIVE_COMMIT_STEP": "2"},
+            )
+            self.assertNotEqual(failed.returncode, 0)
+            output = root / "commit-failure"
+            self.assertFalse((output / "demo-template-1.0.0.zip").exists())
+            self.assertFalse((output / "demo-template-1.0.0.zip.sha256").exists())
+            self.assertFalse((output / "demo-template-1.0.0.metadata.json").exists())
+
     def test_archive_is_deterministic_self_describing_and_excludes_build_artifacts(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
@@ -430,12 +834,16 @@ class TemplatePackageToolingTests(unittest.TestCase):
             archive_path = first_dir / "demo-template-1.0.0.zip"
             with zipfile.ZipFile(archive_path) as archive:
                 names = archive.namelist()
-                self.assertEqual(names, ["CHANGELOG.md", "manifest.yaml", "template.txt"])
+                self.assertEqual(names, [
+                    "demo-template/v1.0.0/CHANGELOG.md",
+                    "demo-template/v1.0.0/manifest.yaml",
+                    "demo-template/v1.0.0/template.txt",
+                ])
                 self.assertFalse(any("qa" in name or "stage" in name for name in names))
                 self.assertTrue(all(info.date_time == (1980, 1, 1, 0, 0, 0) for info in archive.infolist()))
             sidecar = (first_dir / "demo-template-1.0.0.zip.sha256").read_text(encoding="ascii")
             self.assertIn(first_payload["archive_sha256"], sidecar)
-            metadata = json.loads((first_dir / "demo-template-1.0.0.zip.json").read_text(encoding="utf-8"))
+            metadata = json.loads((first_dir / "demo-template-1.0.0.metadata.json").read_text(encoding="utf-8"))
             self.assertEqual(metadata["archive_sha256"], first_payload["archive_sha256"])
             self.assertEqual(metadata["template_sha256"], sha256(package / "template.txt"))
 

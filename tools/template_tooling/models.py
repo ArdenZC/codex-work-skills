@@ -68,6 +68,11 @@ class TemplatePackage:
             "manifest": display_path(self.manifest_path) if root is not None else self.manifest_path.name,
             "fingerprint": self.fingerprint,
             "validator": display_path(self.validator) if root is not None else (self.validator.name if self.validator else None),
+            "owner_skill": (
+                display_path(self.validator.parent.parent)
+                if self.validator is not None and root is not None
+                else (self.validator.parent.parent.name if self.validator else None)
+            ),
             "is_default": self.is_default,
             "is_canonical": self.is_canonical,
             "errors": list(self.errors),
