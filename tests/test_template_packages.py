@@ -4710,6 +4710,130 @@ class GradebookTemplatePackageTests(unittest.TestCase):
                     self.assertIn(expected_error.lower(), (rejected.stdout + rejected.stderr).lower())
                     self.assertFalse((output / "template.xls").exists())
 
+    def test_controlled_v11_baseline_handles_roundtrip_normalization_and_protected_tamper(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="grade-package-controlled-baseline-") as temp_name:
+            folder = Path(temp_name)
+            soffice = soffice_path()
+            self.assertIsNotNone(soffice)
+            scripts_path = str(GRADE / "scripts")
+            for module_name in (
+                "validate_template",
+                "named_range_template_baseline",
+                "package_common",
+                "named_range_contracts",
+                "named_range_utils",
+                "xls_named_range_utils",
+            ):
+                sys.modules.pop(module_name, None)
+            if scripts_path in sys.path:
+                sys.path.remove(scripts_path)
+            sys.path.insert(0, scripts_path)
+            from named_range_template_baseline import build_controlled_v11_baseline
+            from package_common import load_manifest
+            from validate_template import _signature_differences, _workbook_signature
+
+            base_manifest = load_manifest(GRADE_V10_MANIFEST)
+            canonical_xlsx = convert_with_soffice(
+                GRADE_V10_TEMPLATE,
+                folder / "direct-v10-xlsx",
+                "xlsx",
+            )
+            committed_xlsx = convert_with_soffice(
+                GRADE_V11_TEMPLATE,
+                folder / "direct-v11-xlsx",
+                "xlsx",
+            )
+            canonical_signature = _workbook_signature(
+                load_workbook(canonical_xlsx, data_only=False),
+                base_manifest,
+            )
+            committed_signature = _workbook_signature(
+                load_workbook(committed_xlsx, data_only=False),
+                base_manifest,
+            )
+            for signature in (canonical_signature, committed_signature):
+                signature.pop("named_ranges", None)
+
+            simulated_roundtrip_xlsx = folder / "simulated-v10-roundtrip.xlsx"
+            simulated_workbook = load_workbook(canonical_xlsx, data_only=False)
+            simulated_sheet = simulated_workbook[base_manifest["structure"]["worksheet"]]
+            simulated_sheet.column_dimensions["B"].width = round(
+                float(committed_signature["column_widths"]["B"] or 0) + 0.2,
+                1,
+            )
+            simulated_workbook.save(simulated_roundtrip_xlsx)
+            simulated_signature = _workbook_signature(
+                load_workbook(simulated_roundtrip_xlsx, data_only=False),
+                base_manifest,
+            )
+            simulated_signature.pop("named_ranges", None)
+            old_model_differences = _signature_differences(
+                simulated_signature,
+                committed_signature,
+            )
+            self.assertTrue(
+                any(item["path"] == "column_widths.B" for item in old_model_differences),
+                old_model_differences,
+            )
+
+            controlled = build_controlled_v11_baseline(
+                folder / "controlled-v11",
+                str(soffice),
+            )
+            controlled_signature = _workbook_signature(
+                controlled.controlled_workbook,
+                base_manifest,
+            )
+            controlled_signature.pop("named_ranges", None)
+            self.assertEqual(
+                _signature_differences(controlled_signature, committed_signature),
+                [],
+            )
+
+            tampered_xlsx = folder / "tampered-font.xlsx"
+            shutil.copy2(committed_xlsx, tampered_xlsx)
+            tampered_workbook = load_workbook(tampered_xlsx, data_only=False)
+            tampered_sheet = tampered_workbook[base_manifest["structure"]["worksheet"]]
+            tampered_sheet.column_dimensions["B"].width = round(
+                float(tampered_sheet.column_dimensions["B"].width or 0) + 1.0,
+                1,
+            )
+            tampered_workbook.save(tampered_xlsx)
+            tampered_xls = convert_with_soffice(
+                tampered_xlsx,
+                folder / "tampered-font-xls",
+                "xls",
+            )
+            custom_template, custom_manifest = write_gradebook_manifest(
+                folder / "custom-tamper",
+                GRADE_V11_MANIFEST,
+                GRADE_V11_TEMPLATE,
+            )
+            shutil.copy2(tampered_xls, custom_template)
+            manifest_data = yaml.safe_load(custom_manifest.read_text(encoding="utf-8"))
+            digest = file_sha256(custom_template)
+            manifest_data["fingerprint"]["sha256"] = digest
+            manifest_data["fingerprint"]["value"] = digest
+            custom_manifest.write_text(
+                yaml.safe_dump(manifest_data, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            rejected = run_script(
+                GRADE / "scripts" / "validate_template.py",
+                "--template",
+                str(custom_template),
+                "--manifest",
+                str(custom_manifest),
+                "--json",
+            )
+            self.assertNotEqual(rejected.returncode, 0, rejected.stdout + rejected.stderr)
+            tamper_report = json.loads(rejected.stdout)
+            differences = tamper_report["checks"]["protected_signature_differences"]
+            self.assertTrue(
+                any(str(item.get("path", "")).startswith("column_widths.") for item in differences),
+                differences,
+            )
+
     def test_named_range_manifest_contract_is_closed_and_minor_matrix_is_strict(self) -> None:
         sys.modules.pop("package_common", None)
         sys.modules.pop("named_range_contracts", None)

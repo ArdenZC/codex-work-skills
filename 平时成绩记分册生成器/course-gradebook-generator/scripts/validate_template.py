@@ -749,9 +749,16 @@ def _named_range_checks(
         "anchor_mode": "excel_named_range",
     }
 
-    base_xlsx = convert_to_xlsx(V10_TEMPLATE, temp_dir / "base-template", find_soffice())
-    base_workbook = load_workbook(base_xlsx, data_only=False)
-    expected_signature = _workbook_signature(base_workbook, base_manifest)
+    from named_range_template_baseline import build_controlled_v11_baseline
+
+    controlled_baseline = build_controlled_v11_baseline(
+        temp_dir / "controlled-v11-baseline",
+        find_soffice(),
+    )
+    expected_signature = _workbook_signature(
+        controlled_baseline.controlled_workbook,
+        base_manifest,
+    )
     actual_signature = _workbook_signature(workbook, base_manifest)
     expected_signature.pop("named_ranges", None)
     actual_signature.pop("named_ranges", None)

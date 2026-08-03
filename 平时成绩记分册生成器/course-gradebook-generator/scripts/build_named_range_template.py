@@ -20,8 +20,6 @@ from openpyxl import load_workbook
 from named_range_contracts import required_names
 from named_range_utils import (
     compare_named_range_inventories,
-    expected_named_range_locations,
-    set_named_range_from_location,
     validate_named_range_inventory,
 )
 from package_common import (
@@ -31,11 +29,10 @@ from package_common import (
     sha256_file,
     validate_canonical_baselines,
 )
-from validate_template import convert_to_format, find_soffice
+from named_range_template_baseline import build_controlled_v11_baseline
+from validate_template import controlled_roundtrip_paths, convert_to_format, find_soffice
 from xls_named_range_utils import (
     compare_xls_and_xlsx_named_ranges,
-    normalize_libreoffice_print_title_records,
-    normalize_xls_summary_information,
     validate_xls_named_range_inventory,
 )
 
@@ -180,13 +177,6 @@ def _assert_fixed_v10_baseline(
         raise RuntimeError("Named-range build rejected a source whose PDF page layout differs from canonical v1.0")
 
 
-def _build_named_workbook(source_xlsx: Path, target_xlsx: Path, expected_locations) -> None:
-    workbook = load_workbook(source_xlsx, data_only=False)
-    for name in required_names("with_skill"):
-        set_named_range_from_location(workbook, expected_locations[name])
-    workbook.save(target_xlsx)
-
-
 def _write_manifest(
     source_manifest: Path,
     target_manifest: Path,
@@ -254,13 +244,6 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         temp = Path(temp_name)
         source_manifest_v11 = V11_PACKAGE_DIR / "manifest.yaml"
         manifest_data = yaml.safe_load(source_manifest_v11.read_text(encoding="utf-8")) or {}
-        base_manifest = yaml.safe_load(V10_MANIFEST.read_text(encoding="utf-8")) or {}
-        expected_locations = expected_named_range_locations(base_manifest["structure"], "with_skill")
-        expected_inventory = {
-            "locations": {
-                name: location.to_dict() for name, location in expected_locations.items()
-            }
-        }
         source_xls_inventory = validate_xls_named_range_inventory(
             source,
             manifest_data["anchors"],
@@ -269,6 +252,16 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         source_xlsx = _convert(soffice, source, temp / "source-xlsx", "xlsx")
         canonical_xlsx = _convert(soffice, V10_TEMPLATE, temp / "canonical-xlsx", "xlsx")
         _assert_fixed_v10_baseline(source_xlsx, canonical_xlsx, soffice, source, temp)
+        controlled_baseline = build_controlled_v11_baseline(
+            temp / "controlled-v11-baseline",
+            soffice,
+        )
+        expected_locations = controlled_baseline.expected_locations
+        expected_inventory = {
+            "locations": {
+                name: location.to_dict() for name, location in expected_locations.items()
+            }
+        }
         source_xlsx_inventory = validate_named_range_inventory(
             load_workbook(source_xlsx, data_only=False),
             manifest_data["anchors"],
@@ -327,13 +320,9 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
                     + "; ".join(sorted(set(source_errors)))
                 )
             source_named_state = "v1.1 canonical"
-        named_xlsx = temp / "named-ranges.xlsx"
         if source_named_state == "v1.0 seed":
-            _build_named_workbook(source_xlsx, named_xlsx, expected_locations)
-            named_xls = _convert(soffice, named_xlsx, temp / "named-xls", "xls")
-            normalize_libreoffice_print_title_records(named_xls)
-            normalize_xls_summary_information(named_xls)
-            named_roundtrip_xlsx = _convert(soffice, named_xls, temp / "named-roundtrip-xlsx", "xlsx")
+            named_xls = controlled_baseline.controlled_v11_xls
+            named_roundtrip_xlsx = controlled_baseline.controlled_v11_xlsx
         else:
             # A complete v1.1 source is already a canonical semantic package.
             # Validate its raw and round-trip inventories, then preserve its
@@ -374,10 +363,19 @@ def build_template(source: Path, output_dir: Path, force: bool = False) -> dict[
         differences.extend(compare_named_range_inventories(xls_inventory, xlsx_inventory, required_names("with_skill")))
         if differences:
             raise RuntimeError("Raw XLS and round-trip XLSX named-range inventories differ: " + "; ".join(sorted(set(differences))))
-        if _workbook_layout_signature(load_workbook(canonical_xlsx, data_only=False)) != _workbook_layout_signature(
-            load_workbook(named_roundtrip_xlsx, data_only=False)
+        _, controlled_v10_xlsx = controlled_roundtrip_paths(
+            V10_TEMPLATE,
+            temp / "controlled-v10-baseline",
+            soffice,
+        )
+        if _workbook_layout_signature(load_workbook(controlled_v10_xlsx, data_only=False)) != _workbook_layout_signature(
+            load_workbook(controlled_baseline.controlled_v11_xlsx, data_only=False)
         ):
             raise RuntimeError("Named-range build changed protected workbook layout or formatting")
+        if _workbook_layout_signature(load_workbook(controlled_baseline.controlled_v11_xlsx, data_only=False)) != _workbook_layout_signature(
+            load_workbook(named_roundtrip_xlsx, data_only=False)
+        ):
+            raise RuntimeError("Named-range template differs from the controlled v1.1 baseline")
 
         baseline_pdf = _convert(soffice, V10_TEMPLATE, temp / "baseline-pdf", "pdf")
         named_pdf = _convert(soffice, named_xls, temp / "named-pdf", "pdf")
