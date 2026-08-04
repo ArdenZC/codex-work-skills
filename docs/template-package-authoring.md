@@ -44,13 +44,15 @@ python tools/template_package.py validate --package <package> --json
 
 默认执行通用身份/fingerprint 检查，再调用受信任 Skill 的真实 `scripts/validate_template.py`；执行前会再次读取 Git index、检查 owner validator 和完整 scripts 支持文件，工作树新增但未暂存的 helper 会 fail closed。external 包会复制 Git-tracked 的普通脚本、本地依赖、schema、当前包和声明的 base 依赖到系统临时隔离 Skill 树中执行，绝不执行 external workspace 自带的 validator；真实 canonical 树不会创建 shadow，随机临时绝对路径不会进入报告。完整校验必须通过时才报告 `status=passed`。`--identity-only` 明确报告 `status=identity_only`、`full_validation=false`，它不是完整通过，适合纯路径或 manifest 检查。
 
+所有完整 validator 流程都使用系统临时的正常 Skill 树，包括 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不存在 canonical 直接执行的例外。隔离树只复制 Git-tracked 的普通源文件、模板、manifest、schema、helper 和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或写入。子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并把 `PYTHONPYCACHEPREFIX` 指向临时树内的 `python-cache`。验证前后都会检查缓存、字节码和临时目录边界，清理失败返回失败；报告的 `source_scope` 可为 `canonical` 或 `external`，完整报告的 `validation_scope` 必须为 `isolated_temp`。身份检查不会执行 validator，也不会报告为完整通过。
+
 ## 晋级
 
 ```bash
 python tools/template_package.py promote --package <validated-work-package>
 ```
 
-目标路径由所属 Skill 的模板根、manifest 的 template id 和版本计算，不能由用户指定任意 canonical 目标。工具先把工作包复制到系统临时目录的不可变 snapshot，并只使用 snapshot 完整校验；snapshot、stage、安装后的 target、target validator 成功后以及动态仓库校验成功后都必须与 snapshot 全树字节一致，validator 或 repository validator 在包内产生任何文件都会阻断晋级。随后复制到 canonical 同父目录 stage，执行 identity/full validation，安装后再次对实际 target 执行真实 validator，要求 `status=passed`、`full_validation=true`、`validation_scope=package`，最后运行动态 `tests/validate_template_packages.py` 验证全部 canonical 包。任何后置失败都会删除本次 target、确认删除结果并清理 stage；删除失败会同时报告原始错误和回滚错误，既有包不会被覆盖。`--dry-run` 会执行 snapshot 和前置完整校验并仅输出计划。
+目标路径由所属 Skill 的模板根、manifest 的 template id 和版本计算，不能由用户指定任意 canonical 目标。工具先把工作包复制到系统临时目录的不可变 snapshot，并只使用 snapshot 完整校验；snapshot、stage、安装后的 target、target validator 成功后以及动态仓库校验成功后都必须与 snapshot 全树字节一致，validator 或 repository validator 在包内产生任何文件都会阻断晋级。随后复制到 canonical 同父目录 stage，执行 identity/full validation，安装后再次对实际 target 执行真实 validator，要求 `status=passed`、`full_validation=true`、`validation_scope=isolated_temp`，最后运行动态 `tests/validate_template_packages.py` 验证全部 canonical 包。任何后置失败都会删除本次 target、确认删除结果并清理 stage；删除失败会同时报告原始错误和回滚错误，既有包不会被覆盖。`--dry-run` 会执行 snapshot 和前置完整校验并仅输出计划。
 
 ## 归档
 

@@ -56,6 +56,8 @@ requirements.txt
 
 校验失败必须返回非零退出码，并在标准错误输出清晰原因。非阻断提醒放入 `warnings`，不能把警告伪装成成功校验。正常生成默认启用模板校验和输出校验；只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才能跳过。
 
+模板包的完整 validator 始终在系统临时的正常 Skill 树中执行，覆盖 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不会从真实 canonical 或用户工作目录直接加载 owner validator。隔离树只复制 Git-tracked 的普通源文件和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或修改。validator 子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并将 `PYTHONPYCACHEPREFIX` 重定向到临时树内的 `python-cache`。验证前后检查缓存和字节码，所有临时目录必须清理；清理失败即为失败。`--identity-only` 只执行身份检查，不执行完整 validator，也不能作为完整通过。
+
 ## Word 语义书签
 
 教案 `lesson-plan/v1.1.0` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。所有 managed semantic bookmark 必须匹配 `^[A-Za-z][A-Za-z0-9_]{0,39}$`，不使用中文、空格、连字符、点号、`_GoBack` 或超过 40 个字符的名称；教学实施区使用 `prep`、`intro`、`demo`、`exec`、`extend`、`practice`、`peer`、`summary`、`improve` 等短阶段代码。固定字段、教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确，且 start/end 的完整稳定边界位置未改变。构建器对临时最终 DOCX 扫描主文档、所有页眉和页脚 story 后才原子替换输出；书签 ID 只允许 ASCII 十进制数字。

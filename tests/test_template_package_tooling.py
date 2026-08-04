@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import py_compile
 import re
 import shutil
 import subprocess
@@ -118,19 +119,33 @@ class TemplatePackageToolingTests(unittest.TestCase):
         schemas = skill_root / "schemas"
         schemas.mkdir(exist_ok=True)
         (schemas / "demo.schema.json").write_text('{"type": "object"}\n', encoding="utf-8")
+        helper = scripts / "helper.py"
+        helper_prefix = 'VALUE = "trusted"\n'
+        helper.write_text(
+            helper_prefix + "#" + "x" * (2048 - len(helper_prefix) - 2) + "\n",
+            encoding="utf-8",
+        )
         (scripts / "validate_template.py").write_text(
             "from pathlib import Path\n"
             "import os\n"
             "import sys\n"
+            "import time\n"
+            "import helper\n"
+            "assert helper.VALUE == 'trusted'\n"
+            "manifest = Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
+            "package = manifest.parent\n"
+            "if (package / 'validator-timeout').exists():\n"
+            "    time.sleep(60)\n"
             "marker = os.environ.get('TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER')\n"
             "if marker:\n"
             "    Path(marker).write_text('started', encoding='utf-8')\n"
-            "inspect = os.environ.get('TEMPLATE_TOOL_TEST_INSPECT_SCRIPTS')\n"
+            "inspect_config = package / 'validator-inspect-target.txt'\n"
+            "inspect = inspect_config.read_text(encoding='utf-8').strip() if inspect_config.is_file() else None\n"
             "if inspect:\n"
             "    scripts = Path(__file__).resolve().parent\n"
             "    files = sorted(path.relative_to(scripts).as_posix() for path in scripts.rglob('*') if path.is_file())\n"
             "    Path(inspect).write_text('\\n'.join(files), encoding='utf-8')\n"
-            "if (Path(__file__).resolve().parent.parent / 'validator-fail').exists():\n"
+            "if (package / 'validator-fail').exists():\n"
             "    print('fixture validator failed', file=sys.stderr)\n"
             "    raise SystemExit(7)\n"
             "print('fixture validator passed')\n",
@@ -139,6 +154,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
         tracked = [
             package / "manifest.yaml",
             package / "template.txt",
+            helper,
             scripts / "validate_template.py",
             schemas / "demo.schema.json",
         ]
@@ -162,7 +178,15 @@ class TemplatePackageToolingTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def run_repo_validator(self, root: Path) -> subprocess.CompletedProcess[str]:
+    def run_repo_validator(
+        self,
+        root: Path,
+        *,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        process_env = os.environ.copy()
+        if env:
+            process_env.update(env)
         return subprocess.run(
             [str(PYTHON), str(ROOT / "tests" / "validate_template_packages.py"), "--repo-root", str(root)],
             cwd=ROOT,
@@ -170,6 +194,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             text=True,
             encoding="utf-8",
             errors="replace",
+            env=process_env,
         )
 
     def make_dependent_fixture_repo(self, root: Path) -> tuple[Path, Path, Path]:
@@ -227,12 +252,12 @@ class TemplatePackageToolingTests(unittest.TestCase):
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             manifest["template"]["version"] = "1.0.1"
             manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
-            (skill / "validator-fail-v101").write_text("fail\n", encoding="utf-8")
+            (patch / "validator-fail-v101").write_text("fail\n", encoding="utf-8")
             (skill / "scripts" / "validate_template.py").write_text(
                 "from pathlib import Path\n"
                 "import sys\n"
                 "manifest = Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
-                "if manifest.parent.name == 'v1.0.1' and (Path(__file__).resolve().parent.parent / 'validator-fail-v101').exists():\n"
+                "if manifest.parent.name == 'v1.0.1' and (manifest.parent / 'validator-fail-v101').exists():\n"
                 "    print('patch validator failed', file=sys.stderr)\n"
                 "    raise SystemExit(7)\n"
                 "print('fixture validator passed')\n",
@@ -291,6 +316,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             )
             new_scripts = new_skill / "scripts"
             new_scripts.mkdir(parents=True)
+            shutil.copy2(skill / "scripts" / "helper.py", new_scripts / "helper.py")
             shutil.copy2(skill / "scripts" / "validate_template.py", new_scripts / "validate_template.py")
             new_schemas = new_skill / "schemas"
             new_schemas.mkdir(parents=True)
@@ -299,6 +325,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 root,
                 new_package / "manifest.yaml",
                 new_package / "template.txt",
+                new_scripts / "helper.py",
                 new_scripts / "validate_template.py",
                 new_schemas / "demo.schema.json",
                 new_package / "CHANGELOG.md",
@@ -376,6 +403,8 @@ class TemplatePackageToolingTests(unittest.TestCase):
             cache.mkdir()
             (cache / "helper.cpython-311.pyc").write_bytes(b"cache")
             (cache / "helper.pyo").write_bytes(b"cache")
+            inspected = root / "isolated-scripts.txt"
+            (package / "validator-inspect-target.txt").write_text(str(inspected), encoding="utf-8")
             external_package = root / "external-work" / "demo-template" / "v1.0.1"
             external_package.parent.mkdir(parents=True)
             shutil.copytree(package, external_package)
@@ -386,13 +415,11 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 yaml.safe_dump(external_manifest, allow_unicode=True, sort_keys=False),
                 encoding="utf-8",
             )
-            inspected = root / "isolated-scripts.txt"
             result = self.run_tool(
                 "validate",
                 "--package", external_package,
                 "--json",
                 root=root,
-                env={"TEMPLATE_TOOL_TEST_INSPECT_SCRIPTS": str(inspected)},
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(self.json_result(result)["status"], "passed")
@@ -413,6 +440,170 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual(archive.returncode, 0, archive.stdout + archive.stderr)
             self.assertTrue((root / "dist" / "demo-template-1.0.1.zip").is_file())
 
+    def test_all_validator_flows_isolate_timestamp_cache_and_python_environment(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            scripts = skill / "scripts"
+            helper = scripts / "helper.py"
+            cache = scripts / "__pycache__"
+            cache.mkdir()
+            marker = root / "MALICIOUS_CACHE_EXECUTED"
+            malicious_source = root / "malicious-helper-source.py"
+            malicious_code = (
+                "from pathlib import Path\n"
+                f"Path({str(marker)!r}).write_text('executed', encoding='utf-8')\n"
+                "VALUE = 'malicious'\n"
+            )
+            helper_size = helper.stat().st_size
+            self.assertLess(len(malicious_code.encode("utf-8")), helper_size)
+            malicious_source.write_bytes(
+                malicious_code.encode("utf-8")
+                + b"#"
+                + b"x" * (helper_size - len(malicious_code.encode("utf-8")) - 2)
+                + b"\n"
+            )
+            helper_mtime = helper.stat().st_mtime
+            os.utime(malicious_source, (helper_mtime, helper_mtime))
+            cache_path = cache / f"helper.{sys.implementation.cache_tag}.pyc"
+            py_compile.compile(
+                str(malicious_source),
+                cfile=str(cache_path),
+                doraise=True,
+                invalidation_mode=py_compile.PycInvalidationMode.TIMESTAMP,
+            )
+            malicious_source.unlink()
+
+            probe_environment = os.environ.copy()
+            for key in tuple(probe_environment):
+                if key.startswith("PYTHON"):
+                    probe_environment.pop(key, None)
+            proof = subprocess.run(
+                [str(PYTHON), "-c", "import helper; assert helper.VALUE == 'malicious'"],
+                cwd=scripts,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=probe_environment,
+            )
+            self.assertEqual(proof.returncode, 0, proof.stdout + proof.stderr)
+            self.assertTrue(marker.is_file())
+            marker.unlink()
+
+            def script_snapshot() -> dict[str, str]:
+                return {
+                    path.relative_to(scripts).as_posix(): sha256(path)
+                    for path in scripts.rglob("*")
+                    if path.is_file()
+                }
+
+            cache_before = script_snapshot()
+            malicious_pythonpath = root / "malicious-pythonpath"
+            malicious_pythonpath.mkdir()
+            (malicious_pythonpath / "sitecustomize.py").write_text(
+                f"from pathlib import Path\nPath({str(root / 'MALICIOUS_ENV_EXECUTED')!r}).write_text('executed', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            malicious_userbase = root / "malicious-userbase"
+            malicious_startup = root / "malicious-startup.py"
+            malicious_startup.write_text("raise SystemExit('startup should not run')\n", encoding="utf-8")
+            validator_env = {
+                "PYTHONPATH": str(malicious_pythonpath),
+                "PYTHONUSERBASE": str(malicious_userbase),
+                "PYTHONSTARTUP": str(malicious_startup),
+                "PYTHONINSPECT": "1",
+                "PYTHONHOME": str(root / "malicious-pythonhome"),
+            }
+            injected_env = {"TEMPLATE_TOOL_TEST_VALIDATOR_ENV_JSON": json.dumps(validator_env)}
+            temporary_before = {
+                path
+                for prefix in ("template-tool-validation-*", "template-tool-repo-validation-*")
+                for path in Path(tempfile.gettempdir()).glob(prefix)
+            }
+
+            canonical = self.run_tool(
+                "validate", "--package", package, "--json", root=root, env=injected_env
+            )
+            self.assertEqual(canonical.returncode, 0, canonical.stdout + canonical.stderr)
+            canonical_report = self.json_result(canonical)
+            self.assertEqual(canonical_report["source_scope"], "canonical")
+            self.assertEqual(canonical_report["validation_scope"], "isolated_temp")
+            self.assertEqual(canonical_report["validator_environment"], {
+                "isolated_python_path": True,
+                "user_site_disabled": True,
+                "pycache_redirected": True,
+            })
+            self.assertFalse(marker.exists())
+            self.assertFalse(root.joinpath("MALICIOUS_ENV_EXECUTED").exists())
+
+            repository = self.run_repo_validator(root, env=injected_env)
+            self.assertEqual(repository.returncode, 0, repository.stdout + repository.stderr)
+            self.assertFalse(marker.exists())
+            self.assertFalse(root.joinpath("MALICIOUS_ENV_EXECUTED").exists())
+
+            external_package = root / "external-work" / "demo-template" / "v1.0.1"
+            external_package.parent.mkdir(parents=True)
+            shutil.copytree(package, external_package)
+            external_manifest_path = external_package / "manifest.yaml"
+            external_manifest = yaml.safe_load(external_manifest_path.read_text(encoding="utf-8"))
+            external_manifest["template"]["version"] = "1.0.1"
+            external_manifest_path.write_text(
+                yaml.safe_dump(external_manifest, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            external = self.run_tool(
+                "validate", "--package", external_package, "--json", root=root, env=injected_env
+            )
+            self.assertEqual(external.returncode, 0, external.stdout + external.stderr)
+            external_report = self.json_result(external)
+            self.assertEqual(external_report["source_scope"], "external")
+            self.assertEqual(external_report["validation_scope"], "isolated_temp")
+            self.assertFalse(marker.exists())
+            self.assertFalse(root.joinpath("MALICIOUS_ENV_EXECUTED").exists())
+
+            archived = self.run_tool(
+                "archive",
+                "--package", external_package,
+                "--output-dir", root / "dist-external",
+                "--json",
+                root=root,
+                env=injected_env,
+            )
+            self.assertEqual(archived.returncode, 0, archived.stdout + archived.stderr)
+            self.assertFalse(marker.exists())
+            self.assertFalse(root.joinpath("MALICIOUS_ENV_EXECUTED").exists())
+
+            self.make_repo_validator(root)
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.2"
+            scaffold = self.run_tool(
+                "scaffold",
+                "--base-package", package,
+                "--version", "1.0.2",
+                "--output-dir", source,
+                "--json",
+                root=root,
+                env=injected_env,
+            )
+            self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
+            promoted = self.run_tool(
+                "promote", "--package", source, "--json", root=root, env=injected_env
+            )
+            self.assertEqual(promoted.returncode, 0, promoted.stdout + promoted.stderr)
+            promoted_report = self.json_result(promoted)
+            self.assertEqual(promoted_report["target_validation"]["source_scope"], "canonical")
+            self.assertEqual(promoted_report["target_validation"]["validation_scope"], "isolated_temp")
+            self.assertTrue((skill / "assets" / "templates" / "demo-template" / "v1.0.2").is_dir())
+            self.assertFalse(marker.exists())
+            self.assertFalse(root.joinpath("MALICIOUS_ENV_EXECUTED").exists())
+            self.assertEqual(cache_before, script_snapshot())
+            temporary_after = {
+                path
+                for prefix in ("template-tool-validation-*", "template-tool-repo-validation-*")
+                for path in Path(tempfile.gettempdir()).glob(prefix)
+            }
+            self.assertEqual(temporary_before, temporary_after)
+
     def test_validator_commands_fail_closed_without_a_git_index(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
@@ -420,6 +611,19 @@ class TemplatePackageToolingTests(unittest.TestCase):
             result = self.run_tool("validate", "--package", package, "--json", root=root)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Git index is required", result.stdout)
+
+    def test_validator_timeout_cleans_isolated_workspace(self) -> None:
+        from tools.template_tooling.validation import validate_package_path
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            (package / "validator-timeout").write_text("timeout\n", encoding="utf-8")
+            before = set(Path(tempfile.gettempdir()).glob("template-tool-validation-*"))
+            report = validate_package_path(package, root, timeout=1)
+            self.assertEqual(report["status"], "failed")
+            self.assertTrue(any("timed out" in error for error in report["errors"]))
+            self.assertEqual(before, set(Path(tempfile.gettempdir()).glob("template-tool-validation-*")))
 
     def test_symlink_in_validator_scripts_is_rejected_before_execution(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -539,7 +743,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertTrue(payload["full_validation"])
             self.assertEqual(payload["validator"]["exit_code"], 0)
             self.assertIn("fixture validator passed", payload["validator"]["stdout"])
-            (package.parent.parent.parent.parent / "validator-fail").write_text("fail\n", encoding="utf-8")
+            (package / "validator-fail").write_text("fail\n", encoding="utf-8")
             failed = self.run_tool("validate", "--package", package, "--json", root=root)
             self.assertNotEqual(failed.returncode, 0)
             failed_payload = self.json_result(failed)
@@ -789,7 +993,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             skill, base, template = self.make_fixture_repo(root)
-            (skill / "validator-fail").write_text("fail\n", encoding="utf-8")
+            (base / "validator-fail").write_text("fail\n", encoding="utf-8")
             output = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             before = sha256(template)
             failed = self.run_tool(
@@ -1191,7 +1395,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             }
             self.assertEqual(target_tree, original_tree)
             self.assertNotEqual((source / "template.txt").read_bytes(), original)
-            self.assertEqual(self.json_result(promoted)["target_validation"]["validation_scope"], "package")
+            self.assertEqual(self.json_result(promoted)["target_validation"]["validation_scope"], "isolated_temp")
 
     def test_promote_rolls_back_when_target_validator_mutates_target_after_success(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -1203,14 +1407,14 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
             self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
-            (skill / "mutate-target").write_text("enabled\n", encoding="utf-8")
+            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
             (skill / "scripts" / "validate_template.py").write_text(
                 "from pathlib import Path\n"
                 "import sys\n"
                 "manifest = Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
-                "skill = Path(__file__).resolve().parent.parent\n"
-                "if (skill / 'mutate-target').exists() and manifest.parent.name == 'v1.0.1':\n"
-                "    (manifest.parent / 'validator-output.txt').write_text('unexpected\\n', encoding='utf-8')\n"
+                f"target = Path(r'{target}')\n"
+                "if target.exists() and manifest.parent.name == 'v1.0.1':\n"
+                "    (target / 'validator-output.txt').write_text('unexpected\\n', encoding='utf-8')\n"
                 "print('fixture validator passed')\n",
                 encoding="utf-8",
             )
@@ -1218,7 +1422,6 @@ class TemplatePackageToolingTests(unittest.TestCase):
             failed = self.run_tool("promote", "--package", source, "--json", root=root)
             self.assertNotEqual(failed.returncode, 0)
             self.assertIn("target validation changed immutable promotion content", failed.stdout)
-            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
             self.assertFalse(target.exists())
             self.assertEqual(sha256(base / "template.txt"), before)
             self.assertFalse(any(path.name.endswith(".stage") for path in target.parent.iterdir()))
@@ -1255,10 +1458,12 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             skill, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
+            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
             (skill / "scripts" / "validate_template.py").write_text(
                 "from pathlib import Path\n"
                 "import sys\n"
-                "if (Path(__file__).resolve().parent.parent / 'canonical-only-fail').exists() and Path(sys.argv[sys.argv.index('--manifest') + 1]).parent.name == 'v1.0.1':\n"
+                f"target = Path(r'{target}')\n"
+                "if target.exists() and Path(sys.argv[sys.argv.index('--manifest') + 1]).parent.name == 'v1.0.1':\n"
                 "    print('canonical target validator failed', file=sys.stderr)\n"
                 "    raise SystemExit(11)\n"
                 "print('fixture validator passed')\n",
@@ -1270,11 +1475,9 @@ class TemplatePackageToolingTests(unittest.TestCase):
             )
             self.assertEqual(scaffold.returncode, 0, scaffold.stdout + scaffold.stderr)
             before = sha256(base / "template.txt")
-            (skill / "canonical-only-fail").write_text("fail\n", encoding="utf-8")
             failed = self.run_tool("promote", "--package", source, "--json", root=root)
             self.assertNotEqual(failed.returncode, 0)
             self.assertIn("final canonical target validation failed", failed.stdout)
-            target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
             self.assertFalse(target.exists())
             self.assertEqual(sha256(base / "template.txt"), before)
             self.assertFalse(any(path.name.endswith(".stage") for path in target.parent.iterdir()))
@@ -1329,7 +1532,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
                     "--output-dir", valid_patch, "--json", root=root
                 )
                 self.assertEqual(scaffold.returncode, 0, scaffold.stderr)
-                (skill / "validator-fail").write_text("fail\n", encoding="utf-8")
+                (valid_patch / "validator-fail").write_text("fail\n", encoding="utf-8")
                 failed = self.run_tool("promote", "--package", valid_patch, "--json", root=root)
                 self.assertNotEqual(failed.returncode, 0)
                 self.assertFalse((skill / "assets" / "templates" / "demo-template" / "v1.0.1").exists())
@@ -1545,7 +1748,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertIn("validator exit_code: 7", combined)
             self.assertIn("specific validator stdout diagnostic", combined)
             self.assertIn("specific validator stderr diagnostic", combined)
-            self.assertIn("validation_scope: package", combined)
+            self.assertIn("validation_scope: isolated_temp", combined)
 
     def test_promote_preserves_repository_validator_diagnostics(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:

@@ -16,7 +16,14 @@ from .discovery import discover_packages, owner_skill_root
 from .manifest import load_manifest, package_template_path, sha256_file
 from .models import TemplateToolError, parse_semver
 from .paths import copy_tree_no_symlinks, display_path, paths_overlap, remove_path_or_raise, tree_fingerprints
-from .validation import package_from_path, validate_package_path, validation_succeeded
+from .validation import (
+    _assert_validator_runtime_state,
+    _cleanup_validation_workspace,
+    _validator_environment,
+    package_from_path,
+    validate_package_path,
+    validation_succeeded,
+)
 
 
 def _canonical_target(package: Any, canonical: list[Any]) -> Path:
@@ -31,7 +38,12 @@ def _run_repo_validator(root: Path) -> dict[str, Any]:
     validator = root / "tests" / "validate_template_packages.py"
     if not validator.is_file():
         raise TemplateToolError(f"repository-wide validator was not found: {validator}")
-    command = [sys.executable, str(validator)]
+    command = [sys.executable, "-B", str(validator)]
+    temporary = tempfile.TemporaryDirectory(prefix="template-tool-repo-validation-")
+    temporary_root = Path(temporary.name)
+    error: TemplateToolError | None = None
+    runtime_error: TemplateToolError | None = None
+    result: subprocess.CompletedProcess[str] | None = None
     try:
         result = subprocess.run(
             command,
@@ -40,11 +52,28 @@ def _run_repo_validator(root: Path) -> dict[str, Any]:
             text=True,
             encoding="utf-8",
             errors="replace",
-            env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+            env=_validator_environment(temporary_root),
             timeout=1800,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise TemplateToolError(f"repository-wide validator could not run: {exc}") from exc
+        error = TemplateToolError(f"repository-wide validator could not run: {exc}")
+    try:
+        _assert_validator_runtime_state(temporary_root)
+    except (OSError, TemplateToolError) as exc:
+        runtime_error = TemplateToolError(f"repository validator temporary workspace integrity failed: {exc}")
+    cleanup_error = _cleanup_validation_workspace(temporary, temporary_root)
+    if cleanup_error:
+        cleanup_failure = TemplateToolError(cleanup_error)
+        if error is not None:
+            raise TemplateToolError(f"{error}; {cleanup_failure}") from error
+        if runtime_error is not None:
+            raise TemplateToolError(f"{runtime_error}; {cleanup_failure}") from runtime_error
+        raise cleanup_failure
+    if runtime_error is not None:
+        raise runtime_error
+    if error is not None:
+        raise error
+    assert result is not None
     return {
         "command": [str(item) for item in command],
         "exit_code": result.returncode,
@@ -184,8 +213,8 @@ def promote_package(package_dir: Path, root: Path, *, dry_run: bool = False) -> 
             result["target_validation"] = target_validation
             if not validation_succeeded(target_validation):
                 raise TemplateToolError(f"final canonical target validation failed: {_validation_error(target_validation)}")
-            if not target_validation.get("full_validation") or target_validation.get("validation_scope") != "package":
-                raise TemplateToolError("final canonical target validation did not report package full_validation=true")
+            if not target_validation.get("full_validation") or target_validation.get("validation_scope") != "isolated_temp":
+                raise TemplateToolError("final canonical target validation did not report isolated full_validation=true")
             assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="target validation")
 
             repo_validation = _run_repo_validator(root)
