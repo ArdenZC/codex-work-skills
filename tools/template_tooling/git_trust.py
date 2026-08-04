@@ -12,7 +12,7 @@ from .models import TemplateToolError
 
 
 _IGNORED_SCRIPT_PARTS = {"__pycache__"}
-_IGNORED_SCRIPT_SUFFIXES = {".pyc"}
+_IGNORED_SCRIPT_SUFFIXES = {".pyc", ".pyo"}
 _IGNORED_SCRIPT_PREFIXES = ("~$",)
 
 
@@ -24,11 +24,11 @@ def _normalise_index_path(value: str) -> str:
     return result.casefold() if os.name == "nt" else result
 
 
-def _is_ignored_script_file(path: Path) -> bool:
-    parts = {part.casefold() for part in path.parts}
+def _is_ignored_script_file(path: Path, scripts_root: Path) -> bool:
+    relative = path.relative_to(scripts_root)
+    parts = {part.casefold() for part in relative.parts[:-1]}
     return (
-        "__pycache__" in parts
-        or path.suffix.casefold() in _IGNORED_SCRIPT_SUFFIXES
+        (parts & _IGNORED_SCRIPT_PARTS and path.suffix.casefold() in _IGNORED_SCRIPT_SUFFIXES)
         or path.name.casefold().startswith(_IGNORED_SCRIPT_PREFIXES)
     )
 
@@ -158,8 +158,10 @@ def trusted_script_files(owner: Path, trust_index: GitTrustIndex) -> list[Path]:
     for path in sorted(scripts.rglob("*"), key=lambda item: item.as_posix().casefold()):
         if path.is_symlink():
             raise TemplateToolError(f"Owner scripts directory contains a symlink: {path}")
-        if path.is_dir() or _is_ignored_script_file(path):
+        if path.is_dir() or _is_ignored_script_file(path, scripts):
             continue
+        if path.suffix.casefold() in _IGNORED_SCRIPT_SUFFIXES:
+            raise TemplateToolError(f"Owner scripts directory contains an untrusted bytecode file: {path}")
         try:
             mode = path.stat(follow_symlinks=False).st_mode
         except OSError as exc:
@@ -173,7 +175,7 @@ def trusted_script_files(owner: Path, trust_index: GitTrustIndex) -> list[Path]:
 
     trusted: list[Path] = []
     for path in trust_index.tracked_files_under(scripts):
-        if _is_ignored_script_file(path):
+        if _is_ignored_script_file(path, scripts):
             continue
         trusted.append(trust_index.require_tracked_regular_file(path, label="Owner scripts file"))
     return sorted(set(trusted), key=lambda item: item.as_posix().casefold())

@@ -31,6 +31,9 @@ from .models import TemplatePackage, TemplateToolError
 from .paths import copy_tree_no_symlinks, display_path, is_within, remove_path_or_raise, tree_fingerprints
 
 
+_PYTHON_CACHE_SUFFIXES = {".pyc", ".pyo"}
+
+
 def _display_command(command: list[str], root: Path) -> list[str]:
     displayed: list[str] = []
     for token in command:
@@ -155,6 +158,19 @@ def _copy_dependency_closure(
         active.remove(source_package)
 
 
+def _assert_no_python_cache_or_bytecode(root: Path) -> None:
+    for path in root.rglob("*"):
+        relative = path.relative_to(root)
+        if any(part.casefold() == "__pycache__" for part in relative.parts):
+            raise TemplateToolError(
+                f"validation workspace contains forbidden Python cache: {path}"
+            )
+        if path.is_file() and path.suffix.casefold() in _PYTHON_CACHE_SUFFIXES:
+            raise TemplateToolError(
+                f"validation workspace contains forbidden Python bytecode: {path}"
+            )
+
+
 def _prepare_isolated_package(
     package: TemplatePackage,
     trust_index: GitTrustIndex,
@@ -189,6 +205,8 @@ def _prepare_isolated_package(
             if base_manifest.parent != base_template.parent or not base_manifest.is_file() or not base_template.is_file():
                 raise TemplateToolError("template base dependency is incomplete")
             _copy_dependency_closure(base_manifest.parent, target_root, copied=copied, active=set())
+
+        _assert_no_python_cache_or_bytecode(temporary_root)
 
         validator_relative = package.validator.resolve().relative_to(owner / "scripts")
         isolated_validator = isolated_skill / "scripts" / validator_relative

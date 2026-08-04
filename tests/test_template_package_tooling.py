@@ -120,7 +120,16 @@ class TemplatePackageToolingTests(unittest.TestCase):
         (schemas / "demo.schema.json").write_text('{"type": "object"}\n', encoding="utf-8")
         (scripts / "validate_template.py").write_text(
             "from pathlib import Path\n"
+            "import os\n"
             "import sys\n"
+            "marker = os.environ.get('TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER')\n"
+            "if marker:\n"
+            "    Path(marker).write_text('started', encoding='utf-8')\n"
+            "inspect = os.environ.get('TEMPLATE_TOOL_TEST_INSPECT_SCRIPTS')\n"
+            "if inspect:\n"
+            "    scripts = Path(__file__).resolve().parent\n"
+            "    files = sorted(path.relative_to(scripts).as_posix() for path in scripts.rglob('*') if path.is_file())\n"
+            "    Path(inspect).write_text('\\n'.join(files), encoding='utf-8')\n"
             "if (Path(__file__).resolve().parent.parent / 'validator-fail').exists():\n"
             "    print('fixture validator failed', file=sys.stderr)\n"
             "    raise SystemExit(7)\n"
@@ -327,6 +336,82 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertIn("untrusted", result.stdout.lower())
             self.assertIn("scripts", result.stdout.lower())
             self.assertFalse(marker.exists())
+
+    def test_scripts_reject_ordinary_bytecode_but_ignore_python_cache(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            ordinary_files = (
+                Path("yaml.pyc"),
+                Path("sitecustomize.pyc"),
+                Path("helpers") / "compiled.pyc",
+                Path("helpers") / "legacy.pyo",
+            )
+            for relative in ordinary_files:
+                with self.subTest(relative=relative):
+                    path = skill / "scripts" / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(b"not executable Python bytecode")
+                    self.stage_fixture_paths(root, path)
+                    result = self.run_tool("validate", "--package", package, "--json", root=root)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("bytecode", result.stdout.lower())
+                    self.assertIn(path.name, result.stdout)
+                    path.unlink()
+                    subprocess.run(
+                        [
+                            "git",
+                            "rm",
+                            "--cached",
+                            "--quiet",
+                            "--",
+                            str(path.relative_to(root)).replace("\\", "/"),
+                        ],
+                        cwd=root,
+                        check=True,
+                        capture_output=True,
+                    )
+
+            cache = skill / "scripts" / "__pycache__"
+            cache.mkdir()
+            (cache / "helper.cpython-311.pyc").write_bytes(b"cache")
+            (cache / "helper.pyo").write_bytes(b"cache")
+            external_package = root / "external-work" / "demo-template" / "v1.0.1"
+            external_package.parent.mkdir(parents=True)
+            shutil.copytree(package, external_package)
+            external_manifest_path = external_package / "manifest.yaml"
+            external_manifest = yaml.safe_load(external_manifest_path.read_text(encoding="utf-8"))
+            external_manifest["template"]["version"] = "1.0.1"
+            external_manifest_path.write_text(
+                yaml.safe_dump(external_manifest, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            inspected = root / "isolated-scripts.txt"
+            result = self.run_tool(
+                "validate",
+                "--package", external_package,
+                "--json",
+                root=root,
+                env={"TEMPLATE_TOOL_TEST_INSPECT_SCRIPTS": str(inspected)},
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(self.json_result(result)["status"], "passed")
+            copied_scripts = inspected.read_text(encoding="utf-8")
+            self.assertNotIn("__pycache__", copied_scripts)
+            self.assertNotIn(".pyc", copied_scripts)
+            self.assertNotIn(".pyo", copied_scripts)
+
+            repository = self.run_repo_validator(root)
+            self.assertEqual(repository.returncode, 0, repository.stdout + repository.stderr)
+            archive = self.run_tool(
+                "archive",
+                "--package", external_package,
+                "--output-dir", root / "dist",
+                "--json",
+                root=root,
+            )
+            self.assertEqual(archive.returncode, 0, archive.stdout + archive.stderr)
+            self.assertTrue((root / "dist" / "demo-template-1.0.1.zip").is_file())
 
     def test_validator_commands_fail_closed_without_a_git_index(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -811,6 +896,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             skill, base, template = self.make_fixture_repo(root)
             base_sha = sha256(template)
+            validator_marker = root / "BASE_VALIDATOR_STARTED"
             invalid_outputs = [
                 root / "1.0.1",
                 root / "docs" / "1.0.1",
@@ -865,25 +951,100 @@ class TemplatePackageToolingTests(unittest.TestCase):
             escaped = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.3",
                 "--output-dir", escape / "1.0.3", "--dry-run", "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER": str(validator_marker)},
             )
             self.assertNotEqual(escaped.returncode, 0)
+            self.assertIn("scaffold output inside the repository must be below", escaped.stdout)
             self.assertFalse((docs / "1.0.3").exists())
+            self.assertFalse(validator_marker.exists())
 
-            external_target = root.parent / f"{root.name}-external-target"
-            external_target.mkdir()
-            external_escape = escape_parent / "external-escape"
+            external_root = root.parent / f"{root.name}-external-target"
+            external_root.mkdir()
             try:
-                external_escape.symlink_to(external_target, target_is_directory=True)
+                internal_external = escape_parent / "internal-external-alias"
+                internal_external.symlink_to(external_root, target_is_directory=True)
+                escaped_external = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", "1.0.31",
+                    "--output-dir", internal_external / "1.0.31", "--dry-run", "--json", root=root,
+                    env={"TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER": str(validator_marker)},
+                )
+                self.assertNotEqual(escaped_external.returncode, 0)
+                self.assertIn("scaffold output symlink escapes the repository", escaped_external.stdout)
+                self.assertFalse((external_root / "1.0.31").exists())
+                self.assertFalse(validator_marker.exists())
+
+                dangerous_links = {
+                    "docs": root / "docs",
+                    "work": root / "work" / "template-packages",
+                    "canonical": base,
+                }
+                for index, (name, target) in enumerate(dangerous_links.items(), start=4):
+                    link = external_root / f"repo-{name}-alias"
+                    link.symlink_to(target, target_is_directory=True)
+                    result = self.run_tool(
+                        "scaffold", "--base-package", base, "--version", f"1.0.{index}",
+                        "--output-dir", link / f"1.0.{index}", "--dry-run", "--json", root=root,
+                        env={"TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER": str(validator_marker)},
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("external scaffold path resolves inside the repository", result.stdout)
+                    self.assertFalse((target / f"1.0.{index}").exists())
+                    self.assertFalse(validator_marker.exists())
+
+                multi_target = external_root / "multi-target"
+                multi_target.symlink_to(root, target_is_directory=True)
+                multi_alias = external_root / "multi-alias"
+                multi_alias.symlink_to(multi_target, target_is_directory=True)
+                multi_result = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", "1.0.7",
+                    "--output-dir", multi_alias / "1.0.7", "--dry-run", "--json", root=root,
+                    env={"TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER": str(validator_marker)},
+                )
+                self.assertNotEqual(multi_result.returncode, 0)
+                self.assertIn("external scaffold path resolves inside the repository", multi_result.stdout)
+                self.assertFalse((root / "1.0.7").exists())
+                self.assertFalse(validator_marker.exists())
+
+                report_alias = external_root / "repo-report-alias"
+                report_alias.symlink_to(root / "docs", target_is_directory=True)
+                report_result = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", "1.0.71",
+                    "--output-dir", external_root / "report-boundary" / "demo-template" / "1.0.71",
+                    "--report-path", report_alias / "report.json",
+                    "--dry-run", "--json", root=root,
+                    env={"TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER": str(validator_marker)},
+                )
+                self.assertNotEqual(report_result.returncode, 0)
+                self.assertIn("report must be in the output package sibling directory", report_result.stdout)
+                self.assertFalse(validator_marker.exists())
+
+                legal_output = external_root / "legal-work" / "demo-template" / "1.0.8"
+                legal = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", "1.0.8",
+                    "--output-dir", legal_output, "--json", root=root,
+                )
+                self.assertEqual(legal.returncode, 0, legal.stdout + legal.stderr)
+                self.assertTrue(legal_output.is_dir())
+                self.assertTrue((legal_output.parent / "scaffold-report-demo-template-1.0.8.json").is_file())
+
+                real_workspace = external_root / "real-workspace"
+                real_workspace.mkdir()
+                legal_alias = external_root / "legal-alias"
+                legal_alias.symlink_to(real_workspace, target_is_directory=True)
+                aliased_output = legal_alias / "demo-template" / "1.0.9"
+                aliased = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", "1.0.9",
+                    "--output-dir", aliased_output, "--json", root=root,
+                )
+                self.assertEqual(aliased.returncode, 0, aliased.stdout + aliased.stderr)
+                self.assertTrue((real_workspace / "demo-template" / "1.0.9").is_dir())
+                self.assertTrue(
+                    (real_workspace / "demo-template" / "scaffold-report-demo-template-1.0.9.json").is_file()
+                )
             except (OSError, NotImplementedError):
-                shutil.rmtree(external_target, ignore_errors=True)
-                self.skipTest("the current platform cannot create external directory symlinks")
-            escaped_external = self.run_tool(
-                "scaffold", "--base-package", base, "--version", "1.0.4",
-                "--output-dir", external_escape / "1.0.4", "--dry-run", "--json", root=root,
-            )
-            self.assertNotEqual(escaped_external.returncode, 0)
-            self.assertFalse((external_target / "1.0.4").exists())
-            shutil.rmtree(external_target, ignore_errors=True)
+                self.skipTest("the current platform cannot create directory symlinks")
+            finally:
+                shutil.rmtree(external_root, ignore_errors=True)
 
     def test_scaffold_generator_version_is_strict_ascii_semver(self) -> None:
         invalid = ("1.1.01", "01.1.1", "１.１.１", "v1.1.1", "latest", "")
@@ -905,6 +1066,38 @@ class TemplatePackageToolingTests(unittest.TestCase):
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("semantic version", result.stdout)
                     self.assertFalse(output.exists())
+
+    def test_scaffold_external_alias_keeps_dependency_in_resolved_workspace(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_dependent_fixture_repo(root)
+            external_root = root.parent / f"{root.name}-dependency-external"
+            external_root.mkdir()
+            real_workspace = external_root / "real-workspace"
+            real_workspace.mkdir()
+            alias = external_root / "workspace-alias"
+            try:
+                alias.symlink_to(real_workspace, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                shutil.rmtree(external_root, ignore_errors=True)
+                self.skipTest("the current platform cannot create directory symlinks")
+            try:
+                output = alias / "demo-template" / "v1.1.1"
+                result = self.run_tool(
+                    "scaffold",
+                    "--base-package", base,
+                    "--version", "1.1.1",
+                    "--output-dir", output,
+                    "--json",
+                    root=root,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                workspace_package = real_workspace / "demo-template"
+                self.assertTrue((workspace_package / "v1.0.0").is_dir())
+                self.assertTrue((workspace_package / "v1.1.1").is_dir())
+                self.assertTrue((workspace_package / "scaffold-report-demo-template-1.1.1.json").is_file())
+            finally:
+                shutil.rmtree(external_root, ignore_errors=True)
 
     def test_scaffold_dry_run_and_overlap_do_not_mutate(self) -> None:
         base = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0"

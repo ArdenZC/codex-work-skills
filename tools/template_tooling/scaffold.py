@@ -18,7 +18,6 @@ from .paths import (
     atomic_write_text,
     copy_tree_no_symlinks,
     display_path,
-    is_within,
     paths_overlap,
     remove_path_or_raise,
     require_no_overlap,
@@ -106,6 +105,36 @@ def _tree_fingerprints(root: Path) -> dict[str, str]:
     return tree_fingerprints(root)
 
 
+def _lexical_absolute(path: Path) -> Path:
+    return Path(os.path.abspath(os.fspath(path.expanduser())))
+
+
+def _lexical_is_within(path: Path, root: Path, *, allow_equal: bool = True) -> bool:
+    path_text = os.path.normcase(os.path.abspath(os.fspath(path)))
+    root_text = os.path.normcase(os.path.abspath(os.fspath(root)))
+    try:
+        common = os.path.commonpath((path_text, root_text))
+    except ValueError:
+        return False
+    if common != root_text:
+        return False
+    return allow_equal or path_text != root_text
+
+
+def _resolve_existing_ancestors(path: Path) -> Path:
+    """Resolve every existing ancestor while preserving a non-existent tail."""
+    lexical = _lexical_absolute(path)
+    missing_tail: list[str] = []
+    current = lexical
+    while not current.exists() and not current.is_symlink() and current.parent != current:
+        missing_tail.append(current.name)
+        current = current.parent
+    resolved = current.resolve(strict=False)
+    for part in reversed(missing_tail):
+        resolved /= part
+    return resolved
+
+
 def _dependency_plan(base: TemplatePackage, output_dir: Path) -> list[tuple[Path, Path]]:
     base_manifest = manifest_reference(base.manifest, "base_manifest", base.manifest_path)
     base_template = manifest_reference(base.manifest, "base_template", base.manifest_path)
@@ -116,11 +145,14 @@ def _dependency_plan(base: TemplatePackage, output_dir: Path) -> list[tuple[Path
     source_package = base_manifest.parent
     if not source_package.is_dir() or not (source_package / "manifest.yaml").is_file():
         raise TemplateToolError(f"base package dependency is missing: {source_package}")
-    destination_manifest = (output_dir / str(base.manifest["template"]["base_manifest"])).resolve(strict=False)
+    destination_manifest = _resolve_existing_ancestors(
+        output_dir / str(base.manifest["template"]["base_manifest"])
+    )
     destination_package = destination_manifest.parent
-    if not is_within(destination_package, output_dir.parent):
+    workspace_parent = _resolve_existing_ancestors(output_dir.parent)
+    if not _lexical_is_within(destination_package, workspace_parent, allow_equal=False):
         raise TemplateToolError(f"base package dependency escapes scaffold workspace: {destination_package}")
-    if destination_package == output_dir:
+    if destination_package == _resolve_existing_ancestors(output_dir):
         raise TemplateToolError("base package dependency overlaps scaffold output")
     return [(source_package, destination_package)]
 
@@ -148,31 +180,32 @@ def _report_path(output_dir: Path, explicit: Path | None, template_id: str, vers
 
 def _validate_scaffold_workspace(output_dir: Path, root: Path) -> None:
     """Reject repository source paths before any expensive base validation."""
-    lexical_output = Path(os.path.abspath(os.fspath(output_dir.expanduser())))
-    lexical_root = Path(os.path.abspath(os.fspath(root.expanduser())))
-    try:
-        lexical_output.relative_to(lexical_root)
-        lexical_inside_repository = True
-    except ValueError:
-        lexical_inside_repository = False
+    lexical_output = _lexical_absolute(output_dir)
+    lexical_root = _lexical_absolute(root)
+    resolved_output = _resolve_existing_ancestors(lexical_output)
+    resolved_root = _resolve_existing_ancestors(lexical_root)
+    lexical_inside_repository = _lexical_is_within(lexical_output, lexical_root)
+    resolved_inside_repository = _lexical_is_within(resolved_output, resolved_root)
+
     if not lexical_inside_repository:
+        if resolved_inside_repository:
+            raise TemplateToolError("external scaffold path resolves inside the repository")
         return
-    resolved_output = output_dir.expanduser().resolve(strict=False)
-    resolved_root = root.expanduser().resolve()
-    if not is_within(resolved_output, resolved_root, allow_equal=False):
+    if not resolved_inside_repository:
         raise TemplateToolError("scaffold output symlink escapes the repository")
-    allowed_lexical = resolved_root / DEFAULT_SCAFFOLD_WORK_ROOT
-    current = resolved_root
+
+    allowed_lexical = lexical_root / DEFAULT_SCAFFOLD_WORK_ROOT
+    current = lexical_root
     for part in DEFAULT_SCAFFOLD_WORK_ROOT.parts:
         current = current / part
         if current.is_symlink():
             raise TemplateToolError(
                 f"scaffold work root contains a symlinked component: {current}"
             )
-    allowed_root = allowed_lexical.resolve(strict=False)
-    if not is_within(allowed_root, resolved_root, allow_equal=False):
+    allowed_root = _resolve_existing_ancestors(allowed_lexical)
+    if not _lexical_is_within(allowed_root, resolved_root, allow_equal=False):
         raise TemplateToolError("scaffold work root must remain inside the repository")
-    if not is_within(resolved_output, allowed_root, allow_equal=False):
+    if not _lexical_is_within(resolved_output, allowed_root, allow_equal=False):
         raise TemplateToolError(
             "scaffold output inside the repository must be below "
             f"{DEFAULT_SCAFFOLD_WORK_ROOT.as_posix()}/"
@@ -251,7 +284,7 @@ def scaffold_package(
     require_no_overlap(output_dir, protected, label="scaffold output")
     dependencies = _dependency_plan(base, output_dir)
     report = _report_path(output_dir, report_path, base.template_id, version)
-    if report.parent.resolve(strict=False) != output_dir.parent.resolve(strict=False):
+    if _resolve_existing_ancestors(report.parent) != _resolve_existing_ancestors(output_dir.parent):
         raise TemplateToolError("scaffold report must be in the output package sibling directory")
     if report.suffix.casefold() != ".json":
         raise TemplateToolError("scaffold report filename must use the .json suffix")
