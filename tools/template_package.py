@@ -112,7 +112,7 @@ def _run(args: argparse.Namespace) -> tuple[int, Any]:
     if args.command == "scaffold":
         result = scaffold_package(
             resolve_path(args.base_package),
-            resolve_path(args.output_dir),
+            Path(args.output_dir).expanduser().absolute(),
             root,
             version=args.version,
             generator_version=args.generator_version,

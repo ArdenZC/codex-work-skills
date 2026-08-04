@@ -23,7 +23,7 @@ requirements.txt
 
 旧模板路径必须保留，且只能作为兼容入口。兼容入口与当前 canonical template 的 SHA-256 必须一致；如果两者发生分歧，校验器报错，不允许静默选择其中一份。
 
-模板包生命周期由仓库根目录的 `tools/template_package.py` 统一处理。工具从 `**/assets/templates/*/*/manifest.yaml` 动态发现包，不维护人工同步的 registry；仓库级校验器同样按 discovery 结果验证所有 canonical 包、输入 schema 和 owner Skill validator。工具只读取 manifest 和包文件，不启动 LibreOffice。external/work 包不能提供或覆盖 validator，只能使用仓库内 canonical Skill 的受信任 validator；owner 不唯一时必须失败。`scaffold` 先完整验证 canonical 基线并生成 output sibling 原子 report，`validate` 对外部包在系统临时隔离 Skill 树执行真实模板校验，`promote` 在不可变 snapshot、stage、最终 target、全树 fingerprint 一致性和动态仓库校验都通过后原子安装，`archive` 生成可复现的自包含 ZIP、SHA-256 sidecar 和结构化元数据。已有 canonical、默认入口、兼容入口和 manifest 不会被这些命令静默覆盖。
+模板包生命周期由仓库根目录的 `tools/template_package.py` 统一处理。工具从 `**/assets/templates/*/*/manifest.yaml` 动态发现包，不维护人工同步的 registry；仓库级校验器同样按 discovery 结果验证所有 canonical 包、输入 schema 和 owner Skill validator。工具只读取 manifest 和包文件，不启动 LibreOffice。validator 信任根是 repo-root 的 Git index；validator 及其 scripts 支持文件必须是已跟踪的普通文件，symlink、未跟踪 canonical-like Skill 和未跟踪 helper 都 fail closed。工具不会自动暂存文件；新 Skill 需精确 `git add` validator、manifest、模板、schema 和已跟踪 helper，未 commit 的已跟踪工作树修改可以运行。external/work 包不能提供或覆盖 validator，只能使用唯一的 Git-tracked canonical Skill owner。`scaffold` 先检查工作目录，再完整验证 canonical 基线并生成 output sibling 原子 report；仓库内 output 只能在 `work/template-packages/` 下，仓库外独立 workspace 仍可用。`validate` 对外部包在系统临时隔离 Skill 树执行真实模板校验，`promote` 在不可变 snapshot、stage、最终 target、全树 fingerprint 一致性和动态仓库校验都通过后原子安装，`archive` 生成可复现的自包含 ZIP、SHA-256 sidecar 和结构化元数据。已有 canonical、默认入口、兼容入口和 manifest 不会被这些命令静默覆盖。
 
 ## Manifest
 

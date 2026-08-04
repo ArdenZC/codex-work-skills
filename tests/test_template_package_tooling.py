@@ -32,6 +32,27 @@ def sha256(path: Path) -> str:
 class TemplatePackageToolingTests(unittest.TestCase):
     maxDiff = None
 
+    def initialize_fixture_git_index(self, root: Path, *tracked_paths: Path) -> None:
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.name", "Template Tool Tests"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "template-tool-tests@example.invalid"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        )
+        relative = [str(path.relative_to(root)).replace("\\", "/") for path in tracked_paths]
+        subprocess.run(["git", "add", "--", *relative], cwd=root, check=True, capture_output=True)
+
+    def stage_fixture_paths(self, root: Path, *tracked_paths: Path) -> None:
+        relative = [str(path.relative_to(root)).replace("\\", "/") for path in tracked_paths]
+        subprocess.run(["git", "add", "--", *relative], cwd=root, check=True, capture_output=True)
+
     def run_tool(
         self,
         *arguments: str | Path,
@@ -66,6 +87,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
         version: str = "1.0.0",
         validator_mode: str = "pass",
         with_changelog: bool = True,
+        init_git: bool = True,
     ) -> tuple[Path, Path, Path]:
         skill_root = temp_root / "技能工具" / "demo-skill"
         package = skill_root / "assets" / "templates" / template_id / f"v{version}"
@@ -105,6 +127,16 @@ class TemplatePackageToolingTests(unittest.TestCase):
             "print('fixture validator passed')\n",
             encoding="utf-8",
         )
+        tracked = [
+            package / "manifest.yaml",
+            package / "template.txt",
+            scripts / "validate_template.py",
+            schemas / "demo.schema.json",
+        ]
+        if with_changelog:
+            tracked.append(package / "CHANGELOG.md")
+        if init_git:
+            self.initialize_fixture_git_index(temp_root, *tracked)
         return skill_root, package, template
 
     def make_repo_validator(self, root: Path) -> None:
@@ -202,6 +234,141 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertIn("template validator failed", failed.stdout)
             self.assertIn("1.0.1", failed.stdout)
 
+    def test_untracked_canonical_like_skill_is_reported_and_never_executed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            fake_skill = root / "untrusted-skill"
+            fake_package = fake_skill / "assets" / "templates" / "demo-template" / "v1.0.1"
+            fake_package.parent.mkdir(parents=True)
+            shutil.copytree(base, fake_package)
+            manifest_path = fake_package / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["version"] = "1.0.1"
+            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            marker = root / "MALICIOUS_VALIDATOR_EXECUTED"
+            fake_validator = fake_skill / "scripts" / "validate_template.py"
+            fake_validator.parent.mkdir(parents=True)
+            fake_validator.write_text(
+                "from pathlib import Path\n"
+                f"Path(r'{marker}').write_text('executed', encoding='utf-8')\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+
+            discovered = self.run_tool("discover", "--json", root=root)
+            self.assertNotEqual(discovered.returncode, 0)
+            self.assertIn("no trusted Git-tracked owner validator", discovered.stdout)
+            validated = self.run_tool("validate", "--package", fake_package, "--json", root=root)
+            self.assertNotEqual(validated.returncode, 0)
+            self.assertIn("no trusted Git-tracked owner validator", validated.stdout)
+            repository = self.run_repo_validator(root)
+            self.assertNotEqual(repository.returncode, 0)
+            self.assertIn("Git-tracked owner validator", repository.stdout)
+            self.assertFalse(marker.exists())
+
+    def test_git_index_tracked_new_skill_can_be_discovered_and_validated(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, _ = self.make_fixture_repo(root)
+            new_skill = root / "new-skill"
+            new_package = new_skill / "assets" / "templates" / "new-template" / "v1.0.0"
+            new_package.parent.mkdir(parents=True)
+            shutil.copytree(base, new_package)
+            new_manifest = yaml.safe_load((new_package / "manifest.yaml").read_text(encoding="utf-8"))
+            new_manifest["template"]["id"] = "new-template"
+            (new_package / "manifest.yaml").write_text(
+                yaml.safe_dump(new_manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
+            )
+            new_scripts = new_skill / "scripts"
+            new_scripts.mkdir(parents=True)
+            shutil.copy2(skill / "scripts" / "validate_template.py", new_scripts / "validate_template.py")
+            new_schemas = new_skill / "schemas"
+            new_schemas.mkdir(parents=True)
+            shutil.copy2(skill / "schemas" / "demo.schema.json", new_schemas / "demo.schema.json")
+            self.stage_fixture_paths(
+                root,
+                new_package / "manifest.yaml",
+                new_package / "template.txt",
+                new_scripts / "validate_template.py",
+                new_schemas / "demo.schema.json",
+                new_package / "CHANGELOG.md",
+            )
+
+            discovered = self.run_tool("discover", "--json", root=root)
+            self.assertEqual(discovered.returncode, 0, discovered.stdout + discovered.stderr)
+            package_info = next(
+                item for item in self.json_result(discovered)["packages"] if item["id"] == "new-template"
+            )
+            self.assertTrue(package_info["is_canonical"])
+            self.assertEqual(package_info["errors"], [])
+            validated = self.run_tool("validate", "--package", new_package, "--json", root=root)
+            self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            self.assertEqual(self.json_result(validated)["status"], "passed")
+
+    def test_untracked_scripts_helper_is_rejected_before_validator_execution(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            marker = root / "MALICIOUS_HELPER_EXECUTED"
+            helper = skill / "scripts" / "malicious_helper.py"
+            helper.write_text(
+                "from pathlib import Path\n"
+                f"Path(r'{marker}').write_text('executed', encoding='utf-8')\n",
+                encoding="utf-8",
+            )
+            (skill / "scripts" / "validate_template.py").write_text(
+                "import malicious_helper\n"
+                "print('validator should not have run')\n",
+                encoding="utf-8",
+            )
+            result = self.run_tool("validate", "--package", package, "--json", root=root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("untrusted", result.stdout.lower())
+            self.assertIn("scripts", result.stdout.lower())
+            self.assertFalse(marker.exists())
+
+    def test_validator_commands_fail_closed_without_a_git_index(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, _ = self.make_fixture_repo(root, init_git=False)
+            result = self.run_tool("validate", "--package", package, "--json", root=root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Git index is required", result.stdout)
+
+    def test_symlink_in_validator_scripts_is_rejected_before_execution(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            link = skill / "scripts" / "linked_helper.py"
+            try:
+                link.symlink_to(skill / "scripts" / "validate_template.py")
+            except (OSError, NotImplementedError):
+                self.skipTest("the current platform cannot create symlinks")
+            result = self.run_tool("validate", "--package", package, "--json", root=root)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symlink", result.stdout.lower())
+
+            linked_skill = root / "linked-validator-skill"
+            linked_package = linked_skill / "assets" / "templates" / "linked-template" / "v1.0.0"
+            linked_package.parent.mkdir(parents=True)
+            shutil.copytree(package, linked_package)
+            linked_manifest = yaml.safe_load((linked_package / "manifest.yaml").read_text(encoding="utf-8"))
+            linked_manifest["template"]["id"] = "linked-template"
+            (linked_package / "manifest.yaml").write_text(
+                yaml.safe_dump(linked_manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
+            )
+            linked_scripts = linked_skill / "scripts"
+            linked_scripts.mkdir(parents=True)
+            linked_validator = linked_scripts / "validate_template.py"
+            try:
+                linked_validator.symlink_to(skill / "scripts" / "validate_template.py")
+            except (OSError, NotImplementedError):
+                self.skipTest("the current platform cannot create validator symlinks")
+            linked_result = self.run_tool("validate", "--package", linked_package, "--json", root=root)
+            self.assertNotEqual(linked_result.returncode, 0)
+            self.assertIn("trusted Git-tracked owner validator", linked_result.stdout)
+
     def test_fingerprint_contract_rejects_all_incomplete_or_ambiguous_forms(self) -> None:
         mutations = {
             "algorithm": lambda value: value.update(algorithm="SHA256"),
@@ -226,7 +393,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("fingerprint", result.stdout)
 
-    def test_external_package_rejects_ambiguous_owner_but_canonical_path_uses_local_owner(self) -> None:
+    def test_untracked_fake_owner_is_ignored_for_external_validation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             skill, package, _ = self.make_fixture_repo(root)
@@ -253,9 +420,9 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 "raise SystemExit(0)\n",
                 encoding="utf-8",
             )
-            ambiguous = self.run_tool("validate", "--package", external, "--json", root=root)
-            self.assertNotEqual(ambiguous.returncode, 0)
-            self.assertIn("ambiguous", ambiguous.stdout)
+            validated = self.run_tool("validate", "--package", external, "--json", root=root)
+            self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            self.assertEqual(self.json_result(validated)["status"], "passed")
             self.assertFalse((external.parent / "MALICIOUS_VALIDATOR_EXECUTED").exists())
             canonical = self.run_tool("validate", "--package", package, "--json", root=root)
             self.assertEqual(canonical.returncode, 0, canonical.stdout + canonical.stderr)
@@ -348,7 +515,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             _, base, _ = self.make_fixture_repo(root)
-            output = root / "work" / "demo-template" / "1.0.1"
+            output = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
             )
@@ -368,7 +535,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             _, base, _ = self.make_fixture_repo(root)
             outputs = []
             for version in ("1.0.1", "1.0.2"):
-                output = root / "work" / "demo-template" / version
+                output = root / "work" / "template-packages" / "demo-template" / version
                 result = self.run_tool(
                     "scaffold", "--base-package", base, "--version", version, "--output-dir", output, "--json", root=root
                 )
@@ -451,7 +618,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertIn("does not equal manifest version", errors)
             self.assertIn("template file does not exist", errors)
             self.assertIn("fingerprint.sha256 must be a 64-character", errors)
-            self.assertIn("owner validator scripts/validate_template.py was not found", errors)
+            self.assertIn("canonical-like package has no trusted Git-tracked owner validator", errors)
 
     def test_scaffold_patch_updates_only_declared_manifest_fields_and_passes_real_validation(self) -> None:
         base = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0"
@@ -538,7 +705,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             skill, base, template = self.make_fixture_repo(root)
             (skill / "validator-fail").write_text("fail\n", encoding="utf-8")
-            output = root / "work" / "demo-template" / "1.0.1"
+            output = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             before = sha256(template)
             failed = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
@@ -555,7 +722,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             _, base, _ = self.make_fixture_repo(root)
-            output = root / "work" / "demo-template" / "1.0.1"
+            output = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             protected = self.run_tool(
                 "scaffold",
                 "--base-package", base,
@@ -571,7 +738,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", output, "--json", root=root
             )
             self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-            output2 = root / "work" / "demo-template" / "1.0.2"
+            output2 = root / "work" / "template-packages" / "demo-template" / "1.0.2"
             second = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.2", "--output-dir", output2, "--json", root=root
             )
@@ -582,21 +749,21 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 "scaffold",
                 "--base-package", base,
                 "--version", "1.0.3",
-                "--output-dir", root / "work" / "demo-template" / "1.0.3",
+                "--output-dir", root / "work" / "template-packages" / "demo-template" / "1.0.3",
                 "--json",
                 root=root,
                 env={"TEMPLATE_TOOL_TEST_FAIL_REPORT_COMMIT": "1"},
             )
             self.assertNotEqual(failed_commit.returncode, 0)
             self.assertIn("injected scaffold report commit failure", failed_commit.stdout)
-            self.assertFalse((root / "work" / "demo-template" / "1.0.3").exists())
+            self.assertFalse((root / "work" / "template-packages" / "demo-template" / "1.0.3").exists())
 
     def test_scaffold_report_must_be_output_sibling_and_never_source_directory(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             skill, base, template = self.make_fixture_repo(root)
             before = sha256(template)
-            output_parent = root / "work" / "demo-template"
+            output_parent = root / "work" / "template-packages" / "demo-template"
             invalid_reports = [
                 root / "report.json",
                 root / "docs" / "report.json",
@@ -639,6 +806,85 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual(allowed.returncode, 0, allowed.stdout + allowed.stderr)
             self.assertTrue(allowed_report.is_file())
 
+    def test_scaffold_repo_workspace_is_closed_and_checked_before_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, base, template = self.make_fixture_repo(root)
+            base_sha = sha256(template)
+            invalid_outputs = [
+                root / "1.0.1",
+                root / "docs" / "1.0.1",
+                root / "tools" / "1.0.1",
+                root / "tests" / "1.0.1",
+                root / ".github" / "1.0.1",
+                skill / "scripts" / "1.0.1",
+                skill / "assets" / "1.0.1",
+                root / "work" / "1.0.1",
+                root / "work" / "template-packages",
+            ]
+            for output in invalid_outputs:
+                with self.subTest(output=output):
+                    result = self.run_tool(
+                        "scaffold", "--base-package", base, "--version", "1.0.1",
+                        "--output-dir", output, "--json", root=root,
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertFalse(output.exists())
+                    self.assertFalse(output.is_symlink())
+            self.assertEqual(sha256(template), base_sha)
+            self.assertFalse(list(root.rglob("scaffold-report-*.json")))
+            self.assertFalse(list(root.rglob("*.stage")))
+
+            allowed = root / "work" / "template-packages" / "demo-template" / "1.0.1"
+            successful = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.1",
+                "--output-dir", allowed, "--json", root=root,
+            )
+            self.assertEqual(successful.returncode, 0, successful.stdout + successful.stderr)
+            self.assertTrue(allowed.is_dir())
+            self.assertTrue((allowed.parent / "scaffold-report-demo-template-1.0.1.json").is_file())
+
+            dry_output = root / "work" / "template-packages" / "dry-only" / "1.0.2"
+            dry = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.2",
+                "--output-dir", dry_output, "--dry-run", "--json", root=root,
+            )
+            self.assertEqual(dry.returncode, 0, dry.stdout + dry.stderr)
+            self.assertFalse(dry_output.exists())
+            self.assertFalse(dry_output.parent.exists())
+
+            escape_parent = root / "work" / "template-packages"
+            escape_parent.mkdir(parents=True, exist_ok=True)
+            docs = root / "docs"
+            docs.mkdir(exist_ok=True)
+            escape = escape_parent / "escape"
+            try:
+                escape.symlink_to(docs, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("the current platform cannot create symlinks")
+            escaped = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.3",
+                "--output-dir", escape / "1.0.3", "--dry-run", "--json", root=root,
+            )
+            self.assertNotEqual(escaped.returncode, 0)
+            self.assertFalse((docs / "1.0.3").exists())
+
+            external_target = root.parent / f"{root.name}-external-target"
+            external_target.mkdir()
+            external_escape = escape_parent / "external-escape"
+            try:
+                external_escape.symlink_to(external_target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                shutil.rmtree(external_target, ignore_errors=True)
+                self.skipTest("the current platform cannot create external directory symlinks")
+            escaped_external = self.run_tool(
+                "scaffold", "--base-package", base, "--version", "1.0.4",
+                "--output-dir", external_escape / "1.0.4", "--dry-run", "--json", root=root,
+            )
+            self.assertNotEqual(escaped_external.returncode, 0)
+            self.assertFalse((external_target / "1.0.4").exists())
+            shutil.rmtree(external_target, ignore_errors=True)
+
     def test_scaffold_generator_version_is_strict_ascii_semver(self) -> None:
         invalid = ("1.1.01", "01.1.1", "１.１.１", "v1.1.1", "latest", "")
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -664,7 +910,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
         base = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0"
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
-            output = root / "dry" / "1.1.1"
+            output = Path(directory) / "dry" / "1.1.1"
             result = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.1.1", "--output-dir", output, "--dry-run", "--json"
             )
@@ -673,17 +919,18 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertFalse(output.exists())
             self.assertFalse(output.parent.exists())
             overlap = self.run_tool(
-                "scaffold", "--base-package", base, "--version", "1.1.1", "--output-dir", base / "1.1.1", "--json"
+                "scaffold", "--base-package", base, "--version", "1.1.1",
+                "--output-dir", ROOT / "work" / "template-packages", "--json"
             )
             self.assertNotEqual(overlap.returncode, 0)
-            self.assertIn("overlaps protected path", overlap.stdout + overlap.stderr)
+            self.assertIn("below work/template-packages", overlap.stdout + overlap.stderr)
 
     def test_promote_success_and_target_exists_are_atomic(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             _, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -710,7 +957,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             _, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
             (root / "repo-fail").write_text("fail\n", encoding="utf-8")
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -726,7 +973,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             _, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -758,7 +1005,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             skill, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -788,7 +1035,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             skill, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -824,7 +1071,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 "print('fixture validator passed')\n",
                 encoding="utf-8",
             )
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -845,7 +1092,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             _, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
             (root / "repo-fail").write_text("fail\n", encoding="utf-8")
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )
@@ -863,7 +1110,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             skill, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
-            unsupported = root / "work" / "demo-template" / "1.1.0"
+            unsupported = root / "work" / "template-packages" / "demo-template" / "1.1.0"
             scaffold = self.run_tool(
                 "scaffold",
                 "--base-package",
@@ -881,15 +1128,20 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertNotEqual(promoted.returncode, 0)
             self.assertFalse((skill / "assets" / "templates" / "demo-template" / "1.1.0").exists())
 
-            valid_patch = root / "work-second" / "demo-template" / "1.0.1"
-            scaffold = self.run_tool(
-                "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", valid_patch, "--json", root=root
-            )
-            self.assertEqual(scaffold.returncode, 0, scaffold.stderr)
-            (skill / "validator-fail").write_text("fail\n", encoding="utf-8")
-            failed = self.run_tool("promote", "--package", valid_patch, "--json", root=root)
-            self.assertNotEqual(failed.returncode, 0)
-            self.assertFalse((skill / "assets" / "templates" / "demo-template" / "v1.0.1").exists())
+            external_root = Path(tempfile.mkdtemp(prefix="模板工具-外部工作包-"))
+            try:
+                valid_patch = external_root / "demo-template" / "1.0.1"
+                scaffold = self.run_tool(
+                    "scaffold", "--base-package", base, "--version", "1.0.1",
+                    "--output-dir", valid_patch, "--json", root=root
+                )
+                self.assertEqual(scaffold.returncode, 0, scaffold.stderr)
+                (skill / "validator-fail").write_text("fail\n", encoding="utf-8")
+                failed = self.run_tool("promote", "--package", valid_patch, "--json", root=root)
+                self.assertNotEqual(failed.returncode, 0)
+                self.assertFalse((skill / "assets" / "templates" / "demo-template" / "v1.0.1").exists())
+            finally:
+                shutil.rmtree(external_root, ignore_errors=True)
 
     def test_archive_contains_dependency_closure_and_is_valid_after_extraction(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -1107,7 +1359,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             root = Path(directory)
             _, base, _ = self.make_fixture_repo(root)
             self.make_repo_validator(root)
-            source = root / "work" / "demo-template" / "1.0.1"
+            source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
             scaffold = self.run_tool(
                 "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
             )

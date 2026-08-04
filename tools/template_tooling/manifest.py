@@ -109,7 +109,14 @@ def package_template_path(manifest: dict[str, Any], manifest_path: Path) -> Path
     return template_path
 
 
-def inspect_manifest_package(package_dir: Path, validator: Path | None, *, is_canonical: bool, is_default: bool) -> TemplatePackage:
+def inspect_manifest_package(
+    package_dir: Path,
+    validator: Path | None,
+    *,
+    is_canonical: bool,
+    is_default: bool,
+    validator_error: str | None = None,
+) -> TemplatePackage:
     manifest_path = package_dir / "manifest.yaml"
     errors: list[str] = []
     warnings: list[str] = []
@@ -139,7 +146,7 @@ def inspect_manifest_package(package_dir: Path, validator: Path | None, *, is_ca
     except OSError as exc:
         errors.append(f"cannot inspect package {package_dir}: {exc}")
     if validator is None:
-        errors.append("owner validator scripts/validate_template.py was not found")
+        errors.append(validator_error or "owner validator scripts/validate_template.py was not found")
     return TemplatePackage(
         template_id=template_id,
         version=version,

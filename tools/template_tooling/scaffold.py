@@ -29,6 +29,7 @@ from .validation import validate_package_path, validation_succeeded
 
 
 UNSUPPORTED_MINOR_REASON = "Template minor is not supported by the current generator contract."
+DEFAULT_SCAFFOLD_WORK_ROOT = Path("work") / "template-packages"
 
 
 def _replace_section_scalar(text: str, section: str, key: str, value: str) -> tuple[str, bool]:
@@ -124,17 +125,18 @@ def _dependency_plan(base: TemplatePackage, output_dir: Path) -> list[tuple[Path
     return [(source_package, destination_package)]
 
 
-def _find_base(base_dir: Path, root: Path) -> TemplatePackage:
+def _find_base(base_dir: Path, root: Path, *, full_validate: bool = True) -> TemplatePackage:
     target = base_dir.resolve()
     for package in discover_packages(root):
         if package.package_dir.resolve() == target:
             if not package.is_canonical or package.errors:
                 detail = "; ".join(package.errors) or "package is not canonical"
                 raise TemplateToolError(f"base package is not a valid canonical package: {detail}")
-            validation = validate_package_path(package.package_dir, root, identity_only=False)
-            if not validation_succeeded(validation):
-                detail = "; ".join(validation.get("errors", []))
-                raise TemplateToolError(f"base package full validation failed: {detail}")
+            if full_validate:
+                validation = validate_package_path(package.package_dir, root, identity_only=False)
+                if not validation_succeeded(validation):
+                    detail = "; ".join(validation.get("errors", []))
+                    raise TemplateToolError(f"base package full validation failed: {detail}")
             return package
     raise TemplateToolError(f"base package was not discovered: {base_dir}")
 
@@ -142,6 +144,39 @@ def _find_base(base_dir: Path, root: Path) -> TemplatePackage:
 def _report_path(output_dir: Path, explicit: Path | None, template_id: str, version: str) -> Path:
     path = explicit or (output_dir.parent / f"scaffold-report-{template_id}-{version}.json")
     return path.expanduser().absolute()
+
+
+def _validate_scaffold_workspace(output_dir: Path, root: Path) -> None:
+    """Reject repository source paths before any expensive base validation."""
+    lexical_output = Path(os.path.abspath(os.fspath(output_dir.expanduser())))
+    lexical_root = Path(os.path.abspath(os.fspath(root.expanduser())))
+    try:
+        lexical_output.relative_to(lexical_root)
+        lexical_inside_repository = True
+    except ValueError:
+        lexical_inside_repository = False
+    if not lexical_inside_repository:
+        return
+    resolved_output = output_dir.expanduser().resolve(strict=False)
+    resolved_root = root.expanduser().resolve()
+    if not is_within(resolved_output, resolved_root, allow_equal=False):
+        raise TemplateToolError("scaffold output symlink escapes the repository")
+    allowed_lexical = resolved_root / DEFAULT_SCAFFOLD_WORK_ROOT
+    current = resolved_root
+    for part in DEFAULT_SCAFFOLD_WORK_ROOT.parts:
+        current = current / part
+        if current.is_symlink():
+            raise TemplateToolError(
+                f"scaffold work root contains a symlinked component: {current}"
+            )
+    allowed_root = allowed_lexical.resolve(strict=False)
+    if not is_within(allowed_root, resolved_root, allow_equal=False):
+        raise TemplateToolError("scaffold work root must remain inside the repository")
+    if not is_within(resolved_output, allowed_root, allow_equal=False):
+        raise TemplateToolError(
+            "scaffold output inside the repository must be below "
+            f"{DEFAULT_SCAFFOLD_WORK_ROOT.as_posix()}/"
+        )
 
 
 def _protected_report_paths(root: Path, base: TemplatePackage, canonical: list[TemplatePackage], dependencies: list[tuple[Path, Path]], output_dir: Path) -> list[Path]:
@@ -182,7 +217,7 @@ def scaffold_package(
         generator_semver = parse_semver(generator_version)
     else:
         generator_semver = None
-    base = _find_base(base_dir, root)
+    base = _find_base(base_dir, root, full_validate=False)
     supported_major = base.manifest.get("generator", {}).get("supported_major")
     if generator_semver is not None and generator_semver.major != supported_major:
         raise TemplateToolError(
@@ -194,6 +229,8 @@ def scaffold_package(
         raise TemplateToolError(f"new version must be greater than base version: {version} <= {base.version}")
     if target_version.major != base_version.major:
         raise TemplateToolError("new version must keep the base major version")
+    _validate_scaffold_workspace(output_dir, root)
+
     if not package_dir_matches_version(output_dir.name, version):
         raise TemplateToolError(f"output directory name must equal target version {version!r} or v{version!r}")
 
@@ -233,6 +270,11 @@ def scaffold_package(
             if not destination.is_dir() or _tree_fingerprints(source) != _tree_fingerprints(destination):
                 raise TemplateToolError(f"scaffold dependency already exists and differs: {destination}")
 
+    base_validation = validate_package_path(base.package_dir, root, identity_only=False)
+    if not validation_succeeded(base_validation):
+        detail = "; ".join(base_validation.get("errors", []))
+        raise TemplateToolError(f"base package full validation failed: {detail}")
+
     template_relative = base.template_path.relative_to(base.package_dir)
     new_template_sha = sha256_file(base.template_path)
     file_list = [
@@ -254,7 +296,7 @@ def scaffold_package(
         "base_package": display_path(base.package_dir, root),
         "base_version": base.version,
         "base_sha256": base.fingerprint,
-        "base_validation": {"status": "passed", "full_validation": True, "validation_scope": "package"},
+        "base_validation": base_validation,
         "owner_skill": display_path(owner_skill_root(base), root) if base.validator is not None else None,
         "version": version,
         "template_sha256": new_template_sha,

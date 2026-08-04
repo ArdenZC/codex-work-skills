@@ -12,7 +12,14 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from .discovery import discover_packages, find_validator_for_package, owner_skill_root, trusted_validator_for_package
+from .discovery import (
+    canonical_skill_root_for_package,
+    discover_packages,
+    find_validator_for_package,
+    owner_skill_root,
+    trusted_validator_for_package,
+)
+from .git_trust import GitTrustIndex, trusted_script_files
 from .manifest import (
     inspect_manifest_package,
     load_manifest,
@@ -59,11 +66,14 @@ def _copy_regular_file(source: Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
-def _copy_owner_support(owner: Path, isolated_skill: Path, template_id: str) -> None:
+def _copy_owner_support(owner: Path, isolated_skill: Path, template_id: str, trust_index: GitTrustIndex) -> None:
     scripts = owner / "scripts"
-    if not scripts.is_dir():
-        raise TemplateToolError(f"owner validator scripts directory was not found: {scripts}")
-    copy_tree_no_symlinks(scripts, isolated_skill / "scripts")
+    trusted_scripts = trusted_script_files(owner, trust_index)
+    target_scripts = isolated_skill / "scripts"
+    target_scripts.mkdir(parents=True, exist_ok=False)
+    for source in trusted_scripts:
+        relative = source.relative_to(scripts)
+        _copy_regular_file(source, target_scripts / relative)
 
     source_schemas = owner / "schemas"
     if source_schemas.is_dir():
@@ -145,7 +155,10 @@ def _copy_dependency_closure(
         active.remove(source_package)
 
 
-def _prepare_isolated_package(package: TemplatePackage) -> tuple[TemplatePackage, tempfile.TemporaryDirectory[str], Path]:
+def _prepare_isolated_package(
+    package: TemplatePackage,
+    trust_index: GitTrustIndex,
+) -> tuple[TemplatePackage, tempfile.TemporaryDirectory[str], Path]:
     if package.validator is None:
         raise TemplateToolError("owner validator is unavailable")
     owner = owner_skill_root(package)
@@ -154,7 +167,7 @@ def _prepare_isolated_package(package: TemplatePackage) -> tuple[TemplatePackage
     isolated_skill = temporary_root / "skill"
     isolated_skill.mkdir()
     try:
-        _copy_owner_support(owner, isolated_skill, package.template_id)
+        _copy_owner_support(owner, isolated_skill, package.template_id, trust_index)
         target_root = isolated_skill / "assets" / "templates" / package.template_id
         destination_package = target_root / package.package_dir.name
 
@@ -199,7 +212,13 @@ def _prepare_isolated_package(package: TemplatePackage) -> tuple[TemplatePackage
         raise
 
 
-def package_from_path(package_dir: Path, root: Path) -> TemplatePackage:
+def package_from_path(
+    package_dir: Path,
+    root: Path,
+    *,
+    trust_index: GitTrustIndex | None = None,
+) -> TemplatePackage:
+    trust_index = trust_index or GitTrustIndex.from_repo_root(root)
     package_dir = package_dir.resolve()
     manifest_path = package_dir / "manifest.yaml"
     if not manifest_path.is_file():
@@ -208,12 +227,24 @@ def package_from_path(package_dir: Path, root: Path) -> TemplatePackage:
     template = manifest.get("template") if isinstance(manifest, dict) else None
     template_id = str(template.get("id") or "") if isinstance(template, dict) else ""
     format_name = str(template.get("format") or "") if isinstance(template, dict) else ""
-    validator = find_validator_for_package(package_dir, root, template_id=template_id, format_name=format_name)
+    validator = find_validator_for_package(
+        package_dir,
+        root,
+        template_id=template_id,
+        format_name=format_name,
+        trust_index=trust_index,
+    )
+    local_shape = canonical_skill_root_for_package(package_dir, root)
     return inspect_manifest_package(
         package_dir,
         validator,
         is_canonical=False,
         is_default=False,
+        validator_error=(
+            "canonical-like package has no trusted Git-tracked owner validator"
+            if local_shape is not None
+            else None
+        ),
     )
 
 
@@ -235,6 +266,7 @@ def _run_validator(
     *,
     validation_scope: str,
     temporary_root: Path | None = None,
+    trust_index: GitTrustIndex | None = None,
     timeout: int,
 ) -> dict[str, Any]:
     if package.validator is None:
@@ -243,7 +275,7 @@ def _run_validator(
         return report
     try:
         if validation_scope == "package":
-            trusted_validator_for_package(package, root)
+            trusted_validator_for_package(package, root, trust_index)
         elif (
             temporary_root is None
             or package.validator.is_symlink()
@@ -313,7 +345,8 @@ def _run_validator(
 
 
 def validate_package_path(package_dir: Path, root: Path, *, identity_only: bool = False, timeout: int = 900) -> dict[str, Any]:
-    package = package_from_path(package_dir, root)
+    trust_index = GitTrustIndex.from_repo_root(root)
+    package = package_from_path(package_dir, root, trust_index=trust_index)
     report = identity_report(package, root)
     if package.errors or identity_only:
         return report
@@ -322,7 +355,7 @@ def validate_package_path(package_dir: Path, root: Path, *, identity_only: bool 
         report["errors"].append("owner validator is unavailable")
         return report
     try:
-        trusted_validator_for_package(package, root)
+        trusted_validator_for_package(package, root, trust_index)
     except (OSError, TemplateToolError) as exc:
         report["status"] = "failed"
         report["errors"].append(f"untrusted owner validator: {exc}")
@@ -336,10 +369,10 @@ def validate_package_path(package_dir: Path, root: Path, *, identity_only: bool 
         owner = owner_skill_root(package)
         canonical_package = any(
             item.is_canonical and item.package_dir.resolve() == package.package_dir.resolve()
-            for item in discover_packages(root)
+            for item in discover_packages(root, trust_index=trust_index)
         )
         if not canonical_package:
-            validator_package, isolated, temporary_root = _prepare_isolated_package(package)
+            validator_package, isolated, temporary_root = _prepare_isolated_package(package, trust_index)
             validation_scope = "isolated_temp"
         return _run_validator(
             validator_package,
@@ -347,6 +380,7 @@ def validate_package_path(package_dir: Path, root: Path, *, identity_only: bool 
             report,
             validation_scope=validation_scope,
             temporary_root=temporary_root,
+            trust_index=trust_index,
             timeout=timeout,
         )
     except (OSError, TemplateToolError, ValueError) as exc:
@@ -366,6 +400,7 @@ def validate_package_with_owner(
     owner_validator: Path,
     *,
     trusted_root: Path | None = None,
+    trust_index: GitTrustIndex | None = None,
     timeout: int = 900,
 ) -> dict[str, Any]:
     """Validate an extracted package with the already-resolved owner validator."""
@@ -380,7 +415,8 @@ def validate_package_with_owner(
         return report
     try:
         if trusted_root is not None:
-            trusted_validator_for_package(package, trusted_root)
+            trust_index = trust_index or GitTrustIndex.from_repo_root(trusted_root)
+            trusted_validator_for_package(package, trusted_root, trust_index)
         elif owner_validator.is_symlink() or not owner_validator.is_file() or not is_within(owner_validator, root):
             raise TemplateToolError("owner validator is not a trusted regular file")
     except (OSError, TemplateToolError) as exc:
@@ -390,13 +426,16 @@ def validate_package_with_owner(
     isolated = None
     temporary_root: Path | None = None
     try:
-        validator_package, isolated, temporary_root = _prepare_isolated_package(package)
+        if trust_index is None:
+            trust_index = GitTrustIndex.from_repo_root(trusted_root or root)
+        validator_package, isolated, temporary_root = _prepare_isolated_package(package, trust_index)
         return _run_validator(
             validator_package,
             root,
             report,
             validation_scope="isolated_temp",
             temporary_root=temporary_root,
+            trust_index=trust_index,
             timeout=timeout,
         )
     except (OSError, TemplateToolError, ValueError) as exc:

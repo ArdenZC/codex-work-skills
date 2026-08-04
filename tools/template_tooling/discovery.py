@@ -8,6 +8,7 @@ import re
 import stat
 
 from .manifest import inspect_manifest_package, load_manifest
+from .git_trust import GitTrustIndex, trusted_script_files
 from .models import TemplatePackage, TemplateToolError, parse_semver
 from .paths import is_within, repo_root, safe_relative
 
@@ -45,7 +46,11 @@ def _regular_local_file(path: Path, root: Path) -> Path | None:
     return resolved
 
 
-def trusted_local_validator_for_canonical_package(package_dir: Path, root: Path) -> Path | None:
+def trusted_local_validator_for_canonical_package(
+    package_dir: Path,
+    root: Path,
+    trust_index: GitTrustIndex | None = None,
+) -> Path | None:
     """Resolve only the validator owned by a canonical in-repository Skill."""
     skill_root = canonical_skill_root_for_package(package_dir, root)
     if skill_root is None:
@@ -53,6 +58,11 @@ def trusted_local_validator_for_canonical_package(package_dir: Path, root: Path)
     candidate = skill_root / "scripts" / "validate_template.py"
     resolved = _regular_local_file(candidate, root.resolve())
     if resolved is None or resolved.parent != (skill_root / "scripts").resolve():
+        return None
+    trust_index = trust_index or GitTrustIndex.from_repo_root(root)
+    try:
+        trust_index.require_tracked_regular_file(resolved, label="Owner validator")
+    except TemplateToolError:
         return None
     return resolved
 
@@ -127,13 +137,18 @@ def _scan_manifest_paths(root: Path) -> list[Path]:
     return paths
 
 
-def discover_packages(root: Path | None = None) -> list[TemplatePackage]:
+def discover_packages(root: Path | None = None, *, trust_index: GitTrustIndex | None = None) -> list[TemplatePackage]:
     root = (root or repo_root()).resolve()
+    trust_index = trust_index or GitTrustIndex.from_repo_root(root)
     packages: list[TemplatePackage] = []
     for manifest_path in _scan_manifest_paths(root):
         skill_root = canonical_skill_root_for_package(manifest_path.parent, root)
         is_canonical = skill_root is not None
-        validator = trusted_local_validator_for_canonical_package(manifest_path.parent, root) if is_canonical else None
+        validator = (
+            trusted_local_validator_for_canonical_package(manifest_path.parent, root, trust_index)
+            if is_canonical
+            else None
+        )
         try:
             preliminary = load_manifest(manifest_path)
             template = preliminary.get("template", {})
@@ -150,6 +165,11 @@ def discover_packages(root: Path | None = None) -> list[TemplatePackage]:
                 validator,
                 is_canonical=is_canonical,
                 is_default=is_default,
+                validator_error=(
+                    "canonical-like package has no trusted Git-tracked owner validator"
+                    if is_canonical
+                    else None
+                ),
             )
         )
 
@@ -173,21 +193,29 @@ def discover_packages(root: Path | None = None) -> list[TemplatePackage]:
     return sorted(packages, key=sort_key)
 
 
-def find_validator_for_package(package_dir: Path, root: Path | None = None, *, template_id: str | None = None, format_name: str | None = None) -> Path | None:
+def find_validator_for_package(
+    package_dir: Path,
+    root: Path | None = None,
+    *,
+    template_id: str | None = None,
+    format_name: str | None = None,
+    trust_index: GitTrustIndex | None = None,
+) -> Path | None:
     root = (root or repo_root()).resolve()
+    trust_index = trust_index or GitTrustIndex.from_repo_root(root)
     local_shape = canonical_skill_root_for_package(package_dir, root)
-    local = trusted_local_validator_for_canonical_package(package_dir, root)
+    local = trusted_local_validator_for_canonical_package(package_dir, root, trust_index)
     if local_shape is not None:
         return local
     candidates: list[Path] = []
-    for package in discover_packages(root):
+    for package in discover_packages(root, trust_index=trust_index):
         if not package.is_canonical or package.validator is None:
             continue
         if template_id and package.template_id != template_id:
             continue
         if format_name and package.format != format_name:
             continue
-        trusted = trusted_local_validator_for_canonical_package(package.package_dir, root)
+        trusted = trusted_local_validator_for_canonical_package(package.package_dir, root, trust_index)
         if trusted is not None and trusted not in candidates:
             candidates.append(trusted)
     if len(candidates) == 1:
@@ -200,26 +228,33 @@ def find_validator_for_package(package_dir: Path, root: Path | None = None, *, t
     )
 
 
-def trusted_validator_for_package(package: TemplatePackage, root: Path) -> Path:
+def trusted_validator_for_package(
+    package: TemplatePackage,
+    root: Path,
+    trust_index: GitTrustIndex | None = None,
+) -> Path:
     """Re-check the resolved validator immediately before execution."""
+    trust_index = trust_index or GitTrustIndex.from_repo_root(root)
     if package.validator is None:
         raise TemplateToolError("owner validator is unavailable")
     raw_validator = package.validator
     resolved_validator = _regular_local_file(raw_validator, root.resolve())
     if resolved_validator is None:
         raise TemplateToolError(f"owner validator is not a trusted regular file: {raw_validator}")
+    trust_index.require_tracked_regular_file(resolved_validator, label="Owner validator")
 
-    local_validator = trusted_local_validator_for_canonical_package(package.package_dir, root)
+    local_validator = trusted_local_validator_for_canonical_package(package.package_dir, root, trust_index)
     if local_validator is not None:
         if resolved_validator != local_validator:
             raise TemplateToolError("canonical package validator is outside its owning Skill")
+        trusted_script_files(skill_root_for_validator(local_validator), trust_index)
         return local_validator
 
     candidates: list[Path] = []
-    for candidate in discover_packages(root):
+    for candidate in discover_packages(root, trust_index=trust_index):
         if not candidate.is_canonical or candidate.template_id != package.template_id or candidate.format != package.format:
             continue
-        trusted = trusted_local_validator_for_canonical_package(candidate.package_dir, root)
+        trusted = trusted_local_validator_for_canonical_package(candidate.package_dir, root, trust_index)
         if trusted is not None and trusted not in candidates:
             candidates.append(trusted)
     if len(candidates) != 1:
@@ -230,6 +265,7 @@ def trusted_validator_for_package(package: TemplatePackage, root: Path) -> Path:
         )
     if resolved_validator != candidates[0]:
         raise TemplateToolError("resolved validator is not the trusted canonical owner validator")
+    trusted_script_files(skill_root_for_validator(candidates[0]), trust_index)
     return candidates[0]
 
 
