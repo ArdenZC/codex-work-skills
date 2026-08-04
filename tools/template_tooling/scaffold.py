@@ -106,12 +106,37 @@ def _tree_fingerprints(root: Path) -> dict[str, str]:
 
 
 def _lexical_absolute(path: Path) -> Path:
-    return Path(os.path.abspath(os.fspath(path.expanduser())))
+    lexical = Path(os.path.abspath(os.fspath(path.expanduser())))
+    if os.name != "nt":
+        return lexical
+
+    # Windows runners may expose TEMP through an 8.3 alias. Expand only
+    # existing path components so lexical symlink checks remain distinct from
+    # the resolved containment checks below.
+    missing_tail: list[str] = []
+    current = lexical
+    while not current.exists() and not current.is_symlink() and current.parent != current:
+        missing_tail.append(current.name)
+        current = current.parent
+    try:
+        import ctypes
+
+        get_long_path_name = ctypes.windll.kernel32.GetLongPathNameW
+        get_long_path_name.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        get_long_path_name.restype = ctypes.c_uint32
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_long_path_name(os.fspath(current), buffer, len(buffer))
+        resolved_existing = Path(buffer.value) if 0 < length < len(buffer) else current
+    except (AttributeError, OSError):
+        resolved_existing = current
+    for part in reversed(missing_tail):
+        resolved_existing /= part
+    return resolved_existing
 
 
 def _lexical_is_within(path: Path, root: Path, *, allow_equal: bool = True) -> bool:
-    path_text = os.path.normcase(os.path.abspath(os.fspath(path)))
-    root_text = os.path.normcase(os.path.abspath(os.fspath(root)))
+    path_text = os.path.normcase(os.fspath(_lexical_absolute(path)))
+    root_text = os.path.normcase(os.fspath(_lexical_absolute(root)))
     try:
         common = os.path.commonpath((path_text, root_text))
     except ValueError:

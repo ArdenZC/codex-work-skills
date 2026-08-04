@@ -30,8 +30,8 @@ permissions:
   contents: read
 
 jobs:
-  template-package-tests:
-    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+  template-tooling:
+    name: Template tooling / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -88,11 +88,91 @@ jobs:
       - name: Validate manifests, schemas and template hashes
         run: python "tests/validate_template_packages.py"
 
-      - name: Compile Python sources
-        run: python -m compileall -q "教案生成器" "平时成绩记分册生成器" "tools" "tests"
+      - name: Compile template tooling sources
+        run: python -m compileall -q "tools" "tests/test_template_package_tooling.py"
 
-      - name: Run root template package regression tests
-        run: python -m unittest discover -s "tests" -p "test_*.py" -v
+      - name: Run template tooling regression tests
+        run: python -m unittest discover -s "tests" -p "test_template_package_tooling.py" -v
+
+      - name: Verify tooling worktree is clean on Ubuntu
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          test -z "$(git status --porcelain)"
+
+      - name: Verify tooling worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) {
+            $status
+            throw "Tests left changes in the worktree."
+          }
+
+  template-core:
+    name: Template core / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install LibreOffice on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libreoffice
+
+      - name: Install LibreOffice on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install libreoffice-fresh --yes --no-progress
+          $programPaths = @(
+            (Join-Path $env:ProgramFiles "LibreOffice\program"),
+            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
+          )
+          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $programPath) {
+            throw "LibreOffice installation path was not found."
+          }
+          $soffice = Join-Path $programPath "soffice.com"
+          if (-not (Test-Path $soffice)) {
+            throw "LibreOffice command was not found: $soffice"
+          }
+          & $soffice --version | Select-Object -First 1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
+
+      - name: Validate manifests, schemas and template hashes
+        run: python "tests/validate_template_packages.py"
+
+      - name: Compile template core sources
+        run: python -m compileall -q "教案生成器" "平时成绩记分册生成器" "tests/test_template_packages.py"
+
+      - name: Run template core regression tests
+        run: python -m unittest discover -s "tests" -p "test_template_packages.py" -v
 
       - name: Run lesson-plan skill tests
         run: python -m unittest discover -s "教案生成器/lesson-plan-docx-generator/tests" -p "test_*.py" -v
@@ -100,13 +180,13 @@ jobs:
       - name: Run course-gradebook skill tests
         run: python -m unittest discover -s "平时成绩记分册生成器/course-gradebook-generator/tests" -p "test_*.py" -v
 
-      - name: Verify worktree is clean on Ubuntu
+      - name: Verify core worktree is clean on Ubuntu
         if: runner.os == 'Linux'
         shell: bash
         run: |
           test -z "$(git status --porcelain)"
 
-      - name: Verify worktree is clean on Windows
+      - name: Verify core worktree is clean on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
