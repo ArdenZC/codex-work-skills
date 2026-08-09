@@ -172,7 +172,9 @@ def _json_or_text(value: Any, as_json: bool) -> None:
 
 
 def _run(args: argparse.Namespace) -> tuple[int, Any]:
-    root = resolve_path(args.repo_root)
+    # Keep the caller's lexical root so containment checks can compare it with
+    # sibling CLI paths before independently resolving symlinks.
+    root = _lexical_path(args.repo_root)
     if args.command == "discover":
         packages = discover_packages(root)
         payload = {

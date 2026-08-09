@@ -3464,6 +3464,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("ubuntu-latest", workflow)
         self.assertIn("suite: lesson-plan", workflow)
         self.assertIn("suite: gradebook", workflow)
+        self.assertIn("if: matrix.suite == 'gradebook'\n        run: python \"tests/validate_template_packages.py\"", workflow)
         for test_class in (
             "LessonTemplatePackageTests",
             "GradebookTotalRuleTests",
