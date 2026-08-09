@@ -158,8 +158,14 @@ class TemplatePackageToolingTests(unittest.TestCase):
             "assert helper.VALUE == 'trusted'\n"
             "manifest = Path(sys.argv[sys.argv.index('--manifest') + 1])\n"
             "package = manifest.parent\n"
+            "start_marker = package / 'validator-start-marker.txt'\n"
+            "if start_marker.is_file():\n"
+            "    Path(start_marker.read_text(encoding='utf-8').strip()).write_text('started', encoding='utf-8')\n"
             "if (package / 'validator-timeout').exists():\n"
-            "    time.sleep(60)\n"
+            "    print('超时标准输出', flush=True)\n"
+            "    print('超时错误输出', file=sys.stderr, flush=True)\n"
+            "    print(str(package), flush=True)\n"
+            "    time.sleep(30)\n"
             "marker = os.environ.get('TEMPLATE_TOOL_TEST_BASE_VALIDATOR_MARKER')\n"
             "if marker:\n"
             "    Path(marker).write_text('started', encoding='utf-8')\n"
@@ -193,14 +199,66 @@ class TemplatePackageToolingTests(unittest.TestCase):
         tests_dir.mkdir(exist_ok=True)
         (tests_dir / "validate_template_packages.py").write_text(
             "from pathlib import Path\n"
+            "import os\n"
             "import sys\n"
             "root = Path(__file__).resolve().parents[1]\n"
+            "mutation = os.environ.get('TEMPLATE_TOOL_TEST_REPO_MUTATION')\n"
+            "template_roots = sorted(root.glob('**/assets/templates'))\n"
+            "template_root = template_roots[0]\n"
+            "other = template_root / 'other-template' / 'v1.0.0'\n"
+            "target = template_root / 'demo-template' / 'v1.0.1'\n"
+            "if mutation in {'other-change', 'other-change-nonzero', 'target-and-other'}:\n"
+            "    (other / 'CHANGELOG.md').write_text('mutated by repository validator\\n', encoding='utf-8')\n"
+            "    (other / 'repo-validator-output.txt').write_text('unexpected\\n', encoding='utf-8')\n"
+            "if mutation == 'other-delete':\n"
+            "    (other / 'manifest.yaml').unlink()\n"
+            "if mutation == 'other-add':\n"
+            "    added = template_root / 'other-template' / 'v9.9.9'\n"
+            "    added.mkdir(parents=True)\n"
+            "    (added / 'manifest.yaml').write_text('added: true\\n', encoding='utf-8')\n"
+            "    (added / 'template.txt').write_text('added\\n', encoding='utf-8')\n"
+            "if mutation == 'target-and-other':\n"
+            "    (target / 'template.txt').write_text('target mutation\\n', encoding='utf-8')\n"
+            "if mutation == 'other-change-nonzero':\n"
+            "    print('repository validator mutated another package', file=sys.stderr)\n"
+            "    raise SystemExit(17)\n"
             "if (root / 'repo-fail').exists():\n"
             "    print('repo validator failed', file=sys.stderr)\n"
             "    raise SystemExit(9)\n"
             "print('repo validator passed')\n",
             encoding="utf-8",
         )
+
+    def add_fixture_package(self, skill_root: Path, template_id: str = "other-template", version: str = "1.0.0") -> Path:
+        root = skill_root.parents[1]
+        package = skill_root / "assets" / "templates" / template_id / f"v{version}"
+        package.mkdir(parents=True)
+        template = package / "template.txt"
+        template.write_text(f"{template_id} canonical template\n", encoding="utf-8")
+        digest = sha256(template)
+        manifest = {
+            "template": {
+                "id": template_id,
+                "name": "Fixture template",
+                "version": version,
+                "format": "txt",
+                "file": "template.txt",
+            },
+            "generator": {"version": "1.0.0", "supported_major": 1},
+            "fingerprint": {"algorithm": "sha256", "sha256": digest, "value": digest},
+            "schema": "schemas/demo.schema.json",
+        }
+        (package / "manifest.yaml").write_text(
+            yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
+        )
+        (package / "CHANGELOG.md").write_text("# Other fixture\n", encoding="utf-8")
+        self.stage_fixture_paths(
+            root,
+            package / "manifest.yaml",
+            package / "template.txt",
+            package / "CHANGELOG.md",
+        )
+        return package
 
     def run_repo_validator(
         self,
@@ -233,6 +291,18 @@ class TemplatePackageToolingTests(unittest.TestCase):
             yaml.safe_dump(target_manifest, allow_unicode=True, sort_keys=False), encoding="utf-8"
         )
         return skill, target, target / "template.txt"
+
+    def prepare_multi_package_promotion(self, root: Path) -> tuple[Path, Path, Path, Path, Path]:
+        skill, base, _ = self.make_fixture_repo(root)
+        other = self.add_fixture_package(skill)
+        self.make_repo_validator(root)
+        source = root / "work" / "template-packages" / "demo-template" / "1.0.1"
+        scaffold = self.run_tool(
+            "scaffold", "--base-package", base, "--version", "1.0.1", "--output-dir", source, "--json", root=root
+        )
+        self.assert_process_succeeded(scaffold)
+        target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
+        return skill, base, other, source, target
 
     def test_discover_current_four_packages_without_libreoffice(self) -> None:
         result = self.run_tool("discover", "--json")
@@ -457,12 +527,12 @@ class TemplatePackageToolingTests(unittest.TestCase):
             archive = self.run_tool(
                 "archive",
                 "--package", external_package,
-                "--output-dir", root / "dist",
+                "--output-dir", root / "dist" / "template-packages",
                 "--json",
                 root=root,
             )
             self.assert_process_succeeded(archive)
-            self.assertTrue((root / "dist" / "demo-template-1.0.1.zip").is_file())
+            self.assertTrue((root / "dist" / "template-packages" / "demo-template-1.0.1.zip").is_file())
 
     def test_all_validator_flows_isolate_timestamp_cache_and_python_environment(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -589,7 +659,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             archived = self.run_tool(
                 "archive",
                 "--package", external_package,
-                "--output-dir", root / "dist-external",
+                "--output-dir", root.parent / f"{root.name}-dist-external",
                 "--json",
                 root=root,
                 env=injected_env,
@@ -637,7 +707,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertIn("Git index is required", result.stdout)
 
     def test_validator_timeout_cleans_isolated_workspace(self) -> None:
-        from tools.template_tooling.validation import validate_package_path
+        from tools.template_tooling.validation import _subprocess_text, validate_package_path
 
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
@@ -647,7 +717,14 @@ class TemplatePackageToolingTests(unittest.TestCase):
             report = validate_package_path(package, root, timeout=1)
             self.assertEqual(report["status"], "failed")
             self.assertTrue(any("timed out" in error for error in report["errors"]))
+            self.assertIn("超时标准输出", report["validator"]["stdout"])
+            self.assertIn("超时错误输出", report["validator"]["stderr"])
+            self.assertIsInstance(report["validator"]["stdout"], str)
+            self.assertIsInstance(report["validator"]["stderr"], str)
+            self.assertNotIn("template-tool-validation-", json.dumps(report, ensure_ascii=False))
             self.assertEqual(before, set(Path(tempfile.gettempdir()).glob("template-tool-validation-*")))
+            self.assertIsInstance(_subprocess_text(b"\xffabc"), str)
+            self.assertEqual(_subprocess_text(b"\xffabc"), "�abc")
 
     def test_symlink_in_validator_scripts_is_rejected_before_execution(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -803,7 +880,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertFalse((external_root / "MALICIOUS_VALIDATOR_EXECUTED").exists())
 
             archived = self.run_tool(
-                "archive", "--package", external_package, "--output-dir", root / "dist-external", "--json", root=root
+                "archive", "--package", external_package, "--output-dir", root.parent / f"{root.name}-dist-external", "--json", root=root
             )
             self.assert_process_succeeded(archived)
             self.assertFalse((external_root / "MALICIOUS_VALIDATOR_EXECUTED").exists())
@@ -1364,6 +1441,10 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual(sha256(base / "template.txt"), base_sha)
             promoted = self.run_tool("promote", "--package", source, "--json", root=root)
             self.assert_process_succeeded(promoted)
+            self.assertEqual(self.json_result(promoted)["repository_package_guard"], {
+                "protected_roots": 1,
+                "unchanged": True,
+            })
             target = root / "技能工具" / "demo-skill" / "assets" / "templates" / "demo-template" / "v1.0.1"
             self.assertTrue(target.is_dir())
             self.assertTrue(source.is_dir())
@@ -1371,6 +1452,111 @@ class TemplatePackageToolingTests(unittest.TestCase):
             repeated = self.run_tool("promote", "--package", source, "--json", root=root)
             self.assert_process_failed(repeated)
             self.assertIn("already exists", repeated.stdout + repeated.stderr)
+
+    def test_promote_repository_validator_restores_other_package_mutation(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, other, source, target = self.prepare_multi_package_promotion(root)
+            before = tree_inventory(skill / "assets" / "templates")
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_REPO_MUTATION": "other-change"},
+            )
+            self.assert_process_failed(failed)
+            self.assertIn("repository package tree mutation detected", failed.stdout)
+            self.assertEqual(tree_inventory(skill / "assets" / "templates"), before)
+            self.assertTrue(other.is_dir())
+            self.assertFalse(target.exists())
+            self.assertFalse(any("stage" in path.name or "backup" in path.name for path in root.rglob("*")))
+            self.assertFalse(any("repository-package-snapshots" in path.name for path in root.rglob("*")))
+
+    def test_promote_repository_validator_restores_deleted_other_package_file(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, _, source, target = self.prepare_multi_package_promotion(root)
+            before = tree_inventory(skill / "assets" / "templates")
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_REPO_MUTATION": "other-delete"},
+            )
+            self.assert_process_failed(failed)
+            self.assertIn("removed", failed.stdout)
+            self.assertEqual(tree_inventory(skill / "assets" / "templates"), before)
+            self.assertFalse(target.exists())
+
+    def test_promote_repository_validator_removes_added_other_package(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, _, source, target = self.prepare_multi_package_promotion(root)
+            before = tree_inventory(skill / "assets" / "templates")
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_REPO_MUTATION": "other-add"},
+            )
+            self.assert_process_failed(failed)
+            self.assertIn("added", failed.stdout)
+            self.assertEqual(tree_inventory(skill / "assets" / "templates"), before)
+            self.assertFalse((skill / "assets" / "templates" / "other-template" / "v9.9.9").exists())
+            self.assertFalse(target.exists())
+
+    def test_promote_repository_validator_restores_target_and_other_mutations(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, _, source, target = self.prepare_multi_package_promotion(root)
+            before = tree_inventory(skill / "assets" / "templates")
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_REPO_MUTATION": "target-and-other"},
+            )
+            self.assert_process_failed(failed)
+            self.assertIn("changed", failed.stdout)
+            self.assertEqual(tree_inventory(skill / "assets" / "templates"), before)
+            self.assertFalse(target.exists())
+
+    def test_promote_repository_validator_nonzero_mutation_preserves_both_diagnostics(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, _, source, target = self.prepare_multi_package_promotion(root)
+            before = tree_inventory(skill / "assets" / "templates")
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={"TEMPLATE_TOOL_TEST_REPO_MUTATION": "other-change-nonzero"},
+            )
+            self.assert_process_failed(failed)
+            self.assertIn("repository package tree mutation detected", failed.stdout)
+            self.assertIn("exit code 17", failed.stdout)
+            self.assertEqual(tree_inventory(skill / "assets" / "templates"), before)
+            self.assertFalse(target.exists())
+
+    def test_promote_repository_package_restore_failure_reports_original_and_restore_errors(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, _, _, source, target = self.prepare_multi_package_promotion(root)
+            before = tree_inventory(skill / "assets" / "templates")
+            failed = self.run_tool(
+                "promote", "--package", source, "--json", root=root,
+                env={
+                    "TEMPLATE_TOOL_TEST_REPO_MUTATION": "other-change",
+                    "TEMPLATE_TOOL_TEST_FAIL_REPO_PACKAGE_RESTORE": "1",
+                },
+            )
+            self.assert_process_failed(failed)
+            self.assertIn("repository package tree mutation detected", failed.stdout)
+            self.assertIn("restore failure", failed.stdout)
+            self.assertEqual(tree_inventory(skill / "assets" / "templates"), before)
+            self.assertFalse(target.exists())
 
     def test_promote_repo_validator_failure_rolls_back_target(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
@@ -1471,7 +1657,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             before = sha256(base / "template.txt")
             failed = self.run_tool("promote", "--package", source, "--json", root=root)
             self.assert_process_failed(failed)
-            self.assertIn("repository validation changed immutable promotion content", failed.stdout)
+            self.assertIn("repository package tree mutation detected", failed.stdout)
             target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
             self.assertFalse(target.exists())
             self.assertEqual(sha256(base / "template.txt"), before)
@@ -1567,8 +1753,8 @@ class TemplatePackageToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             _, package, _ = self.make_dependent_fixture_repo(root)
-            first_dir = root / "dist-a"
-            second_dir = root / "dist-b"
+            first_dir = root / "dist" / "template-packages" / "dist-a"
+            second_dir = root / "dist" / "template-packages" / "dist-b"
             first = self.run_tool("archive", "--package", package, "--output-dir", first_dir, "--json", root=root)
             second = self.run_tool("archive", "--package", package, "--output-dir", second_dir, "--json", root=root)
             self.assert_process_succeeded(first)
@@ -1594,7 +1780,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             _, package, _ = self.make_dependent_fixture_repo(root)
             base = package.parent / "v1.0.0"
             (base / "manifest.yaml").unlink()
-            missing = self.run_tool("archive", "--package", package, "--output-dir", root / "missing-dist", "--json", root=root)
+            missing = self.run_tool("archive", "--package", package, "--output-dir", root / "dist" / "template-packages" / "missing-dist", "--json", root=root)
             self.assert_process_failed(missing)
             self.assertIn("dependency", missing.stdout)
 
@@ -1606,7 +1792,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             manifest["fingerprint"]["sha256"] = "0" * 64
             manifest["fingerprint"]["value"] = "0" * 64
             (base / "manifest.yaml").write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
-            bad = self.run_tool("archive", "--package", package, "--output-dir", root / "bad-dist", "--json", root=root)
+            bad = self.run_tool("archive", "--package", package, "--output-dir", root / "dist" / "template-packages" / "bad-dist", "--json", root=root)
             self.assert_process_failed(bad)
             self.assertIn("fingerprint", bad.stdout)
 
@@ -1618,7 +1804,7 @@ class TemplatePackageToolingTests(unittest.TestCase):
             manifest["template"]["base_manifest"] = "../v1.1.0/manifest.yaml"
             manifest["template"]["base_template"] = "../v1.1.0/template.txt"
             (base / "manifest.yaml").write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
-            cycle = self.run_tool("archive", "--package", package, "--output-dir", root / "cycle-dist", "--json", root=root)
+            cycle = self.run_tool("archive", "--package", package, "--output-dir", root / "dist" / "template-packages" / "cycle-dist", "--json", root=root)
             self.assert_process_failed(cycle)
             self.assertIn("cycle", cycle.stdout)
 
@@ -1634,11 +1820,11 @@ class TemplatePackageToolingTests(unittest.TestCase):
                         _assert_unique_portable_names(list(names))
             self.assertEqual(_validate_archive_name("模板/合法.txt"), "模板/合法.txt")
             failed = self.run_tool(
-                "archive", "--package", package, "--output-dir", root / "commit-failure", "--json", root=root,
+                "archive", "--package", package, "--output-dir", root / "dist" / "template-packages" / "commit-failure", "--json", root=root,
                 env={"TEMPLATE_TOOL_TEST_FAIL_ARCHIVE_COMMIT_STEP": "2"},
             )
             self.assert_process_failed(failed)
-            output = root / "commit-failure"
+            output = root / "dist" / "template-packages" / "commit-failure"
             self.assertFalse((output / "demo-template-1.0.0.zip").exists())
             self.assertFalse((output / "demo-template-1.0.0.zip.sha256").exists())
             self.assertFalse((output / "demo-template-1.0.0.metadata.json").exists())
@@ -1654,8 +1840,8 @@ class TemplatePackageToolingTests(unittest.TestCase):
             (package / "~$office.tmp").write_bytes(b"junk")
             (package / "build.stage").mkdir()
             (package / "build.stage" / "junk.txt").write_text("junk", encoding="utf-8")
-            first_dir = root / "dist-a"
-            second_dir = root / "dist-b"
+            first_dir = root / "dist" / "template-packages" / "dist-a"
+            second_dir = root / "dist" / "template-packages" / "dist-b"
             first = self.run_tool("archive", "--package", package, "--output-dir", first_dir, "--json", root=root)
             second = self.run_tool("archive", "--package", package, "--output-dir", second_dir, "--json", root=root)
             self.assert_process_succeeded(first)
@@ -1685,9 +1871,9 @@ class TemplatePackageToolingTests(unittest.TestCase):
             _, package, template = self.make_fixture_repo(root)
             overlap = self.run_tool("archive", "--package", package, "--output-dir", package / "dist", "--json", root=root)
             self.assert_process_failed(overlap)
-            self.assertIn("overlaps", overlap.stdout + overlap.stderr)
+            self.assertIn("repository archive output", overlap.stdout + overlap.stderr)
             template.write_text("tampered\n", encoding="utf-8")
-            tampered = self.run_tool("archive", "--package", package, "--output-dir", root / "dist", "--json", root=root)
+            tampered = self.run_tool("archive", "--package", package, "--output-dir", root / "dist" / "template-packages", "--json", root=root)
             self.assert_process_failed(tampered)
             self.assertIn("fingerprint mismatch", tampered.stdout + tampered.stderr)
 
@@ -1699,7 +1885,11 @@ class TemplatePackageToolingTests(unittest.TestCase):
                 link.symlink_to(outside)
             except OSError:
                 self.skipTest("the current Windows account cannot create symlinks")
-            linked = self.run_tool("archive", "--package", package, "--output-dir", root / "dist-link", "--json", root=root)
+            linked = self.run_tool(
+                "archive", "--package", package,
+                "--output-dir", root / "dist" / "template-packages" / "link-output",
+                "--json", root=root,
+            )
             self.assert_process_failed(linked)
             self.assertIn("symlink", linked.stdout + linked.stderr)
 
@@ -1707,11 +1897,125 @@ class TemplatePackageToolingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
             _, package, _ = self.make_fixture_repo(root)
-            output = root / "dist"
+            output = root / "dist" / "template-packages"
             result = self.run_tool("archive", "--package", package, "--output-dir", output, "--dry-run", "--json", root=root)
             self.assert_process_succeeded(result)
             self.assertTrue(self.json_result(result)["dry_run"])
             self.assertFalse(output.exists())
+
+    def test_archive_rejects_protected_repository_output_paths_before_validation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, template = self.make_fixture_repo(root)
+            marker = root / "FULL_VALIDATOR_STARTED"
+            (package / "validator-start-marker.txt").write_text(str(marker), encoding="utf-8")
+            protected = [
+                root,
+                root / "tools",
+                root / "tests",
+                root / ".github",
+                root / "docs",
+                skill / "scripts",
+                skill / "schemas",
+                skill / "assets",
+                skill / "assets" / "templates",
+                root / "work" / "template-packages",
+                root / "dist",
+            ]
+            before = sha256(template)
+            for output in protected:
+                with self.subTest(output=output):
+                    result = self.run_tool(
+                        "archive", "--package", package, "--output-dir", output, "--dry-run", "--json", root=root
+                    )
+                    self.assert_process_failed(result)
+                    self.assertIn("dist/template-packages", result.stdout)
+                    self.assertFalse(marker.exists())
+                    self.assertEqual(sha256(template), before)
+                    self.assertFalse(list(root.rglob("*.stage")))
+                    self.assertFalse(list(root.rglob("*.backup")))
+
+            for output in (
+                root / "dist" / "template-packages",
+                root / "dist" / "template-packages" / "custom-subdir",
+            ):
+                with self.subTest(allowed_output=output):
+                    result = self.run_tool(
+                        "archive", "--package", package, "--output-dir", output, "--dry-run", "--json", root=root
+                    )
+                    self.assert_process_succeeded(result)
+                    self.assertTrue(self.json_result(result)["dry_run"])
+                    marker.unlink()
+                    self.assertFalse(output.exists())
+
+    def test_archive_rejects_repository_and_external_symlink_escapes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            skill, package, _ = self.make_fixture_repo(root)
+            marker = root / "FULL_VALIDATOR_STARTED"
+            (package / "validator-start-marker.txt").write_text(str(marker), encoding="utf-8")
+            allowed_root = root / "dist" / "template-packages"
+            allowed_root.mkdir(parents=True)
+            external_root = root.parent / f"{root.name}-archive-links"
+            external_root.mkdir()
+            outside_target = external_root / "outside-target"
+            outside_target.mkdir()
+            safe_target = external_root / "external-safe-output"
+            safe_target.mkdir()
+            links = {
+                "repo-to-protected": (allowed_root / "repo-to-protected", root / "tools"),
+                "external-to-repo": (external_root / "external-to-repo", root / "tests"),
+                "repo-to-external": (allowed_root / "repo-to-external", outside_target),
+                "external-to-external": (external_root / "external-to-external", safe_target),
+            }
+            try:
+                for link, target in links.values():
+                    try:
+                        link.symlink_to(target, target_is_directory=True)
+                    except (OSError, NotImplementedError):
+                        self.skipTest("the current platform cannot create directory symlinks")
+
+                rejected = (
+                    links["repo-to-protected"][0] / "archive-output",
+                    links["external-to-repo"][0] / "archive-output",
+                    links["repo-to-external"][0] / "archive-output",
+                )
+                for output in rejected:
+                    with self.subTest(rejected_output=output):
+                        result = self.run_tool(
+                            "archive", "--package", package, "--output-dir", output, "--dry-run", "--json", root=root
+                        )
+                        self.assert_process_failed(result)
+                        self.assertFalse(marker.exists())
+
+                allowed = self.run_tool(
+                    "archive", "--package", package,
+                    "--output-dir", links["external-to-external"][0] / "archive-output",
+                    "--dry-run", "--json", root=root,
+                )
+                self.assert_process_succeeded(allowed)
+                self.assertTrue(self.json_result(allowed)["dry_run"])
+                self.assertTrue(marker.exists())
+                marker.unlink()
+            finally:
+                shutil.rmtree(external_root, ignore_errors=True)
+
+    def test_archive_unsafe_output_fails_before_full_validator_and_file_creation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, package, template = self.make_fixture_repo(root)
+            marker = root / "FULL_VALIDATOR_STARTED"
+            (package / "validator-start-marker.txt").write_text(str(marker), encoding="utf-8")
+            output = root / "tools"
+            before = sha256(template)
+            result = self.run_tool("archive", "--package", package, "--output-dir", output, "--json", root=root)
+            self.assert_process_failed(result)
+            self.assertIn("repository archive output", result.stdout)
+            self.assertFalse(marker.exists())
+            self.assertFalse((output / "demo-template-1.0.0.zip").exists())
+            self.assertFalse((output / "demo-template-1.0.0.zip.sha256").exists())
+            self.assertFalse((output / "demo-template-1.0.0.metadata.json").exists())
+            self.assertEqual(sha256(template), before)
 
     def test_real_lesson_and_gradebook_archive_sha_are_cross_checked_four_ways(self) -> None:
         packages = (

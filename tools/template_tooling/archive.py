@@ -19,6 +19,9 @@ from .discovery import owner_skill_root
 from .manifest import inspect_manifest_package, load_manifest, manifest_reference, package_template_path, sha256_file
 from .models import METADATA_SCHEMA_VERSION, TOOL_VERSION, TemplatePackage, TemplateToolError
 from .paths import (
+    _lexical_absolute,
+    _lexical_is_within,
+    _resolve_existing_ancestors,
     atomic_write_text,
     display_path,
     is_within,
@@ -30,6 +33,40 @@ from .validation import package_from_path, validate_package_path, validate_packa
 
 
 EXCLUDED_DIR_NAMES = {"__pycache__", ".git", "stage", "backup", "qa", "qa-reports"}
+DEFAULT_ARCHIVE_OUTPUT_ROOT = Path("dist") / "template-packages"
+
+
+def _validate_archive_output_workspace(
+    output_dir: Path,
+    root: Path,
+    closure: list[TemplatePackage],
+) -> Path:
+    """Validate archive output using the shared lexical/resolved path model."""
+    lexical_root = _lexical_absolute(root)
+    lexical_output = _lexical_absolute(output_dir)
+    resolved_root = _resolve_existing_ancestors(lexical_root)
+    resolved_output = _resolve_existing_ancestors(lexical_output)
+    lexical_inside_repository = _lexical_is_within(lexical_output, lexical_root)
+    resolved_inside_repository = _lexical_is_within(resolved_output, resolved_root)
+    allowed_lexical = lexical_root / DEFAULT_ARCHIVE_OUTPUT_ROOT
+    allowed_resolved = _resolve_existing_ancestors(allowed_lexical)
+
+    if lexical_inside_repository:
+        if not resolved_inside_repository:
+            raise TemplateToolError("archive output symlink escapes the repository")
+        if not _lexical_is_within(lexical_output, allowed_lexical):
+            raise TemplateToolError(
+                "repository archive output must be below "
+                f"{DEFAULT_ARCHIVE_OUTPUT_ROOT.as_posix()}/"
+            )
+        if not _lexical_is_within(resolved_output, allowed_resolved):
+            raise TemplateToolError("archive output symlink escapes dist/template-packages")
+    elif resolved_inside_repository:
+        raise TemplateToolError("external archive path resolves inside the repository")
+
+    if any(paths_overlap(lexical_output, item.package_dir) for item in closure):
+        raise TemplateToolError("archive output directory overlaps the template package or dependency")
+    return lexical_output
 
 
 def _excluded(relative: Path) -> bool:
@@ -283,13 +320,11 @@ def archive_package(package_dir: Path, output_dir: Path, root: Path, *, dry_run:
     package = package_from_path(package_dir, root)
     if package.errors:
         raise TemplateToolError("package identity validation failed: " + "; ".join(package.errors))
+    closure = _dependency_closure(package, root)
+    output_dir = _validate_archive_output_workspace(output_dir, root, closure)
     validation = validate_package_path(package.package_dir, root, identity_only=False)
     if not validation_succeeded(validation):
         raise TemplateToolError("full template validation failed: " + "; ".join(validation.get("errors", [])))
-    closure = _dependency_closure(package, root)
-    output_dir = output_dir.resolve(strict=False)
-    if any(paths_overlap(output_dir, item.package_dir) for item in closure):
-        raise TemplateToolError("archive output directory overlaps the template package or dependency")
 
     prefix_by_package = {
         item.package_dir.resolve(): f"{item.template_id}/{item.package_dir.name}"

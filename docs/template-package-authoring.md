@@ -44,7 +44,7 @@ python tools/template_package.py validate --package <package> --json
 
 默认执行通用身份/fingerprint 检查，再调用受信任 Skill 的真实 `scripts/validate_template.py`；执行前会再次读取 Git index、检查 owner validator 和完整 scripts 支持文件，工作树新增但未暂存的 helper 会 fail closed。external 包会复制 Git-tracked 的普通脚本、本地依赖、schema、当前包和声明的 base 依赖到系统临时隔离 Skill 树中执行，绝不执行 external workspace 自带的 validator；真实 canonical 树不会创建 shadow，随机临时绝对路径不会进入报告。完整校验必须通过时才报告 `status=passed`。`--identity-only` 明确报告 `status=identity_only`、`full_validation=false`，它不是完整通过，适合纯路径或 manifest 检查。
 
-所有完整 validator 流程都使用系统临时的正常 Skill 树，包括 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不存在 canonical 直接执行的例外。隔离树只复制 Git-tracked 的普通源文件、模板、manifest、schema、helper 和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或写入。子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并把 `PYTHONPYCACHEPREFIX` 指向临时树内的 `python-cache`。验证前后都会检查缓存、字节码和临时目录边界，清理失败返回失败；报告的 `source_scope` 可为 `canonical` 或 `external`，完整报告的 `validation_scope` 必须为 `isolated_temp`。身份检查不会执行 validator，也不会报告为完整通过。
+所有完整 validator 流程都使用系统临时的正常 Skill 树，包括 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不存在 canonical 直接执行的例外。隔离树只复制 Git-tracked 的普通源文件、模板、manifest、schema、helper 和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或写入。子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并把 `PYTHONPYCACHEPREFIX` 指向临时树内的 `python-cache`。验证前后都会检查缓存、字节码和临时目录边界，清理失败返回失败；超时产生的部分 stdout/stderr 会先统一解码为可安全展示的 UTF-8 文本；报告的 `source_scope` 可为 `canonical` 或 `external`，完整报告的 `validation_scope` 必须为 `isolated_temp`。身份检查不会执行 validator，也不会报告为完整通过。
 
 ## 晋级
 
@@ -52,7 +52,7 @@ python tools/template_package.py validate --package <package> --json
 python tools/template_package.py promote --package <validated-work-package>
 ```
 
-目标路径由所属 Skill 的模板根、manifest 的 template id 和版本计算，不能由用户指定任意 canonical 目标。工具先把工作包复制到系统临时目录的不可变 snapshot，并只使用 snapshot 完整校验；snapshot、stage、安装后的 target、target validator 成功后以及动态仓库校验成功后都必须与 snapshot 全树字节一致，validator 或 repository validator 在包内产生任何文件都会阻断晋级。随后复制到 canonical 同父目录 stage，执行 identity/full validation，安装后再次对实际 target 执行真实 validator，要求 `status=passed`、`full_validation=true`、`validation_scope=isolated_temp`，最后运行动态 `tests/validate_template_packages.py` 验证全部 canonical 包。任何后置失败都会删除本次 target、确认删除结果并清理 stage；删除失败会同时报告原始错误和回滚错误，既有包不会被覆盖。`--dry-run` 会执行 snapshot 和前置完整校验并仅输出计划。
+目标路径由所属 Skill 的模板根、manifest 的 template id 和版本计算，不能由用户指定任意 canonical 目标。工具先把工作包复制到系统临时目录的不可变 snapshot，并只使用 snapshot 完整校验；snapshot、stage、安装后的 target、target validator 成功后以及动态仓库校验成功后都必须与 snapshot 全树字节一致，validator 或 repository validator 在包内产生任何文件都会阻断晋级。动态仓库校验前会为每个受信任 Skill 的完整 `assets/templates` 根建立 snapshot；校验后任何 canonical 包的新增、删除或修改都会被报告、事务性恢复并使晋级失败。随后复制到 canonical 同父目录 stage，执行 identity/full validation，安装后再次对实际 target 执行真实 validator，要求 `status=passed`、`full_validation=true`、`validation_scope=isolated_temp`，最后运行动态 `tests/validate_template_packages.py` 验证全部 canonical 包。任何后置失败都会删除本次 target、确认删除结果并清理 stage；删除失败会同时报告原始错误和回滚错误，既有包不会被覆盖。`--dry-run` 会执行 snapshot 和前置完整校验并仅输出计划。
 
 ## 归档
 
@@ -64,7 +64,7 @@ python tools/template_package.py archive \
 
 归档前必须完整校验，并递归收集 `base_manifest/base_template` 依赖闭包。输出为 `<id>-<version>.zip`、同名 `.sha256` sidecar 和 `<id>-<version>.metadata.json` 元数据；ZIP 内统一使用 `<template-id>/<version>/...`，使 v1.1 解压后仍能解析 v1.0 相对依赖。每个依赖执行身份和 fingerprint 检查，循环、跨 id、逃离 template root 或缺少成对引用都会失败。
 
-ZIP 文件使用 NFC/casefold 稳定排序，拒绝 casefold/NFC 冲突、zip-slip、symlink、控制字符、Windows 保留名称、尾随点/空格和非法字符；中文合法路径可以保留。生成后会解压到新的系统临时目录，复验路径、入口包、依赖闭包、所有文件 SHA、metadata，并用真实 owner validator 完整验证入口包。ZIP、sidecar、metadata 三个最终文件拒绝覆盖并作为一个提交事务处理，任一步失败都会清理已提交文件和临时文件。
+归档输出路径在完整 validator、LibreOffice、输出目录、ZIP stage 创建之前使用共享的 lexical/resolved 工作区保护检查：仓库内只能写入 `dist/template-packages/`，仓库外独立目录仍拒绝与包/依赖闭包重叠以及两方向 symlink 逃逸。ZIP 文件使用 NFC/casefold 稳定排序，拒绝 casefold/NFC 冲突、zip-slip、symlink、控制字符、Windows 保留名称、尾随点/空格和非法字符；中文合法路径可以保留。生成后会解压到新的系统临时目录，复验路径、入口包、依赖闭包、所有文件 SHA、metadata，并用真实 owner validator 完整验证入口包。ZIP、sidecar、metadata 三个最终文件拒绝覆盖并作为一个提交事务处理，任一步失败都会清理已提交文件和临时文件。
 
 ## CI 与交付边界
 

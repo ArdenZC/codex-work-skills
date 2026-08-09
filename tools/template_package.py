@@ -132,7 +132,8 @@ def _run(args: argparse.Namespace) -> tuple[int, Any]:
         result = promote_package(resolve_path(args.package), root, dry_run=args.dry_run)
         return 0, result
     if args.command == "archive":
-        result = archive_package(resolve_path(args.package), resolve_path(args.output_dir), root, dry_run=args.dry_run)
+        output_dir = Path(args.output_dir).expanduser().absolute()
+        result = archive_package(resolve_path(args.package), output_dir, root, dry_run=args.dry_run)
         return 0, result
     raise TemplateToolError(f"unknown command: {args.command}")
 

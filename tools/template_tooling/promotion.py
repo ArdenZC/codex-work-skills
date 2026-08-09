@@ -15,10 +15,20 @@ import yaml
 from .discovery import discover_packages, owner_skill_root
 from .manifest import load_manifest, package_template_path, sha256_file
 from .models import TemplateToolError, parse_semver
-from .paths import copy_tree_no_symlinks, display_path, paths_overlap, remove_path_or_raise, tree_fingerprints
+from .paths import (
+    copy_tree_no_symlinks,
+    display_path,
+    is_within,
+    paths_overlap,
+    remove_path_or_raise,
+    restore_directory_from_snapshot,
+    tree_fingerprints,
+    tree_inventory,
+)
 from .validation import (
     _assert_validator_runtime_state,
     _cleanup_validation_workspace,
+    _subprocess_text,
     _validator_environment,
     package_from_path,
     validate_package_path,
@@ -41,9 +51,13 @@ def _run_repo_validator(root: Path) -> dict[str, Any]:
     command = [sys.executable, "-B", str(validator)]
     temporary = tempfile.TemporaryDirectory(prefix="template-tool-repo-validation-")
     temporary_root = Path(temporary.name)
-    error: TemplateToolError | None = None
-    runtime_error: TemplateToolError | None = None
+    errors: list[str] = []
     result: subprocess.CompletedProcess[str] | None = None
+    started = False
+    environment = _validator_environment(temporary_root)
+    for key in ("TEMPLATE_TOOL_TEST_REPO_MUTATION",):
+        if key in os.environ:
+            environment[key] = os.environ[key]
     try:
         result = subprocess.run(
             command,
@@ -52,33 +66,45 @@ def _run_repo_validator(root: Path) -> dict[str, Any]:
             text=True,
             encoding="utf-8",
             errors="replace",
-            env=_validator_environment(temporary_root),
+            env=environment,
             timeout=1800,
         )
-    except (OSError, subprocess.SubprocessError) as exc:
-        error = TemplateToolError(f"repository-wide validator could not run: {exc}")
+    except subprocess.TimeoutExpired as exc:
+        started = True
+        return_code = None
+        stdout = _subprocess_text(exc.stdout)
+        stderr = _subprocess_text(exc.stderr)
+        errors.append("repository-wide validator timed out after 1800s")
+    except OSError as exc:
+        return_code = None
+        stdout = ""
+        stderr = str(exc)
+        errors.append("repository-wide validator could not start")
+    except subprocess.SubprocessError as exc:
+        started = True
+        return_code = None
+        stdout = ""
+        stderr = str(exc)
+        errors.append("repository-wide validator failed to execute")
+    else:
+        started = True
+        return_code = result.returncode
+        stdout = _subprocess_text(result.stdout)
+        stderr = _subprocess_text(result.stderr)
     try:
         _assert_validator_runtime_state(temporary_root)
     except (OSError, TemplateToolError) as exc:
-        runtime_error = TemplateToolError(f"repository validator temporary workspace integrity failed: {exc}")
+        errors.append(f"repository validator temporary workspace integrity failed: {exc}")
     cleanup_error = _cleanup_validation_workspace(temporary, temporary_root)
     if cleanup_error:
-        cleanup_failure = TemplateToolError(cleanup_error)
-        if error is not None:
-            raise TemplateToolError(f"{error}; {cleanup_failure}") from error
-        if runtime_error is not None:
-            raise TemplateToolError(f"{runtime_error}; {cleanup_failure}") from runtime_error
-        raise cleanup_failure
-    if runtime_error is not None:
-        raise runtime_error
-    if error is not None:
-        raise error
-    assert result is not None
+        errors.append(cleanup_error)
     return {
         "command": [str(item) for item in command],
-        "exit_code": result.returncode,
-        "stdout": result.stdout,
-        "stderr": result.stderr,
+        "exit_code": return_code,
+        "stdout": stdout,
+        "stderr": stderr,
+        "started": started,
+        "errors": errors,
     }
 
 
@@ -116,6 +142,113 @@ def assert_tree_matches_snapshot(path: Path, expected: dict[str, str], *, phase:
         f"{phase} changed immutable promotion content; "
         f"added={added[:20]}; removed={removed[:20]}; changed={changed[:20]}"
     )
+
+
+def _canonical_template_roots(root: Path, canonical: list[Any]) -> list[Path]:
+    repository = root.resolve()
+    roots: dict[str, Path] = {}
+    for package in canonical:
+        if not package.is_canonical or package.validator is None:
+            continue
+        owner = owner_skill_root(package)
+        template_root = owner / "assets" / "templates"
+        if template_root.is_symlink() or not template_root.is_dir():
+            raise TemplateToolError("canonical template root must be a regular directory")
+        resolved = template_root.resolve(strict=False)
+        if not is_within(resolved, repository, allow_equal=False):
+            raise TemplateToolError("canonical template root escapes the repository")
+        roots.setdefault(os.path.normcase(os.fspath(resolved)), resolved)
+    return [roots[key] for key in sorted(roots)]
+
+
+def _snapshot_repository_package_trees(
+    root: Path,
+    canonical: list[Any],
+    snapshot_root: Path,
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for index, protected_root in enumerate(_canonical_template_roots(root, canonical), start=1):
+        snapshot = snapshot_root / f"root-{index}"
+        source_inventory = tree_inventory(protected_root)
+        copy_tree_no_symlinks(protected_root, snapshot)
+        if tree_inventory(snapshot) != source_inventory:
+            raise TemplateToolError("repository package snapshot did not match its source")
+        records.append(
+            {
+                "root": protected_root,
+                "display_root": display_path(protected_root, root),
+                "snapshot": snapshot,
+                "inventory": source_inventory,
+            }
+        )
+    return records
+
+
+def _repository_package_difference(record: dict[str, Any]) -> dict[str, Any] | None:
+    expected = record["inventory"]
+    try:
+        actual = tree_inventory(record["root"])
+    except (OSError, TemplateToolError):
+        return {
+            "root": record["display_root"],
+            "added": [],
+            "removed": sorted(
+                [*expected["directories"], *expected["files"].keys()]
+            ),
+            "changed": ["<protected-root>"],
+        }
+    expected_files = expected["files"]
+    actual_files = actual["files"]
+    expected_entries = set(expected["directories"]) | set(expected_files)
+    actual_entries = set(actual["directories"]) | set(actual_files)
+    added = sorted(actual_entries - expected_entries)
+    removed = sorted(expected_entries - actual_entries)
+    changed = sorted(
+        name
+        for name in set(expected_files) & set(actual_files)
+        if expected_files[name] != actual_files[name]
+    )
+    if not added and not removed and not changed:
+        return None
+    return {
+        "root": record["display_root"],
+        "added": added,
+        "removed": removed,
+        "changed": changed,
+    }
+
+
+def _restore_repository_package_trees(
+    records: list[dict[str, Any]],
+    differences: list[dict[str, Any]],
+) -> list[str]:
+    changed_roots = {difference["root"] for difference in differences}
+    errors: list[str] = []
+    for record in records:
+        if record["display_root"] not in changed_roots:
+            continue
+        try:
+            restore_directory_from_snapshot(record["snapshot"], record["root"])
+            if tree_inventory(record["root"]) != record["inventory"]:
+                errors.append(f"{record['display_root']}: restored fingerprint mismatch")
+        except (OSError, TemplateToolError) as exc:
+            errors.append(f"{record['display_root']}: restore failed: {exc}")
+    return errors
+
+
+def _repository_guard_error(
+    differences: list[dict[str, Any]],
+    restore_errors: list[str],
+) -> str:
+    details = [
+        f"root={difference['root']}; added={difference['added']}; "
+        f"removed={difference['removed']}; changed={difference['changed']}"
+        for difference in differences
+    ]
+    message = "repository package tree mutation detected: " + " | ".join(details)
+    if restore_errors:
+        message += "; repository package tree restore failure: " + "; ".join(restore_errors)
+    return message
 
 
 def _mutate_source_after_snapshot(source: Path) -> None:
@@ -217,10 +350,36 @@ def promote_package(package_dir: Path, root: Path, *, dry_run: bool = False) -> 
                 raise TemplateToolError("final canonical target validation did not report isolated full_validation=true")
             assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="target validation")
 
+            repository_snapshot_root = Path(temporary_name) / "repository-package-snapshots"
+            repository_snapshot_root.mkdir()
+            protected_canonical = [item for item in discover_packages(root) if item.is_canonical]
+            repository_package_records = _snapshot_repository_package_trees(
+                root,
+                protected_canonical,
+                repository_snapshot_root,
+            )
             repo_validation = _run_repo_validator(root)
             result["repo_validation"] = repo_validation
+            differences = [
+                difference
+                for record in repository_package_records
+                if (difference := _repository_package_difference(record)) is not None
+            ]
+            restore_errors = _restore_repository_package_trees(repository_package_records, differences)
+            result["repository_package_guard"] = {
+                "protected_roots": len(repository_package_records),
+                "unchanged": not differences and not restore_errors,
+            }
+            failure_messages: list[str] = []
+            if differences or restore_errors:
+                failure_messages.append(_repository_guard_error(differences, restore_errors))
             assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="repository validation")
-            if repo_validation["exit_code"] != 0:
+            if repo_validation["errors"]:
+                details = "; ".join(repo_validation["errors"])
+                if repo_validation.get("stderr"):
+                    details += f"; stderr: {repo_validation['stderr'].strip()}"
+                failure_messages.append(f"repository-wide validator could not complete: {details}")
+            elif repo_validation["exit_code"] != 0:
                 details = "\n".join(
                     part
                     for part in (
@@ -230,10 +389,12 @@ def promote_package(package_dir: Path, root: Path, *, dry_run: bool = False) -> 
                     if part
                 )
                 suffix = f": {details}" if details else ""
-                raise TemplateToolError(
+                failure_messages.append(
                     f"repository-wide validator failed after promotion "
                     f"(exit code {repo_validation['exit_code']}){suffix}"
                 )
+            if failure_messages:
+                raise TemplateToolError("; ".join(failure_messages))
             assert_tree_matches_snapshot(target, snapshot_fingerprints, phase="promotion final")
             result["status"] = "passed"
             return result

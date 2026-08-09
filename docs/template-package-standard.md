@@ -56,7 +56,7 @@ requirements.txt
 
 校验失败必须返回非零退出码，并在标准错误输出清晰原因。非阻断提醒放入 `warnings`，不能把警告伪装成成功校验。正常生成默认启用模板校验和输出校验；只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才能跳过。
 
-模板包的完整 validator 始终在系统临时的正常 Skill 树中执行，覆盖 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不会从真实 canonical 或用户工作目录直接加载 owner validator。隔离树只复制 Git-tracked 的普通源文件和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或修改。validator 子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并将 `PYTHONPYCACHEPREFIX` 重定向到临时树内的 `python-cache`。验证前后检查缓存和字节码，所有临时目录必须清理；清理失败即为失败。`--identity-only` 只执行身份检查，不执行完整 validator，也不能作为完整通过。
+模板包的完整 validator 始终在系统临时的正常 Skill 树中执行，覆盖 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不会从真实 canonical 或用户工作目录直接加载 owner validator。隔离树只复制 Git-tracked 的普通源文件和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或修改。validator 子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并将 `PYTHONPYCACHEPREFIX` 重定向到临时树内的 `python-cache`。验证前后检查缓存和字节码，超时产生的部分 stdout/stderr 会统一解码并保留为 UTF-8 文本，所有临时目录必须清理；清理失败即为失败。`--identity-only` 只执行身份检查，不执行完整 validator，也不能作为完整通过。
 
 ## Word 语义书签
 

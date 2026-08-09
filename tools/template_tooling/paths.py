@@ -34,6 +34,62 @@ def resolve_path(value: str | os.PathLike[str], base: Path | None = None) -> Pat
     return path.resolve(strict=False)
 
 
+def _lexical_absolute(path: Path) -> Path:
+    """Return an absolute path without resolving symlinks."""
+    lexical = Path(os.path.abspath(os.fspath(path.expanduser())))
+    if os.name != "nt":
+        return lexical
+
+    # Windows runners may expose TEMP through an 8.3 alias. Expand only
+    # existing path components so lexical symlink checks remain distinct from
+    # resolved containment checks.
+    missing_tail: list[str] = []
+    current = lexical
+    while not current.exists() and not current.is_symlink() and current.parent != current:
+        missing_tail.append(current.name)
+        current = current.parent
+    try:
+        import ctypes
+
+        get_long_path_name = ctypes.windll.kernel32.GetLongPathNameW
+        get_long_path_name.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        get_long_path_name.restype = ctypes.c_uint32
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = get_long_path_name(os.fspath(current), buffer, len(buffer))
+        resolved_existing = Path(buffer.value) if 0 < length < len(buffer) else current
+    except (AttributeError, OSError):
+        resolved_existing = current
+    for part in reversed(missing_tail):
+        resolved_existing /= part
+    return resolved_existing
+
+
+def _lexical_is_within(path: Path, root: Path, *, allow_equal: bool = True) -> bool:
+    path_text = os.path.normcase(os.fspath(_lexical_absolute(path)))
+    root_text = os.path.normcase(os.fspath(_lexical_absolute(root)))
+    try:
+        common = os.path.commonpath((path_text, root_text))
+    except ValueError:
+        return False
+    if common != root_text:
+        return False
+    return allow_equal or path_text != root_text
+
+
+def _resolve_existing_ancestors(path: Path) -> Path:
+    """Resolve every existing ancestor while preserving a non-existent tail."""
+    lexical = _lexical_absolute(path)
+    missing_tail: list[str] = []
+    current = lexical
+    while not current.exists() and not current.is_symlink() and current.parent != current:
+        missing_tail.append(current.name)
+        current = current.parent
+    resolved = current.resolve(strict=False)
+    for part in reversed(missing_tail):
+        resolved /= part
+    return resolved
+
+
 def relative_path(path: Path, root: Path) -> str:
     try:
         return path.resolve().relative_to(root.resolve()).as_posix()
@@ -156,6 +212,96 @@ def tree_fingerprints(root: Path) -> dict[str, str]:
                 digest.update(chunk)
         result[path.relative_to(root).as_posix()] = digest.hexdigest().upper()
     return result
+
+
+def tree_inventory(root: Path) -> dict[str, object]:
+    """Capture both directory structure and file bytes for transactional guards."""
+    if root.is_symlink() or not root.is_dir():
+        raise TemplateToolError("protected tree is not a regular directory")
+    directories = sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_dir()
+    )
+    return {"directories": directories, "files": tree_fingerprints(root)}
+
+
+def restore_directory_from_snapshot(snapshot: Path, destination: Path) -> None:
+    """Restore a directory with a sibling stage/backup exchange and verification."""
+    expected = tree_inventory(snapshot)
+    stage = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.restore-stage"
+    backup = destination.parent / f".{destination.name}.{uuid.uuid4().hex}.restore-backup"
+    destination_moved = False
+    destination_installed = False
+    destination_verified = False
+    try:
+        try:
+            copy_tree_no_symlinks(snapshot, stage)
+            if tree_inventory(stage) != expected:
+                raise TemplateToolError("restore staging verification failed")
+        except Exception as exc:
+            raise TemplateToolError("restore staging failed") from exc
+
+        if destination.exists() or destination.is_symlink():
+            try:
+                destination.replace(backup)
+                destination_moved = True
+            except Exception as exc:
+                raise TemplateToolError("restore backup exchange failed") from exc
+        try:
+            stage.replace(destination)
+            destination_installed = True
+            if tree_inventory(destination) != expected:
+                raise TemplateToolError("restore destination verification failed")
+            destination_verified = True
+        except Exception as exc:
+            raise TemplateToolError("restore destination exchange failed") from exc
+
+        if os.environ.get("TEMPLATE_TOOL_TEST_FAIL_REPO_PACKAGE_RESTORE") == "1":
+            raise OSError("injected repository package restore failure")
+        if backup.exists() or backup.is_symlink():
+            try:
+                remove_path_or_raise(backup)
+            except Exception as exc:
+                raise TemplateToolError("restore backup cleanup failed") from exc
+    except Exception as original:
+        recovery_errors: list[str] = []
+        if destination_installed and not destination_verified:
+            try:
+                if destination.exists() or destination.is_symlink():
+                    remove_path_or_raise(destination)
+                if destination_moved:
+                    if not (backup.exists() or backup.is_symlink()):
+                        raise FileNotFoundError("restore backup is missing")
+                    backup.replace(destination)
+            except Exception as exc:
+                recovery_errors.append(f"destination recovery failed ({type(exc).__name__})")
+        elif destination_installed and (backup.exists() or backup.is_symlink()):
+            try:
+                remove_path_or_raise(backup)
+            except Exception as exc:
+                recovery_errors.append(f"restore backup cleanup failed ({type(exc).__name__})")
+        elif destination_moved and (backup.exists() or backup.is_symlink()):
+            try:
+                backup.replace(destination)
+            except Exception as exc:
+                recovery_errors.append(f"backup recovery failed ({type(exc).__name__})")
+        elif destination_moved:
+            recovery_errors.append("backup recovery failed (FileNotFoundError)")
+        elif not destination_moved and destination.exists() and stage.exists():
+            try:
+                remove_path_or_raise(destination)
+            except Exception as exc:
+                recovery_errors.append(f"staged destination cleanup failed ({type(exc).__name__})")
+        if stage.exists() or stage.is_symlink():
+            try:
+                remove_path_or_raise(stage)
+            except Exception as exc:
+                recovery_errors.append(f"restore stage cleanup failed ({type(exc).__name__})")
+        message = f"directory restore failed: {original}"
+        if recovery_errors:
+            message += "; " + "; ".join(recovery_errors)
+        raise TemplateToolError(message) from original
 
 
 def remove_path_or_raise(path: Path) -> None:

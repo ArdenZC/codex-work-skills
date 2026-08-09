@@ -70,7 +70,22 @@ def _display_command(command: list[str], root: Path) -> list[str]:
     return displayed
 
 
-def _display_output(value: str, package: TemplatePackage, root: Path, *, temporary_root: Path | None = None) -> str:
+def _subprocess_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _display_output(
+    value: str | bytes | None,
+    package: TemplatePackage,
+    root: Path,
+    *,
+    temporary_root: Path | None = None,
+) -> str:
+    value = _subprocess_text(value)
     for path in (package.package_dir, package.template_path, package.manifest_path, package.validator):
         if path is None:
             continue
@@ -461,13 +476,15 @@ def _run_validator(
             timeout=timeout,
         )
     except subprocess.TimeoutExpired as exc:
+        stdout = _subprocess_text(exc.stdout)
+        stderr = _subprocess_text(exc.stderr)
         report["status"] = "failed"
         report["errors"].append(f"template validator timed out after {timeout}s")
         report["validator"] = {
             "command": _display_command(command, root),
             "exit_code": None,
-            "stdout": _display_output(exc.stdout or "", package, root, temporary_root=temporary_root),
-            "stderr": _display_output(exc.stderr or "", package, root, temporary_root=temporary_root),
+            "stdout": _display_output(stdout, package, root, temporary_root=temporary_root),
+            "stderr": _display_output(stderr, package, root, temporary_root=temporary_root),
         }
     except OSError as exc:
         report["status"] = "failed"
