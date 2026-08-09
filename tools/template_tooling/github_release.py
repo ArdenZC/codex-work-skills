@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import json
-import os
 import re
-import shutil
 import subprocess
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+from .manifest import sha256_file
 from .models import RELEASE_TOOL_VERSION, TemplateToolError, parse_semver
-from .paths import atomic_write_text, display_path, remove_path_or_raise, validate_windows_component
+from .paths import atomic_write_text, remove_path_or_raise, validate_windows_component
 from .release import (
     RELEASE_PLAN_SCHEMA_VERSION,
     _load_json_object,
@@ -194,6 +194,11 @@ class InMemoryGitHubReleaseClient:
         if event == self.fail_at or (isinstance(self.fail_at, set) and event in self.fail_at):
             raise TemplateToolError(f"injected GitHub adapter failure: {event}")
 
+    def _mutate_then_raise(self, event: str) -> None:
+        marker = f"mutate_then_raise:{event}"
+        if marker == self.fail_at or (isinstance(self.fail_at, set) and marker in self.fail_at):
+            raise TemplateToolError(f"injected GitHub adapter failure after mutation: {event}")
+
     def tag_exists(self, tag: str) -> bool:
         return tag in self.tags
 
@@ -216,6 +221,7 @@ class InMemoryGitHubReleaseClient:
     def create_tag(self, tag: str, source_commit: str, message: str) -> None:
         self._fail("create_tag")
         self.tags[tag] = source_commit
+        self._mutate_then_raise("create_tag")
 
     def delete_tag(self, tag: str) -> None:
         self._fail("delete_tag")
@@ -224,6 +230,7 @@ class InMemoryGitHubReleaseClient:
     def create_release(self, tag: str, name: str, body: str, prerelease: bool) -> None:
         self._fail("create_release")
         self.releases[tag] = {"name": name, "body": body, "prerelease": prerelease, "assets": {}}
+        self._mutate_then_raise("create_release")
 
     def delete_release(self, tag: str) -> None:
         self._fail("delete_release")
@@ -237,6 +244,7 @@ class InMemoryGitHubReleaseClient:
         if path.name in assets:
             raise TemplateToolError("fake asset already exists")
         assets[path.name] = path.read_bytes()
+        self._mutate_then_raise(f"upload_asset:{path.name}")
 
     def delete_asset(self, tag: str, name: str) -> None:
         self._fail(f"delete_asset:{name}")
@@ -331,12 +339,98 @@ def _assert_master_clean(root: Path, source_commit: str) -> None:
     head = _run(["git", "rev-parse", "HEAD"], root).stdout.strip().lower()
     if head != source_commit.lower():
         raise TemplateToolError("release plan source_commit does not match current HEAD")
-    remote = _run(["git", "rev-parse", "origin/master"], root, check=False)
-    if remote.returncode == 0 and remote.stdout.strip().lower() != head:
-        raise TemplateToolError("release publication requires HEAD to equal origin/master")
+    remote = _run(
+        ["git", "ls-remote", "--heads", "origin", "refs/heads/master"],
+        root,
+        check=False,
+    )
+    if remote.returncode != 0:
+        details = remote.stderr.strip() or remote.stdout.strip()
+        raise TemplateToolError(f"cannot confirm remote master: {details}")
+    lines = [line.split() for line in remote.stdout.splitlines() if line.strip()]
+    if len(lines) != 1 or len(lines[0]) != 2 or lines[0][1] != "refs/heads/master" or not re.fullmatch(
+        r"[0-9a-fA-F]{40}", lines[0][0]
+    ):
+        raise TemplateToolError("cannot confirm a unique remote origin/master head")
+    remote_head = lines[0][0].lower()
+    if remote_head != head:
+        raise TemplateToolError("release publication requires HEAD to equal the remote master head")
     branch = _run(["git", "branch", "--show-current"], root, check=False).stdout.strip()
     if branch != "master":
         raise TemplateToolError("release publication must run from master")
+
+
+@dataclass(frozen=True)
+class _RemoteSnapshot:
+    tag_exists: bool
+    release_exists: bool
+    assets: frozenset[str]
+
+
+def _snapshot_remote(client: GitHubReleaseClient, tag: str) -> _RemoteSnapshot:
+    tag_exists = client.tag_exists(tag)
+    if tag_exists:
+        client.tag_target(tag)
+    release_exists = client.release_exists(tag)
+    assets = frozenset(client.asset_names(tag)) if release_exists else frozenset()
+    if release_exists:
+        client.release_tag(tag)
+    return _RemoteSnapshot(tag_exists=tag_exists, release_exists=release_exists, assets=assets)
+
+
+def _reconcile_tag_ownership(client: GitHubReleaseClient, tag: str, source_commit: str) -> bool:
+    try:
+        if not client.tag_exists(tag):
+            return False
+        target = client.tag_target(tag)
+    except Exception as exc:
+        raise TemplateToolError(
+            f"remote state changed but ownership could not be proven for tag {tag}: {exc}"
+        ) from exc
+    if target.lower() != source_commit.lower():
+        raise TemplateToolError(
+            f"remote state changed but ownership could not be proven for tag {tag}: target mismatch"
+        )
+    return True
+
+
+def _reconcile_release_ownership(client: GitHubReleaseClient, tag: str) -> bool:
+    try:
+        if not client.release_exists(tag):
+            return False
+        release_tag = client.release_tag(tag)
+    except Exception as exc:
+        raise TemplateToolError(
+            f"remote state changed but ownership could not be proven for Release {tag}: {exc}"
+        ) from exc
+    if release_tag != tag:
+        raise TemplateToolError(
+            f"remote state changed but ownership could not be proven for Release {tag}: tag mismatch"
+        )
+    return True
+
+
+def _reconcile_asset_ownership(
+    client: GitHubReleaseClient,
+    tag: str,
+    name: str,
+    initial_assets: frozenset[str],
+) -> bool:
+    try:
+        if client.release_tag(tag) != tag:
+            raise TemplateToolError("Release tag mismatch")
+        assets = client.asset_names(tag)
+    except Exception as exc:
+        raise TemplateToolError(
+            f"remote state changed but ownership could not be proven for asset {name}: {exc}"
+        ) from exc
+    if name not in assets:
+        return False
+    if name in initial_assets:
+        raise TemplateToolError(
+            f"remote state changed but ownership could not be proven for asset {name}: pre-existing asset"
+        )
+    return True
 
 
 def publish_release_transaction(
@@ -363,25 +457,34 @@ def publish_release_transaction(
         sidecar_path=sidecar_path,
         metadata_path=metadata_path,
     )
+    local_asset_hashes = {asset.name: sha256_file(asset) for asset in assets}
     if verification["archive_sha256"] != plan["archive_sha256"]:
         raise TemplateToolError("release plan archive SHA does not match the local bundle")
+    if local_asset_hashes[plan["archive"]] != plan["archive_sha256"]:
+        raise TemplateToolError("local archive SHA does not match the release plan")
     for key in ("template_id", "version", "format"):
         if verification[key] != plan[key]:
             raise TemplateToolError(f"release plan {key} does not match the verified bundle")
     client = client or GhCliGitHubReleaseClient(root)
     tag = plan["tag"]
-    if client.tag_exists(tag):
+    initial = _snapshot_remote(client, tag)
+    if initial.tag_exists:
         raise TemplateToolError(f"release tag already exists: {tag}")
-    if client.release_exists(tag):
+    if initial.release_exists:
         raise TemplateToolError(f"GitHub Release already exists: {tag}")
     created_tag = False
     created_release = False
     uploaded: list[str] = []
     try:
-        client.create_tag(tag, plan["source_commit"], f"{plan['release_name']}\n\n{plan['source_commit']}")
-        created_tag = True
-        if client.tag_target(tag) != plan["source_commit"].lower():
-            raise TemplateToolError("created tag target does not match release plan source_commit")
+        try:
+            client.create_tag(tag, plan["source_commit"], f"{plan['release_name']}\n\n{plan['source_commit']}")
+            if client.tag_target(tag) != plan["source_commit"].lower():
+                raise TemplateToolError("created tag target does not match release plan source_commit")
+            created_tag = True
+        except Exception as original:
+            if _reconcile_tag_ownership(client, tag, plan["source_commit"]):
+                created_tag = True
+            raise original
         release_body = body or (
             f"Template: {plan['template_id']}\n"
             f"Version: {plan['version']}\n"
@@ -392,18 +495,36 @@ def publish_release_transaction(
             + "\n".join(f"- {name}" for name in plan["assets"])
             + "\n\nGitHub Actions does not run Microsoft Office COM or native Office rendering tests."
         )
-        client.create_release(tag, plan["release_name"], release_body, bool(plan["prerelease"]))
-        created_release = True
-        if client.release_tag(tag) != tag:
-            raise TemplateToolError("created GitHub Release tag does not match the release plan")
+        try:
+            client.create_release(tag, plan["release_name"], release_body, bool(plan["prerelease"]))
+            if client.release_tag(tag) != tag:
+                raise TemplateToolError("created GitHub Release tag does not match the release plan")
+            created_release = True
+        except Exception as original:
+            if _reconcile_release_ownership(client, tag):
+                created_release = True
+            raise original
         for asset in assets:
-            client.upload_asset(tag, asset)
-            uploaded.append(asset.name)
+            try:
+                client.upload_asset(tag, asset)
+                uploaded.append(asset.name)
+            except Exception as original:
+                if _reconcile_asset_ownership(client, tag, asset.name, initial.assets):
+                    uploaded.append(asset.name)
+                raise original
         with tempfile.TemporaryDirectory(prefix="template-release-download-") as temporary_name:
             downloaded_dir = Path(temporary_name)
             downloaded: dict[str, Path] = {}
             for name in plan["assets"]:
                 downloaded[name] = client.download_asset(tag, name, downloaded_dir / name)
+            remote_asset_hashes = {name: sha256_file(path) for name, path in downloaded.items()}
+            if remote_asset_hashes != local_asset_hashes:
+                raise TemplateToolError(
+                    "remote asset SHA does not match local release plan: "
+                    f"local={local_asset_hashes}, remote={remote_asset_hashes}"
+                )
+            if remote_asset_hashes[plan["archive"]] != plan["archive_sha256"]:
+                raise TemplateToolError("remote archive SHA does not match the release plan")
             downloaded_verification = verify_release_bundle(
                 downloaded[plan["archive"]],
                 root,
@@ -422,6 +543,9 @@ def publish_release_transaction(
             "created_tag": created_tag,
             "created_release": created_release,
             "uploaded_assets": uploaded,
+            "local_asset_sha256": local_asset_hashes,
+            "remote_asset_sha256": remote_asset_hashes,
+            "remote_assets_identical": True,
         }
     except Exception as original:
         cleanup_errors: list[str] = []

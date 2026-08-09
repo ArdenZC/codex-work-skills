@@ -75,11 +75,11 @@ python tools/template_package.py release --template-id <id> --version <version> 
 python tools/template_package.py verify-release --release-dir dist/template-packages --json
 python tools/template_package.py install --archive <id-version>.zip --json
 python tools/template_package.py upgrade --release-dir <release-dir> --json
-python tools/template_package.py rollback --template-id <id> [--to-version <lower-version>] --json
+python tools/template_package.py rollback --template-id <id> [--to-version <installed-version>] --json
 python tools/template_package.py list-installed [--verify] --json
 ```
 
-release 只接受 canonical package，输出 deterministic archive 和不含绝对路径的 release plan。严格验证会检查既有 metadata required keys、实际 archive SHA、sidecar、ZIP inventory、entries、per-file SHA、依赖闭包和当前 trusted owner validator；不得用自带 bundle validator 绕过信任边界。默认安装根为 `/installed/template-packages/`，仓库内其他目录、canonical/package overlap、symlink 逃逸和 Windows 8.3 containment 都拒绝；仓库外完全独立的安装根可以使用。版本目录 immutable，active state 原子更新，失败恢复旧 active state。
+release 可接受 canonical 或 release workspace package，输出 deterministic archive 和不含绝对路径的 release plan。严格验证会检查既有 metadata required keys、实际 archive SHA、sidecar、ZIP inventory、entries、per-file SHA、依赖闭包和按 Skill 解析的 trusted owner validator；Release entry package 的 template SHA 不要求等于当前 canonical template SHA，不得用自带 bundle validator 绕过信任边界。默认安装根为 `/installed/template-packages/`，仓库内其他目录、canonical/package overlap、symlink 逃逸和 Windows 8.3 containment 都拒绝；仓库外完全独立的安装根可以使用。版本目录 immutable，active state 原子更新，失败恢复旧 active state；rollback 可以在任意已安装版本之间切换，默认 previous 支持双向 toggle。
 
 GitHub Release 不属于模板 registry。`.github/workflows/template-release.yml` 只在 `master` 上 `workflow_dispatch`，确认 tag/Release/assets 不存在后创建三个 archive assets，下载后重新 verify；事务失败仅清理本次创建的远程对象。GitHub Actions 不运行 Microsoft Excel COM；COM 仍由本地 Windows + Excel 环境验证。
 

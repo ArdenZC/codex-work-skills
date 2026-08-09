@@ -115,7 +115,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_dry_run(upgrade)
     _add_json(upgrade)
 
-    rollback = commands.add_parser("rollback", help="activate an already installed lower version")
+    rollback = commands.add_parser("rollback", help="switch active state to another installed version")
     _add_repo_root(rollback)
     rollback.add_argument("--template-id", required=True)
     rollback.add_argument("--to-version")

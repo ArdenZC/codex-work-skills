@@ -7,7 +7,6 @@ adds the install/release lifecycle around a verified three-file bundle.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -25,9 +24,16 @@ from typing import Any, Iterable
 
 from .archive import (
     DEFAULT_ARCHIVE_OUTPUT_ROOT,
+    MAX_ARCHIVE_COMPRESSION_RATIO,
+    MAX_ARCHIVE_ENTRIES,
+    MAX_ARCHIVE_ENTRY_SIZE,
+    MAX_ARCHIVE_TOTAL_SIZE,
     _assert_unique_portable_names,
     _dependency_closure,
     _extract_archive,
+    _stream_zip_entry,
+    _validate_zip_info_type,
+    _validate_zip_resource_limits,
     _validate_archive_name,
     _verify_extracted_dependency_closure,
     archive_package,
@@ -65,10 +71,16 @@ from .paths import (
     remove_path_or_raise,
     validate_windows_component,
 )
-from .validation import validate_package_with_owner, validation_succeeded
+from .validation import package_from_path, validate_package_with_owner, validation_succeeded
 
 
 RELEASE_PLAN_SCHEMA_VERSION = "1.0"
+# Keep the public Release limits in this module while sharing the actual
+# implementation with deterministic archive verification/extraction.
+MAX_RELEASE_ENTRIES = MAX_ARCHIVE_ENTRIES
+MAX_RELEASE_ENTRY_SIZE = MAX_ARCHIVE_ENTRY_SIZE
+MAX_RELEASE_TOTAL_SIZE = MAX_ARCHIVE_TOTAL_SIZE
+MAX_COMPRESSION_RATIO = MAX_ARCHIVE_COMPRESSION_RATIO
 ARCHIVE_METADATA_KEYS = {
     "schema_version",
     "tool_version",
@@ -114,6 +126,15 @@ INSTALLATION_KEYS = {
 INSTALLATION_FILE_KEYS = {"path", "sha256"}
 SHA256_RE = re.compile(r"^[0-9A-Fa-f]{64}$")
 HEX_COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+
+
+@dataclass(frozen=True)
+class TrustedReleaseOwner:
+    template_id: str
+    format: str
+    skill_root: Path
+    validator: Path
+    reference_package: TemplatePackage
 
 
 def _strict_object_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -164,6 +185,11 @@ def _require_version(value: Any, *, label: str) -> str:
         return str(parse_semver(value))
     except TemplateToolError as exc:
         raise TemplateToolError(f"{label}: {exc}") from exc
+
+
+def _require_tool_version(value: Any, *, label: str) -> str:
+    """Validate a tool provenance value without coupling it to this reader."""
+    return _require_version(value, label=label)
 
 
 def _strict_archive_name(value: Any, *, label: str) -> str:
@@ -335,23 +361,25 @@ def _validate_zip_entries(archive_path: Path, file_records: list[dict[str, Any]]
     try:
         with zipfile.ZipFile(archive_path, "r") as archive:
             infos = archive.infolist()
+            _validate_zip_resource_limits(
+                infos,
+                max_entries=MAX_RELEASE_ENTRIES,
+                max_entry_size=MAX_RELEASE_ENTRY_SIZE,
+                max_total_size=MAX_RELEASE_TOTAL_SIZE,
+                max_compression_ratio=MAX_COMPRESSION_RATIO,
+            )
             actual_names: list[str] = []
             for info in infos:
                 name = _strict_archive_name(info.filename, label="ZIP entry")
-                if info.is_dir() or name.endswith("/"):
-                    raise TemplateToolError(f"ZIP directories are not allowed: {name}")
-                mode = (info.external_attr >> 16) & 0xFFFF
-                if mode and not stat.S_ISREG(mode):
-                    raise TemplateToolError(f"ZIP entry is not a regular file: {name}")
+                _validate_zip_info_type(info)
                 actual_names.append(name)
             if actual_names != expected_names:
                 raise TemplateToolError("ZIP entries do not exactly match metadata files")
             _assert_unique_portable_names(actual_names)
             for info, name in zip(infos, actual_names):
-                content = archive.read(info)
-                if len(content) != expected_sizes[name]:
+                count, digest = _stream_zip_entry(archive, info)
+                if count != expected_sizes[name]:
                     raise TemplateToolError(f"ZIP entry size mismatch: {name}")
-                digest = hashlib.sha256(content).hexdigest().upper()
                 if digest != expected_hashes[name]:
                     raise TemplateToolError(f"ZIP entry SHA-256 mismatch: {name}")
     except zipfile.BadZipFile as exc:
@@ -361,37 +389,53 @@ def _validate_zip_entries(archive_path: Path, file_records: list[dict[str, Any]]
         raise TemplateToolError("archive SHA-256 does not match metadata")
 
 
-def _find_canonical_owner(metadata: dict[str, Any], root: Path) -> tuple[TemplatePackage, Path]:
-    candidates = [
-        package
-        for package in discover_packages(root)
-        if package.is_canonical
-        and package.template_id == metadata["template_id"]
-        and package.version == metadata["version"]
-        and package.format == metadata["format"]
-    ]
-    if len(candidates) != 1:
+def _find_trusted_release_owner(metadata: dict[str, Any], root: Path) -> TrustedReleaseOwner:
+    """Resolve one current Git-tracked Skill owner, independent of release version."""
+    candidates: dict[Path, list[TemplatePackage]] = {}
+    for package in discover_packages(root):
+        if (
+            not package.is_canonical
+            or package.errors
+            or package.template_id != metadata["template_id"]
+            or package.format != metadata["format"]
+            or package.validator is None
+        ):
+            continue
+        skill_root = owner_skill_root(package).resolve()
+        expected_owner = display_path(skill_root, root)
+        if metadata["owner_skill"] != expected_owner:
+            continue
+        candidates.setdefault(skill_root, []).append(package)
+
+    if not candidates:
         raise TemplateToolError(
-            "current trusted canonical owner is unavailable or ambiguous for release bundle: "
-            f"{metadata['template_id']} {metadata['version']}"
+            "current trusted Skill owner is unavailable for release bundle: "
+            f"{metadata['template_id']} {metadata['format']} {metadata['owner_skill']}"
         )
-    package = candidates[0]
-    if package.errors or package.validator is None:
-        raise TemplateToolError("current canonical owner package is not valid")
-    validator = trusted_validator_for_package(package, root)
-    expected_owner = display_path(owner_skill_root(package), root)
-    if metadata["owner_skill"] != expected_owner:
-        raise TemplateToolError("archive metadata owner_skill does not match the current trusted owner")
-    return package, validator
+    if len(candidates) != 1:
+        owners = ", ".join(path.as_posix() for path in sorted(candidates, key=lambda item: item.as_posix().casefold()))
+        raise TemplateToolError(f"current trusted Skill owner is ambiguous for release bundle: {owners}")
+
+    skill_root, packages = next(iter(candidates.items()))
+    packages.sort(key=lambda item: (item.semver.as_tuple(), item.package_dir.as_posix().casefold()), reverse=True)
+    reference_package = packages[0]
+    validator = trusted_validator_for_package(reference_package, root)
+    return TrustedReleaseOwner(
+        template_id=metadata["template_id"],
+        format=metadata["format"],
+        skill_root=skill_root,
+        validator=validator,
+        reference_package=reference_package,
+    )
 
 
 def _validate_extracted_packages(
     extracted: Path,
     metadata: dict[str, Any],
-    owner_package: TemplatePackage,
-    owner_validator: Path,
+    owner: TrustedReleaseOwner,
     root: Path,
 ) -> None:
+    owner_validator = owner.validator
     package_records = metadata["packages"]
     expected_manifest_paths = {item["manifest"] for item in package_records}
     entry_dir = extracted / PurePosixPath(metadata["entry_package"])
@@ -433,8 +477,17 @@ def _validate_extracted_packages(
         discovered_manifest_paths.add(manifest.relative_to(extracted).as_posix())
     if discovered_manifest_paths != expected_manifest_paths:
         raise TemplateToolError("archive package dependency closure does not match metadata packages")
-    if metadata["template_sha256"] != owner_package.fingerprint:
-        raise TemplateToolError("archive entry template SHA does not match the current canonical package")
+    entry_record = next(
+        (record for record in package_records if record["manifest"].rsplit("/", 1)[0] == metadata["entry_package"]),
+        None,
+    )
+    if entry_record is None:
+        raise TemplateToolError("archive entry package record is missing")
+    if metadata["template_sha256"] != entry_record["template_sha256"]:
+        raise TemplateToolError("archive metadata template_sha256 does not match the entry package record")
+    entry_template = extracted / PurePosixPath(entry_record["template"])
+    if sha256_file(entry_template) != metadata["template_sha256"]:
+        raise TemplateToolError("archive metadata template_sha256 does not match the extracted entry template")
     validation = validate_package_with_owner(
         entry_dir,
         extracted,
@@ -455,8 +508,7 @@ class _VerifiedBundle:
     sidecar: Path
     metadata_path: Path
     metadata: dict[str, Any]
-    owner_package: TemplatePackage
-    owner_validator: Path
+    owner: TrustedReleaseOwner
 
     @property
     def archive_sha256(self) -> str:
@@ -499,18 +551,17 @@ def _verify_release_bundle(
     if metadata["archive_sha256"] != archive_sha:
         raise TemplateToolError("release metadata archive_sha256 does not match the archive")
     _validate_zip_entries(archive_path, metadata["files"], archive_sha)
-    owner_package, owner_validator = _find_canonical_owner(metadata, root)
+    owner = _find_trusted_release_owner(metadata, root)
     with tempfile.TemporaryDirectory(prefix="template-release-verify-") as temporary_name:
         extracted = Path(temporary_name)
         _extract_archive(archive_path, extracted)
-        _validate_extracted_packages(extracted, metadata, owner_package, owner_validator, root)
+        _validate_extracted_packages(extracted, metadata, owner, root)
     return _VerifiedBundle(
         archive=archive_path,
         sidecar=sidecar_path,
         metadata_path=metadata_path,
         metadata=metadata,
-        owner_package=owner_package,
-        owner_validator=owner_validator,
+        owner=owner,
     )
 
 
@@ -578,22 +629,23 @@ def _git_head(root: Path) -> str:
 
 
 def _canonical_package_for_release(root: Path, package: Path | None, template_id: str | None, version: str | None) -> TemplatePackage:
-    packages = discover_packages(root)
     if package is not None:
-        package = package.resolve(strict=False)
-        candidates = [item for item in packages if item.package_dir.resolve() == package]
-    else:
-        if not template_id or not version:
-            raise TemplateToolError("release requires --package or both --template-id and --version")
-        canonical_version = _require_version(version, label="release.version")
-        candidates = [
-            item for item in packages
-            if item.is_canonical and item.template_id == template_id and item.version == canonical_version
-        ]
+        target = package_from_path(package.expanduser().resolve(strict=False), root)
+        if target.errors:
+            raise TemplateToolError("release target package is invalid: " + "; ".join(target.errors))
+        return target
+    if not template_id or not version:
+        raise TemplateToolError("release requires --package or both --template-id and --version")
+    packages = discover_packages(root)
+    canonical_version = _require_version(version, label="release.version")
+    candidates = [
+        item for item in packages
+        if item.is_canonical and item.template_id == template_id and item.version == canonical_version
+    ]
     if len(candidates) != 1:
         raise TemplateToolError("release target must identify exactly one canonical template package")
     target = candidates[0]
-    if not target.is_canonical or target.errors:
+    if target.errors:
         raise TemplateToolError("release target is not a valid canonical template package")
     return target
 
@@ -615,6 +667,13 @@ def _validate_release_output(output_dir: Path, root: Path, closure: Iterable[Tem
         if paths_overlap(lexical_output, _lexical_absolute(package.package_dir)) or paths_overlap(resolved_output, _resolve_existing_ancestors(package.package_dir)):
             raise TemplateToolError("release output overlaps a canonical package")
     return lexical_output
+
+
+def _cleanup_release_output(path: Path) -> None:
+    injected = os.environ.get("TEMPLATE_TOOL_TEST_FAIL_RELEASE_CLEANUP")
+    if injected and (injected == "all" or injected == path.name):
+        raise OSError(f"injected release cleanup failure for {path.name}")
+    remove_path_or_raise(path)
 
 
 def release_package(
@@ -666,6 +725,8 @@ def release_package(
         result = archive_package(target.package_dir, output_dir, root, dry_run=False)
         created_paths = final_paths[:3]
         archive_path = output_dir / archive_name
+        if os.environ.get("TEMPLATE_TOOL_TEST_FAIL_RELEASE_VERIFY") == "1":
+            raise TemplateToolError("injected release verification failure")
         verified = _verify_release_bundle(archive_path, root)
         base_plan["archive_sha256"] = verified.archive_sha256
         base_plan["status"] = "passed"
@@ -673,13 +734,17 @@ def release_package(
         base_plan["plan"] = plan_name
         created_paths.append(plan_path)
         atomic_write_text(plan_path, json.dumps(base_plan, ensure_ascii=False, indent=2) + "\n")
-    except Exception:
+    except Exception as original:
+        cleanup_errors: list[str] = []
         for path in reversed(created_paths):
             try:
-                remove_path_or_raise(path)
-            except Exception:
-                pass
-        raise
+                _cleanup_release_output(path)
+            except Exception as cleanup:
+                cleanup_errors.append(f"failed to remove {path.name}: {cleanup}")
+        message = f"release transaction failed: {original}"
+        if cleanup_errors:
+            message += "; " + "; ".join(cleanup_errors)
+        raise TemplateToolError(message) from original
     return {
         **base_plan,
         "status": "passed",
@@ -751,8 +816,13 @@ class _InstallationLock:
         self.path = path
         self.template_id = template_id
         self._owned = False
+        self._injected_release_failure = False
 
-    def __enter__(self) -> "_InstallationLock":
+    @property
+    def owned(self) -> bool:
+        return self._owned
+
+    def acquire(self) -> "_InstallationLock":
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.is_symlink():
             raise TemplateToolError(f"installation lock is a symlink: {self.path}")
@@ -792,10 +862,26 @@ class _InstallationLock:
                 pass
             raise
 
+    def release(self) -> None:
+        if not self._owned:
+            return
+        failure_mode = os.environ.get("TEMPLATE_TOOL_TEST_FAIL_LOCK_RELEASE")
+        if failure_mode == "always" or (failure_mode == "1" and not self._injected_release_failure):
+            self._injected_release_failure = True
+            raise OSError("injected installation lock release failure")
+        try:
+            self.path.unlink()
+        except OSError as exc:
+            raise TemplateToolError(f"cannot remove installation lock: {self.path}: {exc}") from exc
+        self._owned = False
+
+    def __enter__(self) -> "_InstallationLock":
+        return self.acquire()
+
     def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
         if self._owned:
             try:
-                self.path.unlink(missing_ok=True)
+                self.release()
             except OSError as error:
                 if exc is None:
                     raise TemplateToolError(f"cannot remove installation lock: {self.path}: {error}") from error
@@ -814,12 +900,15 @@ def _load_state(path: Path, template_id: str) -> dict[str, Any] | None:
     previous = state["previous_version"]
     if previous is not None:
         previous = _require_version(previous, label="previous_version")
-    if state["updated_by_tool_version"] != RELEASE_TOOL_VERSION:
-        raise TemplateToolError("unsupported active installation state tool version")
+    updated_by_tool_version = _require_tool_version(
+        state["updated_by_tool_version"],
+        label="updated_by_tool_version",
+    )
     return {
         **state,
         "active_version": active,
         "previous_version": previous,
+        "updated_by_tool_version": updated_by_tool_version,
     }
 
 
@@ -962,6 +1051,15 @@ def _restore_active_bytes(path: Path, previous: bytes | None) -> None:
             remove_path_or_raise(temporary)
 
 
+def _assert_active_bytes(path: Path, expected: bytes | None) -> None:
+    if expected is None:
+        if path.exists() or path.is_symlink():
+            raise TemplateToolError(f"active installation state was not restored: {path}")
+        return
+    if path.is_symlink() or not path.is_file() or path.read_bytes() != expected:
+        raise TemplateToolError(f"active installation state was not restored: {path}")
+
+
 def _extract_verified_to_stage(verified: _VerifiedBundle, stage_bundle: Path) -> None:
     stage_bundle.mkdir(parents=True, exist_ok=False)
     _extract_archive(verified.archive, stage_bundle)
@@ -981,6 +1079,7 @@ def _install_verified_bundle(
     *,
     operation: str,
     dry_run: bool,
+    lock: _InstallationLock | None = None,
 ) -> dict[str, Any]:
     template_id = str(verified.metadata["template_id"])
     version = str(verified.metadata["version"])
@@ -1082,7 +1181,7 @@ def _install_verified_bundle(
         _write_state(active_path, new_state)
         if _load_state(active_path, template_id) != new_state:
             raise TemplateToolError("active installation state verification failed")
-        return {
+        result = {
             "status": "passed",
             "operation": operation,
             "template_id": template_id,
@@ -1092,6 +1191,12 @@ def _install_verified_bundle(
             "install_root": display_path(install_root, root),
             "dry_run": False,
         }
+        if lock is not None:
+            try:
+                lock.release()
+            except Exception as lock_error:
+                raise TemplateToolError(f"installation lock release failed: {lock_error}") from lock_error
+        return result
     except Exception as original:
         recovery_errors: list[str] = []
         if installed and (target_dir.exists() or target_dir.is_symlink()):
@@ -1106,8 +1211,14 @@ def _install_verified_bundle(
                 recovery_errors.append(f"failed to remove installation stage: {error}")
         try:
             _restore_active_bytes(active_path, old_active_bytes)
+            _assert_active_bytes(active_path, old_active_bytes)
         except Exception as error:
             recovery_errors.append(f"failed to restore active state: {error}")
+        if lock is not None and lock.owned:
+            try:
+                lock.release()
+            except Exception as error:
+                recovery_errors.append(f"failed to release installation lock after rollback: {error}")
         message = f"{operation} transaction failed: {original}"
         if recovery_errors:
             message += "; " + "; ".join(recovery_errors)
@@ -1154,10 +1265,24 @@ def _install_or_upgrade(
     if dry_run:
         return _install_verified_bundle(verified, root, target_root, operation=operation, dry_run=True)
     template_dir_existed = template_dir.exists() or template_dir.is_symlink()
+    lock = _InstallationLock(lock_path, template_id)
     try:
-        with _InstallationLock(lock_path, template_id):
-            return _install_verified_bundle(verified, root, target_root, operation=operation, dry_run=False)
-    except Exception:
+        lock.acquire()
+        return _install_verified_bundle(
+            verified,
+            root,
+            target_root,
+            operation=operation,
+            dry_run=False,
+            lock=lock,
+        )
+    except Exception as original:
+        recovery_errors: list[str] = []
+        if lock.owned:
+            try:
+                lock.release()
+            except Exception as error:
+                recovery_errors.append(f"failed to release installation lock: {error}")
         if operation == "install" and not template_dir_existed and template_dir.is_dir() and not template_dir.is_symlink():
             try:
                 versions = template_dir / "versions"
@@ -1165,8 +1290,10 @@ def _install_or_upgrade(
                     remove_path_or_raise(versions)
                 if not any(template_dir.iterdir()):
                     remove_path_or_raise(template_dir)
-            except Exception:
-                pass
+            except Exception as error:
+                recovery_errors.append(f"failed to remove empty installation directory: {error}")
+        if recovery_errors:
+            raise TemplateToolError(f"{operation} transaction failed: {original}; {'; '.join(recovery_errors)}") from original
         raise
 
 
@@ -1228,7 +1355,12 @@ def rollback_installation(
     if template_dir.is_symlink() or not template_dir.is_dir():
         raise TemplateToolError("template has no installed lifecycle state")
     lock_path = template_dir / ".lock"
-    with _InstallationLock(lock_path, template_id) if not dry_run else _NullLock():
+    lock = _InstallationLock(lock_path, template_id)
+    if not dry_run:
+        lock.acquire()
+    old_active_bytes: bytes | None = None
+    old_active_captured = False
+    try:
         active_path = template_dir / "active.json"
         state = _load_state(active_path, template_id)
         if state is None:
@@ -1238,8 +1370,8 @@ def rollback_installation(
         if target_version is None:
             raise TemplateToolError("no previous installed version is available for rollback")
         target_version = _require_version(target_version, label="rollback target version")
-        if parse_semver(target_version) >= parse_semver(current_version):
-            raise TemplateToolError("rollback target must be lower than the active version")
+        if target_version == current_version:
+            raise TemplateToolError("rollback target must differ from the active version")
         target_dir = template_dir / "versions" / target_version
         if target_dir.is_symlink() or not target_dir.is_dir():
             raise TemplateToolError("rollback target version is not installed")
@@ -1255,6 +1387,7 @@ def rollback_installation(
                 "dry_run": True,
             }
         old_active_bytes = active_path.read_bytes() if active_path.is_file() else None
+        old_active_captured = True
         new_state = {
             "schema_version": INSTALL_STATE_SCHEMA_VERSION,
             "template_id": template_id,
@@ -1262,19 +1395,10 @@ def rollback_installation(
             "previous_version": current_version,
             "updated_by_tool_version": RELEASE_TOOL_VERSION,
         }
-        try:
-            _write_state(active_path, new_state)
-            if _load_state(active_path, template_id) != new_state:
-                raise TemplateToolError("rollback active state verification failed")
-        except Exception as original:
-            try:
-                _restore_active_bytes(active_path, old_active_bytes)
-            except Exception as recovery:
-                raise TemplateToolError(
-                    f"rollback transaction failed: {original}; failed to restore active state: {recovery}"
-                ) from original
-            raise TemplateToolError(f"rollback transaction failed: {original}") from original
-        return {
+        _write_state(active_path, new_state)
+        if _load_state(active_path, template_id) != new_state:
+            raise TemplateToolError("rollback active state verification failed")
+        result = {
             "status": "passed",
             "operation": "rollback",
             "template_id": template_id,
@@ -1284,14 +1408,28 @@ def rollback_installation(
             "install_root": display_path(target_root, root),
             "dry_run": False,
         }
-
-
-class _NullLock:
-    def __enter__(self) -> "_NullLock":
-        return self
-
-    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
-        return None
+        try:
+            lock.release()
+        except Exception as lock_error:
+            raise TemplateToolError(f"installation lock release failed: {lock_error}") from lock_error
+        return result
+    except Exception as original:
+        recovery_errors: list[str] = []
+        if old_active_captured:
+            try:
+                _restore_active_bytes(active_path, old_active_bytes)
+                _assert_active_bytes(active_path, old_active_bytes)
+            except Exception as recovery:
+                recovery_errors.append(f"failed to restore active state: {recovery}")
+        if lock.owned:
+            try:
+                lock.release()
+            except Exception as recovery:
+                recovery_errors.append(f"failed to release installation lock after rollback: {recovery}")
+        message = f"rollback transaction failed: {original}"
+        if recovery_errors:
+            message += "; " + "; ".join(recovery_errors)
+        raise TemplateToolError(message) from original
 
 
 def _installed_template_ids(install_root: Path) -> list[str]:

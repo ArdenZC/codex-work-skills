@@ -35,6 +35,13 @@ from .validation import package_from_path, validate_package_path, validate_packa
 EXCLUDED_DIR_NAMES = {"__pycache__", ".git", "stage", "backup", "qa", "qa-reports"}
 DEFAULT_ARCHIVE_OUTPUT_ROOT = Path("dist") / "template-packages"
 
+# Release archives are untrusted at verification/extraction time.  Keep these
+# limits well above the current bundles while preventing resource exhaustion.
+MAX_ARCHIVE_ENTRIES = 512
+MAX_ARCHIVE_ENTRY_SIZE = 64 * 1024 * 1024
+MAX_ARCHIVE_TOTAL_SIZE = 256 * 1024 * 1024
+MAX_ARCHIVE_COMPRESSION_RATIO = 200
+
 
 def _archive_output_overlaps_closure(
     lexical_output: Path,
@@ -208,16 +215,84 @@ def _archive_sha(path: Path) -> str:
     return sha256_file(path)
 
 
+def _validate_zip_info_type(info: zipfile.ZipInfo, *, label: str = "ZIP entry") -> None:
+    if info.is_dir() or info.filename.endswith("/"):
+        raise TemplateToolError(f"{label} directories are not allowed: {info.filename}")
+    mode = (info.external_attr >> 16) & 0xFFFF
+    if mode and not stat.S_ISREG(mode):
+        raise TemplateToolError(f"{label} is not a regular file: {info.filename}")
+
+
+def _validate_zip_resource_limits(
+    infos: list[zipfile.ZipInfo],
+    *,
+    max_entries: int = MAX_ARCHIVE_ENTRIES,
+    max_entry_size: int = MAX_ARCHIVE_ENTRY_SIZE,
+    max_total_size: int = MAX_ARCHIVE_TOTAL_SIZE,
+    max_compression_ratio: int = MAX_ARCHIVE_COMPRESSION_RATIO,
+) -> int:
+    if len(infos) > max_entries:
+        raise TemplateToolError(f"ZIP contains too many entries: {len(infos)} > {max_entries}")
+    total_size = 0
+    for info in infos:
+        _validate_zip_info_type(info)
+        if info.file_size < 0 or info.file_size > max_entry_size:
+            raise TemplateToolError(
+                f"ZIP entry is too large: {info.filename} ({info.file_size} > {max_entry_size})"
+            )
+        total_size += info.file_size
+        if total_size > max_total_size:
+            raise TemplateToolError(
+                f"ZIP uncompressed size exceeds limit: {total_size} > {max_total_size}"
+            )
+        ratio = info.file_size / max(info.compress_size, 1)
+        if ratio > max_compression_ratio:
+            raise TemplateToolError(
+                f"ZIP compression ratio exceeds limit: {info.filename} ({ratio:.2f} > {max_compression_ratio})"
+            )
+    return total_size
+
+
+def _stream_zip_entry(
+    archive: zipfile.ZipFile,
+    info: zipfile.ZipInfo,
+    *,
+    destination: Any | None = None,
+) -> tuple[int, str]:
+    digest = hashlib.sha256()
+    count = 0
+    with archive.open(info, "r") as source:
+        while True:
+            chunk = source.read(1024 * 1024)
+            if not chunk:
+                break
+            count += len(chunk)
+            if count > info.file_size:
+                raise TemplateToolError(f"ZIP entry expanded beyond its declared size: {info.filename}")
+            digest.update(chunk)
+            if destination is not None:
+                destination.write(chunk)
+    if count != info.file_size:
+        raise TemplateToolError(
+            f"ZIP entry size mismatch while streaming: {info.filename} ({count} != {info.file_size})"
+        )
+    return count, digest.hexdigest().upper()
+
+
 def _extract_archive(archive_path: Path, destination: Path) -> None:
     with zipfile.ZipFile(archive_path, "r") as archive:
-        for info in archive.infolist():
-            name = info.filename
+        infos = archive.infolist()
+        _validate_zip_resource_limits(infos)
+        names = [_validate_archive_name(info.filename) for info in infos]
+        _assert_unique_portable_names(names)
+        for info, name in zip(infos, names):
             _validate_archive_name(name)
             target = (destination / PurePosixPath(name)).resolve(strict=False)
             if not is_within(target, destination):
                 raise TemplateToolError(f"archive contains zip-slip path: {name}")
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes(archive.read(name))
+            with target.open("wb") as output:
+                _stream_zip_entry(archive, info, destination=output)
 
 
 def _verify_extracted_dependency_closure(entry: TemplatePackage, root: Path, owner_validator: Path) -> None:
@@ -267,13 +342,17 @@ def _verify_archive(
 ) -> None:
     expected_names = [str(record["path"]) for record in file_records]
     expected_hashes = {str(record["path"]): str(record["sha256"]) for record in file_records}
+    expected_sizes = {str(record["path"]): int(record["size"]) for record in file_records}
     _assert_unique_portable_names(expected_names)
     with zipfile.ZipFile(archive_path, "r") as archive:
-        names = archive.namelist()
+        infos = archive.infolist()
+        _validate_zip_resource_limits(infos)
+        names = [info.filename for info in infos]
         if names != expected_names or len(names) != len(set(names)):
             raise TemplateToolError("archive file order or duplicate entries failed verification")
-        for name in names:
-            if hashlib.sha256(archive.read(name)).hexdigest().upper() != expected_hashes[name]:
+        for info, name in zip(infos, names):
+            count, digest = _stream_zip_entry(archive, info)
+            if count != expected_sizes[name] or digest != expected_hashes[name]:
                 raise TemplateToolError(f"archive entry hash mismatch: {name}")
     if _archive_sha(archive_path) != expected_archive_sha:
         raise TemplateToolError("archive SHA changed during verification")
