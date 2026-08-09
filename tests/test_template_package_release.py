@@ -231,6 +231,33 @@ class TemplatePackageReleaseTests(unittest.TestCase):
         self.assertTrue((output / f"demo-template-{package.name.removeprefix('v')}.zip").is_file())
         return output
 
+    def test_release_preserves_lexical_repo_root_for_aliased_workspace(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="template-release-root-alias-") as directory:
+            container = Path(directory)
+            real_root = container / "real-repository"
+            real_root.mkdir()
+            _, packages = self.make_fixture_repo(real_root, versions=("1.1.1",))
+            alias = container / "repository-alias"
+            try:
+                alias.symlink_to(real_root, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("the current platform cannot create directory symlinks")
+
+            package = alias / packages["1.1.1"].relative_to(real_root)
+            output = alias / "dist" / "template-packages" / "aliased-root"
+            result = self.run_tool(
+                "release",
+                "--package",
+                package,
+                "--output-dir",
+                output,
+                "--json",
+                root=alias,
+            )
+            payload = self.assert_succeeded(result)
+            self.assertEqual(payload["status"], "passed")
+            self.assertEqual(len(list(output.glob("*.zip"))), 1)
+
     def copy_bundle(self, source: Path, destination: Path) -> Path:
         destination.mkdir(parents=True)
         for path in source.iterdir():

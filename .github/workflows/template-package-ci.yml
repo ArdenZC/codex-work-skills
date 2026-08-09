@@ -89,7 +89,6 @@ jobs:
           python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
 
       - name: Validate manifests, schemas and template hashes
-        if: matrix.suite == 'gradebook'
         run: python "tests/validate_template_packages.py"
 
       - name: Compile template tooling sources
@@ -179,6 +178,7 @@ jobs:
           python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
 
       - name: Validate manifests, schemas and template hashes
+        if: matrix.suite == 'gradebook'
         run: python "tests/validate_template_packages.py"
 
       - name: Compile template core sources

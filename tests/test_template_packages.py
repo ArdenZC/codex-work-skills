@@ -3464,7 +3464,19 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("ubuntu-latest", workflow)
         self.assertIn("suite: lesson-plan", workflow)
         self.assertIn("suite: gradebook", workflow)
-        self.assertIn("if: matrix.suite == 'gradebook'\n        run: python \"tests/validate_template_packages.py\"", workflow)
+        workflow_data = yaml.safe_load(workflow)
+        tooling_validation = next(
+            step
+            for step in workflow_data["jobs"]["template-tooling"]["steps"]
+            if step.get("name") == "Validate manifests, schemas and template hashes"
+        )
+        core_validation = next(
+            step
+            for step in workflow_data["jobs"]["template-core"]["steps"]
+            if step.get("name") == "Validate manifests, schemas and template hashes"
+        )
+        self.assertNotIn("if", tooling_validation)
+        self.assertEqual(core_validation["if"], "matrix.suite == 'gradebook'")
         for test_class in (
             "LessonTemplatePackageTests",
             "GradebookTotalRuleTests",

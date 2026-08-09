@@ -1087,7 +1087,7 @@ def release_package(
     output_dir: Path | None = None,
     dry_run: bool = False,
 ) -> dict[str, Any]:
-    root = root.resolve()
+    root = _lexical_absolute(root)
     target = _canonical_package_for_release(root, package, template_id, version)
     _assert_release_worktree_clean(root)
     closure = _dependency_closure(target, root)
