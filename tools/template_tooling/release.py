@@ -698,13 +698,17 @@ def _assert_release_source_matches_head(root: Path, paths: Iterable[Path]) -> No
             errors="replace",
             check=False,
         )
-        expected_blob_result = subprocess.run(
-            ["git", "-C", str(root), "cat-file", "blob", f"HEAD:{relative}"],
+        actual = subprocess.run(
+            ["git", "-C", str(root), "hash-object", "--", relative],
             capture_output=True,
+            text=True,
+            encoding="ascii",
+            errors="replace",
             check=False,
         )
-        actual_source = root / Path(relative)
-        if expected_blob_result.returncode != 0 or actual_source.read_bytes() != expected_blob_result.stdout:
+        expected_blob = expected.stdout.strip().lower()
+        actual_blob = actual.stdout.strip().lower()
+        if expected.returncode != 0 or actual.returncode != 0 or expected_blob != actual_blob:
             raise TemplateToolError("release source package differs from source_commit")
 
 
