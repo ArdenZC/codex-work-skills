@@ -1681,7 +1681,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             output = self.create_release(root, packages["1.1.1"], "master-unavailable")
             plan = output / "demo-template-1.1.1.release-plan.json"
             self.git(root, "remote", "remove", "origin")
-            with self.assertRaisesRegex(Exception, "cannot confirm remote master"):
+            with self.assertRaisesRegex(Exception, "cannot resolve GitHub origin repository"):
                 publish_release_transaction(plan, root, client=InMemoryGitHubReleaseClient())
 
     def test_release_workflow_contract_is_manual_master_only_and_fail_closed(self) -> None:
