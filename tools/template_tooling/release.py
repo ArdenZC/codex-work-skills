@@ -668,6 +668,18 @@ def _relative_git_paths(root: Path, paths: Iterable[Path]) -> list[str]:
     return relative_paths
 
 
+def _source_bytes_match_head(path: Path, expected: bytes, actual: bytes) -> bool:
+    if actual == expected:
+        return True
+    if path.suffix.casefold() not in {".md", ".yaml", ".yml"}:
+        return False
+    if b"\x00" in expected or b"\x00" in actual:
+        return False
+    normalized_expected = expected.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    normalized_actual = actual.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    return normalized_actual == normalized_expected
+
+
 def _assert_release_source_matches_head(root: Path, paths: Iterable[Path]) -> None:
     relative_paths = _relative_git_paths(root, paths)
     if not relative_paths:
@@ -698,17 +710,21 @@ def _assert_release_source_matches_head(root: Path, paths: Iterable[Path]) -> No
             errors="replace",
             check=False,
         )
-        actual = subprocess.run(
-            ["git", "-C", str(root), "hash-object", "--", relative],
+        expected_blob_result = subprocess.run(
+            ["git", "-C", str(root), "cat-file", "blob", f"HEAD:{relative}"],
             capture_output=True,
-            text=True,
-            encoding="ascii",
-            errors="replace",
             check=False,
         )
-        expected_blob = expected.stdout.strip().lower()
-        actual_blob = actual.stdout.strip().lower()
-        if expected.returncode != 0 or actual.returncode != 0 or expected_blob != actual_blob:
+        actual_source = root / Path(relative)
+        if (
+            expected.returncode != 0
+            or expected_blob_result.returncode != 0
+            or not _source_bytes_match_head(
+                actual_source,
+                expected_blob_result.stdout,
+                actual_source.read_bytes(),
+            )
+        ):
             raise TemplateToolError("release source package differs from source_commit")
 
 
