@@ -36,6 +36,21 @@ EXCLUDED_DIR_NAMES = {"__pycache__", ".git", "stage", "backup", "qa", "qa-report
 DEFAULT_ARCHIVE_OUTPUT_ROOT = Path("dist") / "template-packages"
 
 
+def _archive_output_overlaps_closure(
+    lexical_output: Path,
+    resolved_output: Path,
+    closure: list[TemplatePackage],
+) -> bool:
+    for item in closure:
+        lexical_package = _lexical_absolute(item.package_dir)
+        resolved_package = _resolve_existing_ancestors(lexical_package)
+        if paths_overlap(lexical_output, lexical_package):
+            return True
+        if paths_overlap(resolved_output, resolved_package):
+            return True
+    return False
+
+
 def _validate_archive_output_workspace(
     output_dir: Path,
     root: Path,
@@ -64,7 +79,7 @@ def _validate_archive_output_workspace(
     elif resolved_inside_repository:
         raise TemplateToolError("external archive path resolves inside the repository")
 
-    if any(paths_overlap(lexical_output, item.package_dir) for item in closure):
+    if _archive_output_overlaps_closure(lexical_output, resolved_output, closure):
         raise TemplateToolError("archive output directory overlaps the template package or dependency")
     return lexical_output
 

@@ -2000,6 +2000,90 @@ class TemplatePackageToolingTests(unittest.TestCase):
             finally:
                 shutil.rmtree(external_root, ignore_errors=True)
 
+    def test_archive_rejects_resolved_overlap_with_external_package_closure(self) -> None:
+        from tools.template_tooling.paths import tree_inventory
+
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            root = Path(directory)
+            _, internal_package, _ = self.make_dependent_fixture_repo(root)
+            source_root = root.parent / f"{root.name}-archive-resolved-source"
+            external_links = root.parent / f"{root.name}-archive-resolved-links"
+            safe_target = root.parent / f"{root.name}-archive-resolved-safe"
+            shutil.copytree(internal_package.parent, source_root / internal_package.parent.name)
+            package = source_root / internal_package.parent.name / internal_package.name
+            dependency = package.parent / "v1.0.0"
+            marker = root / "FULL_VALIDATOR_STARTED"
+            (package / "validator-start-marker.txt").write_text(str(marker), encoding="utf-8")
+            before = tree_inventory(source_root)
+            external_links.mkdir()
+            safe_target.mkdir()
+            links = {
+                "entry": external_links / "entry-package-link",
+                "dependency": external_links / "dependency-link",
+                "ancestor": external_links / "package-ancestor-link",
+                "multi-hop": external_links / "multi-hop-a",
+                "multi-hop-target": external_links / "multi-hop-b",
+                "safe": external_links / "safe-output-link",
+            }
+            try:
+                try:
+                    links["entry"].symlink_to(package, target_is_directory=True)
+                    links["dependency"].symlink_to(dependency, target_is_directory=True)
+                    links["ancestor"].symlink_to(package.parent, target_is_directory=True)
+                    links["multi-hop-target"].symlink_to(dependency, target_is_directory=True)
+                    links["multi-hop"].symlink_to(links["multi-hop-target"], target_is_directory=True)
+                    links["safe"].symlink_to(safe_target, target_is_directory=True)
+                except (OSError, NotImplementedError):
+                    self.skipTest("the current platform cannot create directory symlinks")
+
+                rejected = (
+                    ("lexical package inside", package / "lexical-output"),
+                    ("lexical package equal", package),
+                    ("resolved entry package", links["entry"] / "generated"),
+                    ("resolved dependency", links["dependency"] / "generated"),
+                    ("package ancestor", links["ancestor"]),
+                    ("multilevel dependency", links["multi-hop"] / "generated"),
+                )
+                archive_name = "demo-template-1.1.0.zip"
+                for label, output in rejected:
+                    with self.subTest(overlap=label):
+                        result = self.run_tool(
+                            "archive", "--package", package, "--output-dir", output, "--json", root=root
+                        )
+                        self.assert_process_failed(result)
+                        self.assertIn("overlap", result.stdout + result.stderr)
+                        self.assertFalse(marker.exists())
+                        self.assertEqual(tree_inventory(source_root), before)
+                        resolved_output = output.resolve(strict=False)
+                        self.assertFalse((resolved_output / archive_name).exists())
+                        self.assertFalse((resolved_output / f"{archive_name}.sha256").exists())
+                        self.assertFalse((resolved_output / "demo-template-1.1.0.metadata.json").exists())
+                        self.assertFalse(list(source_root.rglob("*.stage")))
+                        self.assertFalse(list(source_root.rglob("*.sidecar")))
+                        self.assertFalse(list(source_root.rglob("*.metadata")))
+
+                safe = self.run_tool(
+                    "archive", "--package", package, "--output-dir", links["safe"], "--json", root=root
+                )
+                self.assert_process_succeeded(safe)
+                safe_payload = self.json_result(safe)
+                archive_path = safe_target / archive_name
+                sidecar_path = safe_target / f"{archive_name}.sha256"
+                metadata_path = safe_target / "demo-template-1.1.0.metadata.json"
+                self.assertTrue(archive_path.is_file())
+                self.assertTrue(sidecar_path.is_file())
+                self.assertTrue(metadata_path.is_file())
+                cli_sha = safe_payload["archive_sha256"]
+                sidecar_sha = sidecar_path.read_text(encoding="ascii").split()[0]
+                metadata_sha = json.loads(metadata_path.read_text(encoding="utf-8"))["archive_sha256"]
+                actual_sha = sha256(archive_path)
+                self.assertEqual({cli_sha, sidecar_sha, metadata_sha, actual_sha}, {actual_sha})
+                self.assertTrue(marker.exists())
+            finally:
+                shutil.rmtree(source_root, ignore_errors=True)
+                shutil.rmtree(external_links, ignore_errors=True)
+                shutil.rmtree(safe_target, ignore_errors=True)
+
     def test_archive_unsafe_output_fails_before_full_validator_and_file_creation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
