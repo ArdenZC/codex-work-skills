@@ -671,7 +671,7 @@ def _relative_git_paths(root: Path, paths: Iterable[Path]) -> list[str]:
 def _source_bytes_match_head(path: Path, expected: bytes, actual: bytes) -> bool:
     if actual == expected:
         return True
-    if path.suffix.casefold() not in {".md", ".yaml", ".yml"}:
+    if path.suffix.casefold() not in {".md", ".txt", ".yaml", ".yml"}:
         return False
     if b"\x00" in expected or b"\x00" in actual:
         return False
