@@ -23,6 +23,8 @@ requirements.txt
 
 旧模板路径必须保留，且只能作为兼容入口。兼容入口与当前 canonical template 的 SHA-256 必须一致；如果两者发生分歧，校验器报错，不允许静默选择其中一份。
 
+模板包生命周期由仓库根目录的 `tools/template_package.py` 统一处理。工具从 `**/assets/templates/*/*/manifest.yaml` 动态发现包，不维护人工同步的 registry；仓库级校验器同样按 discovery 结果验证所有 canonical 包、输入 schema 和 owner Skill validator。工具只读取 manifest 和包文件，不启动 LibreOffice。validator 信任根是 repo-root 的 Git index；validator 及其 scripts 支持文件必须是已跟踪的普通文件，symlink、未跟踪 canonical-like Skill 和未跟踪 helper 都 fail closed。只有 `scripts/__pycache__/` 内的 `.pyc/.pyo` 会被忽略，普通 scripts 目录中的 `.pyc/.pyo` 即使已跟踪也 fail closed；外部验证建立的隔离 Skill 树还必须不含 `__pycache__`、`.pyc` 或 `.pyo`。工具不会自动暂存文件；新 Skill 需精确 `git add` validator、manifest、模板、schema 和已跟踪 helper，未 commit 的已跟踪工作树修改可以运行。external/work 包不能提供或覆盖 validator，只能使用唯一的 Git-tracked canonical Skill owner。`scaffold` 先检查 lexical/resolved 工作目录，再完整验证 canonical 基线并生成 output sibling 原子 report；仓库内 output 只能在 `work/template-packages/` 下，仓库外路径解析回仓库时拒绝，解析后仍在独立 workspace 的目录或 alias 仍可用，report 与依赖必须解析到同一 workspace。`validate` 对外部包在系统临时隔离 Skill 树执行真实模板校验，`promote` 在不可变 snapshot、stage、最终 target、全树 fingerprint 一致性和动态仓库校验都通过后原子安装，`archive` 生成可复现的自包含 ZIP、SHA-256 sidecar 和结构化元数据。已有 canonical、默认入口、兼容入口和 manifest 不会被这些命令静默覆盖。
+
 ## Manifest
 
 `manifest.yaml` 是模板结构和写入契约的唯一事实来源，至少声明：
@@ -34,10 +36,10 @@ requirements.txt
 - `fields`，包括字段名称、语义写入目标、写入模式、允许的长度或数值范围；
 - `allowed_changes` 与 `protected`，说明生成器可以改什么、不能改什么；
 - `validation`，包括固定标签、行列数、公式、格式和输出检查项；
-- canonical template 的 `fingerprint.sha256`。
+- `fingerprint` 必须严格包含 `algorithm: sha256`、`sha256`、`value` 三个键；两个 hash 必须相同并匹配 canonical template 的实际 SHA-256，不能添加未知 fingerprint 键。
 - `validation` 中的禁止残留文字、长度/段落限制和是否要求渲染检查。
 
-版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。版本—定位模式矩阵固定为：教案 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；成绩册 `1.0.x = legacy_coordinates`、`1.1.x = excel_named_range`。其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
+版本使用严格的 ASCII `MAJOR.MINOR.PATCH`，不接受前导零、`v` 前缀、预发布后缀或 Unicode 数字。`scaffold --generator-version` 也必须使用同一 semver 解析器，并且 major 必须等于 manifest 的 `generator.supported_major`。版本—定位模式矩阵固定为：教案 `1.0.x = legacy_coordinates`、`1.1.x = word_bookmark`；成绩册 `1.0.x = legacy_coordinates`、`1.1.x = excel_named_range`。其他 `1.x` minor 和不支持的大版本均拒绝，显式模式与版本冲突也拒绝。结构或生成契约不兼容时增加 MAJOR；新增兼容字段或规则时增加 MINOR；错误修复或指纹修订时增加 PATCH。生成器默认只接受 `supported_major` 对应的大版本。
 
 ### 模板身份与指纹
 
@@ -53,6 +55,8 @@ requirements.txt
 ```
 
 校验失败必须返回非零退出码，并在标准错误输出清晰原因。非阻断提醒放入 `warnings`，不能把警告伪装成成功校验。正常生成默认启用模板校验和输出校验；只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才能跳过。
+
+模板包的完整 validator 始终在系统临时的正常 Skill 树中执行，覆盖 canonical、external、archive 解压包以及 scaffold、snapshot、stage、最终 target 和动态仓库校验；不会从真实 canonical 或用户工作目录直接加载 owner validator。隔离树只复制 Git-tracked 的普通源文件和声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不会被读取或修改。validator 子进程使用 `python -B` 和 OS 环境白名单，过滤 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量，设置 `PYTHONNOUSERSITE=1`，并将 `PYTHONPYCACHEPREFIX` 重定向到临时树内的 `python-cache`。验证前后检查缓存和字节码，超时产生的部分 stdout/stderr 会统一解码并保留为 UTF-8 文本，所有临时目录必须清理；清理失败即为失败。`--identity-only` 只执行身份检查，不执行完整 validator，也不能作为完整通过。
 
 ## Word 语义书签
 
