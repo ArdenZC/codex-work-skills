@@ -97,3 +97,7 @@ v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0
   ```
 
 - 自定义模板必须同时提供匹配的 manifest；不建议直接修改内置 canonical 模板。仅传 canonical v1.0 模板或旧 compatibility entry 时，解析器会自动选择 v1.0 manifest。
+
+## 发布与安装边界
+
+canonical package 只存在于 Skill 的 Git-tracked source tree；archive 是由现有 metadata contract 描述的三个分发文件，installed package 则位于独立的 `installed/template-packages/` 生命周期目录。安装器不回写 canonical，不执行 archive 中的 validator，不覆盖已经安装的 version；安装和升级使用 O_EXCL lock、stage/atomic exchange 和当前 trusted owner full validation。rollback 只允许切换到低于 active 的已安装版本。archive 校验和 GitHub Release 校验分别独立执行，GitHub Release 不是第二份 registry。正式 tag/release 只能由 master-only `workflow_dispatch` 创建，普通 CI 不创建远程资源。

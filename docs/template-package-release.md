@@ -1,0 +1,47 @@
+# 模板包发布与安装
+
+Phase 3.2 在既有 `tools/template_package.py` 上增加发布归档验证和本地安装生命周期。它不维护第二份模板 registry；release metadata 中的 `packages`、`files`、`entry_package` 和 `owner_skill` 仍是唯一归档事实来源。
+
+## 四类对象
+
+- **canonical package**：Skill 目录中由 Git 跟踪的 `assets/templates/<id>/<version>`。它是发布输入，不是安装目录。
+- **archive bundle**：`<id>-<version>.zip`、同名 `.zip.sha256` 和 `<id>-<version>.metadata.json` 三个文件。ZIP 不含 source commit，且不能覆盖已有文件。
+- **installed package**：默认位于仓库根 `installed/template-packages/`，也可以是解析后仍在仓库外的独立目录。每个版本写入 `<id>/versions/<version>/bundle/` 和 `.installation.json`，`active.json` 只指向当前版本。
+- **GitHub Release**：由 master-only、手动触发的 workflow 创建。它只是 archive 三文件的远程分发，不是 canonical source，也不替代本地 archive 验证。
+
+## 生成和验证
+
+```bash
+python tools/template_package.py release \
+  --template-id lesson-plan --version 1.1.0 \
+  --output-dir dist/template-packages --json
+
+python tools/template_package.py verify-release \
+  --release-dir dist/template-packages --json
+```
+
+`release` 先完整验证 canonical package，再调用已有 deterministic archive，最后重新验证 sidecar、实际 ZIP SHA、metadata contract、ZIP 顺序和 per-file SHA、NFC/casefold portable path、依赖闭包、entry identity 和当前 Git-tracked owner validator。生成的 `.release-plan.json` 只含稳定 asset 文件名、精确 tag `template/<id>/v<version>`、release name、archive SHA、`prerelease: false` 和 source commit；不含绝对路径。`--dry-run` 不创建 archive、sidecar、metadata 或 plan。
+
+Phase 3.1 的 archive metadata 保持 `tool_version=0.1.0`，以保护已有确定性 archive SHA；Phase 3.2 生命周期状态使用 `RELEASE_TOOL_VERSION=0.2.0` 和 `INSTALL_STATE_SCHEMA_VERSION=1.0`。
+
+## 安装、升级和回滚
+
+```bash
+python tools/template_package.py install --release-dir dist/template-packages --json
+python tools/template_package.py upgrade --archive path/to/course-gradebook-1.1.1.zip --json
+python tools/template_package.py rollback --template-id course-gradebook --json
+python tools/template_package.py rollback --template-id course-gradebook --to-version 1.1.0 --json
+python tools/template_package.py list-installed --verify --json
+```
+
+安装和升级使用模板级 `.lock`，通过 `O_CREAT|O_EXCL` 创建，遇到已有锁直接失败，没有 `--break-lock`。版本目录一旦提交就不可修改、不可覆盖；安装只接受未安装模板，升级必须严格高于 active version，且保留旧版本。rollback 只把 active 指针切换到已经安装的更低版本，不下载、不重建、不删除版本，也拒绝向上切换。
+
+所有写入都先进入同父目录 stage，再原子交换版本目录和 `active.json`。post-validation 或 active state 写入失败时，新版本和状态都会恢复。`.installation.json` 只记录相对文件 inventory、archive SHA、entry package 和版本身份，不记录绝对路径。`list-installed` 默认只读轻量状态；`--verify` 会重新计算 inventory，并用当前受信任 owner validator 隔离验证已安装 bundle。
+
+安装器永远不写 canonical source tree，也不执行 bundle 中携带的 Python validator 或其他代码。执行的唯一 validator 是当前仓库 Git index 中受信任的 owner；安装根必须是 `installed/template-packages/` 下的仓库内路径，或解析后完全独立于仓库的外部路径。lexical/resolved containment、symlink 四象限、Windows 8.3 别名、canonical/package/bundle/stage overlap 都 fail closed。
+
+## GitHub 发布
+
+`.github/workflows/template-release.yml` 只有 `workflow_dispatch` 触发，先 checkout `master`，确认 clean 且等于 `origin/master`，生成并验证 release bundle 和 plan，确认同名 tag、release、assets 均不存在，再创建 annotated tag、GitHub Release 和三个 asset。发布后会下载三个 asset 并再次执行本地 `verify-release`。事务失败时只删除本次事务创建的 tag、release 和 assets；已存在的远程资源不会被覆盖或删除。
+
+正式发布需要 GitHub Actions 的 `contents: write` 权限。普通 CI 只运行独立 release 回归，不创建真实 tag 或 GitHub Release。离线环境可以运行 `release`、`verify-release`、`install`、`upgrade`、`rollback` 和 `list-installed`；不具备 `gh`、远程网络或 Microsoft Office 的环境不能执行对应的远程发布/Excel COM 集成步骤。

@@ -66,6 +66,23 @@ python tools/template_package.py archive \
 
 归档输出路径在完整 validator、LibreOffice、输出目录、ZIP stage 创建之前使用共享的 lexical/resolved 工作区保护检查：仓库内只能写入 `dist/template-packages/`，仓库外独立目录仍拒绝与包/依赖闭包重叠以及两方向 symlink 逃逸。ZIP 文件使用 NFC/casefold 稳定排序，拒绝 casefold/NFC 冲突、zip-slip、symlink、控制字符、Windows 保留名称、尾随点/空格和非法字符；中文合法路径可以保留。生成后会解压到新的系统临时目录，复验路径、入口包、依赖闭包、所有文件 SHA、metadata，并用真实 owner validator 完整验证入口包。ZIP、sidecar、metadata 三个最终文件拒绝覆盖并作为一个提交事务处理，任一步失败都会清理已提交文件和临时文件。
 
+## Release、install、upgrade 和 rollback
+
+Phase 3.2 的生命周期入口仍是同一个 CLI：
+
+```bash
+python tools/template_package.py release --template-id <id> --version <version> --output-dir dist/template-packages --json
+python tools/template_package.py verify-release --release-dir dist/template-packages --json
+python tools/template_package.py install --archive <id-version>.zip --json
+python tools/template_package.py upgrade --release-dir <release-dir> --json
+python tools/template_package.py rollback --template-id <id> [--to-version <lower-version>] --json
+python tools/template_package.py list-installed [--verify] --json
+```
+
+release 只接受 canonical package，输出 deterministic archive 和不含绝对路径的 release plan。严格验证会检查既有 metadata required keys、实际 archive SHA、sidecar、ZIP inventory、entries、per-file SHA、依赖闭包和当前 trusted owner validator；不得用自带 bundle validator 绕过信任边界。默认安装根为 `/installed/template-packages/`，仓库内其他目录、canonical/package overlap、symlink 逃逸和 Windows 8.3 containment 都拒绝；仓库外完全独立的安装根可以使用。版本目录 immutable，active state 原子更新，失败恢复旧 active state。
+
+GitHub Release 不属于模板 registry。`.github/workflows/template-release.yml` 只在 `master` 上 `workflow_dispatch`，确认 tag/Release/assets 不存在后创建三个 archive assets，下载后重新 verify；事务失败仅清理本次创建的远程对象。GitHub Actions 不运行 Microsoft Excel COM；COM 仍由本地 Windows + Excel 环境验证。
+
 ## CI 与交付边界
 
 CI 对 `tools/**` 变更运行现有双平台模板包工作流，并把 `tools` 纳入 `compileall`；不会增加新的平台或放宽现有 timeout。工具测试使用真实 CLI 和轻量 fixture，fixture 必须先初始化 Git 并精确暂存需要信任的 validator、manifest、模板、schema 和 helper；仓库级 `tests/validate_template_packages.py` 会动态校验发现到的全部 canonical 包和所属 schema/validator。仓库内 scaffold 工作包统一放在 `/work/template-packages/`，该目录不属于正式模板包或发布内容，并由 `.gitignore` 忽略。归档、scaffold report、stage、snapshot 和 backup 都是本地工作产物，不应提交、打 tag、创建 release 或上传 `dist`。

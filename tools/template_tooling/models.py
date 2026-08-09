@@ -8,6 +8,10 @@ from typing import Any
 
 TOOL_VERSION = "0.1.0"
 METADATA_SCHEMA_VERSION = "1.0"
+# Archive metadata is part of the Phase 3.1 deterministic identity.  Keep its
+# historical tool version stable while the lifecycle CLI advances separately.
+RELEASE_TOOL_VERSION = "0.2.0"
+INSTALL_STATE_SCHEMA_VERSION = "1.0"
 
 
 class TemplateToolError(Exception):

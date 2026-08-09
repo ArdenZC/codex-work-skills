@@ -5,3 +5,4 @@ __pycache__/
 ~$*
 /work/template-packages/
 /dist/template-packages/
+/installed/template-packages/

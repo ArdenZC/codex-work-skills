@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/template-package-ci.yml"
+      - ".github/workflows/template-release.yml"
       - "docs/**"
       - "tests/**"
       - "教案生成器/**"
@@ -17,6 +18,7 @@ on:
       - master
     paths:
       - ".github/workflows/template-package-ci.yml"
+      - ".github/workflows/template-release.yml"
       - "docs/**"
       - "tests/**"
       - "教案生成器/**"
@@ -195,3 +197,75 @@ jobs:
             $status
             throw "Tests left changes in the worktree."
           }
+
+  template-release:
+    name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install LibreOffice on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libreoffice
+
+      - name: Install LibreOffice on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          choco install libreoffice-fresh --yes --no-progress
+          $programPaths = @(
+            (Join-Path $env:ProgramFiles "LibreOffice\program"),
+            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
+          )
+          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $programPath) { throw "LibreOffice installation path was not found." }
+          $soffice = Join-Path $programPath "soffice.com"
+          if (-not (Test-Path $soffice)) { throw "LibreOffice command was not found: $soffice" }
+          & $soffice --version | Select-Object -First 1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
+
+      - name: Validate canonical template packages
+        run: python "tests/validate_template_packages.py"
+
+      - name: Validate template package release lifecycle
+        run: python -m unittest discover -s "tests" -p "test_template_package_release.py" -v
+
+      - name: Compile release tooling
+        run: python -m compileall -q "tools" "tests/test_template_package_release.py"
+
+      - name: Verify release worktree is clean on Ubuntu
+        if: runner.os == 'Linux'
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
+      - name: Verify release worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) { $status; throw "Tests left changes in the worktree." }
