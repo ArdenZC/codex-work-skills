@@ -6,9 +6,11 @@ import json
 import re
 import subprocess
 import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+from urllib.parse import quote
 
 from .manifest import sha256_file
 from .models import RELEASE_TOOL_VERSION, TemplateToolError, parse_semver
@@ -29,9 +31,13 @@ class GitHubReleaseClient(Protocol):
 
     def tag_target(self, tag: str) -> str: ...
 
+    def tag_annotation(self, tag: str) -> dict[str, Any]: ...
+
     def release_exists(self, tag: str) -> bool: ...
 
     def release_tag(self, tag: str) -> str: ...
+
+    def release_identity(self, tag: str) -> dict[str, Any]: ...
 
     def asset_names(self, tag: str) -> set[str]: ...
 
@@ -89,24 +95,32 @@ class GhCliGitHubReleaseClient:
         raise TemplateToolError(f"cannot check remote tag {tag}: {details}")
 
     def tag_target(self, tag: str) -> str:
-        result = _run(
-            ["git", "ls-remote", "origin", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"],
-            self.root,
-        )
-        direct: str | None = None
-        dereferenced: str | None = None
-        for line in result.stdout.splitlines():
-            fields = line.split()
-            if len(fields) != 2 or not re.fullmatch(r"[0-9a-fA-F]{40}", fields[0]):
-                continue
-            if fields[1] == f"refs/tags/{tag}^{{}}":
-                dereferenced = fields[0]
-            elif fields[1] == f"refs/tags/{tag}":
-                direct = fields[0]
-        target = dereferenced or direct
-        if target is None:
-            raise TemplateToolError(f"remote tag target could not be resolved: {tag}")
-        return target.lower()
+        return str(self.tag_annotation(tag)["target"]).lower()
+
+    def tag_annotation(self, tag: str) -> dict[str, Any]:
+        if not self.repository:
+            raise TemplateToolError("GitHub repository is required to inspect annotated tag ownership")
+        encoded_tag = quote(tag, safe="")
+        reference_result = self._gh("api", f"repos/{self.repository}/git/ref/tags/{encoded_tag}")
+        try:
+            reference = json.loads(reference_result.stdout)
+            tag_object = reference["object"]
+            object_id = str(tag_object["sha"])
+            object_type = str(tag_object["type"])
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise TemplateToolError("GitHub tag reference returned invalid JSON") from exc
+        if object_type != "tag":
+            raise TemplateToolError(f"remote tag is not annotated: {tag}")
+        tag_result = self._gh("api", f"repos/{self.repository}/git/tags/{object_id}")
+        try:
+            payload = json.loads(tag_result.stdout)
+            target = str(payload["object"]["sha"])
+            message = payload["message"]
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise TemplateToolError("GitHub annotated tag returned invalid JSON") from exc
+        if not target or not isinstance(message, str):
+            raise TemplateToolError("GitHub annotated tag has incomplete identity")
+        return {"object_id": object_id, "target": target.lower(), "message": message}
 
     def release_exists(self, tag: str) -> bool:
         result = self._gh("release", "view", tag, check=False)
@@ -118,14 +132,23 @@ class GhCliGitHubReleaseClient:
         raise TemplateToolError(f"cannot check GitHub Release {tag}: {details}")
 
     def release_tag(self, tag: str) -> str:
-        result = self._gh("release", "view", tag, "--json", "tagName")
+        return str(self.release_identity(tag)["tag"])
+
+    def release_identity(self, tag: str) -> dict[str, Any]:
         try:
-            value = json.loads(result.stdout)["tagName"]
+            payload = json.loads(
+                self._gh("release", "view", tag, "--json", "tagName,body,databaseId").stdout
+            )
+            value = payload["tagName"]
+            body = payload.get("body")
+            database_id = payload.get("databaseId")
         except (json.JSONDecodeError, KeyError, TypeError) as exc:
             raise TemplateToolError("gh release view returned invalid tag JSON") from exc
         if not isinstance(value, str) or not value:
             raise TemplateToolError("GitHub Release returned an empty tag name")
-        return value
+        if not isinstance(body, str):
+            raise TemplateToolError("GitHub Release returned an invalid body")
+        return {"id": database_id, "tag": value, "body": body}
 
     def asset_names(self, tag: str) -> set[str]:
         result = self._gh("release", "view", tag, "--json", "assets", check=True)
@@ -184,10 +207,12 @@ class InMemoryGitHubReleaseClient:
     """Fake adapter for transaction rehearsals and deterministic unit tests."""
 
     def __init__(self, *, fail_at: str | set[str] | None = None) -> None:
-        self.tags: dict[str, str] = {}
+        self.tags: dict[str, dict[str, Any]] = {}
         self.releases: dict[str, dict[str, Any]] = {}
         self.fail_at = fail_at
         self.events: list[str] = []
+        self.other_operation_id = "other-publication"
+        self._next_release_id = 1
 
     def _fail(self, event: str) -> None:
         self.events.append(event)
@@ -196,31 +221,81 @@ class InMemoryGitHubReleaseClient:
 
     def _mutate_then_raise(self, event: str) -> None:
         marker = f"mutate_then_raise:{event}"
-        if marker == self.fail_at or (isinstance(self.fail_at, set) and marker in self.fail_at):
+        base_event = event.split(":", 1)[0]
+        markers = {marker, f"mutate_then_raise:{base_event}"}
+        if any(
+            candidate == self.fail_at or (isinstance(self.fail_at, set) and candidate in self.fail_at)
+            for candidate in markers
+        ):
             raise TemplateToolError(f"injected GitHub adapter failure after mutation: {event}")
+
+    def _concurrent_other(self, event: str) -> bool:
+        base_event = event.split(":", 1)[0]
+        markers = {f"concurrent_other:{event}", f"concurrent_other:{base_event}"}
+        return any(
+            candidate == self.fail_at or (isinstance(self.fail_at, set) and candidate in self.fail_at)
+            for candidate in markers
+        )
+
+    def _tag_operation(self, message: str) -> str:
+        match = re.search(r"(?m)^Release operation: ([^\r\n]+)$", message)
+        return match.group(1) if match else "missing-operation"
+
+    def _tag_message(self, target: str, operation_id: str) -> str:
+        return f"Fixture tag\n\nSource commit: {target}\nRelease operation: {operation_id}"
+
+    def _release_body(self, operation_id: str) -> str:
+        return f"fixture release\n\n<!-- template-release-operation:{operation_id} -->"
 
     def tag_exists(self, tag: str) -> bool:
         return tag in self.tags
 
     def tag_target(self, tag: str) -> str:
+        return str(self.tag_annotation(tag)["target"]).lower()
+
+    def tag_annotation(self, tag: str) -> dict[str, Any]:
         if tag not in self.tags:
             raise TemplateToolError(f"fake tag does not exist: {tag}")
-        return self.tags[tag].lower()
+        value = self.tags[tag]
+        if isinstance(value, str):
+            return {"object_id": "legacy-fake-tag", "target": value.lower(), "message": "legacy"}
+        return dict(value)
 
     def release_exists(self, tag: str) -> bool:
         return tag in self.releases
 
     def release_tag(self, tag: str) -> str:
+        return str(self.release_identity(tag)["tag"])
+
+    def release_identity(self, tag: str) -> dict[str, Any]:
         if tag not in self.releases:
             raise TemplateToolError(f"fake release does not exist: {tag}")
-        return tag
+        value = self.releases[tag]
+        return {
+            "id": value.get("id"),
+            "tag": value.get("tag", tag),
+            "body": value.get("body", ""),
+        }
 
     def asset_names(self, tag: str) -> set[str]:
         return set(self.releases.get(tag, {}).get("assets", {}))
 
     def create_tag(self, tag: str, source_commit: str, message: str) -> None:
         self._fail("create_tag")
-        self.tags[tag] = source_commit
+        if tag in self.tags:
+            raise TemplateToolError(f"fake tag already exists: {tag}")
+        if self._concurrent_other("create_tag"):
+            self.tags[tag] = {
+                "object_id": uuid.uuid4().hex,
+                "target": source_commit,
+                "message": self._tag_message(source_commit, self.other_operation_id),
+            }
+            raise TemplateToolError("remote tag was created concurrently by another publication")
+        self.tags[tag] = {
+            "object_id": uuid.uuid4().hex,
+            "target": source_commit,
+            "message": message,
+        }
         self._mutate_then_raise("create_tag")
 
     def delete_tag(self, tag: str) -> None:
@@ -229,7 +304,30 @@ class InMemoryGitHubReleaseClient:
 
     def create_release(self, tag: str, name: str, body: str, prerelease: bool) -> None:
         self._fail("create_release")
-        self.releases[tag] = {"name": name, "body": body, "prerelease": prerelease, "assets": {}}
+        if tag in self.releases:
+            raise TemplateToolError(f"fake release already exists: {tag}")
+        if self._concurrent_other("create_release"):
+            other_id = self.other_operation_id
+            self.releases[tag] = {
+                "id": self._next_release_id,
+                "name": name,
+                "tag": tag,
+                "body": self._release_body(other_id),
+                "prerelease": prerelease,
+                "assets": {},
+            }
+            self._next_release_id += 1
+            raise TemplateToolError("remote Release was created concurrently by another publication")
+        else:
+            self.releases[tag] = {
+                "id": self._next_release_id,
+                "name": name,
+                "tag": tag,
+                "body": body,
+                "prerelease": prerelease,
+                "assets": {},
+            }
+        self._next_release_id += 1
         self._mutate_then_raise("create_release")
 
     def delete_release(self, tag: str) -> None:
@@ -244,6 +342,9 @@ class InMemoryGitHubReleaseClient:
         if path.name in assets:
             raise TemplateToolError("fake asset already exists")
         assets[path.name] = path.read_bytes()
+        if self._concurrent_other(f"upload_asset:{path.name}"):
+            self.releases[tag]["body"] = self._release_body(self.other_operation_id)
+            raise TemplateToolError("remote asset was created concurrently by another publication")
         self._mutate_then_raise(f"upload_asset:{path.name}")
 
     def delete_asset(self, tag: str, name: str) -> None:
@@ -378,34 +479,49 @@ def _snapshot_remote(client: GitHubReleaseClient, tag: str) -> _RemoteSnapshot:
     return _RemoteSnapshot(tag_exists=tag_exists, release_exists=release_exists, assets=assets)
 
 
-def _reconcile_tag_ownership(client: GitHubReleaseClient, tag: str, source_commit: str) -> bool:
+def _reconcile_tag_ownership(
+    client: GitHubReleaseClient,
+    tag: str,
+    source_commit: str,
+    operation_id: str,
+) -> bool:
     try:
         if not client.tag_exists(tag):
             return False
-        target = client.tag_target(tag)
+        identity = client.tag_annotation(tag)
     except Exception as exc:
         raise TemplateToolError(
             f"remote state changed but ownership could not be proven for tag {tag}: {exc}"
         ) from exc
-    if target.lower() != source_commit.lower():
+    target = str(identity.get("target") or "")
+    message = identity.get("message")
+    if target.lower() != source_commit.lower() or not isinstance(message, str):
         raise TemplateToolError(
-            f"remote state changed but ownership could not be proven for tag {tag}: target mismatch"
+            f"remote tag was created concurrently by another publication: ownership could not be proven for {tag}"
+        )
+    operation_match = re.search(r"(?m)^Release operation: ([^\r\n]+)$", message)
+    operation = operation_match.group(1) if operation_match else None
+    if operation != operation_id:
+        raise TemplateToolError(
+            f"remote tag was created concurrently by another publication: operation identity mismatch for {tag}"
         )
     return True
 
 
-def _reconcile_release_ownership(client: GitHubReleaseClient, tag: str) -> bool:
+def _reconcile_release_ownership(client: GitHubReleaseClient, tag: str, operation_id: str) -> bool:
     try:
         if not client.release_exists(tag):
             return False
-        release_tag = client.release_tag(tag)
+        identity = client.release_identity(tag)
     except Exception as exc:
         raise TemplateToolError(
             f"remote state changed but ownership could not be proven for Release {tag}: {exc}"
         ) from exc
-    if release_tag != tag:
+    body = identity.get("body")
+    marker = f"<!-- template-release-operation:{operation_id} -->"
+    if identity.get("tag") != tag or not isinstance(body, str) or marker not in body:
         raise TemplateToolError(
-            f"remote state changed but ownership could not be proven for Release {tag}: tag mismatch"
+            f"remote Release was created concurrently by another publication: ownership could not be proven for {tag}"
         )
     return True
 
@@ -415,10 +531,17 @@ def _reconcile_asset_ownership(
     tag: str,
     name: str,
     initial_assets: frozenset[str],
+    operation_id: str,
+    release_owned: bool,
 ) -> bool:
     try:
-        if client.release_tag(tag) != tag:
-            raise TemplateToolError("Release tag mismatch")
+        if not release_owned:
+            raise TemplateToolError("Release ownership was not proven")
+        identity = client.release_identity(tag)
+        body = identity.get("body")
+        marker = f"<!-- template-release-operation:{operation_id} -->"
+        if identity.get("tag") != tag or not isinstance(body, str) or marker not in body:
+            raise TemplateToolError("Release operation identity mismatch")
         assets = client.asset_names(tag)
     except Exception as exc:
         raise TemplateToolError(
@@ -472,20 +595,37 @@ def publish_release_transaction(
         raise TemplateToolError(f"release tag already exists: {tag}")
     if initial.release_exists:
         raise TemplateToolError(f"GitHub Release already exists: {tag}")
-    created_tag = False
-    created_release = False
+    operation_id = uuid.uuid4().hex
+    tag_owned = False
+    release_owned = False
     uploaded: list[str] = []
+    ownership_unknown = False
     try:
+        tag_message = (
+            f"{plan['release_name']}\n\n"
+            f"Source commit: {plan['source_commit']}\n"
+            f"Release operation: {operation_id}"
+        )
         try:
-            client.create_tag(tag, plan["source_commit"], f"{plan['release_name']}\n\n{plan['source_commit']}")
-            if client.tag_target(tag) != plan["source_commit"].lower():
-                raise TemplateToolError("created tag target does not match release plan source_commit")
-            created_tag = True
+            client.create_tag(tag, plan["source_commit"], tag_message)
         except Exception as original:
-            if _reconcile_tag_ownership(client, tag, plan["source_commit"]):
-                created_tag = True
-            raise original
-        release_body = body or (
+            try:
+                tag_owned = _reconcile_tag_ownership(client, tag, plan["source_commit"], operation_id)
+            except Exception as reconciliation:
+                ownership_unknown = True
+                raise TemplateToolError(
+                    f"{original}; ownership reconciliation error: {reconciliation}; manual cleanup may be required"
+                ) from original
+            raise
+        try:
+            tag_owned = _reconcile_tag_ownership(client, tag, plan["source_commit"], operation_id)
+        except Exception:
+            ownership_unknown = True
+            raise
+        if not tag_owned:
+            raise TemplateToolError("created tag ownership could not be proven")
+
+        release_body = body if body is not None else (
             f"Template: {plan['template_id']}\n"
             f"Version: {plan['version']}\n"
             f"Format: {plan['format']}\n"
@@ -495,23 +635,62 @@ def publish_release_transaction(
             + "\n".join(f"- {name}" for name in plan["assets"])
             + "\n\nGitHub Actions does not run Microsoft Office COM or native Office rendering tests."
         )
+        release_body = release_body.rstrip() + f"\n\n<!-- template-release-operation:{operation_id} -->"
         try:
             client.create_release(tag, plan["release_name"], release_body, bool(plan["prerelease"]))
-            if client.release_tag(tag) != tag:
-                raise TemplateToolError("created GitHub Release tag does not match the release plan")
-            created_release = True
         except Exception as original:
-            if _reconcile_release_ownership(client, tag):
-                created_release = True
-            raise original
+            try:
+                release_owned = _reconcile_release_ownership(client, tag, operation_id)
+            except Exception as reconciliation:
+                ownership_unknown = True
+                raise TemplateToolError(
+                    f"{original}; ownership reconciliation error: {reconciliation}; manual cleanup may be required"
+                ) from original
+            raise
+        try:
+            release_owned = _reconcile_release_ownership(client, tag, operation_id)
+        except Exception:
+            ownership_unknown = True
+            raise
+        if not release_owned:
+            raise TemplateToolError("created Release ownership could not be proven")
+
         for asset in assets:
             try:
                 client.upload_asset(tag, asset)
-                uploaded.append(asset.name)
             except Exception as original:
-                if _reconcile_asset_ownership(client, tag, asset.name, initial.assets):
+                try:
+                    owned = _reconcile_asset_ownership(
+                        client,
+                        tag,
+                        asset.name,
+                        initial.assets,
+                        operation_id,
+                        release_owned,
+                    )
+                except Exception as reconciliation:
+                    ownership_unknown = True
+                    raise TemplateToolError(
+                        f"{original}; ownership reconciliation error: {reconciliation}; manual cleanup may be required"
+                    ) from original
+                if owned:
                     uploaded.append(asset.name)
-                raise original
+                raise
+            try:
+                owned = _reconcile_asset_ownership(
+                    client,
+                    tag,
+                    asset.name,
+                    initial.assets,
+                    operation_id,
+                    release_owned,
+                )
+            except Exception:
+                ownership_unknown = True
+                raise
+            if not owned:
+                raise TemplateToolError(f"created asset ownership could not be proven: {asset.name}")
+            uploaded.append(asset.name)
         with tempfile.TemporaryDirectory(prefix="template-release-download-") as temporary_name:
             downloaded_dir = Path(temporary_name)
             downloaded: dict[str, Path] = {}
@@ -540,8 +719,9 @@ def publish_release_transaction(
             "assets": plan["assets"],
             "archive_sha256": downloaded_verification["archive_sha256"],
             "source_commit": plan["source_commit"],
-            "created_tag": created_tag,
-            "created_release": created_release,
+            "operation_id": operation_id,
+            "created_tag": tag_owned,
+            "created_release": release_owned,
             "uploaded_assets": uploaded,
             "local_asset_sha256": local_asset_hashes,
             "remote_asset_sha256": remote_asset_hashes,
@@ -549,21 +729,24 @@ def publish_release_transaction(
         }
     except Exception as original:
         cleanup_errors: list[str] = []
-        for name in reversed(uploaded):
-            try:
-                client.delete_asset(tag, name)
-            except Exception as error:
-                cleanup_errors.append(f"failed to delete created asset {name}: {error}")
-        if created_release:
-            try:
-                client.delete_release(tag)
-            except Exception as error:
-                cleanup_errors.append(f"failed to delete created release: {error}")
-        if created_tag:
-            try:
-                client.delete_tag(tag)
-            except Exception as error:
-                cleanup_errors.append(f"failed to delete created tag: {error}")
+        if not ownership_unknown:
+            for name in reversed(uploaded):
+                try:
+                    client.delete_asset(tag, name)
+                except Exception as error:
+                    cleanup_errors.append(f"failed to delete created asset {name}: {error}")
+            if release_owned:
+                try:
+                    client.delete_release(tag)
+                except Exception as error:
+                    cleanup_errors.append(f"failed to delete created release: {error}")
+            if tag_owned:
+                try:
+                    client.delete_tag(tag)
+                except Exception as error:
+                    cleanup_errors.append(f"failed to delete created tag: {error}")
+        else:
+            cleanup_errors.append("ownership is unknown; manual cleanup may be required")
         message = f"GitHub release transaction failed: {original}"
         if cleanup_errors:
             message += "; " + "; ".join(cleanup_errors)

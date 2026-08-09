@@ -145,6 +145,20 @@ def _package_files(package: TemplatePackage, prefix: str) -> list[tuple[str, Pat
     return files
 
 
+def _archive_source_files(closure: list[TemplatePackage]) -> list[tuple[str, Path]]:
+    """Return the exact source files that deterministic archive writes."""
+    prefix_by_package = {
+        item.package_dir.resolve(): f"{item.template_id}/{item.package_dir.name}"
+        for item in closure
+    }
+    files: list[tuple[str, Path]] = []
+    for item in closure:
+        files.extend(_package_files(item, prefix_by_package[item.package_dir.resolve()]))
+    files.sort(key=lambda pair: _archive_sort_key(pair[0]))
+    _assert_unique_portable_names([name for name, _ in files])
+    return files
+
+
 def _assert_unique_portable_names(names: list[str]) -> None:
     seen: dict[str, str] = {}
     for name in names:
@@ -424,12 +438,8 @@ def archive_package(package_dir: Path, output_dir: Path, root: Path, *, dry_run:
         item.package_dir.resolve(): f"{item.template_id}/{item.package_dir.name}"
         for item in closure
     }
-    files: list[tuple[str, Path]] = []
-    for item in closure:
-        files.extend(_package_files(item, prefix_by_package[item.package_dir.resolve()]))
-    files.sort(key=lambda pair: _archive_sort_key(pair[0]))
+    files = _archive_source_files(closure)
     names = [name for name, _ in files]
-    _assert_unique_portable_names(names)
 
     archive_name = f"{package.template_id}-{package.version}.zip"
     validate_windows_component(archive_name, label="archive filename")

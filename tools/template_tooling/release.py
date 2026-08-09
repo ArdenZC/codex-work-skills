@@ -29,6 +29,7 @@ from .archive import (
     MAX_ARCHIVE_ENTRY_SIZE,
     MAX_ARCHIVE_TOTAL_SIZE,
     _assert_unique_portable_names,
+    _archive_source_files,
     _dependency_closure,
     _extract_archive,
     _stream_zip_entry,
@@ -71,7 +72,7 @@ from .paths import (
     remove_path_or_raise,
     validate_windows_component,
 )
-from .validation import package_from_path, validate_package_with_owner, validation_succeeded
+from .validation import validate_package_with_owner, validation_succeeded
 
 
 RELEASE_PLAN_SCHEMA_VERSION = "1.0"
@@ -628,15 +629,124 @@ def _git_head(root: Path) -> str:
     return value.lower()
 
 
+def _git_status(root: Path) -> str:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        details = result.stderr.strip() or result.stdout.strip()
+        raise TemplateToolError(f"cannot inspect release source worktree: {details}")
+    return result.stdout
+
+
+def _assert_release_worktree_clean(root: Path) -> None:
+    if _git_status(root).strip():
+        raise TemplateToolError("release requires a clean worktree")
+
+
+def _relative_git_paths(root: Path, paths: Iterable[Path]) -> list[str]:
+    repository = root.resolve()
+    relative_paths: list[str] = []
+    for path in paths:
+        try:
+            relative = path.resolve(strict=False).relative_to(repository)
+        except ValueError as exc:
+            raise TemplateToolError(f"release source file is outside the repository: {path}") from exc
+        relative_paths.append(relative.as_posix())
+    return relative_paths
+
+
+def _assert_release_source_matches_head(root: Path, paths: Iterable[Path]) -> None:
+    relative_paths = _relative_git_paths(root, paths)
+    if not relative_paths:
+        raise TemplateToolError("release source package contains no archive files")
+    for diff_args in (
+        ["diff", "--quiet", "HEAD", "--", *relative_paths],
+        ["diff", "--cached", "--quiet", "HEAD", "--", *relative_paths],
+    ):
+        result = subprocess.run(
+            ["git", "-C", str(root), *diff_args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        if result.returncode == 1:
+            raise TemplateToolError("release source package differs from source_commit")
+        if result.returncode != 0:
+            details = result.stderr.strip() or result.stdout.strip()
+            raise TemplateToolError(f"cannot compare release source with source_commit: {details}")
+    for relative in relative_paths:
+        expected = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", f"HEAD:{relative}"],
+            capture_output=True,
+            text=True,
+            encoding="ascii",
+            errors="replace",
+            check=False,
+        )
+        actual = subprocess.run(
+            ["git", "-C", str(root), "hash-object", "--", relative],
+            capture_output=True,
+            text=True,
+            encoding="ascii",
+            errors="replace",
+            check=False,
+        )
+        expected_blob = expected.stdout.strip().lower()
+        actual_blob = actual.stdout.strip().lower()
+        if expected.returncode != 0 or actual.returncode != 0 or expected_blob != actual_blob:
+            raise TemplateToolError("release source package differs from source_commit")
+
+
+def _require_release_source_is_committed_canonical(
+    package: TemplatePackage,
+    root: Path,
+    trust_index: GitTrustIndex,
+    closure: Iterable[TemplatePackage],
+) -> None:
+    if not package.is_canonical or canonical_skill_root_for_package(package.package_dir, root) is None:
+        raise TemplateToolError("release requires a canonical repository package")
+    if package.validator is None:
+        raise TemplateToolError("release canonical package owner validator is unavailable")
+    trust_index.require_tracked_regular_file(package.validator, label="release owner validator")
+
+    source_files = _archive_source_files(list(closure))
+    for archive_name, source_path in source_files:
+        trust_index.require_tracked_regular_file(
+            source_path,
+            label=f"release source file {archive_name}",
+        )
+    _assert_release_source_matches_head(root, (path for _, path in source_files))
+
+
 def _canonical_package_for_release(root: Path, package: Path | None, template_id: str | None, version: str | None) -> TemplatePackage:
+    trust_index = GitTrustIndex.from_repo_root(root)
+    packages = discover_packages(root, trust_index=trust_index)
     if package is not None:
-        target = package_from_path(package.expanduser().resolve(strict=False), root)
-        if target.errors:
-            raise TemplateToolError("release target package is invalid: " + "; ".join(target.errors))
-        return target
+        requested = package.expanduser().resolve(strict=False)
+        candidates = [
+            item for item in packages
+            if item.package_dir.resolve(strict=False) == requested and item.is_canonical
+        ]
+        if len(candidates) != 1:
+            raise TemplateToolError("release requires a canonical repository package")
+        return candidates[0]
     if not template_id or not version:
         raise TemplateToolError("release requires --package or both --template-id and --version")
-    packages = discover_packages(root)
     canonical_version = _require_version(version, label="release.version")
     candidates = [
         item for item in packages
@@ -644,10 +754,7 @@ def _canonical_package_for_release(root: Path, package: Path | None, template_id
     ]
     if len(candidates) != 1:
         raise TemplateToolError("release target must identify exactly one canonical template package")
-    target = candidates[0]
-    if target.errors:
-        raise TemplateToolError("release target is not a valid canonical template package")
-    return target
+    return candidates[0]
 
 
 def _validate_release_output(output_dir: Path, root: Path, closure: Iterable[TemplatePackage]) -> Path:
@@ -687,13 +794,16 @@ def release_package(
 ) -> dict[str, Any]:
     root = root.resolve()
     target = _canonical_package_for_release(root, package, template_id, version)
+    _assert_release_worktree_clean(root)
     closure = _dependency_closure(target, root)
+    trust_index = GitTrustIndex.from_repo_root(root)
+    source_commit = _git_head(root)
+    _require_release_source_is_committed_canonical(target, root, trust_index, closure)
     output_dir = _validate_release_output(output_dir or (root / DEFAULT_ARCHIVE_OUTPUT_ROOT), root, closure)
     archive_name = f"{target.template_id}-{target.version}.zip"
     sidecar_name = f"{archive_name}.sha256"
     metadata_name = f"{target.template_id}-{target.version}.metadata.json"
     plan_name = f"{target.template_id}-{target.version}.release-plan.json"
-    source_commit = _git_head(root)
     base_plan: dict[str, Any] = {
         "status": "planned" if dry_run else "pending",
         "schema_version": RELEASE_PLAN_SCHEMA_VERSION,
@@ -944,6 +1054,13 @@ def _bundle_inventory(bundle: Path) -> list[dict[str, Any]]:
         raise TemplateToolError(f"installed bundle must be a real directory: {bundle}")
     records: list[dict[str, Any]] = []
     for path in sorted(bundle.rglob("*"), key=lambda item: (item.relative_to(bundle).as_posix().casefold(), item.relative_to(bundle).as_posix())):
+        relative_path = path.relative_to(bundle)
+        if any(
+            part.casefold() in {"stage", "backup", "cache", "qa", "qa-reports", "__pycache__"}
+            or part.casefold().endswith((".stage", ".backup", ".cache"))
+            for part in relative_path.parts
+        ):
+            raise TemplateToolError(f"installed bundle contains a staging or cache path: {path}")
         if path.is_symlink():
             raise TemplateToolError(f"symlink is not allowed in installed bundle: {path}")
         if path.is_dir():
@@ -951,12 +1068,25 @@ def _bundle_inventory(bundle: Path) -> list[dict[str, Any]]:
         mode = path.stat(follow_symlinks=False).st_mode
         if not stat.S_ISREG(mode):
             raise TemplateToolError(f"installed bundle contains a special file: {path}")
-        relative = _strict_archive_name(path.relative_to(bundle).as_posix(), label="installed bundle path")
+        relative = _strict_archive_name(relative_path.as_posix(), label="installed bundle path")
         records.append({"path": relative, "sha256": sha256_file(path)})
     if not records:
         raise TemplateToolError("installed bundle is empty")
     _assert_unique_portable_names([item["path"] for item in records])
     return records
+
+
+def _validate_installed_inventory_only(
+    version_dir: Path,
+    template_id: str,
+    version: str,
+) -> dict[str, Any]:
+    """Check installation metadata and real bundle bytes without full QA."""
+    installation = _load_installation(version_dir / ".installation.json", template_id, version)
+    actual_inventory = _bundle_inventory(version_dir / "bundle")
+    if actual_inventory != installation["files"]:
+        raise TemplateToolError("installed bundle inventory does not match .installation.json")
+    return {"installation": installation, "inventory": actual_inventory}
 
 
 def _installed_entry(bundle: Path, installation: dict[str, Any], template_id: str) -> tuple[Path, Path]:
@@ -981,15 +1111,14 @@ def _validate_installed_version(
     root: Path,
     *,
     expected_archive_sha: str | None = None,
+    inventory_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    installation_path = version_dir / ".installation.json"
     bundle = version_dir / "bundle"
-    installation = _load_installation(installation_path, template_id, version)
+    inventory_result = inventory_result or _validate_installed_inventory_only(version_dir, template_id, version)
+    installation = inventory_result["installation"]
+    actual_inventory = inventory_result["inventory"]
     if expected_archive_sha is not None and installation["archive_sha256"] != expected_archive_sha:
         raise TemplateToolError("installed archive SHA does not match the release bundle")
-    actual_inventory = _bundle_inventory(bundle)
-    if actual_inventory != installation["files"]:
-        raise TemplateToolError("installed bundle inventory does not match .installation.json")
     entry_dir, manifest_path = _installed_entry(bundle, installation, template_id)
     manifest = load_manifest(manifest_path)
     format_name = str(manifest.get("template", {}).get("format") or "")
@@ -1481,17 +1610,25 @@ def list_installed(
                 if version_dir.is_symlink() or not version_dir.is_dir():
                     raise TemplateToolError(f"installed version is unsafe: {version_dir}")
                 version = _require_version(version_dir.name, label="installed version directory")
-                installation = _load_installation(version_dir / ".installation.json", current_id, version)
+                inventory_result = _validate_installed_inventory_only(version_dir, current_id, version)
+                installation = inventory_result["installation"]
                 is_active = bool(state and state["active_version"] == version)
                 item: dict[str, Any] = {
                     "version": version,
                     "status": "active" if is_active else "installed",
                     "active": is_active,
+                    "integrity": "passed",
                     "archive_sha256": installation["archive_sha256"],
                     "files": len(installation["files"]),
                 }
                 if verify:
-                    item["verification"] = _validate_installed_version(version_dir, current_id, version, root)
+                    item["verification"] = _validate_installed_version(
+                        version_dir,
+                        current_id,
+                        version,
+                        root,
+                        inventory_result=inventory_result,
+                    )
                 versions.append(item)
         version_names = {item["version"] for item in versions}
         if state is None and version_names:
@@ -1507,6 +1644,7 @@ def list_installed(
                 "active_version": state["active_version"] if state else None,
                 "previous_version": state["previous_version"] if state else None,
                 "versions": versions,
+                "integrity": "passed",
                 "verified": verify,
             }
         )
@@ -1516,5 +1654,6 @@ def list_installed(
         "install_root": display_path(target_root, root),
         "templates": templates,
         "count": len(templates),
+        "integrity": "passed",
         "verify": verify,
     }

@@ -108,6 +108,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
         (scripts / "helper.py").write_text('VALUE = "trusted"\n', encoding="utf-8")
         (scripts / "validate_template.py").write_text(
             "from pathlib import Path\n"
+            "import os\n"
             "import helper\n"
             "import sys\n"
             "import yaml\n"
@@ -115,6 +116,11 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             "template = Path(sys.argv[sys.argv.index('--template') + 1])\n"
             "assert helper.VALUE == 'trusted'\n"
             "assert manifest.is_file() and template.is_file()\n"
+            "marker = os.environ.get('TEMPLATE_TOOL_TEST_VALIDATOR_MARKER')\n"
+            "if not marker and os.environ.get('HOME', '').endswith('.full-validator-marker'):\n"
+            "    marker = os.environ['HOME']\n"
+            "if marker:\n"
+            "    Path(marker).write_text('FULL_VALIDATOR_STARTED', encoding='utf-8')\n"
             "version = str(yaml.safe_load(manifest.read_text(encoding='utf-8'))['template']['version'])\n"
             "if not version.startswith('1.1.'):\n"
             "    raise SystemExit(f'fixture validator does not support {version}')\n"
@@ -199,6 +205,22 @@ class TemplatePackageReleaseTests(unittest.TestCase):
         self.assertEqual(payload["status"], "passed")
         plan = output / f"demo-template-{package.name.removeprefix('v')}.release-plan.json"
         self.assertTrue(plan.is_file())
+        return output
+
+    def create_archive(self, root: Path, package: Path, output_name: str) -> Path:
+        output = root / "dist" / "template-packages" / output_name
+        result = self.run_tool(
+            "archive",
+            "--package",
+            package,
+            "--output-dir",
+            output,
+            "--json",
+            root=root,
+        )
+        payload = self.assert_succeeded(result)
+        self.assertFalse(payload["dry_run"])
+        self.assertTrue((output / f"demo-template-{package.name.removeprefix('v')}.zip").is_file())
         return output
 
     def copy_bundle(self, source: Path, destination: Path) -> Path:
@@ -444,9 +466,104 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             self.assertEqual(promoted["status"], "passed")
             canonical = skill / "assets" / "templates" / "demo-template" / "v1.1.1"
             self.assertTrue(canonical.is_dir())
+            shutil.rmtree(root / "work")
+            self.git(root, "add", "--", canonical.relative_to(root).as_posix())
+            self.git(root, "commit", "-qm", "commit promoted canonical package")
             output = self.create_release(root, canonical, "promoted")
             verified = self.assert_succeeded(self.run_tool("verify-release", "--release-dir", output, "--json", root=root))
             self.assertEqual(verified["version"], "1.1.1")
+
+    def test_release_requires_committed_canonical_source_and_head_bytes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="template-release-provenance-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root, versions=("1.1.0", "1.1.1"))
+            external = self.make_external_package(packages["1.1.1"], root, "1.1.9")
+            external_output = root / "dist" / "template-packages" / "external-release"
+            external_release = self.run_tool(
+                "release",
+                "--package",
+                external,
+                "--output-dir",
+                external_output,
+                "--json",
+                root=root,
+            )
+            self.assert_failed(external_release, "canonical repository package")
+            self.assertFalse(external_output.exists())
+
+            first = self.create_release(root, packages["1.1.1"], "clean-first")
+            second = self.create_release(root, packages["1.1.1"], "clean-second")
+            first_archive = next(first.glob("*.zip"))
+            second_archive = next(second.glob("*.zip"))
+            self.assertEqual(first_archive.read_bytes(), second_archive.read_bytes())
+            first_plan = json.loads(next(first.glob("*.release-plan.json")).read_text(encoding="utf-8"))
+            self.assertEqual(first_plan["source_commit"], self.git(root, "rev-parse", "HEAD"))
+
+            template = packages["1.1.1"] / "template.txt"
+            original_template = template.read_bytes()
+            template.write_bytes(original_template + b"unstaged mutation\n")
+            unstaged = self.run_tool(
+                "release",
+                "--package",
+                packages["1.1.1"],
+                "--output-dir",
+                root / "dist" / "template-packages" / "unstaged",
+                "--json",
+                root=root,
+            )
+            self.assert_failed(unstaged, "clean worktree")
+            template.write_bytes(original_template)
+
+            template.write_bytes(original_template + b"staged mutation\n")
+            self.git(root, "add", "--", template.relative_to(root).as_posix())
+            staged = self.run_tool(
+                "release",
+                "--package",
+                packages["1.1.1"],
+                "--output-dir",
+                root / "dist" / "template-packages" / "staged",
+                "--json",
+                root=root,
+            )
+            self.assert_failed(staged, "clean worktree")
+            self.git(root, "restore", "--staged", "--", template.relative_to(root).as_posix())
+            template.write_bytes(original_template)
+
+            manifest_path = packages["1.1.1"] / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["base_manifest"] = "../v1.1.0/manifest.yaml"
+            manifest["template"]["base_template"] = "../v1.1.0/template.txt"
+            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            self.git(root, "add", "--", manifest_path.relative_to(root).as_posix())
+            self.git(root, "commit", "-qm", "add fixture dependency closure")
+            dependency_template = packages["1.1.0"] / "template.txt"
+            original_dependency = dependency_template.read_bytes()
+            dependency_template.write_bytes(original_dependency + b"dependency mutation\n")
+            dependency_failure = self.run_tool(
+                "release",
+                "--package",
+                packages["1.1.1"],
+                "--output-dir",
+                root / "dist" / "template-packages" / "dependency-modified",
+                "--json",
+                root=root,
+            )
+            self.assert_failed(dependency_failure, "clean worktree")
+            dependency_template.write_bytes(original_dependency)
+
+            untracked = packages["1.1.1"] / "notes-secret.txt"
+            untracked.write_text("must not enter a release\n", encoding="utf-8")
+            untracked_failure = self.run_tool(
+                "release",
+                "--package",
+                packages["1.1.1"],
+                "--output-dir",
+                root / "dist" / "template-packages" / "untracked-file",
+                "--json",
+                root=root,
+            )
+            self.assert_failed(untracked_failure, "clean worktree")
+            untracked.unlink()
 
     def test_install_upgrade_and_rollback_lock_release_failure_restore_filesystem(self) -> None:
         with tempfile.TemporaryDirectory(prefix="template-release-lock-release-") as directory:
@@ -499,9 +616,9 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             external_112 = self.make_external_package(packages["1.1.0"], root, "1.1.2")
             external_119 = self.make_external_package(packages["1.1.0"], root, "1.1.9")
             canonical_release = self.create_release(root, packages["1.1.0"], "canonical")
-            release_111 = self.create_release(root, external_111, "external-111")
-            release_112 = self.create_release(root, external_112, "external-112")
-            release_119 = self.create_release(root, external_119, "external-119")
+            release_111 = self.create_archive(root, external_111, "external-111")
+            release_112 = self.create_archive(root, external_112, "external-112")
+            release_119 = self.create_archive(root, external_119, "external-119")
             self.assertEqual(
                 self.assert_succeeded(self.run_tool("verify-release", "--release-dir", release_119, "--json", root=root))["version"],
                 "1.1.9",
@@ -544,7 +661,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             self.assertEqual(sorted(path.name for path in (skill / "assets" / "templates" / "demo-template").iterdir()), ["v1.1.0"])
 
             unsupported = self.make_external_package(packages["1.1.0"], root, "1.2.0")
-            failed = self.run_tool("release", "--package", unsupported, "--output-dir", root / "dist" / "template-packages" / "unsupported", "--json", root=root)
+            failed = self.run_tool("archive", "--package", unsupported, "--output-dir", root / "dist" / "template-packages" / "unsupported", "--json", root=root)
             self.assert_failed(failed, "full template validation failed")
 
     def test_release_entry_template_sha_is_self_owned_and_mismatch_is_rejected(self) -> None:
@@ -552,7 +669,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             root = Path(directory)
             _, packages = self.make_fixture_repo(root, versions=("1.1.0",))
             external = self.make_external_package(packages["1.1.0"], root, "1.1.1")
-            source = self.create_release(root, external, "source")
+            source = self.create_archive(root, external, "source")
             tampered = root / "dist" / "template-packages" / "tampered"
             shutil.copytree(source, tampered)
             archive = next(tampered.glob("*.zip"))
@@ -625,6 +742,67 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             corrupt_file.write_text("corrupt\n", encoding="utf-8")
             corrupted = self.run_tool("rollback", "--template-id", "demo-template", "--install-root", corrupt_root, "--json", root=root)
             self.assert_failed(corrupted, "inventory")
+
+    def test_list_installed_default_checks_inventory_without_full_validator(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="template-release-inventory-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root, versions=("1.1.1",))
+            release = self.create_release(root, packages["1.1.1"], "inventory")
+            install_root = root / "installed" / "template-packages"
+            self.assert_succeeded(self.run_tool("install", "--release-dir", release, "--install-root", install_root, "--json", root=root))
+            version_dir = install_root / "demo-template" / "versions" / "1.1.1"
+            template = version_dir / "bundle" / "demo-template" / "v1.1.1" / "template.txt"
+            original = template.read_bytes()
+            marker = root / "FULL_VALIDATOR_STARTED.full-validator-marker"
+            marker_env = {
+                "TEMPLATE_TOOL_TEST_VALIDATOR_ENV_JSON": json.dumps(
+                    {"HOME": str(marker)}
+                )
+            }
+
+            normal = self.assert_succeeded(
+                self.run_tool("list-installed", "--install-root", install_root, "--json", root=root, env=marker_env)
+            )
+            self.assertEqual(normal["integrity"], "passed")
+            self.assertEqual(normal["templates"][0]["integrity"], "passed")
+            self.assertEqual(normal["templates"][0]["versions"][0]["integrity"], "passed")
+            self.assertFalse(marker.exists())
+
+            template.write_bytes(original + b"tampered\n")
+            modified = self.run_tool("list-installed", "--install-root", install_root, "--json", root=root)
+            self.assert_failed(modified, "inventory")
+            template.write_bytes(original)
+
+            template.unlink()
+            missing = self.run_tool("list-installed", "--install-root", install_root, "--json", root=root)
+            self.assert_failed(missing, "inventory")
+            template.write_bytes(original)
+
+            extra = template.with_name("unexpected.txt")
+            extra.write_text("extra\n", encoding="utf-8")
+            added = self.run_tool("list-installed", "--install-root", install_root, "--json", root=root)
+            self.assert_failed(added, "inventory")
+            extra.unlink()
+
+            link = template.with_name("link.txt")
+            try:
+                link.symlink_to(template)
+            except OSError:
+                pass
+            else:
+                symlinked = self.run_tool("list-installed", "--install-root", install_root, "--json", root=root)
+                self.assert_failed(symlinked, "symlink")
+                link.unlink()
+
+            self.assert_succeeded(
+                self.run_tool("list-installed", "--install-root", install_root, "--json", root=root, env=marker_env)
+            )
+            self.assertFalse(marker.exists())
+            verified = self.assert_succeeded(
+                self.run_tool("list-installed", "--install-root", install_root, "--verify", "--json", root=root, env=marker_env)
+            )
+            self.assertTrue(verified["templates"][0]["verified"])
+            self.assertTrue(marker.exists())
 
     def test_list_installed_empty_and_corrupt_inventory_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="template-release-list-") as directory:
@@ -1125,8 +1303,11 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             self.assertEqual(happy["status"], "passed")
             self.assertTrue(happy["remote_assets_identical"])
             self.assertEqual(happy["local_asset_sha256"], happy["remote_asset_sha256"])
+            self.assertTrue(happy["operation_id"])
             tag = "template/demo-template/v1.1.1"
             self.assertIn(tag, happy_client.tags)
+            self.assertIn(f"Release operation: {happy['operation_id']}", happy_client.tags[tag]["message"])
+            self.assertIn(f"<!-- template-release-operation:{happy['operation_id']} -->", happy_client.releases[tag]["body"])
             self.assertEqual(set(happy_client.releases[tag]["assets"]), {
                 "demo-template-1.1.1.zip",
                 "demo-template-1.1.1.zip.sha256",
@@ -1135,7 +1316,9 @@ class TemplatePackageReleaseTests(unittest.TestCase):
 
             preexisting_release = InMemoryGitHubReleaseClient()
             preexisting_release.releases[tag] = {
+                "id": 99,
                 "name": "existing",
+                "tag": tag,
                 "body": "existing",
                 "prerelease": False,
                 "assets": {"demo-template-1.1.1.zip": b"existing"},
@@ -1145,10 +1328,14 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             self.assertEqual(preexisting_release.releases[tag]["assets"]["demo-template-1.1.1.zip"], b"existing")
 
             preexisting = InMemoryGitHubReleaseClient()
-            preexisting.tags[tag] = "existing"
+            preexisting.tags[tag] = {
+                "object_id": "existing-object",
+                "target": "existing",
+                "message": "existing",
+            }
             with self.assertRaises(Exception):
                 publish_release_transaction(plan, root, client=preexisting)
-            self.assertEqual(preexisting.tags[tag], "existing")
+            self.assertEqual(preexisting.tags[tag]["target"], "existing")
 
             assets = [
                 "demo-template-1.1.1.zip",
@@ -1176,8 +1363,10 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             self.assertEqual(corrupt_download.releases, {})
 
             class WrongIdentityClient(InMemoryGitHubReleaseClient):
-                def tag_target(self, tag: str) -> str:
-                    return "0" * 40
+                def tag_annotation(self, tag: str) -> dict[str, Any]:
+                    identity = super().tag_annotation(tag)
+                    identity["target"] = "0" * 40
+                    return identity
 
             wrong_identity = WrongIdentityClient()
             with self.assertRaisesRegex(Exception, "ownership could not be proven"):
@@ -1214,8 +1403,28 @@ class TemplatePackageReleaseTests(unittest.TestCase):
                 self.assertEqual(mutated.tags, {})
                 self.assertEqual(mutated.releases, {})
 
+            concurrent_tag = InMemoryGitHubReleaseClient(fail_at="concurrent_other:create_tag")
+            with self.assertRaisesRegex(Exception, "concurrently"):
+                publish_release_transaction(plan, root, client=concurrent_tag)
+            self.assertIn(tag, concurrent_tag.tags)
+            self.assertEqual(concurrent_tag.releases, {})
+
+            concurrent_release = InMemoryGitHubReleaseClient(fail_at="concurrent_other:create_release")
+            with self.assertRaisesRegex(Exception, "concurrently"):
+                publish_release_transaction(plan, root, client=concurrent_release)
+            self.assertIn(tag, concurrent_release.tags)
+            self.assertIn(tag, concurrent_release.releases)
+            self.assertEqual(concurrent_release.releases[tag]["assets"], {})
+
+            concurrent_asset = InMemoryGitHubReleaseClient(fail_at="concurrent_other:upload_asset")
+            with self.assertRaisesRegex(Exception, "concurrently"):
+                publish_release_transaction(plan, root, client=concurrent_asset)
+            self.assertIn(tag, concurrent_asset.tags)
+            self.assertIn(tag, concurrent_asset.releases)
+            self.assertEqual(set(concurrent_asset.releases[tag]["assets"]), {assets[0]})
+
             replacement_package = self.make_external_package(packages["1.1.1"], root, "1.1.1")
-            replacement = self.create_release(root, replacement_package, "replacement")
+            replacement = self.create_archive(root, replacement_package, "replacement")
 
             class RemoteSelfConsistentReplacementClient(InMemoryGitHubReleaseClient):
                 def download_asset(self, remote_tag: str, name: str, destination: Path) -> Path:
@@ -1305,5 +1514,8 @@ class TemplatePackageReleaseTests(unittest.TestCase):
         self.assertIn("github_release", workflow)
         self.assertIn("download", workflow)
         self.assertIn("GH_TOKEN", workflow)
+        self.assertIn("concurrency:", workflow)
+        self.assertIn("group: template-release-${{ inputs.template_id }}-${{ inputs.version }}", workflow)
+        self.assertIn("cancel-in-progress: false", workflow)
         self.assertNotIn("--force", workflow)
         self.assertNotIn("--clobber", workflow)

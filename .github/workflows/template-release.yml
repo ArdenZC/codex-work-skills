@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: template-release-${{ inputs.template_id }}-${{ inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   release:
     name: Template release / ubuntu-latest / Python 3.11

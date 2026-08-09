@@ -79,9 +79,9 @@ python tools/template_package.py rollback --template-id <id> [--to-version <inst
 python tools/template_package.py list-installed [--verify] --json
 ```
 
-release 可接受 canonical 或 release workspace package，输出 deterministic archive 和不含绝对路径的 release plan。严格验证会检查既有 metadata required keys、实际 archive SHA、sidecar、ZIP inventory、entries、per-file SHA、依赖闭包和按 Skill 解析的 trusted owner validator；Release entry package 的 template SHA 不要求等于当前 canonical template SHA，不得用自带 bundle validator 绕过信任边界。默认安装根为 `/installed/template-packages/`，仓库内其他目录、canonical/package overlap、symlink 逃逸和 Windows 8.3 containment 都拒绝；仓库外完全独立的安装根可以使用。版本目录 immutable，active state 原子更新，失败恢复旧 active state；rollback 可以在任意已安装版本之间切换，默认 previous 支持双向 toggle。
+release 只接受当前 repository 中真实 Git-tracked 的 canonical package；工作区必须 clean，entry 和 dependency closure 中所有 archive 正式文件都必须与当前 HEAD blob 一致，只有通过这些 provenance 检查后才生成带 `source_commit` 的 release plan。external future patch 不能使用正式 `release`，应通过 `archive` 构造三文件 bundle，再由 `verify-release`、`install` 或 `upgrade` 处理。严格验证会检查既有 metadata required keys、实际 archive SHA、sidecar、ZIP inventory、entries、per-file SHA、依赖闭包和按 Skill 解析的 trusted owner validator；Release entry package 的 template SHA 不要求等于当前 canonical template SHA，不得用自带 bundle validator 绕过信任边界。默认安装根为 `/installed/template-packages/`，仓库内其他目录、canonical/package overlap、symlink 逃逸和 Windows 8.3 containment 都拒绝；仓库外完全独立的安装根可以使用。版本目录 immutable，active state 原子更新，失败恢复旧 active state；rollback 可以在任意已安装版本之间切换，默认 previous 支持双向 toggle。
 
-GitHub Release 不属于模板 registry。`.github/workflows/template-release.yml` 只在 `master` 上 `workflow_dispatch`，确认 tag/Release/assets 不存在后创建三个 archive assets，下载后重新 verify；事务失败仅清理本次创建的远程对象。GitHub Actions 不运行 Microsoft Excel COM；COM 仍由本地 Windows + Excel 环境验证。
+GitHub Release 不属于模板 registry。`.github/workflows/template-release.yml` 只在 `master` 上 `workflow_dispatch`，同一 template/version 使用 `concurrency` 串行且不取消运行中的发布；事务为每次 publication 生成不进入 archive/plan 的 `operation_id`，写入 annotated tag message 和 Release body marker，只有 tag、Release 和 asset ownership 都能由该 operation 证明时才允许补偿删除。发布前确认 tag/Release/assets 不存在，下载后重新校验三个 asset 的 local/remote SHA；不确定状态 fail closed 并提示人工清理。GitHub Actions 不运行 Microsoft Excel COM；COM 仍由本地 Windows + Excel 环境验证。
 
 ## CI 与交付边界
 
