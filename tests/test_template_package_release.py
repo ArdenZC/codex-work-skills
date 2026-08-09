@@ -145,6 +145,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             package.mkdir()
             template = package / "template.txt"
             template.write_text(f"fixture template {version}\n", encoding="utf-8")
+            template.write_bytes(template.read_bytes().replace(b"\r\n", b"\n"))
             digest = sha256(template)
             manifest = {
                 "template": {
@@ -163,7 +164,11 @@ class TemplatePackageReleaseTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (package / "CHANGELOG.md").write_text(f"# {version}\n", encoding="utf-8")
+            (package / "binary.dat").write_bytes(b"\x00\x01\x02\x03\x04")
             packages[version] = package
+        for path in template_root.rglob("*"):
+            if path.is_file():
+                path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n"))
         self.git(root, "init", "-q", "-b", "master")
         self.git(root, "config", "user.name", "Template Release Tests")
         self.git(root, "config", "user.email", "template-release-tests@example.invalid")
@@ -171,7 +176,9 @@ class TemplatePackageReleaseTests(unittest.TestCase):
         self.git(root, "commit", "-qm", "fixture")
         remote = root.parent / f"{root.name}-origin.git"
         self.git(root.parent, "init", "--bare", "-q", remote)
-        self.git(root, "remote", "add", "origin", remote)
+        origin_url = "https://github.com/ArdenZC/codex-work-skills.git"
+        self.git(root, "remote", "add", "origin", origin_url)
+        self.git(root, "config", f"url.{remote.as_uri()}.insteadOf", origin_url)
         self.git(root, "push", "-q", "origin", "master")
         return skill, packages
 
@@ -473,7 +480,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             verified = self.assert_succeeded(self.run_tool("verify-release", "--release-dir", output, "--json", root=root))
             self.assertEqual(verified["version"], "1.1.1")
 
-    def test_release_requires_committed_canonical_source_and_head_bytes(self) -> None:
+    def test_provenance_requires_committed_canonical_source_and_head_bytes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="template-release-provenance-") as directory:
             root = Path(directory)
             _, packages = self.make_fixture_repo(root, versions=("1.1.0", "1.1.1"))
@@ -498,6 +505,47 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             self.assertEqual(first_archive.read_bytes(), second_archive.read_bytes())
             first_plan = json.loads(next(first.glob("*.release-plan.json")).read_text(encoding="utf-8"))
             self.assertEqual(first_plan["source_commit"], self.git(root, "rev-parse", "HEAD"))
+
+            for source_name in ("manifest.yaml", "CHANGELOG.md"):
+                source = packages["1.1.1"] / source_name
+                original = source.read_bytes()
+                source.write_bytes(original.replace(b"\n", b"\r\n"))
+                output = root / "dist" / "template-packages" / f"crlf-{source_name.replace('.', '-')}"
+                try:
+                    crlf_failure = self.run_tool(
+                        "release",
+                        "--package",
+                        packages["1.1.1"],
+                        "--output-dir",
+                        output,
+                        "--json",
+                        root=root,
+                    )
+                    self.assert_failed(crlf_failure, "byte-for-byte")
+                    for name in (
+                        "demo-template-1.1.1.zip",
+                        "demo-template-1.1.1.zip.sha256",
+                        "demo-template-1.1.1.metadata.json",
+                        "demo-template-1.1.1.release-plan.json",
+                    ):
+                        self.assertFalse((output / name).exists())
+                finally:
+                    source.write_bytes(original)
+
+            binary = packages["1.1.1"] / "binary.dat"
+            original_binary = binary.read_bytes()
+            binary.write_bytes(original_binary[:1] + b"\xff" + original_binary[2:])
+            binary_failure = self.run_tool(
+                "release",
+                "--package",
+                packages["1.1.1"],
+                "--output-dir",
+                root / "dist" / "template-packages" / "binary-modified",
+                "--json",
+                root=root,
+            )
+            self.assert_failed(binary_failure, "clean worktree")
+            binary.write_bytes(original_binary)
 
             template = packages["1.1.1"] / "template.txt"
             original_template = template.read_bytes()
@@ -533,7 +581,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             manifest["template"]["base_manifest"] = "../v1.1.0/manifest.yaml"
             manifest["template"]["base_template"] = "../v1.1.0/template.txt"
-            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+            manifest_path.write_bytes(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False).encode("utf-8"))
             self.git(root, "add", "--", manifest_path.relative_to(root).as_posix())
             self.git(root, "commit", "-qm", "add fixture dependency closure")
             dependency_template = packages["1.1.0"] / "template.txt"
@@ -552,7 +600,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             dependency_template.write_bytes(original_dependency)
 
             untracked = packages["1.1.1"] / "notes-secret.txt"
-            untracked.write_text("must not enter a release\n", encoding="utf-8")
+            untracked.write_bytes(b"must not enter a release\n")
             untracked_failure = self.run_tool(
                 "release",
                 "--package",
@@ -564,6 +612,57 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             )
             self.assert_failed(untracked_failure, "clean worktree")
             untracked.unlink()
+
+    def test_provenance_release_source_snapshot_closes_archive_toc_tou(self) -> None:
+        from unittest.mock import patch
+
+        from tools.template_tooling import release as release_module
+
+        with tempfile.TemporaryDirectory(prefix="template-release-source-snapshot-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root, versions=("1.1.1",))
+            source = packages["1.1.1"] / "CHANGELOG.md"
+            original = source.read_bytes()
+            output = root / "dist" / "template-packages" / "toc-tou-before"
+            original_archive = release_module.archive_package
+
+            def mutate_before_archive(*args: Any, **kwargs: Any) -> dict[str, Any]:
+                source.write_bytes(original + b"TOCTOU before archive\n")
+                return original_archive(*args, **kwargs)
+
+            try:
+                with patch.object(release_module, "archive_package", side_effect=mutate_before_archive):
+                    with self.assertRaisesRegex(Exception, "byte-for-byte"):
+                        release_module.release_package(root, package=packages["1.1.1"], output_dir=output)
+            finally:
+                source.write_bytes(original)
+            for name in (
+                "demo-template-1.1.1.zip",
+                "demo-template-1.1.1.zip.sha256",
+                "demo-template-1.1.1.metadata.json",
+                "demo-template-1.1.1.release-plan.json",
+            ):
+                self.assertFalse((output / name).exists())
+
+            after_output = root / "dist" / "template-packages" / "toc-tou-after"
+
+            def mutate_after_archive(*args: Any, **kwargs: Any) -> dict[str, Any]:
+                result = original_archive(*args, **kwargs)
+                source.write_bytes(original + b"TOCTOU after archive\n")
+                return result
+
+            try:
+                with patch.object(release_module, "archive_package", side_effect=mutate_after_archive):
+                    passed = release_module.release_package(
+                        root,
+                        package=packages["1.1.1"],
+                        output_dir=after_output,
+                    )
+                self.assertEqual(passed["status"], "passed")
+                with zipfile.ZipFile(after_output / "demo-template-1.1.1.zip") as archive:
+                    self.assertEqual(archive.read("demo-template/v1.1.1/CHANGELOG.md"), original)
+            finally:
+                source.write_bytes(original)
 
     def test_install_upgrade_and_rollback_lock_release_failure_restore_filesystem(self) -> None:
         with tempfile.TemporaryDirectory(prefix="template-release-lock-release-") as directory:
@@ -1470,6 +1569,93 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             spoofed_metadata.write_text(json.dumps(spoofed_payload) + "\n", encoding="utf-8")
             rejected = self.run_tool("verify-release", "--release-dir", spoofed, "--json", root=root)
             self.assert_failed(rejected, "owner")
+
+    def test_publication_repository_identity_is_bound_to_origin_before_mutation(self) -> None:
+        from tools.template_tooling.github_release import InMemoryGitHubReleaseClient, publish_release_transaction
+
+        with tempfile.TemporaryDirectory(prefix="template-release-repository-identity-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root)
+            output = self.create_release(root, packages["1.1.1"], "repository-identity")
+            plan = output / "demo-template-1.1.1.release-plan.json"
+            remote = root.parent / f"{root.name}-origin.git"
+            https_origin = "https://github.com/ArdenZC/codex-work-skills.git"
+
+            def set_origin(url: str) -> None:
+                self.git(root, "remote", "set-url", "origin", url)
+                self.git(root, "config", f"url.{remote.as_uri()}.insteadOf", url)
+
+            https_client = InMemoryGitHubReleaseClient()
+            self.assertEqual(
+                publish_release_transaction(plan, root, client=https_client)["status"],
+                "passed",
+            )
+
+            set_origin("git@github.com:ArdenZC/codex-work-skills.git")
+            ssh_client = InMemoryGitHubReleaseClient()
+            self.assertEqual(
+                publish_release_transaction(
+                    plan,
+                    root,
+                    client=ssh_client,
+                    repository="ArdenZC/codex-work-skills",
+                )["status"],
+                "passed",
+            )
+
+            set_origin("ssh://git@github.com/ArdenZC/codex-work-skills.git")
+            ssh_url_client = InMemoryGitHubReleaseClient()
+            self.assertEqual(
+                publish_release_transaction(
+                    plan,
+                    root,
+                    client=ssh_url_client,
+                    repository="ArdenZC/codex-work-skills",
+                )["status"],
+                "passed",
+            )
+
+            set_origin(https_origin)
+            case_client = InMemoryGitHubReleaseClient()
+            self.assertEqual(
+                publish_release_transaction(
+                    plan,
+                    root,
+                    client=case_client,
+                    repository="ardenzc/CODEX-WORK-SKILLS",
+                )["status"],
+                "passed",
+            )
+
+            mismatch = InMemoryGitHubReleaseClient()
+            with self.assertRaisesRegex(Exception, "does not match origin"):
+                publish_release_transaction(
+                    plan,
+                    root,
+                    client=mismatch,
+                    repository="ArdenZC/another-repo",
+                )
+            self.assertEqual(mismatch.events, [])
+            self.assertEqual(mismatch.tags, {})
+            self.assertEqual(mismatch.releases, {})
+
+            self.git(root, "remote", "remove", "origin")
+            missing = InMemoryGitHubReleaseClient()
+            with self.assertRaisesRegex(Exception, "origin"):
+                publish_release_transaction(plan, root, client=missing)
+            self.assertEqual(missing.events, [])
+
+            self.git(root, "remote", "add", "origin", "not-a-url")
+            malformed = InMemoryGitHubReleaseClient()
+            with self.assertRaisesRegex(Exception, "malformed"):
+                publish_release_transaction(plan, root, client=malformed)
+            self.assertEqual(malformed.events, [])
+
+            set_origin("git@example.com:owner/repo.git")
+            unsupported = InMemoryGitHubReleaseClient()
+            with self.assertRaisesRegex(Exception, "unsupported GitHub origin host"):
+                publish_release_transaction(plan, root, client=unsupported)
+            self.assertEqual(unsupported.events, [])
 
     def test_publish_requires_live_remote_master_and_rejects_stale_or_unavailable_origin(self) -> None:
         from tools.template_tooling.github_release import InMemoryGitHubReleaseClient, publish_release_transaction

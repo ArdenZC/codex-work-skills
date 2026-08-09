@@ -10,7 +10,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from .manifest import sha256_file
 from .models import RELEASE_TOOL_VERSION, TemplateToolError, parse_semver
@@ -22,6 +22,80 @@ from .release import (
     _strict_archive_name,
     verify_release_bundle,
 )
+
+
+@dataclass(frozen=True)
+class GitHubRepositoryIdentity:
+    host: str
+    owner: str
+    name: str
+
+    @property
+    def slug(self) -> str:
+        return f"{self.owner}/{self.name}"
+
+
+def _repository_parts(value: str) -> tuple[str, str]:
+    normalized = value.strip().strip("/")
+    if normalized.casefold().endswith(".git"):
+        normalized = normalized[:-4]
+    parts = normalized.split("/")
+    if len(parts) != 2 or any(not part or part in {".", ".."} or re.search(r"\s", part) for part in parts):
+        raise TemplateToolError("GitHub repository must use owner/name form")
+    return parts[0], parts[1]
+
+
+def _parse_repository_argument(repository: str) -> GitHubRepositoryIdentity:
+    if not isinstance(repository, str) or not repository.strip():
+        raise TemplateToolError("GitHub repository must use owner/name form")
+    owner, name = _repository_parts(repository)
+    return GitHubRepositoryIdentity(host="github.com", owner=owner, name=name)
+
+
+def _origin_repository_identity(root: Path) -> GitHubRepositoryIdentity:
+    result = _run(["git", "config", "--get", "remote.origin.url"], root, check=False)
+    remote = result.stdout.strip()
+    if result.returncode != 0 or not remote:
+        details = result.stderr.strip() or result.stdout.strip()
+        raise TemplateToolError(f"cannot resolve GitHub origin repository: {details or 'origin is missing'}")
+
+    scp_match = re.fullmatch(r"[^@/:]+@(?P<host>[^:]+):(?P<path>.+)", remote)
+    if scp_match:
+        host = scp_match.group("host")
+        path = scp_match.group("path")
+    else:
+        try:
+            parsed = urlsplit(remote)
+            host = parsed.hostname or ""
+            path = parsed.path
+        except ValueError as exc:
+            raise TemplateToolError("malformed GitHub origin repository URL") from exc
+        if parsed.scheme.casefold() not in {"https", "ssh"}:
+            raise TemplateToolError("malformed GitHub origin repository URL")
+    if host.casefold() != "github.com":
+        raise TemplateToolError("unsupported GitHub origin host for release publication")
+    try:
+        owner, name = _repository_parts(path)
+    except TemplateToolError as exc:
+        raise TemplateToolError("malformed GitHub origin repository URL") from exc
+    return GitHubRepositoryIdentity(host=host.casefold(), owner=owner, name=name)
+
+
+def _assert_repository_identity(root: Path, requested_repository: str | None) -> GitHubRepositoryIdentity:
+    origin = _origin_repository_identity(root)
+    if requested_repository is None:
+        return origin
+    requested = _parse_repository_argument(requested_repository)
+    if (
+        requested.host.casefold() != origin.host.casefold()
+        or requested.owner.casefold() != origin.owner.casefold()
+        or requested.name.casefold() != origin.name.casefold()
+    ):
+        raise TemplateToolError(
+            "GitHub repository does not match origin: "
+            f"origin={origin.slug}, requested={requested.slug}"
+        )
+    return origin
 
 
 class GitHubReleaseClient(Protocol):
@@ -77,7 +151,7 @@ class GhCliGitHubReleaseClient:
 
     def __init__(self, root: Path, *, repository: str | None = None) -> None:
         self.root = root.resolve()
-        self.repository = repository
+        self.repository = _assert_repository_identity(self.root, repository).slug
 
     def _gh(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         command = ["gh", *arguments]
@@ -433,7 +507,17 @@ def _validate_plan(plan_path: Path, root: Path) -> dict[str, Any]:
     return plan
 
 
-def _assert_master_clean(root: Path, source_commit: str) -> None:
+@dataclass(frozen=True)
+class RemoteMasterIdentity:
+    repository: GitHubRepositoryIdentity
+    commit: str
+
+
+def _assert_master_clean(
+    root: Path,
+    source_commit: str,
+    repository: GitHubRepositoryIdentity,
+) -> RemoteMasterIdentity:
     status = _run(["git", "status", "--porcelain"], root).stdout
     if status.strip():
         raise TemplateToolError("release publication requires a clean worktree")
@@ -459,6 +543,7 @@ def _assert_master_clean(root: Path, source_commit: str) -> None:
     branch = _run(["git", "branch", "--show-current"], root, check=False).stdout.strip()
     if branch != "master":
         raise TemplateToolError("release publication must run from master")
+    return RemoteMasterIdentity(repository=repository, commit=remote_head)
 
 
 @dataclass(frozen=True)
@@ -562,11 +647,13 @@ def publish_release_transaction(
     *,
     client: GitHubReleaseClient | None = None,
     body: str | None = None,
+    repository: str | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
     plan_path = plan_path.expanduser().absolute()
     plan = _validate_plan(plan_path, root)
-    _assert_master_clean(root, plan["source_commit"])
+    origin_repository = _assert_repository_identity(root, repository)
+    _assert_master_clean(root, plan["source_commit"], origin_repository)
     assets = [plan_path.parent / name for name in plan["assets"]]
     for asset in assets:
         if asset.is_symlink() or not asset.is_file():
@@ -588,7 +675,10 @@ def publish_release_transaction(
     for key in ("template_id", "version", "format"):
         if verification[key] != plan[key]:
             raise TemplateToolError(f"release plan {key} does not match the verified bundle")
-    client = client or GhCliGitHubReleaseClient(root)
+    if client is None:
+        client = GhCliGitHubReleaseClient(root, repository=origin_repository.slug)
+    elif isinstance(client, GhCliGitHubReleaseClient) and client.repository.casefold() != origin_repository.slug.casefold():
+        raise TemplateToolError("GitHub repository client does not match origin")
     tag = plan["tag"]
     initial = _snapshot_remote(client, tag)
     if initial.tag_exists:
@@ -771,6 +861,7 @@ def main(argv: list[str] | None = None) -> int:
             args.repo_root,
             client=GhCliGitHubReleaseClient(args.repo_root, repository=args.repository),
             body=body,
+            repository=args.repository,
         )
     except (TemplateToolError, OSError, ValueError) as exc:
         if args.json:

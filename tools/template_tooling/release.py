@@ -7,6 +7,7 @@ adds the install/release lifecycle around a verified three-file bundle.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -20,7 +21,7 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from .archive import (
     DEFAULT_ARCHIVE_OUTPUT_ROOT,
@@ -653,7 +654,9 @@ def _git_status(root: Path) -> str:
 
 def _assert_release_worktree_clean(root: Path) -> None:
     if _git_status(root).strip():
-        raise TemplateToolError("release requires a clean worktree")
+        raise TemplateToolError(
+            "release requires a clean worktree; source files must match HEAD byte-for-byte"
+        )
 
 
 def _relative_git_paths(root: Path, paths: Iterable[Path]) -> list[str]:
@@ -668,40 +671,25 @@ def _relative_git_paths(root: Path, paths: Iterable[Path]) -> list[str]:
     return relative_paths
 
 
-def _source_bytes_match_head(path: Path, expected: bytes, actual: bytes) -> bool:
-    if actual == expected:
-        return True
-    if path.suffix.casefold() not in {".md", ".txt", ".yaml", ".yml"}:
-        return False
-    if b"\x00" in expected or b"\x00" in actual:
-        return False
-    normalized_expected = expected.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-    normalized_actual = actual.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
-    return normalized_actual == normalized_expected
+@dataclass(frozen=True)
+class ReleaseSourceRecord:
+    archive_path: str
+    repository_path: str
+    git_blob_sha: str
+    sha256: str
+    size: int
 
 
-def _assert_release_source_matches_head(root: Path, paths: Iterable[Path]) -> None:
-    relative_paths = _relative_git_paths(root, paths)
-    if not relative_paths:
+def _release_source_snapshot(
+    root: Path,
+    closure: Iterable[TemplatePackage],
+) -> dict[str, ReleaseSourceRecord]:
+    source_files = _archive_source_files(list(closure))
+    if not source_files:
         raise TemplateToolError("release source package contains no archive files")
-    for diff_args in (
-        ["diff", "--quiet", "HEAD", "--", *relative_paths],
-        ["diff", "--cached", "--quiet", "HEAD", "--", *relative_paths],
-    ):
-        result = subprocess.run(
-            ["git", "-C", str(root), *diff_args],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if result.returncode == 1:
-            raise TemplateToolError("release source package differs from source_commit")
-        if result.returncode != 0:
-            details = result.stderr.strip() or result.stdout.strip()
-            raise TemplateToolError(f"cannot compare release source with source_commit: {details}")
-    for relative in relative_paths:
+    relative_paths = _relative_git_paths(root, (path for _, path in source_files))
+    snapshot: dict[str, ReleaseSourceRecord] = {}
+    for (archive_path, source_path), relative in zip(source_files, relative_paths):
         expected = subprocess.run(
             ["git", "-C", str(root), "rev-parse", f"HEAD:{relative}"],
             capture_output=True,
@@ -715,17 +703,64 @@ def _assert_release_source_matches_head(root: Path, paths: Iterable[Path]) -> No
             capture_output=True,
             check=False,
         )
-        actual_source = root / Path(relative)
-        if (
-            expected.returncode != 0
-            or expected_blob_result.returncode != 0
-            or not _source_bytes_match_head(
-                actual_source,
-                expected_blob_result.stdout,
-                actual_source.read_bytes(),
-            )
-        ):
-            raise TemplateToolError("release source package differs from source_commit")
+        if expected.returncode != 0 or expected_blob_result.returncode != 0:
+            raise TemplateToolError("release source package differs byte-for-byte from source_commit")
+        expected_blob_sha = expected.stdout.strip().lower()
+        expected_bytes = expected_blob_result.stdout
+        try:
+            actual_bytes = source_path.read_bytes()
+        except OSError as exc:
+            raise TemplateToolError("release source package differs byte-for-byte from source_commit") from exc
+        if actual_bytes != expected_bytes:
+            raise TemplateToolError("release source package differs byte-for-byte from source_commit")
+        snapshot[archive_path] = ReleaseSourceRecord(
+            archive_path=archive_path,
+            repository_path=relative,
+            git_blob_sha=expected_blob_sha,
+            sha256=hashlib.sha256(expected_bytes).hexdigest().upper(),
+            size=len(expected_bytes),
+        )
+    return snapshot
+
+
+def _verify_release_archive_matches_source_snapshot(
+    archive_path: Path,
+    metadata_path: Path,
+    snapshot: Mapping[str, ReleaseSourceRecord],
+) -> None:
+    metadata = _load_json_object(metadata_path, label="release metadata")
+    raw_files = metadata.get("files")
+    if not isinstance(raw_files, list) or any(not isinstance(record, dict) for record in raw_files):
+        raise TemplateToolError("release archive metadata files are invalid")
+    metadata_paths = [record.get("path") for record in raw_files]
+    if any(not isinstance(path, str) for path in metadata_paths):
+        raise TemplateToolError("release archive metadata files contain an invalid path")
+    snapshot_paths = list(snapshot)
+    if metadata_paths != snapshot_paths:
+        raise TemplateToolError("release archive paths do not match the HEAD source snapshot")
+    try:
+        with zipfile.ZipFile(archive_path, "r") as archive:
+            infos = archive.infolist()
+            _validate_zip_resource_limits(infos)
+            zip_paths = [info.filename for info in infos]
+            if zip_paths != snapshot_paths:
+                raise TemplateToolError("release ZIP entries do not match the HEAD source snapshot")
+            for info, record, archive_name in zip(infos, raw_files, zip_paths):
+                expected = snapshot[archive_name]
+                if (
+                    str(record.get("sha256", "")).upper() != expected.sha256
+                    or record.get("size") != expected.size
+                ):
+                    raise TemplateToolError(
+                        f"release metadata source record differs byte-for-byte from HEAD snapshot: {archive_name}"
+                    )
+                size, digest = _stream_zip_entry(archive, info)
+                if size != expected.size or digest != expected.sha256:
+                    raise TemplateToolError(
+                        f"release ZIP entry differs byte-for-byte from HEAD snapshot: {archive_name}"
+                    )
+    except zipfile.BadZipFile as exc:
+        raise TemplateToolError("release archive is not a valid ZIP") from exc
 
 
 def _require_release_source_is_committed_canonical(
@@ -733,20 +768,21 @@ def _require_release_source_is_committed_canonical(
     root: Path,
     trust_index: GitTrustIndex,
     closure: Iterable[TemplatePackage],
-) -> None:
+) -> dict[str, ReleaseSourceRecord]:
     if not package.is_canonical or canonical_skill_root_for_package(package.package_dir, root) is None:
         raise TemplateToolError("release requires a canonical repository package")
     if package.validator is None:
         raise TemplateToolError("release canonical package owner validator is unavailable")
     trust_index.require_tracked_regular_file(package.validator, label="release owner validator")
 
-    source_files = _archive_source_files(list(closure))
+    closure = list(closure)
+    source_files = _archive_source_files(closure)
     for archive_name, source_path in source_files:
         trust_index.require_tracked_regular_file(
             source_path,
             label=f"release source file {archive_name}",
         )
-    _assert_release_source_matches_head(root, (path for _, path in source_files))
+    return _release_source_snapshot(root, closure)
 
 
 def _canonical_package_for_release(root: Path, package: Path | None, template_id: str | None, version: str | None) -> TemplatePackage:
@@ -814,7 +850,7 @@ def release_package(
     closure = _dependency_closure(target, root)
     trust_index = GitTrustIndex.from_repo_root(root)
     source_commit = _git_head(root)
-    _require_release_source_is_committed_canonical(target, root, trust_index, closure)
+    source_snapshot = _require_release_source_is_committed_canonical(target, root, trust_index, closure)
     output_dir = _validate_release_output(output_dir or (root / DEFAULT_ARCHIVE_OUTPUT_ROOT), root, closure)
     archive_name = f"{target.template_id}-{target.version}.zip"
     sidecar_name = f"{archive_name}.sha256"
@@ -851,9 +887,15 @@ def release_package(
         result = archive_package(target.package_dir, output_dir, root, dry_run=False)
         created_paths = final_paths[:3]
         archive_path = output_dir / archive_name
+        metadata_path = output_dir / metadata_name
         if os.environ.get("TEMPLATE_TOOL_TEST_FAIL_RELEASE_VERIFY") == "1":
             raise TemplateToolError("injected release verification failure")
         verified = _verify_release_bundle(archive_path, root)
+        _verify_release_archive_matches_source_snapshot(
+            archive_path,
+            metadata_path,
+            source_snapshot,
+        )
         base_plan["archive_sha256"] = verified.archive_sha256
         base_plan["status"] = "passed"
         base_plan["dry_run"] = False
