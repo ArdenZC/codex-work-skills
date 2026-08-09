@@ -164,6 +164,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (package / "CHANGELOG.md").write_text(f"# {version}\n", encoding="utf-8")
+            (package / "README.md").write_text(f"fixture README {version}\n", encoding="utf-8")
             (package / "binary.dat").write_bytes(b"\x00\x01\x02\x03\x04")
             packages[version] = package
         for path in template_root.rglob("*"):
@@ -506,7 +507,7 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             first_plan = json.loads(next(first.glob("*.release-plan.json")).read_text(encoding="utf-8"))
             self.assertEqual(first_plan["source_commit"], self.git(root, "rev-parse", "HEAD"))
 
-            for source_name in ("manifest.yaml", "CHANGELOG.md"):
+            for source_name in ("manifest.yaml", "README.md", "CHANGELOG.md"):
                 source = packages["1.1.1"] / source_name
                 original = source.read_bytes()
                 source.write_bytes(original.replace(b"\n", b"\r\n"))
