@@ -20,6 +20,8 @@ from .release import (
     _load_json_object,
     _require_sha,
     _strict_archive_name,
+    _verify_release_archive_matches_source_snapshot,
+    release_source_snapshot_for_commit,
     verify_release_bundle,
 )
 
@@ -661,12 +663,27 @@ def publish_release_transaction(
     archive_path = assets[0]
     sidecar_path = assets[1]
     metadata_path = assets[2]
+    source_snapshot = release_source_snapshot_for_commit(
+        root,
+        template_id=plan["template_id"],
+        version=plan["version"],
+        format=plan["format"],
+        source_commit=plan["source_commit"],
+    )
     verification = verify_release_bundle(
         archive_path,
         root,
         sidecar_path=sidecar_path,
         metadata_path=metadata_path,
     )
+    try:
+        _verify_release_archive_matches_source_snapshot(
+            archive_path,
+            metadata_path,
+            source_snapshot,
+        )
+    except TemplateToolError as exc:
+        raise TemplateToolError(f"release bundle does not match source_commit: {exc}") from exc
     local_asset_hashes = {asset.name: sha256_file(asset) for asset in assets}
     if verification["archive_sha256"] != plan["archive_sha256"]:
         raise TemplateToolError("release plan archive SHA does not match the local bundle")

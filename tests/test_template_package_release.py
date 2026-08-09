@@ -451,6 +451,81 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             )
             self.assertEqual(toggled_back["version"], "1.1.1")
 
+    def test_first_install_rejects_every_preexisting_versions_entry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="template-release-first-install-entries-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root)
+            first = self.create_release(root, packages["1.1.1"], "first-install-111")
+            second = self.create_release(root, packages["1.1.2"], "first-install-112")
+
+            cases = ("note", ".keep", "unknown-version", "version-link")
+            for case in cases:
+                with self.subTest(case=case):
+                    install_root = root / "installed" / "template-packages" / case
+                    template_dir = install_root / "demo-template"
+                    versions_dir = template_dir / "versions"
+                    versions_dir.mkdir(parents=True)
+                    entry = versions_dir / case
+                    if case in {"note", ".keep"}:
+                        entry.write_text("preserve me\n", encoding="utf-8")
+                    elif case == "unknown-version":
+                        entry.mkdir()
+                    else:
+                        try:
+                            entry.symlink_to(root / ".gitignore")
+                        except OSError as exc:
+                            self.skipTest(f"symlink creation unavailable: {exc}")
+
+                    rejected = self.run_tool(
+                        "install",
+                        "--release-dir",
+                        first,
+                        "--install-root",
+                        install_root,
+                        "--json",
+                        root=root,
+                    )
+                    self.assert_failed(rejected, "versions exist without an active installation")
+                    self.assertTrue(entry.exists() or entry.is_symlink())
+                    self.assertFalse((versions_dir / "1.1.1").exists())
+                    self.assertFalse((template_dir / "active.json").exists())
+                    self.assertFalse((template_dir / ".lock").exists())
+                    self.assertEqual(
+                        [item.name for item in versions_dir.iterdir()],
+                        [case],
+                    )
+
+            empty_root = root / "installed" / "template-packages" / "empty"
+            (empty_root / "demo-template" / "versions").mkdir(parents=True)
+            installed = self.assert_succeeded(
+                self.run_tool(
+                    "install",
+                    "--release-dir",
+                    first,
+                    "--install-root",
+                    empty_root,
+                    "--json",
+                    root=root,
+                )
+            )
+            self.assertEqual(installed["version"], "1.1.1")
+            listed = self.assert_succeeded(
+                self.run_tool("list-installed", "--install-root", empty_root, "--json", root=root)
+            )
+            self.assertEqual(listed["templates"][0]["active_version"], "1.1.1")
+            upgraded = self.assert_succeeded(
+                self.run_tool(
+                    "upgrade",
+                    "--release-dir",
+                    second,
+                    "--install-root",
+                    empty_root,
+                    "--json",
+                    root=root,
+                )
+            )
+            self.assertEqual(upgraded["version"], "1.1.2")
+
     def test_fixture_scaffold_validate_promote_then_release(self) -> None:
         with tempfile.TemporaryDirectory(prefix="template-release-promote-") as directory:
             root = Path(directory)
@@ -1542,6 +1617,97 @@ class TemplatePackageReleaseTests(unittest.TestCase):
                 publish_release_transaction(plan, root, client=replacement_client)
             self.assertEqual(replacement_client.tags, {})
             self.assertEqual(replacement_client.releases, {})
+
+    def test_publication_revalidates_local_bundle_against_source_commit(self) -> None:
+        from tools.template_tooling.github_release import InMemoryGitHubReleaseClient, publish_release_transaction
+
+        def replace_bundle_and_rewrite_plan(release_dir: Path, replacement_dir: Path) -> Path:
+            for replacement in replacement_dir.iterdir():
+                if replacement.is_file():
+                    shutil.copy2(replacement, release_dir / replacement.name)
+            plan_path = next(release_dir.glob("*.release-plan.json"))
+            plan = json.loads(plan_path.read_text(encoding="utf-8"))
+            plan["archive_sha256"] = sha256(release_dir / plan["archive"])
+            plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            verified = self.assert_succeeded(
+                self.run_tool("verify-release", "--release-dir", release_dir, "--json", root=release_dir.parents[2])
+            )
+            self.assertEqual(verified["status"], "passed")
+            return plan_path
+
+        with tempfile.TemporaryDirectory(prefix="template-release-publish-provenance-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root)
+            legitimate = self.create_release(root, packages["1.1.1"], "legitimate")
+            legitimate_plan = legitimate / "demo-template-1.1.1.release-plan.json"
+            untouched_client = InMemoryGitHubReleaseClient()
+            self.assertEqual(
+                publish_release_transaction(legitimate_plan, root, client=untouched_client)["status"],
+                "passed",
+            )
+
+            external = self.make_external_package(packages["1.1.1"], root, "1.1.1")
+            replacement = self.create_archive(root, external, "replacement-source")
+            replaced = root / "dist" / "template-packages" / "replaced-source"
+            shutil.copytree(legitimate, replaced)
+            replaced_plan = replace_bundle_and_rewrite_plan(replaced, replacement)
+            replacement_client = InMemoryGitHubReleaseClient()
+            with self.assertRaisesRegex(Exception, "release bundle does not match source_commit"):
+                publish_release_transaction(replaced_plan, root, client=replacement_client)
+            self.assertEqual(replacement_client.events, [])
+
+        with tempfile.TemporaryDirectory(prefix="template-release-publish-dependency-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root, versions=("1.1.0", "1.1.1"))
+            manifest_path = packages["1.1.1"] / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["base_manifest"] = "../v1.1.0/manifest.yaml"
+            manifest["template"]["base_template"] = "../v1.1.0/template.txt"
+            manifest_path.write_text(
+                yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            manifest_path.write_bytes(manifest_path.read_bytes().replace(b"\r\n", b"\n"))
+            self.git(root, "add", "--", manifest_path.relative_to(root).as_posix())
+            self.git(root, "commit", "-qm", "add fixture dependency")
+            self.git(root, "push", "-q", "origin", "master")
+
+            legitimate = self.create_release(root, packages["1.1.1"], "legitimate-dependency")
+            external_root = root / "release-workspace" / "demo-template"
+            external_root.mkdir(parents=True)
+            shutil.copytree(packages["1.1.1"], external_root / "v1.1.1")
+            shutil.copytree(packages["1.1.0"], external_root / "v1.1.9")
+            replacement_dependency = external_root / "v1.1.9"
+            replacement_template = replacement_dependency / "template.txt"
+            replacement_template.write_text("replacement dependency template\n", encoding="utf-8")
+            dependency_manifest_path = replacement_dependency / "manifest.yaml"
+            dependency_manifest = yaml.safe_load(dependency_manifest_path.read_text(encoding="utf-8"))
+            dependency_manifest["template"]["version"] = "1.1.9"
+            dependency_digest = sha256(replacement_template)
+            dependency_manifest["fingerprint"]["sha256"] = dependency_digest
+            dependency_manifest["fingerprint"]["value"] = dependency_digest
+            dependency_manifest_path.write_text(
+                yaml.safe_dump(dependency_manifest, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            replacement_entry_manifest_path = external_root / "v1.1.1" / "manifest.yaml"
+            replacement_entry_manifest = yaml.safe_load(
+                replacement_entry_manifest_path.read_text(encoding="utf-8")
+            )
+            replacement_entry_manifest["template"]["base_manifest"] = "../v1.1.9/manifest.yaml"
+            replacement_entry_manifest["template"]["base_template"] = "../v1.1.9/template.txt"
+            replacement_entry_manifest_path.write_text(
+                yaml.safe_dump(replacement_entry_manifest, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            replacement = self.create_archive(root, external_root / "v1.1.1", "replacement-dependency")
+            replaced = root / "dist" / "template-packages" / "replaced-dependency"
+            shutil.copytree(legitimate, replaced)
+            replaced_plan = replace_bundle_and_rewrite_plan(replaced, replacement)
+            replacement_client = InMemoryGitHubReleaseClient()
+            with self.assertRaisesRegex(Exception, "release bundle does not match source_commit"):
+                publish_release_transaction(replaced_plan, root, client=replacement_client)
+            self.assertEqual(replacement_client.events, [])
 
     def test_untrusted_external_validator_is_never_executed_during_release_verify(self) -> None:
         with tempfile.TemporaryDirectory(prefix="template-release-untrusted-") as directory:

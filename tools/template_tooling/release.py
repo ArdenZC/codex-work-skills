@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
+import yaml
+
 from .archive import (
     DEFAULT_ARCHIVE_OUTPUT_ROOT,
     MAX_ARCHIVE_COMPRESSION_RATIO,
@@ -30,8 +32,10 @@ from .archive import (
     MAX_ARCHIVE_ENTRY_SIZE,
     MAX_ARCHIVE_TOTAL_SIZE,
     _assert_unique_portable_names,
+    _archive_sort_key,
     _archive_source_files,
     _dependency_closure,
+    _excluded,
     _extract_archive,
     _stream_zip_entry,
     _validate_zip_info_type,
@@ -51,6 +55,7 @@ from .git_trust import GitTrustIndex
 from .manifest import (
     inspect_manifest_package,
     load_manifest,
+    manifest_fingerprint,
     manifest_reference,
     sha256_file,
 )
@@ -659,18 +664,6 @@ def _assert_release_worktree_clean(root: Path) -> None:
         )
 
 
-def _relative_git_paths(root: Path, paths: Iterable[Path]) -> list[str]:
-    repository = root.resolve()
-    relative_paths: list[str] = []
-    for path in paths:
-        try:
-            relative = path.resolve(strict=False).relative_to(repository)
-        except ValueError as exc:
-            raise TemplateToolError(f"release source file is outside the repository: {path}") from exc
-        relative_paths.append(relative.as_posix())
-    return relative_paths
-
-
 @dataclass(frozen=True)
 class ReleaseSourceRecord:
     archive_path: str
@@ -680,47 +673,290 @@ class ReleaseSourceRecord:
     size: int
 
 
-def _release_source_snapshot(
-    root: Path,
-    closure: Iterable[TemplatePackage],
-) -> dict[str, ReleaseSourceRecord]:
-    source_files = _archive_source_files(list(closure))
-    if not source_files:
-        raise TemplateToolError("release source package contains no archive files")
-    relative_paths = _relative_git_paths(root, (path for _, path in source_files))
-    snapshot: dict[str, ReleaseSourceRecord] = {}
-    for (archive_path, source_path), relative in zip(source_files, relative_paths):
-        expected = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", f"HEAD:{relative}"],
-            capture_output=True,
-            text=True,
-            encoding="ascii",
-            errors="replace",
-            check=False,
-        )
-        expected_blob_result = subprocess.run(
-            ["git", "-C", str(root), "cat-file", "blob", f"HEAD:{relative}"],
-            capture_output=True,
-            check=False,
-        )
-        if expected.returncode != 0 or expected_blob_result.returncode != 0:
-            raise TemplateToolError("release source package differs byte-for-byte from source_commit")
-        expected_blob_sha = expected.stdout.strip().lower()
-        expected_bytes = expected_blob_result.stdout
+@dataclass(frozen=True)
+class _GitTreeRecord:
+    mode: str
+    object_type: str
+    object_id: str
+
+
+def _git_tree_for_commit(root: Path, source_commit: str) -> dict[str, _GitTreeRecord]:
+    if not isinstance(source_commit, str) or not HEX_COMMIT_RE.fullmatch(source_commit):
+        raise TemplateToolError("release source_commit must be a full commit SHA")
+    commit = source_commit.lower()
+    commit_check = subprocess.run(
+        ["git", "-C", str(root), "cat-file", "-e", f"{commit}^{{commit}}"],
+        capture_output=True,
+        check=False,
+    )
+    if commit_check.returncode != 0:
+        raise TemplateToolError("release source_commit does not identify a repository commit")
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-tree", "-r", "-z", commit],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        details = result.stderr.decode("utf-8", errors="replace").strip()
+        raise TemplateToolError(f"cannot inspect release source_commit tree: {details}")
+    tree: dict[str, _GitTreeRecord] = {}
+    for raw_record in result.stdout.split(b"\0"):
+        if not raw_record:
+            continue
         try:
-            actual_bytes = source_path.read_bytes()
-        except OSError as exc:
-            raise TemplateToolError("release source package differs byte-for-byte from source_commit") from exc
-        if actual_bytes != expected_bytes:
-            raise TemplateToolError("release source package differs byte-for-byte from source_commit")
-        snapshot[archive_path] = ReleaseSourceRecord(
-            archive_path=archive_path,
-            repository_path=relative,
-            git_blob_sha=expected_blob_sha,
-            sha256=hashlib.sha256(expected_bytes).hexdigest().upper(),
-            size=len(expected_bytes),
+            raw_identity, raw_path = raw_record.split(b"\t", 1)
+            mode, object_type, object_id = raw_identity.decode("ascii").split(" ", 2)
+            repository_path = raw_path.decode("utf-8")
+        except (UnicodeDecodeError, ValueError) as exc:
+            raise TemplateToolError("release source_commit tree contains an invalid path record") from exc
+        tree[repository_path] = _GitTreeRecord(mode, object_type, object_id.lower())
+    return tree
+
+
+def _git_blob_bytes(
+    root: Path,
+    repository_path: str,
+    record: _GitTreeRecord,
+) -> bytes:
+    if record.object_type != "blob" or record.mode not in {"100644", "100755"}:
+        raise TemplateToolError(
+            f"release source_commit package contains a non-regular file: {repository_path}"
         )
-    return snapshot
+    result = subprocess.run(
+        ["git", "-C", str(root), "cat-file", "blob", record.object_id],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise TemplateToolError(f"cannot read release source_commit blob: {repository_path}")
+    return result.stdout
+
+
+def _parse_commit_manifest(raw: bytes, repository_path: str) -> dict[str, Any]:
+    try:
+        value = yaml.safe_load(raw.decode("utf-8"))
+    except (UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise TemplateToolError(
+            f"cannot read manifest from release source_commit: {repository_path}: {exc}"
+        ) from exc
+    if not isinstance(value, dict):
+        raise TemplateToolError(
+            f"manifest in release source_commit must be a mapping: {repository_path}"
+        )
+    return value
+
+
+def _resolve_commit_reference(
+    base: PurePosixPath,
+    raw_reference: Any,
+    allowed_root: PurePosixPath,
+    *,
+    label: str,
+) -> str:
+    if not isinstance(raw_reference, str) or not raw_reference or "\\" in raw_reference:
+        raise TemplateToolError(f"{label} must be a relative path in release source_commit")
+    reference = PurePosixPath(raw_reference)
+    if reference.is_absolute():
+        raise TemplateToolError(f"{label} must be a relative path in release source_commit")
+    parts = list(base.parts)
+    floor = len(allowed_root.parts)
+    for part in reference.parts:
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if len(parts) <= floor:
+                raise TemplateToolError(f"{label} escapes its package root in release source_commit")
+            parts.pop()
+            continue
+        validate_windows_component(part, label=label)
+        parts.append(part)
+    resolved = PurePosixPath(*parts)
+    if resolved.parts[:floor] != allowed_root.parts:
+        raise TemplateToolError(f"{label} escapes its package root in release source_commit")
+    return resolved.as_posix()
+
+
+def release_source_snapshot_for_commit(
+    root: Path,
+    *,
+    template_id: str,
+    version: str,
+    format: str,
+    source_commit: str,
+) -> dict[str, ReleaseSourceRecord]:
+    """Reconstruct canonical release inputs exclusively from Git objects."""
+    root = root.resolve()
+    version = _require_version(version, label="release.version")
+    if not isinstance(template_id, str) or not template_id:
+        raise TemplateToolError("release.template_id must be a non-empty string")
+    validate_windows_component(template_id, label="release.template_id")
+    if not isinstance(format, str) or not format.strip():
+        raise TemplateToolError("release.format must be a non-empty string")
+
+    tree = _git_tree_for_commit(root, source_commit)
+    suffix = ("assets", "templates", template_id, f"v{version}", "manifest.yaml")
+    candidates = [
+        path
+        for path in tree
+        if len(PurePosixPath(path).parts) > len(suffix)
+        and PurePosixPath(path).parts[-len(suffix):] == suffix
+    ]
+    if len(candidates) != 1:
+        raise TemplateToolError(
+            "release source_commit must contain exactly one canonical package for the requested identity"
+        )
+    entry_manifest = candidates[0]
+    entry_parts = PurePosixPath(entry_manifest).parts
+    skill_root = PurePosixPath(*entry_parts[:-len(suffix)])
+    validator_path = skill_root / "scripts" / "validate_template.py"
+    validator_record = tree.get(validator_path.as_posix())
+    if (
+        validator_record is None
+        or validator_record.object_type != "blob"
+        or validator_record.mode not in {"100644", "100755"}
+    ):
+        raise TemplateToolError(
+            "release source_commit canonical package owner is missing its tracked validator"
+        )
+
+    template_root = PurePosixPath(*entry_parts[:-1]).parent
+    visited: dict[str, tuple[str, PurePosixPath]] = {}
+    active: set[str] = set()
+
+    def visit(manifest_path: str, *, expected_format: str | None = None) -> str:
+        if manifest_path in active:
+            raise TemplateToolError(f"template dependency cycle in release source_commit: {manifest_path}")
+        if manifest_path in visited:
+            package_dir = visited[manifest_path][1]
+            manifest = _parse_commit_manifest(
+                _git_blob_bytes(root, manifest_path, tree[manifest_path]), manifest_path
+            )
+            template = manifest.get("template")
+            return _resolve_commit_reference(
+                package_dir,
+                template.get("file") if isinstance(template, dict) else None,
+                package_dir,
+                label="template.file",
+            )
+        record = tree.get(manifest_path)
+        if record is None:
+            raise TemplateToolError(f"release source_commit dependency is missing: {manifest_path}")
+        manifest = _parse_commit_manifest(_git_blob_bytes(root, manifest_path, record), manifest_path)
+        template = manifest.get("template")
+        if not isinstance(template, dict):
+            raise TemplateToolError(f"manifest template section is invalid in release source_commit: {manifest_path}")
+        actual_id = template.get("id")
+        actual_version = _require_version(
+            template.get("version"), label=f"release source_commit {manifest_path} version"
+        )
+        actual_format = template.get("format")
+        package_dir = PurePosixPath(manifest_path).parent
+        if (
+            actual_id != template_id
+            or package_dir.parent != template_root
+            or package_dir.name != f"v{actual_version}"
+        ):
+            raise TemplateToolError(
+                f"release source_commit dependency identity is invalid: {manifest_path}"
+            )
+        if not isinstance(actual_format, str) or not actual_format.strip():
+            raise TemplateToolError(
+                f"release source_commit dependency format is invalid: {manifest_path}"
+            )
+        if expected_format is not None and actual_format != expected_format:
+            raise TemplateToolError("release source_commit package format does not match the release plan")
+        template_path = _resolve_commit_reference(
+            package_dir,
+            template.get("file"),
+            package_dir,
+            label="template.file",
+        )
+        template_record = tree.get(template_path)
+        if template_record is None:
+            raise TemplateToolError(f"release source_commit template is missing: {template_path}")
+        template_bytes = _git_blob_bytes(root, template_path, template_record)
+        expected_fingerprint = manifest_fingerprint(manifest, Path(manifest_path))
+        if hashlib.sha256(template_bytes).hexdigest().upper() != expected_fingerprint:
+            raise TemplateToolError(
+                f"release source_commit template fingerprint mismatch: {template_path}"
+            )
+
+        active.add(manifest_path)
+        try:
+            visited[manifest_path] = (actual_version, package_dir)
+            base_manifest_raw = template.get("base_manifest")
+            base_template_raw = template.get("base_template")
+            if (base_manifest_raw is None) != (base_template_raw is None):
+                raise TemplateToolError(
+                    "template.base_manifest and template.base_template must be declared together"
+                )
+            if base_manifest_raw is not None:
+                base_manifest = _resolve_commit_reference(
+                    package_dir,
+                    base_manifest_raw,
+                    template_root,
+                    label="template.base_manifest",
+                )
+                base_template = _resolve_commit_reference(
+                    package_dir,
+                    base_template_raw,
+                    template_root,
+                    label="template.base_template",
+                )
+                if PurePosixPath(base_manifest).parent != PurePosixPath(base_template).parent:
+                    raise TemplateToolError(
+                        "template.base_manifest and template.base_template must share a package"
+                    )
+                declared_base_template = visit(base_manifest)
+                if declared_base_template != base_template:
+                    raise TemplateToolError(
+                        "release source_commit base_template does not match its dependency manifest"
+                    )
+        finally:
+            active.remove(manifest_path)
+        return template_path
+
+    visit(entry_manifest, expected_format=format)
+    closure = sorted(
+        visited.values(),
+        key=lambda item: (parse_semver(item[0]).as_tuple(), item[1].name.casefold()),
+    )
+    source_records: list[ReleaseSourceRecord] = []
+    for _, package_dir in closure:
+        repository_prefix = package_dir.as_posix() + "/"
+        package_entries = [
+            (path, record)
+            for path, record in tree.items()
+            if path.startswith(repository_prefix)
+        ]
+        package_has_manifest = False
+        for repository_path, record in package_entries:
+            relative = repository_path[len(repository_prefix):]
+            relative_path = Path(*PurePosixPath(relative).parts)
+            if _excluded(relative_path):
+                continue
+            archive_path = f"{template_id}/{package_dir.name}/{relative}"
+            _validate_archive_name(archive_path)
+            blob = _git_blob_bytes(root, repository_path, record)
+            package_has_manifest = package_has_manifest or relative == "manifest.yaml"
+            source_records.append(
+                ReleaseSourceRecord(
+                    archive_path=archive_path,
+                    repository_path=repository_path,
+                    git_blob_sha=record.object_id,
+                    sha256=hashlib.sha256(blob).hexdigest().upper(),
+                    size=len(blob),
+                )
+            )
+        if not package_has_manifest:
+            raise TemplateToolError(
+                f"release source_commit dependency has no manifest.yaml: {package_dir.as_posix()}"
+            )
+    if not source_records:
+        raise TemplateToolError("release source_commit package contains no archive files")
+    source_records.sort(key=lambda item: _archive_sort_key(item.archive_path))
+    _assert_unique_portable_names([item.archive_path for item in source_records])
+    return {item.archive_path: item for item in source_records}
 
 
 def _verify_release_archive_matches_source_snapshot(
@@ -737,14 +973,14 @@ def _verify_release_archive_matches_source_snapshot(
         raise TemplateToolError("release archive metadata files contain an invalid path")
     snapshot_paths = list(snapshot)
     if metadata_paths != snapshot_paths:
-        raise TemplateToolError("release archive paths do not match the HEAD source snapshot")
+        raise TemplateToolError("release archive paths do not match the source_commit snapshot")
     try:
         with zipfile.ZipFile(archive_path, "r") as archive:
             infos = archive.infolist()
             _validate_zip_resource_limits(infos)
             zip_paths = [info.filename for info in infos]
             if zip_paths != snapshot_paths:
-                raise TemplateToolError("release ZIP entries do not match the HEAD source snapshot")
+                raise TemplateToolError("release ZIP entries do not match the source_commit snapshot")
             for info, record, archive_name in zip(infos, raw_files, zip_paths):
                 expected = snapshot[archive_name]
                 if (
@@ -752,12 +988,12 @@ def _verify_release_archive_matches_source_snapshot(
                     or record.get("size") != expected.size
                 ):
                     raise TemplateToolError(
-                        f"release metadata source record differs byte-for-byte from HEAD snapshot: {archive_name}"
+                        f"release metadata source record differs byte-for-byte from source_commit: {archive_name}"
                     )
                 size, digest = _stream_zip_entry(archive, info)
                 if size != expected.size or digest != expected.sha256:
                     raise TemplateToolError(
-                        f"release ZIP entry differs byte-for-byte from HEAD snapshot: {archive_name}"
+                        f"release ZIP entry differs byte-for-byte from source_commit: {archive_name}"
                     )
     except zipfile.BadZipFile as exc:
         raise TemplateToolError("release archive is not a valid ZIP") from exc
@@ -768,6 +1004,7 @@ def _require_release_source_is_committed_canonical(
     root: Path,
     trust_index: GitTrustIndex,
     closure: Iterable[TemplatePackage],
+    source_commit: str,
 ) -> dict[str, ReleaseSourceRecord]:
     if not package.is_canonical or canonical_skill_root_for_package(package.package_dir, root) is None:
         raise TemplateToolError("release requires a canonical repository package")
@@ -782,7 +1019,13 @@ def _require_release_source_is_committed_canonical(
             source_path,
             label=f"release source file {archive_name}",
         )
-    return _release_source_snapshot(root, closure)
+    return release_source_snapshot_for_commit(
+        root,
+        template_id=package.template_id,
+        version=package.version,
+        format=package.format,
+        source_commit=source_commit,
+    )
 
 
 def _canonical_package_for_release(root: Path, package: Path | None, template_id: str | None, version: str | None) -> TemplatePackage:
@@ -850,7 +1093,13 @@ def release_package(
     closure = _dependency_closure(target, root)
     trust_index = GitTrustIndex.from_repo_root(root)
     source_commit = _git_head(root)
-    source_snapshot = _require_release_source_is_committed_canonical(target, root, trust_index, closure)
+    source_snapshot = _require_release_source_is_committed_canonical(
+        target,
+        root,
+        trust_index,
+        closure,
+        source_commit,
+    )
     output_dir = _validate_release_output(output_dir or (root / DEFAULT_ARCHIVE_OUTPUT_ROOT), root, closure)
     archive_name = f"{target.template_id}-{target.version}.zip"
     sidecar_name = f"{archive_name}.sha256"
@@ -1283,7 +1532,7 @@ def _install_verified_bundle(
     if operation == "install":
         if state is not None:
             raise TemplateToolError("template is already installed; use upgrade")
-        if versions_dir.exists() and any(item.is_symlink() or item.is_dir() for item in versions_dir.iterdir()):
+        if versions_dir.exists() and any(versions_dir.iterdir()):
             raise TemplateToolError("installed versions exist without an active installation; refusing install")
     elif operation == "upgrade":
         if state is None:
