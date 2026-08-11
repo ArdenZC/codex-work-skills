@@ -3507,10 +3507,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("main", events["push"]["branches"])
         self.assertIn("master", events["push"]["branches"])
         self.assertEqual(events["schedule"][0]["cron"], "17 3 * * 1")
-        self.assertEqual(
-            workflow_data["concurrency"]["cancel-in-progress"],
-            "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
-        )
+        self.assertTrue(workflow_data["concurrency"]["cancel-in-progress"])
+        concurrency_group = workflow_data["concurrency"]["group"]
+        self.assertIn("github.event_name", concurrency_group)
+        self.assertIn("format('pr-{0}', github.event.pull_request.number)", concurrency_group)
+        self.assertIn("format('push-{0}', github.ref)", concurrency_group)
+        self.assertIn("format('preserved-{0}', github.run_id)", concurrency_group)
 
         jobs = workflow_data["jobs"]
         for job_name in (
@@ -3564,6 +3566,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("schedule", events)
         self.assertIn("concurrency", workflow)
         self.assertIn("cancel-in-progress", workflow)
+        self.assertIn("preserved-", workflow)
 
         classifier = (ROOT / ".github" / "scripts" / "classify_ci_changes.py").read_text(encoding="utf-8")
         for output in (

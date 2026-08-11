@@ -11,8 +11,10 @@ on:
     - cron: "17 3 * * 1"
 
 concurrency:
-  group: template-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+  # PR and master-push runs cancel obsolete work; manual and scheduled runs
+  # use unique groups so an in-progress full validation is never cancelled.
+  group: template-ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('push-{0}', github.ref) || format('preserved-{0}', github.run_id) }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
