@@ -122,12 +122,20 @@ def _archive_sort_key(name: str) -> tuple[str, str]:
     return normalized.casefold(), normalized
 
 
-def _package_files(package: TemplatePackage, prefix: str) -> list[tuple[str, Path]]:
+def _package_files(
+    package: TemplatePackage,
+    prefix: str,
+    *,
+    excluded_package_dirs: set[Path] | None = None,
+) -> list[tuple[str, Path]]:
     files: list[tuple[str, Path]] = []
     package_dir = package.package_dir
+    excluded_package_dirs = excluded_package_dirs or set()
     if package_dir.is_symlink() or not package_dir.is_dir():
         raise TemplateToolError(f"archive package root must be a real directory: {package_dir}")
     for path in sorted(package_dir.rglob("*"), key=lambda item: item.as_posix().casefold()):
+        if any(is_within(path, excluded) for excluded in excluded_package_dirs):
+            continue
         relative = path.relative_to(package_dir)
         if _excluded(relative):
             continue
@@ -145,15 +153,49 @@ def _package_files(package: TemplatePackage, prefix: str) -> list[tuple[str, Pat
     return files
 
 
-def _archive_source_files(closure: list[TemplatePackage]) -> list[tuple[str, Path]]:
-    """Return the exact source files that deterministic archive writes."""
-    prefix_by_package = {
-        item.package_dir.resolve(): f"{item.template_id}/{item.package_dir.name}"
-        for item in closure
-    }
-    files: list[tuple[str, Path]] = []
+def _dependency_path_allowed(package_dir: Path, entry_package: Path, template_root: Path) -> bool:
+    """Allow direct version packages and dependencies contained by the entry package."""
+    return package_dir.parent == template_root or is_within(package_dir, entry_package, allow_equal=False)
+
+
+def _archive_prefixes(closure: list[TemplatePackage], template_root: Path) -> dict[Path, str]:
+    prefixes: dict[Path, str] = {}
+    template_root = template_root.resolve()
     for item in closure:
-        files.extend(_package_files(item, prefix_by_package[item.package_dir.resolve()]))
+        package_dir = item.package_dir.resolve()
+        try:
+            relative = package_dir.relative_to(template_root)
+        except ValueError as exc:
+            raise TemplateToolError(f"archive dependency escapes its template-id root: {package_dir}") from exc
+        if not relative.parts:
+            raise TemplateToolError(f"archive package path is invalid: {package_dir}")
+        prefixes[package_dir] = f"{item.template_id}/{relative.as_posix()}"
+    return prefixes
+
+
+def _archive_source_files(
+    closure: list[TemplatePackage],
+    *,
+    template_root: Path,
+) -> list[tuple[str, Path]]:
+    """Return the exact source files that deterministic archive writes."""
+    prefix_by_package = _archive_prefixes(closure, template_root)
+    files: list[tuple[str, Path]] = []
+    package_dirs = [item.package_dir.resolve() for item in closure]
+    for item in closure:
+        package_dir = item.package_dir.resolve()
+        nested_packages = {
+            other
+            for other in package_dirs
+            if other != package_dir and is_within(other, package_dir, allow_equal=False)
+        }
+        files.extend(
+            _package_files(
+                item,
+                prefix_by_package[package_dir],
+                excluded_package_dirs=nested_packages,
+            )
+        )
     files.sort(key=lambda pair: _archive_sort_key(pair[0]))
     _assert_unique_portable_names([name for name, _ in files])
     return files
@@ -181,7 +223,7 @@ def _dependency_closure(package: TemplatePackage, root: Path) -> list[TemplatePa
             raise TemplateToolError(f"template dependency cycle detected at {current_dir}")
         if current_dir in visited:
             return
-        if not is_within(current_dir, template_root) or current_dir.parent != template_root:
+        if not _dependency_path_allowed(current_dir, package.package_dir.resolve(), template_root):
             raise TemplateToolError(f"template dependency escapes its template-id root: {current_dir}")
         if current_package is None:
             if package.validator is None:
@@ -320,7 +362,7 @@ def _verify_extracted_dependency_closure(entry: TemplatePackage, root: Path, own
             raise TemplateToolError(f"extracted archive dependency cycle detected at {package_dir}")
         if package_dir in visited:
             return
-        if package_dir.parent != template_root or not is_within(package_dir, template_root):
+        if not _dependency_path_allowed(package_dir, entry.package_dir.resolve(), template_root):
             raise TemplateToolError(f"extracted archive dependency escapes template root: {package_dir}")
         current = inspect_manifest_package(package_dir, owner_validator, is_canonical=False, is_default=False)
         if current.errors:
@@ -434,11 +476,8 @@ def archive_package(package_dir: Path, output_dir: Path, root: Path, *, dry_run:
     if not validation_succeeded(validation):
         raise TemplateToolError("full template validation failed: " + "; ".join(validation.get("errors", [])))
 
-    prefix_by_package = {
-        item.package_dir.resolve(): f"{item.template_id}/{item.package_dir.name}"
-        for item in closure
-    }
-    files = _archive_source_files(closure)
+    prefix_by_package = _archive_prefixes(closure, package.package_dir.parent)
+    files = _archive_source_files(closure, template_root=package.package_dir.parent)
     names = [name for name, _ in files]
 
     archive_name = f"{package.template_id}-{package.version}.zip"

@@ -219,9 +219,19 @@ def _copy_dependency_closure(
     *,
     copied: dict[Path, Path],
     active: set[Path],
+    entry_source_package: Path,
+    entry_destination_package: Path,
 ) -> None:
     source_package = source_package.resolve()
-    destination_package = destination_root / source_package.name
+    entry_source_package = entry_source_package.resolve()
+    entry_destination_package = entry_destination_package.resolve()
+    template_root = entry_source_package.parent
+    if is_within(source_package, entry_source_package, allow_equal=False):
+        destination_package = entry_destination_package / source_package.relative_to(entry_source_package)
+    elif source_package.parent == template_root:
+        destination_package = destination_root / source_package.name
+    else:
+        raise TemplateToolError(f"template dependency escapes its template-id root: {source_package}")
     if source_package in active:
         raise TemplateToolError(f"template dependency cycle detected at {source_package}")
     existing = copied.get(source_package)
@@ -249,7 +259,10 @@ def _copy_dependency_closure(
             return
         if base_manifest.parent != base_template.parent:
             raise TemplateToolError("template.base_manifest and template.base_template must share a package")
-        if not is_within(base_manifest.parent, source_package.parent):
+        if not (
+            base_manifest.parent.parent == template_root
+            or is_within(base_manifest.parent, entry_source_package, allow_equal=False)
+        ):
             raise TemplateToolError(f"template dependency escapes its template-id root: {base_manifest.parent}")
         if not base_manifest.is_file() or not base_template.is_file():
             raise TemplateToolError(f"template dependency is missing: {base_manifest.parent}")
@@ -258,6 +271,8 @@ def _copy_dependency_closure(
             destination_root,
             copied=copied,
             active=active,
+            entry_source_package=entry_source_package,
+            entry_destination_package=entry_destination_package,
         )
     finally:
         active.remove(source_package)
@@ -346,7 +361,14 @@ def _prepare_isolated_package(
         if base_manifest is not None:
             if base_manifest.parent != base_template.parent or not base_manifest.is_file() or not base_template.is_file():
                 raise TemplateToolError("template base dependency is incomplete")
-            _copy_dependency_closure(base_manifest.parent, target_root, copied=copied, active=set())
+            _copy_dependency_closure(
+                base_manifest.parent,
+                target_root,
+                copied=copied,
+                active=set(),
+                entry_source_package=package.package_dir,
+                entry_destination_package=destination_package,
+            )
 
         _assert_no_python_cache_or_bytecode(temporary_root)
 

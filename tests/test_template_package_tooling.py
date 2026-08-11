@@ -1814,6 +1814,43 @@ class TemplatePackageToolingTests(unittest.TestCase):
             self.assertEqual({item["version"] for item in metadata["packages"]}, {"1.0.0", "1.1.0"})
             self.assertFalse((first_dir / "demo-template-1.1.0.zip.json").exists())
 
+    def test_archive_preserves_nested_dependency_layout_and_is_valid_after_extraction(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-嵌套依赖-") as directory:
+            root = Path(directory)
+            _, base, _ = self.make_fixture_repo(root)
+            package = base.parent / "v1.1.0"
+            shutil.copytree(base, package)
+            nested_base = package / "v1.0.0"
+            shutil.copytree(base, nested_base)
+            manifest_path = package / "manifest.yaml"
+            manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+            manifest["template"]["version"] = "1.1.0"
+            manifest["template"]["base_manifest"] = "v1.0.0/manifest.yaml"
+            manifest["template"]["base_template"] = "v1.0.0/template.txt"
+            manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+            output = root / "dist" / "template-packages" / "nested"
+            archived = self.run_tool("archive", "--package", package, "--output-dir", output, "--json", root=root)
+            self.assert_process_succeeded(archived)
+            archive_path = output / "demo-template-1.1.0.zip"
+            with zipfile.ZipFile(archive_path) as archive:
+                names = archive.namelist()
+                self.assertIn("demo-template/v1.1.0/manifest.yaml", names)
+                self.assertIn("demo-template/v1.1.0/v1.0.0/manifest.yaml", names)
+
+            verified = self.run_tool(
+                "verify-release",
+                "--archive",
+                archive_path,
+                "--sha256-file",
+                output / "demo-template-1.1.0.zip.sha256",
+                "--metadata",
+                output / "demo-template-1.1.0.metadata.json",
+                "--json",
+                root=root,
+            )
+            self.assert_process_succeeded(verified)
+
     def test_archive_rejects_missing_bad_and_cyclic_dependencies(self) -> None:
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
             root = Path(directory)
