@@ -863,7 +863,7 @@ def validate_output_dir(
         if is_semantic_manifest(manifest):
             for bookmark_group, expected_values in zip(
                 implementation_bookmarks(manifest),
-                implementation_cell_values(str(item["task"]), item.get("flows", [])),
+                implementation_cell_values(str(item["task"]), item.get("flows", []), item["hours"]),
             ):
                 for bookmark_name, expected_value in zip(bookmark_group, expected_values.values()):
                     record = find_bookmark(document, bookmark_name)
@@ -885,7 +885,7 @@ def validate_output_dir(
             implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
             for row_index, expected_values in zip(
                 implementation_rows,
-                implementation_cell_values(str(item["task"]), item.get("flows", [])),
+                implementation_cell_values(str(item["task"]), item.get("flows", []), item["hours"]),
             ):
                 cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
                 for cell_index, expected_value in expected_values.items():

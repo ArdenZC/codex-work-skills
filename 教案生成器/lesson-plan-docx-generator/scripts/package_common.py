@@ -28,11 +28,11 @@ from semantic_bookmarks import (
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
+DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
 V10_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 V11_MANIFEST = DEFAULT_MANIFEST
 V10_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
-V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
+V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
 LEGACY_TEMPLATE = SKILL_DIR / "assets" / "lesson-plan-template.docx"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -40,6 +40,9 @@ LEGACY_ANCHOR_MODE = "legacy_coordinates"
 SEMANTIC_ANCHOR_MODE = "word_bookmark"
 MAX_TEACHING_CONTENT_ITEMS = 8
 EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
+IN_CLASS_STAGE_BASE_MINUTES = (5, 15, 30, 10, 15, 10, 5)
+IN_CLASS_TOTAL_MINUTES = 90
+MINUTES_PER_LESSON_HOUR = 45
 EVALUATION_REMARKS = [
     ["出勤正常", "注意力较稳", "参与较积极", "规范意识较好", "质量意识较强", "安全意识较好", "习惯较好", "预习较完整", "答题较准确", "作业较认真", "实操较熟练", "展示较清楚"],
     ["基本到课", "个别环节需提醒", "能主动配合", "流程执行较规范", "能联系项目实际", "职业责任意识较好", "工具使用较规范", "线上学习较及时", "讨论质量尚可", "提交较规范", "任务完成度较高", "汇报条理较清楚"],
@@ -76,7 +79,8 @@ def _sha256(path: Path) -> str:
 
 def _known_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
-    known = ((V11_TEMPLATE, "1.1.0"), (V10_TEMPLATE, "1.0.0"), (LEGACY_TEMPLATE, "1.0.0"))
+    known = ((V11_TEMPLATE, "1.1.1"), (V10_TEMPLATE, "1.0.0"), (LEGACY_TEMPLATE, "1.0.0"))
+    known += ((SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", "1.1.0"),)
     for candidate, version in known:
         if path == candidate:
             return version
@@ -92,7 +96,8 @@ def _known_template_version(path: Path) -> str | None:
 def _exact_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
     for candidate, version in (
-        (V11_TEMPLATE, "1.1.0"),
+        (V11_TEMPLATE, "1.1.1"),
+        (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", "1.1.0"),
         (V10_TEMPLATE, "1.0.0"),
         (LEGACY_TEMPLATE, "1.0.0"),
     ):
@@ -212,11 +217,13 @@ def resolve_template_package(
 
     if manifest is None:
         known_version = _known_template_version(template)
-        if known_version == "1.1.0":
+        if known_version == "1.1.1":
             resolved_manifest = V11_MANIFEST.resolve()
+        elif known_version == "1.1.0":
+            resolved_manifest = (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml").resolve()
         elif known_version == "1.0.0":
             resolved_manifest = V10_MANIFEST.resolve()
-        elif template.parent.name in {"v1.0.0", "v1.1.0"} and (template.parent / "manifest.yaml").exists():
+        elif template.parent.name in {"v1.0.0", "v1.1.0", "v1.1.1"} and (template.parent / "manifest.yaml").exists():
             resolved_manifest = (template.parent / "manifest.yaml").resolve()
         else:
             raise ValueError("Custom template requires a matching --manifest.")
@@ -737,8 +744,35 @@ def evaluation_cell_values(target: float, sequence: int) -> list[dict[int, str]]
     return values
 
 
-def implementation_cell_values(task: str, flows: list[Any]) -> list[dict[int, str]]:
+def implementation_stage_minutes(hours: Any = 2) -> list[int]:
+    try:
+        lesson_hours = Decimal(str(hours).strip())
+    except (InvalidOperation, ValueError, TypeError) as exc:
+        raise ValueError(f"Lesson hours must be numeric for implementation timing: {hours}") from exc
+    if lesson_hours <= 0:
+        raise ValueError(f"Lesson hours must be positive for implementation timing: {hours}")
+
+    total = lesson_hours * Decimal(MINUTES_PER_LESSON_HOUR)
+    rounded_total = int(total.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    weighted = [
+        Decimal(base) * total / Decimal(IN_CLASS_TOTAL_MINUTES)
+        for base in IN_CLASS_STAGE_BASE_MINUTES
+    ]
+    minutes = [int(value) for value in weighted]
+    remainder = rounded_total - sum(minutes)
+    order = sorted(
+        range(len(minutes)),
+        key=lambda index: (weighted[index] - Decimal(minutes[index]), -index),
+        reverse=True,
+    )
+    for index in order[:remainder]:
+        minutes[index] += 1
+    return minutes
+
+
+def implementation_cell_values(task: str, flows: list[Any], hours: Any = 2) -> list[dict[int, str]]:
     numbered_flows = _numbered_text(flows[:3])
+    intro, demo, execution, extension, practice, peer, summary = implementation_stage_minutes(hours)
     return [
         {
             0: "课前准备\n10min\n线上+线下",
@@ -748,49 +782,49 @@ def implementation_cell_values(task: str, flows: list[Any]) -> list[dict[int, st
             4: "保证任务开始前目标明确、环境可用",
         },
         {
-            0: "任务导入5min\n线下",
+            0: f"任务导入\n{intro}min\n线下",
             1: f"以项目情境导入“{task}”，说明本次任务产出物",
             2: "1. 展示项目背景\n2. 明确任务边界\n3. 说明评分要点",
             3: "1. 了解项目情境\n2. 明确小组分工\n3. 确认成果要求",
             4: "用真实任务激活学习动机，形成任务驱动",
         },
         {
-            0: "操作示范\n15min\n线下",
+            0: f"操作示范\n{demo}min\n线下",
             1: f"示范本次任务关键步骤：\n{numbered_flows}",
             2: "1. 演示关键流程\n2. 提醒易错点\n3. 展示合格成果样例",
             3: "1. 观察记录\n2. 对照模板理解要求\n3. 提问确认",
             4: "降低实操门槛，让学生掌握基本路径",
         },
         {
-            0: "任务实施\n25min\n线下",
+            0: f"任务实施\n{execution}min\n线下",
             1: f"小组完成{task}，形成课堂阶段性成果",
             2: "1. 巡视指导\n2. 解答工具和流程问题\n3. 记录共性问题",
             3: "1. 按分工完成任务\n2. 记录操作过程\n3. 整理成果文件",
             4: "通过做中学完成知识、技能和规范的转化",
         },
         {
-            0: "任务拓展\n10min\n线下",
+            0: f"任务拓展\n{extension}min\n线下",
             1: "根据教师反馈修正记录、脚本、用例或文档中的问题",
             2: "1. 点评典型问题\n2. 指导小组修正\n3. 强调质量标准",
             3: "1. 对照反馈修改\n2. 复查成果完整性\n3. 完成自评",
             4: "强化规范意识和质量闭环",
         },
         {
-            0: "项目实训\n15min\n线下",
+            0: f"项目实训\n{practice}min\n线下",
             1: f"提交{task}相关成果包，包括记录、截图、脚本或文档",
             2: "1. 检查提交材料\n2. 抽查关键成果\n3. 给出即时建议",
             3: "1. 提交成果包\n2. 补充说明\n3. 记录改进点",
             4: "形成可评价、可追溯的学习成果",
         },
         {
-            0: "组间互评8min\n线下",
+            0: f"组间互评\n{peer}min\n线下",
             1: "小组交换成果，从正确性、完整性、规范性和可复现性四方面互评",
             2: "1. 下发互评标准\n2. 组织互评\n3. 抽取典型成果点评",
             3: "1. 根据标准互评\n2. 记录建议\n3. 完善本组成果",
             4: "让评价标准显性化，促进互学互改",
         },
         {
-            0: "课堂小结7min\n线下",
+            0: f"课堂小结\n{summary}min\n线下",
             1: "归纳本次任务的关键流程、常见问题和成果规范",
             2: "1. 总结重难点\n2. 发布课后完善要求\n3. 提醒下次课准备",
             3: "1. 回顾任务过程\n2. 完成自评\n3. 明确课后任务",
@@ -849,7 +883,7 @@ def validate_composed_fields(data: dict[str, Any], manifest: dict[str, Any]) -> 
             str(lesson.get("hours", "")).strip(),
             hours_spec,
         )
-        for row_index, values in enumerate(implementation_cell_values(task, flows), start=1):
+        for row_index, values in enumerate(implementation_cell_values(task, flows, lesson.get("hours", 2)), start=1):
             for cell_index, value in values.items():
                 _validate_composed_limit(
                     f"lessons[{index - 1}].implementation row {row_index} cell {cell_index}",

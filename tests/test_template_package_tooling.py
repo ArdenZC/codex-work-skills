@@ -304,19 +304,20 @@ class TemplatePackageToolingTests(unittest.TestCase):
         target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
         return skill, base, other, source, target
 
-    def test_discover_current_four_packages_without_libreoffice(self) -> None:
+    def test_discover_current_five_packages_without_libreoffice(self) -> None:
         result = self.run_tool("discover", "--json")
         self.assert_process_succeeded(result)
         payload = self.json_result(result)
-        self.assertEqual(payload["count"], 4)
+        self.assertEqual(payload["count"], 5)
         self.assertEqual({(item["id"], item["version"]) for item in payload["packages"]}, {
             ("lesson-plan", "1.0.0"),
             ("lesson-plan", "1.1.0"),
+            ("lesson-plan", "1.1.1"),
             ("course-gradebook", "1.0.0"),
             ("course-gradebook", "1.1.0"),
         })
         defaults = {(item["id"], item["version"]) for item in payload["packages"] if item["is_default"]}
-        self.assertEqual(defaults, {("lesson-plan", "1.1.0"), ("course-gradebook", "1.1.0")})
+        self.assertEqual(defaults, {("lesson-plan", "1.1.1"), ("course-gradebook", "1.1.0")})
         self.assertEqual(payload["errors"], [])
 
     def test_dynamic_repository_validator_discovers_and_validates_new_canonical_patch(self) -> None:

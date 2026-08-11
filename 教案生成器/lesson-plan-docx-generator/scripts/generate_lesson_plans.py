@@ -24,7 +24,7 @@ from validate_template import validate_template
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
+DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
 
 MAX_FILENAME_BYTES = 255
 
@@ -269,14 +269,14 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     add_eval_table(evaluation_cell, score, seq, manifest)
 
     if is_semantic_manifest(manifest):
-        for bookmark_group, values in zip(implementation_bookmarks(manifest), implementation_cell_values(task, flows)):
+        for bookmark_group, values in zip(implementation_bookmarks(manifest), implementation_cell_values(task, flows, hours)):
             for bookmark_name, value in zip(bookmark_group, [values[index] for index in range(5)]):
                 set_anchored_cell(doc, manifest, bookmark_name, value, multiline="\n" in str(value))
         for bookmark_name, value in zip(reflection_bookmarks(manifest), reflection_cell_values(task)):
             set_anchored_cell(doc, manifest, bookmark_name, value, multiline="\n" in str(value))
     else:
         implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
-        for row_index, values in zip(implementation_rows, implementation_cell_values(task, flows)):
+        for row_index, values in zip(implementation_rows, implementation_cell_values(task, flows, hours)):
             set_row(table, row_index, values)
         reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
         for row_index, value in zip(reflection_rows, reflection_cell_values(task)):
