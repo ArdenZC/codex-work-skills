@@ -3505,7 +3505,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("      - main\n      - master", workflow)
         self.assertIn("- os: windows-latest", workflow)
         self.assertIn("- os: macos-14", workflow)
-        self.assertNotIn("ubuntu-latest", workflow)
+        self.assertIn("runs-on: ubuntu-latest", workflow)
         self.assertIn("suite: lesson-plan", workflow)
         self.assertIn("suite: gradebook", workflow)
         workflow_data = yaml.safe_load(workflow)
@@ -3533,6 +3533,80 @@ class WorkflowContractTests(unittest.TestCase):
         release_workflow = (ROOT / ".github" / "workflows" / "template-release.yml").read_text(encoding="utf-8")
         self.assertIn("runs-on: macos-14", release_workflow)
         self.assertNotIn("ubuntu-latest", release_workflow)
+
+    def test_template_package_ci_docs_only_fast_path_contract(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
+        workflow_data = yaml.safe_load(workflow)
+        jobs = workflow_data["jobs"]
+        events = workflow_data.get("on", workflow_data.get(True, {}))
+
+        self.assertFalse(events["pull_request"] and "paths" in events["pull_request"])
+        self.assertNotIn("paths", events["push"])
+        self.assertIn("workflow_dispatch", events)
+
+        for job_name in ("classify-changes", "documentation-checks", "ci-gate"):
+            self.assertIn(job_name, jobs)
+        self.assertEqual(jobs["classify-changes"]["runs-on"], "ubuntu-latest")
+        self.assertEqual(jobs["documentation-checks"]["runs-on"], "ubuntu-latest")
+        self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
+
+        classifier = "\n".join(
+            step.get("run", "")
+            for step in jobs["classify-changes"]["steps"]
+        )
+        for allowed_path in (
+            "README.md",
+            "docs/",
+            "教案生成器/简介.md",
+            "平时成绩记分册生成器/简介.md",
+            "多Agent兼容规范.md",
+        ):
+            self.assertIn(allowed_path, classifier)
+        for forbidden_path in (
+            "SKILL.md",
+            "AGENTS.md",
+            "CLAUDE.md",
+            "GEMINI.md",
+            "CONVENTIONS.md",
+            ".py",
+            ".ps1",
+            ".yml",
+            ".yaml",
+            ".json",
+            ".docx",
+            ".xls",
+            "tests/",
+            "tools/",
+        ):
+            self.assertNotIn(forbidden_path, classifier)
+        self.assertIn("workflow_dispatch", classifier)
+        self.assertIn("git diff --name-only", classifier)
+
+        documentation = "\n".join(
+            step.get("run", "")
+            for step in jobs["documentation-checks"]["steps"]
+        )
+        self.assertIn("git diff --check", documentation)
+        self.assertIn("urlsplit", documentation)
+        self.assertIn("install.py", documentation)
+        self.assertIn("manifest_version", documentation)
+        self.assertNotIn("libreoffice", documentation.lower())
+        self.assertNotIn("pip install", documentation.lower())
+
+        for heavy_job in ("template-tooling", "template-core", "template-release"):
+            self.assertEqual(jobs[heavy_job]["needs"], "classify-changes")
+            self.assertEqual(
+                jobs[heavy_job]["if"],
+                "needs.classify-changes.outputs.docs_only != 'true'",
+            )
+
+        self.assertEqual(
+            set(jobs["ci-gate"]["needs"]),
+            {"classify-changes", "documentation-checks", "template-tooling", "template-core", "template-release"},
+        )
+        gate = "\n".join(step.get("run", "") for step in jobs["ci-gate"]["steps"])
+        self.assertIn("skipped", gate)
+        self.assertIn("CI Gate: success", gate)
 
 
 @unittest.skipUnless(soffice_path(), "LibreOffice is required for XLS package tests")
