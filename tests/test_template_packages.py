@@ -3540,7 +3540,7 @@ class WorkflowContractTests(unittest.TestCase):
         lesson_text = str(jobs["template-lesson"]).lower()
         gradebook_text = str(jobs["template-gradebook"]).lower()
         release_text = str(jobs["template-release"]).lower()
-        self.assertNotIn("libreoffice", tooling_text)
+        self.assertIn("libreoffice", tooling_text)
         self.assertNotIn("libreoffice", lesson_text)
         self.assertIn("libreoffice", gradebook_text)
         self.assertIn("libreoffice", release_text)
