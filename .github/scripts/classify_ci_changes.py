@@ -218,23 +218,37 @@ def classify(
     return result
 
 
-def _git_changed_paths(base_sha: str, head_sha: str) -> tuple[list[str], bool]:
-    lines = subprocess.check_output(
-        ["git", "diff", "--name-status", "--find-renames", base_sha, head_sha],
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    ).splitlines()
+def _git_changed_paths(
+    base_sha: str,
+    head_sha: str,
+    *,
+    cwd: Path | None = None,
+) -> tuple[list[str], bool]:
+    raw_fields = subprocess.check_output(
+        ["git", "diff", "--name-status", "--find-renames", "-z", base_sha, head_sha],
+        cwd=cwd,
+    ).split(b"\0")
     paths: list[str] = []
     ambiguous = False
-    for line in lines:
-        fields = line.split("\t")
-        status = fields[0] if fields else ""
+    index = 0
+    while index < len(raw_fields) - 1:
+        status = raw_fields[index].decode("ascii", errors="replace")
+        index += 1
         if status.startswith(("R", "C")):
-            ambiguous = True
-            paths.extend(fields[1:])
+            if index + 1 >= len(raw_fields):
+                ambiguous = True
+                break
+            paths.extend(
+                field.decode("utf-8", errors="surrogateescape")
+                for field in raw_fields[index : index + 2]
+            )
+            index += 2
         else:
-            paths.extend(fields[1:] or fields[:1])
+            if index >= len(raw_fields):
+                ambiguous = True
+                break
+            paths.append(raw_fields[index].decode("utf-8", errors="surrogateescape"))
+            index += 1
             if status.startswith("D"):
                 ambiguous = True
     return paths, ambiguous

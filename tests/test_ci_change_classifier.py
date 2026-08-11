@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -8,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github" / "scripts"))
 
-from classify_ci_changes import classify  # noqa: E402
+from classify_ci_changes import _git_changed_paths, classify  # noqa: E402
 
 
 class ChangeClassifierTests(unittest.TestCase):
@@ -102,6 +104,43 @@ class ChangeClassifierTests(unittest.TestCase):
         for event in ("workflow_dispatch", "schedule"):
             result = classify(["README.md"], event_name=event)
             self.assert_flags(result, docs_only=False, run_docs=False, force_full=True, run_lesson=True, run_gradebook=True, run_tooling=True, run_release=True, run_package_contracts=True)
+
+    def test_git_z_status_decodes_quoted_unicode_paths(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ci-classifier-git-paths-") as temp_name:
+            repo = Path(temp_name)
+            lesson_file = repo / "教案生成器" / "lesson-plan-docx-generator" / "scripts" / "changed.py"
+            lesson_file.parent.mkdir(parents=True)
+
+            def git(*args: str) -> str:
+                result = subprocess.run(
+                    ["git", *args],
+                    cwd=repo,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                )
+                return result.stdout.strip()
+
+            git("init", "--quiet")
+            git("config", "user.email", "ci-classifier@example.invalid")
+            git("config", "user.name", "CI classifier")
+            git("config", "core.quotePath", "true")
+            lesson_file.write_text("before\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "base")
+            base_sha = git("rev-parse", "HEAD")
+            lesson_file.write_text("after\n", encoding="utf-8")
+            git("add", ".")
+            git("commit", "--quiet", "-m", "change")
+            head_sha = git("rev-parse", "HEAD")
+
+            paths, ambiguous = _git_changed_paths(base_sha, head_sha, cwd=repo)
+
+        self.assertFalse(ambiguous)
+        self.assertEqual(paths, ["教案生成器/lesson-plan-docx-generator/scripts/changed.py"])
+        result = classify(paths, event_name="pull_request")
+        self.assert_flags(result, run_lesson=True, run_gradebook=False, force_full=False)
 
 
 if __name__ == "__main__":
