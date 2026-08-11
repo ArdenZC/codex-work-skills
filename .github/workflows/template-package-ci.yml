@@ -14,6 +14,7 @@ concurrency:
   # PR and master-push runs cancel obsolete work; manual and scheduled runs
   # use unique groups so an in-progress full validation is never cancelled.
   # run_id is guaranteed unique for the preserved manual/scheduled groups.
+  # head_ref keeps successive synchronize runs for one PR in the same group.
   group: template-ci-${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && format('preserved-{0}', github.run_id) || github.head_ref || github.ref }}
   cancel-in-progress: true
 
