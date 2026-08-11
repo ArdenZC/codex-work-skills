@@ -16,6 +16,7 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 TEST_RUNNER = ROOT / ".github" / "scripts" / "run_gradebook_tests.py"
 DEFAULT_GROUPS = ("contracts", "generation")
+GRADEBOOK_SCRIPTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "scripts"
 
 
 def _isolated_office_environment(profile_root: Path) -> dict[str, str]:
@@ -35,7 +36,28 @@ def _append_summary(lines: list[str]) -> None:
     if not summary:
         return
     with Path(summary).open("a", encoding="utf-8") as stream:
-        stream.write("\n".join(lines) + "\n")
+            stream.write("\n".join(lines) + "\n")
+
+
+def _prewarm_controlled_baseline() -> float:
+    """Build or validate the shared immutable baseline before forking shards."""
+    candidates = (
+        shutil.which("soffice"),
+        shutil.which("soffice.com"),
+        r"C:\Program Files\LibreOffice\program\soffice.com",
+    )
+    soffice = next((candidate for candidate in candidates if candidate and Path(candidate).exists()), None)
+    if soffice is None:
+        raise RuntimeError("LibreOffice/soffice is required to prewarm the Gradebook baseline")
+
+    if str(GRADEBOOK_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(GRADEBOOK_SCRIPTS))
+    from named_range_template_baseline import build_controlled_v11_baseline
+
+    started = time.monotonic()
+    with tempfile.TemporaryDirectory(prefix="gradebook-shard-baseline-") as temp_name:
+        build_controlled_v11_baseline(Path(temp_name), str(soffice))
+    return time.monotonic() - started
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -50,6 +72,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     processes: dict[str, tuple[subprocess.Popen[bytes], Path, float]] = {}
     handles = []
     try:
+        baseline_seconds = _prewarm_controlled_baseline()
+        print(f"Gradebook controlled baseline ready ({baseline_seconds:.2f}s)")
         for group in groups:
             group_root = log_root / group
             group_root.mkdir()
@@ -79,7 +103,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             if pending:
                 time.sleep(0.1)
 
-        summary_lines = ["### Gradebook semantic shards"]
+        summary_lines = [
+            "### Gradebook semantic shards",
+            f"- controlled baseline prewarm: {baseline_seconds:.2f}s",
+        ]
         for group in groups:
             summary_lines.append(
                 f"- {group}: {durations[group]:.2f}s, exit={statuses[group]}"
