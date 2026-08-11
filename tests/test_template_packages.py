@@ -3510,8 +3510,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertTrue(workflow_data["concurrency"]["cancel-in-progress"])
         concurrency_group = workflow_data["concurrency"]["group"]
         self.assertIn("github.event_name", concurrency_group)
-        self.assertIn("format('pr-{0}', github.event.pull_request.number)", concurrency_group)
-        self.assertIn("format('push-{0}', github.ref)", concurrency_group)
+        self.assertIn("github.head_ref", concurrency_group)
+        self.assertIn("github.ref", concurrency_group)
         self.assertIn("format('preserved-{0}', github.run_id)", concurrency_group)
 
         jobs = workflow_data["jobs"]
