@@ -66,6 +66,8 @@ cd codex-work-skills
 在 Windows 上安装到 Codex 默认目录：
 
 ```powershell
+python -m pip install -r ".\教案生成器\lesson-plan-docx-generator\requirements.txt"
+python -m pip install -r ".\平时成绩记分册生成器\course-gradebook-generator\requirements.txt"
 python ".\教案生成器\lesson-plan-docx-generator\scripts\install.py"
 python ".\平时成绩记分册生成器\course-gradebook-generator\scripts\install.py"
 ```
@@ -73,9 +75,13 @@ python ".\平时成绩记分册生成器\course-gradebook-generator\scripts\inst
 在 macOS 上安装到 Codex 默认目录：
 
 ```bash
+python3 -m pip install -r "./教案生成器/lesson-plan-docx-generator/requirements.txt"
+python3 -m pip install -r "./平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
 python3 "./教案生成器/lesson-plan-docx-generator/scripts/install.py"
 python3 "./平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
 ```
+
+上面的两个 `requirements.txt` 命令会安装生成和 QA 所需的 Python 依赖；`install.py` 负责复制 Skill 文件，不负责安装依赖。
 
 默认安装目录是 `~/.codex/skills/`。如果目标目录已经存在，明确使用 `--replace` 才会替换；它会先备份已有安装：
 
