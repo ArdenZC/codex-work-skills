@@ -2,37 +2,236 @@ name: Template package CI
 
 on:
   pull_request:
-    paths:
-      - ".github/workflows/template-package-ci.yml"
-      - ".github/workflows/template-release.yml"
-      - "docs/**"
-      - "tests/**"
-      - "教案生成器/**"
-      - "平时成绩记分册生成器/**"
-      - "tools/**"
-      - "README.md"
-      - "requirements*.txt"
   push:
     branches:
       - main
       - master
-    paths:
-      - ".github/workflows/template-package-ci.yml"
-      - ".github/workflows/template-release.yml"
-      - "docs/**"
-      - "tests/**"
-      - "教案生成器/**"
-      - "平时成绩记分册生成器/**"
-      - "tools/**"
-      - "README.md"
-      - "requirements*.txt"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  classify-changes:
+    name: Classify changes
+    runs-on: ubuntu-latest
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      changed_files: ${{ steps.classify.outputs.changed_files }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: classify
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+            head_sha="$PR_HEAD_SHA"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            base_sha="$PUSH_BEFORE_SHA"
+            head_sha="$CURRENT_SHA"
+            if [[ "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
+              base_sha="$(git rev-list --max-parents=0 "$head_sha")"
+            fi
+          else
+            {
+              echo "docs_only=false"
+              echo "changed_files=workflow_dispatch"
+            } >> "$GITHUB_OUTPUT"
+            echo "docs_only=false"
+            echo "changed_files=workflow_dispatch"
+            exit 0
+          fi
+
+          git diff --name-only "$base_sha" "$head_sha" > changed-files.txt
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          changed = [line for line in Path("changed-files.txt").read_text(encoding="utf-8").splitlines() if line]
+          exact = {
+              "README.md",
+              "教案生成器/简介.md",
+              "平时成绩记分册生成器/简介.md",
+              "多Agent兼容规范.md",
+          }
+
+          def allowed(path: str) -> bool:
+              return path in exact or (path.startswith("docs/") and path.endswith(".md"))
+
+          invalid = [path for path in changed if not allowed(path)]
+          docs_only = not invalid
+          output = os.environ["GITHUB_OUTPUT"]
+          with open(output, "a", encoding="utf-8") as handle:
+              handle.write(f"docs_only={'true' if docs_only else 'false'}\n")
+              handle.write("changed_files<<CHANGED_FILES\n")
+              handle.write("\n".join(changed) + ("\n" if changed else ""))
+              handle.write("CHANGED_FILES\n")
+          print(f"changed_files={changed}")
+          if invalid:
+              print(f"full CI required; non-doc files: {invalid}")
+          else:
+              print("docs-only change set")
+          PY
+
+  documentation-checks:
+    name: Documentation checks
+    needs: classify-changes
+    if: needs.classify-changes.outputs.docs_only == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check diff
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            base_sha="$PR_BASE_SHA"
+            head_sha="$PR_HEAD_SHA"
+          else
+            base_sha="$PUSH_BEFORE_SHA"
+            head_sha="$CURRENT_SHA"
+          fi
+          git diff --check "$base_sha" "$head_sha"
+
+      - name: Recheck docs-only allowlist
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          CURRENT_SHA: ${{ github.sha }}
+        run: |
+          python - <<'PY'
+          import os
+          import subprocess
+
+          if os.environ["GITHUB_EVENT_NAME"] == "pull_request":
+              base_sha = os.environ["PR_BASE_SHA"]
+              head_sha = os.environ["PR_HEAD_SHA"]
+          else:
+              base_sha = os.environ["PUSH_BEFORE_SHA"]
+              head_sha = os.environ["CURRENT_SHA"]
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", base_sha, head_sha],
+              text=True,
+              encoding="utf-8",
+          ).splitlines()
+          exact = {
+              "README.md",
+              "教案生成器/简介.md",
+              "平时成绩记分册生成器/简介.md",
+              "多Agent兼容规范.md",
+          }
+          invalid = [
+              path for path in changed
+              if path not in exact and not (path.startswith("docs/") and path.endswith(".md"))
+          ]
+          if invalid:
+              raise SystemExit(f"docs-only allowlist violation: {invalid}")
+          print(f"allowlist accepted {len(changed)} file(s)")
+          PY
+
+      - name: Check Markdown relative links
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          from urllib.parse import unquote, urlsplit
+
+          root = Path.cwd().resolve()
+          sources = [
+              root / "README.md",
+              root / "多Agent兼容规范.md",
+              root / "教案生成器" / "简介.md",
+              root / "平时成绩记分册生成器" / "简介.md",
+          ]
+          sources.extend(sorted((root / "docs").rglob("*.md")))
+          link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
+          errors = []
+          for source in sources:
+              if not source.is_file():
+                  errors.append(f"missing documentation source: {source.relative_to(root)}")
+                  continue
+              text = source.read_text(encoding="utf-8")
+              for raw_target in link_pattern.findall(text):
+                  target = raw_target.strip().strip("<>")
+                  if target.startswith(("http://", "https://", "mailto:", "#")):
+                      continue
+                  target = unquote(urlsplit(target).path)
+                  candidate = root / target.lstrip("/") if target.startswith("/") else source.parent / target
+                  resolved = candidate.resolve()
+                  if resolved != root and root not in resolved.parents:
+                      errors.append(f"link escapes repository: {source.relative_to(root)} -> {raw_target}")
+                  elif not resolved.exists():
+                      errors.append(f"missing link target: {source.relative_to(root)} -> {raw_target}")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          print(f"checked relative Markdown links in {len(sources)} file(s)")
+          PY
+
+      - name: Check installation entries and template versions
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          root = Path.cwd()
+          install_paths = [
+              root / "教案生成器" / "lesson-plan-docx-generator" / "scripts" / "install.py",
+              root / "平时成绩记分册生成器" / "course-gradebook-generator" / "scripts" / "install.py",
+          ]
+          missing = [str(path.relative_to(root)) for path in install_paths if not path.is_file()]
+          if missing:
+              raise SystemExit(f"missing installation entry: {missing}")
+
+          def manifest_version(path: Path) -> str:
+              template_section = path.read_text(encoding="utf-8").split("generator:", 1)[0]
+              match = re.search(r"^  version:\s*([^\s#]+)", template_section, re.MULTILINE)
+              if not match:
+                  raise SystemExit(f"template version not found: {path}")
+              return match.group(1)
+
+          lesson_version = manifest_version(
+              root / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
+          )
+          gradebook_version = manifest_version(
+              root / "平时成绩记分册生成器" / "course-gradebook-generator" / "assets" / "templates" / "course-gradebook" / "v1.1.0" / "manifest.yaml"
+          )
+          documents = {
+              root / "README.md": (lesson_version, gradebook_version),
+              root / "教案生成器" / "简介.md": (lesson_version,),
+              root / "平时成绩记分册生成器" / "简介.md": (gradebook_version,),
+          }
+          for document, versions in documents.items():
+              text = document.read_text(encoding="utf-8")
+              for version in versions:
+                  if f"v{version}" not in text:
+                      raise SystemExit(f"template version v{version} missing from {document.relative_to(root)}")
+          print(f"versions: lesson-plan v{lesson_version}; course-gradebook v{gradebook_version}")
+          PY
+
   template-tooling:
+    needs: classify-changes
+    if: needs.classify-changes.outputs.docs_only != 'true'
     name: Template tooling / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -114,6 +313,8 @@ jobs:
           }
 
   template-core:
+    needs: classify-changes
+    if: needs.classify-changes.outputs.docs_only != 'true'
     name: Template core ${{ matrix.suite }} / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -217,6 +418,8 @@ jobs:
           }
 
   template-release:
+    needs: classify-changes
+    if: needs.classify-changes.outputs.docs_only != 'true'
     name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
@@ -288,3 +491,54 @@ jobs:
         run: |
           $status = git status --porcelain
           if ($status) { $status; throw "Tests left changes in the worktree." }
+
+  ci-gate:
+    name: CI Gate
+    if: always()
+    needs:
+      - classify-changes
+      - documentation-checks
+      - template-tooling
+      - template-core
+      - template-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required checks
+        env:
+          DOCS_ONLY: ${{ needs.classify-changes.outputs.docs_only }}
+          CLASSIFY_RESULT: ${{ needs.classify-changes.result }}
+          DOCUMENTATION_RESULT: ${{ needs.documentation-checks.result }}
+          TOOLING_RESULT: ${{ needs.template-tooling.result }}
+          CORE_RESULT: ${{ needs.template-core.result }}
+          RELEASE_RESULT: ${{ needs.template-release.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$CLASSIFY_RESULT" != "success" ]]; then
+            echo "classify-changes result: $CLASSIFY_RESULT"
+            exit 1
+          fi
+          if [[ "$DOCS_ONLY" == "true" ]]; then
+            if [[ "$DOCUMENTATION_RESULT" != "success" ]]; then
+              echo "documentation-checks result: $DOCUMENTATION_RESULT"
+              exit 1
+            fi
+            for result in "$TOOLING_RESULT" "$CORE_RESULT" "$RELEASE_RESULT"; do
+              if [[ "$result" != "skipped" ]]; then
+                echo "heavy job result for docs-only change: $result"
+                exit 1
+              fi
+            done
+          else
+            if [[ "$DOCUMENTATION_RESULT" != "skipped" ]]; then
+              echo "documentation-checks result for full change: $DOCUMENTATION_RESULT"
+              exit 1
+            fi
+            for result in "$TOOLING_RESULT" "$CORE_RESULT" "$RELEASE_RESULT"; do
+              if [[ "$result" != "success" ]]; then
+                echo "heavy job result for full change: $result"
+                exit 1
+              fi
+            done
+          fi
+          echo "CI Gate: success"
