@@ -21,7 +21,7 @@ class LessonPlanPackageTests(unittest.TestCase):
             errors="replace",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout)["template_version"], "1.1.0")
+        self.assertEqual(json.loads(result.stdout)["template_version"], "1.1.1")
 
 
 if __name__ == "__main__":

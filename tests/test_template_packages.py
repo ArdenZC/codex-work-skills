@@ -4,6 +4,7 @@ import json
 import hashlib
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -30,6 +31,7 @@ GRADE = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator"
 PYTHON = Path(sys.executable)
 LESSON_V10_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 LESSON_V11_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
+LESSON_V111_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
 GRADE_V10_MANIFEST = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "manifest.yaml"
 GRADE_V10_TEMPLATE = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
 GRADE_V11_MANIFEST = GRADE / "assets" / "templates" / "course-gradebook" / "v1.1.0" / "manifest.yaml"
@@ -825,6 +827,47 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertEqual(score_sum, Decimal("89"))
 
+    def test_two_hour_lesson_preserves_method_labels_and_totals_90_classroom_minutes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-duration-labels-") as temp_name:
+            folder = Path(temp_name)
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"] = [payload["lessons"][0]]
+            payload["total_hours"] = 2
+            payload["lessons"][0]["hours"] = "2"
+            source = folder / "tasks.json"
+            output = folder / "output"
+            source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+            generated = next(output.glob("*.docx"))
+            table = Document(generated).tables[0]
+            self.assertEqual(table.rows[7].cells[5].text.strip(), "突出方法")
+            self.assertEqual(table.rows[8].cells[5].text.strip(), "破解方法")
+            self.assertIn("任务驱动、教师示范、分组实训、过程评价", table.rows[7].cells[6].text)
+            self.assertIn("提供模板清单、分步演示、同伴互评和教师点评", table.rows[8].cells[6].text)
+
+            classroom_minutes = []
+            for row_index in range(18, 25):
+                classroom_minutes.extend(
+                    int(value)
+                    for value in re.findall(r"(?m)^\s*(\d+)min\s*$", table.rows[row_index].cells[0].text)
+                )
+            self.assertEqual(classroom_minutes, [5, 15, 30, 10, 15, 10, 5])
+            self.assertEqual(sum(classroom_minutes), 90)
+            self.assertIn("10min", table.rows[16].cells[0].text)
+            self.assertIn("15min", table.rows[26].cells[0].text)
+
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "passed")
+
     def test_lesson_course_override_is_validated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-course-override-") as temp_name:
             folder = Path(temp_name)
@@ -1160,8 +1203,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
             self.assertEqual(len(list(output.glob("*.docx"))), 2)
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["template_id"], "lesson-plan")
-            self.assertEqual(report["template_version"], "1.1.0")
-            self.assertEqual(report["generator_version"], "1.1.0")
+            self.assertEqual(report["template_version"], "1.1.1")
+            self.assertEqual(report["generator_version"], "1.1.1")
             self.assertEqual(report["anchor_mode"], "word_bookmark")
             self.assertEqual(report["required_anchor_count"], 70)
             self.assertEqual(report["preserved_anchor_count"], 70)
@@ -1882,7 +1925,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 str(first),
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
-            self.assertEqual(file_sha256(first), "5139D6C0D48E6BA23991D4415BD1D7ED594913010B19DACC37415E946A65DE8B")
+            self.assertEqual(file_sha256(first), "569B076DE30CD64172EE86F2123C8AE5EA67828F46B51C4280FE32DAF6DE1AD0")
             self.assertEqual(
                 file_sha256(LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"),
                 "11783108468204DD67C9F8EAA1543B67279361ECC842A8B37F8541BDD01D16D5",
@@ -1901,7 +1944,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "--template",
                 str(first),
                 "--manifest",
-                str(LESSON_V11_MANIFEST),
+                str(LESSON_V111_MANIFEST),
                 "--json",
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
@@ -1923,7 +1966,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             from bookmark_utils import validate_bookmark_inventory
             from package_common import bookmark_containers, load_manifest, required_bookmarks
 
-            manifest = load_manifest(LESSON_V11_MANIFEST)
+            manifest = load_manifest(LESSON_V111_MANIFEST)
             for path in sorted(output.glob("*.docx")):
                 inventory = validate_bookmark_inventory(
                     Document(path),
@@ -2069,7 +2112,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                         "--output-dir",
                         str(case_dir),
                         "--manifest",
-                        str(LESSON_V11_MANIFEST),
+                        str(LESSON_V111_MANIFEST),
                     )
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("semantic bookmark protection failed", result.stderr.lower())
@@ -2111,7 +2154,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "--output-dir",
                 str(success),
                 "--manifest",
-                str(LESSON_V11_MANIFEST),
+                str(LESSON_V111_MANIFEST),
             )
             self.assertEqual(success_result.returncode, 0, success_result.stderr or success_result.stdout)
             success_report = json.loads((success / "qa-report.json").read_text(encoding="utf-8"))
@@ -2153,7 +2196,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                         "--output-dir",
                         str(case_dir),
                         "--manifest",
-                        str(LESSON_V11_MANIFEST),
+                        str(LESSON_V111_MANIFEST),
                     )
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn("semantic bookmark", result.stderr.lower())
@@ -3315,13 +3358,14 @@ class LessonTemplatePackageTests(unittest.TestCase):
             )
             self.assertEqual(default_result.returncode, 0, default_result.stderr or default_result.stdout)
             default_report = json.loads((folder / "default-v11" / "qa-report.json").read_text(encoding="utf-8"))
-            self.assertEqual(default_report["template_version"], "1.1.0")
+            self.assertEqual(default_report["template_version"], "1.1.1")
             self.assertEqual(default_report["anchor_mode"], "word_bookmark")
 
             for label, template in (
                 ("canonical-v10", LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"),
                 ("compatibility-v10", LESSON / "assets" / "lesson-plan-template.docx"),
                 ("canonical-v11", LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"),
+                ("canonical-v111", LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"),
             ):
                 result = run_script(
                     LESSON / "scripts" / "generate_lesson_plans.py",
@@ -3334,8 +3378,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
                 report = json.loads((folder / label / "qa-report.json").read_text(encoding="utf-8"))
-                expected_version = "1.1.0" if label == "canonical-v11" else "1.0.0"
-                expected_mode = "word_bookmark" if label == "canonical-v11" else "legacy_coordinates"
+                expected_version = "1.1.0" if label == "canonical-v11" else ("1.1.1" if label == "canonical-v111" else "1.0.0")
+                expected_mode = "word_bookmark" if label in {"canonical-v11", "canonical-v111"} else "legacy_coordinates"
                 self.assertEqual(report["template_version"], expected_version)
                 self.assertEqual(report["anchor_mode"], expected_mode)
 

@@ -39,7 +39,7 @@
 输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；成绩册模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `excel_named_range`；其他 `1.x` minor 当前拒绝，版本与定位模式不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明对应的 semantic contract，unknown key、未知 target/mode 不会降级处理；legacy `1.0.x` 也不得夹带 semantic 定位字段。当前默认使用 `lesson-plan/v1.1.0` 和 `course-gradebook/v1.1.0`，两者均保留 v1.0 兼容路径。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
+规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；成绩册模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `excel_named_range`；其他 `1.x` minor 当前拒绝，版本与定位模式不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明对应的 semantic contract，unknown key、未知 target/mode 不会降级处理；legacy `1.0.x` 也不得夹带 semantic 定位字段。当前默认使用 `lesson-plan/v1.1.1` 和 `course-gradebook/v1.1.0`，教案仍保留 v1.0 兼容路径。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
 
 模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
 

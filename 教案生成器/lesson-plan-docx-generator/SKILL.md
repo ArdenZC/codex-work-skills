@@ -22,7 +22,7 @@ If the user provides none of these, infer a projectized teaching plan from the c
 
 Require or infer:
 
-- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.0/template.docx` unless the user explicitly supplies a different template. Supplying canonical `assets/templates/lesson-plan/v1.0.0/template.docx` or the old `assets/lesson-plan-template.docx` without `--manifest` automatically selects the v1.0 coordinate manifest; arbitrary custom templates require a matching `--manifest`.
+- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.1/template.docx` unless the user explicitly supplies a different template. Supplying canonical `assets/templates/lesson-plan/v1.0.0/template.docx` or the old `assets/lesson-plan-template.docx` without `--manifest` automatically selects the v1.0 coordinate manifest; arbitrary custom templates require a matching `--manifest`.
 - `output_dir`: final DOCX folder. Back up an existing output folder before overwriting.
 - `course_name`: value for the title and `课程名称` cell.
 - `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
@@ -128,9 +128,9 @@ To override the built-in template, pass `--template "D:\path\template.docx"`.
 
 ## Template Package
 
-- Manifest: `assets/templates/lesson-plan/v1.1.0/manifest.yaml`
-- Canonical template: `assets/templates/lesson-plan/v1.1.0/template.docx`
-- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.1.0/manifest.yaml`, `assets/templates/lesson-plan/v1.1.0/CHANGELOG.md`
+- Manifest: `assets/templates/lesson-plan/v1.1.1/manifest.yaml`
+- Canonical template: `assets/templates/lesson-plan/v1.1.1/template.docx`
+- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.1.1/manifest.yaml`, `assets/templates/lesson-plan/v1.1.1/CHANGELOG.md`
 - Input schema: `schemas/lesson-plan-input.schema.json`
 - Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
 - QA output: `qa-report.json` in the generated output directory

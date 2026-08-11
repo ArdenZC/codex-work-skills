@@ -29,10 +29,18 @@ from semantic_bookmarks import (
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
 DEFAULT_SOURCE_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
-DEFAULT_OUTPUT = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
+DEFAULT_OUTPUT = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
 
 W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 NS = {"w": W_NS}
+
+# The legacy manifest points strategy fields at the label cells. Semantic
+# templates keep the fixed labels and anchor the writable content cells beside
+# them.
+SEMANTIC_LABEL_CONTENT_CELLS = {
+    "key_strategy": 3,
+    "difficult_strategy": 3,
+}
 
 def _qn(local_name: str) -> str:
     return f"{{{W_NS}}}{local_name}"
@@ -124,7 +132,7 @@ def _definitions(source_manifest: dict[str, Any]) -> list[dict[str, Any]]:
                     "container": "cell",
                     "table": int(spec["table"]),
                     "row": int(spec["row"]),
-                    "cell": int(spec["cell"]),
+                    "cell": SEMANTIC_LABEL_CONTENT_CELLS.get(field, int(spec["cell"])),
                 }
             )
     for stage, stage_code, row in IMPLEMENTATION_STAGES:
