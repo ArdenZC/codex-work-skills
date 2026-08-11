@@ -3502,37 +3502,55 @@ class GradebookPowerShellContractTests(unittest.TestCase):
 class WorkflowContractTests(unittest.TestCase):
     def test_template_package_ci_runs_on_main_push(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
-        self.assertIn("      - main\n      - master", workflow)
-        self.assertIn("- os: windows-latest", workflow)
-        self.assertIn("- os: macos-14", workflow)
-        self.assertIn("runs-on: ubuntu-latest", workflow)
-        self.assertIn("suite: lesson-plan", workflow)
-        self.assertIn("suite: gradebook", workflow)
         workflow_data = yaml.safe_load(workflow)
-        tooling_validation = next(
-            step
-            for step in workflow_data["jobs"]["template-tooling"]["steps"]
-            if step.get("name") == "Validate manifests, schemas and template hashes"
+        events = workflow_data.get("on", workflow_data.get(True, {}))
+        self.assertIn("main", events["push"]["branches"])
+        self.assertIn("master", events["push"]["branches"])
+        self.assertEqual(events["schedule"][0]["cron"], "17 3 * * 1")
+        self.assertEqual(
+            workflow_data["concurrency"]["cancel-in-progress"],
+            "${{ github.event_name == 'pull_request' || github.event_name == 'push' }}",
         )
-        core_validation = next(
-            step
-            for step in workflow_data["jobs"]["template-core"]["steps"]
-            if step.get("name") == "Validate manifests, schemas and template hashes"
-        )
-        self.assertNotIn("if", tooling_validation)
-        self.assertEqual(core_validation["if"], "matrix.suite == 'gradebook'")
-        for test_class in (
-            "LessonTemplatePackageTests",
-            "GradebookTotalRuleTests",
-            "GradebookPowerShellContractTests",
-            "WorkflowContractTests",
-            "GradebookTemplatePackageTests",
+
+        jobs = workflow_data["jobs"]
+        for job_name in (
+            "classify-changes",
+            "documentation-checks",
+            "package-contracts",
+            "template-tooling",
+            "template-lesson",
+            "template-gradebook",
+            "template-release",
+            "ci-gate",
         ):
-            self.assertIn(f"tests.test_template_packages.{test_class}", workflow)
+            self.assertIn(job_name, jobs)
+        self.assertEqual(jobs["classify-changes"]["runs-on"], "ubuntu-latest")
+        self.assertEqual(jobs["package-contracts"]["runs-on"], "ubuntu-latest")
+        self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
+        for job_name in ("template-tooling", "template-lesson", "template-gradebook", "template-release"):
+            self.assertEqual(jobs[job_name]["timeout-minutes"], 30)
+            setup_python = next(
+                step
+                for step in jobs[job_name]["steps"]
+                if step.get("uses") == "actions/setup-python@v5"
+            )
+            self.assertEqual(setup_python["with"]["cache"], "pip")
+
+        tooling_text = str(jobs["template-tooling"]).lower()
+        lesson_text = str(jobs["template-lesson"]).lower()
+        gradebook_text = str(jobs["template-gradebook"]).lower()
+        release_text = str(jobs["template-release"]).lower()
+        self.assertNotIn("libreoffice", tooling_text)
+        self.assertNotIn("libreoffice", lesson_text)
+        self.assertIn("libreoffice", gradebook_text)
+        self.assertNotIn("libreoffice", release_text)
+        self.assertNotIn("pip install --upgrade pip", workflow.lower())
 
         release_workflow = (ROOT / ".github" / "workflows" / "template-release.yml").read_text(encoding="utf-8")
         self.assertIn("runs-on: macos-14", release_workflow)
         self.assertNotIn("ubuntu-latest", release_workflow)
+        self.assertIn("cancel-in-progress: false", release_workflow)
+        self.assertNotIn("cancel-in-progress: true", release_workflow)
 
     def test_template_package_ci_docs_only_fast_path_contract(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
@@ -3543,17 +3561,25 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertFalse(events["pull_request"] and "paths" in events["pull_request"])
         self.assertNotIn("paths", events["push"])
         self.assertIn("workflow_dispatch", events)
+        self.assertIn("schedule", events)
+        self.assertIn("concurrency", workflow)
+        self.assertIn("cancel-in-progress", workflow)
 
-        for job_name in ("classify-changes", "documentation-checks", "ci-gate"):
-            self.assertIn(job_name, jobs)
-        self.assertEqual(jobs["classify-changes"]["runs-on"], "ubuntu-latest")
-        self.assertEqual(jobs["documentation-checks"]["runs-on"], "ubuntu-latest")
-        self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
-
-        classifier = "\n".join(
-            step.get("run", "")
-            for step in jobs["classify-changes"]["steps"]
-        )
+        classifier = (ROOT / ".github" / "scripts" / "classify_ci_changes.py").read_text(encoding="utf-8")
+        for output in (
+            "docs_only",
+            "run_docs",
+            "run_lesson",
+            "run_gradebook",
+            "run_tooling",
+            "run_release",
+            "run_package_contracts",
+            "force_full",
+            "changed_files",
+            "classification",
+            "reason",
+        ):
+            self.assertIn(output, classifier)
         for allowed_path in (
             "README.md",
             "docs/",
@@ -3562,25 +3588,15 @@ class WorkflowContractTests(unittest.TestCase):
             "多Agent兼容规范.md",
         ):
             self.assertIn(allowed_path, classifier)
-        for forbidden_path in (
-            "SKILL.md",
-            "AGENTS.md",
-            "CLAUDE.md",
-            "GEMINI.md",
-            "CONVENTIONS.md",
-            ".py",
-            ".ps1",
-            ".yml",
-            ".yaml",
-            ".json",
-            ".docx",
-            ".xls",
-            "tests/",
-            "tools/",
-        ):
-            self.assertNotIn(forbidden_path, classifier)
         self.assertIn("workflow_dispatch", classifier)
-        self.assertIn("git diff --name-only", classifier)
+        self.assertIn("schedule", classifier)
+        self.assertIn("unknown or ambiguous", classifier)
+
+        for job_name in ("classify-changes", "documentation-checks", "package-contracts", "ci-gate"):
+            self.assertIn(job_name, jobs)
+        self.assertEqual(jobs["classify-changes"]["runs-on"], "ubuntu-latest")
+        self.assertEqual(jobs["documentation-checks"]["runs-on"], "ubuntu-latest")
+        self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
 
         documentation = "\n".join(
             step.get("run", "")
@@ -3589,23 +3605,47 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("git diff --check", documentation)
         self.assertIn("urlsplit", documentation)
         self.assertIn("install.py", documentation)
-        self.assertIn("manifest_version", documentation)
+        self.assertIn("version_from_manifest", documentation)
         self.assertNotIn("libreoffice", documentation.lower())
         self.assertNotIn("pip install", documentation.lower())
 
-        for heavy_job in ("template-tooling", "template-core", "template-release"):
-            self.assertEqual(jobs[heavy_job]["needs"], "classify-changes")
-            self.assertEqual(
-                jobs[heavy_job]["if"],
-                "needs.classify-changes.outputs.docs_only != 'true'",
-            )
+        for heavy_job, output in (
+            ("template-tooling", "run_tooling"),
+            ("template-lesson", "run_lesson"),
+            ("template-gradebook", "run_gradebook"),
+            ("template-release", "run_release"),
+        ):
+            self.assertIn("always()", jobs[heavy_job]["if"])
+            self.assertIn(output, jobs[heavy_job]["if"])
+            self.assertIn("force_full", jobs[heavy_job]["if"])
+
+        self.assertIn("validate_package_contracts.py", "\n".join(step.get("run", "") for step in jobs["package-contracts"]["steps"]))
+        for heavy_job in ("template-tooling", "template-gradebook", "template-release"):
+            heavy_steps = "\n".join(step.get("run", "") for step in jobs[heavy_job]["steps"])
+            self.assertNotIn("tests/validate_template_packages.py", heavy_steps)
+        self.assertIn("package-contracts", jobs["template-tooling"]["needs"])
+        self.assertIn("package-contracts", jobs["template-release"]["needs"])
+        self.assertIn("needs.package-contracts.result == 'success'", jobs["template-tooling"]["if"])
+        self.assertIn("needs.package-contracts.result == 'success'", jobs["template-release"]["if"])
+        self.assertEqual(jobs["template-lesson"]["needs"], "classify-changes")
+        self.assertEqual(jobs["template-gradebook"]["needs"], "classify-changes")
 
         self.assertEqual(
             set(jobs["ci-gate"]["needs"]),
-            {"classify-changes", "documentation-checks", "template-tooling", "template-core", "template-release"},
+            {
+                "classify-changes",
+                "documentation-checks",
+                "package-contracts",
+                "template-tooling",
+                "template-lesson",
+                "template-gradebook",
+                "template-release",
+            },
         )
         gate = "\n".join(step.get("run", "") for step in jobs["ci-gate"]["steps"])
         self.assertIn("skipped", gate)
+        self.assertIn("RUN_PACKAGE", gate)
+        self.assertIn("CHANGED_FILES", gate)
         self.assertIn("CI Gate: success", gate)
 
 
