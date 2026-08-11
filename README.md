@@ -36,7 +36,11 @@
 
 https://github.com/ArdenZC/codex-work-skills
 
-请先阅读仓库 README，以及两个 Skill 各自的 简介.md / SKILL.md。
+请先阅读仓库 README 和仓库根目录的 AGENTS.md，再阅读两个 Skill 各自的：
+- 简介.md
+- AGENTS.md
+- 通用提示词.md
+- SKILL.md
 
 然后：
 
@@ -57,7 +61,11 @@ https://github.com/ArdenZC/codex-work-skills
 
 https://github.com/ArdenZC/codex-work-skills
 
-请阅读 README、教案生成器/简介.md 和 Skill 自身的 SKILL.md，
+请阅读 README、仓库根目录的 AGENTS.md，以及教案生成器的：
+- 简介.md
+- AGENTS.md
+- 通用提示词.md
+- SKILL.md
 完成环境检查、安装和安装验证。
 不要修改源码或模板。
 ```
