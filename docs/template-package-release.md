@@ -49,3 +49,5 @@ python tools/template_package.py list-installed --verify --json
 `verify-release` 和解压共享保守资源限制：最多 512 个文件、单文件 64 MiB、总未压缩大小 256 MiB、压缩比 200；central directory 在任何解压前检查，文件 SHA 使用流式读取，避免将整个 Office 模板一次性加载到内存。
 
 正式发布需要 GitHub Actions 的 `contents: write` 权限。普通 CI 只运行独立 release 回归，不创建真实 tag 或 GitHub Release。离线环境可以运行 `release`、`verify-release`、`install`、`upgrade`、`rollback` 和 `list-installed`；不具备 `gh`、远程网络或 Microsoft Office 的环境不能执行对应的远程发布/Excel COM 集成步骤。
+
+生产 Release 前，必须先确认当前 `master` 提交对应的最近一次 Full CI 已成功；仅通过受影响模块路由的普通 PR/master CI 不足以替代该前置条件。Full CI 可由共享/高风险变更、`workflow_dispatch` 或每周健康检查触发，正式发布仍只使用本文件定义的 `template-release.yml` 事务流程。

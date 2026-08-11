@@ -7,6 +7,12 @@ on:
       - main
       - master
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+concurrency:
+  group: template-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 permissions:
   contents: read
@@ -17,6 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       docs_only: ${{ steps.classify.outputs.docs_only }}
+      run_docs: ${{ steps.classify.outputs.run_docs }}
+      run_lesson: ${{ steps.classify.outputs.run_lesson }}
+      run_gradebook: ${{ steps.classify.outputs.run_gradebook }}
+      run_tooling: ${{ steps.classify.outputs.run_tooling }}
+      run_release: ${{ steps.classify.outputs.run_release }}
+      run_package_contracts: ${{ steps.classify.outputs.run_package_contracts }}
+      force_full: ${{ steps.classify.outputs.force_full }}
+      classification: ${{ steps.classify.outputs.classification }}
+      reason: ${{ steps.classify.outputs.reason }}
       changed_files: ${{ steps.classify.outputs.changed_files }}
     steps:
       - name: Check out repository
@@ -32,62 +47,20 @@ jobs:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
           CURRENT_SHA: ${{ github.sha }}
         shell: bash
-        run: |
-          set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            base_sha="$PR_BASE_SHA"
-            head_sha="$PR_HEAD_SHA"
-          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            base_sha="$PUSH_BEFORE_SHA"
-            head_sha="$CURRENT_SHA"
-            if [[ "$base_sha" == "0000000000000000000000000000000000000000" ]]; then
-              base_sha="$(git rev-list --max-parents=0 "$head_sha")"
-            fi
-          else
-            {
-              echo "docs_only=false"
-              echo "changed_files=workflow_dispatch"
-            } >> "$GITHUB_OUTPUT"
-            echo "docs_only=false"
-            echo "changed_files=workflow_dispatch"
-            exit 0
-          fi
-
-          git diff --name-only "$base_sha" "$head_sha" > changed-files.txt
-          python - <<'PY'
-          import os
-          from pathlib import Path
-
-          changed = [line for line in Path("changed-files.txt").read_text(encoding="utf-8").splitlines() if line]
-          exact = {
-              "README.md",
-              "教案生成器/简介.md",
-              "平时成绩记分册生成器/简介.md",
-              "多Agent兼容规范.md",
-          }
-
-          def allowed(path: str) -> bool:
-              return path in exact or (path.startswith("docs/") and path.endswith(".md"))
-
-          invalid = [path for path in changed if not allowed(path)]
-          docs_only = not invalid
-          output = os.environ["GITHUB_OUTPUT"]
-          with open(output, "a", encoding="utf-8") as handle:
-              handle.write(f"docs_only={'true' if docs_only else 'false'}\n")
-              handle.write("changed_files<<CHANGED_FILES\n")
-              handle.write("\n".join(changed) + ("\n" if changed else ""))
-              handle.write("CHANGED_FILES\n")
-          print(f"changed_files={changed}")
-          if invalid:
-              print(f"full CI required; non-doc files: {invalid}")
-          else:
-              print("docs-only change set")
-          PY
+        run: >-
+          python .github/scripts/classify_ci_changes.py
+          --event "$GITHUB_EVENT_NAME"
+          --base-sha "$PR_BASE_SHA"
+          --head-sha "$PR_HEAD_SHA"
+          --before-sha "$PUSH_BEFORE_SHA"
+          --current-sha "$CURRENT_SHA"
+          --output "$GITHUB_OUTPUT"
+          --summary "$GITHUB_STEP_SUMMARY"
 
   documentation-checks:
     name: Documentation checks
     needs: classify-changes
-    if: needs.classify-changes.outputs.docs_only == 'true'
+    if: needs.classify-changes.outputs.run_docs == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -119,39 +92,20 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
           CURRENT_SHA: ${{ github.sha }}
-        run: |
-          python - <<'PY'
-          import os
-          import subprocess
-
-          if os.environ["GITHUB_EVENT_NAME"] == "pull_request":
-              base_sha = os.environ["PR_BASE_SHA"]
-              head_sha = os.environ["PR_HEAD_SHA"]
-          else:
-              base_sha = os.environ["PUSH_BEFORE_SHA"]
-              head_sha = os.environ["CURRENT_SHA"]
-          changed = subprocess.check_output(
-              ["git", "diff", "--name-only", base_sha, head_sha],
-              text=True,
-              encoding="utf-8",
-          ).splitlines()
-          exact = {
-              "README.md",
-              "教案生成器/简介.md",
-              "平时成绩记分册生成器/简介.md",
-              "多Agent兼容规范.md",
-          }
-          invalid = [
-              path for path in changed
-              if path not in exact and not (path.startswith("docs/") and path.endswith(".md"))
-          ]
-          if invalid:
-              raise SystemExit(f"docs-only allowlist violation: {invalid}")
-          print(f"allowlist accepted {len(changed)} file(s)")
-          PY
+        shell: bash
+        run: >-
+          python .github/scripts/classify_ci_changes.py
+          --event "$GITHUB_EVENT_NAME"
+          --base-sha "$PR_BASE_SHA"
+          --head-sha "$PR_HEAD_SHA"
+          --before-sha "$PUSH_BEFORE_SHA"
+          --current-sha "$CURRENT_SHA"
+          --assert-docs-only
 
       - name: Check Markdown relative links
+        shell: bash
         run: |
+          set -euo pipefail
           python - <<'PY'
           import re
           from pathlib import Path
@@ -189,7 +143,9 @@ jobs:
           PY
 
       - name: Check installation entries and template versions
+        shell: bash
         run: |
+          set -euo pipefail
           python - <<'PY'
           import re
           from pathlib import Path
@@ -203,19 +159,27 @@ jobs:
           if missing:
               raise SystemExit(f"missing installation entry: {missing}")
 
-          def manifest_version(path: Path) -> str:
+          def version_from_manifest(path: Path) -> str:
               template_section = path.read_text(encoding="utf-8").split("generator:", 1)[0]
               match = re.search(r"^  version:\s*([^\s#]+)", template_section, re.MULTILINE)
               if not match:
                   raise SystemExit(f"template version not found: {path}")
               return match.group(1)
 
-          lesson_version = manifest_version(
-              root / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
+          def default_manifest(skill_root: Path, template_id: str) -> Path:
+              candidates = sorted((skill_root / "assets" / "templates" / template_id).glob("v*/manifest.yaml"))
+              if not candidates:
+                  raise SystemExit(f"default manifest not found: {skill_root}")
+              return candidates[-1]
+
+          lesson_manifest = default_manifest(
+              root / "教案生成器" / "lesson-plan-docx-generator", "lesson-plan"
           )
-          gradebook_version = manifest_version(
-              root / "平时成绩记分册生成器" / "course-gradebook-generator" / "assets" / "templates" / "course-gradebook" / "v1.1.0" / "manifest.yaml"
+          gradebook_manifest = default_manifest(
+              root / "平时成绩记分册生成器" / "course-gradebook-generator", "course-gradebook"
           )
+          lesson_version = version_from_manifest(lesson_manifest)
+          gradebook_version = version_from_manifest(gradebook_manifest)
           documents = {
               root / "README.md": (lesson_version, gradebook_version),
               root / "教案生成器" / "简介.md": (lesson_version,),
@@ -229,10 +193,70 @@ jobs:
           print(f"versions: lesson-plan v{lesson_version}; course-gradebook v{gradebook_version}")
           PY
 
-  template-tooling:
+  package-contracts:
+    name: Package contracts / static Ubuntu
     needs: classify-changes
-    if: needs.classify-changes.outputs.docs_only != 'true'
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_package_contracts == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            教案生成器/lesson-plan-docx-generator/requirements.txt
+            平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+
+      - name: Install Python dependencies
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+
+      - name: Validate static package contracts
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "static package contracts"
+          --
+          python .github/scripts/validate_package_contracts.py
+
+      - name: Compile CI and tooling sources
+        run: python -m compileall -q ".github/scripts" "tools"
+
+      - name: Run classifier unit tests
+        run: python -m unittest discover -s "tests" -p "test_ci_change_classifier.py" -v
+
+      - name: Run workflow contract tests
+        run: python -m unittest "tests.test_template_packages.WorkflowContractTests" -v
+
+      - name: Verify package contract worktree is clean
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
+  template-tooling:
     name: Template tooling / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs:
+      - classify-changes
+      - package-contracts
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      needs.package-contracts.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_tooling == 'true')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -255,67 +279,45 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install LibreOffice on macOS
-        if: runner.os == 'macOS'
-        run: |
-          brew install --cask libreoffice
-          echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
-          "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
-
-      - name: Install LibreOffice on Windows
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          choco install libreoffice-fresh --yes --no-progress
-          $programPaths = @(
-            (Join-Path $env:ProgramFiles "LibreOffice\program"),
-            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
-          )
-          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $programPath) {
-            throw "LibreOffice installation path was not found."
-          }
-          $soffice = Join-Path $programPath "soffice.com"
-          if (-not (Test-Path $soffice)) {
-            throw "LibreOffice command was not found: $soffice"
-          }
-          & $soffice --version | Select-Object -First 1
+          cache: pip
+          cache-dependency-path: .github/scripts/requirements-ci-tooling.txt
 
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
-
-      - name: Validate manifests, schemas and template hashes
-        run: python "tests/validate_template_packages.py"
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install -r .github/scripts/requirements-ci-tooling.txt
 
       - name: Compile template tooling sources
-        run: python -m compileall -q "tools" "tests/test_template_package_tooling.py"
+        run: python -m compileall -q "tools" ".github/scripts" "tests/test_template_package_tooling.py"
 
       - name: Run template tooling regression tests
-        run: python -m unittest discover -s "tests" -p "test_template_package_tooling.py" -v
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "template tooling tests"
+          --
+          python -m unittest discover -s "tests" -p "test_template_package_tooling.py" -v
 
       - name: Verify tooling worktree is clean on macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          test -z "$(git status --porcelain)"
+        run: test -z "$(git status --porcelain)"
 
       - name: Verify tooling worktree is clean on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $status = git status --porcelain
-          if ($status) {
-            $status
-            throw "Tests left changes in the worktree."
-          }
+          if ($status) { $status; throw "Tests left changes in the worktree." }
 
-  template-core:
+  template-lesson:
+    name: Template core lesson-plan / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs: classify-changes
-    if: needs.classify-changes.outputs.docs_only != 'true'
-    name: Template core ${{ matrix.suite }} / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_lesson == 'true')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -327,16 +329,8 @@ jobs:
         include:
           - os: macos-14
             python-version: "3.11"
-            suite: lesson-plan
-          - os: macos-14
-            python-version: "3.11"
-            suite: gradebook
           - os: windows-latest
             python-version: "3.11"
-            suite: lesson-plan
-          - os: windows-latest
-            python-version: "3.11"
-            suite: gradebook
 
     steps:
       - name: Check out repository
@@ -346,81 +340,56 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install LibreOffice on macOS
-        if: runner.os == 'macOS' && matrix.suite == 'gradebook'
-        run: |
-          brew install --cask libreoffice
-          echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
-          "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
-
-      - name: Install LibreOffice on Windows
-        if: runner.os == 'Windows' && matrix.suite == 'gradebook'
-        shell: pwsh
-        run: |
-          choco install libreoffice-fresh --yes --no-progress
-          $programPaths = @(
-            (Join-Path $env:ProgramFiles "LibreOffice\program"),
-            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
-          )
-          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $programPath) {
-            throw "LibreOffice installation path was not found."
-          }
-          $soffice = Join-Path $programPath "soffice.com"
-          if (-not (Test-Path $soffice)) {
-            throw "LibreOffice command was not found: $soffice"
-          }
-          & $soffice --version | Select-Object -First 1
+          cache: pip
+          cache-dependency-path: |
+            教案生成器/lesson-plan-docx-generator/requirements.txt
+            .github/scripts/requirements-ci-lesson-tests.txt
 
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          -r .github/scripts/requirements-ci-lesson-tests.txt
 
-      - name: Validate manifests, schemas and template hashes
-        if: matrix.suite == 'gradebook'
-        run: python "tests/validate_template_packages.py"
-
-      - name: Compile template core sources
-        run: python -m compileall -q "教案生成器" "平时成绩记分册生成器" "tests/test_template_packages.py"
+      - name: Compile lesson sources
+        run: python -m compileall -q "教案生成器/lesson-plan-docx-generator" "tests/test_template_packages.py"
 
       - name: Run lesson-plan core regression tests
-        if: matrix.suite == 'lesson-plan'
-        run: python -m unittest "tests.test_template_packages.LessonTemplatePackageTests" -v
-
-      - name: Run gradebook core regression tests
-        if: matrix.suite == 'gradebook'
-        run: python -m unittest "tests.test_template_packages.GradebookTotalRuleTests" "tests.test_template_packages.GradebookPowerShellContractTests" "tests.test_template_packages.WorkflowContractTests" "tests.test_template_packages.GradebookTemplatePackageTests" -v
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "lesson core tests"
+          --
+          python -m unittest "tests.test_template_packages.LessonTemplatePackageTests" -v
 
       - name: Run lesson-plan skill tests
-        if: matrix.suite == 'lesson-plan'
-        run: python -m unittest discover -s "教案生成器/lesson-plan-docx-generator/tests" -p "test_*.py" -v
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "lesson skill tests"
+          --
+          python -m unittest discover -s "教案生成器/lesson-plan-docx-generator/tests" -p "test_*.py" -v
 
-      - name: Run course-gradebook skill tests
-        if: matrix.suite == 'gradebook'
-        run: python -m unittest discover -s "平时成绩记分册生成器/course-gradebook-generator/tests" -p "test_*.py" -v
-
-      - name: Verify core worktree is clean on macOS
+      - name: Verify lesson worktree is clean on macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          test -z "$(git status --porcelain)"
+        run: test -z "$(git status --porcelain)"
 
-      - name: Verify core worktree is clean on Windows
+      - name: Verify lesson worktree is clean on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $status = git status --porcelain
-          if ($status) {
-            $status
-            throw "Tests left changes in the worktree."
-          }
+          if ($status) { $status; throw "Tests left changes in the worktree." }
 
-  template-release:
+  template-gradebook:
+    name: Template core gradebook / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs: classify-changes
-    if: needs.classify-changes.outputs.docs_only != 'true'
-    name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_gradebook == 'true')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     env:
@@ -443,18 +412,26 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+            .github/scripts/requirements-ci-gradebook-tests.txt
 
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
+        shell: bash
         run: |
+          started=$(date +%s)
           brew install --cask libreoffice
           echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
           "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
+          echo "- LibreOffice setup: $(( $(date +%s) - started ))s" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install LibreOffice on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $started = Get-Date
           choco install libreoffice-fresh --yes --no-progress
           $programPaths = @(
             (Join-Path $env:ProgramFiles "LibreOffice\program"),
@@ -465,20 +442,102 @@ jobs:
           $soffice = Join-Path $programPath "soffice.com"
           if (-not (Test-Path $soffice)) { throw "LibreOffice command was not found: $soffice" }
           & $soffice --version | Select-Object -First 1
+          $seconds = [math]::Round(((Get-Date) - $started).TotalSeconds, 2)
+          "- LibreOffice setup: ${seconds}s" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
       - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r "教案生成器/lesson-plan-docx-generator/requirements.txt" -r "平时成绩记分册生成器/course-gradebook-generator/requirements.txt"
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install
+          -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+          -r .github/scripts/requirements-ci-gradebook-tests.txt
 
-      - name: Validate canonical template packages
-        run: python "tests/validate_template_packages.py"
+      - name: Compile gradebook sources
+        run: python -m compileall -q "平时成绩记分册生成器/course-gradebook-generator" "tests/test_template_packages.py"
+
+      - name: Run gradebook core regression tests
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "gradebook core tests"
+          --
+          python -m unittest
+          "tests.test_template_packages.GradebookTotalRuleTests"
+          "tests.test_template_packages.GradebookPowerShellContractTests"
+          "tests.test_template_packages.GradebookTemplatePackageTests"
+          -v
+
+      - name: Run course-gradebook skill tests
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "gradebook skill tests"
+          --
+          python -m unittest discover -s "平时成绩记分册生成器/course-gradebook-generator/tests" -p "test_*.py" -v
+
+      - name: Verify gradebook worktree is clean on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
+      - name: Verify gradebook worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) { $status; throw "Tests left changes in the worktree." }
+
+  template-release:
+    name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs:
+      - classify-changes
+      - package-contracts
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      needs.package-contracts.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_release == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: .github/scripts/requirements-ci-tooling.txt
+
+      - name: Install Python dependencies
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install -r .github/scripts/requirements-ci-tooling.txt
 
       - name: Validate template package release lifecycle
-        run: python -m unittest discover -s "tests" -p "test_template_package_release.py" -v
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "release lifecycle tests"
+          --
+          python -m unittest discover -s "tests" -p "test_template_package_release.py" -v
 
       - name: Compile release tooling
-        run: python -m compileall -q "tools" "tests/test_template_package_release.py"
+        run: python -m compileall -q "tools" ".github/scripts" "tests/test_template_package_release.py"
 
       - name: Verify release worktree is clean on macOS
         if: runner.os == 'macOS'
@@ -498,47 +557,78 @@ jobs:
     needs:
       - classify-changes
       - documentation-checks
+      - package-contracts
       - template-tooling
-      - template-core
+      - template-lesson
+      - template-gradebook
       - template-release
     runs-on: ubuntu-latest
     steps:
       - name: Validate required checks
         env:
-          DOCS_ONLY: ${{ needs.classify-changes.outputs.docs_only }}
           CLASSIFY_RESULT: ${{ needs.classify-changes.result }}
           DOCUMENTATION_RESULT: ${{ needs.documentation-checks.result }}
+          PACKAGE_RESULT: ${{ needs.package-contracts.result }}
           TOOLING_RESULT: ${{ needs.template-tooling.result }}
-          CORE_RESULT: ${{ needs.template-core.result }}
+          LESSON_RESULT: ${{ needs.template-lesson.result }}
+          GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
           RELEASE_RESULT: ${{ needs.template-release.result }}
+          RUN_DOCS: ${{ needs.classify-changes.outputs.run_docs }}
+          RUN_PACKAGE: ${{ needs.classify-changes.outputs.run_package_contracts }}
+          RUN_TOOLING: ${{ needs.classify-changes.outputs.run_tooling }}
+          RUN_LESSON: ${{ needs.classify-changes.outputs.run_lesson }}
+          RUN_GRADEBOOK: ${{ needs.classify-changes.outputs.run_gradebook }}
+          RUN_RELEASE: ${{ needs.classify-changes.outputs.run_release }}
+          FORCE_FULL: ${{ needs.classify-changes.outputs.force_full }}
+          CLASSIFICATION: ${{ needs.classify-changes.outputs.classification }}
+          REASON: ${{ needs.classify-changes.outputs.reason }}
+          CHANGED_FILES: ${{ needs.classify-changes.outputs.changed_files }}
         shell: bash
         run: |
           set -euo pipefail
+
           if [[ "$CLASSIFY_RESULT" != "success" ]]; then
             echo "classify-changes result: $CLASSIFY_RESULT"
             exit 1
           fi
-          if [[ "$DOCS_ONLY" == "true" ]]; then
-            if [[ "$DOCUMENTATION_RESULT" != "success" ]]; then
-              echo "documentation-checks result: $DOCUMENTATION_RESULT"
-              exit 1
-            fi
-            for result in "$TOOLING_RESULT" "$CORE_RESULT" "$RELEASE_RESULT"; do
-              if [[ "$result" != "skipped" ]]; then
-                echo "heavy job result for docs-only change: $result"
-                exit 1
-              fi
-            done
-          else
-            if [[ "$DOCUMENTATION_RESULT" != "skipped" ]]; then
-              echo "documentation-checks result for full change: $DOCUMENTATION_RESULT"
-              exit 1
-            fi
-            for result in "$TOOLING_RESULT" "$CORE_RESULT" "$RELEASE_RESULT"; do
+
+          check_job() {
+            local label="$1"
+            local required="$2"
+            local result="$3"
+            if [[ "$required" == "true" ]]; then
               if [[ "$result" != "success" ]]; then
-                echo "heavy job result for full change: $result"
+                echo "$label is required but finished as $result"
                 exit 1
               fi
-            done
-          fi
+            elif [[ "$result" != "skipped" ]]; then
+              echo "$label is not required but finished as $result"
+              exit 1
+            fi
+          }
+
+          check_job documentation-checks "$RUN_DOCS" "$DOCUMENTATION_RESULT"
+          check_job package-contracts "$RUN_PACKAGE" "$PACKAGE_RESULT"
+          check_job template-tooling "$RUN_TOOLING" "$TOOLING_RESULT"
+          check_job template-lesson "$RUN_LESSON" "$LESSON_RESULT"
+          check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
+          check_job template-release "$RUN_RELEASE" "$RELEASE_RESULT"
+
+          {
+            echo "## CI Gate"
+            echo
+            echo "- Classification: `$CLASSIFICATION`"
+            echo "- force_full: `$FORCE_FULL`"
+            echo "- Reason: $REASON"
+            echo
+            echo "### Changed files"
+            echo
+            if [[ -n "$CHANGED_FILES" ]]; then
+              printf '%s\n' "$CHANGED_FILES" | sed 's/^/- \`/; s/$/\`/'
+            else
+              echo "- none"
+            fi
+            echo
+            echo "CI Gate: success"
+          } >> "$GITHUB_STEP_SUMMARY"
           echo "CI Gate: success"
