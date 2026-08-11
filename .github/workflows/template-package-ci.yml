@@ -491,18 +491,13 @@ jobs:
           -r .github/scripts/requirements-ci-gradebook-tests.txt
 
       - name: Compile gradebook sources
-        run: python -m compileall -q "平时成绩记分册生成器/course-gradebook-generator" "tests/test_template_packages.py"
+        run: python -m compileall -q "平时成绩记分册生成器/course-gradebook-generator" "tests/test_template_packages.py" ".github/scripts/run_gradebook_tests.py" ".github/scripts/run_gradebook_shards.py"
 
-      - name: Run gradebook core regression tests
+      - name: Run gradebook core regression tests in semantic shards
         run: >-
-          python .github/scripts/run_timed.py
-          --label "gradebook core tests"
-          --
-          python -m unittest
-          "tests.test_template_packages.GradebookTotalRuleTests"
-          "tests.test_template_packages.GradebookPowerShellContractTests"
-          "tests.test_template_packages.GradebookTemplatePackageTests"
-          -v
+          python .github/scripts/run_gradebook_shards.py
+          --group contracts
+          --group generation
 
       - name: Run course-gradebook skill tests
         run: >-
