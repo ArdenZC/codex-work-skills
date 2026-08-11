@@ -819,7 +819,8 @@ def release_source_snapshot_for_commit(
             "release source_commit canonical package owner is missing its tracked validator"
         )
 
-    template_root = PurePosixPath(*entry_parts[:-1]).parent
+    entry_package_dir = PurePosixPath(*entry_parts[:-1])
+    template_root = entry_package_dir.parent
     visited: dict[str, tuple[str, PurePosixPath]] = {}
     active: set[str] = set()
 
@@ -851,9 +852,11 @@ def release_source_snapshot_for_commit(
         )
         actual_format = template.get("format")
         package_dir = PurePosixPath(manifest_path).parent
+        package_is_direct = package_dir.parent == template_root
+        package_is_nested = entry_package_dir in package_dir.parents
         if (
             actual_id != template_id
-            or package_dir.parent != template_root
+            or not (package_is_direct or package_is_nested)
             or package_dir.name != f"v{actual_version}"
         ):
             raise TemplateToolError(
@@ -924,6 +927,12 @@ def release_source_snapshot_for_commit(
     source_records: list[ReleaseSourceRecord] = []
     for _, package_dir in closure:
         repository_prefix = package_dir.as_posix() + "/"
+        nested_package_prefixes = [
+            other.as_posix() + "/"
+            for _, other in closure
+            if other != package_dir and package_dir in other.parents
+        ]
+        archive_prefix = f"{template_id}/{package_dir.relative_to(template_root).as_posix()}"
         package_entries = [
             (path, record)
             for path, record in tree.items()
@@ -931,11 +940,13 @@ def release_source_snapshot_for_commit(
         ]
         package_has_manifest = False
         for repository_path, record in package_entries:
+            if any(repository_path.startswith(prefix) for prefix in nested_package_prefixes):
+                continue
             relative = repository_path[len(repository_prefix):]
             relative_path = Path(*PurePosixPath(relative).parts)
             if _excluded(relative_path):
                 continue
-            archive_path = f"{template_id}/{package_dir.name}/{relative}"
+            archive_path = f"{archive_prefix}/{relative}"
             _validate_archive_name(archive_path)
             blob = _git_blob_bytes(root, repository_path, record)
             package_has_manifest = package_has_manifest or relative == "manifest.yaml"
@@ -1013,7 +1024,7 @@ def _require_release_source_is_committed_canonical(
     trust_index.require_tracked_regular_file(package.validator, label="release owner validator")
 
     closure = list(closure)
-    source_files = _archive_source_files(closure)
+    source_files = _archive_source_files(closure, template_root=package.package_dir.parent)
     for archive_name, source_path in source_files:
         trust_index.require_tracked_regular_file(
             source_path,
