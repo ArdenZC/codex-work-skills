@@ -3543,7 +3543,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("libreoffice", tooling_text)
         self.assertNotIn("libreoffice", lesson_text)
         self.assertIn("libreoffice", gradebook_text)
-        self.assertNotIn("libreoffice", release_text)
+        self.assertIn("libreoffice", release_text)
         self.assertNotIn("pip install --upgrade pip", workflow.lower())
 
         release_workflow = (ROOT / ".github" / "workflows" / "template-release.yml").read_text(encoding="utf-8")
