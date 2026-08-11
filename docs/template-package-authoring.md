@@ -66,6 +66,23 @@ python tools/template_package.py archive \
 
 归档输出路径在完整 validator、LibreOffice、输出目录、ZIP stage 创建之前使用共享的 lexical/resolved 工作区保护检查：仓库内只能写入 `dist/template-packages/`，仓库外独立目录仍拒绝与包/依赖闭包重叠以及两方向 symlink 逃逸。ZIP 文件使用 NFC/casefold 稳定排序，拒绝 casefold/NFC 冲突、zip-slip、symlink、控制字符、Windows 保留名称、尾随点/空格和非法字符；中文合法路径可以保留。生成后会解压到新的系统临时目录，复验路径、入口包、依赖闭包、所有文件 SHA、metadata，并用真实 owner validator 完整验证入口包。ZIP、sidecar、metadata 三个最终文件拒绝覆盖并作为一个提交事务处理，任一步失败都会清理已提交文件和临时文件。
 
+## Release、install、upgrade 和 rollback
+
+Phase 3.2 的生命周期入口仍是同一个 CLI：
+
+```bash
+python tools/template_package.py release --template-id <id> --version <version> --output-dir dist/template-packages --json
+python tools/template_package.py verify-release --release-dir dist/template-packages --json
+python tools/template_package.py install --archive <id-version>.zip --json
+python tools/template_package.py upgrade --release-dir <release-dir> --json
+python tools/template_package.py rollback --template-id <id> [--to-version <installed-version>] --json
+python tools/template_package.py list-installed [--verify] --json
+```
+
+release 只接受当前 repository 中真实 Git-tracked 的 canonical package；工作区必须 clean，并为 entry 和 dependency closure 中每个归档文件保存 HEAD blob、SHA-256、大小和精确字节快照；所有 archive 正式文件都必须与当前 HEAD blob 逐字节一致，任何 `.md`、`.txt`、`.yaml`、`.yml` 的 CRLF/LF 或其他换行差异也会被拒绝，归档后再核对 ZIP/metadata，只有通过这些 provenance 检查后才生成带 `source_commit` 的 release plan。external future patch 不能使用正式 `release`，应通过 `archive` 构造三文件 bundle，再由 `verify-release`、`install` 或 `upgrade` 处理。严格验证会检查既有 metadata required keys、实际 archive SHA、sidecar、ZIP inventory、entries、per-file SHA、依赖闭包和按 Skill 解析的 trusted owner validator；Release entry package 的 template SHA 不要求等于当前 canonical template SHA，不得用自带 bundle validator 绕过信任边界。默认安装根为 `/installed/template-packages/`，仓库内其他目录、canonical/package overlap、symlink 逃逸和 Windows 8.3 containment 都拒绝；仓库外完全独立的安装根可以使用。版本目录 immutable，active state 原子更新，失败恢复旧 active state；rollback 可以在任意已安装版本之间切换，默认 previous 支持双向 toggle。
+
+GitHub Release 不属于模板 registry。`.github/workflows/template-release.yml` 只在 `master` 上 `workflow_dispatch`，同一 template/version 使用 `concurrency` 串行且不取消运行中的发布；事务为每次 publication 生成不进入 archive/plan 的 `operation_id`，写入 annotated tag message 和 Release body marker，只有 tag、Release 和 asset ownership 都能由该 operation 证明时才允许补偿删除。发布前确认 tag/Release/assets 不存在，下载后重新校验三个 asset 的 local/remote SHA；GitHub origin 必须解析为 GitHub.com HTTPS 或 SSH repository，`--repository` 只是同仓库 owner/name 断言，mismatch、缺失或非 GitHub host 会在任何远程操作前 fail closed；不确定状态 fail closed 并提示人工清理。GitHub Actions 不运行 Microsoft Excel COM；COM 仍由本地 Windows + Excel 环境验证。
+
 ## CI 与交付边界
 
 CI 对 `tools/**` 变更运行现有双平台模板包工作流，并把 `tools` 纳入 `compileall`；不会增加新的平台或放宽现有 timeout。工具测试使用真实 CLI 和轻量 fixture，fixture 必须先初始化 Git 并精确暂存需要信任的 validator、manifest、模板、schema 和 helper；仓库级 `tests/validate_template_packages.py` 会动态校验发现到的全部 canonical 包和所属 schema/validator。仓库内 scaffold 工作包统一放在 `/work/template-packages/`，该目录不属于正式模板包或发布内容，并由 `.gitignore` 忽略。归档、scaffold report、stage、snapshot 和 backup 都是本地工作产物，不应提交、打 tag、创建 release 或上传 `dist`。

@@ -3459,6 +3459,36 @@ class WorkflowContractTests(unittest.TestCase):
     def test_template_package_ci_runs_on_main_push(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
         self.assertIn("      - main\n      - master", workflow)
+        self.assertIn("- os: windows-latest", workflow)
+        self.assertIn("- os: macos-14", workflow)
+        self.assertNotIn("ubuntu-latest", workflow)
+        self.assertIn("suite: lesson-plan", workflow)
+        self.assertIn("suite: gradebook", workflow)
+        workflow_data = yaml.safe_load(workflow)
+        tooling_validation = next(
+            step
+            for step in workflow_data["jobs"]["template-tooling"]["steps"]
+            if step.get("name") == "Validate manifests, schemas and template hashes"
+        )
+        core_validation = next(
+            step
+            for step in workflow_data["jobs"]["template-core"]["steps"]
+            if step.get("name") == "Validate manifests, schemas and template hashes"
+        )
+        self.assertNotIn("if", tooling_validation)
+        self.assertEqual(core_validation["if"], "matrix.suite == 'gradebook'")
+        for test_class in (
+            "LessonTemplatePackageTests",
+            "GradebookTotalRuleTests",
+            "GradebookPowerShellContractTests",
+            "WorkflowContractTests",
+            "GradebookTemplatePackageTests",
+        ):
+            self.assertIn(f"tests.test_template_packages.{test_class}", workflow)
+
+        release_workflow = (ROOT / ".github" / "workflows" / "template-release.yml").read_text(encoding="utf-8")
+        self.assertIn("runs-on: macos-14", release_workflow)
+        self.assertNotIn("ubuntu-latest", release_workflow)
 
 
 @unittest.skipUnless(soffice_path(), "LibreOffice is required for XLS package tests")

@@ -1404,6 +1404,45 @@ class TemplatePackageToolingTests(unittest.TestCase):
             finally:
                 shutil.rmtree(external_root, ignore_errors=True)
 
+    def test_cli_preserves_lexical_repo_root_for_aliased_workspace(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
+            container = Path(directory)
+            real_root = container / "real-repository"
+            real_root.mkdir()
+            _, base, _ = self.make_fixture_repo(real_root)
+            alias = container / "repository-alias"
+            try:
+                alias.symlink_to(real_root, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("the current platform cannot create directory symlinks")
+
+            scaffold_output = alias / "work" / "template-packages" / "demo-template" / "1.0.1"
+            scaffold = self.run_tool(
+                "scaffold",
+                "--base-package",
+                base,
+                "--version",
+                "1.0.1",
+                "--output-dir",
+                scaffold_output,
+                "--json",
+                root=alias,
+            )
+            self.assert_process_succeeded(scaffold)
+
+            archive_output = alias / "dist" / "template-packages" / "aliased-root"
+            archived = self.run_tool(
+                "archive",
+                "--package",
+                base,
+                "--output-dir",
+                archive_output,
+                "--json",
+                root=alias,
+            )
+            self.assert_process_succeeded(archived)
+            self.assertEqual(len(list(archive_output.glob("*.zip"))), 1)
+
     def test_scaffold_dry_run_and_overlap_do_not_mutate(self) -> None:
         base = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "assets" / "templates" / "lesson-plan" / "v1.1.0"
         with tempfile.TemporaryDirectory(prefix="模板工具-") as directory:
