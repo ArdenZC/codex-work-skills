@@ -3549,6 +3549,12 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("run_gradebook_shards.py", gradebook_steps)
         self.assertIn("--group contracts", gradebook_steps)
         self.assertIn("--group generation", gradebook_steps)
+        gradebook_step_conditions = "\n".join(
+            str(step.get("if", "")) for step in jobs["template-gradebook"]["steps"]
+        )
+        self.assertIn("runner.os == 'Windows'", gradebook_step_conditions)
+        self.assertIn("runner.os == 'macOS'", gradebook_step_conditions)
+        self.assertIn("--sequential", gradebook_steps)
         shard_runner = (ROOT / ".github" / "scripts" / "run_gradebook_tests.py").read_text(encoding="utf-8")
         self.assertIn("GradebookTemplatePackageTests", shard_runner)
         self.assertIn("CONTRACT_TEMPLATE_TESTS", shard_runner)

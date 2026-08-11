@@ -493,9 +493,18 @@ jobs:
       - name: Compile gradebook sources
         run: python -m compileall -q "平时成绩记分册生成器/course-gradebook-generator" "tests/test_template_packages.py" ".github/scripts/run_gradebook_tests.py" ".github/scripts/run_gradebook_shards.py"
 
-      - name: Run gradebook core regression tests in semantic shards
+      - name: Run gradebook core regression tests in parallel semantic shards on Windows
+        if: runner.os == 'Windows'
         run: >-
           python .github/scripts/run_gradebook_shards.py
+          --group contracts
+          --group generation
+
+      - name: Run gradebook core regression tests in sequential semantic shards on macOS
+        if: runner.os == 'macOS'
+        run: >-
+          python .github/scripts/run_gradebook_shards.py
+          --sequential
           --group contracts
           --group generation
 

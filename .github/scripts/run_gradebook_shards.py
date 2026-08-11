@@ -63,6 +63,7 @@ def _prewarm_controlled_baseline() -> float:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--group", action="append", dest="groups", choices=DEFAULT_GROUPS)
+    parser.add_argument("--sequential", action="store_true")
     args = parser.parse_args(argv)
     groups = tuple(args.groups or DEFAULT_GROUPS)
     if len(set(groups)) != len(groups):
@@ -74,7 +75,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         baseline_seconds = _prewarm_controlled_baseline()
         print(f"Gradebook controlled baseline ready ({baseline_seconds:.2f}s)")
-        for group in groups:
+        statuses: dict[str, int] = {}
+        durations: dict[str, float] = {}
+
+        def start_group(group: str) -> tuple[subprocess.Popen[bytes], Path, float]:
             group_root = log_root / group
             group_root.mkdir()
             log_path = group_root / "output.log"
@@ -87,21 +91,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 stdout=handle,
                 stderr=subprocess.STDOUT,
             )
-            processes[group] = (process, log_path, time.monotonic())
+            return process, log_path, time.monotonic()
 
-        statuses: dict[str, int] = {}
-        durations: dict[str, float] = {}
-        pending = set(processes)
-        while pending:
-            for group in tuple(pending):
+        if args.sequential:
+            for group in groups:
+                processes[group] = start_group(group)
                 process, _, started = processes[group]
-                status = process.poll()
-                if status is not None:
-                    statuses[group] = status
-                    durations[group] = time.monotonic() - started
-                    pending.remove(group)
-            if pending:
-                time.sleep(0.1)
+                statuses[group] = process.wait()
+                durations[group] = time.monotonic() - started
+        else:
+            for group in groups:
+                processes[group] = start_group(group)
+            pending = set(processes)
+            while pending:
+                for group in tuple(pending):
+                    process, _, started = processes[group]
+                    status = process.poll()
+                    if status is not None:
+                        statuses[group] = status
+                        durations[group] = time.monotonic() - started
+                        pending.remove(group)
+                if pending:
+                    time.sleep(0.1)
 
         summary_lines = [
             "### Gradebook semantic shards",
