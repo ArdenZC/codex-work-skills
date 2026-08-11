@@ -153,13 +153,43 @@ class GhCliGitHubReleaseClient:
 
     def __init__(self, root: Path, *, repository: str | None = None) -> None:
         self.root = root.resolve()
-        self.repository = _assert_repository_identity(self.root, repository).slug
+        self.repository_identity = _assert_repository_identity(self.root, repository)
+        self.repository = self.repository_identity.slug
 
-    def _gh(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-        command = ["gh", *arguments]
-        if self.repository:
-            command.extend(["--repo", self.repository])
+    def _gh_repo(self, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+        command = ["gh", *arguments, "--repo", self.repository]
         return _run(command, self.root, check=check)
+
+    def _gh_api(
+        self,
+        endpoint: str,
+        *,
+        check: bool = True,
+    ) -> subprocess.CompletedProcess[str]:
+        prefix = f"repos/{self.repository_identity.owner}/{self.repository_identity.name}/"
+        if (
+            not endpoint.startswith(prefix)
+            or any(character in endpoint for character in "\\?#%\r\n")
+            or any(component in {"", ".", ".."} for component in endpoint.split("/"))
+        ):
+            raise TemplateToolError("GitHub API endpoint is not a safe repository-scoped path")
+        command = [
+            "gh",
+            "api",
+            "--hostname",
+            self.repository_identity.host,
+            endpoint,
+        ]
+        return _run(command, self.root, check=check)
+
+    def _tag_ref_endpoint(self, tag: str) -> str:
+        components = tag.split("/")
+        if not components or any(
+            not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", component) for component in components
+        ):
+            raise TemplateToolError(f"GitHub tag contains an unsafe ref path: {tag}")
+        encoded_tag = "/".join(quote(component, safe="-._~") for component in components)
+        return f"repos/{self.repository_identity.owner}/{self.repository_identity.name}/git/ref/tags/{encoded_tag}"
 
     def tag_exists(self, tag: str) -> bool:
         result = _run(["git", "ls-remote", "--exit-code", "origin", f"refs/tags/{tag}"], self.root, check=False)
@@ -174,10 +204,7 @@ class GhCliGitHubReleaseClient:
         return str(self.tag_annotation(tag)["target"]).lower()
 
     def tag_annotation(self, tag: str) -> dict[str, Any]:
-        if not self.repository:
-            raise TemplateToolError("GitHub repository is required to inspect annotated tag ownership")
-        encoded_tag = quote(tag, safe="")
-        reference_result = self._gh("api", f"repos/{self.repository}/git/ref/tags/{encoded_tag}")
+        reference_result = self._gh_api(self._tag_ref_endpoint(tag))
         try:
             reference = json.loads(reference_result.stdout)
             tag_object = reference["object"]
@@ -187,7 +214,11 @@ class GhCliGitHubReleaseClient:
             raise TemplateToolError("GitHub tag reference returned invalid JSON") from exc
         if object_type != "tag":
             raise TemplateToolError(f"remote tag is not annotated: {tag}")
-        tag_result = self._gh("api", f"repos/{self.repository}/git/tags/{object_id}")
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", object_id):
+            raise TemplateToolError("GitHub tag reference returned an invalid tag object id")
+        tag_result = self._gh_api(
+            f"repos/{self.repository_identity.owner}/{self.repository_identity.name}/git/tags/{object_id}"
+        )
         try:
             payload = json.loads(tag_result.stdout)
             target = str(payload["object"]["sha"])
@@ -199,7 +230,7 @@ class GhCliGitHubReleaseClient:
         return {"object_id": object_id, "target": target.lower(), "message": message}
 
     def release_exists(self, tag: str) -> bool:
-        result = self._gh("release", "view", tag, check=False)
+        result = self._gh_repo("release", "view", tag, check=False)
         if result.returncode == 0:
             return True
         details = f"{result.stderr}\n{result.stdout}".strip()
@@ -213,7 +244,7 @@ class GhCliGitHubReleaseClient:
     def release_identity(self, tag: str) -> dict[str, Any]:
         try:
             payload = json.loads(
-                self._gh("release", "view", tag, "--json", "tagName,body,databaseId").stdout
+                self._gh_repo("release", "view", tag, "--json", "tagName,body,databaseId").stdout
             )
             value = payload["tagName"]
             body = payload.get("body")
@@ -227,7 +258,7 @@ class GhCliGitHubReleaseClient:
         return {"id": database_id, "tag": value, "body": body}
 
     def asset_names(self, tag: str) -> set[str]:
-        result = self._gh("release", "view", tag, "--json", "assets", check=True)
+        result = self._gh_repo("release", "view", tag, "--json", "assets", check=True)
         try:
             payload = json.loads(result.stdout)
             return {str(item["name"]) for item in payload.get("assets", [])}
@@ -255,24 +286,24 @@ class GhCliGitHubReleaseClient:
             arguments = ["release", "create", tag, "--title", name, "--notes-file", str(notes_file), "--verify-tag"]
             if prerelease:
                 arguments.append("--prerelease")
-            self._gh(*arguments)
+            self._gh_repo(*arguments)
         finally:
             if notes_file.exists() or notes_file.is_symlink():
                 remove_path_or_raise(notes_file)
 
     def delete_release(self, tag: str) -> None:
-        self._gh("release", "delete", tag, "--yes")
+        self._gh_repo("release", "delete", tag, "--yes")
 
     def upload_asset(self, tag: str, path: Path) -> None:
         # No --clobber: a pre-existing or concurrently-created asset fails closed.
-        self._gh("release", "upload", tag, str(path))
+        self._gh_repo("release", "upload", tag, str(path))
 
     def delete_asset(self, tag: str, name: str) -> None:
-        self._gh("release", "delete-asset", tag, name, "--yes")
+        self._gh_repo("release", "delete-asset", tag, name, "--yes")
 
     def download_asset(self, tag: str, name: str, destination: Path) -> Path:
         destination.mkdir(parents=True, exist_ok=False)
-        self._gh("release", "download", tag, "--pattern", name, "--dir", str(destination))
+        self._gh_repo("release", "download", tag, "--pattern", name, "--dir", str(destination))
         path = destination / name
         if not path.is_file() or path.is_symlink():
             raise TemplateToolError(f"downloaded release asset is missing: {name}")

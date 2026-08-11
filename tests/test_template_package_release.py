@@ -1492,6 +1492,131 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             result = self.run_tool("install", "--release-dir", source, "--install-root", install_root, "--json", root=root)
             self.assert_succeeded(result)
 
+    def test_production_gh_cli_command_contracts(self) -> None:
+        from unittest.mock import patch
+
+        from tools.template_tooling.github_release import GhCliGitHubReleaseClient
+
+        tag = "template/lesson-plan/v1.1.0"
+        tag_object = "44936ee2a3fd7ddbdaec9ef3c92f30776736ea3f"
+        source_commit = "b6710e11ec35dec0d4cb8e812ca72303f53410d1"
+        repository = "ArdenZC/codex-work-skills"
+        with tempfile.TemporaryDirectory(prefix="template-release-gh-cli-") as directory:
+            root = Path(directory)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            log_path = root / "gh-argv.jsonl"
+            self.git(root, "init", "-q")
+            self.git(root, "remote", "add", "origin", "https://github.com/ArdenZC/codex-work-skills.git")
+            fake_code = (
+                "import json\n"
+                "import os\n"
+                "import sys\n"
+                f"log_path = {str(log_path)!r}\n"
+                f"tag = {tag!r}\n"
+                f"tag_object = {tag_object!r}\n"
+                f"source_commit = {source_commit!r}\n"
+                f"repository = {repository!r}\n"
+                "script_name = os.path.basename(sys.argv[0]).casefold()\n"
+                "arguments = sys.argv[1:]\n"
+                "if script_name in {'api', 'release'}:\n"
+                "    arguments = [script_name] + arguments\n"
+                "with open(log_path, 'a', encoding='utf-8') as stream:\n"
+                "    stream.write(json.dumps(arguments) + '\\n')\n"
+                "if arguments[:3] == ['api', '--hostname', 'github.com']:\n"
+                "    endpoint = arguments[3] if len(arguments) == 4 else ''\n"
+                "    ref_endpoint = f'repos/{repository}/git/ref/tags/{tag}'\n"
+                "    object_endpoint = f'repos/{repository}/git/tags/{tag_object}'\n"
+                "    if endpoint == ref_endpoint:\n"
+                "        print(json.dumps({'object': {'sha': tag_object, 'type': 'tag'}}))\n"
+                "    elif endpoint == object_endpoint:\n"
+                "        print(json.dumps({'object': {'sha': source_commit, 'type': 'commit'}, 'message': 'Release operation: 2ea187b6841f4a2c8a591f37aaeada7d'}))\n"
+                "    else:\n"
+                "        raise SystemExit(f'unexpected API endpoint: {endpoint}')\n"
+                "elif arguments[:2] == ['release', 'view']:\n"
+                "    if arguments[-2:] != ['--repo', repository]:\n"
+                "        raise SystemExit(f'missing repository scope: {arguments}')\n"
+                "    print('{}')\n"
+                "else:\n"
+                "    raise SystemExit(f'unexpected gh command: {arguments}')\n"
+            )
+            if os.name == "nt":
+                executable = bin_dir / "gh.exe"
+                shutil.copy2(PYTHON, executable)
+                (root / "api").write_text(fake_code, encoding="utf-8")
+                (root / "release").write_text(fake_code, encoding="utf-8")
+            else:
+                executable = bin_dir / "gh"
+                executable.write_text(f"#!{sys.executable}\n" + fake_code, encoding="utf-8")
+                os.chmod(executable, 0o700)
+
+            child_path = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+            with patch.dict(os.environ, {"PATH": child_path}):
+                client = GhCliGitHubReleaseClient(root, repository=repository)
+                annotation = client.tag_annotation(tag)
+                self.assertEqual(annotation["object_id"], tag_object)
+                self.assertEqual(annotation["target"], source_commit)
+                self.assertIn("Release operation: 2ea187b6841f4a2c8a591f37aaeada7d", annotation["message"])
+                self.assertTrue(client.release_exists(tag))
+                with self.assertRaisesRegex(Exception, "unsafe ref path"):
+                    client.tag_annotation("template/lesson-plan/../v1.1.0")
+
+            calls = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+            api_calls = [arguments for arguments in calls if arguments and arguments[0] == "api"]
+            self.assertEqual(
+                api_calls,
+                [
+                    [
+                        "api",
+                        "--hostname",
+                        "github.com",
+                        f"repos/{repository}/git/ref/tags/{tag}",
+                    ],
+                    [
+                        "api",
+                        "--hostname",
+                        "github.com",
+                        f"repos/{repository}/git/tags/{tag_object}",
+                    ],
+                ],
+            )
+            self.assertTrue(all("--repo" not in arguments for arguments in api_calls))
+            release_calls = [arguments for arguments in calls if arguments[:2] == ["release", "view"]]
+            self.assertEqual(len(release_calls), 1)
+            self.assertEqual(release_calls[0][-2:], ["--repo", repository])
+
+    def test_post_mutation_tag_failure_reconciles_and_cleans_owned_tag(self) -> None:
+        from tools.template_tooling.github_release import (
+            InMemoryGitHubReleaseClient,
+            TemplateToolError,
+            publish_release_transaction,
+        )
+
+        class PostMutationFailureClient(InMemoryGitHubReleaseClient):
+            def __init__(self) -> None:
+                super().__init__()
+                self.annotation_calls = 0
+
+            def create_tag(self, tag: str, source_commit: str, message: str) -> None:
+                super().create_tag(tag, source_commit, message)
+                raise TemplateToolError("simulated post-mutation create_tag failure")
+
+            def tag_annotation(self, tag: str) -> dict[str, Any]:
+                self.annotation_calls += 1
+                return super().tag_annotation(tag)
+
+        with tempfile.TemporaryDirectory(prefix="template-release-reconcile-") as directory:
+            root = Path(directory)
+            _, packages = self.make_fixture_repo(root)
+            output = self.create_release(root, packages["1.1.1"], "post-mutation-reconcile")
+            plan = output / "demo-template-1.1.1.release-plan.json"
+            client = PostMutationFailureClient()
+            with self.assertRaisesRegex(Exception, "simulated post-mutation create_tag failure"):
+                publish_release_transaction(plan, root, client=client)
+            self.assertGreaterEqual(client.annotation_calls, 1)
+            self.assertEqual(client.tags, {})
+            self.assertEqual(client.releases, {})
+
     def test_fake_github_release_transaction_happy_preexisting_and_cleanup(self) -> None:
         from tools.template_tooling.github_release import InMemoryGitHubReleaseClient, publish_release_transaction
 
