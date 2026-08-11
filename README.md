@@ -1,70 +1,238 @@
-# 我的工作 Skills
+# Codex Work Skills
 
-这个仓库用于存放我在工作中复用的 Codex skills。后续新增 skill 时，建议每个 skill 都使用一个中文目录，并在目录中放置 `简介.md`，说明用途、适用场景、输入材料和安装方式。
+面向日常教学资料工作的可复用 AI skill 集合。当前仓库提供教案生成、平时成绩记分册生成和版本化模板包工具链，重点保证模板格式、输入校验、输出 QA 和跨平台使用的一致性。
 
-## 技能列表
+> **当前默认版本**：教案 `lesson-plan/v1.1.1`，成绩册 `course-gradebook/v1.1.0`
+>
+> **交付验证平台**：Windows、macOS
+> **适用方式**：Codex、Claude Code、Gemini CLI、Cursor、Cline、Continue、Windsurf、OpenCode、GitHub Copilot、Aider 等具备本地文件和命令权限的 agent
 
-| 技能名称 | 简介 | 安装目录 |
-| --- | --- | --- |
-| 教案生成器 | 按内置 Word 教案模板生成项目化中文教案 DOCX；可读取能力图谱、章节任务拆解或旧教案，并能在资料不足时按课程特点推断项目和任务。 | `教案生成器/lesson-plan-docx-generator` |
-| 平时成绩记分册生成器 | 根据 `课程成绩单.xls` 自动生成平时成绩记分册，内置模板，按 manifest 定义生成平时成绩项目，并按成绩比例删除或保留技能成绩列；支持 Windows Excel COM 和 macOS/Linux LibreOffice 路径。 | `平时成绩记分册生成器/course-gradebook-generator` |
-| 模板包工具链 | 自动发现、脚手架、完整校验、原子晋级和确定性归档版本化模板包；不维护额外注册表，也不覆盖 canonical 包。 | `tools/template_package.py` |
+## 先看这里
 
-## 使用约定
+| 你的需求 | 使用内容 | 主要输入 | 输出 |
+| --- | --- | --- | --- |
+| 批量生成或修改中文职业教育教案 | [教案生成器](教案生成器/lesson-plan-docx-generator) | 能力图谱、章节任务拆解、旧教案或课程信息 | 项目化 `.docx` 教案 |
+| 生成平时成绩记分册 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | `课程成绩单.xls` | 平时成绩记分册 `.xls` |
+| 创建、校验、晋级或归档模板包 | [模板包工具链](tools/template_package.py) | 版本化模板包 | 校验报告、归档包或已安装版本 |
 
-- 中文目录用于给同事识别技能用途。
-- 实际 Codex skill 目录保留兼容命名，便于安装到 `.codex/skills` 后稳定调用。
-- 每个 skill 需要包含中文简介，说明它能做什么、需要用户提供哪些资料、没有资料时会如何默认处理。
-- 如果 skill 内置模板或脚本，放在 skill 目录下的 `assets/`、`scripts/` 等子目录中，避免依赖个人电脑上的临时路径。
+没有完整资料也可以开始：教案生成器会根据课程信息推断项目化任务结构；成绩册生成器不能凭空生成成绩，必须提供 `课程成绩单.xls`。
 
-## 多Agent兼容
+## 快速安装
 
-仓库中的所有现有 skill 都提供统一的多 Agent 工作协议：AI 负责理解输入资料，技能脚本负责稳定生成最终文件。每个 skill 都包含 AGENTS.md、CLAUDE.md、GEMINI.md、通用提示词.md、Aider 约定和可生成 Cursor/Cline/Continue/Windsurf/Copilot 规则的适配器脚本。
+两个 skill 都自带安装脚本，默认安装到当前用户的 `~/.codex/skills`。安装前请先将本仓库下载或克隆到本机。
 
-适配范围包括 Codex、Claude Code、Gemini CLI、Cursor、Cline、Continue、Windsurf、OpenCode、GitHub Copilot CLI/Cloud Agent、Aider，以及使用 DeepSeek、Claude、GLM、Gemini、OpenAI 等模型的其他 agent 工具。纯网页聊天工具可以先生成结构化输入，再交给具备本地文件和命令权限的 agent 执行。
+### Windows PowerShell
 
-在任一 skill 目录运行 scripts/install_adapters.py 可以把适配规则安装到目标项目；默认不会覆盖已有规则文件。
+```powershell
+python "教案生成器/lesson-plan-docx-generator/scripts/install.py"
+python "平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
+```
 
-成绩册的两个版本有明确边界：v1.0 使用 legacy coordinates，按输入人数删除未使用学生行；v1.1 使用 workbook-level `gb_` named ranges，48 人以内保留到第 52 行，超过模板容量时精确扩展到最后一名学生，`gb_template_row` 始终指向第 5 行。Windows 路径以 Excel COM 作为生成引擎，Python 的 `xlrd`/`olefile` 原始 XLS preflight 在任何 skip 参数下都不可跳过；LibreOffice 只用于完整 round-trip、格式和渲染 QA。Windows 同时显式跳过模板和输出 QA 时，不强制要求 LibreOffice。
+### macOS Terminal
 
-成绩册生成采用候选文件事务：临时生成 → 不可跳过的 raw runtime 检查 → 可选完整 QA 或真实文件基础检查 → XLS 与 QA 原子替换。任一步失败都保留既有正式文件和输出目录中的无关 XLS，只清理本次运行的临时文件；skip QA 仍必须确认输出是非空 `.xls`，v1.1 还必须通过原始 named-range inventory。
+```bash
+python3 "教案生成器/lesson-plan-docx-generator/scripts/install.py"
+python3 "平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
+```
 
-## 模板包标准
+安装脚本支持：
 
-文档和表格生成器使用版本化模板包。每个包的 canonical template、`manifest.yaml`、输入 schema、模板/输出校验器和 `CHANGELOG.md` 都随 skill 分发；旧模板路径继续保留为兼容入口，并由 SHA-256 校验防止两份模板分叉。
+- `--dry-run`：只显示目标路径，不复制文件；
+- `--skills-dir <目录>`：指定 Codex skills 目录；
+- `--replace`：备份已有安装后再替换，默认不会覆盖现有 skill。
 
-统一流程为：
+安装后，重新打开或刷新对应的 agent 会话即可使用。每个 skill 的完整输入、命令和校验说明见其目录下的 `SKILL.md`。
+
+## 技能说明
+
+### 教案生成器
+
+目录：`教案生成器/lesson-plan-docx-generator`
+
+- 默认使用内置 Word 模板，保留既有表格结构和格式；
+- 支持能力图谱 Excel、章节任务拆解、旧教案或用户提供的 DOCX 模板；
+- 默认生成项目化教学：`单元名称` 使用“项目一、项目二……”等项目名称，`任务名称` 使用具体可交付任务；
+- 实训课会优先组织成果包、工具、操作记录、互评和过程性评价；
+- 自动处理课程名称、课时、教学过程、教学评价分数和教学反思；
+- 默认模板为 `lesson-plan/v1.1.1`，仍支持 canonical v1.0 和旧 compatibility 路径。
+
+建议准备：课程名称、专业、授课对象、总课时、单次课时，以及能力图谱或章节任务资料。如果没有这些资料，skill 会明确说明推断依据后按项目化课程结构生成，不会退化成只有章节名称的目录。
+
+### 平时成绩记分册生成器
+
+目录：`平时成绩记分册生成器/course-gradebook-generator`
+
+- 输入 `课程成绩单.xls` 或包含该文件的班级目录；
+- 默认使用 `course-gradebook/v1.1.0` 的 workbook-level `gb_` named ranges；
+- 保留 v1.0 canonical 和旧 compatibility 模板的 legacy-coordinate 路径；
+- 按成绩比例保留或删除技能成绩列，并生成公式、总评和 QA 报告；
+- 48 人以内保留模板到第 52 行，超过模板容量时精确扩展到最后一名学生；
+- v1.1 的 `gb_template_row` 始终指向第 5 行，不静默回退到固定坐标。
+
+建议先确认源成绩单中的课程、教师、班级、成绩比例、学生学号和姓名完整。技能缺少源成绩单时会要求补充，不会伪造输入数据。
+
+### 模板包工具链
+
+入口：`tools/template_package.py`
+
+用于发现、脚手架、校验、原子晋级、确定性归档、安装、升级和回滚版本化模板包。工具不维护额外注册表，也不会覆盖 canonical 模板包。
+
+## 多 Agent 使用
+
+所有 skill 共用同一套“模型理解输入、脚本负责稳定写入和校验”的工作协议。业务逻辑集中在 skill 自带的 Python/PowerShell 脚本中，便于不同 agent 和不同模型复用相同的输入结构与输出规则。
+
+| Agent / 工具 | 入口或适配文件 |
+| --- | --- |
+| Codex / Codex CLI | `SKILL.md`、`agents/openai.yaml` |
+| Claude Code | `CLAUDE.md` |
+| Gemini CLI | `GEMINI.md` |
+| Cursor、Cline、Continue、Windsurf、OpenCode | `AGENTS.md` 及对应规则目录 |
+| GitHub Copilot CLI / Cloud Agent | `AGENTS.md`、`.github/copilot-instructions.md` |
+| Aider | `CONVENTIONS.md`、`.aider.conf.yml` |
+
+工作流与模型供应商无关，DeepSeek、Claude、GLM、Gemini、OpenAI 等模型均可使用。前提是宿主工具能够读写本地文件并执行 Python 或 PowerShell；纯网页聊天工具可以先生成结构化输入，再交给有本地工具权限的 agent 执行。
+
+为目标项目安装适配规则：
+
+```powershell
+python "<skill>/scripts/install_adapters.py" --target-dir "<project>"
+```
+
+macOS 使用 `python3`。默认不覆盖已有规则；可重复传入 `--adapter claude`、`--adapter cursor` 等参数选择工具，只有明确传入 `--replace` 才会备份并替换。需要把整个 skill 包复制到目标项目时，再增加 `--copy-engine`。
+
+详细兼容矩阵见 [`多Agent兼容规范.md`](多Agent兼容规范.md)。
+
+## 版本与兼容性
+
+| Skill | 版本范围 | 定位模式 | 当前默认 |
+| --- | --- | --- | --- |
+| 教案生成器 | `1.0.x` | `legacy_coordinates` | 兼容路径 |
+| 教案生成器 | `1.1.x` | `word_bookmark` | `v1.1.1` |
+| 成绩册生成器 | `1.0.x` | `legacy_coordinates` | 兼容路径 |
+| 成绩册生成器 | `1.1.x` | `excel_named_range` | `v1.1.0` |
+
+其他 `1.x` minor 版本当前会被拒绝；版本号和定位模式不一致也会被拒绝。正常生成默认执行模板校验和输出校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过对应的完整 QA；跳过时仍会写入 QA 报告，并将状态标记为 `skipped`。
+
+自定义模板必须提供匹配的 manifest：
+
+- canonical 模板位于各 skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖；
+- 显式 manifest 的版本、模板路径和 SHA-256 fingerprint 必须一致；
+- v1.1 教案只能使用 manifest 声明的 Word 书签，书签名遵守 Word 40 字符限制，ID 只接受 ASCII 十进制数字；
+- `bookmarkStart` 和 `bookmarkEnd` 必须位于同一目标段落或物理单元格，构建器还会扫描 header/footer story；
+- unknown key、未知 target/mode 和 legacy 模板夹带 semantic 定位字段都会被拒绝，不会静默降级。
+
+## 统一生成流程
 
 ```text
-输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告
+输入资料
+   ↓
+标准化数据 → schema 校验 → 模板校验
+   ↓
+生成临时候选文件 → raw runtime 检查
+   ↓
+完整 QA 或显式 skip QA
+   ↓
+输出校验 → QA 报告 → 原子替换正式输出
 ```
 
-规范说明见 [`docs/template-package-standard.md`](docs/template-package-standard.md)。教案模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `word_bookmark`；成绩册模板版本契约为：`1.0.x` 使用 `legacy_coordinates`，`1.1.x` 使用 `excel_named_range`；其他 `1.x` minor 当前拒绝，版本与定位模式不一致也拒绝。自定义 `1.1.x` manifest 必须完整声明对应的 semantic contract，unknown key、未知 target/mode 不会降级处理；legacy `1.0.x` 也不得夹带 semantic 定位字段。当前默认使用 `lesson-plan/v1.1.1` 和 `course-gradebook/v1.1.0`，教案仍保留 v1.0 兼容路径。正常生成默认校验，只有显式传入 `--skip-template-validation` 或 `--skip-output-validation` 才会跳过；跳过时仍写入 QA 报告并标记为 `skipped`。
+两个生成器都遵循这条边界。成绩册的 raw XLS、named-range inventory 和基本文件有效性检查不能被 skip 参数绕过；完整 round-trip、格式和渲染 QA 可以按命令显式跳过。
 
-模板包默认校验命令如下，路径应替换为对应 Skill 目录中的脚本和版本化 manifest：
+## 平台说明
+
+本仓库的交付和 CI 验证只考虑 Windows、macOS。
+
+| 平台 | 教案 DOCX | 成绩册 XLS |
+| --- | --- | --- |
+| Windows | Python 生成，必要时可用 Word/LibreOffice 做渲染检查 | 优先使用 Microsoft Excel COM；Python `xlrd`/`olefile` raw XLS preflight 始终执行；完整 LibreOffice QA 可选 |
+| macOS | Python 生成，必要时使用 LibreOffice 做渲染检查 | 使用 Python + LibreOffice/`soffice` 完成 `.xls` 转换、写入和回转；不使用 Excel COM |
+
+Windows 同时显式跳过模板和输出 QA 时不强制要求 LibreOffice。Microsoft Excel COM、Word UI 和 Microsoft Office 原生渲染不在 GitHub Actions 中运行；相关 COM 集成需要本地 Windows 和已安装的 Microsoft Office。CI 会在 macOS 和 Windows 上执行结构化 QA、LibreOffice 回转和回归测试。
+
+## 安全与事务边界
+
+- 生成先写临时候选文件，raw runtime 检查和 QA 通过后才替换正式 XLS 与 QA；
+- 任一步失败都保留旧正式输出和输出目录中的无关文件，只清理本次运行的临时文件；
+- 不覆盖源成绩单、实际或声明模板、manifest、base template、base manifest、canonical 或 compatibility 模板；
+- 模板工具的 stage、target 和仓库动态校验通过后才原子晋级；
+- 工具不会自动 `git add`，新模板包需要精确暂存 validator、manifest、模板、schema 和 helper；
+- 已安装包保持 immutable，rollback 只切换已安装版本的 active/previous 状态，不执行 bundle 中的代码。
+
+## 模板包工具链
+
+在仓库根目录运行。路径参数应替换为实际模板包或工作目录：
 
 ```bash
-python scripts/validate_template.py --template <template> --manifest <manifest.yaml>
-python scripts/validate_output.py --input-json <input.json> --output-dir <output> --manifest <manifest.yaml>
-```
-
-模板包维护使用仓库根目录的统一工具：
-
-```bash
+# 发现并检查仓库中的 canonical 包
 python tools/template_package.py discover --json
-python tools/template_package.py scaffold --base-package <canonical-package> --version <new-version> --output-dir <work-package>
+
+# 创建并校验新版本
+python tools/template_package.py scaffold \
+  --base-package <canonical-package> \
+  --version <new-version> \
+  --output-dir <work-package>
 python tools/template_package.py validate --package <package> --json
+
+# 原子晋级并生成确定性归档
 python tools/template_package.py promote --package <package>
-python tools/template_package.py archive --package <package> --output-dir dist/template-packages
-python tools/template_package.py verify-release --release-dir dist/template-packages --json
-python tools/template_package.py install --release-dir dist/template-packages --json
+python tools/template_package.py archive \
+  --package <package> \
+  --output-dir dist/template-packages
+
+# 验证、安装和检查归档
+python tools/template_package.py verify-release \
+  --release-dir dist/template-packages --json
+python tools/template_package.py install \
+  --release-dir dist/template-packages --json
 python tools/template_package.py list-installed --verify --json
 ```
 
-`discover` 动态读取所有 manifest，并严格验证 fingerprint、owner 和 schema；validator 信任根是当前 repo-root 的 Git index，未跟踪的 canonical-like Skill、symlink validator 或未跟踪 scripts helper 都会被拒绝且不会执行。`scripts/__pycache__/` 下的 `.pyc/.pyo` 会被识别为 Python cache 并忽略，普通 scripts 目录中的 `.pyc/.pyo` 即使已跟踪也会被拒绝；隔离 validation workspace 建立后不会含有 `__pycache__`、`.pyc` 或 `.pyo`。工具不会自动 `git add`，新 Skill 需要精确暂存 validator、manifest、模板、schema 和 helper；已跟踪但未 commit 的修改仍可验证。`validate` 对外部包在系统临时隔离 Skill 树中只复制 Git-tracked 普通脚本，调用所属 Skill 的真实 `scripts/validate_template.py`；`--identity-only` 只代表身份检查而不是完整通过，validator 超时时已产生的部分 stdout/stderr 会保留为 UTF-8 文本。`scaffold` 必须先检查 lexical/resolved 工作目录再通过 base full validation；仓库内 output 只能写入 `work/template-packages/`，仓库外 lexical 路径若解析回仓库会被拒绝，解析后仍在独立 workspace 的目录或 symlink alias 可以使用，报告和依赖必须解析到同一 workspace，报告名包含 template id/version 且只能位于 output sibling。`promote` 从不可变 snapshot 开始，在 stage、最终 target 和动态仓库校验都通过后原子安装；repository-wide validation 会保护并恢复所有 canonical Skill 的完整 `assets/templates` 树，任何其他 canonical 包的新增、删除或修改都会失败。`archive` 递归包含依赖闭包，解压后再次完整验证，并生成稳定排序、固定时间和权限的 ZIP、SHA-256 sidecar 与 `<id>-<version>.metadata.json`；仓库内只能输出到 `dist/template-packages/`，外部独立 archive workspace 仍受 symlink 和 package overlap 保护。正式 `release` 只接受当前仓库内真实 Git-tracked canonical 包，且 archive closure 中的每个归档文件都必须与当前 HEAD blob 逐字节一致；任何 CRLF/LF 或其他换行差异都会被拒绝，发布前保存完整 HEAD blob 快照并在归档后逐项核对 ZIP 和 metadata；external future patch 只能通过 `archive` 生成 bundle，再由 `verify-release`/`install`/`upgrade` 处理。所有变更命令都拒绝覆盖已有目标，支持 `--dry-run` 的命令不会创建文件。详细字段和生命周期见 [`docs/template-package-authoring.md`](docs/template-package-authoring.md)。
+常用模板/输出校验命令：
 
-自定义模板应同时提供匹配的 manifest；内置 canonical 模板位于各 Skill 的 `assets/templates/<template-id>/<version>/`，不应直接覆盖。显式传入 manifest 时，canonical 或 compatibility 原始路径必须与声明版本精确匹配；自定义路径按 manifest 的版本、结构、书签契约和实际 SHA-256 fingerprint 校验，不会仅因 SHA 与旧 canonical 相同而推断 patch 版本。因此，普通 `shutil.copy2` 复制的 v1.1.0 模板可以配套声明真实 fingerprint 的 v1.1.1 manifest；compatibility 原始路径配 v1.0.1 manifest 则按路径身份规则拒绝。教案 v1.1 模板只能使用 manifest 显式声明的 Word 书签写入，书签名称遵守 Word 40 字符安全规则并使用短阶段代码，书签 ID 只接受 ASCII 十进制数字；`bookmarkStart`/`bookmarkEnd` 必须位于同一目标段落或物理单元格，构建器还会扫描所有 header/footer story。canonical v1.0 模板和旧 `assets/lesson-plan-template.docx` 仅传 `--template` 时会自动解析为 `legacy_coordinates`，自定义模板仍必须提供匹配 manifest。
+```bash
+python scripts/validate_template.py \
+  --template <template> \
+  --manifest <manifest.yaml>
+python scripts/validate_output.py \
+  --input-json <input.json> \
+  --output-dir <output> \
+  --manifest <manifest.yaml>
+```
 
-模板包完整校验的执行边界：canonical、external、archive 解压包以及 scaffold/promote 的 snapshot、stage、target 和动态仓库验证，统一复制到系统临时的正常 Skill 树，通过 `python -B` 和受控子进程环境执行。只复制 Git-tracked 普通源文件与声明依赖，真实仓库的 `__pycache__`、`.pyc`、`.pyo` 不参与执行；外部 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等注入变量不会传入，user site 被禁用，Python cache 只允许写入临时树内的 `python-cache`，validator 超时时产生的部分 stdout/stderr 会保留为清洗后的 UTF-8 文本，执行后必须检查并清理。任何隔离或清理失败都会使验证失败，`--identity-only` 仍只做身份检查。
+### 工具链的关键保护
 
-发布和安装生命周期见 [`docs/template-package-release.md`](docs/template-package-release.md)。canonical 模板、三文件 archive、installed 版本和 GitHub Release 是四类不同对象；Release owner 按 trusted Skill 而不是同版本 canonical 解析，Release entry template SHA 独立于 canonical SHA。正式 release 只接受 committed canonical source，不能用 external package 声明 repository provenance；GitHub 发布前会解析 origin 的 GitHub owner/name，`--repository` 只作为同一仓库的断言，大小写不敏感但不匹配或非 GitHub origin 会在任何远程操作前失败；external future patch 仍可 verify/install/upgrade。installed 版本 immutable，rollback 是已安装版本之间的 active/previous 状态切换，且安装器不会执行 bundle 中的代码。默认 `list-installed` 会重新计算 bundle inventory SHA，`--verify` 才执行完整隔离 Skill QA。发布 workflow 只从 clean `master` 手动触发，按 template/version 串行化，使用 operation_id 证明 annotated tag、Release 和 asset ownership，live 校验远程 master 和三个 asset SHA，不覆盖已有 tag、Release 或 asset；verify-release 对不可信 ZIP 施加资源上限。
+- `discover` 动态读取 manifest，并检查 fingerprint、owner、schema、Git index 信任根和 canonical 包完整性；未跟踪的 canonical-like skill、symlink validator、未跟踪 helper 会被拒绝；`scripts/__pycache__/` 中的 Python cache 会被忽略，普通 `scripts` 中的 `.pyc/.pyo` 会被拒绝；
+- `validate` 在系统临时目录创建隔离的正常 Skill 树，只复制 Git-tracked 普通脚本并调用真实 validator；`--identity-only` 只做身份检查，不代表完整通过；超时时已产生的 stdout/stderr 会保留为 UTF-8 文本；
+- `scaffold` 检查 lexical/resolved workspace、symlink containment、报告路径和依赖路径；仓库内输出只能写入 `work/template-packages/`；
+- `promote` 从不可变 snapshot 开始，在 stage、最终 target 和 repository-wide 动态校验都通过后原子安装，并保护所有 canonical skill 的完整模板树；
+- `archive` 递归包含依赖闭包，解压后再次验证，生成稳定排序、固定时间和权限的 ZIP、SHA-256 sidecar 以及 `<id>-<version>.metadata.json`；
+- 所有变更命令拒绝覆盖已有目标；支持 `--dry-run` 的命令不会创建文件。
+
+## 发布和安装生命周期
+
+canonical 模板、三文件 archive、installed 版本和 GitHub Release 是四类不同对象：
+
+```text
+canonical source → deterministic archive → installed version → GitHub Release
+```
+
+- 正式 release 只接受当前仓库内真实 Git-tracked 的 canonical 包；archive 中的每个文件必须与当前 HEAD blob 逐字节一致，CRLF/LF 或其他换行差异都会被拒绝；
+- 发布前会保存完整 HEAD blob 快照，发布后逐项核对 ZIP、metadata 和远程 asset SHA；
+- GitHub 操作前会校验 origin 的 GitHub owner/name，`--repository` 只能作为同一仓库断言；
+- release workflow 只从 clean `master` 手动触发，并按 template/version 串行化；`operation_id` 用于证明 annotated tag、Release 和 asset 的归属；
+- 不覆盖已有 tag、Release 或 asset；live 校验远程 master 和三个发布 asset 的 SHA；
+- external future patch 只能先通过 `archive` 生成 bundle，再由 `verify-release`、`install` 或 `upgrade` 处理；
+- 默认 `list-installed` 重新计算 bundle inventory SHA，`--verify` 才执行完整隔离 Skill QA；不可信 ZIP 受资源上限保护。
+
+详细字段、作者约束和生命周期说明：
+
+- [`docs/template-package-standard.md`](docs/template-package-standard.md)
+- [`docs/template-package-authoring.md`](docs/template-package-authoring.md)
+- [`docs/template-package-release.md`](docs/template-package-release.md)
+
+## 仓库约定
+
+- 顶层中文目录用于直观标识用途，实际安装目录使用稳定的兼容名称；
+- 每个 skill 应包含 `SKILL.md`、中文简介、输入说明、`assets/`、`scripts/` 和必要的 schema/manifest；
+- 新增 skill 时同时更新对应的多 Agent 入口和适配器；
+- 模板和脚本随 skill 分发，不依赖个人电脑上的绝对路径或临时文件；
+- 变更模板包时保留 CHANGELOG、fingerprint 和可复现的验证记录。
