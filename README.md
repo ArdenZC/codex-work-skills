@@ -1,6 +1,8 @@
 # Codex Work Skills
 
-一组用于教学资料处理的可复用 AI skill。当前包含项目化教案生成、平时成绩记分册生成和版本化模板包工具链，重点保证模板格式、输入校验、输出 QA 与 Windows/macOS 使用的一致性。
+一组用于实际教学工作的可复用 AI Skills，目前包含教案生成器和平时成绩记分册生成器。
+
+AI 负责理解课程资料和用户要求，Skill 自带脚本负责稳定生成 Word / Excel 文件、保留模板格式并执行结果校验。
 
 > **当前内置模板**：教案 `lesson-plan/v1.1.1`，成绩册 `course-gradebook/v1.1.0`
 >
@@ -156,20 +158,22 @@ Windows 和 macOS 是当前 CI 与交付验收平台。
 - Linux：基于 Python + LibreOffice 的路径设计上保持兼容，但当前不属于持续集成验收平台；
 - Microsoft Excel COM、Word UI 和 Microsoft Office 原生渲染不在 GitHub Actions 中运行。
 
-## 当前版本与兼容性
+## 当前版本
 
-这些版本指内置 canonical 模板版本，不是 Skill 安装包版本。Skill 本身的安装来源仍是仓库 `master`，不是 GitHub Release ZIP。
+| Skill | 当前默认模板 | 状态 |
+| --- | --- | --- |
+| 教案生成器 | `lesson-plan v1.1.1` | 当前默认 |
+| 平时成绩记分册生成器 | `course-gradebook v1.1.0` | 当前默认 |
 
-| Skill | 版本 | 定位方式 | 说明 |
-| --- | --- | --- | --- |
-| 教案生成器 | `1.0.x` | `legacy_coordinates` | 旧模板兼容路径 |
-| 教案生成器 | `1.1.x` | `word_bookmark` | 当前默认 `v1.1.1` |
-| 成绩册生成器 | `1.0.x` | `legacy_coordinates` | 旧模板兼容路径 |
-| 成绩册生成器 | `1.1.x` | `excel_named_range` | 当前默认 `v1.1.0` |
+这些版本指 Skill 内置的 canonical 模板版本，不是 Skill 安装包版本。
 
-其他 `1.x` minor 版本当前会被拒绝，版本号与定位方式不一致也会被拒绝。正常生成默认执行 schema、模板和输出 QA；只有显式传入 skip 参数才会跳过对应的完整 QA，并在报告中标记为 `skipped`。canonical 模板不应直接覆盖，自定义模板应提供匹配 manifest。
+完整 Skill 的当前安装来源仍是仓库 `master`。GitHub Release 中的 ZIP 是版本化模板包，不是完整 Skill 安装包。
 
-教案 v1.1.1 保留项目化结构、70 个 Word 语义书签和两个课时严格合计 90 分钟的课中阶段；成绩册 v1.1.0 保留 8 次平时成绩、24 个 `gb_` named ranges、48 人模板容量规则、技能成绩列切换和输出 QA。
+旧模板兼容模式、模板定位契约、支持的 minor 版本及详细 QA 规则属于维护者规范，见：
+
+- [模板包标准](docs/template-package-standard.md)
+- [模板包作者指南](docs/template-package-authoring.md)
+- [模板包发布与安装](docs/template-package-release.md)
 
 ## 关于 GitHub Release
 
