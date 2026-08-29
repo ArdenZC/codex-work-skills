@@ -20,6 +20,8 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 ## Content Contract V2
 
+默认使用 `assets/templates/lesson-plan/v1.1.1/template.docx`。
+
 正式生产输入必须是 `content_contract_version: "2.0"`，与 Word 模板版本独立。默认 Word 模板仍为 `lesson-plan v1.1.1`，并继续支持 v1.0 legacy-coordinate 与 v1.1 semantic-bookmark 模板路径；旧 sparse JSON 不再生产生成。
 
 课程级必填字段：
