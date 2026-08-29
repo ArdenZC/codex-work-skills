@@ -4,9 +4,11 @@ import argparse
 import copy
 import hashlib
 import json
+import os
 import re
 import shutil
-from datetime import datetime
+import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +20,10 @@ from docx.text.paragraph import Paragraph
 from docx.table import _Cell
 
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, evaluation_cell_values, ensure_supported_major, field_bookmark, field_spec, generated_lesson_fields, implementation_bookmarks, implementation_cell_values, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, reflection_cell_values, resolve_template_package, validate_composed_fields, validate_input
+from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_header_values, format_title
+from content_quality import ContentQualityError, validate_content_quality
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
+from path_safety import assert_output_path_safe, lesson_protected_paths
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -182,13 +187,6 @@ def set_anchored_cell(document, manifest: dict[str, Any], bookmark_name: str, va
     writer(cell, value, bookmark_end=record.end)
 
 
-def numbered(items: list[str], limit: int | None = None) -> str:
-    values = [str(x).strip() for x in items if str(x).strip()]
-    if limit and len(values) > limit:
-        values = values[:limit] + ["结合任务材料完成其余流程训练"]
-    return "\n".join(f"{idx}. {item}" for idx, item in enumerate(values, 1))
-
-
 def safe_name(text: str) -> str:
     text = re.sub(r"\s+", "", str(text))
     return re.sub(r'[\\/:*?"<>|]+', "", text)
@@ -214,27 +212,27 @@ def lesson_filename(seq: int, unit: str, task: str) -> str:
     return f"{prefix}{_utf8_prefix(stem, stem_budget)}{marker}{suffix}"
 
 
-def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):
+def add_eval_table(cell, target: float, lesson: dict[str, Any], manifest: dict[str, Any]):
     table = cell.tables[0] if cell.tables else cell.add_table(rows=14, cols=4)
-    for r_idx, values in enumerate(evaluation_cell_values(target, seq), start=1):
+    for r_idx, values in enumerate(
+        format_evaluation_values(lesson, score_breakdown(target)),
+        start=1,
+    ):
         set_cell_text(table.cell(r_idx, 2), values[2], preserve_cell_layout=True)
         set_cell_text(table.cell(r_idx, 3), values[3], preserve_cell_layout=True)
 
 
 def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict[str, Any], seq: int, manifest: dict[str, Any]) -> Path:
-    course = item.get("course_name") or meta["course_name"]
-    major = item.get("major") or meta.get("major", "软件技术")
-    audience = item.get("audience") or meta.get("audience", "高职二年级")
-    hours = str(item.get("hours") or meta.get("default_hours", "2"))
-    unit = str(item["unit"])
-    task = str(item["task"])
-    flows = [str(x) for x in item.get("flows", [])]
-    knowledge = [str(x) for x in item.get("knowledge", [])]
-    tools = str(item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"))
-    score = float(item.get("score", 89 + ((seq - 1) % 6) * 0.5))
+    header_values = lesson_header_values(meta, item)
+    course = header_values["course_name"]
+    major = header_values["major"]
+    audience = header_values["audience"]
+    hours = header_values["hours"]
+    lesson_content = lesson_content_field_values(item)
+    score = float(item["evaluation"]["score"])
 
     doc = Document(str(template))
-    title_text = f"{seq} 《{course}》教学单元设计：{task}"
+    title_text = format_title(seq, meta, item)
     if is_semantic_manifest(manifest):
         target, bookmark_end = _semantic_target(doc, manifest, "title")
         set_paragraph_text(target, title_text, WD_ALIGN_PARAGRAPH.CENTER, bookmark_end=bookmark_end)
@@ -246,13 +244,7 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
         set_paragraph_text(doc.paragraphs[title_index], title_text, WD_ALIGN_PARAGRAPH.CENTER)
 
     table = doc.tables[0]
-    set_manifest_field(doc, table, manifest, "course_name", course)
-    set_manifest_field(doc, table, manifest, "major", major)
-    set_manifest_field(doc, table, manifest, "audience", audience)
-    set_manifest_field(doc, table, manifest, "unit", unit)
-    set_manifest_field(doc, table, manifest, "task", task)
-    set_manifest_field(doc, table, manifest, "hours", hours)
-    for name, value in generated_lesson_fields(unit, task, flows, knowledge, tools).items():
+    for name, value in {**header_values, **lesson_content}.items():
         set_manifest_field(doc, table, manifest, name, value)
     if is_semantic_manifest(manifest):
         evaluation_name = field_bookmark(manifest, "evaluation")
@@ -266,23 +258,23 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     else:
         evaluation_spec = manifest["structure"]["evaluation_table"]
         evaluation_cell = actual_cells(table.rows[int(evaluation_spec["row"])])[int(evaluation_spec["cell"])]
-    add_eval_table(evaluation_cell, score, seq, manifest)
+    add_eval_table(evaluation_cell, score, item, manifest)
 
     if is_semantic_manifest(manifest):
-        for bookmark_group, values in zip(implementation_bookmarks(manifest), implementation_cell_values(task, flows, hours)):
+        for bookmark_group, values in zip(implementation_bookmarks(manifest), format_implementation(item["implementation"])):
             for bookmark_name, value in zip(bookmark_group, [values[index] for index in range(5)]):
                 set_anchored_cell(doc, manifest, bookmark_name, value, multiline="\n" in str(value))
-        for bookmark_name, value in zip(reflection_bookmarks(manifest), reflection_cell_values(task)):
+        for bookmark_name, value in zip(reflection_bookmarks(manifest), format_reflection(item["reflection"])):
             set_anchored_cell(doc, manifest, bookmark_name, value, multiline="\n" in str(value))
     else:
         implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
-        for row_index, values in zip(implementation_rows, implementation_cell_values(task, flows, hours)):
+        for row_index, values in zip(implementation_rows, format_implementation(item["implementation"])):
             set_row(table, row_index, values)
         reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
-        for row_index, value in zip(reflection_rows, reflection_cell_values(task)):
+        for row_index, value in zip(reflection_rows, format_reflection(item["reflection"])):
             set_row(table, row_index, {2: value})
 
-    out = out_dir / lesson_filename(seq, unit, task)
+    out = out_dir / lesson_filename(seq, header_values["unit"], header_values["task"])
     doc.save(out)
     return out
 
@@ -298,6 +290,7 @@ def validate_outputs(
     custom_template: bool,
     template_validation: bool,
     template_warnings: list[str],
+    render: bool,
 ) -> dict[str, Any]:
     return validate_output_dir(
         out_dir,
@@ -310,7 +303,52 @@ def validate_outputs(
         engine="python-docx",
         template_validation=template_validation,
         extra_warnings=template_warnings,
+        render=render,
     )
+
+
+def _unique_backup_path(out_dir: Path) -> Path:
+    for _ in range(100):
+        candidate = out_dir.parent / f"_{out_dir.name}_backup_{uuid.uuid4().hex[:12]}"
+        if not candidate.exists():
+            return candidate
+    raise FileExistsError(f"Unable to allocate a backup path beside {out_dir}")
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+def atomic_commit_candidate(candidate: Path, out_dir: Path, backup_existing: bool) -> Path | None:
+    """Swap a fully validated candidate into place and restore on commit failure."""
+
+    displaced: Path | None = None
+    try:
+        if out_dir.exists():
+            if not out_dir.is_dir():
+                raise FileExistsError(f"Output path is not a directory: {out_dir}")
+            if any(out_dir.iterdir()) and not backup_existing:
+                raise FileExistsError(f"Output directory is not empty: {out_dir}")
+            backup_path = _unique_backup_path(out_dir)
+            os.replace(str(out_dir), str(backup_path))
+            displaced = backup_path
+        os.replace(str(candidate), str(out_dir))
+        if displaced is not None and not backup_existing:
+            _remove_path(displaced)
+            displaced = None
+        return displaced
+    except Exception:
+        if displaced is not None and out_dir.exists():
+            _remove_path(out_dir)
+        if displaced is not None and displaced.exists() and not out_dir.exists():
+            try:
+                os.replace(str(displaced), str(out_dir))
+            except Exception as restore_error:  # pragma: no cover - only reachable on a second filesystem failure
+                raise RuntimeError(f"Output commit failed and rollback failed: {restore_error}") from restore_error
+        raise
 
 
 def main() -> None:
@@ -323,6 +361,7 @@ def main() -> None:
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
+    parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
     parser.add_argument("--qa-report", default="")
     args = parser.parse_args()
 
@@ -333,12 +372,34 @@ def main() -> None:
     ensure_supported_major(manifest)
     if not template.exists():
         raise FileNotFoundError(f"Template not found: {template}")
-    out_dir = Path(args.output_dir)
-    with open(args.tasks_json, "r", encoding="utf-8") as f:
+    out_dir = Path(args.output_dir).expanduser().absolute()
+    source_path = Path(args.tasks_json).expanduser().resolve()
+    schema_path = Path(args.schema).expanduser().resolve()
+    with source_path.open("r", encoding="utf-8") as f:
         meta = json.load(f)
-    validate_input(meta, args.schema)
-    validate_composed_fields(meta, manifest)
+    validate_content_v2_input(meta, schema_path)
     lessons = meta["lessons"]
+
+    package_roots = [manifest_path.parent]
+    base_manifest = manifest.get("template", {}).get("base_manifest")
+    if base_manifest:
+        package_roots.append((manifest_path.parent / str(base_manifest)).resolve().parent)
+    protected_paths = lesson_protected_paths(
+        skill_dir=SKILL_DIR,
+        source=source_path,
+        schema=schema_path,
+        template=template,
+        manifest=manifest_path,
+        package_roots=package_roots,
+    )
+    assert_output_path_safe(out_dir, protected_paths)
+    requested_qa = Path(args.qa_report).expanduser().absolute() if args.qa_report else None
+    if requested_qa is not None:
+        assert_output_path_safe(requested_qa, protected_paths)
+    if out_dir.exists() and not out_dir.is_dir():
+        raise FileExistsError(f"Output path is not a directory: {out_dir}")
+    if out_dir.exists() and any(out_dir.iterdir()) and not args.backup_existing:
+        raise FileExistsError(f"Output directory is not empty: {out_dir}")
 
     template_warnings: list[str] = []
     if not args.skip_template_validation:
@@ -347,45 +408,57 @@ def main() -> None:
         for warning in template_warnings:
             print(f"WARNING: {warning}")
 
-    if out_dir.exists() and any(out_dir.iterdir()):
-        if args.backup_existing:
-            backup = out_dir.parent / f"_{out_dir.name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            shutil.move(str(out_dir), str(backup))
-            print(f"backup={backup}")
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    candidate = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.candidate-", dir=str(out_dir.parent)))
+    assert_output_path_safe(candidate, protected_paths)
+    try:
+        content_quality = validate_content_quality(meta, manifest)
+        for seq, item in enumerate(lessons, 1):
+            print(build_lesson(template, candidate, meta, item, seq, manifest))
+        candidate_qa = candidate / "qa-report.json"
+        if not args.skip_output_validation:
+            report = validate_outputs(
+                candidate,
+                meta,
+                manifest,
+                schema_path,
+                candidate_qa,
+                template=template,
+                custom_template=bool(args.template),
+                template_validation=not args.skip_template_validation,
+                template_warnings=template_warnings,
+                render=args.render,
+            )
         else:
-            raise FileExistsError(f"Output directory is not empty: {out_dir}")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    for seq, item in enumerate(lessons, 1):
-        print(build_lesson(template, out_dir, meta, item, seq, manifest))
-    if not args.skip_output_validation:
-        report = validate_outputs(
-            out_dir,
-            meta,
-            manifest,
-            Path(args.schema),
-            Path(args.qa_report) if args.qa_report else None,
-            template=template,
-            custom_template=bool(args.template),
-            template_validation=not args.skip_template_validation,
-            template_warnings=template_warnings,
-        )
+            report = write_skipped_report(
+                candidate,
+                meta,
+                manifest,
+                candidate_qa,
+                schema_path,
+                template_path=template,
+                custom_template=bool(args.template),
+                engine="python-docx",
+                template_validation=not args.skip_template_validation,
+                warnings=template_warnings,
+                render=args.render,
+            )
+        final_qa = requested_qa or (out_dir / "qa-report.json")
+        report["output_dir"] = str(out_dir)
+        report["qa_report"] = str(final_qa)
+        report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+        candidate_qa.write_text(report_text, encoding="utf-8")
+        backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
+        if backup is not None:
+            print(f"backup={backup}")
+        if requested_qa is not None and requested_qa != out_dir / "qa-report.json":
+            requested_qa.parent.mkdir(parents=True, exist_ok=True)
+            requested_qa.write_text(report_text, encoding="utf-8")
         action = "skipped validation" if report["status"] == "skipped" else "validated"
         print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
-    else:
-        report = write_skipped_report(
-            out_dir,
-            meta,
-            manifest,
-            Path(args.qa_report) if args.qa_report else None,
-            args.schema,
-            template_path=template,
-            custom_template=bool(args.template),
-            engine="python-docx",
-            template_validation=not args.skip_template_validation,
-            warnings=template_warnings,
-        )
-        print(f"WARNING: output validation skipped; qa={report['qa_report']}")
+    finally:
+        if candidate.exists():
+            shutil.rmtree(candidate, ignore_errors=True)
 
 
 if __name__ == "__main__":

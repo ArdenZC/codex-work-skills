@@ -1,4 +1,4 @@
 interface:
   display_name: "教案生成器"
   short_description: "按项目化模板批量生成中文教案 DOCX"
-  default_prompt: "使用 $lesson-plan-docx-generator 生成项目化中文教案 DOCX；开始前先提醒我提供课程名、课时、能力图谱、章节任务拆解或旧教案等资料。"
+  default_prompt: "使用 $lesson-plan-docx-generator 生成符合 Content Contract V2 的项目化中文教案 DOCX；开始前读取 SKILL.md，并一次性提醒我提供课程名、专业/对象、课时、能力图谱、章节任务拆解或旧教案等资料。"

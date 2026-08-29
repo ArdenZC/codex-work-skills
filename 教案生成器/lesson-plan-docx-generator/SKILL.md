@@ -1,138 +1,136 @@
 ---
 name: lesson-plan-docx-generator
-description: Generate projectized Chinese vocational-course lesson plan DOCX files from the built-in Word template, an optional supplied template, an Excel 能力图谱, or an inferred project/task structure. Use when the user asks to create, batch-generate, convert, split, or revise 教案/教学单元设计/实训教案 files, while preserving a DOCX template format, reminding the user what source files are helpful, defaulting to 项目化教学 when materials are missing, setting course names/hours, adding natural teaching evaluation scores, and verifying generated DOCX layout.
+description: Generate projectized Chinese vocational-course lesson plan DOCX files from a strict Lesson Content V2 JSON contract, using the protected Word template, semantic bookmarks, output QA, and optional local render QA. Use for creating, converting, batching, or revising 教案, 教学单元设计, and 实训教案 files.
 ---
 
-# Lesson Plan DOCX Generator
+# 教案生成器
 
-Use this skill to reproduce the established workflow for template-matched, projectized Chinese lesson plan DOCX generation.
+本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS；模型供应商不影响 DOCX 结果。
 
-## Intake Reminder
+## 任务入口
 
-At the start of a generation task, briefly tell the user these materials are helpful, but do not block if they want you to proceed with reasonable assumptions:
+任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。一次核对课程名称、专业或授课对象、总课时、单次课时和输出目录：
 
-- course name, major, audience, total hours, and per-lesson hours;
-- 能力图谱/章节任务拆解 Excel, existing syllabus, textbook table of contents, or old lesson plans;
-- a different DOCX template only if they do not want the built-in template;
-- required output folder and any fixed unit/task names.
+- 信息足够时直接规划，不重复追问；
+- 真正缺少且会影响整门课程的事实时，只进行一次集中确认；
+- 用户允许合理推断后，按项目化教学补齐项目、任务、教学内容、评价和预生成反思；
+- 正式 DOCX 不出现“资料不足、推断、AI、QA、similarity、confidence”等内部说明。
 
-If the user provides none of these, infer a projectized teaching plan from the course name and common vocational-course structure. State the assumption, then generate instead of producing a chapter-only outline.
+没有任务资料时也必须先形成课程级 outline，再生成逐课内容。outline 至少包含 lesson sequence、项目/任务、prior learning、capability stage、deliverable、next bridge。长课程可以内部按 4 至 6 课一批生成，但最终必须用完整课程上下文统一 QA。
 
-## Inputs
+## Content Contract V2
 
-Require or infer:
+正式生产输入必须是 `content_contract_version: "2.0"`，与 Word 模板版本独立。默认 Word 模板仍为 `lesson-plan v1.1.1`，并继续支持 v1.0 legacy-coordinate 与 v1.1 semantic-bookmark 模板路径；旧 sparse JSON 不再生产生成。
 
-- `template_docx`: optional. Use the canonical built-in template at `assets/templates/lesson-plan/v1.1.1/template.docx` unless the user explicitly supplies a different template. Supplying canonical `assets/templates/lesson-plan/v1.0.0/template.docx` or the old `assets/lesson-plan-template.docx` without `--manifest` automatically selects the v1.0 coordinate manifest; arbitrary custom templates require a matching `--manifest`.
-- `output_dir`: final DOCX folder. Back up an existing output folder before overwriting.
-- `course_name`: value for the title and `课程名称` cell.
-- `tasks`: project/task records. Prefer extracting these from an Excel 能力图谱 when supplied.
-- `hours`: per task or inferred by total hours. For 实训课 with 12 total hours, prefer 6 tasks x 2 hours unless the user supplies another structure.
+课程级必填字段：
 
-
-## Multi-Agent Use
-
-Treat tasks.json and scripts/generate_lesson_plans.py as the cross-agent contract. Codex loads this file as a skill; other agents should first read 通用提示词.md and the nearest tool adapter before producing the same JSON and running the same script.
-
-- AGENTS.md is the shared baseline for Codex CLI, OpenCode, Windsurf, Cursor CLI, and GitHub Copilot agents.
-- CLAUDE.md and GEMINI.md are native entry points for Claude Code and Gemini CLI.
-- Cursor, Cline, Continue, Windsurf, GitHub Copilot, and Aider adapters are included in the package and can be copied into another project with scripts/install_adapters.py.
-- The workflow is model/provider independent. DeepSeek, Claude, GLM, Gemini, OpenAI, and other models can use it when their host tool can read files and run Python; the DOCX result does not depend on a particular model API.
-- The adapter installer skips existing files by default and creates a timestamped backup when --replace is explicitly supplied.
-
-Read 多Agent兼容说明.md for the compatibility matrix and examples/tasks.example.json for a complete input example.
-
-## Workflow
-
-1. Use the `documents` skill for DOCX work. If an Excel 能力图谱 is supplied, use the `spreadsheets` skill only to inspect/extract task data, not to author the final DOCX.
-2. Inspect the template structure before generation. The known template has one 30-row main table:
-   - row 1: course/major/audience
-   - row 2: unit/task/hours
-   - row 4: learning analysis
-   - row 5: teaching content
-   - row 7: goals
-   - rows 8-12: key/difficulty/method/resources/references
-   - row 13: nested teaching evaluation table
-   - rows 17, 19-25, 27: teaching implementation
-   - rows 28-30: reflection
-3. Extract tasks from the source:
-   - For an Excel 能力图谱, inherit merged project/task cells downward.
-   - Merge multiple `流程` rows under the same task into one lesson plan.
-   - Keep project names in `单元名称`; keep task names in `任务名称`.
-4. If no task source is supplied, create a projectized task list before writing JSON:
-   - Use project names like `项目一 认识课程核心对象`, `项目二 完成基础操作`, `项目三 实施综合应用`, adjusted to the actual course.
-   - Use task names as concrete deliverables or skill actions, not generic chapter titles.
-   - For database-style courses, follow the pattern `项目一 理解数据库`, `项目二 设计学生信息管理数据库`, `项目三 创建与维护数据库`, `项目四 创建与维护数据表`, `项目五 查询与维护数据表`, etc.
-   - For 实训课, use fewer project tasks and emphasize deliverables, tools,成果包,互评, and过程性评价.
-5. Prepare a canonical JSON file and run `scripts/generate_lesson_plans.py`. Omit `--template` to use the manifest-selected built-in template.
-6. The generator follows `输入资料 → 标准化数据 → schema 校验 → 模板校验 → 生成 → 输出校验 → QA 报告`. Validate all DOCX files:
-   - count files and total hours;
-   - assert 30 main-table rows;
-   - assert `课程名称` and title match `course_name`;
-   - assert each evaluation table exists and scores sum to the requested target;
-   - scan for template course-name leftovers such as `Linux操作系统应用`.
-7. Render and inspect layout:
-   - Prefer the `documents` renderer if it works.
-   - Use the installed documents renderer or LibreOffice when available; any local rendering helper is optional and is not a skill dependency.
-   - Inspect a contact sheet plus at least one dense representative page.
-8. Clean temporary scripts and QA images. Keep only final DOCX outputs and any intentional backup.
-
-## Canonical Task JSON
-
-Create a JSON file like:
-
-```json
-{
-  "course_name": "软件测试实训",
-  "major": "软件技术",
-  "audience": "高职二年级",
-  "default_hours": "2",
-  "lessons": [
-    {
-      "unit": "项目一 软件测试实训项目准备",
-      "task": "测试环境搭建与测试计划编制",
-      "hours": "2",
-      "flows": ["分析实训项目需求", "搭建测试环境并准备测试数据"],
-      "knowledge": ["软件测试实训流程", "测试计划结构"],
-      "tools": "测试计划模板、需求说明书、测试环境检查表",
-      "score": 89.0
-    }
-  ]
-}
+```text
+content_contract_version, course_name, major, audience,
+default_hours, total_hours, lessons
 ```
 
-Run:
+每课必须直接提供：
+
+```text
+lesson_id, unit, task, hours, progression,
+student_analysis, teaching_content, goals,
+key_point, difficult_point, teaching_methods, resources, references,
+implementation, evaluation, reflection
+```
+
+`unit` 使用项目化名称（如“项目一……”）；`progression` 包含具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。四课及以上不得所有能力阶段完全相同，但不要求机械线性递增。
+
+`student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项，references 至少一项。
+
+每课 `implementation` 必须按以下九个 ID、固定顺序完整提供，且每个阶段的 `label`、`minutes`、`modality`、`content`、`teacher_actions`、`student_actions`、`objective` 全部来自 JSON：
+
+```text
+before_class_preparation
+task_introduction
+operation_demonstration
+task_implementation
+task_extension
+project_practice
+peer_review
+lesson_summary
+after_class_improvement
+```
+
+课前准备和课后完善属于课外阶段；中间七个阶段的分钟数必须严格等于 `hours * 45`。`operation_demonstration` 是语义行位，可在护理、会计、机械等课程中显示为方法示范、案例解析或技能示范。
+
+评价必须显式提供 0 至 100 的 `evaluation.score` 和 canonical 13 个 criterion IDs 的逐课 `remarks`。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
+
+完整可运行示例见 `examples/tasks.example.json`，字段说明见 `docs/content-contract-v2.md`，机器约束见 `schemas/lesson-plan-input.schema.json`。
+
+## Python 与 Agent 的边界
+
+Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 校验、编号、换行、分钟格式化、字段映射和模板写入。V2 正式路径不得调用旧的 `generated_lesson_fields`、`implementation_cell_values`、`reflection_cell_values`，不得使用 `flows[:3]` 或根据缺失字段创作正文。若内容超出 manifest 的 `max_chars` 或 `max_paragraphs`，必须失败并指出 lesson、field、actual chars、limit，不能截断或静默删减。
+
+## 生成与 QA 顺序
+
+```text
+资料读取与一次性核对
+  -> 课程 outline
+  -> Content V2 JSON
+  -> Input Contract QA
+  -> Content Quality QA
+  -> Template QA
+  -> candidate DOCX generation
+  -> Output Structure + Content-to-DOCX Fidelity QA
+  -> optional Render QA
+  -> atomic commit to final output
+```
+
+使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render 都通过后才交换到正式目录。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。`qa-report.json` 只写在输出目录，不写入 DOCX。
+
+独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 exact duplicates、implementation duplicates、重复长句、字段/整课 SequenceMatcher 与字符 n-gram 相似度、旧套话、完整性、progression、score pattern、density 和非 IT 污染，并在报告中记录 lesson IDs、field、score 和重复片段。合理重复的课程名、专业、固定工具名、阶段 ID 和评价维度标签不作为正文重复。
+
+默认输出 QA 会读取原始 V2 JSON，通过纯 formatter 计算 expected，再对照 semantic bookmark 或 v1.0 坐标；不重新调用教学内容创作函数。模板布局、70 个 semantic bookmarks、bookmark IDs/names、fingerprint、v1.0/v1.1 compatibility 和 canonical 二进制均受保护。若本机存在 LibreOffice，使用 `--render` 做真实分页检查；没有 renderer 时 structural QA 仍通过，报告标记 `render.status=not_executed`。
+
+路径 preflight 在 mkdir、生成、move、backup、delete 之前执行，保护 Skill root、输入 JSON、schema、selected/custom template、manifest、canonical/compatibility package、scripts 和 tests，并拒绝 ancestor、descendant、resolved symlink 及 Windows lexical/8.3 alias overlap。不要把输出写入受保护目录或自定义模板包。
+
+## 命令
+
+Windows：
 
 ```powershell
-& "<bundled-python>" "<skill-dir>\scripts\generate_lesson_plans.py" `
-  --tasks-json "F:\work\tasks.json" `
-  --output-dir "F:\work\某课程教案"
+python scripts/generate_lesson_plans.py `
+  --tasks-json tasks.json `
+  --output-dir output `
+  --render
 ```
 
-To override the built-in template, pass `--template "D:\path\template.docx"`.
+macOS：
 
-## Content Rules
+```bash
+python3 scripts/generate_lesson_plans.py \
+  --tasks-json tasks.json \
+  --output-dir output \
+  --render
+```
 
-- All generated lesson plans must be projectized by default: `单元名称` starts with `项目一/项目二/...`, and `任务名称` is an actionable task under that project.
-- Preserve the template table structure and formatting by editing existing paragraphs/cells in place.
-- Use `course_name` in both the title and row 1 course cell.
-- Use natural Chinese teaching text for learning analysis, goals, teaching process, and reflection.
-- For 实训课, emphasize task output, tools,操作记录,成果包,互评, and过程性评价.
-- Scores should look realistic, usually 88.5-91.5, not all identical; input scores use 0.5-point increments.
-- Keep the canonical JSON provider-neutral so another agent or model can continue the task without reinterpreting the document template.
-- Do not change unrelated source files or existing folders without backing them up.
+单独校验输出：
 
-## Verification Notes
+```text
+scripts/validate_template.py --json
+scripts/validate_output.py --input-json tasks.json --output-dir output --render
+```
 
-- If PowerShell displays Chinese filenames as mojibake, verify with Python/docx content before assuming files are corrupt.
-- LibreOffice may paginate differently from Word. Use render QA to catch layout defects, but Word COM export is also acceptable when the user needs Word-native pagination.
+跳过参数只影响相应 QA 层，并必须在报告中明确为 `skipped`；输入契约、内容质量和路径保护不能被跳过。临时 JSON、PDF、图片和 candidate 目录在任务结束后清理，不提交生成 DOCX。
 
-## Template Package
+## 模板文件
 
-- Manifest: `assets/templates/lesson-plan/v1.1.1/manifest.yaml`
-- Canonical template: `assets/templates/lesson-plan/v1.1.1/template.docx`
-- Canonical manifest and changelog: `assets/templates/lesson-plan/v1.1.1/manifest.yaml`, `assets/templates/lesson-plan/v1.1.1/CHANGELOG.md`
-- Input schema: `schemas/lesson-plan-input.schema.json`
-- Validators: `scripts/validate_template.py` and `scripts/validate_output.py`
-- QA output: `qa-report.json` in the generated output directory
+```text
+assets/templates/lesson-plan/v1.1.1/template.docx
+assets/templates/lesson-plan/v1.1.1/manifest.yaml
+assets/templates/lesson-plan/v1.0.0/template.docx
+assets/templates/lesson-plan/v1.0.0/manifest.yaml
+schemas/lesson-plan-input.schema.json
+scripts/content_contract.py
+scripts/content_quality.py
+scripts/generate_lesson_plans.py
+scripts/validate_template.py
+scripts/validate_output.py
+```
 
-The package preserves the original single-paragraph replacement and multiline-cell writing modes. The lesson-plan version matrix is strict: `1.0.x` uses `legacy_coordinates`, `1.1.x` uses `word_bookmark`, and other `1.x` minor versions are rejected. v1.1 writes through semantic Word bookmarks, uses Word-safe names no longer than 40 characters, accepts only ASCII decimal bookmark IDs, and verifies complete start/end boundaries, every header/footer story, and physical containers after generation; v1.1 manifest contract fields must be explicit and are never silently defaulted. Fixed semantic fields, implementation, reflection, stages, and evaluation use closed allowed-key contracts, so extra coordinate or bookmark keys fail before DOCX creation. Legacy v1.0 manifests allow only the canonical coordinate contract and optional `anchors.mode: legacy_coordinates`; semantic `required`, `containers`, `bookmark`, `stages`, and mixed locator metadata are rejected. v1.0 remains available through canonical or old compatibility template-only resolution as well as an explicit manifest. When a manifest is explicit, canonical and compatibility paths must match the declared version; custom templates must use the manifest's actual file path and SHA-256 fingerprint, and ordinary file copies need no ZIP metadata mutation. It does not depend on external absolute paths; install Python dependencies from `requirements.txt` when the host does not already provide them. Do not edit the canonical template directly; a custom template should be accompanied by a matching manifest.
+不要直接编辑 canonical template。自定义模板必须匹配 manifest 和 fingerprint，并接受相同的结构、格式、书签、路径和输出 QA。

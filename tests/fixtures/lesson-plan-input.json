@@ -1,27 +1,66 @@
 {
+  "content_contract_version": "2.0",
   "course_name": "软件测试实训",
   "major": "软件技术",
   "audience": "高职二年级",
-  "default_hours": "2",
+  "default_hours": 2,
   "total_hours": 4,
   "lessons": [
     {
+      "lesson_id": "L01",
       "unit": "项目一 测试项目准备",
       "task": "搭建测试环境并编制测试计划",
-      "hours": "2",
-      "flows": ["分析项目需求", "搭建测试环境", "编制测试计划"],
-      "knowledge": ["测试流程", "测试计划结构", "环境检查要点"],
-      "tools": "需求说明书、测试计划模板、测试环境检查表",
-      "score": 89.5
+      "hours": 2,
+      "progression": {"prior_learning": "已阅读项目需求说明，能区分用户目标与系统功能", "capability_stage": "认知", "deliverable": "提交环境检查表和一份带范围边界的测试计划", "next_bridge": "下一课依据计划中的功能范围提取测试点并形成用例"},
+      "student_analysis": {"base": ["接触过软件开发流程，能阅读简单需求条目", "能够使用文件管理和基础网络工具完成环境检查"], "problems": ["容易把测试环境准备理解成软件安装，忽略版本和配置记录", "计划中的测试范围、风险和退出条件表达不够具体"], "strategies": ["用环境清单逐项核对版本、账号和数据准备状态", "以真实需求条目为样例，小组互审范围、风险和时间安排"]},
+      "teaching_content": ["解析项目目标、角色边界与测试范围", "核验浏览器、服务端和测试数据等环境条件", "按照模板编制测试计划并提交检查表"],
+      "goals": {"knowledge": ["说明测试计划的范围、风险和退出条件", "识别测试环境中版本、账号和数据的关键配置"], "ability": ["独立完成环境检查并留下可追溯记录", "依据需求边界编排测试任务和交付时间"], "quality": ["形成先核对后操作的工作习惯", "在记录配置时保持严谨和责任意识"]},
+      "key_point": {"content": ["测试范围与需求条目的对应关系", "环境检查表中的关键配置记录"], "strategy": ["用需求片段做范围标注练习", "展示一份可追溯的环境检查样例"]},
+      "difficult_point": {"content": ["将模糊需求转化为可执行的计划边界", "区分环境风险与功能缺陷"], "strategy": ["提供风险分类卡进行小组判断", "通过同伴审阅追问证据、负责人和截止时间"]},
+      "teaching_methods": ["任务驱动法", "案例分析法", "小组互审法"],
+      "resources": ["项目需求说明书", "测试计划模板与环境检查表", "浏览器、接口服务和测试数据包"],
+      "references": ["软件测试课程标准", "项目测试计划编写规范"],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 10, "modality": "线上+线下", "content": ["阅读项目需求并标记不清楚的范围词"], "teacher_actions": ["发布需求片段和检查表，收集预习标记"], "student_actions": ["完成需求初读，确认本机工具可用"], "objective": "让学生带着范围问题进入环境核验"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "线下", "content": ["比较上线项目中环境遗漏造成的测试风险"], "teacher_actions": ["呈现故障案例，说明本课交付物边界"], "student_actions": ["依据案例说出环境遗漏的影响"], "objective": "建立环境记录与测试计划之间的联系"},
+        {"id": "operation_demonstration", "label": "方法示范", "minutes": 20, "modality": "线下", "content": ["演示版本核验、账号检查和需求范围标注"], "teacher_actions": ["示范检查顺序，解释证据截图和记录格式"], "student_actions": ["跟随示范记录核验步骤与判定依据"], "objective": "掌握可复查的环境核验方法"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "小组实训", "content": ["完成本组环境检查并起草测试计划"], "teacher_actions": ["巡视检查证据链，针对范围遗漏提出追问"], "student_actions": ["分工核验配置，填写风险和退出条件"], "objective": "把需求边界转化为有证据的计划内容"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "小组实训", "content": ["为计划补充一项环境风险和应对措施"], "teacher_actions": ["提供风险卡，指导学生区分风险来源"], "student_actions": ["根据证据补充责任人和应对时限"], "objective": "提升计划对异常情况的预见能力"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "小组实训", "content": ["整理环境检查表和测试计划初稿"], "teacher_actions": ["按交付清单核对文件命名和内容完整性"], "student_actions": ["提交检查表、计划和问题记录"], "objective": "形成第一份可评审的项目测试文档"},
+        {"id": "peer_review", "label": "组间互评", "minutes": 5, "modality": "线下", "content": ["围绕范围、风险、证据三项指标互审计划"], "teacher_actions": ["分配互审对象，记录共性缺口"], "student_actions": ["按指标提出一条可执行修改意见"], "objective": "用外部视角检验计划的可执行性"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "线下", "content": ["回顾环境核验与计划编排的关键连接点"], "teacher_actions": ["归纳易错点，明确下一课测试点提取任务"], "student_actions": ["口头复述检查顺序并记录衔接任务"], "objective": "巩固从需求到计划的基本工作路径"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 15, "modality": "线上", "content": ["依据互评意见修订计划并补全证据"], "teacher_actions": ["在线批注计划，反馈范围和风险表达问题"], "student_actions": ["提交修订版并说明一处改动理由"], "objective": "将课堂反馈落实为可追踪的文档改进"}
+      ],
+      "evaluation": {"score": 88.5, "remarks": {"attendance": "按时到课并完成课前阅读", "attention": "能持续关注案例中的风险证据", "participation": "主动参与范围标注讨论", "compliance": "按检查表顺序记录环境状态", "values": "理解测试记录对团队协作的价值", "ethics": "不隐瞒环境异常并如实报告", "habits": "文件命名和截图归档较规范", "online_learning": "完成需求片段预习标记", "discussion": "能说明风险判断依据", "homework": "按要求提交修订版计划", "practice": "完成环境检查和计划初稿", "presentation": "能清楚介绍本组范围边界", "improvement": "根据互评补充了一项风险措施"}},
+      "reflection": {"summary": "本课围绕环境核验和测试计划编制展开，多数小组能根据需求边界完成检查表；少数学生仍把配置截图当作完整证据，后续需加强记录与判定的对应。", "innovation": "将真实需求片段、环境检查表和风险卡串成一次交付任务，学生在互审中发现了计划范围遗漏，课堂讨论更聚焦于证据。", "improvement": "下一课开始前增加一份范围标注示例，要求学生把每个功能点关联到用例编号，为测试用例设计建立清晰入口。"}
     },
     {
-      "unit": "项目二 功能测试实施",
-      "task": "设计测试用例并提交缺陷报告",
-      "hours": "2",
-      "flows": ["提取功能点", "设计测试用例", "复现并提交缺陷"],
-      "knowledge": ["等价类划分", "边界值分析", "缺陷报告规范"],
-      "tools": "用例模板、缺陷管理平台、测试数据清单",
-      "score": 90
+      "lesson_id": "L02",
+      "unit": "项目二 功能测试用例设计",
+      "task": "根据需求编写边界值测试用例",
+      "hours": 2,
+      "progression": {"prior_learning": "已完成项目范围确认，能够从测试计划中找到本课功能边界", "capability_stage": "理解", "deliverable": "提交包含等价类、边界值和预期结果的功能用例集", "next_bridge": "下一课按本课用例执行功能测试并整理缺陷证据"},
+      "student_analysis": {"base": ["能够阅读字段规则和正常业务流程", "已经接触测试用例模板与测试数据表"], "problems": ["设计输入时容易只覆盖正常值，忽略相邻边界", "预期结果常写成笼统的成功或失败，缺少可观察条件"], "strategies": ["先把规则拆成有效类和无效类，再补充边界邻值", "用例提交前由同伴检查步骤、数据和预期结果是否一一对应"]},
+      "teaching_content": ["从需求规则提取输入条件与业务约束", "使用等价类与边界值方法设计代表性数据", "完善步骤、预期结果和用例优先级"],
+      "goals": {"knowledge": ["解释等价类划分和边界值分析的适用条件", "辨认测试用例中的前置条件、步骤和预期结果"], "ability": ["从业务规则生成覆盖边界的测试数据", "编写可执行且便于复现的功能测试用例"], "quality": ["养成以证据检验覆盖范围的习惯", "重视用例命名、版本和评审记录的规范性"]},
+      "key_point": {"content": ["输入规则的有效类、无效类与边界邻值", "预期结果的可观察描述"], "strategy": ["用表格拆解字段规则并现场补边界", "对比模糊预期与可验证预期的差异"]},
+      "difficult_point": {"content": ["在有限用例数量下保持边界覆盖", "处理多个字段组合造成的条件交互"], "strategy": ["用优先级标记筛选核心组合", "通过同伴追问补齐前置条件和判定证据"]},
+      "teaching_methods": ["案例分析法", "启发式提问法", "同伴评审法"],
+      "resources": ["业务需求片段与字段规则表", "功能测试用例模板", "边界值练习卡和样例数据"],
+      "references": ["功能测试用例设计规范", "软件测试基础教材相关章节"],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 10, "modality": "线上", "content": ["复习测试计划中的功能范围并圈出输入规则"], "teacher_actions": ["推送字段规则练习，提示准备一组边界数据"], "student_actions": ["完成规则初分组，带着疑点进入课堂"], "objective": "让学生把已有范围知识转成用例设计问题"},
+        {"id": "task_introduction", "label": "案例导入", "minutes": 10, "modality": "线下", "content": ["分析一个只覆盖正常值而漏掉边界的缺陷案例"], "teacher_actions": ["呈现缺陷后果，追问遗漏数据属于哪类条件"], "student_actions": ["指出正常值用例的覆盖盲区"], "objective": "认识边界覆盖对功能质量的直接影响"},
+        {"id": "operation_demonstration", "label": "方法示范", "minutes": 20, "modality": "线下", "content": ["示范从字段规则到等价类、边界值和预期结果的转换"], "teacher_actions": ["逐步拆解规则，展示用例模板填写过程"], "student_actions": ["记录分类依据，尝试补充一组邻界数据"], "objective": "掌握可解释的测试数据设计步骤"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "小组研讨", "content": ["为订单金额和数量规则编写功能用例"], "teacher_actions": ["检查覆盖表与用例的对应关系，提示组合遗漏"], "student_actions": ["分工提取规则，填写步骤、数据和预期结果"], "objective": "完成一组能够直接执行的边界测试用例"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "小组研讨", "content": ["为两个字段补充一组高风险组合用例"], "teacher_actions": ["引导比较单字段边界和组合条件的优先级"], "student_actions": ["说明组合选择依据，调整用例优先级"], "objective": "提升有限资源下的覆盖取舍能力"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "小组研讨", "content": ["整理用例集、数据表和覆盖说明"], "teacher_actions": ["抽查预期结果的可观察性和复现条件"], "student_actions": ["提交可执行用例集并标注高风险项"], "objective": "形成下一课可直接使用的执行依据"},
+        {"id": "peer_review", "label": "组间互评", "minutes": 5, "modality": "线下", "content": ["互查边界覆盖和预期结果的明确程度"], "teacher_actions": ["提供三项互评指标，收集典型问题"], "student_actions": ["依据指标指出一条遗漏或表述问题"], "objective": "用评审反馈提高用例的可执行性"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "线下", "content": ["总结规则拆解、边界选择和用例表达方法"], "teacher_actions": ["串联本课方法与下课执行任务，说明缺陷证据要求"], "student_actions": ["整理方法卡，确认执行前置条件"], "objective": "形成从规则到执行的连续认知"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 15, "modality": "线上", "content": ["根据互评修改用例并补充一项组合场景"], "teacher_actions": ["批注覆盖说明，反馈预期结果的判定语句"], "student_actions": ["上传修订用例并记录新增场景理由"], "objective": "把评审意见转化为下一课的执行清单"}
+      ],
+      "evaluation": {"score": 90.0, "remarks": {"attendance": "按时到课并完成规则预习", "attention": "能持续跟随边界推导过程", "participation": "积极提出字段组合问题", "compliance": "按模板填写前置条件和版本号", "values": "理解严谨用例对用户质量的意义", "ethics": "客观记录覆盖不足之处", "habits": "数据表与用例编号对应清楚", "online_learning": "完成边界数据预习练习", "discussion": "能解释等价类划分理由", "homework": "按时提交修订用例集", "practice": "完成边界值和组合场景设计", "presentation": "能清楚说明高风险用例", "improvement": "根据互评补充了组合场景"}},
+      "reflection": {"summary": "本课以字段规则为起点练习等价类和边界值设计，学生能够完成主要用例；部分小组在组合条件和预期结果表达上仍显简略，需要在执行环节检验用例质量。", "innovation": "采用规则拆解表、边界练习卡和同伴追问三步组织设计过程，让学生先说明覆盖理由再填写模板，减少了凭经验列数据的情况。", "improvement": "下一课执行用例时安排一次失败预期复核，要求学生把实际结果、日志和截图与用例编号绑定，形成可复现的缺陷证据。"}
     }
   ]
 }

@@ -1,27 +1,19 @@
-# 教案生成器多Agent兼容说明
+# 教案生成器多 Agent 兼容说明
 
-本 skill 采用“AI 提取结构，脚本生成 DOCX”的跨工具协议。任何能读取课程资料、写出 tasks.json 并运行 Python 的 agent 都可以得到同一套模板结果。
+所有 agent 和模型共用同一份规范：先读取 `SKILL.md` 和 `通用提示词.md`，再生成符合 `content_contract_version: "2.0"` 的 `tasks.json`，最后调用同一套 Python 生成器和 QA。不要在工具专用规则中复制 Content V2 字段或另造 DOCX 写入逻辑。
 
-## 入口
+## 可用入口
 
-- Codex / Codex CLI：SKILL.md 和 agents/openai.yaml。
-- Claude Code：CLAUDE.md。
-- Gemini CLI：GEMINI.md。
-- Cursor、Cline、Continue、Windsurf、GitHub Copilot、Aider：对应规则文件已放在本目录；也可以运行 scripts/install_adapters.py 复制到另一个项目。
-- OpenCode：使用本目录的 AGENTS.md。
+- Codex / Codex CLI：`SKILL.md`、`AGENTS.md`、`agents/openai.yaml`
+- Claude Code：`CLAUDE.md`
+- Gemini CLI：`GEMINI.md`
+- Cursor、Cline、Continue、Windsurf、GitHub Copilot、Aider：各自 adapter 文件
+- OpenCode：`AGENTS.md`
 
-## 模型
+`scripts/install_adapters.py` 可以把 adapter 安装到另一个项目，默认不覆盖已有规则，`--replace` 才会创建备份并替换。
 
-DeepSeek、Claude、GLM、Gemini、OpenAI 等模型都可以负责生成同一格式的 tasks.json。DOCX 的表格结构、模板样式、评分拆解和总课时校验由 Python 脚本执行，不绑定模型 API。
+## 模型与平台
 
-## 使用限制
+DeepSeek、Claude、GLM、Gemini、OpenAI 及其他能读文件和运行 Python 的 agent 都可以负责课程规划和 JSON 内容创作。生成结果由受保护的 Word 模板、semantic bookmarks、manifest 和校验器决定，不依赖模型 API。Windows 使用 `python`，macOS 使用 `python3`；LibreOffice 仅用于可选 render QA。
 
-纯网页聊天工具如果没有本地文件和命令执行能力，可以先生成 tasks.json，再交给具备本地工具权限的 agent 执行脚本。需要 Python 3 和 python-docx；LibreOffice 只用于渲染或分页复核，不是生成 DOCX 的硬性依赖。
-
-## 安装
-
-在 Windows 使用 python，在 macOS/Linux 使用 python3：
-
-python path/to/lesson-plan-docx-generator/scripts/install_adapters.py --target-dir path/to/project
-
-默认不覆盖已有规则文件；增加 --adapter claude --adapter cursor 可以只安装指定适配器，增加 --replace 才会备份并替换已有文件。
+纯网页工具如果不能写文件或运行命令，可以先输出 V2 JSON，再交给有本地执行能力的 agent。生产流程、路径保护、事务提交和 QA 细节始终以 `SKILL.md` 为准。

@@ -24,6 +24,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.workbook.defined_name import DefinedName
 import yaml
 
+from tests.test_lesson_content_v2 import LessonContentV2Mixin
+
 
 ROOT = Path(__file__).resolve().parents[1]
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
@@ -562,7 +564,7 @@ def move_bookmark_end_before_start(root, name: str) -> None:
     parent.insert(parent.index(start), end)
 
 
-class LessonTemplatePackageTests(unittest.TestCase):
+class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
     def test_canonical_template_and_compatibility_entry(self) -> None:
         result = run_script(LESSON / "scripts" / "validate_template.py", "--json")
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
@@ -572,18 +574,16 @@ class LessonTemplatePackageTests(unittest.TestCase):
 
     def test_invalid_input_is_rejected(self) -> None:
         sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import validate_input
+        from package_common import validate_content_v2_input
 
-        bad = {"course_name": "软件测试", "lessons": [{"unit": "项目一"}]}
-        with self.assertRaises(ValueError):
-            validate_input(bad)
-        bad["weights"] = {"regular": 0.5, "theory": 0.5, "skill": 0.5}
-        with self.assertRaises(ValueError):
-            validate_input(bad)
-        with self.assertRaises(ValueError):
-            validate_input({"course_name": "软件测试", "lessons": [{"unit": "", "task": "", "hours": "2"}]})
-        with self.assertRaises(ValueError):
-            validate_input({"course_name": "课" * 33, "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]})
+        valid = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+        for bad in (
+            {key: value for key, value in valid.items() if key != "content_contract_version"},
+            {**valid, "unexpected": True},
+            {**valid, "lessons": [{**valid["lessons"][0], "unit": "第一章 基础测试"}]},
+        ):
+            with self.assertRaises(ValueError):
+                validate_content_v2_input(bad)
 
     def test_non_projectized_unit_rejects_before_docx_generation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-unit-guard-") as temp_name:
@@ -601,32 +601,35 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 str(output),
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("projectized teaching", result.stderr)
+            self.assertIn("Input schema validation failed", result.stderr)
             self.assertFalse(output.exists())
 
-    def test_score_precision_accepts_half_points_and_defaults(self) -> None:
+    def test_score_precision_accepts_explicit_half_points(self) -> None:
         sys.modules.pop("package_common", None)
         sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import validate_input
+        from package_common import validate_content_v2_input
 
-        base = {"course_name": "软件测试实训", "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]}
+        base = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
         for score in (89, 89.0, 89.5):
             payload = json.loads(json.dumps(base, ensure_ascii=False))
-            payload["lessons"][0]["score"] = score
-            validate_input(payload)
-        validate_input(base)
+            payload["lessons"][0]["evaluation"]["score"] = score
+            validate_content_v2_input(payload)
+        missing = json.loads(json.dumps(base, ensure_ascii=False))
+        missing["lessons"][0]["evaluation"].pop("score")
+        with self.assertRaises(ValueError):
+            validate_content_v2_input(missing)
 
     def test_nonpositive_hours_rejects_numeric_values_and_strings(self) -> None:
         sys.modules.pop("package_common", None)
         sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import validate_input
+        from package_common import validate_content_v2_input
 
-        base = {"course_name": "软件测试实训", "lessons": [{"unit": "项目一", "task": "完成任务", "hours": "2"}]}
+        base = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
         for invalid_hours in (-2, "-2", 0, "0"):
             payload = json.loads(json.dumps(base, ensure_ascii=False))
             payload["lessons"][0]["hours"] = invalid_hours
             with self.subTest(invalid_hours=invalid_hours), self.assertRaisesRegex(ValueError, "positive number"):
-                validate_input(payload)
+                validate_content_v2_input(payload)
 
     def test_nonpositive_hours_reject_before_docx_generation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-hours-") as temp_name:
@@ -663,7 +666,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 str(output),
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Input schema validation failed", result.stderr)
+            self.assertIn("hours exceeds manifest max_chars=12", result.stderr)
             self.assertFalse(output.exists())
 
     def test_numeric_lesson_hours_length_rejects_before_docx_generation(self) -> None:
@@ -709,8 +712,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="lesson-package-content-capacity-") as temp_name:
             folder = Path(temp_name)
             payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
-            payload["lessons"][0]["flows"] = [f"流程{i}" for i in range(6)]
-            payload["lessons"][0]["knowledge"] = [f"知识点{i}" for i in range(3)]
+            payload["lessons"][0]["teaching_content"] = [f"教学内容{i}" for i in range(9)]
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -722,40 +724,19 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 str(output),
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("flows and knowledge combined must contain at most 8 items", result.stderr)
+            self.assertIn("Input schema validation failed", result.stderr)
             self.assertFalse(output.exists())
 
-    def test_composed_lesson_fields_reject_before_docx_generation(self) -> None:
+    def test_content_v2_density_rejects_before_docx_generation(self) -> None:
         cases = {
             "teaching_content": {
-                "flows": ["流" * 200 for _ in range(8)],
-                "knowledge": [],
-                "message": "teaching_content exceeds manifest max_chars=1200",
-            },
-            "knowledge_goal": {
-                "flows": [],
-                "knowledge": ["知识点" for _ in range(6)],
-                "message": "knowledge_goal exceeds manifest max_paragraphs=5",
-            },
-            "resources": {
-                "tools": "\n".join("工具" for _ in range(7)),
-                "message": "resources exceeds manifest max_paragraphs=8",
-            },
-            "implementation": {
-                "flows": ["流" * 200 for _ in range(3)],
-                "knowledge": [],
-                "message": "implementation row 3 cell 1 exceeds manifest max_chars=600",
+                "teaching_content": ["教学内容" + str(i) + "具体说明" * 40 for i in range(8)],
+                "message": "content density exceeds teaching_content",
             },
             "title": {
                 "course_name": "课" * 32,
                 "task": "任务" * 40,
-                "message": "title exceeds manifest max_chars=120",
-            },
-            "generated_field": {
-                "task": "第一行\n第二行\n第三行\n第四行",
-                "flows": [],
-                "knowledge": ["知识点"],
-                "message": "ability_goal exceeds manifest max_paragraphs=5",
+                "message": "content density exceeds title",
             },
         }
         for name, case in cases.items():
@@ -765,7 +746,16 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 payload["lessons"] = [payload["lessons"][0]]
                 payload["total_hours"] = 2
                 lesson = payload["lessons"][0]
-                lesson.update({key: value for key, value in case.items() if key != "message"})
+                for key, value in case.items():
+                    if key != "message":
+                        if key == "teaching_content":
+                            lesson[key] = value
+                        elif key == "task":
+                            lesson[key] = value
+                        elif key == "course_name":
+                            payload[key] = value
+                        else:
+                            payload[key] = value
                 source = folder / "tasks.json"
                 output = folder / "output"
                 source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -785,7 +775,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
             with self.subTest(invalid_score=invalid_score), tempfile.TemporaryDirectory(prefix="lesson-package-score-") as temp_name:
                 folder = Path(temp_name)
                 payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
-                payload["lessons"][0]["score"] = invalid_score
+                payload["lessons"][0]["evaluation"]["score"] = invalid_score
                 source = folder / "tasks.json"
                 output = folder / "output"
                 source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -798,16 +788,16 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(
-                    f"lessons[0].score must use 0.5-point increments; received {invalid_score}.",
+                    f"lessons[0].evaluation.score must use 0.5-point increments; received {invalid_score}.",
                     result.stderr,
                 )
                 self.assertFalse(output.exists())
 
-    def test_default_score_generates_exact_evaluation_total(self) -> None:
+    def test_missing_explicit_score_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-default-score-") as temp_name:
             folder = Path(temp_name)
             payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
-            payload["lessons"][0].pop("score")
+            payload["lessons"][0]["evaluation"].pop("score")
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -818,14 +808,9 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 "--output-dir",
                 str(output),
             )
-            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
-            generated = sorted(output.glob("*.docx"))[0]
-            nested = Document(generated).tables[0].cell(12, 1).tables[0]
-            score_sum = sum(
-                (Decimal(nested.cell(row, 2).text.strip()) for row in range(1, 14)),
-                Decimal("0"),
-            )
-            self.assertEqual(score_sum, Decimal("89"))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Input schema validation failed", result.stderr)
+            self.assertFalse(output.exists())
 
     def test_two_hour_lesson_preserves_method_labels_and_totals_90_classroom_minutes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-duration-labels-") as temp_name:
@@ -851,8 +836,8 @@ class LessonTemplatePackageTests(unittest.TestCase):
             table = Document(generated).tables[0]
             self.assertEqual(table.rows[7].cells[5].text.strip(), "突出方法")
             self.assertEqual(table.rows[8].cells[5].text.strip(), "破解方法")
-            self.assertIn("任务驱动、教师示范、分组实训、过程评价", table.rows[7].cells[6].text)
-            self.assertIn("提供模板清单、分步演示、同伴互评和教师点评", table.rows[8].cells[6].text)
+            self.assertIn("用需求片段做范围标注练习", table.rows[7].cells[6].text)
+            self.assertIn("通过同伴审阅追问证据、负责人和截止时间", table.rows[8].cells[6].text)
 
             classroom_minutes = []
             for row_index in range(18, 25):
@@ -860,7 +845,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     int(value)
                     for value in re.findall(r"(?m)^\s*(\d+)min\s*$", table.rows[row_index].cells[0].text)
                 )
-            self.assertEqual(classroom_minutes, [5, 15, 30, 10, 15, 10, 5])
+            self.assertEqual(classroom_minutes, [10, 20, 25, 10, 10, 5, 10])
             self.assertEqual(sum(classroom_minutes), 90)
             self.assertIn("10min", table.rows[16].cells[0].text)
             self.assertIn("15min", table.rows[26].cells[0].text)
@@ -874,9 +859,9 @@ class LessonTemplatePackageTests(unittest.TestCase):
             payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
             payload["lessons"] = [payload["lessons"][0]]
             payload["total_hours"] = 2
-            payload["lessons"][0]["course_name"] = "接口测试实训"
-            payload["lessons"][0]["major"] = "数据科学与大数据技术"
-            payload["lessons"][0]["audience"] = "高职三年级"
+            payload["course_name"] = "接口测试实训"
+            payload["major"] = "数据科学与大数据技术"
+            payload["audience"] = "高职三年级"
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -909,19 +894,11 @@ class LessonTemplatePackageTests(unittest.TestCase):
     def test_lesson_filename_is_bounded_by_utf8_bytes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-long-filename-") as temp_name:
             folder = Path(temp_name)
-            payload = {
-                "course_name": "软件测试",
-                "total_hours": 2,
-                "lessons": [
-                    {
-                        "unit": "项目一" + "单元" * 28,
-                        "task": "完成" + "测试任务" * 19,
-                        "hours": "2",
-                        "flows": [],
-                        "knowledge": [],
-                    }
-                ],
-            }
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"] = [deepcopy(payload["lessons"][0])]
+            payload["total_hours"] = 2
+            payload["lessons"][0]["unit"] = "项目一" + "单元" * 28
+            payload["lessons"][0]["task"] = "完成" + "测试任务" * 19
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -940,20 +917,13 @@ class LessonTemplatePackageTests(unittest.TestCase):
     def test_long_teaching_content_is_generated(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-long-") as temp_name:
             folder = Path(temp_name)
-            payload = {
-                "course_name": "软件测试实训" + "课程" * 13,
-                "total_hours": 2,
-                "lessons": [
-                    {
-                        "unit": "项目一 测试项目准备",
-                        "task": "编制测试计划并完成环境检查",
-                        "hours": "2",
-                        "flows": [f"流程{i + 1}" + "：" + "检查测试环境、记录问题并提交阶段成果" * 3 for i in range(5)],
-                        "knowledge": ["测试计划结构", "环境检查要点"],
-                        "score": 90,
-                    }
-                ],
-            }
+            payload = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+            payload["lessons"] = [deepcopy(payload["lessons"][0])]
+            payload["total_hours"] = 2
+            payload["lessons"][0]["teaching_content"] = [
+                f"教学内容{i + 1}：围绕测试计划、环境核验和交付证据展开具体训练" * 4
+                for i in range(8)
+            ]
             source = folder / "tasks.json"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
             result = run_script(
@@ -1220,7 +1190,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                     (Decimal(nested.cell(row, 2).text.strip()) for row in range(1, 14)),
                     Decimal("0"),
                 )
-                self.assertEqual(score_sum, Decimal(str(item["score"])))
+                self.assertEqual(score_sum, Decimal(str(item["evaluation"]["score"])))
 
     def test_generation_copies_direct_formatting_to_added_multiline_paragraphs(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-multiline-format-") as temp_name:
@@ -1246,21 +1216,14 @@ class LessonTemplatePackageTests(unittest.TestCase):
     def test_output_validation_orders_three_digit_lesson_files_numerically(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-three-digit-") as temp_name:
             folder = Path(temp_name)
-            payload = {
-                "course_name": "软件测试实训",
-                "total_hours": 6,
-                "lessons": [
-                    {
-                        "unit": f"项目{i + 1} 排序验证",
-                        "task": f"完成排序验证任务{i + 1}",
-                        "hours": "2",
-                        "flows": [],
-                        "knowledge": [],
-                        "score": 89.5,
-                    }
-                    for i in range(3)
-                ],
-            }
+            source_fixture = ROOT / "tests" / "fixtures" / "lesson-plan-content-v2-it.json"
+            payload = json.loads(source_fixture.read_text(encoding="utf-8"))
+            payload["lessons"] = [deepcopy(lesson) for lesson in payload["lessons"][:3]]
+            payload["total_hours"] = 6
+            for index, lesson in enumerate(payload["lessons"], 1):
+                lesson["lesson_id"] = f"S{index:02d}"
+                lesson["unit"] = f"项目{index} 排序验证"
+                lesson["task"] = f"完成排序验证任务{index}"
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -1978,7 +1941,7 @@ class LessonTemplatePackageTests(unittest.TestCase):
                 self.assertEqual(inventory["preserved_count"], 70)
             generated = Document(sorted(output.glob("*.docx"))[0])
             self.assertGreater(len(generated.tables[0].cell(4, 1).paragraphs), 1)
-            self.assertGreater(len(generated.tables[0].cell(19, 1).paragraphs), 1)
+            self.assertGreater(len(generated.tables[0].cell(4, 3).paragraphs), 1)
 
     def test_v11_template_fault_injections_are_rejected_by_real_validator(self) -> None:
         mutations = {}
