@@ -2721,7 +2721,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             manifest_path = folder / "manifest.yaml"
             manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
             shutil.copy2(canonical, folder / "template.docx")
-            from validate_template_packages import validate_package
+            from tests.validate_template_packages import validate_package
 
             with self.assertRaisesRegex(ValueError, "anchors.required"):
                 validate_package(
