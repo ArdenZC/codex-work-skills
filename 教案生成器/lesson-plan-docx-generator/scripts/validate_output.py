@@ -40,7 +40,7 @@ from package_common import (
     score_breakdown,
     validate_content_v2_input,
 )
-from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths
+from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from render_qa import render_docx_directory
 
 
@@ -48,9 +48,7 @@ LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
 
 
 def _same_lexical_path(left: Path | str, right: Path | str) -> bool:
-    return os.path.normcase(os.path.normpath(str(Path(left).expanduser().absolute()))) == os.path.normcase(
-        os.path.normpath(str(Path(right).expanduser().absolute()))
-    )
+    return paths_equal(left, right)
 
 
 def actual_cells(row) -> list[_Cell]:

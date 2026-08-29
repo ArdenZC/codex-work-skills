@@ -70,6 +70,12 @@ def paths_overlap(left: Path | str, right: Path | str) -> bool:
     return False
 
 
+def paths_equal(left: Path | str, right: Path | str) -> bool:
+    """Return true when two paths identify the same file across supported aliases."""
+
+    return bool(_variants(Path(left)) & _variants(Path(right)))
+
+
 def assert_output_path_safe(output_dir: Path | str, protected_paths: Iterable[Path | str]) -> Path:
     output = _absolute_lexical(Path(output_dir))
     for protected in protected_paths:

@@ -51,7 +51,7 @@ from package_common import (  # noqa: E402
     required_bookmarks,
     score_breakdown,
 )
-from path_safety import assert_output_path_safe, paths_overlap  # noqa: E402
+from path_safety import assert_output_path_safe, paths_equal, paths_overlap  # noqa: E402
 from validate_output import manifest_field_text  # noqa: E402
 
 # Keep the lesson modules above, but do not leave their generic import names
@@ -994,6 +994,25 @@ class LessonContentV2Mixin:
             self.assertTrue(paths_overlap(alias / "output", LESSON))
             with self.assertRaises(ValueError):
                 assert_output_path_safe(alias / "output", [LESSON])
+
+    def test_internal_qa_path_accepts_platform_aliases(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-path-alias-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            output.mkdir()
+            internal = output / "qa-report.json"
+            self.assertTrue(paths_equal(internal, output.resolve() / "qa-report.json"))
+            if os.name == "nt":
+                import ctypes
+
+                get_short_path = ctypes.windll.kernel32.GetShortPathNameW
+                get_short_path.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+                get_short_path.restype = ctypes.c_uint32
+                buffer = ctypes.create_unicode_buffer(32768)
+                length = get_short_path(str(folder), buffer, len(buffer))
+                if length:
+                    short_internal = Path(buffer.value) / "output" / "qa-report.json"
+                    self.assertTrue(paths_equal(short_internal, internal))
 
     def test_render_report_is_real_or_explicitly_not_executed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-v2-render-") as temp_name:

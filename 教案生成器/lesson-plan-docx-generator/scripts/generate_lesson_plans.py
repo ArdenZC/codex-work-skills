@@ -23,7 +23,7 @@ from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find
 from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_header_values, format_title
 from content_quality import ContentQualityError, validate_content_quality
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
-from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths
+from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -472,9 +472,7 @@ def main() -> None:
     external_qa = None
     qa_parent_created = False
     if requested_qa is not None:
-        same_as_internal = os.path.normcase(os.path.normpath(str(requested_qa))) == os.path.normcase(
-            os.path.normpath(str(internal_qa))
-        )
+        same_as_internal = paths_equal(requested_qa, internal_qa)
         if not same_as_internal:
             external_qa = assert_external_qa_path_safe(requested_qa, out_dir, protected_paths)
     if out_dir.exists() and not out_dir.is_dir():
