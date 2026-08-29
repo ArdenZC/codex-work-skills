@@ -23,13 +23,13 @@ from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find
 from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_header_values, format_title
 from content_quality import ContentQualityError, validate_content_quality
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
-from path_safety import assert_output_path_safe, lesson_protected_paths
+from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
+DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 
 MAX_FILENAME_BYTES = 255
 
@@ -351,6 +351,80 @@ def atomic_commit_candidate(candidate: Path, out_dir: Path, backup_existing: boo
         raise
 
 
+def _unique_file_backup_path(path: Path) -> Path:
+    for _ in range(100):
+        candidate = path.parent / f"_{path.name}_backup_{uuid.uuid4().hex[:12]}"
+        if not candidate.exists() and not candidate.is_symlink():
+            return candidate
+    raise FileExistsError(f"Unable to allocate a backup path beside {path}")
+
+
+def atomic_commit_candidate_with_external_qa(
+    candidate: Path,
+    out_dir: Path,
+    external_candidate: Path,
+    external_qa: Path,
+    backup_existing: bool,
+) -> Path | None:
+    """Commit output and an external QA report, restoring both on any failure."""
+
+    displaced_output: Path | None = None
+    displaced_qa: Path | None = None
+    output_swapped = False
+    qa_swapped = False
+    try:
+        if out_dir.exists():
+            if not out_dir.is_dir():
+                raise FileExistsError(f"Output path is not a directory: {out_dir}")
+            if any(out_dir.iterdir()) and not backup_existing:
+                raise FileExistsError(f"Output directory is not empty: {out_dir}")
+            displaced_output = _unique_backup_path(out_dir)
+            os.replace(str(out_dir), str(displaced_output))
+        os.replace(str(candidate), str(out_dir))
+        output_swapped = True
+
+        if external_qa.exists() or external_qa.is_symlink():
+            if external_qa.is_dir():
+                raise FileExistsError(f"External QA report path must be a file, not a directory: {external_qa}")
+            displaced_qa = _unique_file_backup_path(external_qa)
+            os.replace(str(external_qa), str(displaced_qa))
+        os.replace(str(external_candidate), str(external_qa))
+        qa_swapped = True
+
+        if displaced_output is not None and not backup_existing:
+            _remove_path(displaced_output)
+            displaced_output = None
+        if displaced_qa is not None:
+            _remove_path(displaced_qa)
+            displaced_qa = None
+        return displaced_output
+    except Exception as commit_error:
+        rollback_errors: list[str] = []
+
+        def rollback(action: str, callback) -> None:
+            try:
+                callback()
+            except Exception as exc:  # pragma: no cover - injected filesystem failures vary by platform
+                rollback_errors.append(f"{action}: {exc}")
+
+        if qa_swapped and (external_qa.exists() or external_qa.is_symlink()):
+            rollback("remove new external QA", lambda: _remove_path(external_qa))
+        if displaced_qa is not None and displaced_qa.exists() and not external_qa.exists():
+            rollback("restore external QA", lambda: os.replace(str(displaced_qa), str(external_qa)))
+        if output_swapped and (out_dir.exists() or out_dir.is_symlink()):
+            rollback("remove new output", lambda: _remove_path(out_dir))
+        if displaced_output is not None and displaced_output.exists() and not out_dir.exists():
+            rollback("restore output", lambda: os.replace(str(displaced_output), str(out_dir)))
+
+        if rollback_errors:
+            raise RuntimeError(
+                "External QA commit failed and rollback failed: "
+                + "; ".join(rollback_errors)
+                + f"; original error: {commit_error}"
+            ) from commit_error
+        raise
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate template-matched Chinese lesson plan DOCX files.")
     parser.add_argument("--template", default="")
@@ -394,8 +468,15 @@ def main() -> None:
     )
     assert_output_path_safe(out_dir, protected_paths)
     requested_qa = Path(args.qa_report).expanduser().absolute() if args.qa_report else None
+    internal_qa = out_dir / "qa-report.json"
+    external_qa = None
+    qa_parent_created = False
     if requested_qa is not None:
-        assert_output_path_safe(requested_qa, protected_paths)
+        same_as_internal = os.path.normcase(os.path.normpath(str(requested_qa))) == os.path.normcase(
+            os.path.normpath(str(internal_qa))
+        )
+        if not same_as_internal:
+            external_qa = assert_external_qa_path_safe(requested_qa, out_dir, protected_paths)
     if out_dir.exists() and not out_dir.is_dir():
         raise FileExistsError(f"Output path is not a directory: {out_dir}")
     if out_dir.exists() and any(out_dir.iterdir()) and not args.backup_existing:
@@ -411,6 +492,7 @@ def main() -> None:
     out_dir.parent.mkdir(parents=True, exist_ok=True)
     candidate = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.candidate-", dir=str(out_dir.parent)))
     assert_output_path_safe(candidate, protected_paths)
+    external_candidate: Path | None = None
     try:
         content_quality = validate_content_quality(meta, manifest)
         for seq, item in enumerate(lessons, 1):
@@ -443,22 +525,46 @@ def main() -> None:
                 warnings=template_warnings,
                 render=args.render,
             )
-        final_qa = requested_qa or (out_dir / "qa-report.json")
+        final_qa = requested_qa or internal_qa
         report["output_dir"] = str(out_dir)
         report["qa_report"] = str(final_qa)
         report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         candidate_qa.write_text(report_text, encoding="utf-8")
-        backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
+        if external_qa is not None:
+            if not external_qa.parent.exists():
+                external_qa.parent.mkdir(parents=True, exist_ok=True)
+                qa_parent_created = True
+            fd, external_candidate_name = tempfile.mkstemp(
+                prefix=f".{external_qa.name}.candidate-",
+                suffix=".tmp",
+                dir=str(external_qa.parent),
+            )
+            os.close(fd)
+            external_candidate = Path(external_candidate_name)
+            external_candidate.write_text(report_text, encoding="utf-8")
+            backup = atomic_commit_candidate_with_external_qa(
+                candidate,
+                out_dir,
+                external_candidate,
+                external_qa,
+                args.backup_existing,
+            )
+        else:
+            backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
         if backup is not None:
             print(f"backup={backup}")
-        if requested_qa is not None and requested_qa != out_dir / "qa-report.json":
-            requested_qa.parent.mkdir(parents=True, exist_ok=True)
-            requested_qa.write_text(report_text, encoding="utf-8")
         action = "skipped validation" if report["status"] == "skipped" else "validated"
         print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
     finally:
         if candidate.exists():
             shutil.rmtree(candidate, ignore_errors=True)
+        if external_candidate is not None and external_candidate.exists():
+            external_candidate.unlink(missing_ok=True)
+        if qa_parent_created and external_qa is not None and external_qa.parent.exists():
+            try:
+                external_qa.parent.rmdir()
+            except OSError:
+                pass
 
 
 if __name__ == "__main__":

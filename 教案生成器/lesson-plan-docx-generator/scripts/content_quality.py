@@ -11,6 +11,9 @@ from typing import Any
 from content_contract import (
     CONTENT_FIELD_NAMES,
     EVALUATION_CRITERIA,
+    EVALUATION_SCORE_MAX,
+    EVALUATION_SCORE_MIN,
+    EVALUATION_SCORE_STEP,
     IMPLEMENTATION_STAGE_FIELDS,
     IN_CLASS_STAGE_IDS,
     IMPLEMENTATION_STAGE_IDS,
@@ -28,9 +31,15 @@ REPEATED_SENTENCE_LESSON_COUNT = 3
 # The threshold is deliberately aligned with the old six-lesson baseline
 # (0.8827 maximum SequenceMatcher score), while new fixtures remain below it.
 WHOLE_LESSON_SIMILARITY_THRESHOLD = 0.85
-# Use the same conservative threshold for long narrative fields so a field
-# copied with only superficial edits is reported before whole-lesson scoring.
+# The calibration tests exercise copy+rename, 20% wording edits, synonym/word
+# order edits, and genuinely different lessons.  The adjacent threshold is
+# lower because a copied neighboring lesson is actionable even when its whole
+# text score is diluted by otherwise different fields.
 FIELD_SIMILARITY_THRESHOLD = 0.85
+ADJACENT_WHOLE_LESSON_SIMILARITY_THRESHOLD = 0.78
+ADJACENT_FIELD_SIMILARITY_THRESHOLD = 0.78
+IMPLEMENTATION_SIMILARITY_THRESHOLD = 0.85
+ADJACENT_IMPLEMENTATION_SIMILARITY_THRESHOLD = 0.78
 IMPLEMENTATION_DUPLICATE_LESSON_COUNT = 3
 
 BOILERPLATE_PATTERNS = (
@@ -94,12 +103,24 @@ def _lesson_id(lesson: dict[str, Any], index: int) -> str:
 
 def _field_groups(lesson: dict[str, Any]) -> dict[str, str]:
     analysis = lesson["student_analysis"]
+    goals = lesson["goals"]
+    progression = lesson["progression"]
     return {
         "student_analysis.base": _joined(analysis["base"]),
         "student_analysis.problems": _joined(analysis["problems"]),
         "student_analysis.strategies": _joined(analysis["strategies"]),
-        "key_point": _joined(lesson["key_point"]),
-        "difficult_point": _joined(lesson["difficult_point"]),
+        "teaching_content": _joined(lesson["teaching_content"]),
+        "goals.knowledge": _joined(goals["knowledge"]),
+        "goals.ability": _joined(goals["ability"]),
+        "goals.quality": _joined(goals["quality"]),
+        "key_point.content": _joined(lesson["key_point"]["content"]),
+        "key_point.strategy": _joined(lesson["key_point"]["strategy"]),
+        "difficult_point.content": _joined(lesson["difficult_point"]["content"]),
+        "difficult_point.strategy": _joined(lesson["difficult_point"]["strategy"]),
+        "teaching_methods": _joined(lesson["teaching_methods"]),
+        "progression.prior_learning": _normalize(progression["prior_learning"]),
+        "progression.deliverable": _normalize(progression["deliverable"]),
+        "progression.next_bridge": _normalize(progression["next_bridge"]),
         "reflection.summary": _normalize(lesson["reflection"]["summary"]),
         "reflection.innovation": _normalize(lesson["reflection"]["innovation"]),
         "reflection.improvement": _normalize(lesson["reflection"]["improvement"]),
@@ -108,7 +129,12 @@ def _field_groups(lesson: dict[str, Any]) -> dict[str, str]:
 
 def _lesson_narrative(lesson: dict[str, Any]) -> str:
     values = lesson_content_field_values(lesson)
-    values["progression"] = _joined(lesson["progression"])
+    values["progression"] = _joined(
+        {
+            key: lesson["progression"][key]
+            for key in ("prior_learning", "capability_stage", "deliverable", "next_bridge")
+        }
+    )
     values["reflection"] = _joined(lesson["reflection"])
     values["implementation"] = "\n".join(
         "\n".join(
@@ -200,9 +226,11 @@ def _completeness_report(data: dict[str, Any]) -> tuple[dict[str, Any], list[str
         for field_name in ("base", "problems", "strategies"):
             for item_index, value in enumerate(analysis[field_name], 1):
                 check_text(lesson_id, f"student_analysis.{field_name}[{item_index}]", value)
-        for field_name in ("teaching_content", "teaching_methods", "resources", "references"):
+        for field_name in ("teaching_content", "teaching_methods", "resources"):
             for item_index, value in enumerate(lesson[field_name], 1):
                 check_text(lesson_id, f"{field_name}[{item_index}]", value)
+        for item_index, reference in enumerate(lesson["references"], 1):
+            check_text(lesson_id, f"references[{item_index}]", reference["text"])
         for goal_name in ("knowledge", "ability", "quality"):
             for item_index, value in enumerate(goals[goal_name], 1):
                 check_text(lesson_id, f"goals.{goal_name}[{item_index}]", value)
@@ -273,16 +301,174 @@ def _density_report(data: dict[str, Any], manifest: dict[str, Any] | None) -> tu
     return errors, total_chars
 
 
+def _is_adjacent(left_index: int, right_index: int) -> bool:
+    return right_index == left_index + 1
+
+
+def _similarity_record(
+    *,
+    left_id: str,
+    right_id: str,
+    left_text: str,
+    right_text: str,
+    sequence: float,
+    jaccard: float,
+    field: str | None = None,
+    stage: str | None = None,
+    adjacent: bool = False,
+) -> dict[str, Any]:
+    record: dict[str, Any] = {
+        "lessons": [left_id, right_id],
+        "score": round(max(sequence, jaccard), 4),
+        "sequence_matcher": round(sequence, 4),
+        "character_3gram_jaccard": round(jaccard, 4),
+        "top_fragments": _top_fragments(left_text, right_text),
+        "top_repeated_fragments": _top_fragments(left_text, right_text),
+        "adjacent": adjacent,
+    }
+    if field is not None:
+        record["field"] = field
+    if stage is not None:
+        record["stage"] = stage
+    return record
+
+
+def _similarity_exceeds(sequence: float, jaccard: float, threshold: float) -> bool:
+    """Use both order-sensitive and character-overlap evidence for paraphrase detection."""
+
+    return sequence >= threshold or (jaccard >= threshold and sequence >= threshold - 0.12)
+
+
+def _adjacent_exact_duplicates(
+    values: dict[str, dict[str, str]],
+    lesson_ids: list[str],
+) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for field, per_lesson in values.items():
+        for index in range(len(lesson_ids) - 1):
+            left_id, right_id = lesson_ids[index : index + 2]
+            left_text = _normalize(per_lesson.get(left_id, ""))
+            right_text = _normalize(per_lesson.get(right_id, ""))
+            if left_text and left_text == right_text:
+                records.append(
+                    {
+                        "lessons": [left_id, right_id],
+                        "field": field,
+                        "score": 1.0,
+                        "top_fragments": [left_text[:120]],
+                        "top_repeated_fragments": [left_text[:120]],
+                    }
+                )
+    return sorted(records, key=lambda item: (item["lessons"], item.get("field", "")))
+
+
+def _pairwise_similarity(
+    values: dict[str, dict[str, str]],
+    lesson_ids: list[str],
+    *,
+    threshold: float,
+    adjacent_threshold: float,
+    implementation: bool = False,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    pairs: list[dict[str, Any]] = []
+    adjacent_pairs: list[dict[str, Any]] = []
+    positions = {lesson_id: index for index, lesson_id in enumerate(lesson_ids)}
+    for field, per_lesson in values.items():
+        for left_index, left_id in enumerate(lesson_ids):
+            for right_id in lesson_ids[left_index + 1 :]:
+                left_text, right_text = per_lesson.get(left_id, ""), per_lesson.get(right_id, "")
+                if min(len(left_text), len(right_text)) < 30:
+                    continue
+                adjacent = _is_adjacent(positions[left_id], positions[right_id])
+                effective_threshold = adjacent_threshold if adjacent else threshold
+                sequence, jaccard = _similarity(left_text, right_text)
+                if not _similarity_exceeds(sequence, jaccard, effective_threshold):
+                    continue
+                stage = field.split(".", 1)[0] if implementation else None
+                record = _similarity_record(
+                    left_id=left_id,
+                    right_id=right_id,
+                    left_text=left_text,
+                    right_text=right_text,
+                    sequence=sequence,
+                    jaccard=jaccard,
+                    field=None if implementation else field,
+                    stage=stage,
+                    adjacent=adjacent,
+                )
+                pairs.append(record)
+                if adjacent:
+                    adjacent_pairs.append(record)
+    pairs.sort(key=lambda item: (-item["score"], item.get("field", item.get("stage", "")), item["lessons"]))
+    adjacent_pairs.sort(key=lambda item: (-item["score"], item.get("field", item.get("stage", "")), item["lessons"]))
+    return pairs, adjacent_pairs
+
+
+def _progression_coherence(previous: dict[str, Any], current: dict[str, Any]) -> tuple[float, float, float, float, list[str]]:
+    upstream = _joined([previous["progression"]["deliverable"], previous["progression"]["next_bridge"]])
+    downstream = _joined(
+        [
+            current["progression"]["prior_learning"],
+            current["task"],
+            current["teaching_content"],
+        ]
+    )
+    sequence, _ = _similarity(upstream, downstream)
+    bigrams_left = _character_ngrams(upstream, 2)
+    bigrams_right = _character_ngrams(downstream, 2)
+    trigrams_left = _character_ngrams(upstream, 3)
+    trigrams_right = _character_ngrams(downstream, 3)
+    bigram_union = bigrams_left | bigrams_right
+    trigram_union = trigrams_left | trigrams_right
+    bigram_jaccard = len(bigrams_left & bigrams_right) / len(bigram_union) if bigram_union else 1.0
+    trigram_jaccard = len(trigrams_left & trigrams_right) / len(trigram_union) if trigram_union else 1.0
+    score = max(bigram_jaccard, trigram_jaccard, sequence * 0.35)
+    overlap = sorted(bigrams_left & bigrams_right, key=lambda value: (-len(value), value))[:5]
+    return score, sequence, bigram_jaccard, trigram_jaccard, overlap
+
+
+def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
+    score_pattern: dict[str, Any] = {
+        "values": scores,
+        "all_same": len(scores) > 1 and len(set(scores)) == 1,
+        "simple_cycle": False,
+        "arithmetic_progression": False,
+        "arithmetic_step": None,
+        "range_valid": True,
+    }
+    for value in scores:
+        if value < float(EVALUATION_SCORE_MIN) or value > float(EVALUATION_SCORE_MAX) or (value * 2) % 1:
+            score_pattern["range_valid"] = False
+            errors.append(f"evaluation score {value} is outside 85-96 half-point contract")
+    for period in range(1, min(3, len(scores) - 1) + 1):
+        if all(scores[index] == scores[index % period] for index in range(len(scores))):
+            score_pattern["simple_cycle"] = True
+            break
+    if len(scores) >= 4:
+        steps = [round(scores[index + 1] - scores[index], 6) for index in range(len(scores) - 1)]
+        if steps and steps[0] != 0 and all(step == steps[0] for step in steps):
+            score_pattern["arithmetic_progression"] = True
+            score_pattern["arithmetic_step"] = steps[0]
+    if score_pattern["all_same"]:
+        errors.append("evaluation scores are identical across lessons")
+    if score_pattern["simple_cycle"]:
+        errors.append("evaluation scores use a simple repeating cycle")
+    if score_pattern["arithmetic_progression"]:
+        errors.append("evaluation scores use a mechanical arithmetic progression")
+    return score_pattern
+
+
 def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
     lessons = data.get("lessons", [])
     lesson_ids = [_lesson_id(lesson, index) for index, lesson in enumerate(lessons, 1)]
     errors: list[str] = []
 
-    duplicate_values = {field: {} for field in _field_groups(lessons[0])} if lessons else {}
+    duplicate_values: dict[str, dict[str, str]] = {}
     for index, lesson in enumerate(lessons, 1):
         for field, value in _field_groups(lesson).items():
-            duplicate_values[field][_lesson_id(lesson, index)] = value
+            duplicate_values.setdefault(field, {})[_lesson_id(lesson, index)] = value
     exact_duplicates = _record_duplicate_groups(duplicate_values)
+    adjacent_exact_duplicates = _adjacent_exact_duplicates(duplicate_values, lesson_ids)
     if exact_duplicates:
         errors.extend(f"exact duplicate {item['field']}: {','.join(item['lessons'])}" for item in exact_duplicates)
 
@@ -295,47 +481,77 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             for field_name, cell_index in zip(IMPLEMENTATION_STAGE_FIELDS, (1, 2, 3, 4)):
                 implementation_values.setdefault(f"{stage_id}.{field_name}", {})[lesson_id] = formatted[cell_index]
     implementation_duplicates = _record_duplicate_groups(implementation_values, IMPLEMENTATION_DUPLICATE_LESSON_COUNT)
+    adjacent_implementation_exact_duplicates = _adjacent_exact_duplicates(implementation_values, lesson_ids)
+    for record in adjacent_implementation_exact_duplicates:
+        record["stage"] = record["field"].split(".", 1)[0]
+    implementation_similarity_pairs, adjacent_implementation_similarity_pairs = _pairwise_similarity(
+        implementation_values,
+        lesson_ids,
+        threshold=IMPLEMENTATION_SIMILARITY_THRESHOLD,
+        adjacent_threshold=ADJACENT_IMPLEMENTATION_SIMILARITY_THRESHOLD,
+        implementation=True,
+    )
+    implementation_similarity_pairs = adjacent_implementation_exact_duplicates + implementation_similarity_pairs
+    adjacent_implementation_similarity_pairs = (
+        adjacent_implementation_exact_duplicates + adjacent_implementation_similarity_pairs
+    )
+    implementation_similarity_pairs.sort(
+        key=lambda item: (-item["score"], item.get("field", item.get("stage", "")), item["lessons"])
+    )
+    adjacent_implementation_similarity_pairs.sort(
+        key=lambda item: (-item["score"], item.get("field", item.get("stage", "")), item["lessons"])
+    )
     if implementation_duplicates:
         errors.extend(f"implementation duplicate {item['field']}: {','.join(item['lessons'])}" for item in implementation_duplicates)
+    if adjacent_exact_duplicates:
+        errors.extend(
+            f"adjacent exact duplicate {item['field']} {item['lessons']}"
+            for item in adjacent_exact_duplicates
+        )
+    if implementation_similarity_pairs:
+        errors.extend(
+            f"high implementation similarity {item.get('stage', item.get('field'))} {item['lessons']}: {item['score']}"
+            for item in implementation_similarity_pairs
+        )
 
-    field_similarity_pairs: list[dict[str, Any]] = []
-    for field, per_lesson in duplicate_values.items():
-        ids = list(per_lesson)
-        for left_index, left_id in enumerate(ids):
-            for right_id in ids[left_index + 1 :]:
-                left_text, right_text = per_lesson[left_id], per_lesson[right_id]
-                if min(len(left_text), len(right_text)) < 30:
-                    continue
-                sequence, jaccard = _similarity(left_text, right_text)
-                if sequence >= FIELD_SIMILARITY_THRESHOLD:
-                    field_similarity_pairs.append(
-                        {
-                            "field": field,
-                            "lessons": sorted((left_id, right_id)),
-                            "sequence_matcher": round(sequence, 4),
-                            "character_3gram_jaccard": round(jaccard, 4),
-                            "top_repeated_fragments": _top_fragments(left_text, right_text),
-                        }
-                    )
-    field_similarity_pairs.sort(key=lambda item: (-item["sequence_matcher"], item["field"], item["lessons"]))
+    field_similarity_pairs, adjacent_field_similarity_pairs = _pairwise_similarity(
+        duplicate_values,
+        lesson_ids,
+        threshold=FIELD_SIMILARITY_THRESHOLD,
+        adjacent_threshold=ADJACENT_FIELD_SIMILARITY_THRESHOLD,
+    )
     if field_similarity_pairs:
         errors.extend(
-            f"high field similarity {item['field']} {item['lessons']}: {item['sequence_matcher']}"
+            f"high field similarity {item['field']} {item['lessons']}: {item['score']}"
             for item in field_similarity_pairs
         )
 
-    sentence_locations: dict[str, set[str]] = {}
+    sentence_locations: dict[str, dict[str, set[str]]] = {}
     for index, lesson in enumerate(lessons, 1):
         lesson_id = _lesson_id(lesson, index)
         for field, values in _all_content_strings(lesson).items():
             for value in values:
                 for sentence in _sentences(value):
-                    sentence_locations.setdefault(sentence, set()).add(lesson_id)
-    repeated_sentences = [
-        {"sentence": sentence, "lessons": sorted(locations), "count": len(locations)}
-        for sentence, locations in sentence_locations.items()
-        if len(locations) >= REPEATED_SENTENCE_LESSON_COUNT
-    ]
+                    sentence_locations.setdefault(sentence, {}).setdefault(lesson_id, set()).add(field)
+    repeated_sentences: list[dict[str, Any]] = []
+    for sentence, locations in sentence_locations.items():
+        ordered_locations = [lesson_id for lesson_id in lesson_ids if lesson_id in locations]
+        adjacent = any(
+            _is_adjacent(lesson_ids.index(left_id), lesson_ids.index(right_id))
+            for left_id, right_id in zip(ordered_locations, ordered_locations[1:])
+        )
+        if len(locations) >= REPEATED_SENTENCE_LESSON_COUNT or adjacent:
+            repeated_sentences.append(
+                {
+                    "sentence": sentence,
+                    "lessons": ordered_locations,
+                    "count": len(locations),
+                    "fields": {lesson_id: sorted(locations[lesson_id]) for lesson_id in ordered_locations},
+                    "adjacent": adjacent,
+                    "score": 1.0,
+                    "top_fragments": [sentence],
+                }
+            )
     repeated_sentences.sort(key=lambda item: (-item["count"], item["sentence"]))
     if repeated_sentences:
         errors.extend(f"repeated sentence across lessons: {item['sentence']}" for item in repeated_sentences)
@@ -352,54 +568,93 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     if boilerplate_hits:
         errors.extend(f"legacy boilerplate in {item['lesson']}.{item['field']}: {item['fragment']}" for item in boilerplate_hits)
 
-    high_similarity_pairs: list[dict[str, Any]] = []
     narratives = {_lesson_id(lesson, index): _lesson_narrative(lesson) for index, lesson in enumerate(lessons, 1)}
-    ids = list(narratives)
-    for left_index, left_id in enumerate(ids):
-        for right_id in ids[left_index + 1 :]:
+    whole_lesson_similarity_pairs: list[dict[str, Any]] = []
+    adjacent_similarity_pairs: list[dict[str, Any]] = []
+    for left_index, left_id in enumerate(lesson_ids):
+        for right_id in lesson_ids[left_index + 1 :]:
             left_text, right_text = narratives[left_id], narratives[right_id]
             if min(len(left_text), len(right_text)) < 30:
                 continue
+            adjacent = _is_adjacent(left_index, lesson_ids.index(right_id))
+            threshold = ADJACENT_WHOLE_LESSON_SIMILARITY_THRESHOLD if adjacent else WHOLE_LESSON_SIMILARITY_THRESHOLD
             sequence, jaccard = _similarity(left_text, right_text)
-            if sequence >= WHOLE_LESSON_SIMILARITY_THRESHOLD:
-                high_similarity_pairs.append(
-                    {
-                        "lessons": sorted((left_id, right_id)),
-                        "sequence_matcher": round(sequence, 4),
-                        "character_3gram_jaccard": round(jaccard, 4),
-                        "top_repeated_fragments": _top_fragments(left_text, right_text),
-                    }
+            if _similarity_exceeds(sequence, jaccard, threshold):
+                record = _similarity_record(
+                    left_id=left_id,
+                    right_id=right_id,
+                    left_text=left_text,
+                    right_text=right_text,
+                    sequence=sequence,
+                    jaccard=jaccard,
+                    adjacent=adjacent,
                 )
-    high_similarity_pairs.sort(key=lambda item: (-item["sequence_matcher"], item["lessons"]))
-    if high_similarity_pairs:
-        errors.extend(f"high whole-lesson similarity {item['lessons']}: {item['sequence_matcher']}" for item in high_similarity_pairs)
+                whole_lesson_similarity_pairs.append(record)
+                if adjacent:
+                    adjacent_similarity_pairs.append(record)
+    whole_lesson_similarity_pairs.sort(key=lambda item: (-item["score"], item["lessons"]))
+    adjacent_similarity_pairs.sort(key=lambda item: (-item["score"], item["lessons"]))
+    if whole_lesson_similarity_pairs:
+        errors.extend(f"high whole-lesson similarity {item['lessons']}: {item['score']}" for item in whole_lesson_similarity_pairs)
 
     progression_stages = [str(lesson.get("progression", {}).get("capability_stage", "")) for lesson in lessons]
+    progression_links: list[dict[str, Any]] = []
+    prior_ids: set[str] = set()
+    for index, lesson in enumerate(lessons):
+        progression_data = lesson.get("progression", {})
+        declared_prior = progression_data.get("prior_lesson_id")
+        if index == 0 and declared_prior is not None:
+            errors.append("lessons[0].progression.prior_lesson_id must be null")
+        if index > 0 and declared_prior not in prior_ids:
+            errors.append(
+                f"{lesson_ids[index]}.progression.prior_lesson_id must reference an earlier lesson"
+            )
+        prior_ids.add(lesson_ids[index])
+        if index == 0:
+            continue
+        previous, current = lessons[index - 1], lesson
+        score, sequence, bigram_jaccard, trigram_jaccard, overlap = _progression_coherence(previous, current)
+        same_unit = str(previous.get("unit", "")) == str(current.get("unit", ""))
+        threshold = 0.035 if same_unit else 0.015
+        status = "passed" if score >= threshold else "failed"
+        link = {
+            "from": lesson_ids[index - 1],
+            "to": lesson_ids[index],
+            "score": round(score, 4),
+            "sequence_matcher": round(sequence, 4),
+            "character_2gram_jaccard": round(bigram_jaccard, 4),
+            "character_3gram_jaccard": round(trigram_jaccard, 4),
+            "threshold": threshold,
+            "same_unit": same_unit,
+            "status": status,
+            "top_overlap": overlap,
+        }
+        progression_links.append(link)
+        if status == "failed":
+            errors.append(
+                f"progression coherence failed {link['from']}->{link['to']}: "
+                f"score={link['score']} threshold={threshold}"
+            )
+    progression_variety = len(set(progression_stages)) > 1 if len(progression_stages) >= 4 else True
     progression = {
+        "status": "passed" if all(link["status"] == "passed" for link in progression_links) else "failed",
         "lesson_ids": lesson_ids,
         "capability_stages": progression_stages,
         "distinct_capability_stages": sorted(set(progression_stages)),
         "stage_count": len(progression_stages),
-        "valid_variety": len(set(progression_stages)) > 1 if len(progression_stages) >= 4 else True,
+        "valid_variety": progression_variety,
+        "links": progression_links,
     }
-    if len(progression_stages) >= 4 and len(set(progression_stages)) <= 1:
+    if not progression_variety:
         errors.append("progression capability_stage is identical across all lessons")
 
-    scores = []
+    scores: list[float] = []
     for lesson in lessons:
         try:
             scores.append(float(lesson["evaluation"]["score"]))
         except (KeyError, TypeError, ValueError):
             pass
-    score_pattern = {"values": scores, "all_same": len(scores) > 1 and len(set(scores)) == 1, "simple_cycle": False}
-    for period in range(1, min(3, len(scores) - 1) + 1):
-        if all(scores[index] == scores[index % period] for index in range(len(scores))):
-            score_pattern["simple_cycle"] = True
-            break
-    if score_pattern["all_same"]:
-        errors.append("evaluation scores are identical across lessons")
-    if score_pattern["simple_cycle"]:
-        errors.append("evaluation scores use a simple repeating cycle")
+    score_pattern = _score_pattern(scores, errors)
 
     completeness, completeness_errors = _completeness_report(data)
     errors.extend(completeness_errors)
@@ -423,14 +678,29 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "score_pattern": score_pattern,
         "completeness": completeness,
         "non_it_contamination_terms": list(NON_IT_CONTAMINATION_TERMS),
+        "similarity_thresholds": {
+            "whole_lesson": WHOLE_LESSON_SIMILARITY_THRESHOLD,
+            "adjacent_whole_lesson": ADJACENT_WHOLE_LESSON_SIMILARITY_THRESHOLD,
+            "field": FIELD_SIMILARITY_THRESHOLD,
+            "adjacent_field": ADJACENT_FIELD_SIMILARITY_THRESHOLD,
+            "implementation": IMPLEMENTATION_SIMILARITY_THRESHOLD,
+            "adjacent_implementation": ADJACENT_IMPLEMENTATION_SIMILARITY_THRESHOLD,
+        },
     }
     return {
         "status": "failed" if errors else "passed",
         "errors": errors,
         "exact_duplicates": exact_duplicates,
-        "implementation_duplicates": implementation_duplicates,
-        "high_similarity_pairs": high_similarity_pairs,
+        "adjacent_exact_duplicates": adjacent_exact_duplicates,
+        "adjacent_similarity_pairs": adjacent_similarity_pairs,
         "field_similarity_pairs": field_similarity_pairs,
+        "adjacent_field_similarity_pairs": adjacent_field_similarity_pairs,
+        "whole_lesson_similarity_pairs": whole_lesson_similarity_pairs,
+        "high_similarity_pairs": whole_lesson_similarity_pairs,
+        "implementation_duplicates": implementation_duplicates,
+        "adjacent_implementation_exact_duplicates": adjacent_implementation_exact_duplicates,
+        "implementation_similarity_pairs": implementation_similarity_pairs,
+        "adjacent_implementation_similarity_pairs": adjacent_implementation_similarity_pairs,
         "repeated_sentences": repeated_sentences,
         "boilerplate_hits": boilerplate_hits,
         "progression": progression,

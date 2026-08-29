@@ -78,6 +78,25 @@ def assert_output_path_safe(output_dir: Path | str, protected_paths: Iterable[Pa
     return output
 
 
+def assert_external_qa_path_safe(
+    qa_report: Path | str,
+    output_dir: Path | str,
+    protected_paths: Iterable[Path | str],
+) -> Path:
+    """Validate an external QA path before it participates in a generation commit."""
+
+    report = _absolute_lexical(Path(qa_report))
+    output = _absolute_lexical(Path(output_dir))
+    if report.exists() and report.is_dir():
+        raise ValueError(f"External QA report path must be a file, not a directory: {report}")
+    if paths_overlap(report, output):
+        raise ValueError(f"External QA report must not overlap output directory: {output}")
+    for protected in protected_paths:
+        if paths_overlap(report, protected):
+            raise ValueError(f"External QA report must not overlap protected path: {protected}")
+    return report
+
+
 def lesson_protected_paths(
     *,
     skill_dir: Path,

@@ -1,6 +1,6 @@
 # Lesson Content V2
 
-Content Contract V2 (`2.0`) describes teaching content. It is independent of the Word template version (`1.1.1` by default). The production generator accepts only a V2 document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message.
+Content Contract V2 (`2.0`) describes teaching content. It is independent of the Word template version (`1.1.2` by default). The production generator accepts only a V2 document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message.
 
 ## Course fields
 
@@ -20,7 +20,7 @@ lessons
 
 ```text
 lesson_id, unit, task, hours
-progression: prior_learning, capability_stage, deliverable, next_bridge
+progression: prior_lesson_id, prior_learning, capability_stage, deliverable, next_bridge
 student_analysis: base, problems, strategies
 teaching_content
 goals: knowledge, ability, quality
@@ -62,10 +62,12 @@ habits, online_learning, discussion, homework, practice, presentation,
 improvement
 ```
 
-The score is explicit and uses half-point increments. Existing `score_breakdown()` only distributes that score across the protected 13-row table; it does not invent remarks.
+The score is explicit, must be between 85 and 96, and uses half-point increments. Existing `score_breakdown()` only distributes that score across the protected 13-row table; it does not invent remarks. Generated score sequences must not be all identical, simple cycles, or mechanical arithmetic progressions.
+
+References are objects with a visible `text` and internal `source_kind` (`provided`, `generic`, or `verified_public`). Generic references must not contain ISBN, standard numbers, publishers, authors, explicit years, editions, or file numbers. The formatter writes only `text` to DOCX.
 
 ## Agent workflow
 
 Read all supplied course material once, confirm only missing course-level facts once, create a course outline, then author all lessons in JSON. Python formats existing values with numbering and line breaks. It must not author teaching prose, fall back to `flows`, cycle scores, or silently truncate over-capacity content.
 
-After schema validation, run `scripts/content_quality.py` for exact duplicates, field and whole-lesson similarity, repeated sentences, old boilerplate, progression, completeness, density, and domain contamination. Only after content QA passes should the generator create candidate DOCX files and run output/fidelity/render QA.
+After schema validation, run `scripts/content_quality.py` for adjacent and non-adjacent exact duplicates, calibrated field/implementation/whole-lesson similarity, repeated sentences, old boilerplate, progression coherence, completeness, density, score patterns, and domain contamination. Only after content QA passes should the generator create candidate DOCX files and run output/fidelity/render-smoke QA. The render report is smoke evidence only; visual inspection remains an Agent-level representative-page check.

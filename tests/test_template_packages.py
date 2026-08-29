@@ -34,6 +34,7 @@ PYTHON = Path(sys.executable)
 LESSON_V10_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 LESSON_V11_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
 LESSON_V111_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
+LESSON_V112_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "manifest.yaml"
 GRADE_V10_MANIFEST = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "manifest.yaml"
 GRADE_V10_TEMPLATE = GRADE / "assets" / "templates" / "course-gradebook" / "v1.0.0" / "template.xls"
 GRADE_V11_MANIFEST = GRADE / "assets" / "templates" / "course-gradebook" / "v1.1.0" / "manifest.yaml"
@@ -788,7 +789,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(
-                    f"lessons[0].evaluation.score must use 0.5-point increments; received {invalid_score}.",
+                    f"lessons[0].evaluation.score must be between 85 and 96 in 0.5-point increments; received {invalid_score}.",
                     result.stderr,
                 )
                 self.assertFalse(output.exists())
@@ -1173,8 +1174,8 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             self.assertEqual(len(list(output.glob("*.docx"))), 2)
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["template_id"], "lesson-plan")
-            self.assertEqual(report["template_version"], "1.1.1")
-            self.assertEqual(report["generator_version"], "1.1.1")
+            self.assertEqual(report["template_version"], "1.1.2")
+            self.assertEqual(report["generator_version"], "1.1.2")
             self.assertEqual(report["anchor_mode"], "word_bookmark")
             self.assertEqual(report["required_anchor_count"], 70)
             self.assertEqual(report["preserved_anchor_count"], 70)
@@ -1224,6 +1225,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
                 lesson["lesson_id"] = f"S{index:02d}"
                 lesson["unit"] = f"项目{index} 排序验证"
                 lesson["task"] = f"完成排序验证任务{index}"
+                lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"S{index - 1:02d}"
             source = folder / "tasks.json"
             output = folder / "output"
             source.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
@@ -1929,7 +1931,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             from bookmark_utils import validate_bookmark_inventory
             from package_common import bookmark_containers, load_manifest, required_bookmarks
 
-            manifest = load_manifest(LESSON_V111_MANIFEST)
+            manifest = load_manifest(LESSON_V112_MANIFEST)
             for path in sorted(output.glob("*.docx")):
                 inventory = validate_bookmark_inventory(
                     Document(path),
@@ -2117,7 +2119,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
                 "--output-dir",
                 str(success),
                 "--manifest",
-                str(LESSON_V111_MANIFEST),
+                str(LESSON_V112_MANIFEST),
             )
             self.assertEqual(success_result.returncode, 0, success_result.stderr or success_result.stdout)
             success_report = json.loads((success / "qa-report.json").read_text(encoding="utf-8"))
@@ -3321,7 +3323,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             )
             self.assertEqual(default_result.returncode, 0, default_result.stderr or default_result.stdout)
             default_report = json.loads((folder / "default-v11" / "qa-report.json").read_text(encoding="utf-8"))
-            self.assertEqual(default_report["template_version"], "1.1.1")
+            self.assertEqual(default_report["template_version"], "1.1.2")
             self.assertEqual(default_report["anchor_mode"], "word_bookmark")
 
             for label, template in (

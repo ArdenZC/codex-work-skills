@@ -1,0 +1,21 @@
+# Lesson Plan Template Package Changelog
+
+## 1.1.2 - 2026-08-29
+
+- Generalized the visible evaluation labels `平凡又不平凡的价值观` and `工程伦理` to `职业价值观` and `职业伦理`.
+- Kept the v1.1.1 semantic bookmark package, containers, layout, weights, and all other protected content unchanged.
+
+## 1.1.1 - 2026-08-11
+
+- Kept the fixed `突出方法` and `破解方法` labels in place and moved the semantic strategy anchors to the writable cells beside them.
+- Made the seven in-class stages of a two-hour lesson total exactly 90 minutes; pre-class and after-class work are labeled outside the 90-minute classroom total.
+
+## 1.1.0 - 2026-08-01
+
+- Added 70 versioned Word semantic bookmarks to the unchanged v1.0.0 DOCX package.
+- Added semantic anchors for fixed fields, all writable implementation cells, the three reflection cells, and the evaluation parent cell.
+- Used Word-safe bookmark names no longer than 40 characters with stable short stage/column codes.
+- Kept v1.0.0 and coordinate-based generation available through canonical or old compatibility template-only resolution, as well as explicit manifest selection.
+- Added strict bookmark inventory, ID, pairing, story, start/end boundary, physical-container, output-preservation, and v1.0 visible/structure equivalence checks.
+- Builder validation now checks the final temporary DOCX package across document, header, and footer stories before atomic replacement; failed validation leaves the target absent or unchanged.
+- v1.1 semantic manifest fields are explicit and validated without fallback defaults; bookmark IDs are restricted to ASCII decimal digits.

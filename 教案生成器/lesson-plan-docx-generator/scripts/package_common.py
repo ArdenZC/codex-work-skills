@@ -25,15 +25,25 @@ from semantic_bookmarks import (
     managed_bookmark_names,
     reflection_bookmark_names,
 )
-from content_contract import CONTENT_CONTRACT_VERSION, EVALUATION_CRITERIA, IMPLEMENTATION_STAGE_IDS, IN_CLASS_STAGE_IDS
+from content_contract import (
+    CONTENT_CONTRACT_VERSION,
+    EVALUATION_CRITERIA,
+    EVALUATION_SCORE_MAX,
+    EVALUATION_SCORE_MIN,
+    EVALUATION_SCORE_STEP,
+    IMPLEMENTATION_STAGE_IDS,
+    IN_CLASS_STAGE_IDS,
+)
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
+DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "manifest.yaml"
 V10_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 V11_MANIFEST = DEFAULT_MANIFEST
+V111_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
 V10_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
-V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
+V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
+V111_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
 LEGACY_TEMPLATE = SKILL_DIR / "assets" / "lesson-plan-template.docx"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -42,6 +52,11 @@ SEMANTIC_ANCHOR_MODE = "word_bookmark"
 EVALUATION_MAX_POINTS = [3, 3, 4, 5, 5, 5, 5, 10, 10, 10, 25, 10, 5]
 MINUTES_PER_LESSON_HOUR = 45
 MAX_HOURS_TEXT_LENGTH = 12
+REFERENCE_SPECIFIC_PATTERN = re.compile(
+    r"(?:isbn\s*[-:]?\s*[0-9x-]+|gb\s*[/-]?\s*t|标准编号|文件编号|出版社|作者|"
+    r"(?:19|20)\d{2}\s*年?|第\s*[一二三四五六七八九十百0-9]+\s*版|版次)",
+    re.IGNORECASE,
+)
 
 
 def load_manifest(path: Path | str = DEFAULT_MANIFEST) -> dict[str, Any]:
@@ -73,8 +88,13 @@ def _sha256(path: Path) -> str:
 
 def _known_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
-    known = ((V11_TEMPLATE, "1.1.1"), (V10_TEMPLATE, "1.0.0"), (LEGACY_TEMPLATE, "1.0.0"))
-    known += ((SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", "1.1.0"),)
+    known = (
+        (V11_TEMPLATE, "1.1.2"),
+        (V111_TEMPLATE, "1.1.1"),
+        (V10_TEMPLATE, "1.0.0"),
+        (LEGACY_TEMPLATE, "1.0.0"),
+        (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", "1.1.0"),
+    )
     for candidate, version in known:
         if path == candidate:
             return version
@@ -90,7 +110,8 @@ def _known_template_version(path: Path) -> str | None:
 def _exact_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
     for candidate, version in (
-        (V11_TEMPLATE, "1.1.1"),
+        (V11_TEMPLATE, "1.1.2"),
+        (V111_TEMPLATE, "1.1.1"),
         (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", "1.1.0"),
         (V10_TEMPLATE, "1.0.0"),
         (LEGACY_TEMPLATE, "1.0.0"),
@@ -211,13 +232,15 @@ def resolve_template_package(
 
     if manifest is None:
         known_version = _known_template_version(template)
-        if known_version == "1.1.1":
+        if known_version == "1.1.2":
             resolved_manifest = V11_MANIFEST.resolve()
+        elif known_version == "1.1.1":
+            resolved_manifest = V111_MANIFEST.resolve()
         elif known_version == "1.1.0":
             resolved_manifest = (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml").resolve()
         elif known_version == "1.0.0":
             resolved_manifest = V10_MANIFEST.resolve()
-        elif template.parent.name in {"v1.0.0", "v1.1.0", "v1.1.1"} and (template.parent / "manifest.yaml").exists():
+        elif template.parent.name in {"v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2"} and (template.parent / "manifest.yaml").exists():
             resolved_manifest = (template.parent / "manifest.yaml").resolve()
         else:
             raise ValueError("Custom template requires a matching --manifest.")
@@ -609,9 +632,14 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
                 score = Decimal(str(evaluation["score"]))
             except (InvalidOperation, TypeError, ValueError):
                 score = None
-            if score is not None and (not score.is_finite() or score % Decimal("0.5") != 0):
+            if score is not None and (
+                not score.is_finite()
+                or score < EVALUATION_SCORE_MIN
+                or score > EVALUATION_SCORE_MAX
+                or score % EVALUATION_SCORE_STEP != 0
+            ):
                 raise ValueError(
-                    f"lessons[{index}].evaluation.score must use 0.5-point increments; "
+                    f"lessons[{index}].evaluation.score must be between 85 and 96 in 0.5-point increments; "
                     f"received {evaluation['score']}."
                 )
     _schema_errors(data, schema_path)
@@ -627,6 +655,7 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
         raise ValueError(f"total_hours must be a positive number; received {data.get('total_hours')}")
 
     lesson_ids: set[str] = set()
+    ordered_lesson_ids: list[str] = []
     lesson_hours = Decimal("0")
     expected_stage_ids = list(IMPLEMENTATION_STAGE_IDS)
     placeholder_values = {"已有一定基础", "完成相应任务", "为下一课打基础"}
@@ -635,6 +664,8 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
         if lesson_id in lesson_ids:
             raise ValueError(f"lessons[{index}].lesson_id must be unique; duplicate {lesson_id!r}")
         lesson_ids.add(lesson_id)
+        previous_lesson_ids = set(ordered_lesson_ids)
+        ordered_lesson_ids.append(lesson_id)
         hours = Decimal(str(lesson["hours"]))
         lesson_hours += hours
         classroom_minutes = Decimal("0")
@@ -660,15 +691,39 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
                 f"expected {int(expected_minutes)}, got {int(classroom_minutes)}"
             )
         progression = lesson["progression"]
+        prior_lesson_id = progression["prior_lesson_id"]
+        if index == 0:
+            if prior_lesson_id is not None:
+                raise ValueError("lessons[0].progression.prior_lesson_id must be null")
+        elif prior_lesson_id not in previous_lesson_ids:
+            raise ValueError(
+                f"lessons[{index}].progression.prior_lesson_id must reference an earlier lesson; "
+                f"received {prior_lesson_id!r}"
+            )
         for name in ("prior_learning", "deliverable", "next_bridge"):
             if str(progression[name]).strip() in placeholder_values:
                 raise ValueError(f"lessons[{index}].progression.{name} must contain specific information")
 
         score = Decimal(str(lesson["evaluation"]["score"]))
-        if not score.is_finite() or score % Decimal("0.5") != 0:
-            raise ValueError(f"lessons[{index}].evaluation.score must use 0.5-point increments; received {lesson['evaluation']['score']}")
+        if (
+            not score.is_finite()
+            or score < EVALUATION_SCORE_MIN
+            or score > EVALUATION_SCORE_MAX
+            or score % EVALUATION_SCORE_STEP != 0
+        ):
+            raise ValueError(
+                f"lessons[{index}].evaluation.score must be between 85 and 96 in 0.5-point increments; "
+                f"received {lesson['evaluation']['score']}"
+            )
         if set(lesson["evaluation"]["remarks"]) != {criterion[0] for criterion in EVALUATION_CRITERIA}:
             raise ValueError(f"lessons[{index}].evaluation.remarks must match the canonical evaluation criterion IDs")
+        for reference_index, reference in enumerate(lesson["references"]):
+            reference_text = str(reference["text"]).strip()
+            if reference["source_kind"] == "generic" and REFERENCE_SPECIFIC_PATTERN.search(reference_text):
+                raise ValueError(
+                    f"lessons[{index}].references[{reference_index}] uses source_kind=generic for a specific citation; "
+                    "mark it provided or verified_public only when the source is real"
+                )
 
     if lesson_hours != total_hours:
         raise ValueError(f"total_hours must equal the sum of lesson hours; expected {total_hours}, got {lesson_hours}")
@@ -737,6 +792,13 @@ def field_spec(manifest: dict[str, Any], name: str) -> dict[str, Any]:
 
 def score_breakdown(target: float) -> list[float]:
     target_decimal = Decimal(str(target))
+    if (
+        not target_decimal.is_finite()
+        or target_decimal < EVALUATION_SCORE_MIN
+        or target_decimal > EVALUATION_SCORE_MAX
+        or target_decimal % EVALUATION_SCORE_STEP != 0
+    ):
+        raise ValueError(f"Evaluation score must be between 85 and 96 in 0.5-point increments: {target}")
     target_units_decimal = target_decimal * 2
     if target_units_decimal != target_units_decimal.to_integral_value():
         raise ValueError(f"Evaluation score must use 0.5-point increments: {target}")

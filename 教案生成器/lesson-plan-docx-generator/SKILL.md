@@ -20,9 +20,9 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 ## Content Contract V2
 
-默认使用 `assets/templates/lesson-plan/v1.1.1/template.docx`。
+默认使用 `assets/templates/lesson-plan/v1.1.2/template.docx`。
 
-正式生产输入必须是 `content_contract_version: "2.0"`，与 Word 模板版本独立。默认 Word 模板仍为 `lesson-plan v1.1.1`，并继续支持 v1.0 legacy-coordinate 与 v1.1 semantic-bookmark 模板路径；旧 sparse JSON 不再生产生成。
+正式生产输入必须是 `content_contract_version: "2.0"`，与 Word 模板版本独立。默认 Word 模板为 `lesson-plan v1.1.2`，并继续支持 v1.0 legacy-coordinate、v1.1.0/v1.1.1 semantic-bookmark 与旧 compatibility 模板路径；旧 sparse JSON 不再生产生成。
 
 课程级必填字段：
 
@@ -40,7 +40,7 @@ key_point, difficult_point, teaching_methods, resources, references,
 implementation, evaluation, reflection
 ```
 
-`unit` 使用项目化名称（如“项目一……”）；`progression` 包含具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。四课及以上不得所有能力阶段完全相同，但不要求机械线性递增。
+`unit` 使用项目化名称（如“项目一……”）；`progression` 包含 `prior_lesson_id`、具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。第一课的 `prior_lesson_id` 必须为 `null`，后续课次只能引用已经出现的前序课次。四课及以上不得所有能力阶段完全相同，但不要求机械线性递增。
 
 `student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项，references 至少一项。
 
@@ -60,7 +60,9 @@ after_class_improvement
 
 课前准备和课后完善属于课外阶段；中间七个阶段的分钟数必须严格等于 `hours * 45`。`operation_demonstration` 是语义行位，可在护理、会计、机械等课程中显示为方法示范、案例解析或技能示范。
 
-评价必须显式提供 0 至 100 的 `evaluation.score` 和 canonical 13 个 criterion IDs 的逐课 `remarks`。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
+评价必须显式提供 85–96 的 `evaluation.score`，使用 0.5 分步进，并提供 canonical 13 个 criterion IDs 的逐课 `remarks`。未指定分数时建议自然集中在 88–94，但不得全为 90、简单循环、严格递增或递减。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
+
+`references` 使用 `{text, source_kind}` 对象；`source_kind` 为 `provided`、`generic` 或 `verified_public`。没有用户材料时使用泛化资料名称，不能虚构教材、作者、出版社、ISBN、标准编号、年份、版次或文件编号；具体来源只有在用户提供或可信验证后才标记为非 `generic`。DOCX 只写 `text`，不写 provenance 元数据。
 
 完整可运行示例见 `examples/tasks.example.json`，字段说明见 `docs/content-contract-v2.md`，机器约束见 `schemas/lesson-plan-input.schema.json`。
 
@@ -79,13 +81,16 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
   -> Template QA
   -> candidate DOCX generation
   -> Output Structure + Content-to-DOCX Fidelity QA
-  -> optional Render QA
-  -> atomic commit to final output
+  -> optional LibreOffice render smoke
+  -> Agent representative-page visual inspection
+  -> atomic commit to final output and external QA report
 ```
 
-使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render 都通过后才交换到正式目录。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。`qa-report.json` 只写在输出目录，不写入 DOCX。
+使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render smoke 都通过后才交换到正式目录。显式 `--qa-report` 时，外部报告会在其同父目录先 staging，并与输出目录一起提交；任一交换失败都恢复旧输出和旧报告。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。`qa-report.json` 只写报告，不写入 DOCX。
 
-独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 exact duplicates、implementation duplicates、重复长句、字段/整课 SequenceMatcher 与字符 n-gram 相似度、旧套话、完整性、progression、score pattern、density 和非 IT 污染，并在报告中记录 lesson IDs、field、score 和重复片段。合理重复的课程名、专业、固定工具名、阶段 ID 和评价维度标签不作为正文重复。
+独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、重复长句、旧套话、完整性、progression coherence、score pattern、density 和非 IT 污染，并在报告中记录 lesson IDs、field/stage、score 和 top fragments。相邻课使用校准过的更严格阈值；非相邻课的合理相似仍可通过。合理重复的课程名、专业、固定工具名、阶段 ID 和评价维度标签不作为正文重复。
+
+确定性 QA 通过后，Agent 还要逐课内部复审：这一课比上一课新增什么、使用了上一课什么知识或成果、产出了什么、下一课如何使用该成果。这个复审不写入 DOCX。请求 `--render` 时，Python 报告只表示 `render.scope=smoke`，即 LibreOffice 成功生成非空且有页数的 PDF；它不等同于 visual QA 或 pagination verified。Agent 应检查第一课、正文最密集课、最后一课，课程达到 12 课时再检查 1–2 个中间课，关注溢出、截断、分页、大块空白、异常行高和内容越出表格。
 
 默认输出 QA 会读取原始 V2 JSON，通过纯 formatter 计算 expected，再对照 semantic bookmark 或 v1.0 坐标；不重新调用教学内容创作函数。模板布局、70 个 semantic bookmarks、bookmark IDs/names、fingerprint、v1.0/v1.1 compatibility 和 canonical 二进制均受保护。若本机存在 LibreOffice，使用 `--render` 做真实分页检查；没有 renderer 时 structural QA 仍通过，报告标记 `render.status=not_executed`。
 
@@ -123,6 +128,8 @@ scripts/validate_output.py --input-json tasks.json --output-dir output --render
 ## 模板文件
 
 ```text
+assets/templates/lesson-plan/v1.1.2/template.docx
+assets/templates/lesson-plan/v1.1.2/manifest.yaml
 assets/templates/lesson-plan/v1.1.1/template.docx
 assets/templates/lesson-plan/v1.1.1/manifest.yaml
 assets/templates/lesson-plan/v1.0.0/template.docx

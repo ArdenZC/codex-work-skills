@@ -12,6 +12,9 @@ from typing import Any, Iterable
 
 
 CONTENT_CONTRACT_VERSION = "2.0"
+EVALUATION_SCORE_MIN = Decimal("85")
+EVALUATION_SCORE_MAX = Decimal("96")
+EVALUATION_SCORE_STEP = Decimal("0.5")
 
 IMPLEMENTATION_STAGE_IDS = (
     "before_class_preparation",
@@ -39,8 +42,8 @@ EVALUATION_CRITERIA = (
     ("attention", 3, "专注度"),
     ("participation", 4, "参与度"),
     ("compliance", 5, "遵守规范、守法意识"),
-    ("values", 5, "平凡又不平凡的价值观"),
-    ("ethics", 5, "工程伦理"),
+    ("values", 5, "职业价值观"),
+    ("ethics", 5, "职业伦理"),
     ("habits", 5, "行为习惯、环境维护"),
     ("online_learning", 10, "线上学习情况统计"),
     ("discussion", 10, "课中讨论、答题等"),
@@ -78,6 +81,12 @@ def format_numbered_list(items: Iterable[Any]) -> str:
 
     values = [_clean(item) for item in items if _clean(item)]
     return "\n".join(f"{index}. {value}" for index, value in enumerate(values, 1))
+
+
+def format_reference_list(references: Iterable[dict[str, Any]]) -> str:
+    """Write only reference text; source provenance is an internal contract field."""
+
+    return format_numbered_list(reference["text"] for reference in references)
 
 
 def format_student_analysis(analysis: dict[str, Any]) -> dict[str, str]:
@@ -135,7 +144,7 @@ def lesson_content_field_values(lesson: dict[str, Any]) -> dict[str, str]:
     values["difficult_strategy"] = format_numbered_list(lesson["difficult_point"]["strategy"])
     values["teaching_methods"] = format_numbered_list(lesson["teaching_methods"])
     values["resources"] = format_numbered_list(lesson["resources"])
-    values["references"] = format_numbered_list(lesson["references"])
+    values["references"] = format_reference_list(lesson["references"])
     return values
 
 

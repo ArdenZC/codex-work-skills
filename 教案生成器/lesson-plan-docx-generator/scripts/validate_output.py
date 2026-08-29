@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import math
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -39,11 +40,17 @@ from package_common import (
     score_breakdown,
     validate_content_v2_input,
 )
-from path_safety import assert_output_path_safe, lesson_protected_paths
+from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths
 from render_qa import render_docx_directory
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
+
+
+def _same_lexical_path(left: Path | str, right: Path | str) -> bool:
+    return os.path.normcase(os.path.normpath(str(Path(left).expanduser().absolute()))) == os.path.normcase(
+        os.path.normpath(str(Path(right).expanduser().absolute()))
+    )
 
 
 def actual_cells(row) -> list[_Cell]:
@@ -635,9 +642,14 @@ def _base_qa_report(
         "content_quality": {
             "status": "not_run",
             "exact_duplicates": [],
+            "adjacent_exact_duplicates": [],
+            "adjacent_similarity_pairs": [],
             "implementation_duplicates": [],
+            "adjacent_implementation_exact_duplicates": [],
+            "implementation_similarity_pairs": [],
             "high_similarity_pairs": [],
             "field_similarity_pairs": [],
+            "whole_lesson_similarity_pairs": [],
             "repeated_sentences": [],
             "boilerplate_hits": [],
             "progression": {},
@@ -646,8 +658,17 @@ def _base_qa_report(
         "render": {
             "status": "not_executed",
             "reason": "render was not requested",
+            "scope": "smoke",
             "renderer": None,
             "files_checked": 0,
+            "page_count": 0,
+            "errors": [],
+        },
+        "visual_inspection": {
+            "status": "not_executed",
+            "reason": "visual inspection is performed by the calling Agent after render smoke",
+            "scope": "agent",
+            "pages_checked": [],
             "errors": [],
         },
     }
@@ -706,6 +727,19 @@ def write_skipped_report(
             package_roots=[Path(manifest["_path"]).parent],
         ),
     )
+    if qa_report_path is not None and not _same_lexical_path(qa_report_path, out_dir / "qa-report.json"):
+        assert_external_qa_path_safe(
+            qa_report_path,
+            out_dir,
+            lesson_protected_paths(
+                skill_dir=Path(__file__).resolve().parents[1],
+                source=Path(__file__),
+                schema=Path(schema_path),
+                template=Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest),
+                manifest=Path(manifest["_path"]),
+                package_roots=[Path(manifest["_path"]).parent],
+            ),
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     report = _base_qa_report(
         out_dir,
@@ -738,8 +772,10 @@ def write_skipped_report(
         report["render"] = {
             "status": "not_executed",
             "reason": "render is unavailable when output validation is skipped",
+            "scope": "smoke",
             "renderer": None,
             "files_checked": 0,
+            "page_count": 0,
             "errors": [],
         }
     _write_qa_report(report)
@@ -777,6 +813,19 @@ def validate_output_dir(
             package_roots=[Path(manifest["_path"]).parent],
         ),
     )
+    if qa_report_path is not None and not _same_lexical_path(qa_report_path, out_dir / "qa-report.json"):
+        assert_external_qa_path_safe(
+            qa_report_path,
+            out_dir,
+            lesson_protected_paths(
+                skill_dir=Path(__file__).resolve().parents[1],
+                source=Path(__file__),
+                schema=Path(schema_path),
+                template=Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest),
+                manifest=Path(manifest["_path"]),
+                package_roots=[Path(manifest["_path"]).parent],
+            ),
+        )
     lessons = data["lessons"]
     files = sorted(out_dir.glob("*.docx"), key=_lesson_file_sort_key)
     report = _base_qa_report(
@@ -1125,8 +1174,8 @@ def main() -> int:
             package_roots=package_roots,
         )
         assert_output_path_safe(Path(args.output_dir), protected_paths)
-        if args.qa_report:
-            assert_output_path_safe(Path(args.qa_report), protected_paths)
+        if args.qa_report and not _same_lexical_path(args.qa_report, Path(args.output_dir) / "qa-report.json"):
+            assert_external_qa_path_safe(args.qa_report, args.output_dir, protected_paths)
         validate_content_v2_input(data, schema_path)
         custom_template = args.custom_template if args.custom_template else None
         if args.skip_validation:
