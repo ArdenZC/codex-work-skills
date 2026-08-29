@@ -232,7 +232,7 @@ fields:
     max_chars: 400
     max_paragraphs: 4
     bookmarks: [lp_reflection_summary, lp_reflection_innovation, lp_reflection_improvement]
-  evaluation: {target: nested_table, bookmark: lp_evaluation, mode: nested_table, rows: 14, columns: 4, writable_rows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], writable_cells: [2, 3]}
+  evaluation: {target: nested_table, bookmark: lp_evaluation, mode: nested_table, rows: 14, columns: 4, writable_rows: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], writable_cells: [2, 3], max_remark_chars: 48}
 allowed_changes:
   - title paragraph text and alignment inside lp_title
   - declared lesson fields inside their semantic bookmarks

@@ -43,7 +43,7 @@
           "maxLength": 32
         },
         "prior_learning": {"type": "string", "minLength": 6, "maxLength": 240},
-        "capability_stage": {"type": "string", "minLength": 1, "maxLength": 16},
+        "capability_stage": {"type": "string", "enum": ["认知", "理解", "模仿", "独立", "综合", "优化", "迁移"]},
         "deliverable": {"type": "string", "minLength": 6, "maxLength": 240},
         "next_bridge": {"type": "string", "minLength": 6, "maxLength": 240}
       }
@@ -80,7 +80,8 @@
       "required": ["text", "source_kind"],
       "properties": {
         "text": {"type": "string", "minLength": 1, "maxLength": 180},
-        "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]}
+        "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
+        "evidence": {"type": ["string", "null"], "maxLength": 500}
       }
     },
     "implementationStage": {

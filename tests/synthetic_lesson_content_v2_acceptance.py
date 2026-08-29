@@ -1,9 +1,9 @@
-"""Black-box acceptance harness for natural-language Lesson Content V2 briefs.
+"""Synthetic acceptance harness for Lesson Content V2 course briefs.
 
-This file deliberately builds its temporary V2 payload from a short user brief
-instead of reading one of the committed JSON fixtures.  It is an explicit local
-acceptance command, not part of the regular core test shard because it renders
-24 DOCX files with LibreOffice.
+This file deliberately builds a deterministic temporary V2 payload from a short
+brief instead of reading one of the committed JSON fixtures. It is synthetic
+acceptance evidence, not a true Agent-authored E2E, and is not part of the
+regular core test shard because it renders 24 DOCX files with LibreOffice.
 """
 
 from __future__ import annotations
@@ -25,6 +25,26 @@ ROOT = Path(__file__).resolve().parents[1]
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 GENERATOR = LESSON / "scripts" / "generate_lesson_plans.py"
 NON_IT_FORBIDDEN = ("工程伦理", "平凡又不平凡的价值观", "软件技术", "标准机房", "脚本", "截图工具", "代码编辑器", "数据安全")
+SYNTHETIC_LESSON_MARKERS = (
+    "先核对输入边界再开始操作",
+    "把条件分支写进处理记录",
+    "用反例检验关键判断",
+    "让每个步骤都留下可复查证据",
+    "按风险高低安排处理顺序",
+    "把异常现象与原始条件对应",
+    "用小样本先验证处理假设",
+    "在结果提交前进行交叉核对",
+    "区分事实记录与个人推测",
+    "为关键结论保留依据来源",
+    "遇到变式时先说明调整理由",
+    "把操作规范转成检查清单",
+    "用同伴复核发现遗漏条件",
+    "对边界结果进行单独标记",
+    "把修订前后的差异说清楚",
+    "在交付前确认成果可以复现",
+    "用对照结果支持质量判断",
+    "把后续改进落实到具体动作",
+)
 
 
 def _brief_metadata(brief: str) -> tuple[str, str, int, int]:
@@ -49,6 +69,7 @@ def _lesson(
     previous_artifact: str | None,
     score: float,
 ) -> dict:
+    lesson_marker = SYNTHETIC_LESSON_MARKERS[index - 1]
     prior_learning = (
         f"课程开始前完成需求情境梳理，明确本课将围绕{focus}建立工作入口"
         if previous_artifact is None
@@ -78,14 +99,14 @@ def _lesson(
                 "label": label,
                 "minutes": minutes,
                 "modality": "线上+线下" if stage_id in {"before_class_preparation", "after_class_improvement"} else "小组实训",
-                "content": [f"围绕{focus}完成{activity}，记录{artifact}中的阶段证据"],
-                "teacher_actions": [f"针对{focus}{teacher_action}，提醒成果必须对应{artifact}"],
-                "student_actions": [f"围绕{focus}{student_action}，说明本组对{artifact}的处理依据"],
-                "objective": f"通过{activity}掌握{focus}并推进{artifact}",
+                "content": [f"{lesson_marker}；围绕{focus}完成{activity}，记录{artifact}中的阶段证据"],
+                "teacher_actions": [f"{lesson_marker}；针对{focus}{teacher_action}，提醒成果必须对应{artifact}"],
+                "student_actions": [f"{lesson_marker}；围绕{focus}{student_action}，说明本组对{artifact}的处理依据"],
+                "objective": f"{lesson_marker}；通过{activity}掌握{focus}并推进{artifact}",
             }
         )
     remarks = {
-        key: f"在{focus}任务中{suffix}"
+        key: f"在{focus}任务中{suffix}，本课落实{lesson_marker}"
         for key, suffix in {
             "attendance": "按时完成到课与准备",
             "attention": "持续关注关键条件",
@@ -129,6 +150,196 @@ def _lesson(
         ),
     )
     chosen_reflection = reflection_forms[(index - 1) % len(reflection_forms)]
+    chosen_reflection = tuple(f"{text}本课特别落实{lesson_marker}。" for text in chosen_reflection)
+    quality_principles = (
+        "先核对输入边界再开始操作",
+        "把条件分支写进处理记录",
+        "用反例检验关键判断",
+        "让每个步骤都留下可复查证据",
+        "按风险高低安排处理顺序",
+        "把异常现象与原始条件对应",
+        "用小样本先验证处理假设",
+        "在结果提交前进行交叉核对",
+        "区分事实记录与个人推测",
+        "为关键结论保留依据来源",
+        "遇到变式时先说明调整理由",
+        "把操作规范转成检查清单",
+        "用同伴复核发现遗漏条件",
+        "对边界结果进行单独标记",
+        "把修订前后的差异说清楚",
+        "在交付前确认成果可以复现",
+        "用对照结果支持质量判断",
+        "把后续改进落实到具体动作",
+    )
+    difficulty_strategies = (
+        "先用对照案例区分条件，再逐项核验成果依据",
+        "把输入、处理和结果拆开，分别检查遗漏",
+        "让小组交换成果，按反例清单追查边界",
+        "先复现一条异常路径，再回看处理记录",
+        "用风险排序决定先验证哪一个关键条件",
+        "把现象与证据逐一配对，拒绝只写结论",
+        "先设计最小验证样例，再扩展到完整任务",
+        "设置提交前的交叉检查点，逐项确认结果",
+        "将事实、推断和待确认信息分栏记录",
+        "要求每项结论附带来源和复核方式",
+        "改变一个条件后比较前后结果并说明原因",
+        "把规范要求转换成可勾选的检查清单",
+        "安排同伴按不同角色复核同一份成果",
+        "单独抽取边界样例，验证特殊结果处理",
+        "标记修订前后的差异，说明每次调整目的",
+        "用另一组环境复现成果，确认步骤可迁移",
+        "将对照结果和判断标准并排呈现",
+        "把改进意见转换成下一次可执行的动作",
+    )
+    ability_patterns = (
+        "从输入边界出发，按清单完成{focus}处理",
+        "先拆分业务对象，再依据条件完成{focus}",
+        "对照正常与异常样例，完成{focus}判断",
+        "沿着操作链记录{focus}的每个处理节点",
+        "按风险优先顺序处理{focus}并留下结果",
+        "把现象和证据配对，说明{focus}处理结论",
+        "用最小样例验证{focus}的关键假设",
+        "在交付前逐项复核{focus}结果",
+        "区分事实和推断后说明{focus}处理",
+        "为{focus}结论补充来源和依据",
+        "改变一个条件，比较{focus}前后结果",
+        "将规范要求转成{focus}检查步骤",
+        "交换成果后按角色复核{focus}",
+        "单独抽取边界样例验证{focus}",
+        "标注修改点并解释{focus}调整",
+        "换一组条件复现{focus}成果",
+        "用对照结果支持{focus}判断",
+        "把改进意见落到下一次{focus}动作",
+    )
+    delivery_patterns = (
+        "按成果清单整理并提交可复查的{artifact}",
+        "把对象关系画清后提交{artifact}",
+        "用异常样例核对并归档{artifact}",
+        "沿操作节点整理一份可追溯的{artifact}",
+        "按风险顺序检查后交付{artifact}",
+        "将现象、步骤和证据合并为{artifact}",
+        "以最小验证样例为依据形成{artifact}",
+        "完成提交前复核并发布{artifact}",
+        "把事实判断分栏记录到{artifact}",
+        "为每项结论补全来源后形成{artifact}",
+        "比较条件变化后修订{artifact}",
+        "依据规范清单完善{artifact}",
+        "完成角色互审后确认{artifact}",
+        "单列边界样例并补充到{artifact}",
+        "标注修订差异后重新提交{artifact}",
+        "在另一组条件下复现并校正{artifact}",
+        "用对照结果说明并提交{artifact}",
+        "把改进动作落实到新版{artifact}",
+    )
+    key_content_patterns = (
+        "输入边界、处理条件与成果要素的对应关系",
+        "业务对象拆分和关系确认的关键依据",
+        "正常样例与异常样例的差异识别方法",
+        "操作节点记录与过程证据的完整要求",
+        "风险优先级和处理顺序的判断标准",
+        "现象、步骤、证据和结论的配对规则",
+        "最小验证样例与假设检验的关系",
+        "提交前复核和成果质量的检查要点",
+        "事实记录、推断说明和待确认项的区分",
+        "结论来源、依据链和成果可信度的关系",
+        "单一条件变化对结果的影响方式",
+        "规范条目转化为可执行检查步骤的方法",
+        "角色互审中不同观察角度的互补作用",
+        "边界样例对特殊结果的验证作用",
+        "修订差异与调整理由的清晰表达",
+        "跨条件复现对成果可迁移性的检验",
+        "对照结果支撑质量判断的证据关系",
+        "改进动作与后续成果衔接的落实要求",
+    )
+    key_strategy_patterns = (
+        "先画出输入边界，再用清单核对每个成果要素",
+        "先建立对象关系，再检查条件是否闭合",
+        "用一组正例和一组反例对照确认判断依据",
+        "沿操作节点记录证据，最后回看过程是否完整",
+        "先按风险排序，再决定验证和修订顺序",
+        "把现象逐条绑定到步骤和证据，避免只写结论",
+        "用最小样例试跑假设，再扩展到完整任务",
+        "设置提交前检查点，逐项确认成果可复查",
+        "用两栏记录事实与推断，再补充待确认信息",
+        "要求每项结论标注来源，并安排同伴复核",
+        "只改变一个条件，比较前后结果并解释差异",
+        "把规范条目改写成可勾选的操作检查单",
+        "交换成果并分配不同角色，覆盖不同观察角度",
+        "单独抽取边界样例，检查特殊结果处理",
+        "并排展示修改前后内容，说明每处调整目的",
+        "换一组条件复现成果，确认步骤仍然有效",
+        "将对照结果和判断标准并排呈现再下结论",
+        "把反馈意见写成下一课可以执行的具体动作",
+    )
+    difficulty_content_patterns = (
+        "把输入边界的复杂条件转成可以逐项检查的处理路径",
+        "把多个业务对象的关系转成可复核的判断顺序",
+        "把正反样例的差异转成可执行的判定规则",
+        "把连续操作中的隐含节点转成可追溯记录",
+        "把多项风险约束转成有先后次序的处理步骤",
+        "把零散现象与证据转成完整的结果说明",
+        "把抽象假设转成可以反复运行的最小验证任务",
+        "把交付前的遗漏转成明确的复核清单",
+        "把事实和推断混杂的表述转成两类记录",
+        "把缺少来源的结论转成有证据链的成果",
+        "把条件变化带来的差异转成可比较的结果",
+        "把规范要求转成不会遗漏步骤的操作路径",
+        "把单一视角的检查转成多角色互审流程",
+        "把普通样例覆盖不到的情况转成边界验证",
+        "把模糊的修改过程转成前后差异说明",
+        "把一次性成果转成可以跨条件复现的流程",
+        "把孤立的对照结果转成有标准支撑的判断",
+        "把笼统的改进意见转成下一次可执行动作",
+    )
+    knowledge_patterns = (
+        "说清输入边界包含哪些条件以及它们的作用",
+        "说明业务对象之间如何建立关系并保持一致",
+        "辨别正例和反例分别对应什么判断结果",
+        "解释过程记录为什么需要覆盖每个节点",
+        "概括风险优先级如何影响处理顺序",
+        "说明现象、步骤和证据怎样共同支持结论",
+        "理解最小样例如何用来检验一个假设",
+        "掌握交付前复核应覆盖的质量检查点",
+        "区分事实、推断以及仍需确认的信息",
+        "说明来源和依据如何支撑成果可信度",
+        "分析单一条件变化会怎样影响结果",
+        "理解规范条目如何变成可执行步骤",
+        "说明不同角色的观察角度如何互补",
+        "识别边界样例为什么需要单独验证",
+        "理解修改差异和调整理由的对应关系",
+        "说明跨条件复现如何检验流程迁移性",
+        "解释对照结果怎样支撑质量判断",
+        "理解改进动作如何衔接后续成果",
+    )
+    knowledge_artifact_patterns = (
+        "列出输入边界和成果要素的对应项",
+        "画出对象关系并标注关键关联",
+        "整理正反样例的判定依据表",
+        "列出过程节点和必备证据项",
+        "制作风险排序与处理步骤对照表",
+        "整理现象、步骤、证据和结论关系",
+        "写出最小样例及其预期判断结果",
+        "列明提交前需要复核的成果要素",
+        "把事实、推断和待确认项分开记录",
+        "为各项结论补充对应的来源说明",
+        "整理条件变化前后的结果对照",
+        "把规范要求整理成执行检查单",
+        "形成不同角色的互审分工表",
+        "单独汇总边界样例及处理结果",
+        "列出修改前后差异和调整原因",
+        "形成跨条件复现所需的步骤说明",
+        "整理对照结果和判断标准的关系",
+        "形成下一步改进动作清单",
+    )
+    quality_principle = quality_principles[index - 1]
+    difficulty_strategy = difficulty_strategies[index - 1]
+    ability_pattern = ability_patterns[index - 1].format(focus=focus)
+    delivery_pattern = delivery_patterns[index - 1].format(artifact=artifact)
+    key_content_pattern = key_content_patterns[index - 1]
+    key_strategy_pattern = key_strategy_patterns[index - 1]
+    difficulty_content_pattern = difficulty_content_patterns[index - 1]
+    knowledge_pattern = knowledge_patterns[index - 1]
+    knowledge_artifact_pattern = knowledge_artifact_patterns[index - 1]
     return {
         "lesson_id": f"L{index:02d}",
         "unit": unit,
@@ -142,18 +353,22 @@ def _lesson(
             "next_bridge": f"将{artifact}带入下一课的{next_focus}，继续完善项目成果",
         },
         "student_analysis": {
-            "base": [f"能够识别{focus}涉及的基本对象", f"接触过与{artifact}相关的简单记录"],
-            "problems": [f"容易忽略{focus}中的条件差异", f"成果说明对{artifact}的依据关联不够清晰"],
-            "strategies": [f"使用清单拆解{focus}的处理步骤", f"通过互评核对{artifact}与任务要求"],
+            "base": [f"能够{knowledge_pattern}，并识别{focus}涉及的基本对象", f"接触过{knowledge_artifact_pattern}对应的简单记录"],
+            "problems": [f"容易在{key_content_pattern}中遗漏条件", f"成果说明常缺少{key_strategy_pattern}形成的依据关联"],
+            "strategies": [f"采用{difficulty_strategy}来拆解本课处理步骤", f"按照{key_strategy_pattern}互评并核对任务要求"],
         },
-        "teaching_content": [f"分析{focus}的任务边界与工作条件", f"示范形成{artifact}的关键步骤", f"比较不同情境下{focus}的处理结果"],
+        "teaching_content": [
+            f"{lesson_marker}；分析{focus}的任务边界与工作条件",
+            f"{lesson_marker}；示范形成{artifact}的关键步骤",
+            f"{lesson_marker}；比较不同情境下{focus}的处理结果",
+        ],
         "goals": {
-            "knowledge": [f"说明{focus}的核心概念与判断依据", f"辨认{artifact}应包含的主要要素"],
-            "ability": [f"依据任务条件完成{focus}处理", f"提交可复查的{artifact}"],
-            "quality": ["形成先核对后操作的习惯", f"对{focus}结果保持客观负责"],
+            "knowledge": [f"{knowledge_pattern}，并联系{focus}的核心依据", f"{knowledge_artifact_pattern}，对应{artifact}"],
+            "ability": [ability_pattern, delivery_pattern],
+            "quality": [f"{quality_principle}，并在任务中留下可追溯依据", f"对{focus}结果保持{quality_principle}"],
         },
-        "key_point": {"content": [f"{focus}的关键条件与成果要素"], "strategy": [f"用对照清单拆解{focus}并逐项核验"]},
-        "difficult_point": {"content": [f"把复杂情境转化为可执行的{focus}步骤"], "strategy": [f"用变式案例追问{artifact}的依据和边界"]},
+        "key_point": {"content": [f"{key_content_pattern}，对应{focus}的成果要求"], "strategy": [f"{key_strategy_pattern}，再核对{artifact}"]},
+        "difficult_point": {"content": [f"{difficulty_content_pattern}，最后落到{focus}步骤"], "strategy": [f"{difficulty_strategy}，再回看{artifact}的依据和边界"]},
         "teaching_methods": methods,
         "resources": [f"{focus}任务单", f"{artifact}成果模板", f"{next_focus}参考样例"],
         "references": [{"text": "本课程项目任务资料", "source_kind": "generic"}],
@@ -174,7 +389,7 @@ def lesson_hours_for_course(_course: str) -> int:
     return _CURRENT_LESSON_HOURS
 
 
-def plan_from_brief(brief: str) -> dict:
+def synthetic_plan_from_brief(brief: str) -> dict:
     global _CURRENT_LESSON_HOURS
     course, major, total_hours, lesson_hours = _brief_metadata(brief)
     _CURRENT_LESSON_HOURS = lesson_hours
@@ -259,21 +474,21 @@ def _document_text(path: Path) -> str:
 
 @contextmanager
 def _case_directory(label: str):
-    evidence_root = os.environ.get("LESSON_V2_BLACK_BOX_EVIDENCE_DIR", "").strip()
+    evidence_root = os.environ.get("LESSON_V2_SYNTHETIC_EVIDENCE_DIR", "").strip()
     if evidence_root:
         folder = Path(evidence_root).expanduser().resolve() / label
         if folder.exists():
-            raise RuntimeError(f"black-box evidence directory already exists: {folder}")
+            raise RuntimeError(f"synthetic evidence directory already exists: {folder}")
         folder.mkdir(parents=True)
         yield folder
         return
-    with tempfile.TemporaryDirectory(prefix="lesson-v2-black-box-") as temp_name:
+    with tempfile.TemporaryDirectory(prefix="lesson-v2-synthetic-") as temp_name:
         yield Path(temp_name)
 
 
 def _export_visual_evidence(output: Path, representative: list[Path], evidence_root: Path | None) -> dict[str, object]:
     if evidence_root is None:
-        return {"status": "pending_agent", "representative_files": [path.name for path in representative]}
+        return {"status": "not_exported", "scope": "synthetic_acceptance", "representative_files": [path.name for path in representative]}
     docx_dir = evidence_root / "docx"
     pdf_dir = evidence_root / "pdf"
     docx_dir.mkdir()
@@ -289,7 +504,8 @@ def _export_visual_evidence(output: Path, representative: list[Path], evidence_r
     renderer = next((item for item in renderer_candidates if item and Path(item).exists()), None)
     if renderer is None:
         return {
-            "status": "pending_agent",
+            "status": "not_executed",
+            "scope": "synthetic_acceptance",
             "representative_files": [path.name for path in representative],
             "pdf_files": [],
             "reason": "LibreOffice was not found for representative visual evidence",
@@ -312,7 +528,8 @@ def _export_visual_evidence(output: Path, representative: list[Path], evidence_r
             raise RuntimeError(f"representative PDF conversion failed for {path.name}: {result.stderr or result.stdout}")
         pdf_files.append(pdf.name)
     return {
-        "status": "pending_agent",
+        "status": "rendered_for_external_inspection",
+        "scope": "synthetic_acceptance",
         "representative_files": [path.name for path in representative],
         "pdf_files": pdf_files,
         "evidence_directory": str(evidence_root),
@@ -322,9 +539,9 @@ def _export_visual_evidence(output: Path, representative: list[Path], evidence_r
 def run_case(brief: str, expected_lessons: int) -> dict:
     label = "database" if "数据库" in brief else "nursing"
     with _case_directory(label) as folder:
-        evidence_root = folder if os.environ.get("LESSON_V2_BLACK_BOX_EVIDENCE_DIR", "").strip() else None
+        evidence_root = folder if os.environ.get("LESSON_V2_SYNTHETIC_EVIDENCE_DIR", "").strip() else None
         source = folder / "brief-derived-input.json"
-        source.write_text(json.dumps(plan_from_brief(brief), ensure_ascii=False, indent=2), encoding="utf-8")
+        source.write_text(json.dumps(synthetic_plan_from_brief(brief), ensure_ascii=False, indent=2), encoding="utf-8")
         output = folder / "output"
         env = os.environ.copy()
         env["PYTHONUTF8"] = "1"

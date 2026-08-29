@@ -86,16 +86,24 @@ def _validate_legacy_descriptor(package: dict[str, Path | str]) -> str:
         raise ValueError(f"{package['name']}: owner validator is ambiguous or unavailable")
     validator = next(iter(owners))
     scripts_path = validator.parent
-    if str(scripts_path) not in sys.path:
+    original_path = sys.path[:]
+    saved_package_common = sys.modules.get("package_common")
+    try:
+        sys.modules.pop("package_common", None)
         sys.path.insert(0, str(scripts_path))
-    sys.modules.pop("package_common", None)
-    from package_common import anchor_mode, validate_legacy_manifest_contract, validate_semantic_manifest_contract
+        from package_common import anchor_mode, validate_legacy_manifest_contract, validate_semantic_manifest_contract
 
-    mode = anchor_mode(manifest)
-    if mode == "legacy_coordinates":
-        validate_legacy_manifest_contract(manifest)
-    else:
-        validate_semantic_manifest_contract(manifest)
+        mode = anchor_mode(manifest)
+        if mode == "legacy_coordinates":
+            validate_legacy_manifest_contract(manifest)
+        else:
+            validate_semantic_manifest_contract(manifest)
+    finally:
+        sys.path[:] = original_path
+        if saved_package_common is None:
+            sys.modules.pop("package_common", None)
+        else:
+            sys.modules["package_common"] = saved_package_common
     version = manifest.get("template", {}).get("version")
     fingerprint = str(manifest.get("fingerprint", {}).get("sha256") or "").upper()
     return f"{package['name']}: version={version} sha256={fingerprint} schema=valid"

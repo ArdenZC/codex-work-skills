@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import copy
+from contextlib import contextmanager
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -25,39 +28,127 @@ V112_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "ma
 V111_TEMPLATE = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
 V111_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
 
-sys.path.insert(0, str(SCRIPTS))
-from bookmark_utils import (  # noqa: E402
-    bookmark_boundary_locations,
-    bookmark_parent_cell,
-    bookmark_parent_paragraph,
-    find_bookmark,
-)
-from content_contract import (  # noqa: E402
-    format_evaluation_values,
-    format_implementation,
-    format_reflection,
-    lesson_content_field_values,
-    lesson_header_values,
-)
-from content_quality import ContentQualityError, assess_content_quality, validate_content_quality  # noqa: E402
-import generate_lesson_plans as lesson_generator  # noqa: E402
-from generate_lesson_plans import atomic_commit_candidate, atomic_commit_candidate_with_external_qa  # noqa: E402
-import validate_output as lesson_output  # noqa: E402
-from package_common import (  # noqa: E402
-    field_bookmark,
-    implementation_bookmarks,
-    load_manifest,
-    reflection_bookmarks,
-    required_bookmarks,
-    score_breakdown,
-)
-from path_safety import assert_output_path_safe, paths_equal, paths_overlap  # noqa: E402
-from validate_output import manifest_field_text  # noqa: E402
+_LESSON_NAMESPACE = "lesson_v2"
+_MISSING = object()
+_LESSON_DEPENDENCIES = {
+    "semantic_bookmarks": (),
+    "content_contract": (),
+    "bookmark_utils": ("semantic_bookmarks",),
+    "content_quality": ("content_contract",),
+    "path_safety": (),
+    "render_qa": (),
+    "package_common": ("semantic_bookmarks", "content_contract"),
+    "validate_template": ("bookmark_utils", "package_common"),
+    "validate_output": (
+        "bookmark_utils",
+        "content_contract",
+        "content_quality",
+        "package_common",
+        "path_safety",
+        "render_qa",
+    ),
+    "generate_lesson_plans": (
+        "bookmark_utils",
+        "content_contract",
+        "content_quality",
+        "package_common",
+        "path_safety",
+        "validate_output",
+        "validate_template",
+    ),
+}
 
-# Keep the lesson modules above, but do not leave their generic import names
-# cached for the sibling gradebook package, which has its own implementations.
-for _module_name in ("package_common", "validate_output", "validate_template"):
-    sys.modules.pop(_module_name, None)
+_lesson_package = types.ModuleType(_LESSON_NAMESPACE)
+_lesson_package.__path__ = [str(SCRIPTS)]
+sys.modules[_LESSON_NAMESPACE] = _lesson_package
+
+
+def _load_lesson_module(name: str):
+    """Load Lesson modules without publishing their generic import names."""
+
+    fullname = f"{_LESSON_NAMESPACE}.{name}"
+    existing = sys.modules.get(fullname)
+    if existing is not None:
+        return existing
+    for dependency in _LESSON_DEPENDENCIES.get(name, ()):
+        _load_lesson_module(dependency)
+
+    spec = importlib.util.spec_from_file_location(fullname, SCRIPTS / f"{name}.py")
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load Lesson module: {name}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[fullname] = module
+    aliases = {name, *_LESSON_DEPENDENCIES.get(name, ())}
+    saved = {alias: sys.modules.get(alias, _MISSING) for alias in aliases}
+    try:
+        for alias in aliases:
+            sys.modules[alias] = sys.modules[f"{_LESSON_NAMESPACE}.{alias}"]
+        spec.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(fullname, None)
+        raise
+    finally:
+        for alias, previous in saved.items():
+            if previous is _MISSING:
+                sys.modules.pop(alias, None)
+            else:
+                sys.modules[alias] = previous
+    return module
+
+
+@contextmanager
+def isolated_generic_imports(scripts: Path, module_names: tuple[str, ...]):
+    """Exercise a legacy package import while restoring process-global state."""
+
+    original_path = sys.path[:]
+    saved_modules = {name: sys.modules.get(name, _MISSING) for name in module_names}
+    try:
+        for name in module_names:
+            sys.modules.pop(name, None)
+        sys.path.insert(0, str(scripts))
+        yield
+    finally:
+        sys.path[:] = original_path
+        for name, previous in saved_modules.items():
+            if previous is _MISSING:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+
+
+lesson_bookmark_utils = _load_lesson_module("bookmark_utils")
+lesson_content_contract = _load_lesson_module("content_contract")
+lesson_content_quality = _load_lesson_module("content_quality")
+lesson_package_common = _load_lesson_module("package_common")
+lesson_path_safety = _load_lesson_module("path_safety")
+lesson_validate_template = _load_lesson_module("validate_template")
+lesson_output = _load_lesson_module("validate_output")
+lesson_generator = _load_lesson_module("generate_lesson_plans")
+
+bookmark_boundary_locations = lesson_bookmark_utils.bookmark_boundary_locations
+bookmark_parent_cell = lesson_bookmark_utils.bookmark_parent_cell
+bookmark_parent_paragraph = lesson_bookmark_utils.bookmark_parent_paragraph
+find_bookmark = lesson_bookmark_utils.find_bookmark
+format_evaluation_values = lesson_content_contract.format_evaluation_values
+format_implementation = lesson_content_contract.format_implementation
+format_reflection = lesson_content_contract.format_reflection
+lesson_content_field_values = lesson_content_contract.lesson_content_field_values
+lesson_header_values = lesson_content_contract.lesson_header_values
+ContentQualityError = lesson_content_quality.ContentQualityError
+assess_content_quality = lesson_content_quality.assess_content_quality
+validate_content_quality = lesson_content_quality.validate_content_quality
+atomic_commit_candidate = lesson_generator.atomic_commit_candidate
+atomic_commit_candidate_with_external_qa = lesson_generator.atomic_commit_candidate_with_external_qa
+field_bookmark = lesson_package_common.field_bookmark
+implementation_bookmarks = lesson_package_common.implementation_bookmarks
+load_manifest = lesson_package_common.load_manifest
+reflection_bookmarks = lesson_package_common.reflection_bookmarks
+required_bookmarks = lesson_package_common.required_bookmarks
+score_breakdown = lesson_package_common.score_breakdown
+assert_output_path_safe = lesson_path_safety.assert_output_path_safe
+paths_equal = lesson_path_safety.paths_equal
+paths_overlap = lesson_path_safety.paths_overlap
+manifest_field_text = lesson_output.manifest_field_text
 
 
 def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
@@ -119,6 +210,43 @@ def bookmark_text(document: Document, name: str) -> str:
 
 
 class LessonContentV2Mixin:
+    def test_lesson_and_gradebook_imports_are_isolated_in_one_interpreter(self) -> None:
+        grade_scripts = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "scripts"
+        grade_modules = ("package_common", "named_range_contracts", "named_range_utils", "xls_named_range_utils")
+        lesson_modules = (
+            "package_common",
+            "semantic_bookmarks",
+            "content_contract",
+            "bookmark_utils",
+            "content_quality",
+            "path_safety",
+            "render_qa",
+            "validate_template",
+            "validate_output",
+            "generate_lesson_plans",
+        )
+        original_path = sys.path[:]
+
+        with isolated_generic_imports(grade_scripts, grade_modules):
+            import package_common as gradebook_package_common
+
+            self.assertTrue(hasattr(gradebook_package_common, "calculate_expected_total"))
+            self.assertIsNot(gradebook_package_common, lesson_package_common)
+            self.assertEqual(sys.path[1:], original_path)
+
+        self.assertEqual(sys.path, original_path)
+        self.assertIs(sys.modules[f"{_LESSON_NAMESPACE}.package_common"], lesson_package_common)
+
+        with isolated_generic_imports(SCRIPTS, lesson_modules):
+            import package_common as generic_lesson_package_common
+
+            self.assertTrue(hasattr(generic_lesson_package_common, "validate_content_v2_input"))
+            self.assertIsNot(generic_lesson_package_common, lesson_package_common)
+            self.assertEqual(sys.path[1:], original_path)
+
+        self.assertEqual(sys.path, original_path)
+        self.assertIs(sys.modules[f"{_LESSON_NAMESPACE}.package_common"], lesson_package_common)
+
     def test_sparse_input_fails_closed_through_real_generator(self) -> None:
         sparse = {
             "course_name": "软件测试实训",
@@ -421,6 +549,91 @@ class LessonContentV2Mixin:
             report,
         )
 
+    def test_content_quality_adversarial_skeletons_and_allowed_reuse(self) -> None:
+        base = load_fixture("lesson-plan-content-v2-it.json")
+
+        def add_topic_entities(data: dict) -> None:
+            for index, lesson in enumerate(data["lessons"], 1):
+                topic = f"主题{index}"
+                artifact = f"成果{index}"
+                lesson["unit"] = f"项目{index} {topic}"
+                lesson["task"] = f"完成{topic}处理"
+                lesson["progression"]["deliverable"] = artifact
+
+        implementation_skeleton = copy.deepcopy(base)
+        add_topic_entities(implementation_skeleton)
+        for index, lesson in enumerate(implementation_skeleton["lessons"], 1):
+            topic, artifact = f"主题{index}", f"成果{index}"
+            stage = lesson["implementation"][3]
+            stage["content"] = [f"围绕{topic}分析任务边界并记录{artifact}的关键证据"]
+            stage["teacher_actions"] = [f"教师引导学生围绕{topic}逐项核对操作条件并记录判断依据"]
+            stage["student_actions"] = [f"学生根据{topic}完成条件核对并提交{artifact}"]
+            stage["objective"] = f"通过{topic}完成任务并形成{artifact}"
+        implementation_report = assess_content_quality(implementation_skeleton)
+        self.assertEqual(implementation_report["status"], "failed", implementation_report)
+        self.assertTrue(implementation_report["implementation_structural_similarity_pairs"], implementation_report)
+
+        skeleton_cases = {
+            "goals": lambda lesson, topic: lesson["goals"].update(
+                {
+                    "knowledge": [f"掌握{topic}基本方法", f"分析{topic}关键条件"],
+                    "ability": [f"完成{topic}操作并说明依据", f"提交{topic}成果"],
+                    "quality": [f"形成规范{topic}意识", f"保持{topic}记录习惯"],
+                }
+            ),
+            "student_analysis": lambda lesson, topic: lesson["student_analysis"].update(
+                {
+                    "base": [f"了解{topic}基本对象", f"接触{topic}简单记录"],
+                    "problems": [f"容易忽略{topic}条件", f"说明{topic}依据不清"],
+                    "strategies": [f"用清单拆解{topic}步骤", f"通过互评核对{topic}结果"],
+                }
+            ),
+            "reflection": lambda lesson, topic: lesson.__setitem__(
+                "reflection",
+                {
+                    "summary": f"围绕{topic}完成本课任务并形成成果",
+                    "innovation": f"将{topic}拆成连续检查点组织课堂",
+                    "improvement": f"下一课继续完善{topic}的判断依据",
+                },
+            ),
+        }
+        for field_name, mutate in skeleton_cases.items():
+            data = copy.deepcopy(base)
+            add_topic_entities(data)
+            for index, lesson in enumerate(data["lessons"], 1):
+                mutate(lesson, f"主题{index}")
+            report = assess_content_quality(data)
+            self.assertEqual(report["status"], "failed", (field_name, report))
+            self.assertTrue(
+                any(item["field"].startswith(field_name + ".") for item in report["structural_similarity_pairs"]),
+                (field_name, report),
+            )
+
+        distinct = copy.deepcopy(base)
+        distinct["lessons"] = distinct["lessons"][:2]
+        distinct["total_hours"] = 4
+        self.assertEqual(assess_content_quality(distinct)["status"], "passed")
+
+        allowed_reuse = copy.deepcopy(base)
+        for lesson in allowed_reuse["lessons"]:
+            lesson["teaching_methods"][0] = "任务驱动法"
+            lesson["resources"][0] = "数据库客户端工具"
+        allowed_report = assess_content_quality(allowed_reuse)
+        self.assertEqual(allowed_report["status"], "passed", allowed_report)
+
+        short_item = copy.deepcopy(base)
+        for lesson in short_item["lessons"]:
+            lesson["goals"]["quality"][0] = "形成质量意识"
+        short_report = assess_content_quality(short_item)
+        self.assertEqual(short_report["status"], "failed", short_report)
+        self.assertTrue(any(item["field"] == "goals.quality" for item in short_report["frequency_item_duplicates"]))
+
+        adjacent_item = copy.deepcopy(base)
+        adjacent_item["lessons"][1]["teaching_content"][0] = adjacent_item["lessons"][0]["teaching_content"][0]
+        adjacent_report = assess_content_quality(adjacent_item)
+        self.assertEqual(adjacent_report["status"], "failed", adjacent_report)
+        self.assertTrue(any(item["field"] == "teaching_content" for item in adjacent_report["adjacent_item_duplicates"]))
+
     def test_progression_coherence_and_score_calibration_are_deterministic(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
         connected = copy.deepcopy(base)
@@ -455,6 +668,21 @@ class LessonContentV2Mixin:
         self.assertEqual(disconnected_report["progression"]["links"][0]["status"], "failed", disconnected_report)
         self.assertGreater(disconnected_report["progression"]["links"][0]["threshold"], 0)
 
+        declared = copy.deepcopy(base)
+        declared["lessons"][3]["progression"]["prior_lesson_id"] = "L02"
+        declared["lessons"][3]["progression"]["prior_learning"] = "承接L02功能用例集，依据其中的边界条件分析缺陷影响"
+        declared_report = assess_content_quality(declared)
+        self.assertTrue(declared_report["progression"]["declared_prior_links"], declared_report)
+        declared_l04 = next(item for item in declared_report["progression"]["declared_prior_links"] if item["to"] == "L04")
+        self.assertEqual(declared_l04["from"], "L02")
+        self.assertEqual(declared_l04["to"], "L04")
+        self.assertEqual(declared_report["progression"]["sequence_links"][2]["from"], "L03")
+        self.assertEqual(declared_report["progression"]["sequence_links"][2]["to"], "L04")
+
+        calibration = lesson_content_quality.progression_calibration()
+        self.assertEqual(len(calibration), 8)
+        self.assertTrue(all(item["expected"] == item["calibrated_status"] for item in calibration), calibration)
+
         arithmetic = copy.deepcopy(base)
         for lesson, score in zip(arithmetic["lessons"], (88, 88.5, 89, 89.5, 90, 90.5)):
             lesson["evaluation"]["score"] = score
@@ -463,11 +691,33 @@ class LessonContentV2Mixin:
         self.assertEqual(arithmetic_report["status"], "failed")
 
         natural = copy.deepcopy(base)
-        for lesson, score in zip(natural["lessons"], (88.5, 90, 89.5, 91, 90.5, 92)):
+        for lesson, score in zip(natural["lessons"], (89, 90.5, 89.5, 91, 90, 92)):
             lesson["evaluation"]["score"] = score
         natural_report = assess_content_quality(natural)
         self.assertFalse(natural_report["coverage"]["score_pattern"]["arithmetic_progression"])
         self.assertEqual(natural_report["status"], "passed", natural_report)
+
+        cycle = copy.deepcopy(base)
+        cycle["lessons"] = []
+        for index, source in enumerate(base["lessons"][:4] * 2, 1):
+            lesson = copy.deepcopy(source)
+            lesson["lesson_id"] = f"L{index:02d}"
+            lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"L{index - 1:02d}"
+            lesson["evaluation"]["score"] = (88, 89, 90, 91)[(index - 1) % 4]
+            cycle["lessons"].append(lesson)
+        cycle["total_hours"] = 16
+        cycle_report = assess_content_quality(cycle)
+        self.assertTrue(cycle_report["coverage"]["score_pattern"]["simple_cycle"], cycle_report)
+        self.assertEqual(cycle_report["coverage"]["score_pattern"]["cycle_period"], 4)
+
+        default_override = copy.deepcopy(base)
+        default_override["default_hours"] = 1
+        lesson_generator.validate_content_v2_input(default_override)
+
+        invalid_stage = copy.deepcopy(base)
+        invalid_stage["lessons"][0]["progression"]["capability_stage"] = "熟练"
+        with self.assertRaisesRegex(ValueError, "capability_stage"):
+            lesson_generator.validate_content_v2_input(invalid_stage)
 
     def test_content_quality_failure_is_reported_by_real_output_validator(self) -> None:
         payload = load_fixture("lesson-plan-input.json")
@@ -500,6 +750,62 @@ class LessonContentV2Mixin:
             self.assertEqual(report["content_quality"]["status"], "failed")
             self.assertTrue(report["content_quality"]["exact_duplicates"])
             self.assertTrue(any("student_analysis.base" in error for error in report["content_quality"]["errors"]))
+
+    def test_evaluation_remark_failures_are_written_to_real_qa_report(self) -> None:
+        payload = load_fixture("lesson-plan-input.json")
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-evaluation-quality-") as temp_name:
+            folder = Path(temp_name)
+            source = write_payload(folder, payload)
+            output = folder / "output"
+            generated = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr or generated.stdout)
+
+            duplicate = copy.deepcopy(payload)
+            duplicate["lessons"][1]["evaluation"]["remarks"]["practice"] = duplicate["lessons"][0]["evaluation"]["remarks"]["practice"]
+            duplicate_source = write_payload(folder, duplicate, "duplicate-remarks.json")
+            duplicate_result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(duplicate_source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(duplicate_result.returncode, 0)
+            duplicate_report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertTrue(duplicate_report["content_quality"]["evaluation_remark_duplicates"])
+            self.assertTrue(
+                any(item["field"] == "evaluation.remarks.practice" for item in duplicate_report["content_quality"]["evaluation_remark_duplicates"]),
+                duplicate_report,
+            )
+
+            dense = copy.deepcopy(payload)
+            dense["lessons"][0]["evaluation"]["remarks"]["practice"] = "评价备注" * 12 + "超限"
+            dense_source = write_payload(folder, dense, "dense-remarks.json")
+            dense_result = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(dense_source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(dense_result.returncode, 0)
+            dense_report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertTrue(dense_report["content_quality"]["evaluation_remark_density"])
+            density = dense_report["content_quality"]["evaluation_remark_density"][0]
+            self.assertEqual(density["field"], "evaluation.remarks.practice")
+            self.assertEqual(density["actual_chars"], 50)
+            self.assertEqual(density["limit"], 48)
+
+            whitespace = copy.deepcopy(payload)
+            whitespace["lessons"][0]["evaluation"]["remarks"]["practice"] = " \t"
+            with self.assertRaisesRegex(ValueError, "meaningful"):
+                lesson_generator.validate_content_v2_input(whitespace)
 
     def test_distinct_it_and_non_it_fixtures_generate_without_contamination(self) -> None:
         fixtures = (
@@ -578,16 +884,22 @@ class LessonContentV2Mixin:
     def test_references_require_provenance_without_writing_metadata_to_docx(self) -> None:
         base = load_fixture("lesson-plan-input.json")
         cases = (
-            ("generic", "课程配套教学资源", "generic", True),
-            ("provided", "《软件测试基础》作者甲，某出版社，2024年第2版", "provided", True),
-            ("generic-isbn", "《软件测试基础》ISBN 978-7-0000-0000-0", "generic", False),
-            ("generic-standard", "GB/T 0000-2024 软件测试规范", "generic", False),
-            ("generic-author", "作者甲 某出版社 软件测试教材", "generic", False),
+            ("generic", "课程配套教学资源", "generic", None, True),
+            ("generic-book-title", "《数据库原理与应用》", "generic", None, False),
+            ("provided", "《软件测试基础》作者甲，某出版社，2024年第2版", "provided", "用户提供教材目录", True),
+            ("generic-isbn", "《软件测试基础》ISBN 978-7-0000-0000-0", "generic", None, False),
+            ("generic-standard", "GB/T 0000-2024 软件测试规范", "generic", None, False),
+            ("generic-author", "作者甲 某出版社 软件测试教材", "generic", None, False),
+            ("verified-missing-evidence", "软件测试公开课程资料", "verified_public", None, False),
+            ("verified-url", "软件测试公开课程资料", "verified_public", "https://example.edu/testing", True),
         )
-        for label, text, source_kind, should_pass in cases:
+        for label, text, source_kind, evidence, should_pass in cases:
             with self.subTest(reference=label):
                 payload = copy.deepcopy(base)
-                payload["lessons"][0]["references"] = [{"text": text, "source_kind": source_kind}]
+                reference = {"text": text, "source_kind": source_kind}
+                if evidence is not None:
+                    reference["evidence"] = evidence
+                payload["lessons"][0]["references"] = [reference]
                 try:
                     lesson_generator.validate_content_v2_input(payload)
                 except ValueError:
@@ -823,7 +1135,7 @@ class LessonContentV2Mixin:
                     raise OSError("injected candidate exchange failure")
                 real_replace(source, target)
 
-            with patch("generate_lesson_plans.os.replace", side_effect=fail_second_replace):
+            with patch.object(lesson_generator.os, "replace", side_effect=fail_second_replace):
                 with self.assertRaises(OSError):
                     atomic_commit_candidate(candidate, output, backup_existing=True)
             self.assertEqual((output / "old.txt").read_bytes(), b"old")
@@ -845,7 +1157,7 @@ class LessonContentV2Mixin:
             def fail_replace(_source: str, _target: str) -> None:
                 raise OSError("injected backup move failure")
 
-            with patch("generate_lesson_plans.os.replace", side_effect=fail_replace):
+            with patch.object(lesson_generator.os, "replace", side_effect=fail_replace):
                 with self.assertRaises(OSError):
                     atomic_commit_candidate(candidate, output, backup_existing=True)
             self.assertEqual((output / "old.txt").read_bytes(), b"old")

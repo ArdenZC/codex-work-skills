@@ -21,9 +21,46 @@ def _replace_document_text(document_xml: bytes, replacements: list[tuple[str, st
     return document_xml
 
 
+def _lesson_package_root(source: Path) -> Path | None:
+    for ancestor in source.parents:
+        if ancestor.name == "lesson-plan" and ancestor.parent.name == "templates":
+            return ancestor
+    return None
+
+
+def _canonical_paths(source: Path) -> set[Path]:
+    package_root = _lesson_package_root(source)
+    if package_root is None:
+        return set()
+    skill_dir = package_root.parents[2]
+    protected = {
+        skill_dir / "assets" / "lesson-plan-template.docx",
+    }
+    for version in ("v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2"):
+        protected.add(package_root / version / "template.docx")
+        protected.add(package_root / version / "manifest.yaml")
+    return {path.resolve() for path in protected}
+
+
+def _assert_target_safe(source: Path, target: Path) -> None:
+    if not source.is_file():
+        raise FileNotFoundError(f"Source template not found: {source}")
+    if source.resolve() == target.resolve():
+        raise ValueError("Source and target templates must be different files")
+    if target.exists() or target.is_symlink():
+        raise FileExistsError(
+            f"Refusing to overwrite existing target; choose a new path: {target}"
+        )
+    resolved_target = target.resolve()
+    for protected in _canonical_paths(source):
+        if resolved_target == protected:
+            raise ValueError(f"Refusing to write protected canonical template path: {target}")
+
+
 def build_patch(source: Path, target: Path, replacements: list[tuple[str, str]]) -> None:
     if source.resolve() == target.resolve():
         raise ValueError("Source and target templates must be different files")
+    _assert_target_safe(source, target)
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=str(target.parent))
     os.close(fd)

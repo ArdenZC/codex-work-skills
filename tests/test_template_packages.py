@@ -24,7 +24,11 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.workbook.defined_name import DefinedName
 import yaml
 
-from tests.test_lesson_content_v2 import LessonContentV2Mixin
+from tests.test_lesson_content_v2 import (
+    LessonContentV2Mixin,
+    lesson_bookmark_utils,
+    lesson_package_common,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -574,8 +578,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
         self.assertEqual(report["checks"]["evaluation_table"], {"rows": 14, "columns": 4})
 
     def test_invalid_input_is_rejected(self) -> None:
-        sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import validate_content_v2_input
+        validate_content_v2_input = lesson_package_common.validate_content_v2_input
 
         valid = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
         for bad in (
@@ -606,9 +609,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             self.assertFalse(output.exists())
 
     def test_score_precision_accepts_explicit_half_points(self) -> None:
-        sys.modules.pop("package_common", None)
-        sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import validate_content_v2_input
+        validate_content_v2_input = lesson_package_common.validate_content_v2_input
 
         base = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
         for score in (89, 89.0, 89.5):
@@ -621,9 +622,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             validate_content_v2_input(missing)
 
     def test_nonpositive_hours_rejects_numeric_values_and_strings(self) -> None:
-        sys.modules.pop("package_common", None)
-        sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import validate_content_v2_input
+        validate_content_v2_input = lesson_package_common.validate_content_v2_input
 
         base = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
         for invalid_hours in (-2, "-2", 0, "0"):
@@ -1923,13 +1922,13 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
                 str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
                 "--output-dir",
                 str(output),
+                env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
             )
             self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
-            sys.modules.pop("bookmark_utils", None)
-            sys.modules.pop("package_common", None)
-            sys.path.insert(0, str(LESSON / "scripts"))
-            from bookmark_utils import validate_bookmark_inventory
-            from package_common import bookmark_containers, load_manifest, required_bookmarks
+            validate_bookmark_inventory = lesson_bookmark_utils.validate_bookmark_inventory
+            bookmark_containers = lesson_package_common.bookmark_containers
+            load_manifest = lesson_package_common.load_manifest
+            required_bookmarks = lesson_package_common.required_bookmarks
 
             manifest = load_manifest(LESSON_V112_MANIFEST)
             for path in sorted(output.glob("*.docx")):
@@ -1944,6 +1943,71 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             generated = Document(sorted(output.glob("*.docx"))[0])
             self.assertGreater(len(generated.tables[0].cell(4, 1).paragraphs), 1)
             self.assertGreater(len(generated.tables[0].cell(4, 3).paragraphs), 1)
+
+    def test_generator_stdout_reports_only_committed_docx_paths(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-package-stdout-") as temp_name:
+            output = Path(temp_name) / "output"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(ROOT / "tests" / "fixtures" / "lesson-plan-input.json"),
+                "--output-dir",
+                str(output),
+                env={**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+            self.assertNotIn(".output.candidate-", result.stdout)
+            printed = {Path(line.strip()) for line in result.stdout.splitlines() if line.strip().endswith(".docx")}
+            committed = set(output.glob("*.docx"))
+            self.assertEqual(printed, committed)
+            self.assertTrue(all(path.is_file() for path in printed))
+
+    def test_template_patch_rejects_existing_and_canonical_targets(self) -> None:
+        source = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
+        patcher = LESSON / "scripts" / "build_template_patch.py"
+        with tempfile.TemporaryDirectory(prefix="lesson-package-patch-guard-") as temp_name:
+            folder = Path(temp_name)
+            target = folder / "patched-template.docx"
+            source_hash = file_sha256(source)
+            created = run_script(
+                patcher,
+                str(source),
+                str(target),
+                "--replace",
+                "职业价值观=职业价值观修订",
+            )
+            self.assertEqual(created.returncode, 0, created.stderr or created.stdout)
+            self.assertTrue(target.is_file())
+            self.assertIn(str(target.resolve()), created.stdout)
+            self.assertEqual(file_sha256(source), source_hash)
+
+            existing = run_script(
+                patcher,
+                str(source),
+                str(target),
+                "--replace",
+                "职业价值观=职业价值观再次修订",
+            )
+            self.assertNotEqual(existing.returncode, 0)
+            self.assertIn("refusing to overwrite existing target", (existing.stdout + existing.stderr).lower())
+
+            canonical_paths = []
+            for version in ("v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2"):
+                package = LESSON / "assets" / "templates" / "lesson-plan" / version
+                canonical_paths.extend((package / "template.docx", package / "manifest.yaml"))
+            canonical_hashes = {path: file_sha256(path) for path in canonical_paths}
+            for canonical in canonical_paths:
+                rejected = run_script(
+                    patcher,
+                    str(source),
+                    str(canonical),
+                    "--replace",
+                    "职业价值观=职业价值观禁止覆盖",
+                )
+                self.assertNotEqual(rejected.returncode, 0, canonical)
+                diagnostic = (rejected.stdout + rejected.stderr).lower()
+                self.assertTrue("refusing to" in diagnostic or "source and target" in diagnostic, (canonical, diagnostic))
+            self.assertEqual({path: file_sha256(path) for path in canonical_paths}, canonical_hashes)
 
     def test_v11_template_fault_injections_are_rejected_by_real_validator(self) -> None:
         mutations = {}
@@ -2205,11 +2269,10 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             self.assertEqual(report["anchor_mode"], "legacy_coordinates")
 
     def test_v11_bookmark_names_are_safe_and_manifest_matches_definition_source(self) -> None:
-        sys.modules.pop("semantic_bookmarks", None)
-        sys.modules.pop("package_common", None)
-        sys.path.insert(0, str(LESSON / "scripts"))
-        from package_common import load_manifest, required_bookmarks
-        from semantic_bookmarks import BOOKMARK_NAME_PATTERN, managed_bookmark_names
+        load_manifest = lesson_package_common.load_manifest
+        required_bookmarks = lesson_package_common.required_bookmarks
+        BOOKMARK_NAME_PATTERN = lesson_bookmark_utils.BOOKMARK_NAME_PATTERN
+        managed_bookmark_names = lesson_package_common.managed_bookmark_names
 
         manifest = load_manifest(LESSON_V11_MANIFEST)
         expected = managed_bookmark_names()
@@ -2658,9 +2721,6 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             manifest_path = folder / "manifest.yaml"
             manifest_path.write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False), encoding="utf-8")
             shutil.copy2(canonical, folder / "template.docx")
-            sys.modules.pop("package_common", None)
-            sys.path.insert(0, str(LESSON / "scripts"))
-            sys.path.insert(0, str(ROOT / "tests"))
             from validate_template_packages import validate_package
 
             with self.assertRaisesRegex(ValueError, "anchors.required"):
@@ -3235,9 +3295,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
                 self.assertFalse(output.exists())
 
     def test_v11_bookmark_ids_require_ascii_decimal_digits_in_template_and_output(self) -> None:
-        sys.modules.pop("bookmark_utils", None)
-        sys.path.insert(0, str(LESSON / "scripts"))
-        from bookmark_utils import BOOKMARK_ID_PATTERN
+        BOOKMARK_ID_PATTERN = lesson_bookmark_utils.BOOKMARK_ID_PATTERN
 
         for value in ("0", "1", "69", "9999"):
             self.assertIsNotNone(BOOKMARK_ID_PATTERN.fullmatch(value))

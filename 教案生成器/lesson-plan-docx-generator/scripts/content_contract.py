@@ -15,6 +15,7 @@ CONTENT_CONTRACT_VERSION = "2.0"
 EVALUATION_SCORE_MIN = Decimal("85")
 EVALUATION_SCORE_MAX = Decimal("96")
 EVALUATION_SCORE_STEP = Decimal("0.5")
+CAPABILITY_STAGES = ("认知", "理解", "模仿", "独立", "综合", "优化", "迁移")
 
 IMPLEMENTATION_STAGE_IDS = (
     "before_class_preparation",

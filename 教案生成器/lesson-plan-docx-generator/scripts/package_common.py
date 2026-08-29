@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import re
+import unicodedata
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ from semantic_bookmarks import (
 )
 from content_contract import (
     CONTENT_CONTRACT_VERSION,
+    CAPABILITY_STAGES,
     EVALUATION_CRITERIA,
     EVALUATION_SCORE_MAX,
     EVALUATION_SCORE_MIN,
@@ -57,6 +59,21 @@ REFERENCE_SPECIFIC_PATTERN = re.compile(
     r"(?:19|20)\d{2}\s*年?|第\s*[一二三四五六七八九十百0-9]+\s*版|版次)",
     re.IGNORECASE,
 )
+REFERENCE_TITLE_PATTERN = re.compile(r"《[^》]{2,}》")
+REFERENCE_EVIDENCE_URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
+REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
+    r"(?:官方|政府|教育部|国家卫生健康|行业协会).*(?:官网|章节|条款|第[一二三四五六七八九十百0-9]+[章节条]|页|文号|检索|路径)",
+)
+
+
+def require_meaningful_text(value: Any, field_name: str, minimum: int = 1) -> str:
+    """Reject whitespace-only values after the same normalization used by QA."""
+
+    normalized = unicodedata.normalize("NFKC", str(value))
+    compact = re.sub(r"\s+", "", normalized).strip()
+    if len(compact) < minimum:
+        raise ValueError(f"{field_name} must contain meaningful text; received {value!r}")
+    return normalized.strip()
 
 
 def load_manifest(path: Path | str = DEFAULT_MANIFEST) -> dict[str, Any]:
@@ -606,6 +623,89 @@ def _schema_errors(data: dict[str, Any], schema_path: Path | str) -> None:
         raise ValueError(f"Input schema validation failed: {details}")
 
 
+def _validate_meaningful_contract(data: dict[str, Any]) -> None:
+    """Apply semantic text rules that JSON Schema cannot express for whitespace."""
+
+    for field_name in ("course_name", "major", "audience"):
+        require_meaningful_text(data[field_name], field_name)
+
+    for index, lesson in enumerate(data["lessons"]):
+        prefix = f"lessons[{index}]"
+        for field_name in ("unit", "task"):
+            require_meaningful_text(lesson[field_name], f"{prefix}.{field_name}")
+        progression = lesson["progression"]
+        for field_name in ("prior_learning", "deliverable", "next_bridge"):
+            require_meaningful_text(progression[field_name], f"{prefix}.progression.{field_name}", 6)
+        if progression["prior_lesson_id"] is not None:
+            require_meaningful_text(progression["prior_lesson_id"], f"{prefix}.progression.prior_lesson_id")
+        if progression["capability_stage"] not in CAPABILITY_STAGES:
+            raise ValueError(
+                f"{prefix}.progression.capability_stage must be one of {', '.join(CAPABILITY_STAGES)}; "
+                f"received {progression['capability_stage']!r}"
+            )
+
+        list_fields = (
+            ("student_analysis.base", lesson["student_analysis"]["base"]),
+            ("student_analysis.problems", lesson["student_analysis"]["problems"]),
+            ("student_analysis.strategies", lesson["student_analysis"]["strategies"]),
+            ("teaching_content", lesson["teaching_content"]),
+            ("goals.knowledge", lesson["goals"]["knowledge"]),
+            ("goals.ability", lesson["goals"]["ability"]),
+            ("goals.quality", lesson["goals"]["quality"]),
+            ("key_point.content", lesson["key_point"]["content"]),
+            ("key_point.strategy", lesson["key_point"]["strategy"]),
+            ("difficult_point.content", lesson["difficult_point"]["content"]),
+            ("difficult_point.strategy", lesson["difficult_point"]["strategy"]),
+            ("teaching_methods", lesson["teaching_methods"]),
+            ("resources", lesson["resources"]),
+        )
+        for field_name, values in list_fields:
+            for item_index, value in enumerate(values, 1):
+                require_meaningful_text(value, f"{prefix}.{field_name}[{item_index}]")
+
+        for stage_index, stage in enumerate(lesson["implementation"], 1):
+            stage_prefix = f"{prefix}.implementation[{stage_index}]"
+            for field_name in ("label", "modality", "objective"):
+                require_meaningful_text(stage[field_name], f"{stage_prefix}.{field_name}")
+            for field_name in ("content", "teacher_actions", "student_actions"):
+                for item_index, value in enumerate(stage[field_name], 1):
+                    require_meaningful_text(value, f"{stage_prefix}.{field_name}[{item_index}]")
+
+        for criterion, _maximum, _label in EVALUATION_CRITERIA:
+            require_meaningful_text(
+                lesson["evaluation"]["remarks"][criterion],
+                f"{prefix}.evaluation.remarks.{criterion}",
+                4,
+            )
+        for reference_index, reference in enumerate(lesson["references"], 1):
+            reference_prefix = f"{prefix}.references[{reference_index}]"
+            reference_text = require_meaningful_text(reference["text"], f"{reference_prefix}.text")
+            source_kind = reference["source_kind"]
+            evidence = reference.get("evidence")
+            if evidence is not None:
+                evidence = require_meaningful_text(evidence, f"{reference_prefix}.evidence")
+            if source_kind == "generic":
+                if evidence is not None:
+                    raise ValueError(f"{reference_prefix}.generic references must not declare evidence")
+                if REFERENCE_SPECIFIC_PATTERN.search(reference_text) or REFERENCE_TITLE_PATTERN.search(reference_text):
+                    raise ValueError(
+                        f"{reference_prefix} uses source_kind=generic for a specific citation; "
+                        "mark it provided or verified_public only when the source is real"
+                    )
+            elif source_kind == "verified_public":
+                if evidence is None:
+                    raise ValueError(
+                        f"{reference_prefix}.verified_public requires evidence such as a URL or an official locator"
+                    )
+                if not (
+                    REFERENCE_EVIDENCE_URL_PATTERN.search(evidence)
+                    or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence)
+                ):
+                    raise ValueError(
+                        f"{reference_prefix}.verified_public evidence must contain a URL or an official locatable source"
+                    )
+
+
 def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
     version = data.get("content_contract_version")
     if version != CONTENT_CONTRACT_VERSION:
@@ -643,6 +743,7 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
                     f"received {evaluation['score']}."
                 )
     _schema_errors(data, schema_path)
+    _validate_meaningful_contract(data)
 
     try:
         default_hours = Decimal(str(data["default_hours"]))
@@ -717,14 +818,6 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
             )
         if set(lesson["evaluation"]["remarks"]) != {criterion[0] for criterion in EVALUATION_CRITERIA}:
             raise ValueError(f"lessons[{index}].evaluation.remarks must match the canonical evaluation criterion IDs")
-        for reference_index, reference in enumerate(lesson["references"]):
-            reference_text = str(reference["text"]).strip()
-            if reference["source_kind"] == "generic" and REFERENCE_SPECIFIC_PATTERN.search(reference_text):
-                raise ValueError(
-                    f"lessons[{index}].references[{reference_index}] uses source_kind=generic for a specific citation; "
-                    "mark it provided or verified_public only when the source is real"
-                )
-
     if lesson_hours != total_hours:
         raise ValueError(f"total_hours must equal the sum of lesson hours; expected {total_hours}, got {lesson_hours}")
 

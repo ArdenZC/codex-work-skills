@@ -14,7 +14,7 @@ total_hours
 lessons
 ```
 
-`total_hours` must equal the sum of lesson `hours`. `major` and `audience` are required input, not Python defaults.
+`total_hours` must equal the sum of lesson `hours`. `default_hours` is the default single-lesson duration used by the Agent when creating lessons; an explicit `lesson.hours` may override it, so it does not have to equal every lesson's hours. `major` and `audience` are required input, not Python defaults.
 
 ## Lesson fields
 
@@ -32,7 +32,7 @@ evaluation: score, remarks
 reflection: summary, innovation, improvement
 ```
 
-The JSON schema defines item counts and character limits. Content QA additionally requires meaningful text and checks course-level differentiation.
+The JSON schema defines item counts and character limits. `capability_stage` uses the closed vocabulary `认知`, `理解`, `模仿`, `独立`, `综合`, `优化`, `迁移`; it is varied across a long course but is not required to be mechanically monotonic. Content QA additionally requires meaningful text and checks course-level differentiation. `teaching_methods` and necessary tool/resource names may recur; substantive teaching prose may not be a renamed copy.
 
 ## Implementation stages
 
@@ -62,12 +62,16 @@ habits, online_learning, discussion, homework, practice, presentation,
 improvement
 ```
 
-The score is explicit, must be between 85 and 96, and uses half-point increments. Existing `score_breakdown()` only distributes that score across the protected 13-row table; it does not invent remarks. Generated score sequences must not be all identical, simple cycles, or mechanical arithmetic progressions.
+The score is explicit, must be between 85 and 96, and uses half-point increments. Existing `score_breakdown()` only distributes that score across the protected 13-row table; it does not invent remarks. Every remark must be meaningful, and v1.1.2 applies the manifest evaluation density limit without truncation. Generated score sequences must not be all identical, simple cycles of any period, or mechanical arithmetic progressions.
 
-References are objects with a visible `text` and internal `source_kind` (`provided`, `generic`, or `verified_public`). Generic references must not contain ISBN, standard numbers, publishers, authors, explicit years, editions, or file numbers. The formatter writes only `text` to DOCX.
+References are objects with a visible `text`, internal `source_kind` (`provided`, `generic`, or `verified_public`), and optional internal `evidence`. Generic references must not contain ISBN, standard numbers, publishers, authors, explicit years, editions, file numbers, or a specific book-title form. `verified_public` requires URL or locatable official-source evidence; `provided` may identify the supplied material. The formatter writes only `text` to DOCX.
 
 ## Agent workflow
 
 Read all supplied course material once, confirm only missing course-level facts once, create a course outline, then author all lessons in JSON. Python formats existing values with numbering and line breaks. It must not author teaching prose, fall back to `flows`, cycle scores, or silently truncate over-capacity content.
 
-After schema validation, run `scripts/content_quality.py` for adjacent and non-adjacent exact duplicates, calibrated field/implementation/whole-lesson similarity, repeated sentences, old boilerplate, progression coherence, completeness, density, score patterns, and domain contamination. Only after content QA passes should the generator create candidate DOCX files and run output/fidelity/render-smoke QA. The render report is smoke evidence only; visual inspection remains an Agent-level representative-page check.
+After schema validation, run `scripts/content_quality.py` for adjacent and non-adjacent exact/item duplicates, calibrated field/implementation/whole-lesson and entity-masked structural similarity, repeated sentences, old boilerplate, declared-prior and sequence progression coherence, completeness, evaluation remark density, score patterns, and domain contamination. Only after content QA passes should the generator create candidate DOCX files and run output/fidelity/render-smoke QA, then atomically commit the output. The render report is smoke evidence only; visual inspection is a post-commit Agent-level representative-page check. A visual failure requires revised V2 content and a transactional regeneration with `--backup-existing`.
+
+## Acceptance evidence
+
+Synthetic acceptance fixtures exercise deterministic contracts and must be reported as synthetic acceptance. A true Agent E2E is separate evidence: the Agent must author the complete V2 JSON from a natural-language course brief, generate the DOCX files, inspect representative pages, and answer whether the lessons remain visibly different after masking course, task, and topic names. Model-authored E2E evidence does not belong in deterministic CI.

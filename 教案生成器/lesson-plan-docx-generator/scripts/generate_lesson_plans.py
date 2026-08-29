@@ -493,8 +493,9 @@ def main() -> None:
     external_candidate: Path | None = None
     try:
         content_quality = validate_content_quality(meta, manifest)
+        generated_filenames: list[str] = []
         for seq, item in enumerate(lessons, 1):
-            print(build_lesson(template, candidate, meta, item, seq, manifest))
+            generated_filenames.append(build_lesson(template, candidate, meta, item, seq, manifest).name)
         candidate_qa = candidate / "qa-report.json"
         if not args.skip_output_validation:
             report = validate_outputs(
@@ -549,6 +550,8 @@ def main() -> None:
             )
         else:
             backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
+        for filename in generated_filenames:
+            print(out_dir / filename)
         if backup is not None:
             print(f"backup={backup}")
         action = "skipped validation" if report["status"] == "skipped" else "validated"
