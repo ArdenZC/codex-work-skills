@@ -467,7 +467,7 @@ def main() -> None:
         package_roots=package_roots,
     )
     assert_output_path_safe(out_dir, protected_paths)
-    requested_qa = Path(args.qa_report).expanduser().absolute() if args.qa_report else None
+    requested_qa = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
     internal_qa = out_dir / "qa-report.json"
     external_qa = None
     qa_parent_created = False
