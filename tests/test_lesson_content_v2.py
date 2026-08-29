@@ -34,9 +34,20 @@ from content_quality import ContentQualityError, assess_content_quality, validat
 import generate_lesson_plans as lesson_generator  # noqa: E402
 from generate_lesson_plans import atomic_commit_candidate  # noqa: E402
 import validate_output as lesson_output  # noqa: E402
-from package_common import load_manifest, score_breakdown  # noqa: E402
+from package_common import (  # noqa: E402
+    field_bookmark,
+    implementation_bookmarks,
+    load_manifest,
+    reflection_bookmarks,
+    score_breakdown,
+)
 from path_safety import assert_output_path_safe, paths_overlap  # noqa: E402
 from validate_output import manifest_field_text  # noqa: E402
+
+# Keep the lesson modules above, but do not leave their generic import names
+# cached for the sibling gradebook package, which has its own implementations.
+for _module_name in ("package_common", "validate_output", "validate_template"):
+    sys.modules.pop(_module_name, None)
 
 
 def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
@@ -274,7 +285,6 @@ class LessonContentV2Mixin:
     def test_writer_uses_v2_values_and_keeps_internal_qa_out_of_docx(self) -> None:
         payload = load_fixture("lesson-plan-input.json")
         manifest = load_manifest(V111_MANIFEST)
-        from package_common import field_bookmark, implementation_bookmarks, reflection_bookmarks  # noqa: PLC0415
 
         with tempfile.TemporaryDirectory(prefix="lesson-v2-writer-fidelity-") as temp_name:
             folder = Path(temp_name)
