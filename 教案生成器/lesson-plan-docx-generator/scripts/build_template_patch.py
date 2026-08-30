@@ -10,6 +10,8 @@ from pathlib import Path
 
 import yaml
 
+from path_safety import paths_overlap
+
 
 def _replace_document_text(document_xml: bytes, replacements: list[tuple[str, str]]) -> bytes:
     for old_text, new_text in replacements:
@@ -21,25 +23,15 @@ def _replace_document_text(document_xml: bytes, replacements: list[tuple[str, st
     return document_xml
 
 
-def _lesson_package_root(source: Path) -> Path | None:
-    for ancestor in source.parents:
-        if ancestor.name == "lesson-plan" and ancestor.parent.name == "templates":
-            return ancestor
-    return None
-
-
-def _canonical_paths(source: Path) -> set[Path]:
-    package_root = _lesson_package_root(source)
-    if package_root is None:
-        return set()
-    skill_dir = package_root.parents[2]
+def _canonical_paths() -> set[Path]:
+    skill_dir = Path(__file__).resolve().parents[1]
+    package_root = skill_dir / "assets" / "templates" / "lesson-plan"
     protected = {
         skill_dir / "assets" / "lesson-plan-template.docx",
     }
     for version in ("v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2"):
-        protected.add(package_root / version / "template.docx")
-        protected.add(package_root / version / "manifest.yaml")
-    return {path.resolve() for path in protected}
+        protected.add(package_root / version)
+    return {path.resolve(strict=False) for path in protected}
 
 
 def _assert_target_safe(source: Path, target: Path) -> None:
@@ -51,9 +43,8 @@ def _assert_target_safe(source: Path, target: Path) -> None:
         raise FileExistsError(
             f"Refusing to overwrite existing target; choose a new path: {target}"
         )
-    resolved_target = target.resolve()
-    for protected in _canonical_paths(source):
-        if resolved_target == protected:
+    for protected in _canonical_paths():
+        if paths_overlap(target, protected):
             raise ValueError(f"Refusing to write protected canonical template path: {target}")
 
 

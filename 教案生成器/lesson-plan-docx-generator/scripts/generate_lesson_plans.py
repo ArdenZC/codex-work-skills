@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import tempfile
 import uuid
 from pathlib import Path
@@ -322,6 +323,26 @@ def _remove_path(path: Path) -> None:
         path.unlink()
 
 
+def _cleanup_path(path: Path, label: str) -> str | None:
+    """Attempt cleanup without hiding a primary generation or commit error."""
+
+    try:
+        if path.exists() or path.is_symlink():
+            _remove_path(path)
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for {label}: {exc}; residual path: {path}"
+    return None
+
+
+def _cleanup_empty_directory(path: Path, label: str) -> str | None:
+    try:
+        if path.exists():
+            path.rmdir()
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for {label}: {exc}; residual path: {path}"
+    return None
+
+
 def atomic_commit_candidate(candidate: Path, out_dir: Path, backup_existing: bool) -> Path | None:
     """Swap a fully validated candidate into place and restore on commit failure."""
 
@@ -491,6 +512,7 @@ def main() -> None:
     candidate = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.candidate-", dir=str(out_dir.parent)))
     assert_output_path_safe(candidate, protected_paths)
     external_candidate: Path | None = None
+    operation_error: BaseException | None = None
     try:
         content_quality = validate_content_quality(meta, manifest)
         generated_filenames: list[str] = []
@@ -556,16 +578,26 @@ def main() -> None:
             print(f"backup={backup}")
         action = "skipped validation" if report["status"] == "skipped" else "validated"
         print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
+    except BaseException as exc:
+        operation_error = exc
+        raise
     finally:
-        if candidate.exists():
-            shutil.rmtree(candidate, ignore_errors=True)
-        if external_candidate is not None and external_candidate.exists():
-            external_candidate.unlink(missing_ok=True)
+        cleanup_diagnostics: list[str] = []
+        candidate_error = _cleanup_path(candidate, "candidate directory")
+        if candidate_error:
+            cleanup_diagnostics.append(candidate_error)
+        if external_candidate is not None:
+            external_candidate_error = _cleanup_path(external_candidate, "external QA candidate")
+            if external_candidate_error:
+                cleanup_diagnostics.append(external_candidate_error)
         if qa_parent_created and external_qa is not None and external_qa.parent.exists():
-            try:
-                external_qa.parent.rmdir()
-            except OSError:
-                pass
+            parent_error = _cleanup_empty_directory(external_qa.parent, "external QA parent directory")
+            if parent_error:
+                cleanup_diagnostics.append(parent_error)
+        for diagnostic in cleanup_diagnostics:
+            print(f"WARNING: {diagnostic}", file=sys.stderr)
+            if operation_error is not None:
+                operation_error.add_note(diagnostic)
 
 
 if __name__ == "__main__":

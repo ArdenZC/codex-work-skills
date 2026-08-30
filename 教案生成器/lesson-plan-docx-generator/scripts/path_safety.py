@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import ctypes
 import os
+import shutil
+import sys
+import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Iterable
 
@@ -43,10 +47,70 @@ def _long_existing_ancestor(path: Path) -> Path:
         return absolute
 
 
+def filesystem_case_sensitive(path: Path | str) -> bool:
+    """Probe the current Darwin volume without changing Linux case semantics."""
+
+    if os.name == "nt":
+        return False
+    if sys.platform != "darwin":
+        return True
+
+    absolute = _absolute_lexical(Path(path))
+    parent = absolute if absolute.is_dir() else absolute.parent
+    while not parent.exists() and parent != parent.parent:
+        parent = parent.parent
+    if not parent.exists():
+        return True
+    try:
+        device = os.stat(parent).st_dev
+    except OSError:
+        return True
+    cached = _DARWIN_CASE_SENSITIVITY.get(device)
+    if cached is not None:
+        return cached
+
+    probe: Path | None = None
+    try:
+        probe = Path(tempfile.mkdtemp(prefix=".codex-case-probe-", dir=str(parent)))
+        marker = probe / "CaseProbe"
+        marker.mkdir()
+        result = not (probe / "caseprobe").exists()
+    except OSError:
+        result = True
+    finally:
+        if probe is not None:
+            try:
+                shutil.rmtree(probe)
+            except OSError:
+                pass
+    _DARWIN_CASE_SENSITIVITY[device] = result
+    return result
+
+
+_DARWIN_CASE_SENSITIVITY: dict[int, bool] = {}
+
+
 def _variants(path: Path) -> set[str]:
     lexical = _absolute_lexical(path)
-    values = {str(lexical), str(lexical.resolve(strict=False)), str(_long_existing_ancestor(lexical))}
-    if os.name == "nt":
+    path_values = {
+        str(lexical),
+        str(lexical.resolve(strict=False)),
+        str(_long_existing_ancestor(lexical)),
+    }
+    if sys.platform == "darwin":
+        path_values.update(
+            normalized
+            for value in tuple(path_values)
+            for normalized in (
+                unicodedata.normalize("NFC", value),
+                unicodedata.normalize("NFD", value),
+            )
+        )
+    values = set(path_values)
+    case_insensitive = os.name == "nt" or (
+        sys.platform == "darwin" and not filesystem_case_sensitive(lexical)
+    )
+    if case_insensitive:
         values.update(value.casefold() for value in tuple(values))
     return {os.path.normpath(value) for value in values}
 

@@ -859,6 +859,11 @@ def validate_output_dir(
     lesson_checks = []
     anchor_results: list[dict[str, Any]] = []
     contamination_terms: set[str] = set()
+    course_metadata = {
+        key: data[key]
+        for key in ("course_name", "major", "audience", "content_contract_version", "default_hours", "total_hours")
+        if key in data
+    }
     for index, (path, item) in enumerate(zip(files, lessons), start=1):
         item_errors: list[str] = []
         if not path.is_file() or path.stat().st_size == 0:
@@ -1053,7 +1058,7 @@ def validate_output_dir(
             item_errors.append(f"evaluation table validation failed: {exc}")
 
         all_text = _document_text(document, table)
-        contamination = detect_non_it_contamination(data, all_text)
+        contamination = detect_non_it_contamination(course_metadata, item, all_text)
         if contamination:
             contamination_terms.update(contamination)
             item_errors.extend(
