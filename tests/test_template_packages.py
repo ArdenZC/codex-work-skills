@@ -2009,6 +2009,38 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
                 self.assertTrue("refusing to" in diagnostic or "source and target" in diagnostic, (canonical, diagnostic))
             self.assertEqual({path: file_sha256(path) for path in canonical_paths}, canonical_hashes)
 
+            descendant_targets = [
+                LESSON / "assets" / "templates" / "lesson-plan" / version / "nested" / "new-template.docx"
+                for version in ("v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2")
+            ]
+            for descendant in descendant_targets:
+                rejected = run_script(
+                    patcher,
+                    str(source),
+                    str(descendant),
+                    "--replace",
+                    "职业价值观=职业价值观禁止写入子树",
+                )
+                self.assertNotEqual(rejected.returncode, 0, descendant)
+                self.assertIn("protected canonical template path", (rejected.stdout + rejected.stderr).lower())
+
+            alias = folder / "canonical-alias"
+            try:
+                alias.symlink_to(source.parent.parent, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                alias = None
+            if alias is not None:
+                aliased_descendant = alias / "v1.1.2" / "nested" / "alias-template.docx"
+                rejected = run_script(
+                    patcher,
+                    str(source),
+                    str(aliased_descendant),
+                    "--replace",
+                    "职业价值观=职业价值观禁止别名写入",
+                )
+                self.assertNotEqual(rejected.returncode, 0)
+                self.assertIn("protected canonical template path", (rejected.stdout + rejected.stderr).lower())
+
     def test_v11_template_fault_injections_are_rejected_by_real_validator(self) -> None:
         mutations = {}
 

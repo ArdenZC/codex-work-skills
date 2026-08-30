@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import copy
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stderr
 import hashlib
+import io
 import importlib.util
 import json
 import os
@@ -11,6 +12,7 @@ import sys
 import tempfile
 import types
 import unittest
+import unicodedata
 from pathlib import Path
 from unittest.mock import patch
 
@@ -22,7 +24,9 @@ ROOT = Path(__file__).resolve().parents[1]
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 SCRIPTS = LESSON / "scripts"
 V10_TEMPLATE = LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
+V10_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 V110_TEMPLATE = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx"
+V110_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml"
 V112_TEMPLATE = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 V112_MANIFEST = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "manifest.yaml"
 V111_TEMPLATE = LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
@@ -137,6 +141,7 @@ lesson_header_values = lesson_content_contract.lesson_header_values
 ContentQualityError = lesson_content_quality.ContentQualityError
 assess_content_quality = lesson_content_quality.assess_content_quality
 validate_content_quality = lesson_content_quality.validate_content_quality
+detect_non_it_contamination = lesson_content_quality.detect_non_it_contamination
 atomic_commit_candidate = lesson_generator.atomic_commit_candidate
 atomic_commit_candidate_with_external_qa = lesson_generator.atomic_commit_candidate_with_external_qa
 field_bookmark = lesson_package_common.field_bookmark
@@ -148,6 +153,7 @@ score_breakdown = lesson_package_common.score_breakdown
 assert_output_path_safe = lesson_path_safety.assert_output_path_safe
 paths_equal = lesson_path_safety.paths_equal
 paths_overlap = lesson_path_safety.paths_overlap
+filesystem_case_sensitive = lesson_path_safety.filesystem_case_sensitive
 manifest_field_text = lesson_output.manifest_field_text
 
 
@@ -683,6 +689,13 @@ class LessonContentV2Mixin:
         self.assertEqual(len(calibration), 8)
         self.assertTrue(all(item["expected"] == item["calibrated_status"] for item in calibration), calibration)
 
+        gate_calibration = lesson_content_quality.progression_gate_calibration()
+        self.assertEqual(len(gate_calibration), 3)
+        self.assertTrue(
+            all(item["expected"] == item["actual"] for item in gate_calibration),
+            gate_calibration,
+        )
+
         arithmetic = copy.deepcopy(base)
         for lesson, score in zip(arithmetic["lessons"], (88, 88.5, 89, 89.5, 90, 90.5)):
             lesson["evaluation"]["score"] = score
@@ -718,6 +731,146 @@ class LessonContentV2Mixin:
         invalid_stage["lessons"][0]["progression"]["capability_stage"] = "熟练"
         with self.assertRaisesRegex(ValueError, "capability_stage"):
             lesson_generator.validate_content_v2_input(invalid_stage)
+
+    def test_progression_gates_do_not_allow_false_inheritance_or_false_bridge(self) -> None:
+        base = load_fixture("lesson-plan-content-v2-it.json")
+
+        def pair() -> dict:
+            data = copy.deepcopy(base)
+            data["lessons"] = data["lessons"][:2]
+            data["total_hours"] = 4
+            return data
+
+        false_bridge = pair()
+        previous, current = false_bridge["lessons"]
+        previous["progression"].update(
+            deliverable="数据库需求分析报告",
+            next_bridge="进入实体关系建模",
+        )
+        current["progression"].update(
+            prior_learning="已完成数据库需求分析报告",
+            deliverable="生命体征测量记录",
+        )
+        current["task"] = "测量患者生命体征"
+        current["teaching_content"] = ["体温、脉搏、呼吸", "记录测量结果", "判断异常情况"]
+        false_bridge_report = assess_content_quality(false_bridge)
+        false_bridge_link = false_bridge_report["progression"]["declared_prior_links"][0]
+        self.assertEqual(false_bridge_link["artifact_inheritance"]["status"], "passed")
+        self.assertEqual(false_bridge_link["forward_transition"]["status"], "failed")
+        self.assertEqual(false_bridge_link["status"], "failed")
+        self.assertEqual(false_bridge_report["progression"]["status"], "failed")
+
+        false_inheritance = pair()
+        previous, current = false_inheritance["lessons"]
+        previous["progression"].update(
+            deliverable="数据库需求分析报告",
+            next_bridge="根据表结构完成SQL查询",
+        )
+        current["progression"].update(
+            prior_learning="承接护理实训基础",
+            deliverable="SQL查询脚本和结果记录",
+        )
+        current["task"] = "完成SQL查询设计"
+        current["teaching_content"] = ["依据表结构编写查询语句", "验证查询结果", "整理查询证据"]
+        false_inheritance_report = assess_content_quality(false_inheritance)
+        false_inheritance_link = false_inheritance_report["progression"]["declared_prior_links"][0]
+        self.assertEqual(false_inheritance_link["artifact_inheritance"]["status"], "failed")
+        self.assertEqual(false_inheritance_link["forward_transition"]["status"], "passed")
+        self.assertEqual(false_inheritance_link["status"], "failed")
+
+        both_pass = pair()
+        previous, current = both_pass["lessons"]
+        previous["progression"].update(
+            deliverable="E-R图",
+            next_bridge="将实体关系转换为关系表",
+        )
+        current["progression"].update(
+            prior_learning="能解释上一课E-R图中的实体及联系",
+            deliverable="关系模式设计表",
+        )
+        current["task"] = "完成关系模式设计"
+        current["teaching_content"] = ["主键、外键与关系表映射", "依据E-R图确定字段", "检查关系模式约束"]
+        both_pass_report = assess_content_quality(both_pass)
+        both_pass_link = both_pass_report["progression"]["declared_prior_links"][0]
+        self.assertEqual(both_pass_link["artifact_inheritance"]["status"], "passed")
+        self.assertEqual(both_pass_link["forward_transition"]["status"], "passed")
+        self.assertEqual(both_pass_link["status"], "passed")
+        self.assertEqual(both_pass_report["progression"]["status"], "passed")
+
+    def test_resource_reuse_is_domain_neutral_but_narrative_reuse_still_fails(self) -> None:
+        base = load_fixture("lesson-plan-content-v2-it.json")
+        resource_cases = (
+            ["数据库客户端工具", "任务数据"],
+            ["血压计", "护理床"],
+            ["原始凭证", "计算器"],
+        )
+        for resources in resource_cases:
+            with self.subTest(resources=resources):
+                data = copy.deepcopy(base)
+                data["lessons"] = data["lessons"][:3]
+                data["total_hours"] = 6
+                for lesson in data["lessons"]:
+                    lesson["resources"] = list(resources)
+                report = assess_content_quality(data)
+                self.assertEqual(report["status"], "passed", report)
+                self.assertTrue(report["resource_reuse"])
+
+        narrative = copy.deepcopy(base)
+        narrative["lessons"] = narrative["lessons"][:3]
+        narrative["total_hours"] = 6
+        for lesson in narrative["lessons"]:
+            lesson["teaching_content"][0] = "学生依据任务清单核对关键证据"
+        narrative_report = assess_content_quality(narrative)
+        self.assertEqual(narrative_report["status"], "failed", narrative_report)
+        self.assertTrue(
+            any(item["field"] == "teaching_content" for item in narrative_report["frequency_item_duplicates"]),
+            narrative_report,
+        )
+
+    def test_score_cycle_detection_rejects_partial_tails_and_keeps_natural_variation(self) -> None:
+        base = load_fixture("lesson-plan-content-v2-it.json")
+
+        def scored_data(scores: tuple[float, ...]) -> dict:
+            data = copy.deepcopy(base)
+            while len(data["lessons"]) < len(scores):
+                extra = copy.deepcopy(base["lessons"][-1])
+                extra["lesson_id"] = f"L{len(data['lessons']) + 1:02d}"
+                data["lessons"].append(extra)
+            data["lessons"] = data["lessons"][: len(scores)]
+            data["total_hours"] = len(scores) * 2
+            for index, (lesson, score) in enumerate(zip(data["lessons"], scores), 1):
+                lesson["evaluation"]["score"] = score
+                lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"L{index - 1:02d}"
+            return data
+
+        cycle_cases = (
+            ((88, 89, 90, 88, 89, 90), 3),
+            ((88, 89, 90, 88, 89, 90, 88), 3),
+            ((90, 91, 90, 91, 90), 2),
+            ((88, 89, 90, 91, 88, 89, 90), 4),
+            ((90, 90, 90, 90), 1),
+        )
+        for scores, period in cycle_cases:
+            with self.subTest(scores=scores):
+                report = assess_content_quality(scored_data(scores))
+                self.assertTrue(report["coverage"]["score_pattern"]["simple_cycle"], report)
+                self.assertEqual(report["coverage"]["score_pattern"]["cycle_period"], period)
+                self.assertEqual(report["status"], "failed")
+
+        natural = copy.deepcopy(base)
+        natural_scores = (89, 90.5, 89.5, 91, 90, 92)
+        for lesson, score in zip(natural["lessons"], natural_scores):
+            lesson["evaluation"]["score"] = score
+        natural_report = assess_content_quality(natural)
+        self.assertEqual(natural_report["status"], "passed", natural_report)
+        self.assertFalse(natural_report["coverage"]["score_pattern"]["simple_cycle"])
+
+        varied = (90, 89.5, 91, 90.5, 92, 91.5, 93)
+        score_errors: list[str] = []
+        pattern = lesson_content_quality._score_pattern(list(varied), score_errors)
+        self.assertFalse(pattern["simple_cycle"])
+        self.assertFalse(any("repeating cycle" in error for error in score_errors))
+        self.assertFalse(any("outside 85-96" in error for error in score_errors))
 
     def test_content_quality_failure_is_reported_by_real_output_validator(self) -> None:
         payload = load_fixture("lesson-plan-input.json")
@@ -891,7 +1044,11 @@ class LessonContentV2Mixin:
             ("generic-standard", "GB/T 0000-2024 软件测试规范", "generic", None, False),
             ("generic-author", "作者甲 某出版社 软件测试教材", "generic", None, False),
             ("verified-missing-evidence", "软件测试公开课程资料", "verified_public", None, False),
+            ("verified-arbitrary-evidence", "软件测试公开课程资料", "verified_public", "有人说这是公开资料", False),
             ("verified-url", "软件测试公开课程资料", "verified_public", "https://example.edu/testing", True),
+            ("verified-official-locator", "软件测试公开课程资料", "verified_public", "教育部官网第2章节", True),
+            ("provided-missing-evidence", "《数据库原理与应用》", "provided", None, False),
+            ("provided-file", "《数据库原理与应用》", "provided", "用户上传：数据库教材目录.pdf", True),
         )
         for label, text, source_kind, evidence, should_pass in cases:
             with self.subTest(reference=label):
@@ -922,6 +1079,132 @@ class LessonContentV2Mixin:
             text = "\n".join(document_text(Document(path)) for path in output.glob("*.docx"))
             self.assertNotIn("source_kind", text)
             self.assertNotIn("generic", text)
+
+    def test_evaluation_remark_contract_limit_applies_to_all_template_versions(self) -> None:
+        base = load_fixture("lesson-plan-content-v2-it.json")
+        base["lessons"] = base["lessons"][:2]
+        base["total_hours"] = 4
+        manifests = (
+            ("v1.0.0", V10_MANIFEST),
+            ("v1.1.0", V110_MANIFEST),
+            ("v1.1.1", V111_MANIFEST),
+            ("v1.1.2", V112_MANIFEST),
+        )
+        for version, manifest_path in manifests:
+            with self.subTest(version=version):
+                accepted = copy.deepcopy(base)
+                accepted["lessons"][0]["evaluation"]["remarks"]["practice"] = "甲" * 48
+                accepted_report = assess_content_quality(accepted, load_manifest(manifest_path))
+                self.assertEqual(accepted_report["status"], "passed", accepted_report)
+                self.assertEqual(accepted_report["coverage"]["evaluation_remark_contract_limit"], 48)
+
+                rejected = copy.deepcopy(base)
+                rejected["lessons"][0]["evaluation"]["remarks"]["practice"] = "甲" * 49
+                rejected_report = assess_content_quality(rejected, load_manifest(manifest_path))
+                self.assertEqual(rejected_report["status"], "failed", rejected_report)
+                self.assertTrue(rejected_report["evaluation_remark_density"])
+                self.assertEqual(rejected_report["evaluation_remark_density"][0]["limit"], 48)
+
+    def test_non_it_contamination_uses_current_lesson_scope_and_real_output_validation(self) -> None:
+        payload = load_fixture("lesson-plan-content-v2-non-it.json")
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-lesson-scope-contamination-") as temp_name:
+            folder = Path(temp_name)
+            source = write_payload(folder, payload)
+            output = folder / "output"
+            generated = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr or generated.stdout)
+            target = sorted(output.glob("*.docx"))[0]
+            document = Document(target)
+            document.tables[0].cell(0, 0).paragraphs[0].add_run("脚本")
+            document.save(target)
+
+            validation = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertNotEqual(validation.returncode, 0)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertIn("脚本", report["content_quality"]["coverage"]["non_it_contamination"])
+            self.assertTrue(any("脚本" in error for error in report["errors"]))
+
+        course_metadata = {"course_name": "基础护理技术", "major": "护理", "audience": "高职护理"}
+        allowed_lesson = {"task": "使用护理信息系统脚本查询", "resources": ["护理信息系统"]}
+        other_lesson = {"task": "完成生命体征测量", "resources": ["血压计"]}
+        self.assertEqual(detect_non_it_contamination(course_metadata, allowed_lesson, "脚本生成结果"), [])
+        self.assertEqual(detect_non_it_contamination(course_metadata, other_lesson, "脚本生成结果"), ["脚本"])
+
+    def test_cleanup_failure_preserves_primary_error_and_reports_residual_candidate(self) -> None:
+        payload = load_fixture("lesson-plan-input.json")
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-cleanup-diagnostics-") as temp_name:
+            folder = Path(temp_name)
+            source = write_payload(folder, payload)
+            output = folder / "output"
+            argv = [
+                "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            ]
+            diagnostics = io.StringIO()
+            with patch.object(lesson_generator, "validate_content_quality", side_effect=RuntimeError("primary operation failure")):
+                with patch.object(lesson_generator, "_remove_path", side_effect=OSError("candidate is locked")):
+                    with patch.object(sys, "argv", argv):
+                        with redirect_stderr(diagnostics):
+                            with self.assertRaisesRegex(RuntimeError, "primary operation failure") as raised:
+                                lesson_generator.main()
+            self.assertTrue(any("cleanup failed" in note for note in getattr(raised.exception, "__notes__", [])))
+            self.assertIn("candidate is locked", diagnostics.getvalue())
+            self.assertIn("residual path", diagnostics.getvalue())
+            self.assertFalse(output.exists())
+
+    def test_active_content_quality_has_no_legacy_implementation(self) -> None:
+        source = (SCRIPTS / "content_quality.py").read_text(encoding="utf-8")
+        self.assertNotIn("_assess_content_quality_legacy", source)
+        self.assertNotIn("_progression_coherence", source)
+        self.assertNotIn("0.035 if same_unit else 0.015", source)
+
+    def test_render_documentation_distinguishes_smoke_from_visual_qa(self) -> None:
+        skill_text = (LESSON / "SKILL.md").read_text(encoding="utf-8")
+        contract_text = (LESSON / "docs" / "content-contract-v2.md").read_text(encoding="utf-8")
+        self.assertIn("render smoke", skill_text.lower())
+        self.assertIn("not pagination", contract_text.lower())
+        self.assertNotIn("--render 做真实分页检查", skill_text)
+
+    @unittest.skipUnless(sys.platform == "darwin", "Darwin path aliases are only exercised on macOS")
+    def test_macos_unicode_and_case_aliases_are_real_path_contracts(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-路径-") as temp_name:
+            folder = Path(temp_name)
+            nfc_name = unicodedata.normalize("NFC", "临时目录")
+            nfd_name = unicodedata.normalize("NFD", "临时目录")
+            actual = folder / nfc_name / "教案生成器" / "Template"
+            actual.mkdir(parents=True)
+            alias = folder / nfd_name / "教案生成器" / "Template"
+            self.assertTrue(paths_equal(actual, alias))
+            self.assertTrue(paths_overlap(actual / "输出", alias))
+            case_alias = folder / nfc_name / "教案生成器" / "template"
+            if not filesystem_case_sensitive(actual):
+                self.assertTrue(paths_overlap(actual, case_alias))
+            else:
+                self.assertFalse(paths_overlap(actual, case_alias))
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux case semantics are checked on Linux CI")
+    def test_linux_path_safety_remains_case_sensitive(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-linux-case-") as temp_name:
+            folder = Path(temp_name)
+            upper = folder / "CaseSensitive"
+            lower = folder / "casesensitive"
+            self.assertFalse(paths_equal(upper, lower))
+            self.assertFalse(paths_overlap(upper, lower))
 
     def test_external_qa_report_is_committed_with_output_and_preflight_is_fail_closed(self) -> None:
         payload = load_fixture("lesson-plan-input.json")
