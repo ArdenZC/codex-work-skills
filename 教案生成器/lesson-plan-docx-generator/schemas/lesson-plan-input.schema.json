@@ -82,7 +82,23 @@
         "text": {"type": "string", "minLength": 1, "maxLength": 180},
         "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
         "evidence": {"type": ["string", "null"], "maxLength": 500}
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"source_kind": {"const": "provided"}}, "required": ["source_kind"]},
+          "then": {
+            "required": ["evidence"],
+            "properties": {"evidence": {"type": "string", "minLength": 1}}
+          }
+        },
+        {
+          "if": {"properties": {"source_kind": {"const": "verified_public"}}, "required": ["source_kind"]},
+          "then": {
+            "required": ["evidence"],
+            "properties": {"evidence": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
     },
     "implementationStage": {
       "type": "object",

@@ -65,6 +65,7 @@ PROGRESSION_MIN_BIGRAM_SIGNAL = 0.025
 PROGRESSION_MIN_TRIGRAM_SIGNAL = 0.012
 PROGRESSION_MIN_SEQUENCE_SIGNAL = 0.085
 EVALUATION_REMARK_MIN_CHARS = 4
+CONTENT_V2_EVALUATION_REMARK_MAX_CHARS = 48
 EVALUATION_REMARK_FIXED_CRITERIA = frozenset({"attendance", "compliance", "habits"})
 EVALUATION_REMARK_CONTENT_CRITERIA = frozenset(
     {"participation", "discussion", "homework", "practice", "presentation", "improvement"}
@@ -118,6 +119,10 @@ REFERENCE_SPECIFIC_PATTERN = re.compile(
     r"(?:isbn\s*[-:]?\s*[0-9x-]+|gb\s*[/-]?\s*t|标准编号|文件编号|出版社|作者|"
     r"(?:19|20)\d{2}\s*年?|第\s*[一二三四五六七八九十百0-9]+\s*版|版次)",
     re.IGNORECASE,
+)
+REFERENCE_EVIDENCE_URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
+REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
+    r"(?:官方|政府|教育部|国家卫生健康|行业协会).*(?:官网|章节|条款|第[一二三四五六七八九十百0-9]+[章节条]|页|文号|检索|路径)",
 )
 
 BOILERPLATE_PATTERNS = (
@@ -228,9 +233,7 @@ def _is_allowed_repeated_item(field: str, value: str, course_terms: set[str]) ->
     if field == "references":
         return True
     if field == "resources":
-        return bool(
-            re.search(r"(?:软件|工具|平台|浏览器|服务器|电脑|设备|网络|机房|投影|数据库|客户端|终端|系统|环境)", value)
-        )
+        return True
     if field.startswith("evaluation.remarks."):
         criterion = field.rsplit(".", 1)[-1]
         return criterion in EVALUATION_REMARK_FIXED_CRITERIA
@@ -572,11 +575,9 @@ def _completeness_report(data: dict[str, Any]) -> tuple[dict[str, Any], list[str
 
 
 def _density_report(data: dict[str, Any], manifest: dict[str, Any] | None) -> tuple[list[dict[str, Any]], int]:
-    if not manifest:
-        return [], 0
     errors: list[dict[str, Any]] = []
     total_chars = 0
-    fields = manifest.get("fields", {})
+    fields = manifest.get("fields", {}) if manifest else {}
     for index, lesson in enumerate(data["lessons"], 1):
         lesson_id = _lesson_id(lesson, index)
         title = format_title(index, data, lesson)
@@ -618,20 +619,22 @@ def _density_report(data: dict[str, Any], manifest: dict[str, Any] | None) -> tu
             if max_paragraphs is not None and paragraphs > int(max_paragraphs):
                 errors.append({"lesson": lesson_id, "field": f"reflection.{name}", "actual_paragraphs": paragraphs, "limit": int(max_paragraphs)})
         evaluation_spec = fields.get("evaluation", {})
-        remark_limit = evaluation_spec.get("max_remark_chars")
-        if remark_limit is not None:
-            for criterion_id in EVALUATION_CRITERION_IDS:
-                value = _normalize(lesson["evaluation"]["remarks"][criterion_id])
-                total_chars += len(value)
-                if _meaningful_length(value) > int(remark_limit):
-                    errors.append(
-                        {
-                            "lesson": lesson_id,
-                            "field": f"evaluation.remarks.{criterion_id}",
-                            "actual_chars": _meaningful_length(value),
-                            "limit": int(remark_limit),
-                        }
-                    )
+        manifest_limit = evaluation_spec.get("max_remark_chars")
+        remark_limit = CONTENT_V2_EVALUATION_REMARK_MAX_CHARS
+        if manifest_limit is not None:
+            remark_limit = min(remark_limit, int(manifest_limit))
+        for criterion_id in EVALUATION_CRITERION_IDS:
+            value = _normalize(lesson["evaluation"]["remarks"][criterion_id])
+            total_chars += len(value)
+            if _meaningful_length(value) > remark_limit:
+                errors.append(
+                    {
+                        "lesson": lesson_id,
+                        "field": f"evaluation.remarks.{criterion_id}",
+                        "actual_chars": _meaningful_length(value),
+                        "limit": remark_limit,
+                    }
+                )
     return errors, total_chars
 
 
@@ -803,17 +806,11 @@ def _jaccard(left: set[str], right: set[str]) -> float:
     return len(left & right) / len(union) if union else 0.0
 
 
-def _progression_coherence(previous: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
-    upstream = _progression_signal_text(
-        [previous["progression"]["deliverable"], previous["progression"]["next_bridge"]]
-    )
-    downstream = _progression_signal_text(
-        [
-            current["progression"]["prior_learning"],
-            current["task"],
-            current["teaching_content"],
-        ]
-    )
+def _progression_gate(upstream: Any, downstream: Any, threshold: float) -> dict[str, Any]:
+    """Evaluate one directional progression claim with independent evidence."""
+
+    upstream = _progression_signal_text(upstream)
+    downstream = _progression_signal_text(downstream)
     sequence, _ = _similarity(upstream, downstream)
     bigrams_left = _character_ngrams(upstream, 2)
     bigrams_right = _character_ngrams(downstream, 2)
@@ -837,7 +834,132 @@ def _progression_coherence(previous: dict[str, Any], current: dict[str, Any]) ->
         "character_3gram_jaccard": trigram_jaccard,
         "signal_count": signal_count,
         "top_overlap": overlap,
+        "status": "passed" if weighted >= threshold and signal_count >= 2 else "failed",
     }
+
+
+def _progression_gates(previous: dict[str, Any], current: dict[str, Any], threshold: float) -> dict[str, Any]:
+    """Keep artifact inheritance and the next-step bridge as separate gates."""
+
+    previous_progression = previous["progression"]
+    current_progression = current["progression"]
+    artifact_inheritance = _progression_gate(
+        [previous_progression["deliverable"], previous.get("task", "")],
+        current_progression["prior_learning"],
+        threshold,
+    )
+    forward_transition = _progression_gate(
+        previous_progression["next_bridge"],
+        [current.get("task", ""), *current.get("teaching_content", []), current_progression["deliverable"]],
+        threshold,
+    )
+    return {
+        "artifact_inheritance": artifact_inheritance,
+        "forward_transition": forward_transition,
+        "status": (
+            "passed"
+            if artifact_inheritance["status"] == "passed" and forward_transition["status"] == "passed"
+            else "failed"
+        ),
+    }
+
+
+PROGRESSION_GATE_CALIBRATION_CORPUS = (
+    (
+        "false_inheritance",
+        {
+            "task": "完成需求分析",
+            "progression": {
+                "deliverable": "数据库需求分析报告",
+                "next_bridge": "根据表结构完成SQL查询",
+            },
+        },
+        {
+            "task": "完成SQL查询设计",
+            "teaching_content": ["依据表结构编写查询语句", "验证查询结果"],
+            "progression": {
+                "prior_learning": "承接护理实训基础",
+                "deliverable": "SQL查询脚本和结果记录",
+            },
+        },
+        "failed",
+        "passed",
+        "failed",
+    ),
+    (
+        "false_bridge",
+        {
+            "task": "完成关系模式设计",
+            "progression": {
+                "deliverable": "E-R图",
+                "next_bridge": "根据表结构完成SQL查询",
+            },
+        },
+        {
+            "task": "设计护理床整理流程",
+            "teaching_content": ["整理床单位", "检查护理操作规范"],
+            "progression": {
+                "prior_learning": "承接E-R图中的实体及联系",
+                "deliverable": "护理床整理记录",
+            },
+        },
+        "passed",
+        "failed",
+        "failed",
+    ),
+    (
+        "connected",
+        {
+            "task": "完成需求分析",
+            "progression": {
+                "deliverable": "E-R图",
+                "next_bridge": "将实体关系转换为关系表",
+            },
+        },
+        {
+            "task": "完成关系模式设计",
+            "teaching_content": ["主键、外键与关系表映射", "依据E-R图确定字段"],
+            "progression": {
+                "prior_learning": "能解释上一课E-R图中的实体及联系",
+                "deliverable": "关系模式设计表",
+            },
+        },
+        "passed",
+        "passed",
+        "passed",
+    ),
+)
+
+
+def progression_gate_calibration() -> list[dict[str, Any]]:
+    calibrated: list[dict[str, Any]] = []
+    for (
+        label,
+        previous,
+        current,
+        expected_artifact,
+        expected_forward,
+        expected_overall,
+    ) in PROGRESSION_GATE_CALIBRATION_CORPUS:
+        gates = _progression_gates(previous, current, PROGRESSION_DECLARED_BOUNDARY_THRESHOLD)
+        actual = {
+            "artifact_inheritance": gates["artifact_inheritance"]["status"],
+            "forward_transition": gates["forward_transition"]["status"],
+            "overall": gates["status"],
+        }
+        calibrated.append(
+            {
+                "case": label,
+                "expected": {
+                    "artifact_inheritance": expected_artifact,
+                    "forward_transition": expected_forward,
+                    "overall": expected_overall,
+                },
+                "actual": actual,
+                "gates": gates,
+            }
+        )
+    return calibrated
 
 
 # This small, reviewable corpus calibrates the threshold classes.  The positive
@@ -858,14 +980,7 @@ PROGRESSION_CALIBRATION_CORPUS = (
 def progression_calibration() -> list[dict[str, Any]]:
     calibrated: list[dict[str, Any]] = []
     for upstream, downstream, expected in PROGRESSION_CALIBRATION_CORPUS:
-        signals = _progression_coherence(
-            {"progression": {"deliverable": upstream, "next_bridge": ""}},
-            {
-                "progression": {"prior_learning": downstream},
-                "task": downstream,
-                "teaching_content": [downstream],
-            },
-        )
+        signals = _progression_gate(upstream, downstream, PROGRESSION_DECLARED_BOUNDARY_THRESHOLD)
         calibrated.append(
             {
                 "upstream": upstream,
@@ -897,8 +1012,12 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
         if value < float(EVALUATION_SCORE_MIN) or value > float(EVALUATION_SCORE_MAX) or (value * 2) % 1:
             score_pattern["range_valid"] = False
             errors.append(f"evaluation score {value} is outside 85-96 half-point contract")
-    for period in range(1, (len(scores) // 2) + 1):
-        if len(scores) % period == 0 and all(scores[index] == scores[index % period] for index in range(len(scores))):
+    for period in range(1, len(scores) // 2 + 1):
+        repeated = all(scores[index] == scores[index % period] for index in range(period, len(scores)))
+        complete_cycle = len(scores) >= 2 * period and repeated
+        tail_length = len(scores) - period
+        partial_tail_cycle = 2 <= tail_length < period and repeated
+        if complete_cycle or partial_tail_cycle:
             score_pattern["simple_cycle"] = True
             score_pattern["cycle_period"] = period
             break
@@ -921,262 +1040,11 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
     return score_pattern
 
 
-def _assess_content_quality_legacy(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
-    lessons = data.get("lessons", [])
-    lesson_ids = [_lesson_id(lesson, index) for index, lesson in enumerate(lessons, 1)]
-    errors: list[str] = []
-
-    duplicate_values: dict[str, dict[str, str]] = {}
-    for index, lesson in enumerate(lessons, 1):
-        for field, value in _field_groups(lesson).items():
-            duplicate_values.setdefault(field, {})[_lesson_id(lesson, index)] = value
-    exact_duplicates = _record_duplicate_groups(duplicate_values)
-    adjacent_exact_duplicates = _adjacent_exact_duplicates(duplicate_values, lesson_ids)
-    if exact_duplicates:
-        errors.extend(f"exact duplicate {item['field']}: {','.join(item['lessons'])}" for item in exact_duplicates)
-
-    implementation_values: dict[str, dict[str, str]] = {}
-    for index, lesson in enumerate(lessons, 1):
-        lesson_id = _lesson_id(lesson, index)
-        for stage in lesson.get("implementation", []):
-            stage_id = str(stage.get("id", ""))
-            formatted = format_implementation_stage(stage)
-            for field_name, cell_index in zip(IMPLEMENTATION_STAGE_FIELDS, (1, 2, 3, 4)):
-                implementation_values.setdefault(f"{stage_id}.{field_name}", {})[lesson_id] = formatted[cell_index]
-    implementation_duplicates = _record_duplicate_groups(implementation_values, IMPLEMENTATION_DUPLICATE_LESSON_COUNT)
-    adjacent_implementation_exact_duplicates = _adjacent_exact_duplicates(implementation_values, lesson_ids)
-    for record in adjacent_implementation_exact_duplicates:
-        record["stage"] = record["field"].split(".", 1)[0]
-    implementation_similarity_pairs, adjacent_implementation_similarity_pairs = _pairwise_similarity(
-        implementation_values,
-        lesson_ids,
-        threshold=IMPLEMENTATION_SIMILARITY_THRESHOLD,
-        adjacent_threshold=ADJACENT_IMPLEMENTATION_SIMILARITY_THRESHOLD,
-        implementation=True,
-    )
-    implementation_similarity_pairs = adjacent_implementation_exact_duplicates + implementation_similarity_pairs
-    adjacent_implementation_similarity_pairs = (
-        adjacent_implementation_exact_duplicates + adjacent_implementation_similarity_pairs
-    )
-    implementation_similarity_pairs.sort(
-        key=lambda item: (-item["score"], item.get("field", item.get("stage", "")), item["lessons"])
-    )
-    adjacent_implementation_similarity_pairs.sort(
-        key=lambda item: (-item["score"], item.get("field", item.get("stage", "")), item["lessons"])
-    )
-    if implementation_duplicates:
-        errors.extend(f"implementation duplicate {item['field']}: {','.join(item['lessons'])}" for item in implementation_duplicates)
-    if adjacent_exact_duplicates:
-        errors.extend(
-            f"adjacent exact duplicate {item['field']} {item['lessons']}"
-            for item in adjacent_exact_duplicates
-        )
-    if implementation_similarity_pairs:
-        errors.extend(
-            f"high implementation similarity {item.get('stage', item.get('field'))} {item['lessons']}: {item['score']}"
-            for item in implementation_similarity_pairs
-        )
-
-    field_similarity_pairs, adjacent_field_similarity_pairs = _pairwise_similarity(
-        duplicate_values,
-        lesson_ids,
-        threshold=FIELD_SIMILARITY_THRESHOLD,
-        adjacent_threshold=ADJACENT_FIELD_SIMILARITY_THRESHOLD,
-    )
-    if field_similarity_pairs:
-        errors.extend(
-            f"high field similarity {item['field']} {item['lessons']}: {item['score']}"
-            for item in field_similarity_pairs
-        )
-
-    sentence_locations: dict[str, dict[str, set[str]]] = {}
-    for index, lesson in enumerate(lessons, 1):
-        lesson_id = _lesson_id(lesson, index)
-        for field, values in _all_content_strings(lesson).items():
-            for value in values:
-                for sentence in _sentences(value):
-                    sentence_locations.setdefault(sentence, {}).setdefault(lesson_id, set()).add(field)
-    repeated_sentences: list[dict[str, Any]] = []
-    for sentence, locations in sentence_locations.items():
-        ordered_locations = [lesson_id for lesson_id in lesson_ids if lesson_id in locations]
-        adjacent = any(
-            _is_adjacent(lesson_ids.index(left_id), lesson_ids.index(right_id))
-            for left_id, right_id in zip(ordered_locations, ordered_locations[1:])
-        )
-        if len(locations) >= REPEATED_SENTENCE_LESSON_COUNT or adjacent:
-            repeated_sentences.append(
-                {
-                    "sentence": sentence,
-                    "lessons": ordered_locations,
-                    "count": len(locations),
-                    "fields": {lesson_id: sorted(locations[lesson_id]) for lesson_id in ordered_locations},
-                    "adjacent": adjacent,
-                    "score": 1.0,
-                    "top_fragments": [sentence],
-                }
-            )
-    repeated_sentences.sort(key=lambda item: (-item["count"], item["sentence"]))
-    if repeated_sentences:
-        errors.extend(f"repeated sentence across lessons: {item['sentence']}" for item in repeated_sentences)
-
-    boilerplate_hits: list[dict[str, str]] = []
-    for index, lesson in enumerate(lessons, 1):
-        lesson_id = _lesson_id(lesson, index)
-        for field, values in _all_content_strings(lesson).items():
-            text = "\n".join(values)
-            for pattern in BOILERPLATE_PATTERNS:
-                if pattern in text:
-                    boilerplate_hits.append({"lesson": lesson_id, "field": field, "fragment": pattern})
-    boilerplate_hits.sort(key=lambda item: (item["lesson"], item["field"], item["fragment"]))
-    if boilerplate_hits:
-        errors.extend(f"legacy boilerplate in {item['lesson']}.{item['field']}: {item['fragment']}" for item in boilerplate_hits)
-
-    narratives = {_lesson_id(lesson, index): _lesson_narrative(lesson) for index, lesson in enumerate(lessons, 1)}
-    whole_lesson_similarity_pairs: list[dict[str, Any]] = []
-    adjacent_similarity_pairs: list[dict[str, Any]] = []
-    for left_index, left_id in enumerate(lesson_ids):
-        for right_id in lesson_ids[left_index + 1 :]:
-            left_text, right_text = narratives[left_id], narratives[right_id]
-            if min(len(left_text), len(right_text)) < 30:
-                continue
-            adjacent = _is_adjacent(left_index, lesson_ids.index(right_id))
-            threshold = ADJACENT_WHOLE_LESSON_SIMILARITY_THRESHOLD if adjacent else WHOLE_LESSON_SIMILARITY_THRESHOLD
-            sequence, jaccard = _similarity(left_text, right_text)
-            if _similarity_exceeds(sequence, jaccard, threshold):
-                record = _similarity_record(
-                    left_id=left_id,
-                    right_id=right_id,
-                    left_text=left_text,
-                    right_text=right_text,
-                    sequence=sequence,
-                    jaccard=jaccard,
-                    adjacent=adjacent,
-                )
-                whole_lesson_similarity_pairs.append(record)
-                if adjacent:
-                    adjacent_similarity_pairs.append(record)
-    whole_lesson_similarity_pairs.sort(key=lambda item: (-item["score"], item["lessons"]))
-    adjacent_similarity_pairs.sort(key=lambda item: (-item["score"], item["lessons"]))
-    if whole_lesson_similarity_pairs:
-        errors.extend(f"high whole-lesson similarity {item['lessons']}: {item['score']}" for item in whole_lesson_similarity_pairs)
-
-    progression_stages = [str(lesson.get("progression", {}).get("capability_stage", "")) for lesson in lessons]
-    progression_links: list[dict[str, Any]] = []
-    prior_ids: set[str] = set()
-    for index, lesson in enumerate(lessons):
-        progression_data = lesson.get("progression", {})
-        declared_prior = progression_data.get("prior_lesson_id")
-        if index == 0 and declared_prior is not None:
-            errors.append("lessons[0].progression.prior_lesson_id must be null")
-        if index > 0 and declared_prior not in prior_ids:
-            errors.append(
-                f"{lesson_ids[index]}.progression.prior_lesson_id must reference an earlier lesson"
-            )
-        prior_ids.add(lesson_ids[index])
-        if index == 0:
-            continue
-        previous, current = lessons[index - 1], lesson
-        score, sequence, bigram_jaccard, trigram_jaccard, overlap = _progression_coherence(previous, current)
-        same_unit = str(previous.get("unit", "")) == str(current.get("unit", ""))
-        threshold = 0.035 if same_unit else 0.015
-        status = "passed" if score >= threshold else "failed"
-        link = {
-            "from": lesson_ids[index - 1],
-            "to": lesson_ids[index],
-            "score": round(score, 4),
-            "sequence_matcher": round(sequence, 4),
-            "character_2gram_jaccard": round(bigram_jaccard, 4),
-            "character_3gram_jaccard": round(trigram_jaccard, 4),
-            "threshold": threshold,
-            "same_unit": same_unit,
-            "status": status,
-            "top_overlap": overlap,
-        }
-        progression_links.append(link)
-        if status == "failed":
-            errors.append(
-                f"progression coherence failed {link['from']}->{link['to']}: "
-                f"score={link['score']} threshold={threshold}"
-            )
-    progression_variety = len(set(progression_stages)) > 1 if len(progression_stages) >= 4 else True
-    progression = {
-        "status": "passed" if all(link["status"] == "passed" for link in progression_links) else "failed",
-        "lesson_ids": lesson_ids,
-        "capability_stages": progression_stages,
-        "distinct_capability_stages": sorted(set(progression_stages)),
-        "stage_count": len(progression_stages),
-        "valid_variety": progression_variety,
-        "links": progression_links,
-    }
-    if not progression_variety:
-        errors.append("progression capability_stage is identical across all lessons")
-
-    scores: list[float] = []
-    for lesson in lessons:
-        try:
-            scores.append(float(lesson["evaluation"]["score"]))
-        except (KeyError, TypeError, ValueError):
-            pass
-    score_pattern = _score_pattern(scores, errors)
-
-    completeness, completeness_errors = _completeness_report(data)
-    errors.extend(completeness_errors)
-
-    density_errors, meaningful_chars = _density_report(data, manifest)
-    if density_errors:
-        errors.extend(
-            f"content density exceeds {item['field']} for {item['lesson']}: "
-            f"actual_chars={item.get('actual_chars', '?')} limit={item.get('limit', '?')}"
-            for item in density_errors
-        )
-
-    coverage = {
-        "lesson_count": len(lessons),
-        "implementation_stages": {lesson_id: len(lesson.get("implementation", [])) for lesson_id, lesson in zip(lesson_ids, lessons)},
-        "meaningful_characters": meaningful_chars,
-        "content_fields": len(CONTENT_FIELD_NAMES),
-        "evaluation_criteria": len(EVALUATION_CRITERIA),
-        "in_class_stage_ids": sorted(IN_CLASS_STAGE_IDS),
-        "required_stage_ids": list(IMPLEMENTATION_STAGE_IDS),
-        "score_pattern": score_pattern,
-        "completeness": completeness,
-        "non_it_contamination_terms": list(NON_IT_CONTAMINATION_TERMS),
-        "similarity_thresholds": {
-            "whole_lesson": WHOLE_LESSON_SIMILARITY_THRESHOLD,
-            "adjacent_whole_lesson": ADJACENT_WHOLE_LESSON_SIMILARITY_THRESHOLD,
-            "field": FIELD_SIMILARITY_THRESHOLD,
-            "adjacent_field": ADJACENT_FIELD_SIMILARITY_THRESHOLD,
-            "implementation": IMPLEMENTATION_SIMILARITY_THRESHOLD,
-            "adjacent_implementation": ADJACENT_IMPLEMENTATION_SIMILARITY_THRESHOLD,
-        },
-    }
-    return {
-        "status": "failed" if errors else "passed",
-        "errors": errors,
-        "exact_duplicates": exact_duplicates,
-        "adjacent_exact_duplicates": adjacent_exact_duplicates,
-        "adjacent_similarity_pairs": adjacent_similarity_pairs,
-        "field_similarity_pairs": field_similarity_pairs,
-        "adjacent_field_similarity_pairs": adjacent_field_similarity_pairs,
-        "whole_lesson_similarity_pairs": whole_lesson_similarity_pairs,
-        "high_similarity_pairs": whole_lesson_similarity_pairs,
-        "implementation_duplicates": implementation_duplicates,
-        "adjacent_implementation_exact_duplicates": adjacent_implementation_exact_duplicates,
-        "implementation_similarity_pairs": implementation_similarity_pairs,
-        "adjacent_implementation_similarity_pairs": adjacent_implementation_similarity_pairs,
-        "repeated_sentences": repeated_sentences,
-        "boilerplate_hits": boilerplate_hits,
-        "progression": progression,
-        "coverage": coverage,
-        "completeness": completeness,
-        "density_errors": density_errors,
-    }
-
-
 def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list[str]) -> dict[str, Any]:
     by_lesson: dict[str, list[dict[str, Any]]] = {}
     missing_evidence: list[dict[str, Any]] = []
     invalid_generic: list[dict[str, Any]] = []
+    invalid_verified_public: list[dict[str, Any]] = []
     for lesson_id, lesson in zip(lesson_ids, lessons):
         entries: list[dict[str, Any]] = []
         for index, reference in enumerate(lesson.get("references", []), 1):
@@ -1190,8 +1058,19 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
                 "evidence_present": evidence_present,
             }
             entries.append(entry)
-            if source_kind == "verified_public" and not evidence_present:
-                missing_evidence.append({"lesson": lesson_id, "reference": index})
+            if source_kind in {"provided", "verified_public"} and not evidence_present:
+                missing_evidence.append(
+                    {"lesson": lesson_id, "reference": index, "source_kind": source_kind}
+                )
+            if source_kind == "verified_public" and evidence_present:
+                evidence_text = _normalize(evidence)
+                if not (
+                    REFERENCE_EVIDENCE_URL_PATTERN.search(evidence_text)
+                    or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence_text)
+                ):
+                    invalid_verified_public.append(
+                        {"lesson": lesson_id, "reference": index}
+                    )
             if source_kind == "generic" and (
                 REFERENCE_SPECIFIC_PATTERN.search(text)
                 or re.search(r"《[^》]{2,}》", text)
@@ -1203,6 +1082,7 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
         "by_lesson": by_lesson,
         "missing_evidence": missing_evidence,
         "invalid_generic": invalid_generic,
+        "invalid_verified_public": invalid_verified_public,
     }
 
 
@@ -1337,11 +1217,23 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         if criterion in EVALUATION_REMARK_FIXED_CRITERIA and item["count"] >= 4:
             warnings.append(f"evaluation remark {criterion} repeats across {item['count']} lessons")
 
+    resource_values = {
+        "resources": {
+            lesson_id: _joined(lesson.get("resources", []))
+            for lesson_id, lesson in zip(lesson_ids, lessons)
+        }
+    }
+    resource_reuse = _record_duplicate_groups(resource_values)
+    if len(lessons) >= 4 and resource_reuse and len(resource_reuse[0]["lessons"]) == len(lessons):
+        warnings.append("all lessons reuse the same complete resources list")
+
     structural_pairs = _structural_item_pairs(
         {
             field: values
             for field, values in item_values.items()
-            if not field.startswith("implementation.") and not field.startswith("progression.")
+            if not field.startswith("implementation.")
+            and not field.startswith("progression.")
+            and field != "resources"
         },
         lesson_ids,
         lessons_by_id,
@@ -1459,36 +1351,43 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             errors.append(f"{current_id}.progression.prior_lesson_id must reference an earlier lesson")
         elif declared_prior != current_id:
             prior_lesson = lessons_by_id[str(declared_prior)]
-            signal = _progression_coherence(prior_lesson, lesson)
             same_unit = str(prior_lesson.get("unit", "")) == str(lesson.get("unit", ""))
             threshold = PROGRESSION_DECLARED_SAME_UNIT_THRESHOLD if same_unit else PROGRESSION_DECLARED_BOUNDARY_THRESHOLD
-            status = "passed" if signal["score"] >= threshold and signal["signal_count"] >= 2 else "failed"
+            gates = _progression_gates(prior_lesson, lesson, threshold)
+            artifact = gates["artifact_inheritance"]
+            forward = gates["forward_transition"]
             link = {
                 "from": str(declared_prior),
                 "to": current_id,
                 "kind": "declared_prior",
-                "score": round(signal["score"], 4),
-                "sequence_matcher": round(signal["sequence_matcher"], 4),
-                "character_2gram_jaccard": round(signal["character_2gram_jaccard"], 4),
-                "character_3gram_jaccard": round(signal["character_3gram_jaccard"], 4),
-                "signal_count": signal["signal_count"],
+                "score": round(min(artifact["score"], forward["score"]), 4),
+                "sequence_matcher": round(min(artifact["sequence_matcher"], forward["sequence_matcher"]), 4),
+                "character_2gram_jaccard": round(min(artifact["character_2gram_jaccard"], forward["character_2gram_jaccard"]), 4),
+                "character_3gram_jaccard": round(min(artifact["character_3gram_jaccard"], forward["character_3gram_jaccard"]), 4),
+                "signal_count": min(artifact["signal_count"], forward["signal_count"]),
                 "threshold": threshold,
                 "same_unit": same_unit,
-                "status": status,
-                "top_overlap": signal["top_overlap"],
+                "status": gates["status"],
+                "top_overlap": sorted(set(artifact["top_overlap"] + forward["top_overlap"]))[:5],
+                "artifact_inheritance": artifact,
+                "forward_transition": forward,
             }
             declared_prior_links.append(link)
-            if status == "failed":
+            if link["status"] == "failed":
                 errors.append(
-                    f"progression declared prior coherence failed {link['from']}->{link['to']}: "
+                    f"progression declared prior gate failed {link['from']}->{link['to']}: "
                     f"score={link['score']} threshold={threshold}"
                 )
         if index > 0:
             previous_id = lesson_ids[index - 1]
             previous = lessons_by_id[previous_id]
-            signal = _progression_coherence(previous, lesson)
             same_unit = str(previous.get("unit", "")) == str(lesson.get("unit", ""))
-            status = "passed" if signal["score"] >= PROGRESSION_SEQUENCE_THRESHOLD and signal["signal_count"] >= 1 else "review"
+            signal = _progression_gate(
+                previous["progression"]["next_bridge"],
+                [lesson.get("task", ""), *lesson.get("teaching_content", []), lesson["progression"]["deliverable"]],
+                PROGRESSION_SEQUENCE_THRESHOLD,
+            )
+            status = "passed" if signal["status"] == "passed" else "review"
             hard_failure = status == "review" and declared_prior in {None, previous_id}
             link = {
                 "from": previous_id,
@@ -1504,6 +1403,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
                 "status": "failed" if hard_failure else status,
                 "hard_failure": hard_failure,
                 "top_overlap": signal["top_overlap"],
+                "forward_transition": signal,
             }
             sequence_links.append(link)
             if hard_failure:
@@ -1533,6 +1433,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             "declared_same_unit": PROGRESSION_DECLARED_SAME_UNIT_THRESHOLD,
             "declared_project_boundary": PROGRESSION_DECLARED_BOUNDARY_THRESHOLD,
             "sequence": PROGRESSION_SEQUENCE_THRESHOLD,
+            "minimum_signal_count": 2,
         },
     }
 
@@ -1556,9 +1457,15 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
 
     reference_provenance = _reference_provenance_report(lessons, lesson_ids)
     for item in reference_provenance["missing_evidence"]:
-        errors.append(f"{item['lesson']}.references[{item['reference']}].verified_public requires evidence")
+        errors.append(
+            f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence"
+        )
     for item in reference_provenance["invalid_generic"]:
         errors.append(f"{item['lesson']}.references[{item['reference']}] generic source is too specific")
+    for item in reference_provenance["invalid_verified_public"]:
+        errors.append(
+            f"{item['lesson']}.references[{item['reference']}] verified_public evidence is not locatable"
+        )
 
     coverage = {
         "lesson_count": len(lessons),
@@ -1566,6 +1473,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "meaningful_characters": meaningful_chars,
         "content_fields": len(CONTENT_FIELD_NAMES),
         "evaluation_criteria": len(EVALUATION_CRITERIA),
+        "evaluation_remark_contract_limit": CONTENT_V2_EVALUATION_REMARK_MAX_CHARS,
         "in_class_stage_ids": sorted(IN_CLASS_STAGE_IDS),
         "required_stage_ids": list(IMPLEMENTATION_STAGE_IDS),
         "score_pattern": score_pattern,
@@ -1614,6 +1522,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "coverage": coverage,
         "completeness": completeness,
         "density_errors": density_errors,
+        "resource_reuse": resource_reuse,
         "evaluation_remark_density": [
             item for item in density_errors if str(item.get("field", "")).startswith("evaluation.remarks.")
         ],
@@ -1628,10 +1537,27 @@ def validate_content_quality(data: dict[str, Any], manifest: dict[str, Any] | No
     return report
 
 
-def detect_non_it_contamination(data: dict[str, Any], rendered_text: str) -> list[str]:
-    """Find IT defaults that appear in output without being present in the source JSON."""
+def detect_non_it_contamination(
+    course_metadata: dict[str, Any],
+    lesson: dict[str, Any] | str,
+    rendered_text: str | None = None,
+) -> list[str]:
+    """Find IT defaults absent from the course metadata and current lesson source.
 
-    source_text = json.dumps(data, ensure_ascii=False, sort_keys=True)
+    The two-argument form remains accepted for callers that only have a complete
+    source object; output validation uses the lesson-scoped three-argument form.
+    """
+
+    if rendered_text is None:
+        rendered_text = str(lesson)
+        lesson_scope: dict[str, Any] = {}
+    else:
+        lesson_scope = lesson if isinstance(lesson, dict) else {}
+    source_text = json.dumps(
+        {"course": course_metadata, "lesson": lesson_scope},
+        ensure_ascii=False,
+        sort_keys=True,
+    )
     return sorted(
         term
         for term in NON_IT_CONTAMINATION_TERMS

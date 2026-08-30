@@ -692,6 +692,11 @@ def _validate_meaningful_contract(data: dict[str, Any]) -> None:
                         f"{reference_prefix} uses source_kind=generic for a specific citation; "
                         "mark it provided or verified_public only when the source is real"
                     )
+            elif source_kind == "provided":
+                if evidence is None:
+                    raise ValueError(
+                        f"{reference_prefix}.provided requires evidence identifying the supplied material"
+                    )
             elif source_kind == "verified_public":
                 if evidence is None:
                     raise ValueError(
