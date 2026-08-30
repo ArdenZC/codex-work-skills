@@ -1012,7 +1012,10 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
         if value < float(EVALUATION_SCORE_MIN) or value > float(EVALUATION_SCORE_MAX) or (value * 2) % 1:
             score_pattern["range_valid"] = False
             errors.append(f"evaluation score {value} is outside 85-96 half-point contract")
-    for period in range(1, len(scores) // 2 + 1):
+    # A mechanically repeated pattern may contain one complete period followed
+    # by a two-or-more-value tail, so the period can be longer than half the
+    # observed sequence (for example, A B C D A B C).
+    for period in range(1, len(scores) - 1):
         repeated = all(scores[index] == scores[index % period] for index in range(period, len(scores)))
         complete_cycle = len(scores) >= 2 * period and repeated
         tail_length = len(scores) - period
