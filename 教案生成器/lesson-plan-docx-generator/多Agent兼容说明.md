@@ -14,6 +14,6 @@
 
 ## 模型与平台
 
-DeepSeek、Claude、GLM、Gemini、OpenAI 及其他能读文件和运行 Python 的 agent 都可以负责课程规划和 JSON 内容创作。生成结果由受保护的 Word 模板、semantic bookmarks、manifest 和校验器决定，不依赖模型 API。Windows 使用 `python`，macOS 使用 `python3`；LibreOffice 仅用于可选 render QA。
+DeepSeek、Claude、GLM、Gemini、OpenAI 及其他能读文件和运行 Python 的 agent 都可以负责课程规划和 JSON 内容创作。生成结果由受保护的 Word 模板、semantic bookmarks、manifest 和校验器决定，不依赖模型 API。Windows 使用 `python`，macOS 使用 `python3`；LibreOffice 仅用于可选 render smoke。
 
 纯网页工具如果不能写文件或运行命令，可以先输出 V2 JSON，再交给有本地执行能力的 agent。生产流程、路径保护、事务提交和 QA 细节始终以 `SKILL.md` 为准。

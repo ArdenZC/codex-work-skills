@@ -1,6 +1,6 @@
 ---
 name: lesson-plan-docx-generator
-description: Generate projectized Chinese vocational-course lesson plan DOCX files from a strict Lesson Content V2 JSON contract, using the protected Word template, semantic bookmarks, output QA, and optional local render QA. Use for creating, converting, batching, or revising 教案, 教学单元设计, and 实训教案 files.
+description: Generate projectized Chinese vocational-course lesson plan DOCX files from a strict Lesson Content V2 JSON contract, using the protected Word template, semantic bookmarks, output QA, and optional local render smoke. Use for creating, converting, batching, or revising 教案, 教学单元设计, and 实训教案 files.
 ---
 
 # 教案生成器
@@ -60,9 +60,9 @@ after_class_improvement
 
 课前准备和课后完善属于课外阶段；中间七个阶段的分钟数必须严格等于 `hours * 45`。`operation_demonstration` 是语义行位，可在护理、会计、机械等课程中显示为方法示范、案例解析或技能示范。
 
-评价必须显式提供 85–96 的 `evaluation.score`，使用 0.5 分步进，并提供 canonical 13 个 criterion IDs 的逐课 `remarks`。每条 remark 必须有实质内容；v1.1.2 的评价备注还受 manifest `max_remark_chars` 密度上限保护，超限必须失败而不能截断。未指定分数时建议自然集中在 88–94，但不得全为 90、任意短周期循环、严格递增或递减。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
+评价必须显式提供 85–96 的 `evaluation.score`，使用 0.5 分步进，并提供 canonical 13 个 criterion IDs 的逐课 `remarks`。每条 remark 必须有实质内容；所有 Content V2 模板版本统一执行不超过 48 个有意义字符的合同上限，manifest 只能进一步收紧，超限必须失败而不能截断。未指定分数时建议自然集中在 88–94，但不得全为 90、任意短周期循环、严格递增或递减。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
 
-`references` 使用 `{text, source_kind, evidence?}` 对象；`source_kind` 为 `provided`、`generic` 或 `verified_public`。没有用户材料时使用泛化资料名称，不能虚构教材、作者、出版社、ISBN、标准编号、年份、版次或文件编号；`generic` 不得伪装为具体书名，`verified_public` 必须提供 URL 或可定位的官方来源证据，`provided` 的 evidence 可记录用户资料标识。具体来源只有在用户提供或可信验证后才标记为非 `generic`。evidence 只用于输入和 QA，DOCX 只写 `text`。
+`references` 使用 `{text, source_kind, evidence?}` 对象；`source_kind` 为 `provided`、`generic` 或 `verified_public`。没有用户材料时使用泛化资料名称，不能虚构教材、作者、出版社、ISBN、标准编号、年份、版次或文件编号；`generic` 不得伪装为具体书名，`verified_public` 必须提供 URL 或可定位的官方来源证据，`provided` 必须提供真实用户资料标识。没有真实附件或资料标识时不得自报 `provided`，只能使用 `generic` 或完成公开来源验证后使用 `verified_public`。具体来源只有在用户提供或可信验证后才标记为非 `generic`。evidence 只用于输入和 QA，DOCX 只写 `text`。
 
 完整可运行示例见 `examples/tasks.example.json`，字段说明见 `docs/content-contract-v2.md`，机器约束见 `schemas/lesson-plan-input.schema.json`。
 
@@ -90,9 +90,9 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
 
 独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染，并在报告中记录 lesson IDs、field/stage、criterion、score 和 top fragments。`teaching_methods`、必要工具资源和固定评价维度可以合理重复，Content QA 重点约束实质教学正文；相邻课使用校准过的更严格阈值，非相邻课的合理相似仍可通过。progression 同时报告声明的 `prior_lesson_id` 链和物理相邻链。合理重复的课程名、专业、固定工具名、阶段 ID 和评价维度标签不作为正文重复。
 
-确定性 QA 通过并完成原子提交后，Agent 还要逐课内部复审：这一课比上一课新增什么、使用了上一课什么知识或成果、产出了什么、下一课如何使用该成果。这个复审不写入 DOCX。请求 `--render` 时，Python 报告只表示 `render.scope=smoke`，即 LibreOffice 成功生成非空且有页数的 PDF；它不等同于 visual QA 或 pagination verified。Agent 应检查第一课、正文最密集课、最后一课，课程达到 12 课时再检查 1–2 个中间课，关注溢出、截断、分页、大块空白、异常行高和内容越出表格。视觉检查失败时，Agent 应修改 V2 JSON 后用 `--backup-existing` 重新生成，不把视觉结论冒充为 render smoke 结果。
+确定性 QA 通过并完成原子提交后，Agent 还要逐课内部复审：这一课比上一课新增什么、使用了上一课什么知识或成果、产出了什么、下一课如何使用该成果。这个复审不写入 DOCX。请求 `--render` 时，Python 报告只表示 `render.scope=smoke`，即 LibreOffice 成功生成非空且有页数的 PDF；它不等同于 visual QA 或 pagination verified，也不能证明没有溢出、截断、异常分页或表格变形。Agent 应检查第一课、正文最密集课、最后一课，课程达到 12 课时再检查 1–2 个中间课，关注溢出、截断、分页、大块空白、异常行高和内容越出表格。视觉检查失败时，Agent 应修改 V2 JSON 后用 `--backup-existing` 重新生成，不把视觉结论冒充为 render smoke 结果。
 
-默认输出 QA 会读取原始 V2 JSON，通过纯 formatter 计算 expected，再对照 semantic bookmark 或 v1.0 坐标；不重新调用教学内容创作函数。模板布局、70 个 semantic bookmarks、bookmark IDs/names、fingerprint、v1.0/v1.1 compatibility 和 canonical 二进制均受保护。若本机存在 LibreOffice，使用 `--render` 做真实分页检查；没有 renderer 时 structural QA 仍通过，报告标记 `render.status=not_executed`。
+默认输出 QA 会读取原始 V2 JSON，通过纯 formatter 计算 expected，再对照 semantic bookmark 或 v1.0 坐标；不重新调用教学内容创作函数。模板布局、70 个 semantic bookmarks、bookmark IDs/names、fingerprint、v1.0/v1.1 compatibility 和 canonical 二进制均受保护。若本机存在 LibreOffice，使用 `--render` 做 render smoke；没有 renderer 时 structural QA 仍通过，报告标记 `render.status=not_executed`。真实分页、溢出和视觉布局结论只来自 Agent 的代表页检查。
 
 路径 preflight 在 mkdir、生成、move、backup、delete 之前执行，保护 Skill root、输入 JSON、schema、selected/custom template、manifest、canonical/compatibility package、scripts 和 tests，并拒绝 ancestor、descendant、resolved symlink 及 Windows lexical/8.3 alias overlap。不要把输出写入受保护目录或自定义模板包。
 
