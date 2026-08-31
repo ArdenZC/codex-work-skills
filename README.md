@@ -22,6 +22,8 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 
 完整用户可见更新见 [CHANGELOG.md](CHANGELOG.md)。
 
+Lesson Acceptance V2 的本地验收、报告和人工复核协议见 [docs/lesson-acceptance.md](docs/lesson-acceptance.md)。
+
 ## 教案生成器 2.0
 
 2.0 不是单纯的模板更新，而是教案内容生成链的重构：

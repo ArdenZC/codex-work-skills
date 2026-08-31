@@ -84,6 +84,9 @@ def load_module(path: Path, name: str):
     return module
 
 
+lesson_acceptance = load_module(ROOT / "tests" / "lesson_acceptance.py", "lesson_acceptance_contracts")
+
+
 class LessonSkillHardeningTests(unittest.TestCase):
     def test_lesson_intake_and_reference_instruction_contract(self) -> None:
         skill = (LESSON / "SKILL.md").read_text(encoding="utf-8")
@@ -110,6 +113,218 @@ class LessonSkillHardeningTests(unittest.TestCase):
             )
         self.assertIn("同一课内部", canonical)
         self.assertIn("禁止为了降低课程重复率编造", canonical)
+
+    def _acceptance_fixture(self, folder: Path, lesson_count: int = 3) -> tuple[Path, Path, Path, dict]:
+        lessons = []
+        for index in range(1, lesson_count + 1):
+            lessons.append(
+                {
+                    "id": f"L{index:02d}",
+                    "unit": f"项目{(index - 1) // 2 + 1}",
+                    "teaching_content": {"topic": f"主题{index}"},
+                    "implementation": {
+                        "stages": [
+                            {
+                                "teacher_actions": [f"教师动作{index}"],
+                                "student_actions": [f"学生动作{index}"],
+                            }
+                        ]
+                    },
+                    "evaluation": {"remarks": {"practice": f"评价备注{index}"}},
+                    "reflection": {"summary": f"反思{index}"},
+                }
+            )
+        data = {
+            "course_name": "验收测试课程",
+            "major": "软件技术",
+            "audience": "高职一年级",
+            "content_contract_version": "2.0",
+            "total_hours": lesson_count * 2,
+            "lessons": lessons,
+        }
+        links = [
+            {
+                "from": f"L{index:02d}",
+                "to": f"L{index + 1:02d}",
+                "status": "passed",
+                "same_unit": data["lessons"][index - 1]["unit"] == data["lessons"][index]["unit"],
+            }
+            for index in range(1, lesson_count)
+        ]
+        qa = {
+            "status": "passed",
+            "template_id": "lesson-plan",
+            "template_version": "1.1.2",
+            "template_path": "lesson-plan/v1.1.2/template.docx",
+            "content_contract_version": "2.0",
+            "files_checked": lesson_count,
+            "errors": [],
+            "validation": {"template": True, "output": True},
+            "checks": {
+                "file_count": {"expected": lesson_count, "actual": lesson_count},
+                "total_hours": {"expected": lesson_count * 2, "actual": lesson_count * 2},
+                "lessons": [{"file_index": index, "errors": []} for index in range(1, lesson_count + 1)],
+                "anchors": {
+                    "mode": "word_bookmark",
+                    "required": 2,
+                    "preserved": 2,
+                    "missing": [],
+                    "duplicates": [],
+                    "invalid_names": [],
+                    "unexpected_names": [],
+                    "invalid_ids": [],
+                    "boundary_errors": [],
+                },
+            },
+            "content_quality": {
+                "status": "passed",
+                "errors": [],
+                "exact_duplicates": [],
+                "adjacent_exact_duplicates": [],
+                "adjacent_similarity_pairs": [],
+                "whole_lesson_similarity_pairs": [],
+                "field_similarity_pairs": [],
+                "implementation_similarity_pairs": [],
+                "evaluation_remark_duplicates": [],
+                "reference_provenance": {
+                    "reuse_policy": "reference_reusable",
+                    "cross_lesson_reuse": "allowed",
+                    "same_lesson_duplicates": [],
+                    "invalid_resource_only": [],
+                },
+                "progression": {"status": "passed", "sequence_links": links},
+            },
+            "render": {
+                "status": "passed",
+                "files_checked": lesson_count,
+                "page_count": lesson_count * 2,
+                "page_counts": {f"L{index:02d}.docx": 2 for index in range(1, lesson_count + 1)},
+            },
+        }
+        input_path = folder / "content-v2.json"
+        output = folder / "output"
+        output.mkdir()
+        qa_path = output / "qa-report.json"
+        report_dir = folder / "acceptance-report"
+        input_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        qa_path.write_text(json.dumps(qa, ensure_ascii=False), encoding="utf-8")
+        for index in range(1, lesson_count + 1):
+            (output / f"L{index:02d}.docx").write_bytes(f"docx-{index}".encode("ascii"))
+        return input_path, output, qa_path, data
+
+    def test_acceptance_report_schema_metadata_and_read_only_inventory(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-acceptance-schema-") as temp_name:
+            folder = Path(temp_name)
+            input_path, output, qa_path, _data = self._acceptance_fixture(folder)
+            before = {path: path.read_bytes() for path in output.iterdir()}
+            report = lesson_acceptance.build_acceptance_report(
+                input_path,
+                output,
+                qa_path,
+                source_type="synthetic_fixture",
+                report_dir=folder / "report",
+                master_commit="a" * 40,
+            )
+            self.assertEqual(lesson_acceptance.validate_report_schema(report), [])
+            from jsonschema import Draft202012Validator
+
+            schema = json.loads((ROOT / "docs" / "lesson-acceptance-report.schema.json").read_text(encoding="utf-8"))
+            self.assertEqual(list(Draft202012Validator(schema).iter_errors(report)), [])
+            self.assertEqual(report["metadata"]["content_contract_version"], "2.0")
+            self.assertEqual(report["metadata"]["template_version"], "v1.1.2")
+            self.assertEqual(report["metadata"]["lesson_count"], 3)
+            self.assertEqual(report["structural_hard_gates"]["status"], "PASS")
+            self.assertEqual(report["final_status"], "PENDING_MANUAL_REVIEW")
+            self.assertEqual(report["visual_review"]["status"], "not_executed")
+            self.assertTrue(report["metadata"]["output_inventory_fingerprint"])
+            self.assertEqual({path: path.read_bytes() for path in output.iterdir()}, before)
+
+            with self.assertRaisesRegex(ValueError, "must not overlap"):
+                lesson_acceptance.build_acceptance_report(
+                    input_path,
+                    output,
+                    qa_path,
+                    source_type="synthetic_fixture",
+                    report_dir=output / "acceptance-report",
+                )
+
+    def test_acceptance_reuses_existing_metrics_and_expands_only_review_links(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-acceptance-metrics-") as temp_name:
+            folder = Path(temp_name)
+            input_path, output, qa_path, _data = self._acceptance_fixture(folder)
+            qa = json.loads(qa_path.read_text(encoding="utf-8"))
+            qa["content_quality"]["whole_lesson_similarity_pairs"] = [{"from": "L01", "to": "L02", "score": 0.31}]
+            qa["content_quality"]["field_similarity_pairs"] = [{"field": "teaching_content", "score": 0.22}]
+            qa["content_quality"]["implementation_similarity_pairs"] = [{"field": "teacher_actions", "score": 0.19}]
+            qa["content_quality"]["evaluation_remark_duplicates"] = [{"field": "evaluation.remarks.practice", "score": 0.12}]
+            qa_path.write_text(json.dumps(qa, ensure_ascii=False), encoding="utf-8")
+            report = lesson_acceptance.build_acceptance_report(
+                input_path,
+                output,
+                qa_path,
+                source_type="synthetic_fixture",
+                report_dir=folder / "report",
+            )
+            evidence = report["content_quality_evidence"]
+            self.assertEqual(evidence["similarity"]["whole_lesson"]["max"], 0.31)
+            self.assertEqual(evidence["similarity"]["fields"]["teaching_content"]["count"], 1)
+            self.assertEqual(evidence["similarity"]["implementation"]["count"], 1)
+            self.assertNotIn('"threshold":', json.dumps(evidence, ensure_ascii=False).lower())
+            self.assertEqual(report["sequence_review"]["physical_transition_count"], 2)
+            self.assertEqual(report["sequence_review"]["summary"]["boundaries"], 1)
+            self.assertTrue(all(item["boundary"] or item["status"] != "PASS" for item in report["sequence_review"]["attention_transitions"]))
+
+    def test_acceptance_known_software_modeling_boundaries_use_existing_sequence_links(self) -> None:
+        lessons = [{"id": f"L{index:02d}", "unit": f"项目{(index - 1) // 4 + 1}"} for index in range(1, 33)]
+        data = {"total_hours": 64, "lessons": lessons}
+        links = [
+            {"from": f"L{index:02d}", "to": f"L{index + 1:02d}", "status": "passed", "same_unit": (index - 1) // 4 == index // 4}
+            for index in range(1, 32)
+        ]
+        links[3]["requires_agent_review"] = True
+        report = lesson_acceptance.sequence_review(
+            data,
+            {"content_quality": {"progression": {"sequence_links": links}}},
+        )
+        self.assertEqual(report["physical_transition_count"], 31)
+        self.assertTrue(report["known_software_modeling_64h"])
+        self.assertEqual(
+            [(item["from"], item["to"]) for item in report["known_boundaries"]],
+            list(lesson_acceptance.KNOWN_SOFTWARE_MODELING_64H_BOUNDARIES),
+        )
+        self.assertEqual(report["physical_transitions"][3]["status"], "REVIEW")
+
+    def test_acceptance_manual_layers_and_negative_control_catalog_are_explicit(self) -> None:
+        catalog = lesson_acceptance.negative_control_catalog()
+        self.assertEqual(
+            {item["id"] for item in catalog},
+            {
+                "nursing_sql_contamination",
+                "database_patient_bp",
+                "copied_teacher_actions",
+                "mechanical_scores",
+                "generic_fabricated_reference",
+                "short_remark",
+            },
+        )
+        controls = lesson_acceptance.negative_controls()
+        self.assertEqual(controls["status"], "not_executed")
+        self.assertEqual(controls["transaction_safety"]["candidate_cleanup"], "not_executed")
+        self.assertEqual(controls["transaction_safety"]["old_output_preserved"], "not_executed")
+        scope = lesson_acceptance.course_scope_review({"lessons": [{"unit": "P1"}, {"unit": "P2"}]})
+        self.assertFalse(scope["hard_gate"])
+        self.assertEqual(scope["allowed_classifications"], ["CORE", "EXTENSION", "POSSIBLE_SCOPE_DRIFT"])
+        self.assertIn("PENDING_MANUAL_REVIEW", lesson_acceptance.acceptance_markdown({
+            "final_status": "PENDING_MANUAL_REVIEW",
+            "metadata": {"course": "C", "major": "M", "audience": "A", "lesson_count": 0, "total_hours": 0, "source_type": "mixed", "master_commit": "unknown", "content_contract_version": "2.0", "template_version": "v1.1.2", "input_sha256": "x", "qa_report_sha256": "x", "output_inventory_fingerprint": None, "render_status": "not_executed", "visual_status": "not_executed"},
+            "structural_hard_gates": {"status": "FAIL", "gates": []},
+            "content_quality_evidence": {"status": "not_available", "detector_counts": {}},
+            "sequence_review": {"physical_transition_count": 0, "summary": {}},
+            "visual_review": {"status": "not_executed"},
+            "teaching_design_review": {"status": "not_executed"},
+            "teacher_usability": {"status": "not_executed"},
+            "negative_controls": {"status": "not_executed"},
+        }))
 
     def test_hardening_import_loader_restores_process_global_state(self) -> None:
         original_path = sys.path[:]

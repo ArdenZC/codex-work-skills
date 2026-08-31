@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/docs/lesson-acceptance-report.schema.json",
+  "title": "Lesson Acceptance V2 Report",
+  "type": "object",
+  "required": [
+    "acceptance_schema_version",
+    "metadata",
+    "structural_hard_gates",
+    "content_quality_evidence",
+    "sequence_review",
+    "course_scope_review",
+    "content_length",
+    "visual_review",
+    "negative_controls",
+    "hallucination_review",
+    "teaching_design_review",
+    "teacher_usability",
+    "final_status"
+  ],
+  "properties": {
+    "acceptance_schema_version": { "const": "2.0" },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "course",
+        "major",
+        "audience",
+        "lesson_count",
+        "total_hours",
+        "source_type",
+        "master_commit",
+        "content_contract_version",
+        "template_version",
+        "input_sha256",
+        "qa_report_sha256",
+        "output_inventory_fingerprint",
+        "render_status",
+        "visual_status"
+      ],
+      "properties": {
+        "source_type": {
+          "enum": ["real_agent", "synthetic_fixture", "human_authored", "mixed"]
+        },
+        "content_contract_version": { "const": "2.0" },
+        "template_version": { "const": "v1.1.2" },
+        "lesson_count": { "type": "integer", "minimum": 0 },
+        "total_hours": { "type": ["number", "null"] },
+        "input_sha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
+        "qa_report_sha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
+        "output_inventory_fingerprint": { "type": ["string", "null"] }
+      },
+      "additionalProperties": true
+    },
+    "structural_hard_gates": {
+      "type": "object",
+      "required": ["status", "hard_gate", "gates"],
+      "properties": {
+        "status": { "enum": ["PASS", "FAIL"] },
+        "hard_gate": { "const": true },
+        "gates": { "type": "array" }
+      },
+      "additionalProperties": true
+    },
+    "final_status": {
+      "enum": [
+        "PENDING_MANUAL_REVIEW",
+        "PASSED",
+        "PASSED_WITH_TEACHER_ADJUSTMENTS",
+        "FAILED"
+      ]
+    }
+  },
+  "additionalProperties": true
+}
