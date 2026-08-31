@@ -81,6 +81,20 @@ def _assert_destination_safe(directory: Path, report_path: Path, destination_pat
             raise ValueError(f"visual inspection destination must not overwrite protected path: {protected}")
 
 
+def _validate_inspected_pages(inspected_pages: Any) -> None:
+    """Validate the direct writer API, including bool-as-int edge cases."""
+
+    if not isinstance(inspected_pages, dict) or not inspected_pages:
+        raise ValueError("visual inspection evidence requires inspected files and representative pages")
+    for filename, pages in inspected_pages.items():
+        if not isinstance(filename, str) or not filename.strip():
+            raise ValueError("inspected DOCX filenames must be non-empty strings")
+        if not isinstance(pages, list) or not pages:
+            raise ValueError(f"inspected pages must be a non-empty list for {filename}")
+        if any(type(page) is not int or page <= 0 for page in pages):
+            raise ValueError(f"inspected pages must be positive integers for {filename}")
+
+
 def write_visual_inspection_evidence(
     *,
     output_dir: Path | str,
@@ -94,6 +108,7 @@ def write_visual_inspection_evidence(
     directory = Path(output_dir).expanduser().resolve()
     report_path = Path(qa_report).expanduser().resolve()
     destination_path = Path(destination).expanduser().resolve()
+    _validate_inspected_pages(inspected_pages)
     _assert_destination_safe(directory, report_path, destination_path)
     if not report_path.is_file():
         raise ValueError(f"related qa-report.json does not exist: {report_path}")
@@ -119,9 +134,6 @@ def write_visual_inspection_evidence(
         raise ValueError("passed visual inspection requires every recorded check to pass")
     if status == "failed" and all(value == "passed" for value in checks.values()):
         raise ValueError("failed visual inspection must identify at least one failed check")
-    if not inspected_pages:
-        raise ValueError("visual inspection evidence requires inspected files and representative pages")
-
     available = {path.name for path in directory.glob("*.docx") if path.is_file() and not path.is_symlink()}
     missing = sorted(set(inspected_pages) - available)
     if missing:
@@ -131,7 +143,7 @@ def write_visual_inspection_evidence(
     if page_bounds_verified:
         for name, pages in inspected_pages.items():
             maximum = page_counts.get(name)
-            if not isinstance(maximum, int) or maximum <= 0 or any(page > maximum for page in pages):
+            if type(maximum) is not int or maximum <= 0 or any(page > maximum for page in pages):
                 raise ValueError(f"inspected page is outside render.page_counts for {name}")
     evidence = {
         "status": status,

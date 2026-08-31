@@ -756,11 +756,26 @@ class LessonContentV2Mixin:
         calibration = lesson_content_quality.progression_calibration()
         self.assertEqual(len(calibration), 11)
         self.assertTrue(all(item["expected"] == item["calibrated_status"] for item in calibration), calibration)
+        self.assertTrue(
+            all(
+                item["effective_status"] == ("passed" if item["passed"] else "failed")
+                and item["passed"] == (item["expected"] == "通过")
+                and item["raw_score"] == item["evidence_score"]
+                for item in calibration
+            ),
+            calibration,
+        )
         margin = lesson_content_quality.progression_calibration_margin()
         self.assertEqual(margin["positive_count"], 5)
         self.assertEqual(margin["hard_negative_count"], 6)
-        self.assertGreater(margin["positive_minimum"], margin["negative_maximum"])
-        self.assertGreater(margin["margin"], 0)
+        self.assertEqual(
+            margin["negative_maximum"],
+            max(item["raw_score"] for item in calibration if item["expected"] == "失败"),
+        )
+        self.assertEqual(
+            margin["margin"],
+            round(margin["positive_minimum"] - margin["negative_maximum"], 4),
+        )
         for item in calibration:
             anchor = item["signals"]["substantive_anchor"]
             self.assertIn("matched_fragments", anchor)
@@ -867,7 +882,9 @@ class LessonContentV2Mixin:
             deliverable="SQL查询脚本和结果记录",
         )
         current["task"] = "完成SQL查询设计"
-        current["teaching_content"] = ["依据表结构编写查询语句", "验证查询结果", "整理查询证据"]
+        current["teaching_content"] = ["依据SQL查询设计的表结构编写查询语句", "验证查询结果", "整理查询证据"]
+        for stage in current["implementation"]:
+            stage["content"] = [f"围绕SQL查询设计，{stage['content'][0]}"]
         false_inheritance_report = assess_content_quality(false_inheritance)
         false_inheritance_link = false_inheritance_report["progression"]["declared_prior_links"][0]
         self.assertEqual(false_inheritance_link["artifact_inheritance"]["status"], "failed")
@@ -886,6 +903,8 @@ class LessonContentV2Mixin:
         )
         current["task"] = "完成关系模式设计"
         current["teaching_content"] = ["主键、外键与关系表映射", "依据E-R图确定字段", "检查关系模式约束"]
+        for stage in current["implementation"]:
+            stage["content"] = [f"围绕关系模式设计，{stage['content'][0]}"]
         both_pass_report = assess_content_quality(both_pass)
         both_pass_link = both_pass_report["progression"]["declared_prior_links"][0]
         self.assertEqual(both_pass_link["artifact_inheritance"]["status"], "passed")

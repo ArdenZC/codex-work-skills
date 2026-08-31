@@ -24,11 +24,26 @@ MINIMAL_ENGINE_FILES = (
     Path("AGENTS.md"),
     Path("CONVENTIONS.md"),
 )
-FULL_ENGINE_SENTINELS = (
+FULL_ENGINE_RUNTIME_FILES = (
+    Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
+    Path("scripts/content_contract.py"),
+    Path("scripts/content_quality.py"),
+    Path("scripts/package_common.py"),
+    Path("scripts/path_safety.py"),
+    Path("scripts/validate_output.py"),
+    Path("scripts/validate_template.py"),
+    Path("scripts/render_qa.py"),
+    Path("scripts/semantic_bookmarks.py"),
+    Path("scripts/bookmark_utils.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
+    Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
 )
+# Kept as a compatibility name for callers that inspected the old sentinel
+# tuple; it now represents the complete health inventory rather than three
+# representative files.
+FULL_ENGINE_SENTINELS = FULL_ENGINE_RUNTIME_FILES
 REFERENCE_TEXT_SUFFIXES = {".md", ".mdc", ".yml", ".yaml"}
 RUNTIME_REFERENCE = re.compile(
     r"(?<![./\w-])"
@@ -196,6 +211,17 @@ def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
     return list(MINIMAL_ENGINE_FILES)
 
 
+def _required_engine_files(source_root: Path, copy_engine: bool) -> tuple[Path, ...]:
+    required = (*MINIMAL_ENGINE_FILES, *(FULL_ENGINE_RUNTIME_FILES if copy_engine else ()))
+    missing = [source_root / relative for relative in required if not (source_root / relative).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Lesson adapter source is incomplete; missing critical runtime files: "
+            + ", ".join(str(path) for path in missing)
+        )
+    return required
+
+
 def _detect_existing_engine_mode(engine_target: Path) -> str:
     """Classify an existing project-local engine without following symlinks."""
 
@@ -209,10 +235,10 @@ def _detect_existing_engine_mode(engine_target: Path) -> str:
         return path.is_file() and not path.is_symlink()
 
     minimal = all(real_file(relative) for relative in MINIMAL_ENGINE_FILES)
-    sentinel_states = [real_file(relative) for relative in FULL_ENGINE_SENTINELS]
-    if minimal and all(sentinel_states):
+    full_states = [real_file(relative) for relative in FULL_ENGINE_RUNTIME_FILES]
+    if minimal and all(full_states):
         return "full"
-    if minimal and not any(sentinel_states):
+    if minimal and not any(full_states):
         return "minimal"
     return "inconsistent"
 
@@ -237,12 +263,28 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
     selected = list(ADAPTER_PATHS) if "all" in selected else list(dict.fromkeys(selected))
     if paths_overlap(source_root, target_root):
         raise ValueError(f"Adapter target must not overlap the Skill source: {target_root}")
+    _required_engine_files(source_root, copy_engine)
     for name in selected:
         for relative in ADAPTER_PATHS[name]:
             source = source_root / relative
             if not source.is_file():
                 raise FileNotFoundError(f"Adapter source file not found: {source}")
     _preflight(source_root, target_root, selected, copy_engine)
+
+    engine_target = target_root / ENGINE_NAME
+    if engine_target.is_symlink():
+        raise ValueError(f"Namespaced engine target must not be a symlink: {engine_target}")
+    if engine_target.exists() and not engine_target.is_dir():
+        raise ValueError(f"Namespaced engine target is not a directory: {engine_target}")
+    existing_engine_mode = _detect_existing_engine_mode(engine_target)
+    if existing_engine_mode == "inconsistent" and not (copy_engine and replace):
+        raise ValueError(
+            f"Namespaced engine is inconsistent: {engine_target}; refusing to mutate it"
+        )
+    if copy_engine and existing_engine_mode != "none" and not replace:
+        # A full engine replacement can otherwise leave stale files behind.
+        raise FileExistsError(f"Namespaced engine already exists: {engine_target}; use --replace")
+    adapter_runtime_available = copy_engine or existing_engine_mode == "full"
 
     files: dict[Path, bytes] = {}
     shared_targets = {relative for name in selected for relative in ADAPTER_PATHS[name] if relative in SHARED_SOURCES}
@@ -251,7 +293,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         target = target_root / relative
         if target.is_symlink():
             raise ValueError(f"Refusing to replace symlinked adapter file: {target}")
-        payload = _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=copy_engine)
+        payload = _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=adapter_runtime_available)
         merged = merge_marker_section(_read_text(target), payload)
         if not target.exists() or target.read_bytes() != merged.encode("utf-8"):
             files[target] = merged.encode("utf-8")
@@ -268,7 +310,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
                 merged = merge_aider_config(_read_text(target))
                 payload = merged.encode("utf-8")
             else:
-                payload = _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=copy_engine).encode("utf-8")
+                payload = _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=adapter_runtime_available).encode("utf-8")
             if target.exists() and not replace and target.read_bytes() != payload:
                 # Adapter files are intentionally additive only through their
                 # marker-managed shared counterparts; plain files need opt-in.
@@ -276,20 +318,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
             if not target.exists() or target.read_bytes() != payload:
                 files[target] = payload
 
-    engine_target = target_root / ENGINE_NAME
     engine_files = _source_files(source_root, copy_engine)
-    if engine_target.is_symlink():
-        raise ValueError(f"Namespaced engine target must not be a symlink: {engine_target}")
-    if engine_target.exists() and not engine_target.is_dir():
-        raise ValueError(f"Namespaced engine target is not a directory: {engine_target}")
-    existing_engine_mode = _detect_existing_engine_mode(engine_target)
-    if existing_engine_mode == "inconsistent" and not (copy_engine and replace):
-        raise ValueError(
-            f"Namespaced engine is inconsistent: {engine_target}; refusing to mutate it"
-        )
-    if copy_engine and existing_engine_mode != "none" and not replace:
-        # A full engine replacement can otherwise leave stale files behind.
-        raise FileExistsError(f"Namespaced engine already exists: {engine_target}; use --replace")
     if not copy_engine and existing_engine_mode == "full":
         # Default installs update project-root adapter rules but preserve a
         # complete runtime byte-for-byte.  Never downgrade or rewrite it.

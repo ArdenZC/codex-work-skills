@@ -47,6 +47,15 @@ class TestShardManifest(unittest.TestCase):
         full = set(run_test_shards._expand_suites(("full",), specs))
         self.assertTrue(fast <= full)
 
+    def test_hardening_suite_is_in_full_manifest(self) -> None:
+        specs = run_test_shards._suite_specs()
+        self.assertIn("hardening", specs)
+        self.assertIn("hardening", run_test_shards._expand_suites(("full",), specs))
+        self.assertEqual(
+            specs["hardening"].count,
+            unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_skill_hardening").countTestCases(),
+        )
+
     def test_list_json_reports_parallel_safety_and_counts(self) -> None:
         result = subprocess.run(
             [sys.executable, str(SCRIPTS / "run_test_shards.py"), "--list", "--json"],

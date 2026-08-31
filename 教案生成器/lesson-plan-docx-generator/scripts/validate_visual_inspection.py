@@ -71,7 +71,7 @@ def validate_visual_inspection(
     if any(
         not isinstance(pages, list)
         or not pages
-        or any(not isinstance(page, int) or page <= 0 for page in pages)
+        or any(type(page) is not int or page <= 0 for page in pages)
         for pages in inspected_pages.values()
     ):
         raise ValueError("visual evidence must include positive inspected page numbers")
@@ -85,9 +85,9 @@ def validate_visual_inspection(
             raise ValueError("page_bounds_verified requires render.page_counts")
         for name, pages in inspected_pages.items():
             maximum = page_counts.get(name)
-            if not isinstance(pages, list) or not isinstance(maximum, int) or maximum <= 0:
+            if not isinstance(pages, list) or type(maximum) is not int or maximum <= 0:
                 raise ValueError(f"page bounds are malformed for {name}")
-            if any(not isinstance(page, int) or page <= 0 or page > maximum for page in pages):
+            if any(type(page) is not int or page <= 0 or page > maximum for page in pages):
                 raise ValueError(f"inspected pages exceed render.page_counts for {name}")
     return evidence
 

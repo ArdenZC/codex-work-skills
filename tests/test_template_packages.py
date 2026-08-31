@@ -3567,6 +3567,15 @@ class GradebookPowerShellContractTests(unittest.TestCase):
 
 
 class WorkflowContractTests(unittest.TestCase):
+    def test_template_package_ci_lesson_jobs_run_hardening_suite(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
+        workflow_data = yaml.safe_load(workflow)
+        lesson_job = workflow_data["jobs"]["template-lesson"]
+        lesson_steps = "\n".join(str(step.get("run", "")) for step in lesson_job["steps"])
+        self.assertIn("--suite lesson-content", lesson_steps)
+        self.assertIn("--suite lesson-package", lesson_steps)
+        self.assertIn("--suite hardening", lesson_steps)
+
     def test_template_package_ci_runs_on_main_push(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
         workflow_data = yaml.safe_load(workflow)

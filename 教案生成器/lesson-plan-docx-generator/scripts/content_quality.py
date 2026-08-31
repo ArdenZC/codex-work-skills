@@ -1203,148 +1203,303 @@ def _best_intra_item(left: Any, values: list[Any]) -> tuple[int, Any, dict[str, 
     )
 
 
+def _intra_diagnostic_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
+    """Keep edge diagnostics bounded and free of complete user paragraphs."""
+
+    return {
+        key: evidence[key]
+        for key in (
+            "status",
+            "score",
+            "reason",
+            "matched_fragments",
+            "longest_substantive_match",
+            "acronym_matches",
+            "generic_only_matches",
+            "substantive_residuals",
+        )
+        if key in evidence
+    }
+
+
 def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]) -> dict[str, Any]:
-    """Check that each task, body and deliverable describe the same lesson."""
+    """Require one substantive connected component for the lesson's main chain."""
 
     checks: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    progression_fields = ("prior_learning", "next_bridge")
+    boundary_stage_ids = {IMPLEMENTATION_STAGE_IDS[0], IMPLEMENTATION_STAGE_IDS[-1]}
+
     for lesson_id, lesson in zip(lesson_ids, lessons):
-        task = lesson.get("task", "")
         body_fields = {
             "teaching_content": list(lesson.get("teaching_content", [])),
-            "key_point": list(lesson.get("key_point", {}).get("content", [])),
-            "difficult_point": list(lesson.get("difficult_point", {}).get("content", [])),
+            "key_point.content": list(lesson.get("key_point", {}).get("content", [])),
+            "difficult_point.content": list(lesson.get("difficult_point", {}).get("content", [])),
         }
-        body_results = {
-            field: _intra_anchor_evidence(task, values)
-            for field, values in body_fields.items()
-        }
-        body_items = {
-            field: _best_intra_item(task, values)
-            for field, values in body_fields.items()
-        }
-        gate_a = max(
-            body_results.items(),
-            key=lambda item: (item[1]["status"] == "passed", item[1]["score"], item[0]),
+        nodes: list[dict[str, Any]] = [
+            {"id": "task", "kind": "task", "field": "task", "value": lesson.get("task", "")},
+        ]
+        for field, values in body_fields.items():
+            for index, value in enumerate(values):
+                nodes.append(
+                    {"id": f"{field}[{index}]", "kind": "instructional_body", "field": field, "index": index, "value": value}
+                )
+        nodes.append(
+            {
+                "id": "deliverable",
+                "kind": "deliverable",
+                "field": "progression.deliverable",
+                "value": lesson.get("progression", {}).get("deliverable", ""),
+            }
         )
-        gate_a_field, gate_a_evidence = gate_a
-        gate_a_item = body_items[gate_a_field]
-        deliverable = lesson.get("progression", {}).get("deliverable", "")
-        task_anchor = _intra_anchor_evidence(deliverable, task)
-        deliverable_items = {
-            field: _best_intra_item(deliverable, values)
-            for field, values in body_fields.items()
-        }
-        body_anchor = max(
-            (_intra_anchor_evidence(deliverable, values) for values in body_fields.values()),
-            key=lambda item: (item["status"] == "passed", item["score"], item["reason"]),
+        node_by_id = {node["id"]: node for node in nodes}
+        body_node_ids = [node["id"] for node in nodes if node["kind"] == "instructional_body"]
+        adjacency = {node["id"]: set() for node in nodes}
+        edge_map: dict[frozenset[str], dict[str, Any]] = {}
+        edges: list[dict[str, Any]] = []
+        for left_index, left in enumerate(nodes):
+            for right in nodes[left_index + 1 :]:
+                evidence = _intra_anchor_evidence(left["value"], right["value"])
+                if evidence["status"] != "passed":
+                    continue
+                adjacency[left["id"]].add(right["id"])
+                adjacency[right["id"]].add(left["id"])
+                edge = {
+                    "left": left["id"],
+                    "right": right["id"],
+                    "left_diagnostic": _diagnostic_fragment(left["value"]),
+                    "right_diagnostic": _diagnostic_fragment(right["value"]),
+                    "evidence": _intra_diagnostic_evidence(evidence),
+                }
+                edges.append(edge)
+                edge_map[frozenset((left["id"], right["id"]))] = edge
+
+        def edge_between(left_id: str, right_id: str) -> dict[str, Any] | None:
+            return edge_map.get(frozenset((left_id, right_id)))
+
+        def component(seed: str) -> set[str]:
+            members: set[str] = set()
+            pending = [seed]
+            while pending:
+                current = pending.pop()
+                if current in members:
+                    continue
+                members.add(current)
+                pending.extend(adjacency[current] - members)
+            return members
+
+        task_component_ids = component("task")
+        task_body_edges = [
+            (body_id, edge_between("task", body_id))
+            for body_id in body_node_ids
+            if edge_between("task", body_id) is not None
+        ]
+        task_connected = bool(task_body_edges)
+        deliverable_connected = task_connected and "deliverable" in task_component_ids
+        gate_a_body = max(
+            task_body_edges,
+            key=lambda item: (item[1]["evidence"]["score"], item[0]),
+            default=(None, None),
         )
-        deliverable_item = max(
-            (
-                (field, item)
-                for field, item in deliverable_items.items()
-                if item is not None
-            ),
-            key=lambda candidate: (
-                candidate[1][2]["status"] == "passed",
-                candidate[1][2]["score"],
-                candidate[0],
-            ),
-            default=None,
+        gate_a_body_id, gate_a_edge = gate_a_body
+        gate_a_evidence = (
+            gate_a_edge["evidence"]
+            if gate_a_edge is not None
+            else {"status": "failed", "score": 0.0, "reason": "task has no substantive edge to instructional body"}
         )
+        task_anchor_edge = edge_between("deliverable", "task")
+        deliverable_body_edges = [
+            (body_id, edge_between("deliverable", body_id))
+            for body_id in body_node_ids
+            if edge_between("deliverable", body_id) is not None
+        ]
+        body_anchor_id, body_anchor_edge = max(
+            deliverable_body_edges,
+            key=lambda item: (item[1]["evidence"]["score"], item[0]),
+            default=(None, None),
+        )
+        body_anchor_evidence = (
+            body_anchor_edge["evidence"]
+            if body_anchor_edge is not None
+            else {"status": "failed", "score": 0.0, "reason": "deliverable has no substantive edge to instructional body"}
+        )
+        same_component_body_edges = [
+            (body_id, edge_between("deliverable", body_id))
+            for body_id in body_node_ids
+            if body_id in task_component_ids and edge_between("deliverable", body_id) is not None
+        ]
+        cross_body_id, cross_body_edge = max(
+            same_component_body_edges,
+            key=lambda item: (item[1]["evidence"]["score"], item[0]),
+            default=(None, None),
+        )
+        cross_body_anchor = (
+            cross_body_edge["evidence"]
+            if cross_body_edge is not None
+            else {"status": "failed", "score": 0.0, "reason": "deliverable has no edge inside task component"}
+        )
+
+        def node_field(node_id: str | None) -> str | None:
+            return node_by_id[node_id]["field"] if node_id is not None else None
+
+        def node_index(node_id: str | None) -> int | None:
+            return node_by_id[node_id].get("index") if node_id is not None else None
+
         gate_a_result = {
-            "status": gate_a_evidence["status"],
+            "status": "passed" if task_connected else "failed",
             "score": gate_a_evidence["score"],
             "anchor_status": gate_a_evidence["status"],
-            "reason": gate_a_evidence["reason"],
-            "matched_field": gate_a_field,
-            "matched_body_index": gate_a_item[0] if gate_a_item is not None else None,
+            "reason": (
+                "task has a substantive edge to instructional body"
+                if task_connected
+                else "task has no substantive edge to teaching_content/key_point.content/difficult_point.content"
+            ),
+            "matched_field": node_field(gate_a_body_id),
+            "matched_body_index": node_index(gate_a_body_id),
+            "matched_node": gate_a_body_id,
             "candidates": {
-                field: {"status": result["status"], "score": result["score"], "reason": result["reason"]}
-                for field, result in body_results.items()
+                field: {
+                    "status": "passed" if any(
+                        node_by_id[node_id]["field"] == field
+                        for node_id, _node_edge in task_body_edges
+                    ) else "failed",
+                    "score": max(
+                        (node_edge["evidence"]["score"] for node_id, node_edge in task_body_edges if node_by_id[node_id]["field"] == field),
+                        default=0.0,
+                    ),
+                }
+                for field in body_fields
             },
         }
-        same_body_anchor = {
-            "status": "failed",
-            "score": 0.0,
-            "reason": "Gate A did not identify a concrete instructional body item",
-        }
-        if gate_a_item is not None:
-            same_body_anchor = _intra_anchor_evidence(deliverable, gate_a_item[1])
-        cross_body_anchor = {
-            "status": "failed",
-            "score": 0.0,
-            "reason": "deliverable and Gate A body evidence have no shared substantive anchor",
-        }
-        cross_body_match = None
-        if gate_a_item is not None and deliverable_item is not None:
-            # A field is a small semantic cluster rather than only the single
-            # item that happened to win Gate A.  Search that field for the
-            # strongest bridge so concise key-point summaries can connect to
-            # the concrete teaching item that established the task anchor.
-            # Exclude the deliverable's own item when both matches are in the
-            # same field; otherwise a mixed field could bridge to itself.
-            deliverable_value = deliverable_item[1][1]
-            cross_body_candidates = [
-                (index, value, _intra_anchor_evidence(value, deliverable_value))
-                for index, value in enumerate(body_fields[gate_a_field])
-                if not (
-                    deliverable_item[0] == gate_a_field
-                    and index == deliverable_item[1][0]
-                )
-            ]
-            if cross_body_candidates:
-                cross_body_match = max(
-                    cross_body_candidates,
-                    key=lambda item: (
-                        item[2]["status"] == "passed",
-                        item[2]["score"],
-                        -item[0],
-                    ),
-                )
-            if cross_body_match is not None:
-                cross_body_anchor = cross_body_match[2]
-        shared_cluster = {
-            "same_gate_a_body": same_body_anchor["status"] == "passed",
-            "direct_task_and_body": (
-                task_anchor["status"] == "passed" and body_anchor["status"] == "passed"
-            ),
-            "cross_body_bridge": cross_body_anchor["status"] == "passed",
-            "same_gate_a_body_evidence": same_body_anchor,
-            "cross_body_evidence": cross_body_anchor,
-            "cross_body_gate_a_body_index": (
-                cross_body_match[0] if cross_body_match is not None else None
-            ),
-            "deliverable_matched_field": deliverable_item[0] if deliverable_item is not None else None,
-            "deliverable_matched_body_index": (
-                deliverable_item[1][0] if deliverable_item is not None else None
-            ),
-        }
-        gate_b_passed = gate_a_result["status"] == "passed" and any(
-            (
-                shared_cluster["same_gate_a_body"],
-                shared_cluster["direct_task_and_body"],
-                shared_cluster["cross_body_bridge"],
-            )
-        )
+        gate_b_passed = deliverable_connected
         gate_b_result = {
             "status": "passed" if gate_b_passed else "failed",
-            "score": round(min(gate_a_result["score"], body_anchor["score"]), 4),
+            "score": round(
+                min(
+                    gate_a_result["score"],
+                    task_anchor_edge["evidence"]["score"] if task_anchor_edge else body_anchor_evidence["score"],
+                ),
+                4,
+            ),
             "anchor_status": {
-                "task": task_anchor["status"],
-                "body": body_anchor["status"],
-                "shared_cluster": "passed" if gate_b_passed else "failed",
+                "task": "passed" if task_connected else "failed",
+                "body": body_anchor_evidence["status"],
+                "shared_component": "passed" if gate_b_passed else "failed",
             },
             "reason": (
-                "deliverable shares a semantic cluster with the Gate A task/body chain"
+                "task and deliverable belong to the same main semantic component"
                 if gate_b_passed
-                else "deliverable matches an instructional body branch unrelated to the Gate A task/body chain"
+                else "deliverable belongs to a component disconnected from the task main semantic component"
             ),
-            "task_anchor": task_anchor,
-            "body_anchor": body_anchor,
-            "shared_cluster": shared_cluster,
+            "task_anchor": task_anchor_edge["evidence"] if task_anchor_edge else {"status": "failed", "score": 0.0},
+            "body_anchor": body_anchor_evidence,
+            "shared_cluster": {
+                "same_gate_a_body": edge_between("deliverable", gate_a_body_id) is not None if gate_a_body_id else False,
+                "direct_task_and_body": task_anchor_edge is not None and body_anchor_edge is not None,
+                "cross_body_bridge": cross_body_edge is not None,
+                "same_component": gate_b_passed,
+                "same_gate_a_body_evidence": (
+                    edge_between("deliverable", gate_a_body_id)["evidence"]
+                    if gate_a_body_id and edge_between("deliverable", gate_a_body_id)
+                    else {"status": "failed", "score": 0.0}
+                ),
+                "cross_body_evidence": cross_body_anchor,
+                "cross_body_gate_a_body_index": node_index(cross_body_id),
+                "deliverable_matched_field": node_field(body_anchor_id),
+                "deliverable_matched_body_index": node_index(body_anchor_id),
+            },
         }
-        record = {"lesson_id": lesson_id, "gate_a": gate_a_result, "gate_b": gate_b_result}
+
+        progression_values = lesson.get("progression", {})
+        eligible_progression: list[tuple[str, Any, str, dict[str, Any]]] = []
+        if task_connected:
+            for field in progression_fields:
+                value = progression_values.get(field, "")
+                for core_id in sorted(task_component_ids):
+                    if core_id not in node_by_id:
+                        continue
+                    evidence = _intra_anchor_evidence(value, node_by_id[core_id]["value"])
+                    if evidence["status"] == "passed":
+                        eligible_progression.append((field, value, core_id, evidence))
+                        break
+
+        implementation_records: list[dict[str, Any]] = []
+        implementation_failures: list[dict[str, Any]] = []
+        for stage in lesson.get("implementation", []):
+            stage_id = str(stage.get("id", ""))
+            stage_values: list[Any] = []
+            for field in IMPLEMENTATION_STAGE_FIELDS:
+                value = stage.get(field, [])
+                if isinstance(value, (list, tuple)):
+                    stage_values.extend(value)
+                elif value:
+                    stage_values.append(value)
+            stage_summary = "\n".join(str(value) for value in stage_values if str(value).strip())
+            component_matches: list[tuple[str, dict[str, Any]]] = []
+            for core_id in sorted(task_component_ids):
+                evidence = _intra_anchor_evidence(stage_summary, node_by_id[core_id]["value"])
+                if evidence["status"] == "passed":
+                    component_matches.append((core_id, evidence))
+            progression_matches: list[tuple[str, str, dict[str, Any]]] = []
+            if stage_id in boundary_stage_ids:
+                for field, _value, core_id, progression_evidence in eligible_progression:
+                    stage_evidence = _intra_anchor_evidence(stage_summary, progression_values.get(field, ""))
+                    if stage_evidence["status"] == "passed":
+                        progression_matches.append((field, core_id, stage_evidence))
+            stage_passed = bool(component_matches or progression_matches)
+            stage_record = {
+                "stage_id": stage_id,
+                "status": "passed" if stage_passed else "failed",
+                "matched_component_members": [item[0] for item in component_matches],
+                "matched_progression_fields": [item[0] for item in progression_matches],
+                "aggregate_diagnostic": _diagnostic_fragment(stage_summary),
+                "evidence": [
+                    {"target": target, "evidence": _intra_diagnostic_evidence(evidence)}
+                    for target, evidence in component_matches
+                ]
+                + [
+                    {"target": field, "component_member": core_id, "evidence": _intra_diagnostic_evidence(evidence)}
+                    for field, core_id, evidence in progression_matches
+                ],
+            }
+            implementation_records.append(stage_record)
+            if not stage_passed:
+                implementation_failures.append(
+                    {
+                        "lesson_id": lesson_id,
+                        "failed_gate": "implementation_stage_coherence",
+                        "stage_id": stage_id,
+                        "score": 0.0,
+                        "anchor_status": "failed",
+                        "reason": "implementation stage has no substantive anchor to the task main component",
+                    }
+                )
+
+        main_component = {
+            "task_connected": task_connected,
+            "deliverable_connected": deliverable_connected,
+            "members": sorted(task_component_ids),
+        }
+        record = {
+            "lesson_id": lesson_id,
+            "main_component": main_component,
+            "core_nodes": [
+                {
+                    **{key: value for key, value in node.items() if key != "value"},
+                    "diagnostic": _diagnostic_fragment(node["value"]),
+                }
+                for node in nodes
+            ],
+            "semantic_edges": edges,
+            "disconnected_core_nodes": sorted(set(node_by_id) - task_component_ids),
+            "gate_a": gate_a_result,
+            "gate_b": gate_b_result,
+            "implementation": {
+                "status": "passed" if not implementation_failures else "failed",
+                "stages": implementation_records,
+                "rule": "each stage aggregate must anchor to a task-component core node; boundary stages may use anchored progression",
+            },
+        }
         checks.append(record)
         for gate_name, gate in (("gate_a_task_body", gate_a_result), ("gate_b_deliverable_body", gate_b_result)):
             if gate["status"] != "passed":
@@ -1357,6 +1512,7 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
                         "reason": gate["reason"],
                     }
                 )
+        failures.extend(implementation_failures)
     return {
         "status": "passed" if not failures else "failed",
         "lessons": checks,
@@ -1364,16 +1520,27 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
         "thresholds": {
             "minimum_substantive_anchor_chars": 3,
             "technical_acronym_allowed": True,
-            "gate_a": "task -> teaching_content|key_point.content|difficult_point.content",
-            "gate_b": "deliverable -> Gate A body cluster, direct task/body bridge, or cross-body bridge",
+            "gate_a": "task must have a direct substantive edge to an instructional body node",
+            "gate_b": "task and deliverable must belong to the same connected core component",
+            "implementation": "stage aggregate content/actions/objective must anchor to task component",
         },
+    }
+
+
+def _intra_calibration_stage(stage_id: str, text: str) -> dict[str, Any]:
+    return {
+        "id": stage_id,
+        "content": [text],
+        "teacher_actions": ["组织课堂活动"],
+        "student_actions": ["完成练习"],
+        "objective": "形成可复核成果",
     }
 
 
 def intra_lesson_coherence_calibration() -> list[dict[str, Any]]:
     """Small cross-domain calibration corpus kept independent of user data."""
 
-    cases = (
+    simple_cases = (
         ("database_positive", "设计数据库表结构", ["确定主键外键并检查数据库表约束"], "数据库表设计说明", "passed"),
         ("nursing_positive", "完成患者生命体征测量", ["练习血压、体温测量并记录异常判定"], "生命体征测量记录", "passed"),
         ("accounting_positive", "整理会计凭证并登记账簿", ["审核原始凭证并按科目登记账簿"], "凭证与账簿核对表", "passed"),
@@ -1389,19 +1556,87 @@ def intra_lesson_coherence_calibration() -> list[dict[str, Any]]:
         ("generic_only", "完成任务并进行分析", ["开展操作、检查流程并形成成果"], "提交成果", "failed"),
         ("prior_bridge_body_cross_domain", "完成数据库查询", ["测量患者血压并记录生命体征"], "数据库查询报告", "failed"),
     )
+    composed_cases = (
+        (
+            "case_a_three_branch_false_bridge",
+            "完成患者无菌护理操作",
+            ["无菌护理准备与患者护理操作", "使用 SQL 完成数据库查询", "分析 SQL 查询性能并记录执行计划"],
+            "SQL 查询结果记录",
+            "failed",
+            [],
+        ),
+        (
+            "case_b_reverse_three_branch_false_bridge",
+            "完成数据库查询与索引维护",
+            ["设计数据库表结构并准备查询数据", "执行血压测量与患者状态核对", "形成异常护理记录"],
+            "患者生命体征记录",
+            "failed",
+            [],
+        ),
+        (
+            "case_c_implementation_cross_domain",
+            "完成患者生命体征监测",
+            ["测量血压、体温并判断异常", "形成护理监测记录", "核对患者状态"],
+            "生命体征监测记录",
+            "failed",
+            [_intra_calibration_stage("task_implementation", "使用数据库索引优化 SQL 查询")],
+        ),
+        (
+            "case_d_implementation_reverse_domain",
+            "完成数据库查询与索引维护",
+            ["编写 SQL 查询语句", "核对查询结果并记录执行计划", "形成数据库查询报告"],
+            "数据库查询报告",
+            "failed",
+            [_intra_calibration_stage("task_implementation", "测量血压、记录患者生命体征并执行无菌护理")],
+        ),
+        (
+            "case_e_database_multi_item_positive",
+            "数据库关系模式设计",
+            ["根据 E-R 图完成关系模式映射", "确定主键外键", "落实表结构约束"],
+            "关系模式设计表",
+            "passed",
+            [],
+        ),
+        (
+            "case_f_nursing_multi_item_positive",
+            "完成患者生命体征监测",
+            ["测量血压、体温并记录异常判定", "比较生命体征变化", "形成护理监测记录"],
+            "生命体征监测记录",
+            "passed",
+            [],
+        ),
+        (
+            "case_g_accounting_multi_item_positive",
+            "整理会计凭证并登记账簿",
+            ["审核原始凭证并按科目登记账簿", "根据借贷方向核对金额", "编制凭证与账簿核对表"],
+            "凭证与账簿核对表",
+            "passed",
+            [],
+        ),
+    )
     results: list[dict[str, Any]] = []
-    for name, task, body, deliverable, expected in cases:
-        result = _intra_lesson_coherence(
-            [{
-                "lesson_id": "calibration",
-                "task": task,
-                "teaching_content": body,
-                "key_point": {"content": [body[0]]},
-                "difficult_point": {"content": [body[0]]},
-                "progression": {"deliverable": deliverable},
-            }],
-            ["calibration"],
-        )
+    for name, task, body, deliverable, expected in simple_cases:
+        lesson = {
+            "lesson_id": "calibration",
+            "task": task,
+            "teaching_content": body,
+            "key_point": {"content": [body[0]]},
+            "difficult_point": {"content": [body[0]]},
+            "progression": {"deliverable": deliverable},
+        }
+        result = _intra_lesson_coherence([lesson], ["calibration"])
+        results.append({"name": name, "expected": expected, "actual": result["status"]})
+    for name, task, body, deliverable, expected, implementation in composed_cases:
+        lesson = {
+            "lesson_id": "calibration",
+            "task": task,
+            "teaching_content": body,
+            "key_point": {"content": [body[0]]},
+            "difficult_point": {"content": [body[0]]},
+            "progression": {"deliverable": deliverable},
+            "implementation": implementation,
+        }
+        result = _intra_lesson_coherence([lesson], ["calibration"])
         results.append({"name": name, "expected": expected, "actual": result["status"]})
     return results
 
@@ -1802,6 +2037,8 @@ def progression_calibration() -> list[dict[str, Any]]:
     calibrated: list[dict[str, Any]] = []
     for label, upstream, downstream, expected in PROGRESSION_CALIBRATION_CORPUS:
         signals = _progression_gate(upstream, downstream, PROGRESSION_DECLARED_BOUNDARY_THRESHOLD)
+        raw_score = round(float(signals["score"]), 4)
+        passed = signals["status"] == "passed"
         calibrated.append(
             {
                 "case": label,
@@ -1809,7 +2046,12 @@ def progression_calibration() -> list[dict[str, Any]]:
                 "downstream": downstream,
                 "expected": expected,
                 "signals": signals,
-                "evidence_score": round(signals["score"] if signals["status"] == "passed" else 0.0, 4),
+                "raw_score": raw_score,
+                "passed": passed,
+                "effective_status": "passed" if passed else "failed",
+                # Compatibility alias; keep the raw score for failed cases
+                # so calibration margins describe the actual classifier.
+                "evidence_score": raw_score,
                 "calibrated_status": "通过" if signals["status"] == "passed" else "失败",
             }
         )
@@ -1818,8 +2060,8 @@ def progression_calibration() -> list[dict[str, Any]]:
 
 def progression_calibration_margin() -> dict[str, Any]:
     cases = progression_calibration()
-    positives = [item["evidence_score"] for item in cases if item["expected"] == "通过"]
-    negatives = [item["evidence_score"] for item in cases if item["expected"] == "失败"]
+    positives = [item["raw_score"] for item in cases if item["expected"] == "通过"]
+    negatives = [item["raw_score"] for item in cases if item["expected"] == "失败"]
     positive_minimum = min(positives) if positives else 0.0
     negative_maximum = max(negatives) if negatives else 0.0
     return {
@@ -2360,11 +2602,14 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     errors.extend(completeness_errors)
     density_errors, meaningful_chars = _density_report(data, manifest)
     if density_errors:
-        errors.extend(
+        density_messages = [
             f"content density exceeds {item['field']} for {item['lesson']}: "
             f"actual_chars={item.get('actual_chars', '?')} limit={item.get('limit', '?')}"
             for item in density_errors
-        )
+        ]
+        # Surface a deterministic, pre-generation capacity failure before
+        # secondary coherence diagnostics for the same malformed payload.
+        errors = density_messages + errors
 
     reference_provenance = _reference_provenance_report(lessons, lesson_ids)
     for item in reference_provenance["missing_evidence"]:

@@ -101,7 +101,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertGreaterEqual(len(cases), 8)
         self.assertTrue(all(item["expected"] == item["actual"] for item in cases), cases)
 
-    def test_intra_lesson_bridge_searches_the_gate_a_field_cluster(self) -> None:
+    def test_intra_lesson_gate_b_requires_the_main_semantic_component(self) -> None:
         fixture = json.loads(
             (ROOT / "tests" / "fixtures" / "lesson-plan-content-v2-it.json").read_text(
                 encoding="utf-8"
@@ -110,9 +110,20 @@ class LessonSkillHardeningTests(unittest.TestCase):
         lesson = next(item for item in fixture["lessons"] if item["lesson_id"] == "L03")
         report = content_quality._intra_lesson_coherence([lesson], ["L03"])
         self.assertEqual(report["status"], "passed", report)
+        lesson_report = report["lessons"][0]
+        self.assertEqual(
+            set(lesson_report["main_component"]),
+            {"task_connected", "deliverable_connected", "members"},
+        )
+        self.assertTrue(lesson_report["main_component"]["task_connected"])
+        self.assertTrue(lesson_report["main_component"]["deliverable_connected"])
+        self.assertNotIn("value", lesson_report["core_nodes"][0])
+        self.assertIn("diagnostic", lesson_report["core_nodes"][0])
+        self.assertIn("preview", lesson_report["core_nodes"][0]["diagnostic"])
+        self.assertIn("text_sha256", lesson_report["core_nodes"][0]["diagnostic"])
         gate_b = report["lessons"][0]["gate_b"]
         self.assertTrue(gate_b["shared_cluster"]["cross_body_bridge"])
-        self.assertEqual(gate_b["shared_cluster"]["cross_body_gate_a_body_index"], 1)
+        self.assertTrue(gate_b["shared_cluster"]["same_component"])
 
     def test_installer_dry_run_and_replace_are_transactional(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-installer-hardening-") as temp_name:
@@ -126,6 +137,30 @@ class LessonSkillHardeningTests(unittest.TestCase):
             backups = list(root.glob("lesson-plan-docx-generator_backup_*"))
             self.assertEqual(len(backups), 1)
             self.assertEqual((backups[0] / "user-marker.txt").read_text(encoding="utf-8"), "old")
+
+    def test_lesson_installer_checks_source_and_staged_runtime_inventory_before_commit(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-installer-inventory-") as temp_name:
+            folder = Path(temp_name)
+            source = folder / "source"
+            shutil.copytree(LESSON, source)
+            (source / "scripts" / "content_quality.py").unlink()
+            target_root = folder / "missing-source-target"
+            with self.assertRaisesRegex(FileNotFoundError, "content_quality.py"):
+                lesson_install.install(source, target_root)
+            self.assertFalse(target_root.exists())
+
+            target_root = folder / "missing-stage-target"
+            real_verify_stage = lesson_install._verify_stage
+
+            def verify_stage_with_missing_runtime(source_path, stage_path):
+                (Path(stage_path) / "scripts" / "content_quality.py").unlink()
+                return real_verify_stage(source_path, stage_path)
+
+            with patch.object(lesson_install, "_verify_stage", side_effect=verify_stage_with_missing_runtime):
+                with self.assertRaisesRegex(RuntimeError, "staged installation is missing required file"):
+                    lesson_install.install(LESSON, target_root)
+            self.assertFalse((target_root / lesson_install.SKILL_NAME).exists())
+            self.assertEqual(list(target_root.glob(f".{lesson_install.SKILL_NAME}.stage-*")), [])
 
     def test_installer_commit_failure_restores_previous_target(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-installer-rollback-") as temp_name:
@@ -375,6 +410,8 @@ class LessonSkillHardeningTests(unittest.TestCase):
             agents_text = agents.read_text(encoding="utf-8")
             self.assertIn("project-owned notes", agents_text)
             self.assertIn(install_adapters.MARKER_START, agents_text)
+            self.assertIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents_text)
+            self.assertNotIn("the full Lesson runtime (install with --copy-engine)", agents_text)
 
             stale = full_engine / "scripts" / "obsolete-helper.py"
             stale.write_text("stale", encoding="utf-8")
@@ -393,6 +430,16 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 install_adapters.install(LESSON, inconsistent, adapters=["agents"])
             self.assertEqual(tree_snapshot(inconsistent), before)
             self.assertEqual(install_adapters._detect_existing_engine_mode(inconsistent_engine), "inconsistent")
+
+            incomplete_full = folder / "incomplete-full"
+            install_adapters.install(LESSON, incomplete_full, adapters=["all"], copy_engine=True)
+            incomplete_engine = incomplete_full / install_adapters.ENGINE_NAME
+            (incomplete_engine / "scripts" / "content_quality.py").unlink()
+            before = tree_snapshot(incomplete_full)
+            self.assertEqual(install_adapters._detect_existing_engine_mode(incomplete_engine), "inconsistent")
+            with self.assertRaisesRegex(ValueError, "inconsistent"):
+                install_adapters.install(LESSON, incomplete_full, adapters=["agents"])
+            self.assertEqual(tree_snapshot(incomplete_full), before)
 
     def test_adapter_namespace_markers_and_aider_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-adapter-hardening-") as temp_name:
@@ -621,6 +668,27 @@ class LessonSkillHardeningTests(unittest.TestCase):
             )
             checks = {name: "passed" for name in CHECK_NAMES}
             evidence_path = output / "visual-inspection.json"
+            for invalid_pages in (
+                {},
+                {lesson.name: []},
+                {lesson.name: [0]},
+                {lesson.name: [-1]},
+                {lesson.name: [1.5]},
+                {lesson.name: [True]},
+                [1],
+            ):
+                with self.subTest(invalid_pages=invalid_pages):
+                    with self.assertRaises(ValueError):
+                        write_visual_inspection_evidence(
+                            output_dir=output,
+                            qa_report=qa_report,
+                            destination=evidence_path,
+                            status="passed",
+                            inspected_pages=invalid_pages,
+                            checks=checks,
+                            notes="invalid direct API input",
+                        )
+            self.assertFalse(evidence_path.exists())
             write_visual_inspection_evidence(
                 output_dir=output,
                 qa_report=qa_report,
