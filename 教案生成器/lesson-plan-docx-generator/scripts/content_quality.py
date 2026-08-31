@@ -293,7 +293,7 @@ def _diagnostic_fragment(value: Any, *, limit: int = DIAGNOSTIC_PREVIEW_MAX_CHAR
     meaningful = re.sub(r"\s+", "", normalized)
     preview = normalized[:limit]
     if len(preview) < len(normalized):
-        preview = preview.rstrip() + "…"
+        preview = normalized[: max(1, limit - 1)].rstrip() + "…"
     return {"preview": preview, "text_sha256": hashlib.sha256(meaningful.encode("utf-8")).hexdigest()}
 
 

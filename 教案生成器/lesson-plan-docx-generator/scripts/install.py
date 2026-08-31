@@ -89,6 +89,8 @@ def _preflight(source: Path, target_root: Path, target: Path, replace: bool) -> 
             raise FileExistsError(
                 f"Target already exists: {target}. Re-run with --replace to back it up and replace it."
             )
+    if target_root.is_symlink():
+        raise ValueError(f"Refusing to install through a symlink installation root: {target_root}")
     if target_root.exists() and not target_root.is_dir():
         raise NotADirectoryError(f"Installation root is not a directory: {target_root}")
 

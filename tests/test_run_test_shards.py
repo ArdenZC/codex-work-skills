@@ -33,6 +33,14 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(content & package, set())
         self.assertEqual(content | package, lesson)
 
+    def test_lesson_package_parallel_partition_is_exact_and_balanced(self) -> None:
+        package = run_test_shards._lesson_package_ids()
+        groups = run_test_shards._partition_ids(package, 4)
+        self.assertEqual(set().union(*(set(group) for group in groups)), set(package))
+        self.assertEqual(sum(len(group) for group in groups), len(package))
+        self.assertLessEqual(max(map(len, groups)) - min(map(len, groups)), 1)
+        self.assertEqual(len(set().union(*(set(group) for group in groups))), len(package))
+
     def test_fast_alias_is_a_subset_of_full_alias(self) -> None:
         specs = run_test_shards._suite_specs()
         fast = set(run_test_shards._expand_suites(("fast",), specs))

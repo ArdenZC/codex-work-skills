@@ -3,7 +3,8 @@
 The normal CI jobs already split the expensive package suites.  This runner
 provides the same boundary for local work: a fast Content V2 lane, a full
 suite manifest, per-shard timing, isolated temporary roots, and safe Office
-scheduling.
+scheduling.  Pure Lesson package IDs are also distributed across a small
+process pool so the long generator/validator lane does not serialize.
 It never changes the tests selected by a shard; ``--list`` reports the exact
 partition so a new test cannot silently disappear from the full lane.
 """
@@ -11,6 +12,7 @@ partition so a new test cannot silently disappear from the full lane.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import importlib
 import json
@@ -31,6 +33,8 @@ TEST_MODULE = "tests.test_template_packages"
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
+LESSON_PACKAGE_WORKERS_ENV = "CODEX_LESSON_PACKAGE_WORKERS"
+DEFAULT_LESSON_PACKAGE_WORKERS = 4
 
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -234,6 +238,109 @@ def _run_ids(ids: Sequence[str], *, verbose: bool) -> int:
     return 0 if result.wasSuccessful() else 1
 
 
+def _partition_ids(ids: Sequence[str], workers: int) -> tuple[tuple[str, ...], ...]:
+    """Partition exact test IDs into deterministic, balanced worker groups."""
+
+    if workers < 1:
+        raise ValueError("workers must be positive")
+    if not ids:
+        return ()
+    group_count = min(workers, len(ids))
+    groups: list[list[str]] = [[] for _ in range(group_count)]
+    # Round-robin avoids putting all of the similarly named, expensive template
+    # fault-injection tests in one process while preserving an exact partition.
+    for index, test_id in enumerate(ids):
+        groups[index % group_count].append(test_id)
+    return tuple(tuple(group) for group in groups)
+
+
+def _lesson_package_worker_count(test_count: int) -> int:
+    configured = os.environ.get(LESSON_PACKAGE_WORKERS_ENV, "").strip()
+    if configured:
+        try:
+            requested = int(configured)
+        except ValueError as exc:
+            raise ValueError(
+                f"{LESSON_PACKAGE_WORKERS_ENV} must be a positive integer"
+            ) from exc
+        if requested < 1:
+            raise ValueError(f"{LESSON_PACKAGE_WORKERS_ENV} must be a positive integer")
+    else:
+        requested = min(DEFAULT_LESSON_PACKAGE_WORKERS, os.cpu_count() or 1)
+    return max(1, min(requested, test_count))
+
+
+def _run_lesson_package_parallel(ids: Sequence[str], *, verbose: bool) -> int:
+    """Run the pure Lesson package tests in isolated Python workers.
+
+    The package tests are independent and mostly spend their time launching the
+    generator/validator over private temporary directories.  Keeping the exact
+    IDs but distributing them across a small process pool cuts wall time without
+    sharing Python globals or changing the semantic coverage of the shard.
+    """
+
+    if not ids:
+        return 0
+    workers = _lesson_package_worker_count(len(ids))
+    if workers == 1:
+        return _run_ids(ids, verbose=verbose)
+
+    configured_parent = os.environ.get("CODEX_TEST_SHARD_ROOT")
+    owned_parent: Path | None = None
+    if configured_parent:
+        parent = Path(configured_parent)
+        parent.mkdir(parents=True, exist_ok=True)
+    else:
+        owned_parent = Path(tempfile.mkdtemp(prefix="lesson-package-workers-"))
+        parent = owned_parent
+    worker_parent = parent / "lesson-package-workers"
+    worker_parent.mkdir(parents=True, exist_ok=True)
+    groups = _partition_ids(ids, workers)
+
+    def run_group(index: int, group: tuple[str, ...]) -> tuple[int, float, str]:
+        worker_root = worker_parent / f"worker-{index + 1}"
+        worker_root.mkdir(parents=True, exist_ok=True)
+        command = [sys.executable, "-m", "unittest"]
+        if verbose:
+            command.append("-v")
+        command.extend(group)
+        started = time.monotonic()
+        result = subprocess.run(
+            command,
+            cwd=ROOT,
+            env=_isolated_environment(worker_root),
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
+        return result.returncode, time.monotonic() - started, result.stdout + result.stderr
+
+    results: list[tuple[int, float, str] | None] = [None] * len(groups)
+    try:
+        with ThreadPoolExecutor(max_workers=len(groups)) as executor:
+            futures = {
+                executor.submit(run_group, index, group): index
+                for index, group in enumerate(groups)
+            }
+            for future, index in futures.items():
+                results[index] = future.result()
+        failures = 0
+        for index, result in enumerate(results, start=1):
+            if result is None:  # pragma: no cover - defensive guard
+                raise RuntimeError(f"lesson package worker {index} produced no result")
+            status, duration, output = result
+            print(f"[lesson-package worker {index}/{len(groups)}] {duration:.2f}s exit={status}")
+            print(output, end="")
+            failures += status != 0
+        return 1 if failures else 0
+    finally:
+        shutil.rmtree(worker_parent, ignore_errors=True)
+        if owned_parent is not None:
+            shutil.rmtree(owned_parent, ignore_errors=True)
+
+
 def _run_discovery(name: str, *, verbose: bool) -> int:
     if name == "lesson-skill":
         start_dir = LESSON_SKILL_TESTS
@@ -253,6 +360,8 @@ def _run_worker(name: str, *, verbose: bool) -> int:
             command.append("--sequential")
         return subprocess.run(command, cwd=ROOT, env=os.environ.copy(), check=False).returncode
     spec = _suite_specs()[name]
+    if name == "lesson-package":
+        return _run_lesson_package_parallel(_suite_test_ids(name), verbose=verbose)
     if spec.kind == "module":
         return _run_ids(_suite_test_ids(name), verbose=verbose)
     if spec.kind == "discover":
