@@ -50,6 +50,7 @@ class SuiteSpec:
     parallel_safe: bool
     kind: str
     count: int
+    resource_group: str | None = None
 
 
 def _class_test_ids(class_name: str, *, include: Iterable[str] | None = None, exclude: Iterable[str] | None = None) -> tuple[str, ...]:
@@ -105,10 +106,10 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     return {
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
         "lesson-package": SuiteSpec("lesson-package", False, "ids", len(lesson_package)),
-        "gradebook": SuiteSpec("gradebook", False, "gradebook", gradebook_class_count + gradebook_static_count),
+        "gradebook": SuiteSpec("gradebook", False, "gradebook", gradebook_class_count + gradebook_static_count, "repository-validator"),
         "package-contracts": SuiteSpec("package-contracts", True, "ids", len(workflow)),
-        "tooling": SuiteSpec("tooling", True, "module", _module_count("tests.test_template_package_tooling")),
-        "release": SuiteSpec("release", False, "module", _module_count("tests.test_template_package_release")),
+        "tooling": SuiteSpec("tooling", True, "module", _module_count("tests.test_template_package_tooling"), "repository-validator"),
+        "release": SuiteSpec("release", False, "module", _module_count("tests.test_template_package_release"), "repository-validator"),
         "classifier": SuiteSpec("classifier", True, "module", _module_count("tests.test_ci_change_classifier")),
         "runner": SuiteSpec("runner", True, "module", _module_count("tests.test_run_test_shards")),
         # The two skill directories intentionally contain the same generic
@@ -261,14 +262,37 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
     else:
         pending = list(names)
         running: dict[str, tuple[subprocess.Popen[bytes], Path, object, float]] = {}
+        specs = _suite_specs()
+
+        def can_start(name: str) -> bool:
+            """Return whether a pending shard can share the current workers.
+
+            Safe shards may overlap by default.  Office/COM shards remain
+            serialized unless explicitly opted into, and repository-wide
+            validators use a shared lock even in opt-in mode because they
+            inspect and materialize the same canonical package trees.
+            """
+
+            spec = specs[name]
+            if not allow_office_parallel:
+                if not spec.parallel_safe and running:
+                    return False
+                if any(not specs[running_name].parallel_safe for running_name in running):
+                    return False
+            if spec.resource_group is not None and any(
+                specs[running_name].resource_group == spec.resource_group for running_name in running
+            ):
+                return False
+            return True
+
         while pending or running:
             capacity = max(1, min(len(pending), os.cpu_count() or 1))
             while pending and len(running) < capacity:
-                candidate = pending[0]
-                spec = _suite_specs()[candidate]
-                if not allow_office_parallel and not spec.parallel_safe and running:
+                candidate_index = next((index for index, name in enumerate(pending) if can_start(name)), None)
+                if candidate_index is None:
                     break
-                pending.pop(0)
+                candidate = pending.pop(candidate_index)
+                spec = specs[candidate]
                 shard_root = root / candidate
                 shard_root.mkdir(parents=True, exist_ok=True)
                 log_path = shard_root / "output.log"
@@ -313,6 +337,7 @@ def _print_manifest(specs: dict[str, SuiteSpec], *, as_json: bool) -> int:
             "tests": _suite_count(name, specs),
             "parallel_safe": spec.parallel_safe,
             "kind": spec.kind,
+            "resource_group": spec.resource_group,
         }
     for alias, names in ALIASES.items():
         expanded = _expand_suites((alias,), specs)

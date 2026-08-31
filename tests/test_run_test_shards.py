@@ -51,6 +51,9 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(payload["aliases"]["full"]["tests"], discovered_count)
         self.assertTrue(payload["suites"]["lesson-content"]["parallel_safe"])
         self.assertFalse(payload["suites"]["gradebook"]["parallel_safe"])
+        self.assertEqual(payload["suites"]["gradebook"]["resource_group"], "repository-validator")
+        self.assertEqual(payload["suites"]["tooling"]["resource_group"], "repository-validator")
+        self.assertEqual(payload["suites"]["release"]["resource_group"], "repository-validator")
 
     def test_isolated_environment_redirects_temp_and_windows_profile(self) -> None:
         root = ROOT / "_test-shard-root"
