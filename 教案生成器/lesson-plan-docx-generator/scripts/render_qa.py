@@ -33,8 +33,22 @@ def render_docx_directory(output_dir: Path | str, *, timeout: int = 180) -> dict
 
     directory = Path(output_dir).expanduser().resolve()
     files = sorted(directory.glob("*.docx"))
+    symlink_files = [path for path in files if path.is_symlink()]
     renderer = find_renderer()
     if renderer is None:
+        if symlink_files:
+            errors = [f"{path.name}: DOCX symbolic links are not rendered or opened" for path in symlink_files]
+            return {
+                "status": "failed",
+                "reason": "LibreOffice render smoke failed",
+                "scope": "smoke",
+                "renderer": None,
+                "files_checked": len(files),
+                "page_count": 0,
+                "page_counts": {},
+                "page_count_method": "pdf_page_object_regex",
+                "errors": errors,
+            }
         return {
             "status": "not_executed",
             "reason": "LibreOffice render smoke not executed: LibreOffice/soffice was not found",
@@ -60,12 +74,15 @@ def render_docx_directory(output_dir: Path | str, *, timeout: int = 180) -> dict
         }
 
     errors: list[str] = []
+    errors.extend(f"{path.name}: DOCX symbolic links are not rendered or opened" for path in symlink_files)
     page_counts: dict[str, int] = {}
     with tempfile.TemporaryDirectory(prefix="lesson-render-") as temp_name:
         render_dir = Path(temp_name)
         profile_dir = render_dir / "profile"
         profile_dir.mkdir()
         for path in files:
+            if path.is_symlink():
+                continue
             try:
                 result = subprocess.run(
                     [

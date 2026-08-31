@@ -658,7 +658,7 @@ def _base_qa_report(
                 "thresholds": {},
             },
             "progression": {},
-            "coverage": {},
+            "coverage": {"non_it_contamination_scope": "template_or_generator_injected_defaults_only"},
         },
         "render": {
             "status": "not_executed",
@@ -870,8 +870,9 @@ def validate_output_dir(
         for index, lesson in enumerate(lessons, start=1)
     ]
     actual_names = [path.name for path in files]
-    if any(path.is_symlink() for path in files):
-        errors.append("Output DOCX files must not be symbolic links")
+    symlink_files = [path.name for path in files if path.is_symlink()]
+    if symlink_files:
+        errors.append("Output DOCX files must not be symbolic links: " + ", ".join(symlink_files))
     if sorted(actual_names) != sorted(expected_files):
         errors.append(
             "Output filenames do not match the deterministic lesson contract: "
@@ -891,6 +892,11 @@ def validate_output_dir(
     }
     for index, (path, item) in enumerate(zip(files, lessons), start=1):
         item_errors: list[str] = []
+        if path.is_symlink():
+            item_errors.append("DOCX symbolic links are not allowed; target was not opened")
+            errors.extend(f"file {index}: {message}" for message in item_errors)
+            lesson_checks.append({"file_index": index, "errors": item_errors})
+            continue
         if not path.is_file() or path.stat().st_size == 0:
             item_errors.append("file is missing or empty")
             errors.extend(f"file {index}: {message}" for message in item_errors)

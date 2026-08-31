@@ -6,6 +6,7 @@ import argparse
 import os
 import re
 import shutil
+import sys
 import tempfile
 import uuid
 from pathlib import Path
@@ -22,6 +23,11 @@ MINIMAL_ENGINE_FILES = (
     Path("通用提示词.md"),
     Path("AGENTS.md"),
     Path("CONVENTIONS.md"),
+)
+FULL_ENGINE_SENTINELS = (
+    Path("scripts/generate_lesson_plans.py"),
+    Path("schemas/lesson-plan-input.schema.json"),
+    Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
 )
 REFERENCE_TEXT_SUFFIXES = {".md", ".mdc", ".yml", ".yaml"}
 RUNTIME_REFERENCE = re.compile(
@@ -190,6 +196,27 @@ def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
     return list(MINIMAL_ENGINE_FILES)
 
 
+def _detect_existing_engine_mode(engine_target: Path) -> str:
+    """Classify an existing project-local engine without following symlinks."""
+
+    if not _exists(engine_target):
+        return "none"
+    if engine_target.is_symlink() or not engine_target.is_dir():
+        return "inconsistent"
+
+    def real_file(relative: Path) -> bool:
+        path = engine_target / relative
+        return path.is_file() and not path.is_symlink()
+
+    minimal = all(real_file(relative) for relative in MINIMAL_ENGINE_FILES)
+    sentinel_states = [real_file(relative) for relative in FULL_ENGINE_SENTINELS]
+    if minimal and all(sentinel_states):
+        return "full"
+    if minimal and not any(sentinel_states):
+        return "minimal"
+    return "inconsistent"
+
+
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
@@ -255,9 +282,18 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         raise ValueError(f"Namespaced engine target must not be a symlink: {engine_target}")
     if engine_target.exists() and not engine_target.is_dir():
         raise ValueError(f"Namespaced engine target is not a directory: {engine_target}")
-    if copy_engine and engine_target.exists() and not replace:
+    existing_engine_mode = _detect_existing_engine_mode(engine_target)
+    if existing_engine_mode == "inconsistent" and not (copy_engine and replace):
+        raise ValueError(
+            f"Namespaced engine is inconsistent: {engine_target}; refusing to mutate it"
+        )
+    if copy_engine and existing_engine_mode != "none" and not replace:
         # A full engine replacement can otherwise leave stale files behind.
         raise FileExistsError(f"Namespaced engine already exists: {engine_target}; use --replace")
+    if not copy_engine and existing_engine_mode == "full":
+        # Default installs update project-root adapter rules but preserve a
+        # complete runtime byte-for-byte.  Never downgrade or rewrite it.
+        engine_files = []
     for relative in engine_files:
         source = source_root / relative
         target = engine_target / relative
@@ -276,6 +312,18 @@ def _remove_path(path: Path) -> None:
         shutil.rmtree(path)
     elif _exists(path):
         path.unlink()
+
+
+def _cleanup_path(path: Path | None, label: str) -> str | None:
+    """Best-effort stage cleanup that never replaces the primary error."""
+
+    if path is None:
+        return None
+    try:
+        _remove_path(path)
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for {label}: {exc}; residual path: {path}"
+    return None
 
 
 def _apply_files(
@@ -308,6 +356,7 @@ def _apply_files(
         }
     backups: list[tuple[Path, Path]] = []
     applied: list[Path] = []
+    operation_error: BaseException | None = None
     try:
         for target, payload in files.items():
             _assert_no_symlink_ancestor(target_root, target)
@@ -339,23 +388,37 @@ def _apply_files(
             applied.append(replace_engine)
         return applied
     except Exception as commit_error:
-        rollback_error: Exception | None = None
-        try:
-            for target in reversed(applied):
+        rollback_errors: list[str] = []
+        for target in reversed(applied):
+            try:
                 _remove_path(target)
-            for target, backup in reversed(backups):
-                if _exists(backup):
-                    os.replace(str(backup), str(target))
-        except Exception as exc:  # pragma: no cover - filesystem-specific
-            rollback_error = exc
+            except Exception as exc:  # pragma: no cover - filesystem-specific
+                rollback_errors.append(f"remove applied target {target}: {exc}; residual path: {target}")
+        for target, backup in reversed(backups):
+            try:
+                if not _exists(backup):
+                    rollback_errors.append(
+                        f"restore backup {backup} to {target}: backup is missing; residual paths: {backup}, {target}"
+                    )
+                    continue
+                os.replace(str(backup), str(target))
+            except Exception as exc:  # pragma: no cover - filesystem-specific
+                rollback_errors.append(
+                    f"restore backup {backup} to {target}: {exc}; residual paths: {backup}, {target}"
+                )
         detail = f"adapter transaction failed: {commit_error}"
-        if rollback_error:
-            detail += f"; rollback failed: {rollback_error}"
+        if rollback_errors:
+            detail += "; rollback failures: " + " | ".join(rollback_errors)
         else:
             detail += "; previous files restored"
-        raise RuntimeError(detail) from commit_error
+        operation_error = RuntimeError(detail)
+        raise operation_error from commit_error
     finally:
-        _remove_path(stage)
+        cleanup_error = _cleanup_path(stage, "adapter staging directory")
+        if cleanup_error:
+            print(f"WARNING: {cleanup_error}", file=sys.stderr)
+            if operation_error is not None:
+                operation_error.add_note(cleanup_error)
 
 
 def install(source_root: Path, target_root: Path, *, adapters: list[str] | None = None, replace: bool = False, copy_engine: bool = False, dry_run: bool = False) -> None:
@@ -365,6 +428,7 @@ def install(source_root: Path, target_root: Path, *, adapters: list[str] | None 
     files, engine_target, engine_files = build_plan(source_root, target_root, names, replace=replace, copy_engine=copy_engine)
     print(f"source={source_root}")
     print(f"target={target_root}")
+    existing_engine_mode = _detect_existing_engine_mode(engine_target)
     print(f"engine={engine_target}")
     print(f"planned_files={len(files)}")
     if dry_run:
@@ -372,7 +436,10 @@ def install(source_root: Path, target_root: Path, *, adapters: list[str] | None 
         return
     replace_engine = engine_target if copy_engine and replace and engine_target.exists() else None
     _apply_files(files, target_root, replace_engine=replace_engine)
-    print(f"installed-engine={engine_target} ({len(engine_files)} files)")
+    if not copy_engine and existing_engine_mode == "full":
+        print(f"preserved-full-engine={engine_target}")
+    else:
+        print(f"installed-engine={engine_target} ({len(engine_files)} files)")
 
 
 def main() -> None:

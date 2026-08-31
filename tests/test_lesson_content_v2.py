@@ -375,14 +375,14 @@ class LessonContentV2Mixin:
         with self.assertRaisesRegex(ValueError, "must be positive for in-class stages"):
             lesson_generator.validate_content_v2_input(zero_middle)
 
-    def test_positive_number_schema_treats_numeric_and_decimal_strings_consistently(self) -> None:
+    def test_lesson_hours_schema_accepts_whole_numbers_and_rejects_fractions(self) -> None:
         base = load_fixture("lesson-plan-input.json")
-        for value in (0.5, "0.5", 2, "2", "2.5"):
+        for value in (1, 2, 4, 12, 1.0, 2.0, "1", "2", "2.0", "12.0"):
             with self.subTest(valid=value):
                 payload = copy.deepcopy(base)
                 payload["default_hours"] = value
                 lesson_generator.validate_content_v2_input(payload)
-        for value in (0, "0", "0.0", -1, "-1", "abc", "", "NaN", "Infinity"):
+        for value in (0.5, 1.5, 2.25, "0.5", "1.5", "2.25", 0, "0", "0.0", -1, "-1", "abc", "", " 2", "2 ", "NaN", "Infinity"):
             with self.subTest(invalid=value):
                 payload = copy.deepcopy(base)
                 payload["default_hours"] = value
@@ -771,11 +771,26 @@ class LessonContentV2Mixin:
                 self.assertEqual(anchor["status"], "failed", item)
 
         gate_calibration = lesson_content_quality.progression_gate_calibration()
-        self.assertEqual(len(gate_calibration), 3)
+        self.assertGreaterEqual(len(gate_calibration), 12)
         self.assertTrue(
             all(item["expected"] == item["actual"] for item in gate_calibration),
             gate_calibration,
         )
+        for case in {
+            "generic_operation_composed",
+            "generic_design_composed",
+            "generic_analysis_composed",
+            "generic_check_record_composed",
+            "generic_implementation_composed",
+            "generic_flow_design_composed",
+        }:
+            with self.subTest(case=case):
+                item = next(record for record in gate_calibration if record["case"] == case)
+                forward = item["gates"]["forward_transition"]
+                self.assertEqual(forward["current_body_coherence"]["status"], "passed", item)
+                self.assertEqual(forward["substantive_anchor"]["status"], "failed", item)
+                self.assertEqual(item["actual"]["forward_transition"], "failed", item)
+                self.assertEqual(item["actual"]["overall"], "failed", item)
 
         arithmetic = copy.deepcopy(base)
         for lesson, score in zip(arithmetic["lessons"], (88, 88.5, 89, 89.5, 90, 90.5)):
@@ -1299,6 +1314,10 @@ class LessonContentV2Mixin:
             self.assertNotEqual(validation.returncode, 0)
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertIn("脚本", report["content_quality"]["coverage"]["non_it_contamination"])
+            self.assertEqual(
+                report["content_quality"]["coverage"]["non_it_contamination_scope"],
+                "template_or_generator_injected_defaults_only",
+            )
             self.assertTrue(any("脚本" in error for error in report["errors"]))
 
         course_metadata = {"course_name": "基础护理技术", "major": "护理", "audience": "高职护理"}

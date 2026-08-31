@@ -40,7 +40,7 @@ key_point, difficult_point, teaching_methods, resources, references,
 implementation, evaluation, reflection
 ```
 
-`default_hours` 是 Agent 创建每课时使用的默认单课学时；某课显式提供的 `hours` 可以覆盖它，`default_hours` 不要求等于所有 `lessons.hours`。`unit` 使用项目化名称（如“项目一……”）；`progression` 包含 `prior_lesson_id`、具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。`capability_stage` 只能使用 `认知`、`理解`、`模仿`、`独立`、`综合`、`优化`、`迁移`，不要求机械线性递增。第一课的 `prior_lesson_id` 必须为 `null`，后续课次只能引用已经出现的前序课次。四课及以上不得所有能力阶段完全相同。
+`default_hours` 是 Agent 创建每课时使用的默认单课学时；某课显式提供的 `hours` 可以覆盖它，`default_hours` 不要求等于所有 `lessons.hours`。`default_hours`、`total_hours` 和每课 `hours` 都必须是正整数课时：数值可为 `1`、`2`、`4`、`12` 等整数，字符串可为 `"1"`、`"2"`、`"2.0"`；不接受空白字符串、分数、零、负数、`NaN` 或 `Infinity`。`unit` 使用项目化名称（如“项目一……”）；`progression` 包含 `prior_lesson_id`、具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。`capability_stage` 只能使用 `认知`、`理解`、`模仿`、`独立`、`综合`、`优化`、`迁移`，不要求机械线性递增。第一课的 `prior_lesson_id` 必须为 `null`，后续课次只能引用已经出现的前序课次。四课及以上不得所有能力阶段完全相同。
 
 `student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项，references 至少一项。
 
@@ -88,7 +88,7 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
 
 使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render smoke 都通过后才交换到正式目录。显式 `--qa-report` 时，外部报告会在其同父目录先 staging，并与输出目录一起提交；任一交换失败都恢复旧输出和旧报告。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。提交成功后，stdout 只报告正式目录中真实存在的 DOCX 路径。Agent 的代表页视觉检查属于提交后的验收；若发现溢出、截断、异常分页或空白页，应重写 V2 内容并使用 `--backup-existing` 重新事务生成。`qa-report.json` 只写报告，不写入 DOCX。
 
-独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、intra-lesson coherence、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染。诊断只保留有限片段和稳定 SHA-256，不输出整段用户正文。所有 detector 共用唯一 reuse policy：`narrative_strict`、`terminology_reusable`、`resource_reusable`、`reference_reusable`、`fixed_rubric_reusable` 和 `ignore`。教学方法、必要资源、合法 reference 与 attendance/compliance/habits 固定 rubric 可以记录复用证据但不 hard fail；学情、目标、教学内容、重难点、反思、progression 和 implementation 始终严格。短课程术语豁免不得进入 narrative field。
+独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、intra-lesson coherence、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染。`non_it_contamination` 及其 scope 元数据只检测“输入没有但模板或生成器注入输出”的 IT 默认词，不是通用课程分类器。诊断只保留有限片段和稳定 SHA-256，不输出整段用户正文。所有 detector 共用唯一 reuse policy：`narrative_strict`、`terminology_reusable`、`resource_reusable`、`reference_reusable`、`fixed_rubric_reusable` 和 `ignore`。教学方法、必要资源、合法 reference 与 attendance/compliance/habits 固定 rubric 可以记录复用证据但不 hard fail；学情、目标、教学内容、重难点、反思、progression 和 implementation 始终严格。短课程术语豁免不得进入 narrative field。
 
 progression 的 artifact inheritance 和 forward transition 都必须同时通过词面/coherence 证据与 `substantive_anchor` 证据；“设计、操作、分析、检查、流程、实施”等通用动作不能独立作为 anchor。非相邻 `prior_lesson_id` 仍允许；若物理顺序链为 `review`，报告必须置 `requires_agent_review=true` 并列出 from/to/reason/score/declared_prior。Agent 最终验收不能静默忽略 physical sequence review；无法解释实际授课顺序时必须重写 progression。
 

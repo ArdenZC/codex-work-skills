@@ -631,6 +631,25 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             with self.subTest(invalid_hours=invalid_hours), self.assertRaisesRegex(ValueError, "positive number"):
                 validate_content_v2_input(payload)
 
+    def test_lesson_hours_are_positive_integers_with_explicit_decimal_zero_strings(self) -> None:
+        for value in (1, 2, 4, 12, 1.0, 2.0, "1", "2", "2.0", "12.0"):
+            with self.subTest(value=value):
+                lesson_package_common._validate_positive_number(value, "hours")
+
+        base = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8"))
+        for field, value in (("default_hours", "2.0"), ("total_hours", "4.0"), ("lesson", "2.0")):
+            payload = json.loads(json.dumps(base, ensure_ascii=False))
+            if field == "lesson":
+                payload["lessons"][0]["hours"] = value
+            else:
+                payload[field] = value
+            with self.subTest(field=field):
+                lesson_package_common.validate_content_v2_input(payload)
+
+        for value in (0.5, 1.5, 2.25, "0.5", "1.5", "2.25", " 2", "2 ", "NaN", "Infinity", ""):
+            with self.subTest(invalid_value=value), self.assertRaises(ValueError):
+                lesson_package_common._validate_positive_number(value, "hours")
+
     def test_nonpositive_hours_reject_before_docx_generation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-hours-") as temp_name:
             folder = Path(temp_name)

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import os
 import shutil
+import sys
 import tempfile
 import uuid
 from pathlib import Path
@@ -95,16 +96,19 @@ def _preflight(source: Path, target_root: Path, target: Path, replace: bool) -> 
         raise NotADirectoryError(f"Installation root is not a directory: {target_root}")
 
 
-def _remove_stage(stage: Path | None) -> None:
+def _remove_stage(stage: Path | None) -> str | None:
     if stage is None:
-        return
+        return None
     try:
-        if stage.is_dir() or stage.is_symlink():
+        if stage.is_symlink():
+            stage.unlink()
+        elif stage.is_dir():
             shutil.rmtree(stage)
         elif stage.exists():
             stage.unlink()
-    except OSError:
-        pass
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for staging directory: {exc}; residual path: {stage}"
+    return None
 
 
 def install(source: Path, target_root: Path, *, replace: bool = False, dry_run: bool = False) -> Path:
@@ -124,6 +128,7 @@ def install(source: Path, target_root: Path, *, replace: bool = False, dry_run: 
     target_root.mkdir(parents=True, exist_ok=True)
     stage: Path | None = None
     moved_backup = False
+    operation_error: BaseException | None = None
     try:
         stage = Path(tempfile.mkdtemp(prefix=f".{SKILL_NAME}.stage-", dir=str(target_root)))
         stage.rmdir()
@@ -157,8 +162,18 @@ def install(source: Path, target_root: Path, *, replace: bool = False, dry_run: 
             raise RuntimeError(detail) from commit_error
         print(f"installed={target}")
         return target
+    except BaseException as exc:
+        operation_error = exc
+        raise
     finally:
-        _remove_stage(stage)
+        try:
+            cleanup_error = _remove_stage(stage)
+        except Exception as exc:  # pragma: no cover - defensive for injected cleanup failures
+            cleanup_error = f"cleanup failed for staging directory: {exc}; residual path: {stage}"
+        if cleanup_error:
+            print(f"WARNING: {cleanup_error}", file=sys.stderr)
+            if operation_error is not None:
+                operation_error.add_note(cleanup_error)
 
 
 def main() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import contextmanager, redirect_stderr
+from contextlib import contextmanager, redirect_stderr, redirect_stdout
 import importlib
 import importlib.util
 import io
@@ -12,7 +12,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +68,7 @@ with isolated_lesson_imports() as _lesson_modules:
     lesson_install = _lesson_modules["install"]
     install_adapters = _lesson_modules["install_adapters"]
     render_qa = _lesson_modules["render_qa"]
+    validate_output = _lesson_modules["validate_output"]
     lesson_generator = _lesson_modules["generate_lesson_plans"]
     CHECK_NAMES = _lesson_modules["record_visual_inspection"].CHECK_NAMES
     write_visual_inspection_evidence = _lesson_modules["record_visual_inspection"].write_visual_inspection_evidence
@@ -147,6 +148,251 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "previous installation restored"):
                     lesson_install.install(LESSON, root, replace=True)
             self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
+
+    def test_installer_cleanup_warning_preserves_success_and_primary_failure(self) -> None:
+        warning = "cleanup failed for staging directory: locked; residual path: stage"
+        with tempfile.TemporaryDirectory(prefix="lesson-installer-cleanup-success-") as temp_name:
+            root = Path(temp_name) / "skills"
+            diagnostics = io.StringIO()
+            with patch.object(lesson_install, "_remove_stage", return_value=warning):
+                with redirect_stderr(diagnostics):
+                    target = lesson_install.install(LESSON, root)
+            self.assertTrue(target.is_dir())
+            self.assertIn("WARNING:", diagnostics.getvalue())
+            self.assertIn("residual path:", diagnostics.getvalue())
+
+        with tempfile.TemporaryDirectory(prefix="lesson-installer-cleanup-failure-") as temp_name:
+            root = Path(temp_name) / "skills"
+            diagnostics = io.StringIO()
+            with patch.object(lesson_install, "_verify_stage", side_effect=RuntimeError("injected verify failure")):
+                with patch.object(lesson_install, "_remove_stage", return_value=warning):
+                    with redirect_stderr(diagnostics):
+                        with self.assertRaisesRegex(RuntimeError, "injected verify failure"):
+                            lesson_install.install(LESSON, root)
+            self.assertIn("WARNING:", diagnostics.getvalue())
+            self.assertIn("residual path:", diagnostics.getvalue())
+
+    def test_adapter_transaction_failure_injections_a_through_e_are_independent(self) -> None:
+        real_replace = install_adapters.os.replace
+
+        with tempfile.TemporaryDirectory(prefix="lesson-adapter-transaction-") as temp_name:
+            folder = Path(temp_name)
+
+            with self.subTest(injection="A-stage validation"):
+                root = folder / "a"
+                root.mkdir()
+                target = root / "existing.txt"
+                target.write_bytes(b"old")
+                with patch.object(
+                    install_adapters,
+                    "_assert_no_symlink_ancestor",
+                    side_effect=OSError("injected staging validation failure"),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "injected staging validation failure"):
+                        install_adapters._apply_files({target: b"new"}, root)
+                self.assertEqual(target.read_bytes(), b"old")
+                self.assertEqual(list(root.glob(".lesson-adapters.stage-*")), [])
+
+            with self.subTest(injection="B-backup"):
+                root = folder / "b"
+                root.mkdir()
+                target = root / "existing.txt"
+                target.write_bytes(b"old")
+                calls = 0
+
+                def fail_backup(source, destination):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 1:
+                        raise OSError("injected backup failure")
+                    return real_replace(source, destination)
+
+                with patch.object(install_adapters.os, "replace", side_effect=fail_backup):
+                    with self.assertRaisesRegex(RuntimeError, "injected backup failure"):
+                        install_adapters._apply_files({target: b"new"}, root)
+                self.assertEqual(target.read_bytes(), b"old")
+                self.assertEqual(list(root.glob("*.backup_*")), [])
+
+            with self.subTest(injection="C-file commit"):
+                root = folder / "c"
+                root.mkdir()
+                target = root / "existing.txt"
+                target.write_bytes(b"old")
+                calls = 0
+
+                def fail_file_commit(source, destination):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 2:
+                        raise OSError("injected file commit failure")
+                    return real_replace(source, destination)
+
+                with patch.object(install_adapters.os, "replace", side_effect=fail_file_commit):
+                    with self.assertRaisesRegex(RuntimeError, "previous files restored"):
+                        install_adapters._apply_files({target: b"new"}, root)
+                self.assertEqual(target.read_bytes(), b"old")
+                self.assertEqual(list(root.glob("*.backup_*")), [])
+
+            with self.subTest(injection="D-engine swap"):
+                root = folder / "d"
+                engine = root / install_adapters.ENGINE_NAME
+                engine.mkdir(parents=True)
+                old_runtime = engine / "scripts" / "old.py"
+                old_runtime.parent.mkdir()
+                old_runtime.write_bytes(b"old")
+                target = engine / "scripts" / "new.py"
+                calls = 0
+
+                def fail_engine_swap(source, destination):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 2:
+                        raise OSError("injected engine swap failure")
+                    return real_replace(source, destination)
+
+                with patch.object(install_adapters.os, "replace", side_effect=fail_engine_swap):
+                    with self.assertRaisesRegex(RuntimeError, "previous files restored"):
+                        install_adapters._apply_files({target: b"new"}, root, replace_engine=engine)
+                self.assertEqual(old_runtime.read_bytes(), b"old")
+                self.assertFalse((engine / "scripts" / "new.py").exists())
+                self.assertEqual(list(root.glob(f"{install_adapters.ENGINE_NAME}.backup_*")), [])
+
+            with self.subTest(injection="E-rollback accumulation"):
+                root = folder / "e"
+                root.mkdir()
+                first = root / "a.txt"
+                second = root / "b.txt"
+                first.write_bytes(b"old-a")
+                second.write_bytes(b"old-b")
+                calls = 0
+
+                def fail_commit_and_restore(source, destination):
+                    nonlocal calls
+                    calls += 1
+                    if calls == 4:
+                        raise OSError("injected commit failure")
+                    if calls in (5, 6):
+                        raise OSError(f"injected rollback restore failure {calls}")
+                    return real_replace(source, destination)
+
+                real_remove = install_adapters._remove_path
+
+                def fail_first_removal(path):
+                    if path == first:
+                        raise OSError("injected rollback remove failure")
+                    return real_remove(path)
+
+                with patch.object(install_adapters.os, "replace", side_effect=fail_commit_and_restore):
+                    with patch.object(install_adapters, "_remove_path", side_effect=fail_first_removal):
+                        with self.assertRaisesRegex(RuntimeError, "injected commit failure") as raised:
+                            install_adapters._apply_files({first: b"new-a", second: b"new-b"}, root)
+                message = str(raised.exception)
+                self.assertIn("rollback failures:", message)
+                self.assertIn("injected rollback remove failure", message)
+                self.assertIn("injected rollback restore failure 5", message)
+                self.assertIn("injected rollback restore failure 6", message)
+                self.assertIn(str(first), message)
+                self.assertIn(str(second), message)
+                self.assertEqual(first.read_bytes(), b"new-a")
+                self.assertFalse(second.exists())
+                self.assertEqual(len(list(root.glob("*.backup_*"))), 2)
+                self.assertEqual(list(root.glob(".lesson-adapters.stage-*")), [])
+
+    def test_adapter_stage_cleanup_warning_preserves_success_and_primary_error(self) -> None:
+        warning = "cleanup failed for adapter staging directory: locked; residual path: stage"
+        real_replace = install_adapters.os.replace
+        with tempfile.TemporaryDirectory(prefix="lesson-adapter-cleanup-") as temp_name:
+            root = Path(temp_name)
+            target = root / "new.txt"
+            diagnostics = io.StringIO()
+            with patch.object(install_adapters, "_cleanup_path", return_value=warning):
+                with redirect_stderr(diagnostics):
+                    install_adapters._apply_files({target: b"new"}, root)
+            self.assertEqual(target.read_bytes(), b"new")
+            self.assertIn("WARNING:", diagnostics.getvalue())
+            self.assertIn("residual path:", diagnostics.getvalue())
+
+            old = root / "old.txt"
+            old.write_bytes(b"old")
+            calls = 0
+
+            def fail_commit(source, destination):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    raise OSError("injected primary commit failure")
+                return real_replace(source, destination)
+
+            diagnostics = io.StringIO()
+            with patch.object(install_adapters.os, "replace", side_effect=fail_commit):
+                with patch.object(install_adapters, "_cleanup_path", return_value=warning):
+                    with redirect_stderr(diagnostics):
+                        with self.assertRaisesRegex(RuntimeError, "injected primary commit failure"):
+                            install_adapters._apply_files({old: b"new"}, root)
+            self.assertEqual(old.read_bytes(), b"old")
+            self.assertIn("WARNING:", diagnostics.getvalue())
+            self.assertIn("residual path:", diagnostics.getvalue())
+
+    def test_lesson_adapter_engine_modes_preserve_full_runtime_and_fail_closed(self) -> None:
+        def engine_snapshot(engine: Path) -> dict[str, bytes]:
+            return {
+                str(path.relative_to(engine)): path.read_bytes()
+                for path in engine.rglob("*")
+                if path.is_file() and not path.is_symlink()
+            }
+
+        def tree_snapshot(root: Path) -> dict[str, bytes]:
+            return {
+                str(path.relative_to(root)): path.read_bytes()
+                for path in root.rglob("*")
+                if path.is_file() and not path.is_symlink()
+            }
+
+        with tempfile.TemporaryDirectory(prefix="lesson-adapter-engine-modes-") as temp_name:
+            folder = Path(temp_name)
+            minimal = folder / "minimal"
+            install_adapters.install(LESSON, minimal, adapters=["all"])
+            minimal_engine = minimal / install_adapters.ENGINE_NAME
+            self.assertEqual(install_adapters._detect_existing_engine_mode(minimal_engine), "minimal")
+            minimal_before = engine_snapshot(minimal_engine)
+            install_adapters.install(LESSON, minimal, adapters=["all"])
+            self.assertEqual(engine_snapshot(minimal_engine), minimal_before)
+
+            full = folder / "full"
+            output = io.StringIO()
+            with redirect_stdout(output):
+                install_adapters.install(LESSON, full, adapters=["all"], copy_engine=True)
+            full_engine = full / install_adapters.ENGINE_NAME
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine), "full")
+            full_before = engine_snapshot(full_engine)
+            agents = full / "AGENTS.md"
+            agents.write_text("project-owned notes\n", encoding="utf-8")
+            output = io.StringIO()
+            with redirect_stdout(output):
+                install_adapters.install(LESSON, full, adapters=["agents"])
+            self.assertIn("preserved-full-engine=", output.getvalue())
+            self.assertEqual(engine_snapshot(full_engine), full_before)
+            agents_text = agents.read_text(encoding="utf-8")
+            self.assertIn("project-owned notes", agents_text)
+            self.assertIn(install_adapters.MARKER_START, agents_text)
+
+            stale = full_engine / "scripts" / "obsolete-helper.py"
+            stale.write_text("stale", encoding="utf-8")
+            install_adapters.install(LESSON, full, adapters=["all"], copy_engine=True, replace=True)
+            self.assertFalse(stale.exists())
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine), "full")
+            install_adapters.install(LESSON, full, adapters=["all"], copy_engine=True, replace=True)
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine), "full")
+
+            inconsistent = folder / "inconsistent"
+            inconsistent_engine = inconsistent / install_adapters.ENGINE_NAME
+            inconsistent_engine.mkdir(parents=True)
+            (inconsistent_engine / "SKILL.md").write_text("partial", encoding="utf-8")
+            before = tree_snapshot(inconsistent)
+            with self.assertRaisesRegex(ValueError, "inconsistent"):
+                install_adapters.install(LESSON, inconsistent, adapters=["agents"])
+            self.assertEqual(tree_snapshot(inconsistent), before)
+            self.assertEqual(install_adapters._detect_existing_engine_mode(inconsistent_engine), "inconsistent")
 
     def test_adapter_namespace_markers_and_aider_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-adapter-hardening-") as temp_name:
@@ -434,6 +680,36 @@ class LessonSkillHardeningTests(unittest.TestCase):
                     report = render_qa.render_docx_directory(output, timeout=1)
             self.assertEqual(report["status"], "failed")
             self.assertIn("timed out after 1s", report["errors"][0])
+
+    def test_output_and_render_qa_reject_docx_symlinks_without_opening_or_rendering(self) -> None:
+        data = json.loads(
+            (ROOT / "tests" / "fixtures" / "lesson-plan-input.json").read_text(encoding="utf-8")
+        )
+        with tempfile.TemporaryDirectory(prefix="lesson-symlink-qa-") as temp_name:
+            output = Path(temp_name) / "output"
+            output.mkdir()
+            expected_name = validate_output.lesson_filename(
+                1, data["lessons"][0]["unit"], data["lessons"][0]["task"]
+            )
+            fake_docx = Mock()
+            fake_docx.name = expected_name
+            fake_docx.is_symlink.return_value = True
+            with patch.object(validate_output.Path, "glob", return_value=[fake_docx]):
+                with patch.object(validate_output, "Document", side_effect=AssertionError("DOCX target opened")) as document:
+                    with self.assertRaisesRegex(RuntimeError, "target was not opened"):
+                        validate_output.validate_output_dir(output, data)
+            document.assert_not_called()
+
+            fake_render_docx = Mock()
+            fake_render_docx.name = "lesson.docx"
+            fake_render_docx.is_symlink.return_value = True
+            with patch.object(render_qa.Path, "glob", return_value=[fake_render_docx]):
+                with patch.object(render_qa, "find_renderer", return_value="soffice"):
+                    with patch.object(render_qa.subprocess, "run") as run:
+                        report = render_qa.render_docx_directory(output)
+            self.assertEqual(report["status"], "failed")
+            self.assertIn("not rendered or opened", report["errors"][0])
+            run.assert_not_called()
 
 
 if __name__ == "__main__":

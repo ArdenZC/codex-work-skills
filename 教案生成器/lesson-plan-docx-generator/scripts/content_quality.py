@@ -272,6 +272,7 @@ NON_IT_CONTAMINATION_TERMS = (
     "代码编辑器",
     "数据安全",
 )
+NON_IT_CONTAMINATION_SCOPE = "template_or_generator_injected_defaults_only"
 
 
 class ContentQualityError(ValueError):
@@ -1423,25 +1424,22 @@ def _progression_gates(previous: dict[str, Any], current: dict[str, Any], thresh
         threshold,
     )
     current_body_coherence = _intra_lesson_coherence([current], [str(current.get("lesson_id", "current"))])
-    # Some bridges are intentionally concise (for example “提取下一课的
-    # 功能测试点”) and do not repeat the full artifact phrase.  They may use
-    # the calibrated sequence signal only when the current task/body has
-    # independently passed Gate A; a deliverable is never used for this
-    # fallback, so a cross-domain body cannot be rescued.
-    if (
-        body_gate["status"] != "passed"
-        and current_body_coherence["status"] == "passed"
-        and body_gate["score"] >= PROGRESSION_SEQUENCE_THRESHOLD
-    ):
+    # Current-lesson coherence is a prerequisite/diagnostic only.  It cannot
+    # turn a failed cross-lesson lexical or substantive-anchor gate into a
+    # pass.  In particular, a coherent database lesson must not be accepted
+    # after an unrelated nursing/accounting/mechanical bridge.
+    body_gate = {
+        **body_gate,
+        "current_body_coherence": {
+            "status": current_body_coherence["status"],
+            "failed_lessons": [item["lesson_id"] for item in current_body_coherence["failures"]],
+        },
+    }
+    if current_body_coherence["status"] != "passed":
         body_gate = {
             **body_gate,
-            "status": "passed",
-            "lexical_status": "passed_with_current_body_anchor",
-            "substantive_anchor": {
-                **body_gate["substantive_anchor"],
-                "status": "passed",
-                "reason": "current task and teaching_content independently share a substantive anchor",
-            },
+            "status": "failed",
+            "lexical_status": "failed_current_body_coherence",
         }
     corroborating_gate = _progression_gate(
         previous_progression["next_bridge"],
@@ -1479,6 +1477,28 @@ def _progression_gates(previous: dict[str, Any], current: dict[str, Any], thresh
             if artifact_inheritance["status"] == "passed" and forward_transition["status"] == "passed"
             else "failed"
         ),
+    }
+
+
+def _calibration_lesson(
+    lesson_id: str,
+    task: str,
+    teaching_content: list[str],
+    prior_learning: str,
+    deliverable: str,
+) -> dict[str, Any]:
+    """Build a compact composed-gate case with an internally coherent lesson."""
+
+    return {
+        "lesson_id": lesson_id,
+        "task": task,
+        "teaching_content": teaching_content,
+        "key_point": {"content": [teaching_content[0]]},
+        "difficult_point": {"content": [teaching_content[0]]},
+        "progression": {
+            "prior_learning": prior_learning,
+            "deliverable": deliverable,
+        },
     }
 
 
@@ -1545,6 +1565,186 @@ PROGRESSION_GATE_CALIBRATION_CORPUS = (
         "passed",
         "passed",
         "passed",
+    ),
+    (
+        "functional_test_points",
+        {
+            "task": "设计功能测试用例",
+            "progression": {
+                "deliverable": "功能测试用例集",
+                "next_bridge": "提取下一课的功能测试点",
+            },
+        },
+        _calibration_lesson(
+            "functional_test_points",
+            "执行功能测试",
+            ["按功能测试点执行边界场景", "记录预期与实际结果"],
+            "承接功能测试用例集",
+            "功能测试执行记录",
+        ),
+        "passed",
+        "passed",
+        "passed",
+    ),
+    (
+        "sql_result_bridge",
+        {
+            "task": "完成SQL查询",
+            "progression": {
+                "deliverable": "SQL查询结果记录",
+                "next_bridge": "根据SQL查询结果分析索引性能",
+            },
+        },
+        _calibration_lesson(
+            "sql_result_bridge",
+            "分析索引性能",
+            ["依据SQL查询结果比较索引性能", "记录执行计划差异"],
+            "承接SQL查询结果记录",
+            "索引性能分析表",
+        ),
+        "passed",
+        "passed",
+        "passed",
+    ),
+    (
+        "nursing_artifact_bridge",
+        {
+            "task": "完成生命体征测量",
+            "progression": {
+                "deliverable": "生命体征测量记录",
+                "next_bridge": "依据生命体征记录完成护理风险判断",
+            },
+        },
+        _calibration_lesson(
+            "nursing_artifact_bridge",
+            "完成护理风险判断",
+            ["依据生命体征记录识别异常", "形成护理风险判断单"],
+            "承接生命体征测量记录",
+            "护理风险判断单",
+        ),
+        "passed",
+        "passed",
+        "passed",
+    ),
+    (
+        "generic_operation_composed",
+        {
+            "task": "完成护理记录",
+            "progression": {
+                "deliverable": "护理操作流程记录",
+                "next_bridge": "护理操作流程",
+            },
+        },
+        _calibration_lesson(
+            "generic_operation_composed",
+            "数据库操作与索引维护",
+            ["创建索引并验证查询计划", "记录索引维护结果"],
+            "承接护理操作流程记录",
+            "数据库索引维护记录",
+        ),
+        "passed",
+        "failed",
+        "failed",
+    ),
+    (
+        "generic_design_composed",
+        {
+            "task": "完成护理方案复核",
+            "progression": {
+                "deliverable": "患者风险评估与护理方案设计记录",
+                "next_bridge": "患者风险评估与护理方案设计",
+            },
+        },
+        _calibration_lesson(
+            "generic_design_composed",
+            "数据库索引设计",
+            ["确定联合索引字段", "验证索引查询性能"],
+            "承接患者风险评估与护理方案设计记录",
+            "数据库索引设计表",
+        ),
+        "passed",
+        "failed",
+        "failed",
+    ),
+    (
+        "generic_analysis_composed",
+        {
+            "task": "完成会计凭证整理",
+            "progression": {
+                "deliverable": "会计数据分析报告",
+                "next_bridge": "会计数据分析",
+            },
+        },
+        _calibration_lesson(
+            "generic_analysis_composed",
+            "软件缺陷分析",
+            ["复现软件缺陷并定位日志异常", "记录缺陷影响范围"],
+            "承接会计数据分析报告",
+            "软件缺陷分析报告",
+        ),
+        "passed",
+        "failed",
+        "failed",
+    ),
+    (
+        "generic_check_record_composed",
+        {
+            "task": "完成机械设备巡检",
+            "progression": {
+                "deliverable": "机械检查记录",
+                "next_bridge": "机械检查记录",
+            },
+        },
+        _calibration_lesson(
+            "generic_check_record_composed",
+            "护理检查记录",
+            ["核对患者体征与护理记录", "形成护理检查记录单"],
+            "承接机械检查记录",
+            "护理检查记录单",
+        ),
+        "passed",
+        "failed",
+        "failed",
+    ),
+    (
+        "generic_implementation_composed",
+        {
+            "task": "完成项目方案评审",
+            "progression": {
+                "deliverable": "项目实施方案",
+                "next_bridge": "项目实施方案",
+            },
+        },
+        _calibration_lesson(
+            "generic_implementation_composed",
+            "无菌护理实施",
+            ["按无菌要求准备护理用品", "记录无菌操作检查结果"],
+            "承接项目实施方案",
+            "无菌护理实施记录",
+        ),
+        "passed",
+        "failed",
+        "failed",
+    ),
+    (
+        "generic_flow_design_composed",
+        {
+            "task": "完成流程设计评审",
+            "progression": {
+                "deliverable": "流程设计结果",
+                "next_bridge": "流程设计结果",
+            },
+        },
+        _calibration_lesson(
+            "generic_flow_design_composed",
+            "Java 接口设计",
+            ["定义Java接口方法并编写调用示例", "验证接口参数约束"],
+            "承接流程设计结果",
+            "Java接口设计说明",
+        ),
+        "passed",
+        "failed",
+        "failed",
     ),
 )
 
@@ -2065,9 +2265,19 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             same_unit = str(previous.get("unit", "")) == str(lesson.get("unit", ""))
             signal = _progression_gate(
                 previous["progression"]["next_bridge"],
-                [lesson.get("task", ""), *lesson.get("teaching_content", []), lesson["progression"]["deliverable"]],
+                [lesson.get("task", ""), *lesson.get("teaching_content", [])],
                 PROGRESSION_SEQUENCE_THRESHOLD,
             )
+            current_body_coherence = _intra_lesson_coherence([lesson], [current_id])
+            signal = {
+                **signal,
+                "current_body_coherence": {
+                    "status": current_body_coherence["status"],
+                    "failed_lessons": [item["lesson_id"] for item in current_body_coherence["failures"]],
+                },
+            }
+            if current_body_coherence["status"] != "passed":
+                signal = {**signal, "status": "failed", "lexical_status": "failed_current_body_coherence"}
             status = "passed" if signal["status"] == "passed" else "review"
             hard_failure = status == "review" and declared_prior in {None, previous_id}
             link = {
@@ -2185,6 +2395,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "capability_stage_vocabulary": list(CAPABILITY_STAGES),
         "completeness": completeness,
         "non_it_contamination_terms": list(NON_IT_CONTAMINATION_TERMS),
+        "non_it_contamination_scope": NON_IT_CONTAMINATION_SCOPE,
         "similarity_thresholds": {
             "whole_lesson": WHOLE_LESSON_SIMILARITY_THRESHOLD,
             "adjacent_whole_lesson": ADJACENT_WHOLE_LESSON_SIMILARITY_THRESHOLD,

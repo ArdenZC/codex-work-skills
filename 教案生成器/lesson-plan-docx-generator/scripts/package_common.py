@@ -603,13 +603,15 @@ def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
 
 def _validate_positive_number(value: Any, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
-        raise ValueError(f"{field_name} must be a positive number; received {value}.")
+        raise ValueError(f"{field_name} must be a positive number; received {value}. Lesson hours must be a positive integer.")
+    if isinstance(value, str) and value != value.strip():
+        raise ValueError(f"{field_name} must be a positive number; received {value}. Lesson hours must be a positive integer.")
     try:
         number = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
-        raise ValueError(f"{field_name} must be a positive number; received {value}.") from None
-    if not number.is_finite() or number <= 0:
-        raise ValueError(f"{field_name} must be a positive number; received {value}.")
+        raise ValueError(f"{field_name} must be a positive number; received {value}. Lesson hours must be a positive integer.") from None
+    if not number.is_finite() or number <= 0 or number != number.to_integral_value():
+        raise ValueError(f"{field_name} must be a positive number; received {value}. Lesson hours must be a positive integer.")
 
 
 def _schema_errors(data: dict[str, Any], schema_path: Path | str) -> None:
@@ -755,10 +757,16 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
         total_hours = Decimal(str(data["total_hours"]))
     except (KeyError, InvalidOperation, TypeError, ValueError) as exc:
         raise ValueError(f"Content Contract V2 course hours are invalid: {exc}") from None
-    if not default_hours.is_finite() or default_hours <= 0:
-        raise ValueError(f"default_hours must be a positive number; received {data.get('default_hours')}")
-    if not total_hours.is_finite() or total_hours <= 0:
-        raise ValueError(f"total_hours must be a positive number; received {data.get('total_hours')}")
+    if not default_hours.is_finite() or default_hours <= 0 or default_hours != default_hours.to_integral_value():
+        raise ValueError(
+            "default_hours must be a positive number; "
+            f"received {data.get('default_hours')}. Lesson hours must be a positive integer."
+        )
+    if not total_hours.is_finite() or total_hours <= 0 or total_hours != total_hours.to_integral_value():
+        raise ValueError(
+            "total_hours must be a positive number; "
+            f"received {data.get('total_hours')}. Lesson hours must be a positive integer."
+        )
 
     lesson_ids: set[str] = set()
     ordered_lesson_ids: list[str] = []
