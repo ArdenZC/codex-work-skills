@@ -10,7 +10,9 @@
 - Cursor、Cline、Continue、Windsurf、GitHub Copilot、Aider：各自 adapter 文件
 - OpenCode：`AGENTS.md`
 
-`scripts/install_adapters.py` 可以把 adapter 安装到另一个项目，默认不覆盖已有规则，`--replace` 才会创建备份并替换。
+`scripts/install_adapters.py` 可以把 adapter 安装到另一个项目，默认是不复制 runtime 的 `instruction-only adapter install（仅规则/指令安装）`；它不承诺目标项目可以直接执行 generator。需要在目标项目的 `.lesson-plan-docx-generator/` 中直接运行 `scripts/generate_lesson_plans.py` 时，必须追加 `--copy-engine`，此时才是 `full runnable project-local Lesson engine（完整可运行引擎）`。Windows 使用 `python`，macOS 使用 `python3`；`--replace` 才会创建备份并替换。
+
+视觉证据 `visual-inspection.json` 是 `Agent visual inspection attestation for the current generated DOCX/QA state`，不是所检查 PDF/图片的加密证明。
 
 ## 模型与平台
 

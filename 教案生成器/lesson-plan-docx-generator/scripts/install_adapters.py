@@ -23,6 +23,12 @@ MINIMAL_ENGINE_FILES = (
     Path("AGENTS.md"),
     Path("CONVENTIONS.md"),
 )
+REFERENCE_TEXT_SUFFIXES = {".md", ".mdc", ".yml", ".yaml"}
+RUNTIME_REFERENCE = re.compile(
+    r"(?<![./\w-])"
+    r"(?:(?:<skill>|lesson-plan-docx-generator|course-gradebook-generator|\.lesson-plan-docx-generator|\.course-gradebook-generator)[/\\])?"
+    r"((?:scripts|docs|examples|schemas|assets)/[^\s`\"'<>（）(),，。；：！？]+)"
+)
 SHARED_SOURCES = {
     "AGENTS.md": "AGENTS.md",
     "CLAUDE.md": "CLAUDE.md",
@@ -77,40 +83,30 @@ def _rewrite_references(text: str, *, copy_engine: bool = True, namespace: bool 
                 "CONVENTIONS.md": f"{ENGINE_NAME}/CONVENTIONS.md",
             }
         )
-    if copy_engine:
-        replacements.update(
-            {
-                "scripts/generate_lesson_plans.py": f"{ENGINE_NAME}/scripts/generate_lesson_plans.py",
-                "docs/content-contract-v2.md": f"{ENGINE_NAME}/docs/content-contract-v2.md",
-                "examples/tasks.example.json": f"{ENGINE_NAME}/examples/tasks.example.json",
-            }
-        )
-    else:
-        # The default install is intentionally a small instruction-only engine.
-        # Do not leave executable/documentation paths that are absent until the
-        # caller opts into ``--copy-engine``.
-        unavailable = "the full Lesson runtime (install with --copy-engine)"
-        replacements.update(
-            {
-                "scripts/generate_lesson_plans.py": unavailable,
-                "docs/content-contract-v2.md": unavailable,
-                "examples/tasks.example.json": unavailable,
-            }
-        )
     for bare, namespaced in replacements.items():
         # Do not rewrite an already namespaced path a second time.
         text = re.sub(rf"(?<![./\w-]){re.escape(bare)}", namespaced, text)
-    if not copy_engine:
-        unavailable = "the full Lesson runtime (install with --copy-engine)"
-        # Keep the instruction-only package honest: its four local entry files
-        # must not advertise templates, schemas, examples, or scripts that are
-        # copied only by the explicit full-engine mode.
-        text = re.sub(
-            r"(?<![./\w-])(?:scripts|docs|examples|schemas|assets)/[^\s`\"'<>（）]+",
-            unavailable,
-            text,
-        )
-    return text
+
+    # Match the finite set of runtime path forms documented by this Skill,
+    # including ``<skill>/scripts/...``.  Already namespaced paths are not
+    # matched because the path component is preceded by ``/``.
+    unavailable = "the full Lesson runtime (install with --copy-engine)"
+
+    def replace_runtime(match: re.Match[str]) -> str:
+        path = match.group(1).replace("\\", "/")
+        return f"{ENGINE_NAME}/{path}" if copy_engine else unavailable
+
+    return RUNTIME_REFERENCE.sub(replace_runtime, text)
+
+
+def _payload_for_engine(source: Path, *, copy_engine: bool) -> bytes:
+    if source.suffix.lower() in REFERENCE_TEXT_SUFFIXES:
+        return _rewrite_references(
+            source.read_text(encoding="utf-8"),
+            copy_engine=copy_engine,
+            namespace=False,
+        ).encode("utf-8")
+    return source.read_bytes()
 
 
 def _marker_block(payload: str) -> str:
@@ -122,12 +118,15 @@ def merge_marker_section(existing: str, payload: str) -> str:
     """Replace this installer's marker while preserving every other section."""
 
     block = _marker_block(payload)
-    start, end = existing.find(MARKER_START), existing.find(MARKER_END)
-    if (start < 0) != (end < 0) or (start >= 0 and end < start):
+    starts = [match.start() for match in re.finditer(re.escape(MARKER_START), existing)]
+    ends = [match.start() for match in re.finditer(re.escape(MARKER_END), existing)]
+    if len(starts) != len(ends) or len(starts) > 1 or (starts and ends[0] < starts[0]):
         raise ValueError(f"Malformed {MARKER_ID} marker block; refusing to mutate the target")
-    if start >= 0:
-        end += len(MARKER_END)
-        return existing[:start].rstrip("\r\n") + "\n\n" + block + existing[end:]
+    if starts:
+        start, end = starts[0], ends[0]
+        prefix = existing[:start].rstrip("\r\n")
+        suffix = existing[end + len(MARKER_END) :]
+        return (prefix + "\n\n" if prefix else "") + block + suffix
     if not existing.strip():
         return block + "\n"
     return existing.rstrip("\r\n") + "\n\n" + block + "\n"
@@ -262,14 +261,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
     for relative in engine_files:
         source = source_root / relative
         target = engine_target / relative
-        if not copy_engine:
-            payload = _rewrite_references(
-                source.read_text(encoding="utf-8"),
-                copy_engine=False,
-                namespace=False,
-            ).encode("utf-8")
-        else:
-            payload = source.read_bytes()
+        payload = _payload_for_engine(source, copy_engine=copy_engine)
         if not target.exists() or replace or target.read_bytes() != payload:
             files[target] = payload
     # Validate every destination's parent chain before the transaction creates

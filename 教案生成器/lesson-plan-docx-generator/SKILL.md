@@ -96,6 +96,8 @@ progression 的 artifact inheritance 和 forward transition 都必须同时通�
 
 默认输出 QA 会读取原始 V2 JSON，通过纯 formatter 计算 expected，再对照 semantic bookmark 或 v1.0 坐标；不重新调用教学内容创作函数。模板布局、70 个 semantic bookmarks、bookmark IDs/names、fingerprint、v1.0/v1.1 compatibility 和 canonical 二进制均受保护。若本机存在 LibreOffice，使用 `--render` 做 render smoke；没有 renderer 时 structural QA 仍通过，报告标记 `render.status=not_executed`。真实分页、溢出和视觉布局结论只来自 Agent 的代表页检查。
 
+适配器安装语义固定为：默认是 `instruction-only adapter install（仅规则/指令安装）`，只安装项目规则和最小 instructions，不复制完整 runtime，也不承诺目标项目可以独立执行 generator；只有追加 `--copy-engine` 才是 `full runnable project-local Lesson engine（完整可运行引擎）`。目标项目需要直接调用 `.lesson-plan-docx-generator/scripts/generate_lesson_plans.py` 时必须使用 `--copy-engine`。`visual-inspection.json` 是 `Agent visual inspection attestation for the current generated DOCX/QA state`，表示 Agent 对当前生成 DOCX/QA 状态的代表页检查，不是所检查 PDF/图片的加密证明。
+
 路径 preflight 在 mkdir、生成、move、backup、delete 之前执行，保护 Skill root、输入 JSON、schema、selected/custom template、manifest、canonical/compatibility package、scripts 和 tests，并拒绝 ancestor、descendant、resolved symlink 及 Windows lexical/8.3 alias overlap。不要把输出写入受保护目录或自定义模板包。
 
 ## 命令

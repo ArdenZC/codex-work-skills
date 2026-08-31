@@ -1187,6 +1187,21 @@ def _intra_anchor_evidence(left: Any, right: Any) -> dict[str, Any]:
     return result
 
 
+def _best_intra_item(left: Any, values: list[Any]) -> tuple[int, Any, dict[str, Any]] | None:
+    """Return the strongest concrete body item for a shared-anchor bridge."""
+
+    candidates = [
+        (index, value, _intra_anchor_evidence(left, value))
+        for index, value in enumerate(values)
+    ]
+    if not candidates:
+        return None
+    return max(
+        candidates,
+        key=lambda item: (item[2]["status"] == "passed", item[2]["score"], -item[0]),
+    )
+
+
 def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]) -> dict[str, Any]:
     """Check that each task, body and deliverable describe the same lesson."""
 
@@ -1203,42 +1218,130 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
             field: _intra_anchor_evidence(task, values)
             for field, values in body_fields.items()
         }
+        body_items = {
+            field: _best_intra_item(task, values)
+            for field, values in body_fields.items()
+        }
         gate_a = max(
             body_results.items(),
             key=lambda item: (item[1]["status"] == "passed", item[1]["score"], item[0]),
         )
+        gate_a_field, gate_a_evidence = gate_a
+        gate_a_item = body_items[gate_a_field]
         deliverable = lesson.get("progression", {}).get("deliverable", "")
         task_anchor = _intra_anchor_evidence(deliverable, task)
+        deliverable_items = {
+            field: _best_intra_item(deliverable, values)
+            for field, values in body_fields.items()
+        }
         body_anchor = max(
             (_intra_anchor_evidence(deliverable, values) for values in body_fields.values()),
             key=lambda item: (item["status"] == "passed", item["score"], item["reason"]),
         )
+        deliverable_item = max(
+            (
+                (field, item)
+                for field, item in deliverable_items.items()
+                if item is not None
+            ),
+            key=lambda candidate: (
+                candidate[1][2]["status"] == "passed",
+                candidate[1][2]["score"],
+                candidate[0],
+            ),
+            default=None,
+        )
         gate_a_result = {
-            "status": gate_a[1]["status"],
-            "score": gate_a[1]["score"],
-            "anchor_status": gate_a[1]["status"],
-            "reason": gate_a[1]["reason"],
-            "matched_field": gate_a[0],
+            "status": gate_a_evidence["status"],
+            "score": gate_a_evidence["score"],
+            "anchor_status": gate_a_evidence["status"],
+            "reason": gate_a_evidence["reason"],
+            "matched_field": gate_a_field,
+            "matched_body_index": gate_a_item[0] if gate_a_item is not None else None,
             "candidates": {
                 field: {"status": result["status"], "score": result["score"], "reason": result["reason"]}
                 for field, result in body_results.items()
             },
         }
-        gate_b_passed = gate_a_result["status"] == "passed" and body_anchor["status"] == "passed"
+        same_body_anchor = {
+            "status": "failed",
+            "score": 0.0,
+            "reason": "Gate A did not identify a concrete instructional body item",
+        }
+        if gate_a_item is not None:
+            same_body_anchor = _intra_anchor_evidence(deliverable, gate_a_item[1])
+        cross_body_anchor = {
+            "status": "failed",
+            "score": 0.0,
+            "reason": "deliverable and Gate A body evidence have no shared substantive anchor",
+        }
+        cross_body_match = None
+        if gate_a_item is not None and deliverable_item is not None:
+            # A field is a small semantic cluster rather than only the single
+            # item that happened to win Gate A.  Search that field for the
+            # strongest bridge so concise key-point summaries can connect to
+            # the concrete teaching item that established the task anchor.
+            # Exclude the deliverable's own item when both matches are in the
+            # same field; otherwise a mixed field could bridge to itself.
+            deliverable_value = deliverable_item[1][1]
+            cross_body_candidates = [
+                (index, value, _intra_anchor_evidence(value, deliverable_value))
+                for index, value in enumerate(body_fields[gate_a_field])
+                if not (
+                    deliverable_item[0] == gate_a_field
+                    and index == deliverable_item[1][0]
+                )
+            ]
+            if cross_body_candidates:
+                cross_body_match = max(
+                    cross_body_candidates,
+                    key=lambda item: (
+                        item[2]["status"] == "passed",
+                        item[2]["score"],
+                        -item[0],
+                    ),
+                )
+            if cross_body_match is not None:
+                cross_body_anchor = cross_body_match[2]
+        shared_cluster = {
+            "same_gate_a_body": same_body_anchor["status"] == "passed",
+            "direct_task_and_body": (
+                task_anchor["status"] == "passed" and body_anchor["status"] == "passed"
+            ),
+            "cross_body_bridge": cross_body_anchor["status"] == "passed",
+            "same_gate_a_body_evidence": same_body_anchor,
+            "cross_body_evidence": cross_body_anchor,
+            "cross_body_gate_a_body_index": (
+                cross_body_match[0] if cross_body_match is not None else None
+            ),
+            "deliverable_matched_field": deliverable_item[0] if deliverable_item is not None else None,
+            "deliverable_matched_body_index": (
+                deliverable_item[1][0] if deliverable_item is not None else None
+            ),
+        }
+        gate_b_passed = gate_a_result["status"] == "passed" and any(
+            (
+                shared_cluster["same_gate_a_body"],
+                shared_cluster["direct_task_and_body"],
+                shared_cluster["cross_body_bridge"],
+            )
+        )
         gate_b_result = {
             "status": "passed" if gate_b_passed else "failed",
             "score": round(min(gate_a_result["score"], body_anchor["score"]), 4),
             "anchor_status": {
                 "task": task_anchor["status"],
                 "body": body_anchor["status"],
+                "shared_cluster": "passed" if gate_b_passed else "failed",
             },
             "reason": (
-                "deliverable is anchored in the current instructional body whose task anchor passed"
+                "deliverable shares a semantic cluster with the Gate A task/body chain"
                 if gate_b_passed
-                else "deliverable lacks a shared substantive anchor with the current task and body"
+                else "deliverable matches an instructional body branch unrelated to the Gate A task/body chain"
             ),
             "task_anchor": task_anchor,
             "body_anchor": body_anchor,
+            "shared_cluster": shared_cluster,
         }
         record = {"lesson_id": lesson_id, "gate_a": gate_a_result, "gate_b": gate_b_result}
         checks.append(record)
@@ -1261,7 +1364,7 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
             "minimum_substantive_anchor_chars": 3,
             "technical_acronym_allowed": True,
             "gate_a": "task -> teaching_content|key_point.content|difficult_point.content",
-            "gate_b": "deliverable -> instructional body, with Gate A task/body anchor required",
+            "gate_b": "deliverable -> Gate A body cluster, direct task/body bridge, or cross-body bridge",
         },
     }
 
@@ -1273,9 +1376,15 @@ def intra_lesson_coherence_calibration() -> list[dict[str, Any]]:
         ("database_positive", "设计数据库表结构", ["确定主键外键并检查数据库表约束"], "数据库表设计说明", "passed"),
         ("nursing_positive", "完成患者生命体征测量", ["练习血压、体温测量并记录异常判定"], "生命体征测量记录", "passed"),
         ("accounting_positive", "整理会计凭证并登记账簿", ["审核原始凭证并按科目登记账簿"], "凭证与账簿核对表", "passed"),
+        ("database_positive_explicit", "数据库表结构设计", ["数据库表的主键、外键、字段约束"], "数据库表设计说明", "passed"),
+        ("nursing_positive_explicit", "患者生命体征测量", ["患者生命体征包括血压、体温、异常判定"], "生命体征测量记录", "passed"),
+        ("http_positive_entity_chain", "分析 HTTP 请求过程", ["HTTP请求头、状态码、浏览器开发者工具"], "Web 请求分析报告", "passed"),
         ("nursing_task_sql_deliverable", "完成患者生命体征测量", ["编写SQL查询并验证结果"], "SQL查询脚本", "failed"),
         ("database_task_nursing_body", "设计数据库表结构", ["练习血压、体温测量并记录异常判定"], "数据库表设计说明", "failed"),
         ("accounting_task_java_deliverable", "登记会计凭证并核对账簿", ["编写Java类并运行单元测试"], "Java程序包", "failed"),
+        ("nursing_sql_mixed_body", "完成患者无菌护理操作", ["无菌护理准备与患者护理操作", "使用 SQL 完成数据库查询"], "SQL 查询结果记录", "failed"),
+        ("database_task_nursing_body_database_deliverable", "数据库表结构设计", ["血压、体温、异常判定"], "数据库表设计说明", "failed"),
+        ("task_body_a_deliverable_body_b", "完成数据库查询", ["数据库查询语句", "测量患者血压并记录生命体征"], "生命体征测量记录", "failed"),
         ("generic_only", "完成任务并进行分析", ["开展操作、检查流程并形成成果"], "提交成果", "failed"),
         ("prior_bridge_body_cross_domain", "完成数据库查询", ["测量患者血压并记录生命体征"], "数据库查询报告", "failed"),
     )
