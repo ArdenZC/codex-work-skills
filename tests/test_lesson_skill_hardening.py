@@ -517,7 +517,10 @@ class LessonSkillHardeningTests(unittest.TestCase):
         def references(root: Path) -> list[str]:
             values: list[str] = []
             for name in ("SKILL.md", "通用提示词.md", "AGENTS.md", "CONVENTIONS.md"):
-                values.extend(runtime_path.findall((root / name).read_text(encoding="utf-8")))
+                values.extend(
+                    item.rstrip(".,;:!?")
+                    for item in runtime_path.findall((root / name).read_text(encoding="utf-8"))
+                )
             return values
 
         with tempfile.TemporaryDirectory(prefix="lesson-adapter-closure-") as temp_name:
