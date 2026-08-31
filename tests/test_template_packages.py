@@ -1223,7 +1223,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             for index, lesson in enumerate(payload["lessons"], 1):
                 lesson["lesson_id"] = f"S{index:02d}"
                 lesson["unit"] = f"项目{index} 排序验证"
-                lesson["task"] = f"完成排序验证任务{index}"
+                lesson["task"] = f"{lesson['task']}（排序验证{index}）"
                 lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"S{index - 1:02d}"
             source = folder / "tasks.json"
             output = folder / "output"
@@ -1239,14 +1239,6 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             generated = sorted(output.glob("*.docx"))
             self.assertEqual(len(generated), 3)
 
-            temporary_names = []
-            for index, path in enumerate(generated):
-                temporary = output / f".sorting-rename-{index}.docx"
-                path.rename(temporary)
-                temporary_names.append(temporary)
-            for sequence, temporary in zip((2, 10, 100), temporary_names):
-                temporary.rename(output / f"教案{sequence}_排序验证.docx")
-
             validate_result = run_script(
                 LESSON / "scripts" / "validate_output.py",
                 "--input-json",
@@ -1258,6 +1250,7 @@ class LessonTemplatePackageTests(LessonContentV2Mixin, unittest.TestCase):
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["status"], "passed")
             self.assertEqual(report["files_checked"], 3)
+            self.assertEqual([path.name for path in generated], sorted(path.name for path in generated))
 
     def test_compatibility_template_and_skipped_validation_leave_qa_metadata(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-package-compat-qa-") as temp_name:
