@@ -19,16 +19,25 @@ W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 XML_NS = "http://www.w3.org/XML/1998/namespace"
 
 
-def _visible_text_nodes(root: etree._Element) -> list[etree._Element]:
-    return root.xpath(".//w:t", namespaces={"w": W_NS})
+def _text_containers(root: etree._Element) -> list[etree._Element]:
+    """Return explicit Word paragraphs so replacements never cross boundaries."""
+
+    return root.xpath(".//w:p", namespaces={"w": W_NS})
+
+
+def _visible_text_nodes(container: etree._Element) -> list[etree._Element]:
+    return container.xpath(".//w:t", namespaces={"w": W_NS})
 
 
 def _replace_visible_once(root: etree._Element, old_text: str, new_text: str) -> None:
-    nodes = _visible_text_nodes(root)
-    joined = "".join(node.text or "" for node in nodes)
-    occurrences = joined.count(old_text)
-    if occurrences != 1:
-        raise ValueError(f"Expected exactly one visible occurrence of {old_text!r}, found {occurrences}")
+    matches: list[tuple[list[etree._Element], str]] = []
+    for container in _text_containers(root):
+        nodes = _visible_text_nodes(container)
+        joined = "".join(node.text or "" for node in nodes)
+        matches.extend((nodes, joined) for _ in range(joined.count(old_text)))
+    if len(matches) != 1:
+        raise ValueError(f"Expected exactly one visible occurrence of {old_text!r}, found {len(matches)}")
+    nodes, joined = matches[0]
     start = joined.index(old_text)
     end = start + len(old_text)
     cursor = 0

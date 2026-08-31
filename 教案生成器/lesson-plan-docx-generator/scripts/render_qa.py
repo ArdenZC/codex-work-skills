@@ -66,24 +66,28 @@ def render_docx_directory(output_dir: Path | str, *, timeout: int = 180) -> dict
         profile_dir = render_dir / "profile"
         profile_dir.mkdir()
         for path in files:
-            result = subprocess.run(
-                [
-                    renderer,
-                    "--headless",
-                    f"-env:UserInstallation={profile_dir.as_uri()}",
-                    "--convert-to",
-                    "pdf",
-                    "--outdir",
-                    str(render_dir),
-                    str(path),
-                ],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout,
-                check=False,
-            )
+            try:
+                result = subprocess.run(
+                    [
+                        renderer,
+                        "--headless",
+                        f"-env:UserInstallation={profile_dir.as_uri()}",
+                        "--convert-to",
+                        "pdf",
+                        "--outdir",
+                        str(render_dir),
+                        str(path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=timeout,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired:
+                errors.append(f"{path.name}: renderer timed out after {timeout}s")
+                continue
             pdf = render_dir / f"{path.stem}.pdf"
             if result.returncode != 0:
                 detail = (result.stderr or result.stdout).strip().replace("\n", " ")

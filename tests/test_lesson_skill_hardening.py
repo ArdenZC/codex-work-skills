@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -20,6 +21,7 @@ import build_template_patch  # noqa: E402
 import content_quality  # noqa: E402
 import install as lesson_install  # noqa: E402
 import install_adapters  # noqa: E402
+import render_qa  # noqa: E402
 from record_visual_inspection import CHECK_NAMES, write_visual_inspection_evidence  # noqa: E402
 from validate_visual_inspection import validate_visual_inspection  # noqa: E402
 
@@ -187,6 +189,26 @@ class LessonSkillHardeningTests(unittest.TestCase):
 
             visible.extend(value for table in document.tables for row in table.rows for cell in row.cells for value in cell_text(cell))
             self.assertIn("A&B <测试>", "\n".join(visible))
+
+    def test_xml_template_patch_does_not_cross_paragraph_boundaries(self) -> None:
+        xml = (
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body><w:p><w:r><w:t>跨</w:t></w:r></w:p>'
+            '<w:p><w:r><w:t>段</w:t></w:r></w:p></w:body></w:document>'
+        ).encode("utf-8")
+        with self.assertRaisesRegex(ValueError, "found 0"):
+            build_template_patch._replace_document_text(xml, [("跨段", "不应替换")])
+
+    def test_render_timeout_is_reported_as_failed_qa(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-render-timeout-") as temp_name:
+            output = Path(temp_name)
+            (output / "教案01_示例.docx").write_bytes(b"docx")
+            timeout = subprocess.TimeoutExpired(["soffice"], 1)
+            with patch.object(render_qa, "find_renderer", return_value="soffice"):
+                with patch.object(render_qa.subprocess, "run", side_effect=timeout):
+                    report = render_qa.render_docx_directory(output, timeout=1)
+            self.assertEqual(report["status"], "failed")
+            self.assertIn("timed out after 1s", report["errors"][0])
 
 
 if __name__ == "__main__":
