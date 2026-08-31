@@ -51,6 +51,7 @@ class TestShardManifest(unittest.TestCase):
         discovered_count = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py").countTestCases()
         self.assertEqual(payload["aliases"]["full"]["tests"], discovered_count)
         self.assertTrue(payload["suites"]["lesson-content"]["parallel_safe"])
+        self.assertTrue(payload["suites"]["lesson-package"]["parallel_safe"])
         self.assertFalse(payload["suites"]["gradebook"]["parallel_safe"])
         self.assertEqual(payload["suites"]["gradebook"]["resource_group"], "repository-validator")
         self.assertEqual(payload["suites"]["tooling"]["resource_group"], "repository-validator")

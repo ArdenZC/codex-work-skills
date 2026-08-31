@@ -2,7 +2,8 @@
 
 The normal CI jobs already split the expensive package suites.  This runner
 provides the same boundary for local work: a fast Content V2 lane, a full
-suite manifest, per-shard timing, and isolated temporary/Office profiles.
+suite manifest, per-shard timing, isolated temporary roots, and safe Office
+scheduling.
 It never changes the tests selected by a shard; ``--list`` reports the exact
 partition so a new test cannot silently disappear from the full lane.
 """
@@ -105,7 +106,12 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     workflow = _workflow_ids()
     return {
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
-        "lesson-package": SuiteSpec("lesson-package", False, "ids", len(lesson_package)),
+        # This slice exercises Python/DOCX generation and package contracts;
+        # LibreOffice/COM rendering is confined to the inherited content
+        # regression and gradebook/release validators.  Keeping this shard
+        # safe lets it overlap with the short contract lanes without changing
+        # the tests selected by the full manifest.
+        "lesson-package": SuiteSpec("lesson-package", True, "ids", len(lesson_package)),
         "gradebook": SuiteSpec("gradebook", False, "gradebook", gradebook_class_count + gradebook_static_count, "repository-validator"),
         "package-contracts": SuiteSpec("package-contracts", True, "ids", len(workflow)),
         "tooling": SuiteSpec("tooling", True, "module", _module_count("tests.test_template_package_tooling"), "repository-validator"),

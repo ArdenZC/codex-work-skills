@@ -16,8 +16,9 @@ python .github/scripts/run_test_shards.py --list
 The `full` alias is an exact partition of root `tests/test_*.py` discovery.
 The `fast` alias covers Content Contract V2, package/workflow contracts, the
 change classifier, and the runner manifest. `ci` additionally runs the two
-skill test directories. Each worker receives its own `TEMP`/`TMP`, Python cache
-root, and Office profile. Put artifacts on a non-system volume when possible:
+skill test directories. Each worker receives its own `TEMP`/`TMP` and Python
+cache root; Office profile handling is described below. Put artifacts on a
+non-system volume when possible:
 
 ```text
 python .github/scripts/run_test_shards.py \
@@ -27,13 +28,15 @@ python .github/scripts/run_test_shards.py \
   --suite full --parallel --root F:\\test-artifacts\\codex-full
 ```
 
-`--parallel` overlaps only shards marked safe. Lesson package, Gradebook, and
-release shards remain serialized because they exercise Office/LibreOffice and
-failure-recovery boundaries. On Windows the runner preserves the host Office
-profile: the isolated owner-validator contract requires LibreOffice's normal
-profile, while each shard still receives isolated TEMP/TMP and Python cache
-roots. `--allow-office-parallel` is an explicit risk opt-in for an environment
-that independently manages Office profiles; it is not the default CI mode.
+`--parallel` overlaps only shards marked safe. The lesson-package slice is
+Python/DOCX-only and can overlap with the short contract lanes; its inherited
+content regression, Gradebook, and release shards remain serialized where they
+exercise Office/LibreOffice and failure-recovery boundaries. On Windows the
+runner preserves the host Office profile: the isolated owner-validator
+contract requires LibreOffice's normal profile, while each shard still
+receives isolated TEMP/TMP and Python cache roots. `--allow-office-parallel`
+is an explicit risk opt-in for an environment that independently manages
+Office profiles; it is not the default CI mode.
 Even with that opt-in, the Gradebook, tooling, and release shards share a
 `repository-validator` lock because they inspect and materialize the same
 canonical package trees.
