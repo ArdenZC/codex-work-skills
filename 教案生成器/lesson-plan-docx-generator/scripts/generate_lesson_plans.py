@@ -590,7 +590,10 @@ def main() -> None:
             external_candidate_error = _cleanup_path(external_candidate, "external QA candidate")
             if external_candidate_error:
                 cleanup_diagnostics.append(external_candidate_error)
-        if qa_parent_created and external_qa is not None and external_qa.parent.exists():
+        # A successful commit intentionally leaves the newly created parent
+        # containing the external report.  Only remove it after a failed
+        # operation, when rollback has left no committed report behind.
+        if operation_error is not None and qa_parent_created and external_qa is not None and external_qa.parent.exists():
             parent_error = _cleanup_empty_directory(external_qa.parent, "external QA parent directory")
             if parent_error:
                 cleanup_diagnostics.append(parent_error)

@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from path_safety import paths_equal, paths_overlap
+
 
 CHECK_NAMES = (
     "clipping",
@@ -60,6 +62,23 @@ def _parse_inspection(value: str) -> tuple[str, list[int]]:
     return filename, pages
 
 
+def _assert_destination_safe(directory: Path, report_path: Path, destination_path: Path) -> None:
+    """Reject evidence writes that could overwrite source or protected package files."""
+
+    if destination_path.exists() and destination_path.is_dir():
+        raise ValueError(f"visual inspection destination must be a file, not a directory: {destination_path}")
+
+    skill_root = Path(__file__).resolve().parents[1]
+    protected_files = [report_path, directory / "qa-report.json", *directory.glob("*.docx")]
+    if paths_overlap(destination_path, skill_root):
+        raise ValueError(
+            f"visual inspection destination must not overlap the protected Skill path: {skill_root}"
+        )
+    for protected in protected_files:
+        if paths_equal(destination_path, protected):
+            raise ValueError(f"visual inspection destination must not overwrite protected path: {protected}")
+
+
 def write_visual_inspection_evidence(
     *,
     output_dir: Path | str,
@@ -73,6 +92,7 @@ def write_visual_inspection_evidence(
     directory = Path(output_dir).expanduser().resolve()
     report_path = Path(qa_report).expanduser().resolve()
     destination_path = Path(destination).expanduser().resolve()
+    _assert_destination_safe(directory, report_path, destination_path)
     if status not in {"passed", "failed"}:
         raise ValueError("visual inspection status must be passed or failed")
     if set(checks) != set(CHECK_NAMES) or any(value not in {"passed", "failed"} for value in checks.values()):

@@ -41,7 +41,7 @@ _LESSON_DEPENDENCIES = {
     "content_quality": ("content_contract",),
     "path_safety": (),
     "render_qa": (),
-    "record_visual_inspection": (),
+    "record_visual_inspection": ("path_safety",),
     "package_common": ("semantic_bookmarks", "content_contract"),
     "validate_template": ("bookmark_utils", "package_common"),
     "validate_output": (
@@ -1453,6 +1453,7 @@ class LessonContentV2Mixin:
             self.assertEqual(internal_report["status"], "passed")
             self.assertEqual(external_report["status"], "passed")
             self.assertEqual(external_report["qa_report"], str(external.resolve()))
+            self.assertNotIn("cleanup failed", result.stderr.lower())
 
             for label in ("output-descendant", "source"):
                 with self.subTest(path=label):
@@ -1802,6 +1803,38 @@ class LessonContentV2Mixin:
                     checks=checks,
                     notes="",
                 )
+
+    def test_visual_inspection_destination_cannot_overwrite_protected_inputs(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-visual-destination-guard-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            output.mkdir()
+            lesson = output / "教案01_示例.docx"
+            lesson.write_bytes(b"explicit visual fixture")
+            qa_report = output / "qa-report.json"
+            qa_report.write_text('{"status":"passed"}\n', encoding="utf-8")
+            checks = {name: "passed" for name in lesson_visual_inspection.CHECK_NAMES}
+
+            for label, destination in (
+                ("qa report", qa_report),
+                ("generated docx", lesson),
+                ("skill path", LESSON / "SKILL.md"),
+            ):
+                with self.subTest(destination=label):
+                    before_report = qa_report.read_bytes()
+                    before_lesson = lesson.read_bytes()
+                    with self.assertRaisesRegex(ValueError, "protected"):
+                        write_visual_inspection_evidence(
+                            output_dir=output,
+                            qa_report=qa_report,
+                            destination=destination,
+                            status="passed",
+                            inspected_pages={lesson.name: [1]},
+                            checks=checks,
+                            notes="",
+                        )
+                    self.assertEqual(qa_report.read_bytes(), before_report)
+                    self.assertEqual(lesson.read_bytes(), before_lesson)
 
     def test_path_safety_rejects_protected_real_cli_paths_and_allows_sibling(self) -> None:
         payload = load_fixture("lesson-plan-input.json")
