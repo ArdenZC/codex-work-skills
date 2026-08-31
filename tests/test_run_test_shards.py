@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -55,15 +56,16 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(payload["suites"]["tooling"]["resource_group"], "repository-validator")
         self.assertEqual(payload["suites"]["release"]["resource_group"], "repository-validator")
 
-    def test_isolated_environment_redirects_temp_and_windows_profile(self) -> None:
+    def test_isolated_environment_redirects_temp_and_preserves_host_office_profile(self) -> None:
         root = ROOT / "_test-shard-root"
         environment = run_test_shards._isolated_environment(root)
         self.assertEqual(environment["TEMP"], str(root))
         self.assertEqual(environment["TMP"], str(root))
         self.assertEqual(environment["PYTHONPYCACHEPREFIX"], str(root / "python-cache"))
         if sys.platform == "win32":
-            self.assertEqual(environment["USERPROFILE"], str(root / "office-profile"))
-            self.assertEqual(environment["LOCALAPPDATA"], str(root / "office-profile" / "AppData" / "Local"))
+            for key in ("USERPROFILE", "APPDATA", "LOCALAPPDATA"):
+                if key in os.environ:
+                    self.assertEqual(environment[key], os.environ[key])
 
 
 if __name__ == "__main__":

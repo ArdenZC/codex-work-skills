@@ -29,11 +29,14 @@ python .github/scripts/run_test_shards.py \
 
 `--parallel` overlaps only shards marked safe. Lesson package, Gradebook, and
 release shards remain serialized because they exercise Office/LibreOffice and
-failure-recovery boundaries. `--allow-office-parallel` is an explicit opt-in
-for a machine with independently isolated Office profiles; it is not the
-default CI mode. Even with that opt-in, the Gradebook, tooling, and release
-shards share a `repository-validator` lock because they inspect and materialize
-the same canonical package trees.
+failure-recovery boundaries. On Windows the runner preserves the host Office
+profile: the isolated owner-validator contract requires LibreOffice's normal
+profile, while each shard still receives isolated TEMP/TMP and Python cache
+roots. `--allow-office-parallel` is an explicit risk opt-in for an environment
+that independently manages Office profiles; it is not the default CI mode.
+Even with that opt-in, the Gradebook, tooling, and release shards share a
+`repository-validator` lock because they inspect and materialize the same
+canonical package trees.
 
 The runner prints one duration and log path per shard. `--keep-artifacts`
 retains logs for diagnosis. A Windows release shard must use a standalone

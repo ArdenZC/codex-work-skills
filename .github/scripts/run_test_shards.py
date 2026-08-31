@@ -185,14 +185,12 @@ def _isolated_environment(shard_root: Path) -> dict[str, str]:
     environment["TMP"] = str(shard_root)
     environment["TMPDIR"] = str(shard_root)
     environment["PYTHONPYCACHEPREFIX"] = str(shard_root / "python-cache")
-    profile_root = shard_root / "office-profile"
-    if os.name == "nt":
-        environment["USERPROFILE"] = str(profile_root)
-        environment["APPDATA"] = str(profile_root / "AppData" / "Roaming")
-        environment["LOCALAPPDATA"] = str(profile_root / "AppData" / "Local")
-    else:
-        environment["HOME"] = str(profile_root)
-        environment["XDG_CONFIG_HOME"] = str(profile_root / ".config")
+    # Do not rewrite the host Office profile.  The repository's isolated owner
+    # validators deliberately use a normal Skill tree and LibreOffice's native
+    # profile; changing USERPROFILE/APPDATA on Windows makes those conversions
+    # fail before the validator can inspect the copied workbook.  The default
+    # scheduler therefore serializes Office/COM shards, while TEMP/TMP and
+    # Python cache isolation still keeps artifacts off the system volume.
     return environment
 
 
