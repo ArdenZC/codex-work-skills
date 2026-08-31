@@ -1,15 +1,13 @@
 # 教案生成器工作规则
 
-本目录是一个与模型供应商无关的项目化中文教案生成工作包。处理教案、教学单元设计、实训教案或旧教案转换任务时，先阅读 SKILL.md 和 通用提示词.md，再根据用户提供的资料执行。
+本文件是各类 agent 的轻量入口。开始教案任务前必须读取同目录 `SKILL.md` 和 `通用提示词.md`；Content Contract V2、QA、模板和事务规则只以 `SKILL.md` 为准，不在 adapter 中复制。
 
-## 工作协议
+执行约束：
 
-1. 先提醒用户提供课程名、专业、授课对象、总课时、单次课时，以及能力图谱、章节任务拆解、课程标准、教材目录或旧教案。资料不全时可以合理推断，但仍按项目化教学生成。
-2. 优先从用户资料提取项目、任务和流程；不要把所有单元都写成“基础”或直接照搬章节名。
-3. 先生成或整理为 tasks.json，再运行 scripts/generate_lesson_plans.py。不要手工重写 DOCX 模板。
-4. 单元名称必须以“项目一、项目二……”开头，任务名称必须是可执行的学习产出或实训动作。评价分数应自然分布，通常在 88.5 至 91.5 之间，不要全部相同。
-5. 生成后校验 DOCX 数量、30 行主表、课程名、单元名称、总课时和评价分数；有条件时再进行 Word 或 LibreOffice 渲染检查。
+- 先读取用户会话、上传资料、能力图谱/任务拆解、课程标准、教材和旧教案；课程级规划先于逐课生成。
+- 一次核对课程名、专业/对象、总课时、单次课时和输出目录。资料不足且用户允许推断时继续，不把推断说明写进 DOCX。
+- 生成严格的 `content_contract_version: "2.0"` JSON。旧 sparse input（只含 task/hours/flows 等）不得用于生产生成。
+- 所有正文、9 个实施阶段、逐课评价备注和三段反思由 JSON 提供；Python 只格式化、映射和校验，不创作正文、不截断、不使用旧默认套话。
+- 运行 Content QA、模板 QA、输出保真 QA，并在可用时运行 Windows/macOS 本地 render smoke；正式目录只接受通过 QA 的 candidate 原子提交。
 
-## 平台与模型
-
-Windows 使用 python，macOS/Linux 使用 python3；首次运行需要安装 python-docx。DeepSeek、Claude、GLM、Gemini、OpenAI 等模型都可以生成同一份 tasks.json。模型本身不负责保持 DOCX 格式，格式由内置模板和 Python 脚本保证。
+使用 `scripts/generate_lesson_plans.py`，完整字段与命令见 `SKILL.md`、`docs/content-contract-v2.md` 和 `examples/tasks.example.json`。

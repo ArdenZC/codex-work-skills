@@ -1,111 +1,94 @@
 {
+  "content_contract_version": "2.0",
   "course_name": "软件测试实训",
   "major": "软件技术",
   "audience": "高职二年级",
-  "default_hours": "2",
-  "total_hours": 12,
+  "default_hours": 2,
+  "total_hours": 6,
   "lessons": [
     {
-      "unit": "项目一 软件测试项目准备",
-      "task": "搭建测试环境并编制测试计划",
-      "hours": "2",
-      "flows": [
-        "分析实训项目需求",
-        "搭建测试环境",
-        "编制测试计划并提交检查表"
+      "lesson_id": "L01",
+      "unit": "项目一 测试项目准备",
+      "task": "搭建环境并编制测试计划",
+      "hours": 2,
+      "progression": {"prior_lesson_id": null, "prior_learning": "已阅读项目需求，能够区分业务目标与系统功能", "capability_stage": "认知", "deliverable": "提交环境检查表、范围清单和测试计划", "next_bridge": "依据范围清单提取下一课的功能测试点"},
+      "student_analysis": {"base": ["接触过软件开发流程并能阅读简单需求", "会使用文件管理和网络工具完成环境检查"], "problems": ["容易忽略工具版本和账号配置记录", "测试范围与风险表达不够具体"], "strategies": ["使用配置清单逐项核验环境", "用需求片段标注范围并进行小组互审"]},
+      "teaching_content": ["解析项目目标和测试范围", "核验工具、账号与测试数据", "编写计划并关联风险和退出条件"],
+      "goals": {"knowledge": ["说明测试计划的范围和退出条件", "识别环境中的关键配置项"], "ability": ["完成环境检查并留下证据", "依据需求边界安排测试任务"], "quality": ["形成先核对后操作的习惯", "如实记录异常并承担交付责任"]},
+      "key_point": {"content": ["需求范围与测试任务的对应关系"], "strategy": ["用需求片段做范围标注"]},
+      "difficult_point": {"content": ["区分环境风险和功能缺陷"], "strategy": ["使用风险分类卡追问证据"]},
+      "teaching_methods": ["任务驱动法", "案例分析法"],
+      "resources": ["项目需求说明书", "测试计划模板和环境检查表"],
+      "references": [{"text": "软件测试课程标准", "source_kind": "generic"}],
+      "implementation": [
+        {"id":"before_class_preparation","label":"课前准备","minutes":10,"modality":"线上+线下","content":["阅读需求并标记范围疑点"],"teacher_actions":["发布需求片段和检查表"],"student_actions":["完成需求初读并确认工具可用"],"objective":"带着范围问题进入环境核验"},
+        {"id":"task_introduction","label":"任务导入","minutes":10,"modality":"线下","content":["比较环境遗漏导致延期的案例"],"teacher_actions":["呈现案例并说明交付边界"],"student_actions":["指出环境遗漏的影响"],"objective":"建立环境记录与测试计划的联系"},
+        {"id":"operation_demonstration","label":"方法示范","minutes":20,"modality":"线下","content":["演示版本核验和范围标注"],"teacher_actions":["示范检查顺序与证据格式"],"student_actions":["记录核验步骤和判定依据"],"objective":"掌握可复查的环境核验方法"},
+        {"id":"task_implementation","label":"任务实施","minutes":25,"modality":"小组实训","content":["完成环境检查并起草测试计划"],"teacher_actions":["巡视证据链并追问范围遗漏"],"student_actions":["分工核验配置并填写风险"],"objective":"把需求边界转成有证据的计划"},
+        {"id":"task_extension","label":"任务拓展","minutes":10,"modality":"小组实训","content":["补充一项环境风险和应对时限"],"teacher_actions":["指导区分风险来源和责任"],"student_actions":["根据证据补充责任人"],"objective":"提升计划的风险预见能力"},
+        {"id":"project_practice","label":"项目实训","minutes":10,"modality":"小组实训","content":["整理检查表、范围清单和计划"],"teacher_actions":["核对文件和证据完整性"],"student_actions":["提交计划并说明一项风险"],"objective":"形成可评审的测试文档"},
+        {"id":"peer_review","label":"组间互评","minutes":5,"modality":"线下","content":["围绕范围、风险和证据互审"],"teacher_actions":["分配对象并记录共性缺口"],"student_actions":["提出一条修改意见"],"objective":"检验计划的可执行性"},
+        {"id":"lesson_summary","label":"课堂小结","minutes":10,"modality":"线下","content":["回顾环境核验到计划编排"],"teacher_actions":["归纳易错点并布置测试点提取"],"student_actions":["复述检查顺序并记录要求"],"objective":"巩固从需求到计划的路径"},
+        {"id":"after_class_improvement","label":"课后完善","minutes":15,"modality":"线上","content":["依据互评修订计划并补全证据"],"teacher_actions":["在线批注范围和风险表达"],"student_actions":["上传修订版并说明改动"],"objective":"将反馈落实为文档改进"}
       ],
-      "knowledge": [
-        "软件测试流程",
-        "测试计划结构",
-        "测试环境检查要点"
-      ],
-      "tools": "需求说明书、测试计划模板、测试环境检查表",
-      "score": 89.5
+      "evaluation": {"score":88.5,"remarks":{"attendance":"按时完成需求初读","attention":"持续关注案例证据","participation":"主动参与范围标注","compliance":"依照清单记录配置","values":"理解测试记录价值","ethics":"如实报告环境异常","habits":"文件归档规范","online_learning":"提交预习标记","discussion":"能说明风险依据","homework":"上传修订计划","practice":"完成环境检查","presentation":"介绍范围边界清楚","improvement":"补充风险措施"}},
+      "reflection": {"summary":"本课完成环境核验和测试计划编制，多数小组能依据需求边界整理检查表；个别学生仍需加强配置证据与判定的对应。","innovation":"将需求片段、环境清单和风险卡串成一次交付任务，让学生在互审中发现计划遗漏。","improvement":"下一课要求每个功能点关联用例编号，为边界测试设计建立清晰入口。"}
     },
     {
-      "unit": "项目二 软件测试用例设计",
-      "task": "根据需求编写功能测试用例",
-      "hours": "2",
-      "flows": [
-        "识别功能点和业务规则",
-        "设计等价类与边界值用例",
-        "完成用例评审"
+      "lesson_id": "L02",
+      "unit": "项目二 功能用例设计",
+      "task": "根据业务规则设计边界用例",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "L01", "prior_learning": "已从测试计划确认功能范围，能够找到本课输入规则", "capability_stage": "理解", "deliverable": "包含等价类、边界值和预期结果的用例集", "next_bridge": "下一课按用例执行功能测试并绑定缺陷证据"},
+      "student_analysis": {"base": ["能够阅读字段规则和正常业务流程", "接触过用例模板与测试数据表"], "problems": ["设计输入时容易漏掉相邻边界", "预期结果缺少可观察条件"], "strategies": ["先拆有效类和无效类再补边界值", "提交前由同伴检查步骤、数据和结果"]},
+      "teaching_content": ["提取输入条件和业务约束", "用等价类与边界值设计数据", "完善步骤、结果和优先级"],
+      "goals": {"knowledge": ["解释等价类和边界值的适用条件", "辨认用例的前置条件和预期结果"], "ability": ["从规则生成边界数据", "编写便于执行的功能用例"], "quality": ["以证据检验覆盖范围", "保持编号、版本和评审记录规范"]},
+      "key_point": {"content": ["有效类、无效类与边界邻值"], "strategy": ["用规则拆解表补齐代表数据"]},
+      "difficult_point": {"content": ["有限用例下的条件组合覆盖"], "strategy": ["用风险优先级筛选核心组合"]},
+      "teaching_methods": ["案例分析法", "启发式提问法"],
+      "resources": ["字段规则表和需求片段", "功能用例模板和边界练习卡"],
+      "references": [{"text": "功能测试用例设计规范", "source_kind": "generic"}],
+      "implementation": [
+        {"id":"before_class_preparation","label":"课前准备","minutes":10,"modality":"线上","content":["复习范围清单并圈出输入规则"],"teacher_actions":["推送字段练习和边界提示"],"student_actions":["完成规则初分组并记录疑点"],"objective":"把范围知识转成设计问题"},
+        {"id":"task_introduction","label":"案例导入","minutes":10,"modality":"线下","content":["分析只覆盖正常值的缺陷案例"],"teacher_actions":["呈现缺陷后果并追问遗漏条件"],"student_actions":["指出用例覆盖盲区"],"objective":"认识边界覆盖的质量作用"},
+        {"id":"operation_demonstration","label":"方法示范","minutes":20,"modality":"线下","content":["示范规则到边界数据的转换"],"teacher_actions":["拆解规则并展示模板填写"],"student_actions":["记录分类依据并补一组数据"],"objective":"掌握可解释的数据设计步骤"},
+        {"id":"task_implementation","label":"任务实施","minutes":25,"modality":"小组研讨","content":["为金额和数量规则编写用例"],"teacher_actions":["检查覆盖表与用例的对应"],"student_actions":["填写步骤、数据和预期结果"],"objective":"完成可执行的边界用例"},
+        {"id":"task_extension","label":"任务拓展","minutes":10,"modality":"小组研讨","content":["补充一个高风险组合场景"],"teacher_actions":["引导比较单字段与组合优先级"],"student_actions":["说明组合选择依据"],"objective":"提升覆盖取舍能力"},
+        {"id":"project_practice","label":"项目实训","minutes":10,"modality":"小组研讨","content":["整理用例、数据表和覆盖说明"],"teacher_actions":["抽查预期结果的观察条件"],"student_actions":["提交用例集并标注风险"],"objective":"形成下一课的执行依据"},
+        {"id":"peer_review","label":"组间互评","minutes":5,"modality":"线下","content":["互查边界覆盖和结果表达"],"teacher_actions":["提供互评指标并收集问题"],"student_actions":["指出一处遗漏或模糊表达"],"objective":"提高用例可执行性"},
+        {"id":"lesson_summary","label":"课堂小结","minutes":10,"modality":"线下","content":["归纳规则拆解和用例表达"],"teacher_actions":["连接下课执行任务并说明证据"],"student_actions":["整理方法卡并确认前置条件"],"objective":"形成从规则到执行的认知"},
+        {"id":"after_class_improvement","label":"课后完善","minutes":15,"modality":"线上","content":["依据互评修改用例并补组合场景"],"teacher_actions":["批注覆盖说明和判定语句"],"student_actions":["上传修订用例并说明理由"],"objective":"将评审意见转成执行清单"}
       ],
-      "knowledge": [
-        "测试用例要素",
-        "等价类划分",
-        "边界值分析"
-      ],
-      "tools": "需求规格说明书、用例模板、缺陷示例库",
-      "score": 90.0
+      "evaluation": {"score":90.0,"remarks":{"attendance":"完成规则预习后到课","attention":"跟随边界推导","participation":"提出组合问题","compliance":"按模板填写版本","values":"理解严谨用例意义","ethics":"客观记录覆盖不足","habits":"编号对应清楚","online_learning":"完成边界练习","discussion":"解释分类依据","homework":"提交修订用例","practice":"完成边界设计","presentation":"说明高风险项","improvement":"补充组合场景"}},
+      "reflection": {"summary":"本课以字段规则练习等价类和边界值，学生能完成主要用例；部分小组对组合条件和预期结果表达仍显简略。","innovation":"通过规则拆解表、边界练习卡和同伴追问组织设计，让覆盖理由先于模板填写。","improvement":"下一课执行用例时复核失败预期，将日志和截图与编号绑定。"}
     },
     {
-      "unit": "项目三 软件测试执行与缺陷记录",
-      "task": "执行功能测试并提交缺陷报告",
-      "hours": "2",
-      "flows": [
-        "按用例执行测试",
-        "复现异常并留存证据",
-        "编写规范缺陷报告"
+      "lesson_id": "L03",
+      "unit": "项目三 功能测试执行",
+      "task": "执行功能测试并整理异常证据",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "L02", "prior_learning": "已完成边界用例集，能够依据步骤准备测试数据", "capability_stage": "模仿", "deliverable": "执行记录、实际结果和异常证据包", "next_bridge": "下一课把复现问题整理为规范缺陷报告"},
+      "student_analysis": {"base": ["能够按用例步骤输入数据并观察反馈", "了解截图、日志和执行记录用途"], "problems": ["容易跳过前置条件和清理步骤", "异常证据与用例编号关联不稳定"], "strategies": ["执行前用前置条件卡逐项确认", "按编号保存结果、日志和复现步骤"]},
+      "teaching_content": ["核对执行条件和测试数据", "记录操作、实际结果与判定", "复现异常并整理环境证据"],
+      "goals": {"knowledge": ["说明执行记录的证据要素", "区分预期结果、实际结果和结论"], "ability": ["按用例执行核心功能场景", "形成编号关联的异常证据包"], "quality": ["遵守账号和数据使用边界", "保持记录客观、完整、可复核"]},
+      "key_point": {"content": ["步骤、结果与证据编号的关联"], "strategy": ["用执行记录表同步填写结果"]},
+      "difficult_point": {"content": ["还原异常复现条件"], "strategy": ["通过二次复现比较环境和数据差异"]},
+      "teaching_methods": ["情境演练法", "过程记录法"],
+      "resources": ["功能测试用例集", "测试数据、执行记录表和日志工具"],
+      "references": [{"text": "功能测试执行规范", "source_kind": "generic"}],
+      "implementation": [
+        {"id":"before_class_preparation","label":"课前准备","minutes":10,"modality":"线上+线下","content":["检查账号并准备功能测试数据"],"teacher_actions":["发布执行清单并提醒数据边界"],"student_actions":["核验账号和数据，标记风险"],"objective":"确保执行具备可重复条件"},
+        {"id":"task_introduction","label":"情境导入","minutes":10,"modality":"线下","content":["对比一条缺少证据的失败记录"],"teacher_actions":["展示复盘材料并追问缺失信息"],"student_actions":["指出记录中的证据缺口"],"objective":"理解完整执行记录的价值"},
+        {"id":"operation_demonstration","label":"执行示范","minutes":20,"modality":"线下","content":["演示用例执行、结果判定和证据编号"],"teacher_actions":["按步骤执行并说明异常格式"],"student_actions":["观察操作节奏并记录证据位置"],"objective":"掌握执行到记录的连续动作"},
+        {"id":"task_implementation","label":"任务实施","minutes":25,"modality":"分组实训","content":["执行登录和订单主流程用例"],"teacher_actions":["巡查前置条件和记录完整性"],"student_actions":["按用例操作并填写实际结果"],"objective":"完成核心场景的真实执行"},
+        {"id":"task_extension","label":"异常复现","minutes":10,"modality":"分组实训","content":["重新执行异常并补充环境信息"],"teacher_actions":["引导比较两次执行差异"],"student_actions":["复现异常并补充日志条件"],"objective":"提高问题复现稳定性"},
+        {"id":"project_practice","label":"成果整理","minutes":10,"modality":"分组实训","content":["整理执行记录和异常证据包"],"teacher_actions":["检查证据与用例编号绑定"],"student_actions":["提交记录、截图和日志清单"],"objective":"形成可供缺陷分析的成果"},
+        {"id":"peer_review","label":"交叉复核","minutes":5,"modality":"线下","content":["交换证据包检查复现条件"],"teacher_actions":["组织快速复核并收集争议"],"student_actions":["按编号复走关键步骤"],"objective":"检验记录的可复现性"},
+        {"id":"lesson_summary","label":"课堂小结","minutes":10,"modality":"线下","content":["总结条件、执行、记录和复现"],"teacher_actions":["归纳漏记项并导入缺陷报告"],"student_actions":["整理证据清单并确认描述重点"],"objective":"为缺陷报告建立证据基础"},
+        {"id":"after_class_improvement","label":"课后复核","minutes":15,"modality":"线上","content":["补充缺失日志并完善执行结论"],"teacher_actions":["反馈证据关联问题"],"student_actions":["提交修订记录和复现说明"],"objective":"提升执行成果的可追溯性"}
       ],
-      "knowledge": [
-        "测试执行流程",
-        "缺陷等级与优先级",
-        "缺陷报告规范"
-      ],
-      "tools": "测试用例、缺陷管理工具、截图和日志工具",
-      "score": 88.5
-    },
-    {
-      "unit": "项目四 软件接口测试实施",
-      "task": "设计并执行接口测试任务",
-      "hours": "2",
-      "flows": [
-        "分析接口文档",
-        "配置请求参数和断言",
-        "整理接口测试结果"
-      ],
-      "knowledge": [
-        "HTTP 请求与响应",
-        "接口参数",
-        "断言和结果分析"
-      ],
-      "tools": "接口文档、Postman 或同类工具、测试数据表",
-      "score": 91.0
-    },
-    {
-      "unit": "项目五 软件测试自动化准备",
-      "task": "编写基础自动化测试脚本",
-      "hours": "2",
-      "flows": [
-        "选择自动化测试场景",
-        "编写和调试测试脚本",
-        "输出自动化执行报告"
-      ],
-      "knowledge": [
-        "自动化测试流程",
-        "脚本结构",
-        "测试数据管理"
-      ],
-      "tools": "自动化测试框架、代码编辑器、测试报告模板",
-      "score": 90.5
-    },
-    {
-      "unit": "项目六 软件测试综合成果交付",
-      "task": "整理测试成果包并完成项目汇报",
-      "hours": "2",
-      "flows": [
-        "汇总用例、缺陷和执行记录",
-        "复核成果包完整性",
-        "完成小组汇报与改进说明"
-      ],
-      "knowledge": [
-        "测试成果包结构",
-        "质量复核方法",
-        "项目汇报要点"
-      ],
-      "tools": "成果包清单、项目汇报模板、互评量表",
-      "score": 91.5
+      "evaluation": {"score":89.0,"remarks":{"attendance":"准时参加执行实训","attention":"关注前置条件","participation":"主动复核异常","compliance":"遵守数据要求","values":"理解证据作用","ethics":"按制度使用账号","habits":"记录编号清楚","online_learning":"完成执行清单","discussion":"能指出复现差异","homework":"补齐课后记录","practice":"完成核心场景执行","presentation":"说明证据清楚","improvement":"补充缺失日志"}},
+      "reflection": {"summary":"本课通过功能场景训练执行记录，学生大多能完成操作；个别小组在数据清理和异常复现上不够稳定，记录习惯仍需强化。","innovation":"把执行记录、证据编号和二次复现安排在同一任务中，让学生看到条件缺失对复核的影响。","improvement":"下一课用本课证据包开展缺陷描述对照，要求每条问题说明环境、步骤、结果和影响。"}
     }
   ]
 }

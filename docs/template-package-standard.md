@@ -60,7 +60,7 @@ requirements.txt
 
 ## Word 语义书签
 
-教案 `lesson-plan/v1.1.1` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。所有 managed semantic bookmark 必须匹配 `^[A-Za-z][A-Za-z0-9_]{0,39}$`，不使用中文、空格、连字符、点号、`_GoBack` 或超过 40 个字符的名称；教学实施区使用 `prep`、`intro`、`demo`、`exec`、`extend`、`practice`、`peer`、`summary`、`improve` 等短阶段代码。固定字段、教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确，且 start/end 的完整稳定边界位置未改变。v1.1.1 还固定保留“突出方法”和“破解方法”标签，并将两学时课中七个阶段严格分配为 90 分钟。构建器对临时最终 DOCX 扫描主文档、所有页眉和页脚 story 后才原子替换输出；书签 ID 只允许 ASCII 十进制数字。
+教案 `lesson-plan/v1.1.2` 使用标准 Word `w:bookmarkStart`/`w:bookmarkEnd` 作为写入锚点。所有 managed semantic bookmark 必须匹配 `^[A-Za-z][A-Za-z0-9_]{0,39}$`，不使用中文、空格、连字符、点号、`_GoBack` 或超过 40 个字符的名称；教学实施区使用 `prep`、`intro`、`demo`、`exec`、`extend`、`practice`、`peer`、`summary`、`improve` 等短阶段代码。固定字段、教学实施区的每个实际可写单元格、三个教学反思单元格和评价表父单元格均有独立锚点。生成器先解析书签并按父段落或父单元格写入，写入完成后由输出校验确认必需书签仍成对存在、位于主文档、容器正确，且 start/end 的完整稳定边界位置未改变。v1.1.2 是基于 v1.1.1 的纯可见标签 patch，只将“平凡又不平凡的价值观”“工程伦理”改为“职业价值观”“职业伦理”，其余书签、布局、权重和结构不变；v1.1.1 还固定保留“突出方法”和“破解方法”标签，并将两学时课中七个阶段严格分配为 90 分钟。构建器对临时最终 DOCX 扫描主文档、所有页眉和页脚 story 后才原子替换输出；书签 ID 只允许 ASCII 十进制数字。
 
 v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0 的可见内容和结构 XML 严格等价。v1.1 manifest 的 semantic 契约字段必须显式存在，不能由 Python 定义静默补全；包括 `anchors.required`、`anchors.containers`、固定字段的 `target/bookmark/mode`、实施阶段的 `id/code/bookmarks`、反思书签和评价书签。固定字段、implementation、reflection、stage 和 evaluation 都采用封闭 allowed-key 契约，未知或冲突的定位键直接失败。v1.0 legacy manifest 只允许坐标字段和 `anchors.mode: legacy_coordinates`，不得出现 semantic `required`、`containers`、`bookmark`、`stages` 或 semantic implementation/reflection 定位元数据。固定字段的 `target`、`mode`、`bookmark`、`container` 来自同一集中定义，未知值会在模板校验和生成前失败。校验器不会用坐标模式静默补写缺失书签。v1.0 canonical 模板和旧 compatibility entry 仅传 `--template` 时自动解析为对应的 v1.0 manifest，QA 报告会标记 `anchor_mode: legacy_coordinates`；v1.1.x 报告会记录 `anchor_mode: word_bookmark`、必需/保留数量以及缺失、重复、非法 ID 和边界错误。自定义模板必须显式提供匹配的 manifest。
 
@@ -88,7 +88,7 @@ v1.1 模板必须从 v1.0.0 模板复制生成，去除书签边界后与 v1.0.0
 - DOCX 生成器继续使用 `python-docx`，并保留单段落替换和多段落内容写入模式；教案 v1.1 的正常写入必须以 Word 书签为入口。
 - `.xls` 生成器继续保留 Windows Excel COM 路径，并提供 Python + LibreOffice 路径；两条路径使用同一份 manifest。Windows COM 是生成引擎，Python 的 `xlrd`/`olefile` 负责不可跳过的 raw XLS preflight；LibreOffice 只用于完整 round-trip、格式和渲染 QA。Windows 同时显式跳过模板和输出 QA 时，不强制要求 LibreOffice；报告会标记为 `skipped`。
 - 仓库内脚本不得依赖个人电脑上的临时工具目录或其他外部绝对路径。
-- 当前模板版本：教案默认 `lesson-plan/v1.1.1`，兼容 `lesson-plan/v1.0.0`；记分册默认 `course-gradebook/v1.1.0`，兼容 `course-gradebook/v1.0.0` 和旧 `assets/平时成绩记分册模板.xls`。
+- 当前模板版本：教案默认 `lesson-plan/v1.1.2`，兼容 `lesson-plan/v1.1.1`、`lesson-plan/v1.1.0`、`lesson-plan/v1.0.0` 和旧 compatibility entry；记分册默认 `course-gradebook/v1.1.0`，兼容 `course-gradebook/v1.0.0` 和旧 `assets/平时成绩记分册模板.xls`。
 - 默认校验命令：
 
   ```bash

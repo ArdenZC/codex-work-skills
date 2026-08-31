@@ -229,7 +229,7 @@ SEMANTIC_FIXED_ALLOWED_KEYS = {
         )
     },
     "evaluation": frozenset(
-        {"target", "bookmark", "mode", "rows", "columns", "writable_rows", "writable_cells"}
+        {"target", "bookmark", "mode", "rows", "columns", "writable_rows", "writable_cells", "max_remark_chars"}
     ),
 }
 SEMANTIC_IMPLEMENTATION_ALLOWED_KEYS = frozenset({"mode", "max_chars", "max_paragraphs", "stages"})

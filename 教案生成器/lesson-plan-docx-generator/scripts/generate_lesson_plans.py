@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import argparse
 import copy
-import hashlib
 import json
+import os
 import re
 import shutil
-from datetime import datetime
+import sys
+import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -18,15 +20,17 @@ from docx.text.paragraph import Paragraph
 from docx.table import _Cell
 
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, evaluation_cell_values, ensure_supported_major, field_bookmark, field_spec, generated_lesson_fields, implementation_bookmarks, implementation_cell_values, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, reflection_cell_values, resolve_template_package, validate_composed_fields, validate_input
+from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
+from content_quality import ContentQualityError, validate_content_quality
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
+from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
+DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 
-MAX_FILENAME_BYTES = 255
 
 
 def actual_cells(row):
@@ -182,59 +186,27 @@ def set_anchored_cell(document, manifest: dict[str, Any], bookmark_name: str, va
     writer(cell, value, bookmark_end=record.end)
 
 
-def numbered(items: list[str], limit: int | None = None) -> str:
-    values = [str(x).strip() for x in items if str(x).strip()]
-    if limit and len(values) > limit:
-        values = values[:limit] + ["结合任务材料完成其余流程训练"]
-    return "\n".join(f"{idx}. {item}" for idx, item in enumerate(values, 1))
-
-
-def safe_name(text: str) -> str:
-    text = re.sub(r"\s+", "", str(text))
-    return re.sub(r'[\\/:*?"<>|]+', "", text)
-
-
-def _utf8_prefix(text: str, max_bytes: int) -> str:
-    encoded = text.encode("utf-8")
-    if len(encoded) <= max_bytes:
-        return text
-    return encoded[:max_bytes].decode("utf-8", errors="ignore")
-
-
-def lesson_filename(seq: int, unit: str, task: str) -> str:
-    prefix = f"教案{seq:02d}_"
-    suffix = ".docx"
-    stem = f"{safe_name(unit)}_{safe_name(task)}"
-    filename = f"{prefix}{stem}{suffix}"
-    if len(filename.encode("utf-8")) <= MAX_FILENAME_BYTES:
-        return filename
-    digest = hashlib.sha256(stem.encode("utf-8")).hexdigest()[:10]
-    marker = f"~{digest}"
-    stem_budget = MAX_FILENAME_BYTES - len((prefix + marker + suffix).encode("utf-8"))
-    return f"{prefix}{_utf8_prefix(stem, stem_budget)}{marker}{suffix}"
-
-
-def add_eval_table(cell, target: float, seq: int, manifest: dict[str, Any]):
+def add_eval_table(cell, target: float, lesson: dict[str, Any], manifest: dict[str, Any]):
     table = cell.tables[0] if cell.tables else cell.add_table(rows=14, cols=4)
-    for r_idx, values in enumerate(evaluation_cell_values(target, seq), start=1):
+    for r_idx, values in enumerate(
+        format_evaluation_values(lesson, score_breakdown(target)),
+        start=1,
+    ):
         set_cell_text(table.cell(r_idx, 2), values[2], preserve_cell_layout=True)
         set_cell_text(table.cell(r_idx, 3), values[3], preserve_cell_layout=True)
 
 
 def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict[str, Any], seq: int, manifest: dict[str, Any]) -> Path:
-    course = item.get("course_name") or meta["course_name"]
-    major = item.get("major") or meta.get("major", "软件技术")
-    audience = item.get("audience") or meta.get("audience", "高职二年级")
-    hours = str(item.get("hours") or meta.get("default_hours", "2"))
-    unit = str(item["unit"])
-    task = str(item["task"])
-    flows = [str(x) for x in item.get("flows", [])]
-    knowledge = [str(x) for x in item.get("knowledge", [])]
-    tools = str(item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"))
-    score = float(item.get("score", 89 + ((seq - 1) % 6) * 0.5))
+    header_values = lesson_header_values(meta, item)
+    course = header_values["course_name"]
+    major = header_values["major"]
+    audience = header_values["audience"]
+    hours = header_values["hours"]
+    lesson_content = lesson_content_field_values(item)
+    score = float(item["evaluation"]["score"])
 
     doc = Document(str(template))
-    title_text = f"{seq} 《{course}》教学单元设计：{task}"
+    title_text = format_title(seq, meta, item)
     if is_semantic_manifest(manifest):
         target, bookmark_end = _semantic_target(doc, manifest, "title")
         set_paragraph_text(target, title_text, WD_ALIGN_PARAGRAPH.CENTER, bookmark_end=bookmark_end)
@@ -246,13 +218,7 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
         set_paragraph_text(doc.paragraphs[title_index], title_text, WD_ALIGN_PARAGRAPH.CENTER)
 
     table = doc.tables[0]
-    set_manifest_field(doc, table, manifest, "course_name", course)
-    set_manifest_field(doc, table, manifest, "major", major)
-    set_manifest_field(doc, table, manifest, "audience", audience)
-    set_manifest_field(doc, table, manifest, "unit", unit)
-    set_manifest_field(doc, table, manifest, "task", task)
-    set_manifest_field(doc, table, manifest, "hours", hours)
-    for name, value in generated_lesson_fields(unit, task, flows, knowledge, tools).items():
+    for name, value in {**header_values, **lesson_content}.items():
         set_manifest_field(doc, table, manifest, name, value)
     if is_semantic_manifest(manifest):
         evaluation_name = field_bookmark(manifest, "evaluation")
@@ -266,23 +232,23 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     else:
         evaluation_spec = manifest["structure"]["evaluation_table"]
         evaluation_cell = actual_cells(table.rows[int(evaluation_spec["row"])])[int(evaluation_spec["cell"])]
-    add_eval_table(evaluation_cell, score, seq, manifest)
+    add_eval_table(evaluation_cell, score, item, manifest)
 
     if is_semantic_manifest(manifest):
-        for bookmark_group, values in zip(implementation_bookmarks(manifest), implementation_cell_values(task, flows, hours)):
+        for bookmark_group, values in zip(implementation_bookmarks(manifest), format_implementation(item["implementation"])):
             for bookmark_name, value in zip(bookmark_group, [values[index] for index in range(5)]):
                 set_anchored_cell(doc, manifest, bookmark_name, value, multiline="\n" in str(value))
-        for bookmark_name, value in zip(reflection_bookmarks(manifest), reflection_cell_values(task)):
+        for bookmark_name, value in zip(reflection_bookmarks(manifest), format_reflection(item["reflection"])):
             set_anchored_cell(doc, manifest, bookmark_name, value, multiline="\n" in str(value))
     else:
         implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
-        for row_index, values in zip(implementation_rows, implementation_cell_values(task, flows, hours)):
+        for row_index, values in zip(implementation_rows, format_implementation(item["implementation"])):
             set_row(table, row_index, values)
         reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
-        for row_index, value in zip(reflection_rows, reflection_cell_values(task)):
+        for row_index, value in zip(reflection_rows, format_reflection(item["reflection"])):
             set_row(table, row_index, {2: value})
 
-    out = out_dir / lesson_filename(seq, unit, task)
+    out = out_dir / lesson_filename(seq, header_values["unit"], header_values["task"])
     doc.save(out)
     return out
 
@@ -298,6 +264,7 @@ def validate_outputs(
     custom_template: bool,
     template_validation: bool,
     template_warnings: list[str],
+    render: bool,
 ) -> dict[str, Any]:
     return validate_output_dir(
         out_dir,
@@ -310,7 +277,146 @@ def validate_outputs(
         engine="python-docx",
         template_validation=template_validation,
         extra_warnings=template_warnings,
+        render=render,
     )
+
+
+def _unique_backup_path(out_dir: Path) -> Path:
+    for _ in range(100):
+        candidate = out_dir.parent / f"_{out_dir.name}_backup_{uuid.uuid4().hex[:12]}"
+        if not candidate.exists():
+            return candidate
+    raise FileExistsError(f"Unable to allocate a backup path beside {out_dir}")
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+def _cleanup_path(path: Path, label: str) -> str | None:
+    """Attempt cleanup without hiding a primary generation or commit error."""
+
+    try:
+        if path.exists() or path.is_symlink():
+            _remove_path(path)
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for {label}: {exc}; residual path: {path}"
+    return None
+
+
+def _cleanup_empty_directory(path: Path, label: str) -> str | None:
+    try:
+        if path.exists():
+            path.rmdir()
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for {label}: {exc}; residual path: {path}"
+    return None
+
+
+def atomic_commit_candidate(candidate: Path, out_dir: Path, backup_existing: bool) -> Path | None:
+    """Swap a fully validated candidate into place and restore on commit failure."""
+
+    displaced: Path | None = None
+    try:
+        if out_dir.exists():
+            if not out_dir.is_dir():
+                raise FileExistsError(f"Output path is not a directory: {out_dir}")
+            if any(out_dir.iterdir()) and not backup_existing:
+                raise FileExistsError(f"Output directory is not empty: {out_dir}")
+            backup_path = _unique_backup_path(out_dir)
+            os.replace(str(out_dir), str(backup_path))
+            displaced = backup_path
+        os.replace(str(candidate), str(out_dir))
+        if displaced is not None and not backup_existing:
+            _remove_path(displaced)
+            displaced = None
+        return displaced
+    except Exception:
+        if displaced is not None and out_dir.exists():
+            _remove_path(out_dir)
+        if displaced is not None and displaced.exists() and not out_dir.exists():
+            try:
+                os.replace(str(displaced), str(out_dir))
+            except Exception as restore_error:  # pragma: no cover - only reachable on a second filesystem failure
+                raise RuntimeError(f"Output commit failed and rollback failed: {restore_error}") from restore_error
+        raise
+
+
+def _unique_file_backup_path(path: Path) -> Path:
+    for _ in range(100):
+        candidate = path.parent / f"_{path.name}_backup_{uuid.uuid4().hex[:12]}"
+        if not candidate.exists() and not candidate.is_symlink():
+            return candidate
+    raise FileExistsError(f"Unable to allocate a backup path beside {path}")
+
+
+def atomic_commit_candidate_with_external_qa(
+    candidate: Path,
+    out_dir: Path,
+    external_candidate: Path,
+    external_qa: Path,
+    backup_existing: bool,
+) -> Path | None:
+    """Commit output and an external QA report, restoring both on any failure."""
+
+    displaced_output: Path | None = None
+    displaced_qa: Path | None = None
+    output_swapped = False
+    qa_swapped = False
+    try:
+        if out_dir.exists():
+            if not out_dir.is_dir():
+                raise FileExistsError(f"Output path is not a directory: {out_dir}")
+            if any(out_dir.iterdir()) and not backup_existing:
+                raise FileExistsError(f"Output directory is not empty: {out_dir}")
+            displaced_output = _unique_backup_path(out_dir)
+            os.replace(str(out_dir), str(displaced_output))
+        os.replace(str(candidate), str(out_dir))
+        output_swapped = True
+
+        if external_qa.exists() or external_qa.is_symlink():
+            if external_qa.is_dir():
+                raise FileExistsError(f"External QA report path must be a file, not a directory: {external_qa}")
+            displaced_qa = _unique_file_backup_path(external_qa)
+            os.replace(str(external_qa), str(displaced_qa))
+        os.replace(str(external_candidate), str(external_qa))
+        qa_swapped = True
+
+        if displaced_output is not None and not backup_existing:
+            _remove_path(displaced_output)
+            displaced_output = None
+        if displaced_qa is not None:
+            _remove_path(displaced_qa)
+            displaced_qa = None
+        return displaced_output
+    except Exception as commit_error:
+        rollback_errors: list[str] = []
+
+        def rollback(action: str, callback) -> None:
+            try:
+                callback()
+            except Exception as exc:  # pragma: no cover - injected filesystem failures vary by platform
+                rollback_errors.append(f"{action}: {exc}")
+
+        if qa_swapped and (external_qa.exists() or external_qa.is_symlink()):
+            rollback("remove new external QA", lambda: _remove_path(external_qa))
+        if displaced_qa is not None and displaced_qa.exists() and not external_qa.exists():
+            rollback("restore external QA", lambda: os.replace(str(displaced_qa), str(external_qa)))
+        if output_swapped and (out_dir.exists() or out_dir.is_symlink()):
+            rollback("remove new output", lambda: _remove_path(out_dir))
+        if displaced_output is not None and displaced_output.exists() and not out_dir.exists():
+            rollback("restore output", lambda: os.replace(str(displaced_output), str(out_dir)))
+
+        if rollback_errors:
+            raise RuntimeError(
+                "External QA commit failed and rollback failed: "
+                + "; ".join(rollback_errors)
+                + f"; original error: {commit_error}"
+            ) from commit_error
+        raise
 
 
 def main() -> None:
@@ -323,6 +429,7 @@ def main() -> None:
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
+    parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
     parser.add_argument("--qa-report", default="")
     args = parser.parse_args()
 
@@ -333,12 +440,39 @@ def main() -> None:
     ensure_supported_major(manifest)
     if not template.exists():
         raise FileNotFoundError(f"Template not found: {template}")
-    out_dir = Path(args.output_dir)
-    with open(args.tasks_json, "r", encoding="utf-8") as f:
+    out_dir = Path(args.output_dir).expanduser().absolute()
+    source_path = Path(args.tasks_json).expanduser().resolve()
+    schema_path = Path(args.schema).expanduser().resolve()
+    with source_path.open("r", encoding="utf-8") as f:
         meta = json.load(f)
-    validate_input(meta, args.schema)
-    validate_composed_fields(meta, manifest)
+    validate_content_v2_input(meta, schema_path)
     lessons = meta["lessons"]
+
+    package_roots = [manifest_path.parent]
+    base_manifest = manifest.get("template", {}).get("base_manifest")
+    if base_manifest:
+        package_roots.append((manifest_path.parent / str(base_manifest)).resolve().parent)
+    protected_paths = lesson_protected_paths(
+        skill_dir=SKILL_DIR,
+        source=source_path,
+        schema=schema_path,
+        template=template,
+        manifest=manifest_path,
+        package_roots=package_roots,
+    )
+    assert_output_path_safe(out_dir, protected_paths)
+    requested_qa = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
+    internal_qa = out_dir / "qa-report.json"
+    external_qa = None
+    qa_parent_created = False
+    if requested_qa is not None:
+        same_as_internal = paths_equal(requested_qa, internal_qa)
+        if not same_as_internal:
+            external_qa = assert_external_qa_path_safe(requested_qa, out_dir, protected_paths)
+    if out_dir.exists() and not out_dir.is_dir():
+        raise FileExistsError(f"Output path is not a directory: {out_dir}")
+    if out_dir.exists() and any(out_dir.iterdir()) and not args.backup_existing:
+        raise FileExistsError(f"Output directory is not empty: {out_dir}")
 
     template_warnings: list[str] = []
     if not args.skip_template_validation:
@@ -347,45 +481,99 @@ def main() -> None:
         for warning in template_warnings:
             print(f"WARNING: {warning}")
 
-    if out_dir.exists() and any(out_dir.iterdir()):
-        if args.backup_existing:
-            backup = out_dir.parent / f"_{out_dir.name}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-            shutil.move(str(out_dir), str(backup))
-            print(f"backup={backup}")
+    out_dir.parent.mkdir(parents=True, exist_ok=True)
+    candidate = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.candidate-", dir=str(out_dir.parent)))
+    assert_output_path_safe(candidate, protected_paths)
+    external_candidate: Path | None = None
+    operation_error: BaseException | None = None
+    try:
+        content_quality = validate_content_quality(meta, manifest)
+        generated_filenames: list[str] = []
+        for seq, item in enumerate(lessons, 1):
+            generated_filenames.append(build_lesson(template, candidate, meta, item, seq, manifest).name)
+        candidate_qa = candidate / "qa-report.json"
+        if not args.skip_output_validation:
+            report = validate_outputs(
+                candidate,
+                meta,
+                manifest,
+                schema_path,
+                candidate_qa,
+                template=template,
+                custom_template=bool(args.template),
+                template_validation=not args.skip_template_validation,
+                template_warnings=template_warnings,
+                render=args.render,
+            )
         else:
-            raise FileExistsError(f"Output directory is not empty: {out_dir}")
-    out_dir.mkdir(parents=True, exist_ok=True)
-
-    for seq, item in enumerate(lessons, 1):
-        print(build_lesson(template, out_dir, meta, item, seq, manifest))
-    if not args.skip_output_validation:
-        report = validate_outputs(
-            out_dir,
-            meta,
-            manifest,
-            Path(args.schema),
-            Path(args.qa_report) if args.qa_report else None,
-            template=template,
-            custom_template=bool(args.template),
-            template_validation=not args.skip_template_validation,
-            template_warnings=template_warnings,
-        )
+            report = write_skipped_report(
+                candidate,
+                meta,
+                manifest,
+                candidate_qa,
+                schema_path,
+                template_path=template,
+                custom_template=bool(args.template),
+                engine="python-docx",
+                template_validation=not args.skip_template_validation,
+                warnings=template_warnings,
+                render=args.render,
+            )
+        final_qa = requested_qa or internal_qa
+        report["output_dir"] = str(out_dir)
+        report["qa_report"] = str(final_qa)
+        report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+        candidate_qa.write_text(report_text, encoding="utf-8")
+        if external_qa is not None:
+            if not external_qa.parent.exists():
+                external_qa.parent.mkdir(parents=True, exist_ok=True)
+                qa_parent_created = True
+            fd, external_candidate_name = tempfile.mkstemp(
+                prefix=f".{external_qa.name}.candidate-",
+                suffix=".tmp",
+                dir=str(external_qa.parent),
+            )
+            os.close(fd)
+            external_candidate = Path(external_candidate_name)
+            external_candidate.write_text(report_text, encoding="utf-8")
+            backup = atomic_commit_candidate_with_external_qa(
+                candidate,
+                out_dir,
+                external_candidate,
+                external_qa,
+                args.backup_existing,
+            )
+        else:
+            backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
+        for filename in generated_filenames:
+            print(out_dir / filename)
+        if backup is not None:
+            print(f"backup={backup}")
         action = "skipped validation" if report["status"] == "skipped" else "validated"
         print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
-    else:
-        report = write_skipped_report(
-            out_dir,
-            meta,
-            manifest,
-            Path(args.qa_report) if args.qa_report else None,
-            args.schema,
-            template_path=template,
-            custom_template=bool(args.template),
-            engine="python-docx",
-            template_validation=not args.skip_template_validation,
-            warnings=template_warnings,
-        )
-        print(f"WARNING: output validation skipped; qa={report['qa_report']}")
+    except BaseException as exc:
+        operation_error = exc
+        raise
+    finally:
+        cleanup_diagnostics: list[str] = []
+        candidate_error = _cleanup_path(candidate, "candidate directory")
+        if candidate_error:
+            cleanup_diagnostics.append(candidate_error)
+        if external_candidate is not None:
+            external_candidate_error = _cleanup_path(external_candidate, "external QA candidate")
+            if external_candidate_error:
+                cleanup_diagnostics.append(external_candidate_error)
+        # A successful commit intentionally leaves the newly created parent
+        # containing the external report.  Only remove it after a failed
+        # operation, when rollback has left no committed report behind.
+        if operation_error is not None and qa_parent_created and external_qa is not None and external_qa.parent.exists():
+            parent_error = _cleanup_empty_directory(external_qa.parent, "external QA parent directory")
+            if parent_error:
+                cleanup_diagnostics.append(parent_error)
+        for diagnostic in cleanup_diagnostics:
+            print(f"WARNING: {diagnostic}", file=sys.stderr)
+            if operation_error is not None:
+                operation_error.add_note(diagnostic)
 
 
 if __name__ == "__main__":

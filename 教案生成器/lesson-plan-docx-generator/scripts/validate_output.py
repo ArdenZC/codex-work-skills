@@ -4,6 +4,7 @@ import argparse
 import copy
 import json
 import math
+import os
 import re
 import sys
 from datetime import datetime, timezone
@@ -18,32 +19,36 @@ from docx.text.paragraph import Paragraph
 from lxml import etree
 
 from bookmark_utils import bookmark_boundary_locations, bookmark_location, bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark, validate_bookmark_inventory
+from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
+from content_quality import assess_content_quality, detect_non_it_contamination
 from package_common import (
     DEFAULT_MANIFEST,
     DEFAULT_SCHEMA,
     EVALUATION_MAX_POINTS,
     anchor_mode,
     bookmark_containers,
-    evaluation_cell_values,
     field_bookmark,
     field_spec,
-    generated_lesson_fields,
     implementation_bookmarks,
-    implementation_cell_values,
     is_semantic_manifest,
     layout_manifest,
     load_manifest,
     manifest_template_path,
     resolve_template_package,
     reflection_bookmarks,
-    reflection_cell_values,
     required_bookmarks,
-    validate_composed_fields,
-    validate_input,
+    score_breakdown,
+    validate_content_v2_input,
 )
+from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
+from render_qa import render_docx_directory
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
+
+
+def _same_lexical_path(left: Path | str, right: Path | str) -> bool:
+    return paths_equal(left, right)
 
 
 def actual_cells(row) -> list[_Cell]:
@@ -631,6 +636,49 @@ def _base_qa_report(
         "checks": {"validation": validation},
         "files_checked": 0,
         "qa_report": str(report_path),
+        "content_contract_version": "2.0",
+        "content_quality": {
+            "status": "not_run",
+            "diagnostic_content_policy": {"mode": "limited_fragments", "max_preview_chars": 120, "hash": "sha256"},
+            "exact_duplicates": [],
+            "adjacent_exact_duplicates": [],
+            "adjacent_similarity_pairs": [],
+            "implementation_duplicates": [],
+            "adjacent_implementation_exact_duplicates": [],
+            "implementation_similarity_pairs": [],
+            "high_similarity_pairs": [],
+            "field_similarity_pairs": [],
+            "whole_lesson_similarity_pairs": [],
+            "repeated_sentences": [],
+            "boilerplate_hits": [],
+            "intra_lesson_coherence": {
+                "status": "not_run",
+                "lessons": [],
+                "failures": [],
+                "thresholds": {},
+            },
+            "progression": {},
+            "coverage": {"non_it_contamination_scope": "template_or_generator_injected_defaults_only"},
+        },
+        "render": {
+            "status": "not_executed",
+            "reason": "render was not requested",
+            "scope": "smoke",
+            "renderer": None,
+            "files_checked": 0,
+            "page_count": 0,
+            "page_counts": {},
+            "page_count_method": "pdf_page_object_regex",
+            "errors": [],
+        },
+        "visual_inspection": {
+            "status": "not_executed",
+            "reason": "visual inspection is performed by the calling Agent after render smoke",
+            "scope": "agent",
+            "evidence_file": "visual-inspection.json",
+            "pages_checked": [],
+            "errors": [],
+        },
     }
     current_anchor_mode = anchor_mode(manifest)
     if current_anchor_mode == "word_bookmark":
@@ -671,10 +719,35 @@ def write_skipped_report(
     engine: str | None = None,
     template_validation: bool = True,
     warnings: list[str] | None = None,
+    render: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
-    validate_input(data, schema_path)
+    validate_content_v2_input(data, schema_path)
+    assert_output_path_safe(
+        out_dir,
+        lesson_protected_paths(
+            skill_dir=Path(__file__).resolve().parents[1],
+            source=Path(__file__),
+            schema=Path(schema_path),
+            template=Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest),
+            manifest=Path(manifest["_path"]),
+            package_roots=[Path(manifest["_path"]).parent],
+        ),
+    )
+    if qa_report_path is not None and not _same_lexical_path(qa_report_path, out_dir / "qa-report.json"):
+        assert_external_qa_path_safe(
+            qa_report_path,
+            out_dir,
+            lesson_protected_paths(
+                skill_dir=Path(__file__).resolve().parents[1],
+                source=Path(__file__),
+                schema=Path(schema_path),
+                template=Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest),
+                manifest=Path(manifest["_path"]),
+                package_roots=[Path(manifest["_path"]).parent],
+            ),
+        )
     out_dir.mkdir(parents=True, exist_ok=True)
     report = _base_qa_report(
         out_dir,
@@ -687,9 +760,38 @@ def write_skipped_report(
         False,
         warnings,
     )
+    content_quality = assess_content_quality(data, manifest)
+    content_quality["coverage"]["non_it_contamination"] = []
+    report["content_quality"] = content_quality
+    if content_quality["status"] != "passed":
+        report["errors"].extend(content_quality["errors"])
+        report["status"] = "failed"
     report["status"] = "skipped"
+    if report["errors"]:
+        report["status"] = "failed"
     report["checks"]["file_count"] = {"expected": len(data["lessons"]), "actual": len(list(out_dir.glob("*.docx")))}
-    return _write_qa_report(report)
+    report["checks"]["total_hours"] = {
+        "expected": data.get("total_hours"),
+        "actual": sum(float(lesson["hours"]) for lesson in data["lessons"]),
+    }
+    report["checks"]["lessons"] = []
+    report["files_checked"] = report["checks"]["file_count"]["actual"]
+    if render:
+        report["render"] = {
+            "status": "not_executed",
+            "reason": "render is unavailable when output validation is skipped",
+            "scope": "smoke",
+            "renderer": None,
+            "files_checked": 0,
+            "page_count": 0,
+            "page_counts": {},
+            "page_count_method": "pdf_page_object_regex",
+            "errors": [],
+        }
+    _write_qa_report(report)
+    if report["errors"]:
+        raise RuntimeError("Content quality validation failed: " + "; ".join(report["errors"][:8]))
+    return report
 
 
 def validate_output_dir(
@@ -705,11 +807,35 @@ def validate_output_dir(
     template_validation: bool = True,
     output_validation: bool = True,
     extra_warnings: list[str] | None = None,
+    render: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
-    validate_input(data, schema_path)
-    validate_composed_fields(data, manifest)
+    validate_content_v2_input(data, schema_path)
+    assert_output_path_safe(
+        out_dir,
+        lesson_protected_paths(
+            skill_dir=Path(__file__).resolve().parents[1],
+            source=Path(__file__),
+            schema=Path(schema_path),
+            template=Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest),
+            manifest=Path(manifest["_path"]),
+            package_roots=[Path(manifest["_path"]).parent],
+        ),
+    )
+    if qa_report_path is not None and not _same_lexical_path(qa_report_path, out_dir / "qa-report.json"):
+        assert_external_qa_path_safe(
+            qa_report_path,
+            out_dir,
+            lesson_protected_paths(
+                skill_dir=Path(__file__).resolve().parents[1],
+                source=Path(__file__),
+                schema=Path(schema_path),
+                template=Path(template_path).expanduser().resolve() if template_path else manifest_template_path(manifest),
+                manifest=Path(manifest["_path"]),
+                package_roots=[Path(manifest["_path"]).parent],
+            ),
+        )
     lessons = data["lessons"]
     files = sorted(out_dir.glob("*.docx"), key=_lesson_file_sort_key)
     report = _base_qa_report(
@@ -726,18 +852,51 @@ def validate_output_dir(
     errors: list[str] = report["errors"]
     checks: dict[str, Any] = report["checks"]
 
+    content_quality = assess_content_quality(data, manifest)
+    report["content_quality"] = content_quality
+    if content_quality["status"] != "passed":
+        errors.extend(
+            f"content quality: {message}"
+            for message in content_quality["errors"]
+        )
+
     if not files:
         errors.append(f"No DOCX files generated in {out_dir}")
     if len(files) != len(lessons):
         errors.append(f"Output count mismatch: expected {len(lessons)}, got {len(files)}")
+
+    expected_files = [
+        lesson_filename(index, lesson.get("unit", ""), lesson.get("task", ""))
+        for index, lesson in enumerate(lessons, start=1)
+    ]
+    actual_names = [path.name for path in files]
+    symlink_files = [path.name for path in files if path.is_symlink()]
+    if symlink_files:
+        errors.append("Output DOCX files must not be symbolic links: " + ", ".join(symlink_files))
+    if sorted(actual_names) != sorted(expected_files):
+        errors.append(
+            "Output filenames do not match the deterministic lesson contract: "
+            f"expected={expected_files}, actual={actual_names}"
+        )
 
     main_spec = manifest["structure"]["main_table"]
     course_expected = str(data["course_name"])
     total_hours = 0.0
     lesson_checks = []
     anchor_results: list[dict[str, Any]] = []
+    contamination_terms: set[str] = set()
+    course_metadata = {
+        key: data[key]
+        for key in ("course_name", "major", "audience", "content_contract_version", "default_hours", "total_hours")
+        if key in data
+    }
     for index, (path, item) in enumerate(zip(files, lessons), start=1):
         item_errors: list[str] = []
+        if path.is_symlink():
+            item_errors.append("DOCX symbolic links are not allowed; target was not opened")
+            errors.extend(f"file {index}: {message}" for message in item_errors)
+            lesson_checks.append({"file_index": index, "errors": item_errors})
+            continue
         if not path.is_file() or path.stat().st_size == 0:
             item_errors.append("file is missing or empty")
             errors.extend(f"file {index}: {message}" for message in item_errors)
@@ -793,9 +952,10 @@ def validate_output_dir(
         if len(table.columns) != int(main_spec["columns"]):
             item_errors.append(f"main table columns expected {main_spec['columns']}, got {len(table.columns)}")
 
-        expected_course = str(item.get("course_name") or data["course_name"])
-        expected_major = str(item.get("major") or data.get("major", "软件技术"))
-        expected_audience = str(item.get("audience") or data.get("audience", "高职二年级"))
+        expected_headers = lesson_header_values(data, item)
+        expected_course = expected_headers["course_name"]
+        expected_major = expected_headers["major"]
+        expected_audience = expected_headers["audience"]
         field_values: dict[str, str] = {}
         for field_name in ("course_name", "major", "audience", "unit", "task", "hours"):
             try:
@@ -809,18 +969,12 @@ def validate_output_dir(
             item_errors.append("major field mismatch")
         if field_values["audience"] != expected_audience:
             item_errors.append("audience field mismatch")
-        if field_values["unit"] != str(item["unit"]):
+        if field_values["unit"] != expected_headers["unit"]:
             item_errors.append("unit field mismatch")
-        if field_values["task"] != str(item["task"]):
+        if field_values["task"] != expected_headers["task"]:
             item_errors.append("task field mismatch")
-        generated = generated_lesson_fields(
-            str(item["unit"]),
-            str(item["task"]),
-            item.get("flows", []),
-            item.get("knowledge", []),
-            item.get("tools", "课程PPT、微课视频、任务单、评分表和成果模板"),
-        )
-        for name, expected in generated.items():
+        expected_content = lesson_content_field_values(item)
+        for name, expected in expected_content.items():
             try:
                 actual = manifest_field_text(document, table, manifest, name)
             except (KeyError, ValueError, IndexError) as exc:
@@ -830,7 +984,7 @@ def validate_output_dir(
                 item_errors.append(f"{name} content mismatch")
         try:
             hours = parse_number(field_values["hours"], "hours")
-            expected_hours = parse_number(item["hours"], "input hours")
+            expected_hours = parse_number(expected_headers["hours"], "input hours")
             total_hours += hours
             if not math.isclose(hours, expected_hours, abs_tol=0.01):
                 item_errors.append(f"hours mismatch: expected {expected_hours}, got {hours}")
@@ -839,7 +993,7 @@ def validate_output_dir(
         if not field_values["unit"].startswith("项目"):
             item_errors.append("unit is not projectized")
 
-        expected_title = f"{index} 《{expected_course}》教学单元设计：{item['task']}"
+        expected_title = format_title(index, data, item)
         if is_semantic_manifest(manifest):
             title_record = find_bookmark(document, field_bookmark(manifest, "title"))
             title_element = bookmark_parent_paragraph(document, title_record) if title_record else None
@@ -863,7 +1017,7 @@ def validate_output_dir(
         if is_semantic_manifest(manifest):
             for bookmark_group, expected_values in zip(
                 implementation_bookmarks(manifest),
-                implementation_cell_values(str(item["task"]), item.get("flows", []), item["hours"]),
+                format_implementation(item["implementation"]),
             ):
                 for bookmark_name, expected_value in zip(bookmark_group, expected_values.values()):
                     record = find_bookmark(document, bookmark_name)
@@ -874,7 +1028,7 @@ def validate_output_dir(
                         item_errors.append(f"implementation cell mismatch at bookmark {bookmark_name}")
             for bookmark_name, expected_value in zip(
                 reflection_bookmarks(manifest),
-                reflection_cell_values(str(item["task"])),
+                format_reflection(item["reflection"]),
             ):
                 record = find_bookmark(document, bookmark_name)
                 cell_element = bookmark_parent_cell(document, record) if record else None
@@ -885,7 +1039,7 @@ def validate_output_dir(
             implementation_rows = [int(row) for row in manifest["fields"]["implementation"]["rows"]]
             for row_index, expected_values in zip(
                 implementation_rows,
-                implementation_cell_values(str(item["task"]), item.get("flows", []), item["hours"]),
+                format_implementation(item["implementation"]),
             ):
                 cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
                 for cell_index, expected_value in expected_values.items():
@@ -895,7 +1049,7 @@ def validate_output_dir(
                         item_errors.append(f"implementation cell mismatch at row {row_index} cell {cell_index}")
 
             reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
-            for row_index, expected_value in zip(reflection_rows, reflection_cell_values(str(item["task"]))):
+            for row_index, expected_value in zip(reflection_rows, format_reflection(item["reflection"])):
                 cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
                 actual_value = cells[2].text if len(cells) > 2 else ""
                 if actual_value != expected_value:
@@ -919,11 +1073,14 @@ def validate_output_dir(
                 for row in range(1, int(nested_spec["rows"]))
             ]
             item_errors.extend(_evaluation_score_errors(score_values))
-            target = parse_decimal(item.get("score", 89 + ((index - 1) % 6) * 0.5), f"evaluation target {index}")
+            target = parse_decimal(item["evaluation"]["score"], f"evaluation target {index}")
             score_sum = sum(score_values, Decimal("0"))
             if score_sum != target:
                 item_errors.append(f"evaluation total mismatch: expected {target}, got {score_sum}")
-            for row_index, expected_values in enumerate(evaluation_cell_values(float(target), index), start=1):
+            for row_index, expected_values in enumerate(
+                format_evaluation_values(item, score_breakdown(float(target))),
+                start=1,
+            ):
                 for cell_index, expected_value in expected_values.items():
                     actual_value = nested.cell(row_index, cell_index).text.strip()
                     if actual_value != expected_value:
@@ -932,6 +1089,13 @@ def validate_output_dir(
             item_errors.append(f"evaluation table validation failed: {exc}")
 
         all_text = _document_text(document, table)
+        contamination = detect_non_it_contamination(course_metadata, item, all_text)
+        if contamination:
+            contamination_terms.update(contamination)
+            item_errors.extend(
+                f"non-IT content contamination: {term}"
+                for term in contamination
+            )
         for forbidden in manifest.get("validation", {}).get("forbidden_template_text", []):
             if forbidden in {course_expected, expected_course, str(item["unit"]), str(item["task"])}:
                 continue
@@ -942,6 +1106,16 @@ def validate_output_dir(
         if item_errors:
             errors.extend(f"file {index}: {message}" for message in item_errors)
         lesson_checks.append({"file_index": index, "errors": item_errors, "fields_checked": sorted(field_values)})
+
+    if contamination_terms:
+        content_quality["status"] = "failed"
+        content_quality["coverage"]["non_it_contamination"] = sorted(contamination_terms)
+        content_quality["errors"].extend(
+            f"non-IT content contamination: {term}"
+            for term in sorted(contamination_terms)
+        )
+    else:
+        content_quality["coverage"]["non_it_contamination"] = []
 
     if anchor_mode(manifest) == "word_bookmark":
         missing_anchors = sorted({name for result in anchor_results for name in result["missing"]})
@@ -985,6 +1159,11 @@ def validate_output_dir(
     checks["total_hours"] = {"expected": expected_total, "actual": total_hours}
     checks["lessons"] = lesson_checks
     report["files_checked"] = len(files)
+    if render and not errors:
+        render_report = render_docx_directory(out_dir)
+        report["render"] = render_report
+        if render_report["status"] == "failed":
+            errors.extend(f"render QA: {message}" for message in render_report["errors"])
     if not errors:
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
@@ -1006,13 +1185,32 @@ def main() -> int:
     parser.add_argument("--engine", default="")
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
+    parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
     args = parser.parse_args()
     try:
-        data = json.loads(Path(args.input_json).read_text(encoding="utf-8-sig"))
+        source_path = Path(args.input_json).expanduser().resolve()
+        schema_path = Path(args.schema).expanduser().resolve()
+        data = json.loads(source_path.read_text(encoding="utf-8-sig"))
         template_path, _manifest_path, manifest = resolve_template_package(
             args.template_path or None,
             args.manifest or None,
         )
+        package_roots = [Path(manifest["_path"]).parent]
+        base_manifest = manifest.get("template", {}).get("base_manifest")
+        if base_manifest:
+            package_roots.append((Path(manifest["_path"]).parent / str(base_manifest)).resolve().parent)
+        protected_paths = lesson_protected_paths(
+            skill_dir=Path(__file__).resolve().parents[1],
+            source=source_path,
+            schema=schema_path,
+            template=template_path,
+            manifest=Path(manifest["_path"]),
+            package_roots=package_roots,
+        )
+        assert_output_path_safe(Path(args.output_dir), protected_paths)
+        if args.qa_report and not _same_lexical_path(args.qa_report, Path(args.output_dir) / "qa-report.json"):
+            assert_external_qa_path_safe(args.qa_report, args.output_dir, protected_paths)
+        validate_content_v2_input(data, schema_path)
         custom_template = args.custom_template if args.custom_template else None
         if args.skip_validation:
             report = write_skipped_report(
@@ -1020,11 +1218,12 @@ def main() -> int:
                 data,
                 manifest,
                 args.qa_report or None,
-                args.schema,
+                schema_path,
                 template_path=template_path,
                 custom_template=custom_template,
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
+                render=args.render,
             )
         else:
             report = validate_output_dir(
@@ -1032,11 +1231,12 @@ def main() -> int:
                 data,
                 manifest,
                 args.qa_report or None,
-                args.schema,
+                schema_path,
                 template_path=template_path,
                 custom_template=custom_template,
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
+                render=args.render,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

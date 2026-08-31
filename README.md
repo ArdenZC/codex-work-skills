@@ -4,7 +4,7 @@
 
 AI 负责理解课程资料和用户要求，Skill 自带脚本负责稳定生成 Word / Excel 文件、保留模板格式并执行结果校验。
 
-> **当前内置模板**：教案 `lesson-plan/v1.1.1`，成绩册 `course-gradebook/v1.1.0`
+> **当前内置模板**：教案 `lesson-plan/v1.1.2`，成绩册 `course-gradebook/v1.1.0`
 >
 > **正式持续验证平台**：Windows、macOS
 
@@ -162,7 +162,7 @@ Windows 和 macOS 是当前 CI 与交付验收平台。
 
 | Skill | 当前默认模板 | 状态 |
 | --- | --- | --- |
-| 教案生成器 | `lesson-plan v1.1.1` | 当前默认 |
+| 教案生成器 | `lesson-plan v1.1.2` | 当前默认 |
 | 平时成绩记分册生成器 | `course-gradebook v1.1.0` | 当前默认 |
 
 这些版本指 Skill 内置的 canonical 模板版本，不是 Skill 安装包版本。

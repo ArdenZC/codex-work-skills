@@ -269,7 +269,7 @@ def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[st
             errors.append(f"Field {name} points to missing cell {cell_index} in row {row_index}")
 
 
-def _document_xml_without_bookmarks(path: Path) -> bytes:
+def _document_xml_without_bookmarks(path: Path, replacements: list[tuple[str, str]] | None = None) -> bytes:
     with zipfile.ZipFile(path, "r") as package:
         root = etree.fromstring(package.read("word/document.xml"))
     word_namespace = qn("w:body").split("}", 1)[0][1:]
@@ -277,17 +277,52 @@ def _document_xml_without_bookmarks(path: Path) -> bytes:
         parent = node.getparent()
         if parent is not None:
             parent.remove(node)
+    for old_text, new_text in replacements or []:
+        for node in root.xpath(".//w:t", namespaces={"w": word_namespace}):
+            if node.text:
+                node.text = node.text.replace(new_text, old_text)
     return etree.tostring(root, method="c14n", with_comments=False)
 
 
-def _docx_equivalent_without_bookmarks(actual: Path, reference: Path) -> bool:
+def _visible_text_replacements(manifest: dict[str, Any]) -> list[tuple[str, str]]:
+    patches = manifest.get("template", {}).get("patches", {})
+    values = patches.get("visible_text_replacements", []) if isinstance(patches, dict) else []
+    if not isinstance(values, list):
+        raise ValueError("template.patches.visible_text_replacements must be a list")
+    result: list[tuple[str, str]] = []
+    for index, value in enumerate(values):
+        if not isinstance(value, dict) or not value.get("from") or not value.get("to"):
+            raise ValueError(f"template.patches.visible_text_replacements[{index}] must contain from and to")
+        old_text, new_text = str(value["from"]), str(value["to"])
+        if old_text == new_text:
+            raise ValueError(f"template.patches.visible_text_replacements[{index}] must change visible text")
+        result.append((old_text, new_text))
+    return result
+
+
+def _docx_equivalent_without_bookmarks(
+    actual: Path,
+    reference: Path,
+    replacements: list[tuple[str, str]] | None = None,
+) -> bool:
     with zipfile.ZipFile(actual, "r") as actual_zip, zipfile.ZipFile(reference, "r") as reference_zip:
         actual_names = set(actual_zip.namelist())
         reference_names = set(reference_zip.namelist())
         names = actual_names | reference_names
         for name in names:
             if name == "word/document.xml":
-                if _document_xml_without_bookmarks(actual) != _document_xml_without_bookmarks(reference):
+                actual_xml = _document_xml_without_bookmarks(actual, replacements)
+                reference_xml = _document_xml_without_bookmarks(reference)
+                if replacements:
+                    word_namespace = qn("w:body").split("}", 1)[0][1:]
+                    actual_root = etree.fromstring(_document_xml_without_bookmarks(actual))
+                    reference_root = etree.fromstring(reference_xml)
+                    actual_text = "\n".join(node.text or "" for node in actual_root.xpath(".//w:t", namespaces={"w": word_namespace}))
+                    reference_text = "\n".join(node.text or "" for node in reference_root.xpath(".//w:t", namespaces={"w": word_namespace}))
+                    for old_text, new_text in replacements:
+                        if actual_text.count(new_text) != reference_text.count(old_text):
+                            return False
+                if actual_xml != reference_xml:
                     return False
                 continue
             if name not in actual_names or name not in reference_names or actual_zip.read(name) != reference_zip.read(name):
@@ -437,8 +472,18 @@ def validate_template(
             reference = (Path(manifest["_path"]).parent / str(base_value)).resolve()
         if not reference.exists():
             errors.append(f"Semantic template reference not found: {reference}")
-        elif not _docx_equivalent_without_bookmarks(template, reference):
-            errors.append("Semantic template changed visible content or structure relative to the protected baseline.")
+        else:
+            try:
+                replacements = _visible_text_replacements(manifest)
+            except ValueError as exc:
+                errors.append(str(exc))
+                replacements = []
+            if not _docx_equivalent_without_bookmarks(template, reference, replacements):
+                errors.append("Semantic template changed visible content or structure relative to the protected baseline.")
+            report["checks"]["visible_text_replacements"] = [
+                {"from": old_text, "to": new_text}
+                for old_text, new_text in replacements
+            ]
         if not is_canonical and canonical.exists() and inventory["valid"]:
             canonical_document = Document(str(canonical))
             location_changes = [

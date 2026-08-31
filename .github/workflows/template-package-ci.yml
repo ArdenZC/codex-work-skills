@@ -398,7 +398,12 @@ jobs:
           python .github/scripts/run_timed.py
           --label "lesson core tests"
           --
-          python -m unittest "tests.test_template_packages.LessonTemplatePackageTests" -v
+          python .github/scripts/run_test_shards.py
+          --suite lesson-content
+          --suite lesson-package
+          --suite hardening
+          --parallel
+          -v
 
       - name: Run lesson-plan skill tests
         run: >-

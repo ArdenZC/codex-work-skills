@@ -1,36 +1,180 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex.local/schemas/lesson-plan-input.schema.json",
-  "title": "Projectized lesson plan input",
+  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.json",
+  "title": "Lesson Content V2 input",
   "type": "object",
-  "required": ["course_name", "lessons"],
+  "additionalProperties": false,
+  "required": ["content_contract_version", "course_name", "major", "audience", "default_hours", "total_hours", "lessons"],
   "properties": {
+    "content_contract_version": {"const": "2.0"},
     "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
     "major": {"type": "string", "minLength": 1, "maxLength": 32},
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
-    "default_hours": {"type": ["string", "number"], "minLength": 1, "exclusiveMinimum": 0},
-    "total_hours": {"type": ["string", "number"], "minLength": 1, "exclusiveMinimum": 0},
-    "lessons": {
+    "default_hours": {"$ref": "#/$defs/positiveNumber"},
+    "total_hours": {"$ref": "#/$defs/positiveNumber"},
+    "lessons": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lesson"}}
+  },
+  "$defs": {
+    "positiveNumber": {
+      "anyOf": [
+        {"type": "number", "minimum": 1, "multipleOf": 1},
+        {"type": "string", "pattern": "^[1-9][0-9]*(?:\\.0+)?$"}
+      ]
+    },
+    "textList": {
       "type": "array",
       "minItems": 1,
-      "items": {
-        "type": "object",
-        "required": ["unit", "task", "hours"],
-        "properties": {
-          "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
-          "major": {"type": "string", "minLength": 1, "maxLength": 32},
-          "audience": {"type": "string", "minLength": 1, "maxLength": 32},
-          "unit": {"type": "string", "minLength": 1, "maxLength": 60},
-          "task": {"type": "string", "minLength": 1, "maxLength": 80},
-          "hours": {"type": ["string", "number"], "minLength": 1, "maxLength": 12, "exclusiveMinimum": 0},
-          "flows": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 200}},
-          "knowledge": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 200}},
-          "tools": {"type": "string", "maxLength": 300},
-          "score": {"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.5}
+      "items": {"type": "string", "minLength": 1, "maxLength": 240}
+    },
+    "twoOrMoreText": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 5,
+      "items": {"type": "string", "minLength": 1, "maxLength": 220}
+    },
+    "progression": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prior_lesson_id", "prior_learning", "capability_stage", "deliverable", "next_bridge"],
+      "properties": {
+        "prior_lesson_id": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 32
         },
-          "additionalProperties": false
+        "prior_learning": {"type": "string", "minLength": 6, "maxLength": 240},
+        "capability_stage": {"type": "string", "enum": ["认知", "理解", "模仿", "独立", "综合", "优化", "迁移"]},
+        "deliverable": {"type": "string", "minLength": 6, "maxLength": 240},
+        "next_bridge": {"type": "string", "minLength": 6, "maxLength": 240}
+      }
+    },
+    "studentAnalysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "problems", "strategies"],
+      "properties": {
+        "base": {"$ref": "#/$defs/twoOrMoreText"},
+        "problems": {"$ref": "#/$defs/twoOrMoreText"},
+        "strategies": {"$ref": "#/$defs/twoOrMoreText"}
+      }
+    },
+    "goals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["knowledge", "ability", "quality"],
+      "properties": {
+        "knowledge": {"$ref": "#/$defs/twoOrMoreText"},
+        "ability": {"$ref": "#/$defs/twoOrMoreText"},
+        "quality": {"$ref": "#/$defs/twoOrMoreText"}
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content", "strategy"],
+      "properties": {"content": {"$ref": "#/$defs/textList"}, "strategy": {"$ref": "#/$defs/textList"}}
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "source_kind"],
+      "properties": {
+        "text": {"type": "string", "minLength": 1, "maxLength": 180},
+        "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
+        "evidence": {"type": ["string", "null"], "maxLength": 500}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"source_kind": {"const": "provided"}}, "required": ["source_kind"]},
+          "then": {
+            "required": ["evidence"],
+            "properties": {"evidence": {"type": "string", "minLength": 1}}
+          }
+        },
+        {
+          "if": {"properties": {"source_kind": {"const": "verified_public"}}, "required": ["source_kind"]},
+          "then": {
+            "required": ["evidence"],
+            "properties": {"evidence": {"type": "string", "minLength": 1}}
+          }
+        }
+      ]
+    },
+    "implementationStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "minutes", "modality", "content", "teacher_actions", "student_actions", "objective"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "label": {"type": "string", "minLength": 1, "maxLength": 24},
+        "minutes": {"type": "integer", "minimum": 0},
+        "modality": {"type": "string", "minLength": 1, "maxLength": 32},
+        "content": {"$ref": "#/$defs/textList"},
+        "teacher_actions": {"$ref": "#/$defs/textList"},
+        "student_actions": {"$ref": "#/$defs/textList"},
+        "objective": {"type": "string", "minLength": 6, "maxLength": 220}
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "remarks"],
+      "properties": {
+        "score": {"type": "number", "minimum": 85, "maximum": 96, "multipleOf": 0.5},
+        "remarks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["attendance", "attention", "participation", "compliance", "values", "ethics", "habits", "online_learning", "discussion", "homework", "practice", "presentation", "improvement"],
+          "properties": {
+            "attendance": {"type": "string", "minLength": 1, "maxLength": 80},
+            "attention": {"type": "string", "minLength": 1, "maxLength": 80},
+            "participation": {"type": "string", "minLength": 1, "maxLength": 80},
+            "compliance": {"type": "string", "minLength": 1, "maxLength": 80},
+            "values": {"type": "string", "minLength": 1, "maxLength": 80},
+            "ethics": {"type": "string", "minLength": 1, "maxLength": 80},
+            "habits": {"type": "string", "minLength": 1, "maxLength": 80},
+            "online_learning": {"type": "string", "minLength": 1, "maxLength": 80},
+            "discussion": {"type": "string", "minLength": 1, "maxLength": 80},
+            "homework": {"type": "string", "minLength": 1, "maxLength": 80},
+            "practice": {"type": "string", "minLength": 1, "maxLength": 80},
+            "presentation": {"type": "string", "minLength": 1, "maxLength": 80},
+            "improvement": {"type": "string", "minLength": 1, "maxLength": 80}
+          }
+        }
+      }
+    },
+    "reflection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary", "innovation", "improvement"],
+      "properties": {
+        "summary": {"type": "string", "minLength": 12, "maxLength": 360},
+        "innovation": {"type": "string", "minLength": 12, "maxLength": 360},
+        "improvement": {"type": "string", "minLength": 12, "maxLength": 360}
+      }
+    },
+    "lesson": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lesson_id", "unit", "task", "hours", "progression", "student_analysis", "teaching_content", "goals", "key_point", "difficult_point", "teaching_methods", "resources", "references", "implementation", "evaluation", "reflection"],
+      "properties": {
+        "lesson_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"},
+        "unit": {"type": "string", "pattern": "^项目[^\\s]*.*", "minLength": 3, "maxLength": 60},
+        "task": {"type": "string", "minLength": 2, "maxLength": 80},
+        "hours": {"$ref": "#/$defs/positiveNumber"},
+        "progression": {"$ref": "#/$defs/progression"},
+        "student_analysis": {"$ref": "#/$defs/studentAnalysis"},
+        "teaching_content": {"type": "array", "minItems": 3, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 240}},
+        "goals": {"$ref": "#/$defs/goals"},
+        "key_point": {"$ref": "#/$defs/point"},
+        "difficult_point": {"$ref": "#/$defs/point"},
+        "teaching_methods": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"type": "string", "minLength": 1, "maxLength": 80}},
+        "resources": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 160}},
+        "references": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"$ref": "#/$defs/reference"}},
+        "implementation": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/implementationStage"}},
+        "evaluation": {"$ref": "#/$defs/evaluation"},
+        "reflection": {"$ref": "#/$defs/reflection"}
       }
     }
-  },
-  "additionalProperties": false
+  }
 }

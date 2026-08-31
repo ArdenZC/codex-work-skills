@@ -1363,7 +1363,10 @@ class TemplatePackageReleaseTests(unittest.TestCase):
                 "install", "--release-dir", str(source), "--install-root", str(concurrent_root), "--json",
             ]
             process_env = os.environ.copy()
-            process_env["TEMPLATE_TOOL_TEST_INSTALL_HOLD_SECONDS"] = "2"
+            # The competing process must finish validating the release bundle
+            # before it reaches the lock; keep the owner alive across that
+            # validation on slower Windows runners.
+            process_env["TEMPLATE_TOOL_TEST_INSTALL_HOLD_SECONDS"] = "10"
             first_process = subprocess.Popen(
                 command,
                 cwd=ROOT,
