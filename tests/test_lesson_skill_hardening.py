@@ -120,14 +120,34 @@ class LessonSkillHardeningTests(unittest.TestCase):
             target = Path(temp_name) / "project"
             install_adapters.install(LESSON, target, adapters=["agents", "aider"])
             gradebook_root = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator"
+            gradebook.copy_engine(gradebook_root, target, False, False)
             gradebook.copy_file(gradebook_root, target, "AGENTS.md", False, False)
-            gradebook.copy_file(gradebook_root, target, ".aider.conf.yml", False, False)
+            first_agents = (target / "AGENTS.md").read_bytes()
+            backups_before = set(target.glob("AGENTS.md.backup_*"))
+            gradebook.copy_file(gradebook_root, target, "AGENTS.md", False, False)
+            self.assertEqual(first_agents, (target / "AGENTS.md").read_bytes())
+            self.assertEqual(backups_before, set(target.glob("AGENTS.md.backup_*")))
             agents = (target / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertTrue((target / ".course-gradebook-generator" / "SKILL.md").is_file())
+            self.assertTrue((target / ".course-gradebook-generator" / "通用提示词.md").is_file())
+            self.assertIn(".course-gradebook-generator/SKILL.md", agents)
+            gradebook.copy_file(gradebook_root, target, ".aider.conf.yml", False, False)
             aider = (target / ".aider.conf.yml").read_text(encoding="utf-8")
             self.assertIn("lesson-plan-docx-generator:start", agents)
             self.assertIn("course-gradebook-generator:start", agents)
             self.assertIn(".lesson-plan-docx-generator/SKILL.md", aider)
             self.assertIn(".course-gradebook-generator/SKILL.md", aider)
+
+            default_target = Path(temp_name) / "default-project"
+            with patch.object(sys, "argv", ["install_adapters.py", "--target-dir", str(default_target)]):
+                gradebook.main()
+            default_agents = default_target / "AGENTS.md"
+            self.assertTrue((default_target / ".course-gradebook-generator" / "SKILL.md").is_file())
+            self.assertIn(".course-gradebook-generator/SKILL.md", default_agents.read_text(encoding="utf-8"))
+            default_backups = set(default_target.glob("*.backup_*"))
+            with patch.object(sys, "argv", ["install_adapters.py", "--target-dir", str(default_target)]):
+                gradebook.main()
+            self.assertEqual(default_backups, set(default_target.glob("*.backup_*")))
 
     def test_visual_evidence_validator_rejects_stale_output(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-visual-hardening-") as temp_name:

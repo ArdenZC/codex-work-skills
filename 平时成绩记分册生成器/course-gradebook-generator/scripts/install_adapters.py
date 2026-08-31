@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import re
+import shutil
 import uuid
-from datetime import datetime
 from pathlib import Path
 
 ADAPTER_PATHS = {
@@ -29,18 +28,33 @@ SHARED_SOURCES = {
 }
 MARKER_START = "<!-- codex-skill: course-gradebook-generator:start -->"
 MARKER_END = "<!-- codex-skill: course-gradebook-generator:end -->"
+MINIMAL_ENGINE_FILES = (
+    Path("SKILL.md"),
+    Path("通用提示词.md"),
+    Path("AGENTS.md"),
+    Path("CONVENTIONS.md"),
+)
 
 
-def _rewrite_references(text: str) -> str:
-    for bare, namespaced in {
-        "SKILL.md": f"{ENGINE_NAME}/SKILL.md",
-        "通用提示词.md": f"{ENGINE_NAME}/通用提示词.md",
-        "AGENTS.md": f"{ENGINE_NAME}/AGENTS.md",
-        "CLAUDE.md": f"{ENGINE_NAME}/CLAUDE.md",
-        "GEMINI.md": f"{ENGINE_NAME}/GEMINI.md",
-        "CONVENTIONS.md": f"{ENGINE_NAME}/CONVENTIONS.md",
-    }.items():
-        text = re.sub(rf"(?<![./\w-]){re.escape(bare)}", namespaced, text)
+def _rewrite_references(text: str, *, copy_engine: bool = True, namespace: bool = True) -> str:
+    """Point adapter instructions at files available in the installed engine."""
+
+    if namespace:
+        for bare, namespaced in {
+            "SKILL.md": f"{ENGINE_NAME}/SKILL.md",
+            "通用提示词.md": f"{ENGINE_NAME}/通用提示词.md",
+            "AGENTS.md": f"{ENGINE_NAME}/AGENTS.md",
+            "CLAUDE.md": f"{ENGINE_NAME}/CLAUDE.md",
+            "GEMINI.md": f"{ENGINE_NAME}/GEMINI.md",
+            "CONVENTIONS.md": f"{ENGINE_NAME}/CONVENTIONS.md",
+        }.items():
+            text = re.sub(rf"(?<![./\w-]){re.escape(bare)}", namespaced, text)
+
+    runtime_path = re.compile(r"(?<![./\w-])((?:scripts|docs|examples|schemas|assets)/[^\s`\"'<>（）]+)")
+    if copy_engine:
+        text = runtime_path.sub(lambda match: f"{ENGINE_NAME}/{match.group(1)}", text)
+    else:
+        text = runtime_path.sub("the full Gradebook runtime (install with --copy-engine)", text)
     return text
 
 
@@ -51,7 +65,9 @@ def _merge_shared(existing: str, payload: str) -> str:
         raise ValueError("Malformed course-gradebook-generator marker block")
     if start >= 0:
         end += len(MARKER_END)
-        return existing[:start].rstrip("\r\n") + "\n\n" + block + existing[end:]
+        prefix = existing[:start].rstrip("\r\n")
+        suffix = existing[end:]
+        return (prefix + "\n\n" if prefix else "") + block + suffix
     return block + "\n" if not existing.strip() else existing.rstrip("\r\n") + "\n\n" + block + "\n"
 
 
@@ -83,11 +99,14 @@ def _merge_aider(existing: str) -> str:
     missing = [item for item in required if item not in paths]
     return existing.rstrip("\r\n") + ("\n" if missing else "\n") + "".join(f"  - {item}\n" for item in missing)
 
-def copy_file(source_root: Path, target_root: Path, relative: str, replace: bool, dry_run: bool) -> None:
+def copy_file(source_root: Path, target_root: Path, relative: str, replace: bool, dry_run: bool, *, copy_engine: bool = False) -> None:
     source = source_root / relative
     target = target_root / relative
     if relative in SHARED_SOURCES:
-        payload = _merge_shared(target.read_text(encoding="utf-8") if target.is_file() else "", _rewrite_references(source.read_text(encoding="utf-8")))
+        payload = _merge_shared(
+            target.read_text(encoding="utf-8") if target.is_file() else "",
+            _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=copy_engine),
+        )
         if target.is_file() and target.read_bytes() == payload.encode("utf-8"):
             print(f"unchanged={target}")
             return
@@ -97,7 +116,13 @@ def copy_file(source_root: Path, target_root: Path, relative: str, replace: bool
             print(f"unchanged={target}")
             return
     else:
-        payload = source.read_bytes()
+        if source.suffix.lower() in {".md", ".mdc", ".yml"}:
+            payload = _rewrite_references(
+                source.read_text(encoding="utf-8"),
+                copy_engine=copy_engine,
+            ).encode("utf-8")
+        else:
+            payload = source.read_bytes()
         if target.exists() and not replace:
             print(f"skip existing={target}")
             return
@@ -112,8 +137,8 @@ def copy_file(source_root: Path, target_root: Path, relative: str, replace: bool
     target.write_bytes(payload.encode("utf-8") if isinstance(payload, str) else payload)
     print(f"installed={target}")
 
-def copy_engine(source_root: Path, target_root: Path, replace: bool, dry_run: bool) -> None:
-    target = target_root / ".lesson-plan-docx-generator" if "course-gradebook-generator" == "lesson-plan-generator" else target_root / ".course-gradebook-generator"
+def copy_engine(source_root: Path, target_root: Path, replace: bool, dry_run: bool, *, full: bool = False) -> None:
+    target = target_root / ENGINE_NAME
     if target.exists() and not replace:
         print(f"skip existing engine={target}")
         return
@@ -121,10 +146,23 @@ def copy_engine(source_root: Path, target_root: Path, replace: bool, dry_run: bo
         print(f"copy-tree {source_root} -> {target}")
         return
     if target.exists():
-        backup = target_root / f"{target.name}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        backup = target_root / f"{target.name}.backup_{uuid.uuid4().hex}"
         shutil.move(str(target), str(backup))
         print(f"backup={backup}")
-    shutil.copytree(source_root, target, ignore=ignore_patterns)
+    if full:
+        shutil.copytree(source_root, target, ignore=ignore_patterns)
+    else:
+        target.mkdir(parents=True, exist_ok=True)
+        for relative in MINIMAL_ENGINE_FILES:
+            source = source_root / relative
+            payload = _rewrite_references(
+                source.read_text(encoding="utf-8"),
+                copy_engine=False,
+                namespace=False,
+            )
+            destination = target / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(payload, encoding="utf-8")
     print(f"installed-engine={target}")
 
 def ignore_patterns(_directory: str, names: list[str]) -> set[str]:
@@ -146,15 +184,12 @@ def main() -> None:
 
     print(f"source={source_root}")
     print(f"target={target_root}")
-    copy_file(source_root, target_root, "AGENTS.md", args.replace, args.dry_run)
-    copy_file(source_root, target_root, "通用提示词.md", args.replace, args.dry_run)
+    if target_root == source_root:
+        raise ValueError("Adapter target must be different from the skill directory.")
     for name in names:
         for relative in ADAPTER_PATHS[name]:
-            copy_file(source_root, target_root, relative, args.replace, args.dry_run)
-    if args.copy_engine:
-        if target_root == source_root:
-            raise ValueError("--copy-engine target must be different from the skill directory.")
-        copy_engine(source_root, target_root, args.replace, args.dry_run)
+            copy_file(source_root, target_root, relative, args.replace, args.dry_run, copy_engine=args.copy_engine)
+    copy_engine(source_root, target_root, args.replace, args.dry_run, full=args.copy_engine)
 
 if __name__ == "__main__":
     main()
