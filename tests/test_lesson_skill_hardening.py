@@ -89,6 +89,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 self.assertNotIn("scripts/generate_lesson_plans.py", minimal_text)
                 self.assertNotIn("docs/content-contract-v2.md", minimal_text)
                 self.assertNotIn("examples/tasks.example.json", minimal_text)
+                self.assertNotRegex(minimal_text, r"(?:scripts|docs|examples|schemas|assets)/")
             full_target = Path(temp_name) / "full-project"
             install_adapters.install(LESSON, full_target, adapters=["all"], copy_engine=True)
             full_agents = (full_target / "AGENTS.md").read_text(encoding="utf-8")

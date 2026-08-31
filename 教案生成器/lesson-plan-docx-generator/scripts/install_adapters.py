@@ -100,6 +100,16 @@ def _rewrite_references(text: str, *, copy_engine: bool = True, namespace: bool 
     for bare, namespaced in replacements.items():
         # Do not rewrite an already namespaced path a second time.
         text = re.sub(rf"(?<![./\w-]){re.escape(bare)}", namespaced, text)
+    if not copy_engine:
+        unavailable = "the full Lesson runtime (install with --copy-engine)"
+        # Keep the instruction-only package honest: its four local entry files
+        # must not advertise templates, schemas, examples, or scripts that are
+        # copied only by the explicit full-engine mode.
+        text = re.sub(
+            r"(?<![./\w-])(?:scripts|docs|examples|schemas|assets)/[^\s`\"'<>（）]+",
+            unavailable,
+            text,
+        )
     return text
 
 
