@@ -36,6 +36,8 @@ def output_fingerprint(output_dir: Path | str, qa_report: Path | str) -> str:
     files = sorted(directory.glob("*.docx"), key=lambda item: item.name.casefold())
     if not files:
         raise ValueError("visual inspection evidence requires at least one generated DOCX")
+    if any(path.is_symlink() for path in files):
+        raise ValueError("visual inspection does not accept symbolic-link DOCX files")
     for path in files:
         digest.update(path.name.encode("utf-8"))
         digest.update(b"\0")
@@ -93,6 +95,22 @@ def write_visual_inspection_evidence(
     report_path = Path(qa_report).expanduser().resolve()
     destination_path = Path(destination).expanduser().resolve()
     _assert_destination_safe(directory, report_path, destination_path)
+    if not report_path.is_file():
+        raise ValueError(f"related qa-report.json does not exist: {report_path}")
+    try:
+        qa_data = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"qa-report.json is not valid JSON: {report_path}") from exc
+    if not isinstance(qa_data, dict):
+        raise ValueError("qa-report.json must contain an object")
+    qa_status = str(qa_data.get("status", ""))
+    if "output_dir" in qa_data and not paths_equal(qa_data["output_dir"], directory):
+        raise ValueError("qa-report output_dir does not match the visual inspection output directory")
+    if status == "passed" and qa_status != "passed":
+        raise ValueError("passed visual inspection requires a passed QA report")
+    validation = qa_data.get("validation", {})
+    if status == "passed" and isinstance(validation, dict) and validation.get("output") is False:
+        raise ValueError("passed visual inspection requires output validation")
     if status not in {"passed", "failed"}:
         raise ValueError("visual inspection status must be passed or failed")
     if set(checks) != set(CHECK_NAMES) or any(value not in {"passed", "failed"} for value in checks.values()):
@@ -104,10 +122,17 @@ def write_visual_inspection_evidence(
     if not inspected_pages:
         raise ValueError("visual inspection evidence requires inspected files and representative pages")
 
-    available = {path.name for path in directory.glob("*.docx")}
+    available = {path.name for path in directory.glob("*.docx") if path.is_file() and not path.is_symlink()}
     missing = sorted(set(inspected_pages) - available)
     if missing:
         raise ValueError(f"inspected DOCX files do not exist in output: {', '.join(missing)}")
+    page_counts = qa_data.get("render", {}).get("page_counts")
+    page_bounds_verified = isinstance(page_counts, dict) and bool(page_counts)
+    if page_bounds_verified:
+        for name, pages in inspected_pages.items():
+            maximum = page_counts.get(name)
+            if not isinstance(maximum, int) or maximum <= 0 or any(page > maximum for page in pages):
+                raise ValueError(f"inspected page is outside render.page_counts for {name}")
     evidence = {
         "status": status,
         "inspected_files": sorted(inspected_pages),
@@ -116,6 +141,8 @@ def write_visual_inspection_evidence(
         "notes": str(notes).strip(),
         "related_qa_report": str(report_path),
         "output_fingerprint": output_fingerprint(directory, report_path),
+        "qa_status": qa_status,
+        "page_bounds_verified": page_bounds_verified,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 

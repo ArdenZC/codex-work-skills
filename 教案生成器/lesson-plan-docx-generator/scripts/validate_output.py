@@ -19,7 +19,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree
 
 from bookmark_utils import bookmark_boundary_locations, bookmark_location, bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark, validate_bookmark_inventory
-from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_header_values, format_title
+from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
 from content_quality import assess_content_quality, detect_non_it_contamination
 from package_common import (
     DEFAULT_MANIFEST,
@@ -639,6 +639,7 @@ def _base_qa_report(
         "content_contract_version": "2.0",
         "content_quality": {
             "status": "not_run",
+            "diagnostic_content_policy": {"mode": "limited_fragments", "max_preview_chars": 120, "hash": "sha256"},
             "exact_duplicates": [],
             "adjacent_exact_duplicates": [],
             "adjacent_similarity_pairs": [],
@@ -650,6 +651,12 @@ def _base_qa_report(
             "whole_lesson_similarity_pairs": [],
             "repeated_sentences": [],
             "boilerplate_hits": [],
+            "intra_lesson_coherence": {
+                "status": "not_run",
+                "lessons": [],
+                "failures": [],
+                "thresholds": {},
+            },
             "progression": {},
             "coverage": {},
         },
@@ -660,6 +667,7 @@ def _base_qa_report(
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
+            "page_counts": {},
             "page_count_method": "pdf_page_object_regex",
             "errors": [],
         },
@@ -776,6 +784,7 @@ def write_skipped_report(
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
+            "page_counts": {},
             "page_count_method": "pdf_page_object_regex",
             "errors": [],
         }
@@ -855,6 +864,19 @@ def validate_output_dir(
         errors.append(f"No DOCX files generated in {out_dir}")
     if len(files) != len(lessons):
         errors.append(f"Output count mismatch: expected {len(lessons)}, got {len(files)}")
+
+    expected_files = [
+        lesson_filename(index, lesson.get("unit", ""), lesson.get("task", ""))
+        for index, lesson in enumerate(lessons, start=1)
+    ]
+    actual_names = [path.name for path in files]
+    if any(path.is_symlink() for path in files):
+        errors.append("Output DOCX files must not be symbolic links")
+    if sorted(actual_names) != sorted(expected_files):
+        errors.append(
+            "Output filenames do not match the deterministic lesson contract: "
+            f"expected={expected_files}, actual={actual_names}"
+        )
 
     main_spec = manifest["structure"]["main_table"]
     course_expected = str(data["course_name"])

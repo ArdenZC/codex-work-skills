@@ -9,18 +9,57 @@ import zipfile
 from pathlib import Path
 
 import yaml
+from docx import Document
+from lxml import etree
 
 from path_safety import paths_overlap
 
 
+W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+XML_NS = "http://www.w3.org/XML/1998/namespace"
+
+
+def _visible_text_nodes(root: etree._Element) -> list[etree._Element]:
+    return root.xpath(".//w:t", namespaces={"w": W_NS})
+
+
+def _replace_visible_once(root: etree._Element, old_text: str, new_text: str) -> None:
+    nodes = _visible_text_nodes(root)
+    joined = "".join(node.text or "" for node in nodes)
+    occurrences = joined.count(old_text)
+    if occurrences != 1:
+        raise ValueError(f"Expected exactly one visible occurrence of {old_text!r}, found {occurrences}")
+    start = joined.index(old_text)
+    end = start + len(old_text)
+    cursor = 0
+    first: etree._Element | None = None
+    for node in nodes:
+        text = node.text or ""
+        node_start, node_end = cursor, cursor + len(text)
+        if node_end > start and node_start < end:
+            if first is None:
+                first = node
+                local_start = max(start - node_start, 0)
+                local_end = min(end - node_start, len(text))
+                node.text = text[:local_start] + new_text + text[local_end:]
+            else:
+                local_start = max(start - node_start, 0)
+                local_end = min(end - node_start, len(text))
+                node.text = text[:local_start] + text[local_end:]
+        cursor = node_end
+    if first is not None and any((node.text or "") for node in nodes):
+        first.set(f"{{{XML_NS}}}space", "preserve")
+
+
 def _replace_document_text(document_xml: bytes, replacements: list[tuple[str, str]]) -> bytes:
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, remove_blank_text=False)
+    try:
+        root = etree.fromstring(document_xml, parser)
+    except etree.XMLSyntaxError as exc:
+        raise ValueError(f"word/document.xml is not valid XML: {exc}") from exc
     for old_text, new_text in replacements:
-        old_bytes, new_bytes = old_text.encode("utf-8"), new_text.encode("utf-8")
-        occurrences = document_xml.count(old_bytes)
-        if occurrences <= 0:
-            raise ValueError(f"Expected at least one visible occurrence of {old_text!r}, found {occurrences}")
-        document_xml = document_xml.replace(old_bytes, new_bytes)
-    return document_xml
+        _replace_visible_once(root, old_text, new_text)
+    return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
 def _canonical_paths() -> set[Path]:
@@ -37,8 +76,8 @@ def _canonical_paths() -> set[Path]:
 def _assert_target_safe(source: Path, target: Path) -> None:
     if not source.is_file():
         raise FileNotFoundError(f"Source template not found: {source}")
-    if source.resolve() == target.resolve():
-        raise ValueError("Source and target templates must be different files")
+    if paths_overlap(source, target):
+        raise ValueError("Source and target templates must not overlap")
     if target.exists() or target.is_symlink():
         raise FileExistsError(
             f"Refusing to overwrite existing target; choose a new path: {target}"
@@ -63,6 +102,15 @@ def build_patch(source: Path, target: Path, replacements: list[tuple[str, str]])
                 if info.filename == "word/document.xml":
                     payload = _replace_document_text(payload, replacements)
                 target_zip.writestr(info, payload)
+        with zipfile.ZipFile(temporary, "r") as check_zip:
+            if check_zip.testzip() is not None:
+                raise ValueError("patched DOCX contains a corrupt ZIP member")
+            document_xml = check_zip.read("word/document.xml")
+        etree.fromstring(document_xml)
+        try:
+            Document(str(temporary))
+        except Exception as exc:  # pragma: no cover - python-docx parser details
+            raise ValueError(f"patched DOCX could not be reopened: {exc}") from exc
         os.replace(str(temporary), str(target))
     finally:
         temporary.unlink(missing_ok=True)

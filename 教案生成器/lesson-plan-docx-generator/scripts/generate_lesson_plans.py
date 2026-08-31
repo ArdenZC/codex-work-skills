@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import copy
-import hashlib
 import json
 import os
 import re
@@ -21,7 +20,7 @@ from docx.text.paragraph import Paragraph
 from docx.table import _Cell
 
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
-from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_header_values, format_title
+from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
 from content_quality import ContentQualityError, validate_content_quality
 from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
@@ -32,7 +31,6 @@ from validate_template import validate_template
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 
-MAX_FILENAME_BYTES = 255
 
 
 def actual_cells(row):
@@ -186,31 +184,6 @@ def set_anchored_cell(document, manifest: dict[str, Any], bookmark_name: str, va
     cell = _Cell(cell_element, document)
     writer = set_cell_multiline if multiline else set_cell_text
     writer(cell, value, bookmark_end=record.end)
-
-
-def safe_name(text: str) -> str:
-    text = re.sub(r"\s+", "", str(text))
-    return re.sub(r'[\\/:*?"<>|]+', "", text)
-
-
-def _utf8_prefix(text: str, max_bytes: int) -> str:
-    encoded = text.encode("utf-8")
-    if len(encoded) <= max_bytes:
-        return text
-    return encoded[:max_bytes].decode("utf-8", errors="ignore")
-
-
-def lesson_filename(seq: int, unit: str, task: str) -> str:
-    prefix = f"教案{seq:02d}_"
-    suffix = ".docx"
-    stem = f"{safe_name(unit)}_{safe_name(task)}"
-    filename = f"{prefix}{stem}{suffix}"
-    if len(filename.encode("utf-8")) <= MAX_FILENAME_BYTES:
-        return filename
-    digest = hashlib.sha256(stem.encode("utf-8")).hexdigest()[:10]
-    marker = f"~{digest}"
-    stem_budget = MAX_FILENAME_BYTES - len((prefix + marker + suffix).encode("utf-8"))
-    return f"{prefix}{_utf8_prefix(stem, stem_budget)}{marker}{suffix}"
 
 
 def add_eval_table(cell, target: float, lesson: dict[str, Any], manifest: dict[str, Any]):

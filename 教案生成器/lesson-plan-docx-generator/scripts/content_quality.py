@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import hashlib
 import unicodedata
 from difflib import SequenceMatcher
 from typing import Any
@@ -279,6 +280,23 @@ class ContentQualityError(ValueError):
         self.report = report
 
 
+DIAGNOSTIC_PREVIEW_MAX_CHARS = 120
+INTRA_GENERIC_TWO_CHAR_ANCHORS = frozenset(
+    {"数据", "结果", "记录", "流程", "内容", "方法", "任务", "方案", "问题", "过程", "系统", "项目", "要求", "工作"}
+)
+
+
+def _diagnostic_fragment(value: Any, *, limit: int = DIAGNOSTIC_PREVIEW_MAX_CHARS) -> dict[str, str]:
+    """Expose only a bounded preview plus a stable digest in QA diagnostics."""
+
+    normalized = _normalize(value)
+    meaningful = re.sub(r"\s+", "", normalized)
+    preview = normalized[:limit]
+    if len(preview) < len(normalized):
+        preview = preview.rstrip() + "…"
+    return {"preview": preview, "text_sha256": hashlib.sha256(meaningful.encode("utf-8")).hexdigest()}
+
+
 def _normalize(value: Any) -> str:
     value = unicodedata.normalize("NFKC", str(value))
     value = re.sub(r"(?:^|\n)\s*\d+[.)、]\s*", "\n", value)
@@ -470,6 +488,11 @@ def _top_fragments(left: str, right: str) -> list[str]:
     return sorted(set(fragments), key=lambda value: (-len(value), value))[:3]
 
 
+def _bounded_fragments(fragments: list[str]) -> tuple[list[str], list[str]]:
+    records = [_diagnostic_fragment(value) for value in fragments]
+    return [record["preview"] for record in records], [record["text_sha256"] for record in records]
+
+
 def _entity_fragments(lesson: dict[str, Any]) -> set[str]:
     """Collect only lesson-specific noun-like phrases for structural masking."""
 
@@ -561,6 +584,7 @@ def _structural_record(
     indices: tuple[int, int] | None = None,
     stage: str | None = None,
 ) -> dict[str, Any]:
+    top_fragments, top_fragment_hashes = _bounded_fragments(_top_fragments(masked_left, masked_right))
     record: dict[str, Any] = {
         "lessons": [left_id, right_id],
         "field": field,
@@ -571,9 +595,12 @@ def _structural_record(
         "raw_character_3gram_jaccard": round(raw_jaccard, 4),
         "masked_sequence_matcher": round(masked_sequence, 4),
         "masked_character_3gram_jaccard": round(masked_jaccard, 4),
-        "masked_fingerprint": _normalize(masked_left)[:120],
-        "top_fragments": _top_fragments(masked_left, masked_right),
-        "top_repeated_fragments": _top_fragments(masked_left, masked_right),
+        "masked_fingerprint": _normalize(masked_left)[:DIAGNOSTIC_PREVIEW_MAX_CHARS],
+        "masked_fingerprint_sha256": hashlib.sha256(_normalize(masked_left).encode("utf-8")).hexdigest(),
+        "top_fragments": top_fragments,
+        "top_fragment_sha256": top_fragment_hashes,
+        "top_repeated_fragments": top_fragments,
+        "top_repeated_fragment_sha256": top_fragment_hashes,
         "adjacent": adjacent,
         "reuse_policy": reuse_policy(field),
     }
@@ -656,11 +683,13 @@ def _record_duplicate_groups(values: dict[str, dict[str, str]], minimum: int = 2
                 by_value.setdefault(normalized, []).append(lesson_id)
         for value, lesson_ids in by_value.items():
             if len(lesson_ids) >= minimum:
+                diagnostic = _diagnostic_fragment(value)
                 groups.append(
                     {
                         "field": field,
                         "lessons": sorted(lesson_ids),
-                        "text": value,
+                        "text": diagnostic["preview"],
+                        "text_sha256": diagnostic["text_sha256"],
                         "reuse_policy": reuse_policy(field),
                     }
                 )
@@ -836,13 +865,16 @@ def _similarity_record(
     stage: str | None = None,
     adjacent: bool = False,
 ) -> dict[str, Any]:
+    top_fragments, top_fragment_hashes = _bounded_fragments(_top_fragments(left_text, right_text))
     record: dict[str, Any] = {
         "lessons": [left_id, right_id],
         "score": round(max(sequence, jaccard), 4),
         "sequence_matcher": round(sequence, 4),
         "character_3gram_jaccard": round(jaccard, 4),
-        "top_fragments": _top_fragments(left_text, right_text),
-        "top_repeated_fragments": _top_fragments(left_text, right_text),
+        "top_fragments": top_fragments,
+        "top_fragment_sha256": top_fragment_hashes,
+        "top_repeated_fragments": top_fragments,
+        "top_repeated_fragment_sha256": top_fragment_hashes,
         "adjacent": adjacent,
     }
     if field is not None:
@@ -870,14 +902,18 @@ def _adjacent_exact_duplicates(
             left_text = _normalize(per_lesson.get(left_id, ""))
             right_text = _normalize(per_lesson.get(right_id, ""))
             if left_text and left_text == right_text:
+                diagnostic = _diagnostic_fragment(left_text)
                 records.append(
                     {
                         "lessons": [left_id, right_id],
                         "field": field,
-                        "text": left_text,
+                        "text": diagnostic["preview"],
+                        "text_sha256": diagnostic["text_sha256"],
                         "score": 1.0,
-                        "top_fragments": [left_text[:120]],
-                        "top_repeated_fragments": [left_text[:120]],
+                        "top_fragments": [diagnostic["preview"]],
+                        "top_fragment_sha256": [diagnostic["text_sha256"]],
+                        "top_repeated_fragments": [diagnostic["preview"]],
+                        "top_repeated_fragment_sha256": [diagnostic["text_sha256"]],
                         "reuse_policy": reuse_policy(field),
                     }
                 )
@@ -906,12 +942,16 @@ def _item_duplicate_reports(
             unique_lesson_ids = sorted({entry[0] for entry in entries}, key=lambda item: positions[item])
             if len(unique_lesson_ids) < 2:
                 continue
+            diagnostic = _diagnostic_fragment(entries[0][2])
+            normalized_diagnostic = _diagnostic_fragment(normalized)
             record = {
                 "field": field,
                 "lessons": unique_lesson_ids,
                 "count": len(unique_lesson_ids),
-                "text": entries[0][2],
-                "normalized": normalized,
+                "text": diagnostic["preview"],
+                "text_sha256": diagnostic["text_sha256"],
+                "normalized": normalized_diagnostic["preview"],
+                "normalized_sha256": normalized_diagnostic["text_sha256"],
                 "items": [
                     {"lesson": lesson_id, "index": item_index}
                     for lesson_id, item_index, _text in entries
@@ -1120,6 +1160,142 @@ def _progression_gate(upstream: Any, downstream: Any, threshold: float) -> dict[
     }
 
 
+def _intra_anchor_evidence(left: Any, right: Any) -> dict[str, Any]:
+    """Require a concrete multi-character or technical anchor for one lesson."""
+
+    evidence = _progression_anchor_evidence(left, right)
+    two_char_specific = any(
+        len(item) == 2 and item not in INTRA_GENERIC_TWO_CHAR_ANCHORS
+        for item in evidence["substantive_residuals"]
+    )
+    acceptable = (
+        bool(evidence["acronym_matches"])
+        or len(evidence["longest_substantive_match"]) >= 3
+        or two_char_specific
+    )
+    # Two distinct concrete fragments can establish a domain, but a single
+    # two-character overlap such as 数据/记录 is too generic for this gate.
+    if not acceptable and len(evidence["substantive_residuals"]) >= 2:
+        acceptable = sum(len(item) for item in evidence["substantive_residuals"]) >= 5
+    result = dict(evidence)
+    result["status"] = "passed" if acceptable else "failed"
+    if acceptable and not evidence["reason"].startswith("shared"):
+        result["reason"] = "shared substantive lesson anchor"
+    elif not acceptable:
+        result["reason"] = evidence["reason"]
+    result["score"] = round(min(1.0, evidence["evidence_strength"] / 12), 4)
+    return result
+
+
+def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]) -> dict[str, Any]:
+    """Check that each task, body and deliverable describe the same lesson."""
+
+    checks: list[dict[str, Any]] = []
+    failures: list[dict[str, Any]] = []
+    for lesson_id, lesson in zip(lesson_ids, lessons):
+        task = lesson.get("task", "")
+        body_fields = {
+            "teaching_content": list(lesson.get("teaching_content", [])),
+            "key_point": list(lesson.get("key_point", {}).get("content", [])),
+            "difficult_point": list(lesson.get("difficult_point", {}).get("content", [])),
+        }
+        body_results = {
+            field: _intra_anchor_evidence(task, values)
+            for field, values in body_fields.items()
+        }
+        gate_a = max(
+            body_results.items(),
+            key=lambda item: (item[1]["status"] == "passed", item[1]["score"], item[0]),
+        )
+        deliverable = lesson.get("progression", {}).get("deliverable", "")
+        task_anchor = _intra_anchor_evidence(deliverable, task)
+        body_anchor = max(
+            (_intra_anchor_evidence(deliverable, values) for values in body_fields.values()),
+            key=lambda item: (item["status"] == "passed", item["score"], item["reason"]),
+        )
+        gate_a_result = {
+            "status": gate_a[1]["status"],
+            "score": gate_a[1]["score"],
+            "anchor_status": gate_a[1]["status"],
+            "reason": gate_a[1]["reason"],
+            "matched_field": gate_a[0],
+            "candidates": {
+                field: {"status": result["status"], "score": result["score"], "reason": result["reason"]}
+                for field, result in body_results.items()
+            },
+        }
+        gate_b_passed = gate_a_result["status"] == "passed" and body_anchor["status"] == "passed"
+        gate_b_result = {
+            "status": "passed" if gate_b_passed else "failed",
+            "score": round(min(gate_a_result["score"], body_anchor["score"]), 4),
+            "anchor_status": {
+                "task": task_anchor["status"],
+                "body": body_anchor["status"],
+            },
+            "reason": (
+                "deliverable is anchored in the current instructional body whose task anchor passed"
+                if gate_b_passed
+                else "deliverable lacks a shared substantive anchor with the current task and body"
+            ),
+            "task_anchor": task_anchor,
+            "body_anchor": body_anchor,
+        }
+        record = {"lesson_id": lesson_id, "gate_a": gate_a_result, "gate_b": gate_b_result}
+        checks.append(record)
+        for gate_name, gate in (("gate_a_task_body", gate_a_result), ("gate_b_deliverable_body", gate_b_result)):
+            if gate["status"] != "passed":
+                failures.append(
+                    {
+                        "lesson_id": lesson_id,
+                        "failed_gate": gate_name,
+                        "score": gate["score"],
+                        "anchor_status": gate["anchor_status"],
+                        "reason": gate["reason"],
+                    }
+                )
+    return {
+        "status": "passed" if not failures else "failed",
+        "lessons": checks,
+        "failures": failures,
+        "thresholds": {
+            "minimum_substantive_anchor_chars": 3,
+            "technical_acronym_allowed": True,
+            "gate_a": "task -> teaching_content|key_point.content|difficult_point.content",
+            "gate_b": "deliverable -> instructional body, with Gate A task/body anchor required",
+        },
+    }
+
+
+def intra_lesson_coherence_calibration() -> list[dict[str, Any]]:
+    """Small cross-domain calibration corpus kept independent of user data."""
+
+    cases = (
+        ("database_positive", "设计数据库表结构", ["确定主键外键并检查数据库表约束"], "数据库表设计说明", "passed"),
+        ("nursing_positive", "完成患者生命体征测量", ["练习血压、体温测量并记录异常判定"], "生命体征测量记录", "passed"),
+        ("accounting_positive", "整理会计凭证并登记账簿", ["审核原始凭证并按科目登记账簿"], "凭证与账簿核对表", "passed"),
+        ("nursing_task_sql_deliverable", "完成患者生命体征测量", ["编写SQL查询并验证结果"], "SQL查询脚本", "failed"),
+        ("database_task_nursing_body", "设计数据库表结构", ["练习血压、体温测量并记录异常判定"], "数据库表设计说明", "failed"),
+        ("accounting_task_java_deliverable", "登记会计凭证并核对账簿", ["编写Java类并运行单元测试"], "Java程序包", "failed"),
+        ("generic_only", "完成任务并进行分析", ["开展操作、检查流程并形成成果"], "提交成果", "failed"),
+        ("prior_bridge_body_cross_domain", "完成数据库查询", ["测量患者血压并记录生命体征"], "数据库查询报告", "failed"),
+    )
+    results: list[dict[str, Any]] = []
+    for name, task, body, deliverable, expected in cases:
+        result = _intra_lesson_coherence(
+            [{
+                "lesson_id": "calibration",
+                "task": task,
+                "teaching_content": body,
+                "key_point": {"content": [body[0]]},
+                "difficult_point": {"content": [body[0]]},
+                "progression": {"deliverable": deliverable},
+            }],
+            ["calibration"],
+        )
+        results.append({"name": name, "expected": expected, "actual": result["status"]})
+    return results
+
+
 def _progression_gates(previous: dict[str, Any], current: dict[str, Any], threshold: float) -> dict[str, Any]:
     """Keep artifact inheritance and the next-step bridge as separate gates."""
 
@@ -1130,20 +1306,47 @@ def _progression_gates(previous: dict[str, Any], current: dict[str, Any], thresh
         current_progression["prior_learning"],
         threshold,
     )
+    # The instructional body is the required forward-transition evidence;
+    # deliverable text can corroborate but cannot rescue an unrelated body.
+    body_gate = _progression_gate(
+        previous_progression["next_bridge"],
+        [current.get("task", ""), *current.get("teaching_content", [])],
+        threshold,
+    )
+    current_body_coherence = _intra_lesson_coherence([current], [str(current.get("lesson_id", "current"))])
+    # Some bridges are intentionally concise (for example “提取下一课的
+    # 功能测试点”) and do not repeat the full artifact phrase.  They may use
+    # the calibrated sequence signal only when the current task/body has
+    # independently passed Gate A; a deliverable is never used for this
+    # fallback, so a cross-domain body cannot be rescued.
+    if (
+        body_gate["status"] != "passed"
+        and current_body_coherence["status"] == "passed"
+        and body_gate["score"] >= PROGRESSION_SEQUENCE_THRESHOLD
+    ):
+        body_gate = {
+            **body_gate,
+            "status": "passed",
+            "lexical_status": "passed_with_current_body_anchor",
+            "substantive_anchor": {
+                **body_gate["substantive_anchor"],
+                "status": "passed",
+                "reason": "current task and teaching_content independently share a substantive anchor",
+            },
+        }
+    corroborating_gate = _progression_gate(
+        previous_progression["next_bridge"],
+        [current.get("task", ""), *current.get("teaching_content", []), current_progression["deliverable"]],
+        threshold,
+    )
     forward_candidates = {
-        "task_and_deliverable": _progression_gate(
-            previous_progression["next_bridge"],
-            [current.get("task", ""), current_progression["deliverable"]],
-            threshold,
-        ),
-        "teaching_content_and_deliverable": _progression_gate(
-            previous_progression["next_bridge"],
-            [*current.get("teaching_content", []), current_progression["deliverable"]],
-            threshold,
-        ),
+        "task_and_deliverable": body_gate,
+        "teaching_content_and_deliverable": corroborating_gate,
+        "instructional_body": body_gate,
+        "instructional_body_with_deliverable": corroborating_gate,
     }
     selected_scope, selected_gate = max(
-        forward_candidates.items(),
+        {"instructional_body": body_gate}.items(),
         key=lambda item: (item[1]["status"] == "passed", item[1]["score"], item[0]),
     )
     forward_transition = {
@@ -1152,6 +1355,11 @@ def _progression_gates(previous: dict[str, Any], current: dict[str, Any], thresh
         "candidate_results": {
             scope: {"status": gate["status"], "score": gate["score"]}
             for scope, gate in forward_candidates.items()
+        },
+        "corroboration": {
+            "status": corroborating_gate["status"],
+            "score": corroborating_gate["score"],
+            "deliverable_cannot_rescue_body": True,
         },
     }
     return {
@@ -1427,6 +1635,13 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     errors: list[str] = []
     warnings: list[str] = []
     course_terms = _course_terms(lessons)
+    intra_lesson_coherence = _intra_lesson_coherence(lessons, lesson_ids)
+    intra_lesson_coherence["calibration"] = intra_lesson_coherence_calibration()
+    if intra_lesson_coherence["status"] != "passed":
+        errors.extend(
+            f"intra_lesson_coherence {item['lesson_id']} {item['failed_gate']}: {item['reason']}"
+            for item in intra_lesson_coherence["failures"]
+        )
 
     duplicate_values: dict[str, dict[str, str]] = {}
     item_values: dict[str, dict[str, list[str]]] = {}
@@ -1623,21 +1838,27 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             for left_id, right_id in zip(strict_ordered, strict_ordered[1:])
         )
         if len(strict_locations) >= REPEATED_SENTENCE_LESSON_COUNT or strict_adjacent:
+            diagnostic = _diagnostic_fragment(sentence)
             repeated_sentences.append(
                 {
-                    "sentence": sentence,
+                    "sentence": diagnostic["preview"],
+                    "sentence_sha256": diagnostic["text_sha256"],
                     "lessons": strict_ordered,
                     "count": len(strict_locations),
                     "fields": strict_locations,
                     "adjacent": strict_adjacent,
                     "reuse_policy": REUSE_NARRATIVE_STRICT,
                     "score": 1.0,
-                    "top_fragments": [sentence],
+                    "top_fragments": [diagnostic["preview"]],
+                    "top_fragment_sha256": [diagnostic["text_sha256"]],
                 }
             )
     repeated_sentences.sort(key=lambda item: (-item["count"], item["sentence"]))
     if repeated_sentences:
-        errors.extend(f"repeated sentence across lessons: {item['sentence']}" for item in repeated_sentences)
+        errors.extend(
+            f"repeated sentence across lessons: {item['sentence']} (sha256={item['sentence_sha256']})"
+            for item in repeated_sentences
+        )
 
     boilerplate_hits: list[dict[str, str]] = []
     for index, lesson in enumerate(lessons, 1):
@@ -1848,6 +2069,10 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "in_class_stage_ids": sorted(IN_CLASS_STAGE_IDS),
         "required_stage_ids": list(IMPLEMENTATION_STAGE_IDS),
         "score_pattern": score_pattern,
+        "intra_lesson_coherence": {
+            "status": intra_lesson_coherence["status"],
+            "failed_lessons": [item["lesson_id"] for item in intra_lesson_coherence["failures"]],
+        },
         "capability_stage_vocabulary": list(CAPABILITY_STAGES),
         "completeness": completeness,
         "non_it_contamination_terms": list(NON_IT_CONTAMINATION_TERMS),
@@ -1866,6 +2091,11 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     }
     return {
         "status": "failed" if errors else "passed",
+        "diagnostic_content_policy": {
+            "mode": "limited_fragments",
+            "max_preview_chars": DIAGNOSTIC_PREVIEW_MAX_CHARS,
+            "hash": "sha256",
+        },
         "errors": errors,
         "warnings": sorted(set(warnings)),
         "reuse_policy": {
@@ -1901,6 +2131,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "repeated_sentences": repeated_sentences,
         "boilerplate_hits": boilerplate_hits,
         "progression": progression,
+        "intra_lesson_coherence": intra_lesson_coherence,
         "reference_provenance": reference_provenance,
         "coverage": coverage,
         "completeness": completeness,

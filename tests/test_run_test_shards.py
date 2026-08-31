@@ -5,7 +5,9 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +69,29 @@ class TestShardManifest(unittest.TestCase):
             for key in ("USERPROFILE", "APPDATA", "LOCALAPPDATA"):
                 if key in os.environ:
                     self.assertEqual(environment[key], os.environ[key])
+
+    def test_python_command_resolution_handles_bare_explicit_relative_and_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="shard-python-resolution-") as temp_name:
+            folder = Path(temp_name)
+            explicit = folder / "fake-python.exe"
+            explicit.write_bytes(b"placeholder")
+            with patch.object(run_test_shards.shutil, "which", return_value=str(explicit)) as which:
+                self.assertEqual(run_test_shards._resolve_python_command("python"), str(explicit.resolve()))
+                which.assert_called_once_with("python")
+            self.assertEqual(
+                run_test_shards._resolve_python_command(str(explicit)),
+                str(explicit.resolve()),
+            )
+            relative = explicit.relative_to(Path.cwd()) if explicit.is_relative_to(Path.cwd()) else None
+            if relative is not None:
+                self.assertEqual(run_test_shards._resolve_python_command(str(relative)), str(explicit.resolve()))
+            with self.assertRaisesRegex(FileNotFoundError, "not found"):
+                with patch.object(run_test_shards.shutil, "which", return_value=None):
+                    run_test_shards._resolve_python_command("definitely-not-a-python")
+
+    def test_windows_style_missing_path_fails_closed(self) -> None:
+        with self.assertRaises(FileNotFoundError):
+            run_test_shards._resolve_python_command(r"C:\missing\python.exe")
 
 
 if __name__ == "__main__":

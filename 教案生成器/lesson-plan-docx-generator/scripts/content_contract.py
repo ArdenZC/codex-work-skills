@@ -7,6 +7,8 @@ template.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from decimal import Decimal
 from typing import Any, Iterable
 
@@ -16,6 +18,7 @@ EVALUATION_SCORE_MIN = Decimal("85")
 EVALUATION_SCORE_MAX = Decimal("96")
 EVALUATION_SCORE_STEP = Decimal("0.5")
 CAPABILITY_STAGES = ("认知", "理解", "模仿", "独立", "综合", "优化", "迁移")
+MAX_FILENAME_BYTES = 255
 
 IMPLEMENTATION_STAGE_IDS = (
     "before_class_preparation",
@@ -75,6 +78,32 @@ CONTENT_FIELD_NAMES = (
 
 def _clean(value: Any) -> str:
     return str(value).strip()
+
+
+def safe_name(text: str) -> str:
+    """Make a deterministic filesystem-safe lesson filename component."""
+
+    text = re.sub(r"\s+", "", str(text))
+    return re.sub(r'[\\/:*?"<>|]+', "", text)
+
+
+def _utf8_prefix(text: str, max_bytes: int) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def lesson_filename(seq: int, unit: str, task: str) -> str:
+    prefix, suffix = f"教案{seq:02d}_", ".docx"
+    stem = f"{safe_name(unit)}_{safe_name(task)}"
+    filename = f"{prefix}{stem}{suffix}"
+    if len(filename.encode("utf-8")) <= MAX_FILENAME_BYTES:
+        return filename
+    digest = hashlib.sha256(stem.encode("utf-8")).hexdigest()[:10]
+    marker = f"~{digest}"
+    budget = MAX_FILENAME_BYTES - len((prefix + marker + suffix).encode("utf-8"))
+    return f"{prefix}{_utf8_prefix(stem, budget)}{marker}{suffix}"
 
 
 def format_numbered_list(items: Iterable[Any]) -> str:

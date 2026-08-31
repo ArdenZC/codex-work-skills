@@ -5,14 +5,14 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 # 教案生成器
 
-本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS；模型供应商不影响 DOCX 结果。
+本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 V2 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。
 
 ## 任务入口
 
 任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。一次核对课程名称、专业或授课对象、总课时、单次课时和输出目录：
 
 - 信息足够时直接规划，不重复追问；
-- 真正缺少且会影响整门课程的事实时，只进行一次集中确认；
+- 真正缺少且会影响整门课程的关键事实时，只进行一次集中确认；已有会话和附件资料直接采用，不重复索要；
 - 用户允许合理推断后，按项目化教学补齐项目、任务、教学内容、评价和预生成反思；
 - 正式 DOCX 不出现“资料不足、推断、AI、QA、similarity、confidence”等内部说明。
 
@@ -88,7 +88,7 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
 
 使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render smoke 都通过后才交换到正式目录。显式 `--qa-report` 时，外部报告会在其同父目录先 staging，并与输出目录一起提交；任一交换失败都恢复旧输出和旧报告。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。提交成功后，stdout 只报告正式目录中真实存在的 DOCX 路径。Agent 的代表页视觉检查属于提交后的验收；若发现溢出、截断、异常分页或空白页，应重写 V2 内容并使用 `--backup-existing` 重新事务生成。`qa-report.json` 只写报告，不写入 DOCX。
 
-独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染。所有 detector 共用唯一 reuse policy：`narrative_strict`、`terminology_reusable`、`resource_reusable`、`reference_reusable`、`fixed_rubric_reusable` 和 `ignore`。教学方法、必要资源、合法 reference 与 attendance/compliance/habits 固定 rubric 可以记录复用证据但不 hard fail；学情、目标、教学内容、重难点、反思、progression 和 implementation 始终严格。短课程术语豁免不得进入 narrative field。
+独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、intra-lesson coherence、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染。诊断只保留有限片段和稳定 SHA-256，不输出整段用户正文。所有 detector 共用唯一 reuse policy：`narrative_strict`、`terminology_reusable`、`resource_reusable`、`reference_reusable`、`fixed_rubric_reusable` 和 `ignore`。教学方法、必要资源、合法 reference 与 attendance/compliance/habits 固定 rubric 可以记录复用证据但不 hard fail；学情、目标、教学内容、重难点、反思、progression 和 implementation 始终严格。短课程术语豁免不得进入 narrative field。
 
 progression 的 artifact inheritance 和 forward transition 都必须同时通过词面/coherence 证据与 `substantive_anchor` 证据；“设计、操作、分析、检查、流程、实施”等通用动作不能独立作为 anchor。非相邻 `prior_lesson_id` 仍允许；若物理顺序链为 `review`，报告必须置 `requires_agent_review=true` 并列出 from/to/reason/score/declared_prior。Agent 最终验收不能静默忽略 physical sequence review；无法解释实际授课顺序时必须重写 progression。
 
@@ -123,6 +123,7 @@ python3 scripts/generate_lesson_plans.py \
 ```text
 scripts/validate_template.py --json
 scripts/validate_output.py --input-json tasks.json --output-dir output --render
+scripts/validate_visual_inspection.py --output-dir output --qa-report output/qa-report.json --evidence output/visual-inspection.json
 ```
 
 跳过参数只影响相应 QA 层，并必须在报告中明确为 `skipped`；输入契约、内容质量和路径保护不能被跳过。临时 JSON、PDF、图片和 candidate 目录在任务结束后清理，不提交生成 DOCX。

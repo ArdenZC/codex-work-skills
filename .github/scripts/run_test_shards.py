@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import ntpath
 import subprocess
 import sys
 import tempfile
@@ -118,6 +119,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "release": SuiteSpec("release", False, "module", _module_count("tests.test_template_package_release"), "repository-validator"),
         "classifier": SuiteSpec("classifier", True, "module", _module_count("tests.test_ci_change_classifier")),
         "runner": SuiteSpec("runner", True, "module", _module_count("tests.test_run_test_shards")),
+        "hardening": SuiteSpec("hardening", True, "module", _module_count("tests.test_lesson_skill_hardening")),
         # The two skill directories intentionally contain the same generic
         # ``test_package`` module name.  They are therefore discovered in
         # separate worker processes; keeping their tiny expected counts here
@@ -129,7 +131,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 ALIASES = {
     "fast": ("lesson-content", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -167,11 +169,34 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return ("tests.test_ci_change_classifier",)
     if name == "runner":
         return ("tests.test_run_test_shards",)
+    if name == "hardening":
+        return ("tests.test_lesson_skill_hardening",)
     return ()
 
 
 def _suite_count(name: str, specs: dict[str, SuiteSpec]) -> int:
     return specs[name].count
+
+
+def _resolve_python_command(requested: str | Path) -> str:
+    """Resolve bare commands through PATH and explicit paths literally.
+
+    A missing interpreter is an immediate error; silently falling back to the
+    parent interpreter can make a shard appear green under the wrong runtime.
+    """
+
+    value = str(requested)
+    explicit = Path(value).is_absolute() or ntpath.isabs(value) or value.startswith((".", "~")) or "/" in value or "\\" in value
+    if explicit:
+        candidate = Path(value).expanduser().resolve(strict=False)
+    else:
+        found = shutil.which(value)
+        if not found:
+            raise FileNotFoundError(f"requested interpreter not found on PATH: {value}")
+        candidate = Path(found).expanduser().resolve(strict=False)
+    if not candidate.is_file():
+        raise FileNotFoundError(f"requested interpreter does not exist: {candidate}")
+    return str(candidate)
 
 
 def _discover_count(name: str) -> int:
@@ -397,7 +422,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         return _run_parent(
             names,
-            python=str(Path(args.python).resolve()),
+            python=_resolve_python_command(args.python),
             root=artifact_root,
             parallel=args.parallel,
             allow_office_parallel=args.allow_office_parallel,

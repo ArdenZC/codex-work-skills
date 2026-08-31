@@ -19,6 +19,26 @@ def _absolute_lexical(path: Path) -> Path:
     return Path(os.path.abspath(os.path.expanduser(str(path))))
 
 
+def _alias_forms(path: Path) -> set[str]:
+    """Return lexical/real and Unicode-normalized spellings without probing."""
+
+    lexical = _absolute_lexical(path)
+    values = {str(lexical), os.path.realpath(str(lexical))}
+    # realpath can fail closed only by returning its lexical input; retain the
+    # short-name expansion as an independent Windows alias where available.
+    values.add(str(_long_existing_ancestor(lexical)))
+    normalized: set[str] = set()
+    for value in values:
+        normalized.update(
+            {
+                os.path.normpath(value),
+                os.path.normpath(unicodedata.normalize("NFC", value)),
+                os.path.normpath(unicodedata.normalize("NFD", value)),
+            }
+        )
+    return normalized
+
+
 def _long_existing_ancestor(path: Path) -> Path:
     """Expand an existing Windows ancestor, including short 8.3 aliases."""
 
@@ -79,7 +99,11 @@ def filesystem_case_sensitive(path: Path | str) -> bool:
     temp_root = _absolute_lexical(Path(tempfile.gettempdir()))
     try:
         temp_device = os.stat(temp_root).st_dev
-        independent = not _lexical_overlap(temp_root, parent)
+        # Use only non-probing aliases here.  Calling paths_overlap would
+        # recurse into filesystem_case_sensitive while deciding whether a
+        # probe is safe, and could mutate a protected tree through a mocked or
+        # aliased temp path.
+        independent = not _alias_overlap(temp_root, parent, casefold=True)
     except OSError:
         temp_device = None
         independent = False
@@ -118,23 +142,21 @@ def _lexical_overlap(left: Path, right: Path) -> bool:
     )
 
 
+def _alias_overlap(left: Path, right: Path, *, casefold: bool = False) -> bool:
+    left_values, right_values = _alias_forms(left), _alias_forms(right)
+    if casefold:
+        left_values |= {value.casefold() for value in left_values}
+        right_values |= {value.casefold() for value in right_values}
+    for left_value in left_values:
+        for right_value in right_values:
+            if left_value == right_value or _contains(left_value, right_value) or _contains(right_value, left_value):
+                return True
+    return False
+
+
 def _variants(path: Path) -> set[str]:
     lexical = _absolute_lexical(path)
-    path_values = {
-        str(lexical),
-        str(lexical.resolve(strict=False)),
-        str(_long_existing_ancestor(lexical)),
-    }
-    if sys.platform == "darwin":
-        path_values.update(
-            normalized
-            for value in tuple(path_values)
-            for normalized in (
-                unicodedata.normalize("NFC", value),
-                unicodedata.normalize("NFD", value),
-            )
-        )
-    values = set(path_values)
+    values = _alias_forms(path)
     case_insensitive = IS_WINDOWS or (
         sys.platform == "darwin" and not filesystem_case_sensitive(lexical)
     )

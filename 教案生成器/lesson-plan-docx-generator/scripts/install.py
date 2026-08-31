@@ -1,12 +1,26 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import os
 import shutil
-from datetime import datetime
+import tempfile
+import uuid
 from pathlib import Path
+
+from path_safety import paths_overlap
 
 
 SKILL_NAME = "lesson-plan-docx-generator"
+REQUIRED_RELATIVE_FILES = (
+    Path("SKILL.md"),
+    Path("通用提示词.md"),
+    Path("AGENTS.md"),
+    Path("requirements.txt"),
+    Path("scripts/generate_lesson_plans.py"),
+    Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
+    Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
+)
 
 
 def default_skills_dir() -> Path:
@@ -18,6 +32,133 @@ def ignore_patterns(_dir: str, names: list[str]) -> set[str]:
     return {name for name in names if name in ignored or name.endswith(".pyc")}
 
 
+def _absolute(path: Path | str) -> Path:
+    return Path(path).expanduser().absolute()
+
+
+def _exists(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def _unique_backup_path(target_root: Path) -> Path:
+    while True:
+        candidate = target_root / f"{SKILL_NAME}_backup_{uuid.uuid4().hex}"
+        if not _exists(candidate):
+            return candidate
+
+
+def _required_source_files(source: Path) -> list[Path]:
+    missing = [source / relative for relative in REQUIRED_RELATIVE_FILES if not (source / relative).is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Lesson Skill source is incomplete; missing required files: "
+            + ", ".join(str(path) for path in missing)
+        )
+    return [source / relative for relative in REQUIRED_RELATIVE_FILES]
+
+
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verify_stage(source: Path, stage: Path) -> None:
+    for relative in REQUIRED_RELATIVE_FILES:
+        source_file, staged_file = source / relative, stage / relative
+        if not staged_file.is_file():
+            raise RuntimeError(f"staged installation is missing required file: {relative}")
+        if _sha256(source_file) != _sha256(staged_file):
+            raise RuntimeError(f"staged installation integrity check failed: {relative}")
+
+
+def _preflight(source: Path, target_root: Path, target: Path, replace: bool) -> None:
+    """Perform every rejecting check before the first filesystem mutation."""
+
+    if not source.is_dir() or source.is_symlink():
+        raise FileNotFoundError(f"Lesson Skill source directory not found: {source}")
+    _required_source_files(source)
+    if paths_overlap(source, target_root) or paths_overlap(source, target):
+        raise ValueError(f"Source and installation target must not overlap: {source} / {target_root}")
+    if _exists(target):
+        if target.is_dir() and target.is_symlink():
+            raise ValueError(f"Refusing to install through a symlink target: {target}")
+        if not replace:
+            raise FileExistsError(
+                f"Target already exists: {target}. Re-run with --replace to back it up and replace it."
+            )
+    if target_root.exists() and not target_root.is_dir():
+        raise NotADirectoryError(f"Installation root is not a directory: {target_root}")
+
+
+def _remove_stage(stage: Path | None) -> None:
+    if stage is None:
+        return
+    try:
+        if stage.is_dir() or stage.is_symlink():
+            shutil.rmtree(stage)
+        elif stage.exists():
+            stage.unlink()
+    except OSError:
+        pass
+
+
+def install(source: Path, target_root: Path, *, replace: bool = False, dry_run: bool = False) -> Path:
+    source = _absolute(source)
+    target_root = _absolute(target_root)
+    target = target_root / SKILL_NAME
+    _preflight(source, target_root, target, replace)
+    backup = _unique_backup_path(target_root) if _exists(target) else None
+    print(f"source={source}")
+    print(f"target={target}")
+    if backup is not None:
+        print(f"backup={backup}")
+    if dry_run:
+        print("dry-run=yes (no filesystem mutation)")
+        return target
+
+    target_root.mkdir(parents=True, exist_ok=True)
+    stage: Path | None = None
+    moved_backup = False
+    try:
+        stage = Path(tempfile.mkdtemp(prefix=f".{SKILL_NAME}.stage-", dir=str(target_root)))
+        stage.rmdir()
+        shutil.copytree(source, stage, ignore=ignore_patterns, symlinks=False)
+        _verify_stage(source, stage)
+        if backup is not None:
+            os.replace(str(target), str(backup))
+            moved_backup = True
+        try:
+            os.replace(str(stage), str(target))
+            stage = None
+        except Exception as commit_error:
+            rollback_error: Exception | None = None
+            if moved_backup:
+                try:
+                    if _exists(target):
+                        if target.is_dir() and not target.is_symlink():
+                            shutil.rmtree(target)
+                        else:
+                            target.unlink()
+                    os.replace(str(backup), str(target))
+                    moved_backup = False
+                except Exception as exc:  # pragma: no cover - filesystem-specific
+                    rollback_error = exc
+            detail = f"installation commit failed: {commit_error}"
+            detail += (
+                f"; rollback failed: {rollback_error}; backup retained at {backup}"
+                if rollback_error is not None
+                else "; previous installation restored"
+            )
+            raise RuntimeError(detail) from commit_error
+        print(f"installed={target}")
+        return target
+    finally:
+        _remove_stage(stage)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Install lesson-plan-docx-generator into the local Codex skills directory.")
     parser.add_argument("--skills-dir", default=str(default_skills_dir()), help="Target Codex skills directory. Defaults to ~/.codex/skills.")
@@ -26,24 +167,7 @@ def main() -> None:
     args = parser.parse_args()
 
     source = Path(__file__).resolve().parents[1]
-    target_root = Path(args.skills_dir).expanduser().resolve()
-    target = target_root / SKILL_NAME
-
-    print(f"source={source}")
-    print(f"target={target}")
-    if args.dry_run:
-        return
-
-    if target.exists():
-        if not args.replace:
-            raise FileExistsError(f"Target already exists: {target}. Re-run with --replace to back it up and replace it.")
-        backup = target_root / f"{SKILL_NAME}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        shutil.move(str(target), str(backup))
-        print(f"backup={backup}")
-
-    target_root.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, target, ignore=ignore_patterns)
-    print(f"installed={target}")
+    install(source, Path(args.skills_dir), replace=args.replace, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
