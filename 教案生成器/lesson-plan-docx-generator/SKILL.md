@@ -9,10 +9,23 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 ## 任务入口
 
-任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。一次核对课程名称、专业或授课对象、总课时、单次课时和输出目录：
+任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。正式开始课程规划前，必须把当前理解整理成一次集中的课程基本信息确认；即使信息已经从会话或附件中推断出来，也必须展示并请求用户确认一次。
 
-- 信息足够时直接规划，不重复追问；
-- 真正缺少且会影响整门课程的关键事实时，只进行一次集中确认；已有会话和附件资料直接采用，不重复索要；
+一次确认必须同时包含以下四个核心字段：
+
+```text
+course_name  课程名称
+major        专业
+audience     授课对象
+total_hours  总课时 / 总学时
+```
+
+确认摘要同时显示 `default_hours=2`（单课课时：默认 2 学时），但默认值不是另一个必答问题。只有用户明确指定“每课 4 学时”“部分课次 1 学时”或按章节实际拆分时，才覆盖默认值；现有正整数课时合同不变。摘要还必须显示教材：用户已提供文件或书名时直接列出；未提供时写“未指定（如有指定教材请告诉我；没有也可以继续）”。教材是 recommended, not required，缺失不能阻断生成。
+
+用户完成这一次课程基本信息确认后，Agent 自主完成资料检索、课程级 outline、Content V2、QA 和 DOCX。不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”；默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
+
+资料检索优先使用用户提供的教材/课程资料和用户指定教材；有联网能力时再查找出版社或学校官方页、标准/指南、官方技术文档和可核实公开文献。只给出书名时只能写入真实核实的作者、出版社、ISBN、版次或年份；网络不可用时正常继续，不因无法联网中断生成。
+
 - 用户允许合理推断后，按项目化教学补齐项目、任务、教学内容、评价和预生成反思；
 - 正式 DOCX 不出现“资料不足、推断、AI、QA、similarity、confidence”等内部说明。
 
@@ -62,7 +75,9 @@ after_class_improvement
 
 评价必须显式提供 85–96 的 `evaluation.score`，使用 0.5 分步进，并提供 canonical 13 个 criterion IDs 的逐课 `remarks`。每条 remark 必须有实质内容；所有 Content V2 模板版本统一执行不超过 48 个有意义字符的合同上限，manifest 只能进一步收紧，超限必须失败而不能截断。未指定分数时建议自然集中在 88–94，但不得全为 90、任意短周期循环、严格递增或递减。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
 
-`references` 使用 `{text, source_kind, evidence?}` 对象；`source_kind` 为 `provided`、`generic` 或 `verified_public`。没有用户材料时使用泛化资料名称，不能虚构教材、作者、出版社、ISBN、标准编号、年份、版次或文件编号；`generic` 不得伪装为具体书名，`verified_public` 必须提供 URL 或可定位的官方来源证据，`provided` 必须提供真实用户资料标识。没有真实附件或资料标识时不得自报 `provided`，只能使用 `generic` 或完成公开来源验证后使用 `verified_public`。信任边界为 `contract_and_locator_only`：Python 只验证 evidence 存在与 locator 形式，不证明用户真的上传了文件，也不证明公开资料真实；Agent 必须在写 JSON 前完成资料核对。evidence 只用于输入和 QA，DOCX 只写 `text`。
+`references` 使用 `{text, source_kind, evidence?}` 对象；`references` 只表示可以阅读、查阅、引用或作为课程依据的文献/文档来源，包括教材、课程/教学标准、国家/行业/职业标准、指南/规范、论文、公开文献、官方技术文档、官方产品手册和用户提供的正式教学文档。`resources` 表示实施教学时使用的工具、设备、环境和材料，例如 MySQL Workbench、数据库服务器、PPT、投影仪、护理模型、虚拟机、实训任务单和案例数据集；这些默认不能为了凑数写入 `references`。同一个课程级来源可放入内部 `course_reference_pool`，再按课选择真正相关的引用，不必为了课次差异虚构资料。
+
+`source_kind` 为 `provided`、`generic` 或 `verified_public`。没有用户材料时使用泛化的文献/文档类名称，不能虚构教材、作者、出版社、ISBN、标准编号、年份、版次或文件编号；`generic` 不得伪装为具体书名，`verified_public` 必须提供 URL 或可定位的官方来源证据，`provided` 必须提供真实用户资料标识。没有真实附件或资料标识时不得自报 `provided`，只能使用 `generic` 或完成公开来源验证后使用 `verified_public`。同一 reference 跨课重复完全允许，属于 `reference_reusable`，不参与任何课程反重复 hard-fail；同一课内部的 exact duplicate reference 仍必须 fail-fast，不能静默删除。禁止为了降低课程重复率编造不同教材、作者、ISBN、出版社、标准编号或公开文献；同一教材重复 18 次优于编造 18 本教材。信任边界为 `contract_and_locator_only`：Python 只验证 evidence 存在与 locator 形式，不证明用户真的上传了文件，也不证明公开资料真实；Agent 必须在写 JSON 前完成资料核对。evidence 只用于输入和 QA，DOCX 只写 `text`。
 
 完整可运行示例见 `examples/tasks.example.json`，字段说明见 `docs/content-contract-v2.md`，机器约束见 `schemas/lesson-plan-input.schema.json`。
 
@@ -73,7 +88,7 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
 ## 生成与 QA 顺序
 
 ```text
-资料读取与一次性核对
+读取资料 → 一次性课程基本信息确认
   -> 课程 outline
   -> Content V2 JSON
   -> Input Contract QA
@@ -86,9 +101,9 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
   -> Agent representative-page visual inspection
 ```
 
-使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render smoke 都通过后才交换到正式目录。显式 `--qa-report` 时，外部报告会在其同父目录先 staging，并与输出目录一起提交；任一交换失败都恢复旧输出和旧报告。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。提交成功后，stdout 只报告正式目录中真实存在的 DOCX 路径。Agent 的代表页视觉检查属于提交后的验收；若发现溢出、截断、异常分页或空白页，应重写 V2 内容并使用 `--backup-existing` 重新事务生成。`qa-report.json` 只写报告，不写入 DOCX。
+使用 `scripts/generate_lesson_plans.py` 生成。所有 DOCX 先写入与正式目录同父目录的 candidate；Content QA、模板 QA、输出结构/书签/格式保护、内容保真 QA 和请求的 render smoke 都通过后才交换到正式目录。显式 `--qa-report` 时，外部报告会在其同父目录先 staging，并与输出目录一起提交；任一交换失败都恢复旧输出和旧报告。非空正式目录需要 `--backup-existing`；交换失败必须恢复旧目录。提交成功后，stdout 只报告正式目录中真实存在的 DOCX 路径。课程基本信息确认后不再为生成 DOCX 追加确认；Agent 的代表页视觉检查属于提交后的验收；若发现溢出、截断、异常分页或空白页，应重写 V2 内容并使用 `--backup-existing` 重新事务生成。`qa-report.json` 只写报告，不写入 DOCX。
 
-独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、intra-lesson coherence、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染。`non_it_contamination` 及其 scope 元数据只检测“输入没有但模板或生成器注入输出”的 IT 默认词，不是通用课程分类器。诊断只保留有限片段和稳定 SHA-256，不输出整段用户正文。所有 detector 共用唯一 reuse policy：`narrative_strict`、`terminology_reusable`、`resource_reusable`、`reference_reusable`、`fixed_rubric_reusable` 和 `ignore`。教学方法、必要资源、合法 reference 与 attendance/compliance/habits 固定 rubric 可以记录复用证据但不 hard fail；学情、目标、教学内容、重难点、反思、progression 和 implementation 始终严格。短课程术语豁免不得进入 narrative field。
+独立 `scripts/content_quality.py` 必须在本地确定性运行，不调用在线 API、embedding 或模型服务。它检查 `adjacent_exact_duplicates`、`adjacent_similarity_pairs`、`field_similarity_pairs`、`whole_lesson_similarity_pairs`、`implementation_similarity_pairs`、逐项重复、实体屏蔽后的 structural similarity、重复长句、旧套话、完整性、intra-lesson coherence、progression coherence、score pattern、13 项评价备注 density 和非 IT 污染。`non_it_contamination` 及其 scope 元数据只检测“输入没有但模板或生成器注入输出”的 IT 默认词，不是通用课程分类器。诊断只保留有限片段和稳定 SHA-256，不输出整段用户正文。所有 detector 共用唯一 reuse policy：`narrative_strict`、`terminology_reusable`、`resource_reusable`、`reference_reusable`、`fixed_rubric_reusable` 和 `ignore`。教学方法、必要资源、合法 reference 与 attendance/compliance/habits 固定 rubric 可以记录复用证据但不 hard fail；reference 允许跨课完全重复，但同课内部 exact duplicate 和明显的纯工具/设备 reference 必须 hard-fail；学情、目标、教学内容、重难点、反思、progression 和 implementation 始终严格。短课程术语豁免不得进入 narrative field。不得为了降低课程重复率虚构参考文献。
 
 progression 的 artifact inheritance 和 forward transition 都必须同时通过词面/coherence 证据与 `substantive_anchor` 证据；“设计、操作、分析、检查、流程、实施”等通用动作不能独立作为 anchor。非相邻 `prior_lesson_id` 仍允许；若物理顺序链为 `review`，报告必须置 `requires_agent_review=true` 并列出 from/to/reason/score/declared_prior。Agent 最终验收不能静默忽略 physical sequence review；无法解释实际授课顺序时必须重写 progression。
 

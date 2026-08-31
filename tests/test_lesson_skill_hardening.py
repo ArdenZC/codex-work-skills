@@ -85,6 +85,32 @@ def load_module(path: Path, name: str):
 
 
 class LessonSkillHardeningTests(unittest.TestCase):
+    def test_lesson_intake_and_reference_instruction_contract(self) -> None:
+        skill = (LESSON / "SKILL.md").read_text(encoding="utf-8")
+        prompt = (LESSON / "通用提示词.md").read_text(encoding="utf-8")
+        agents = (LESSON / "AGENTS.md").read_text(encoding="utf-8")
+        openai = (LESSON / "agents" / "openai.yaml").read_text(encoding="utf-8")
+        canonical = "\n".join((skill, prompt, agents, openai))
+
+        for field in ("course_name", "major", "audience", "total_hours"):
+            self.assertIn(field, canonical)
+        self.assertRegex(canonical, r"default_hours\s*=\s*2")
+        self.assertIn("教材", canonical)
+        self.assertIn("recommended, not required", canonical)
+        self.assertRegex(canonical, r"一次(?:性)?(?:.*)确认")
+        self.assertIn("course_reference_pool", canonical)
+        self.assertIn("reference_reusable", canonical)
+        self.assertIn("references", canonical)
+        self.assertIn("resources", canonical)
+
+        for forbidden_second_prompt in ("outline", "输出目录", "是否开始生成 DOCX"):
+            self.assertRegex(
+                canonical,
+                rf"(?:不得再次询问|不再询问)[^\n]*{re.escape(forbidden_second_prompt)}",
+            )
+        self.assertIn("同一课内部", canonical)
+        self.assertIn("禁止为了降低课程重复率编造", canonical)
+
     def test_hardening_import_loader_restores_process_global_state(self) -> None:
         original_path = sys.path[:]
         original_modules = {name: sys.modules.get(name, _MISSING) for name in _LESSON_MODULE_NAMES}

@@ -3,7 +3,7 @@
 This file deliberately builds a deterministic temporary V2 payload from a short
 brief instead of reading one of the committed JSON fixtures. It is synthetic
 acceptance evidence, not a true Agent-authored E2E, and is not part of the
-regular core test shard because it renders 24 DOCX files with LibreOffice.
+regular core test shard because it renders 30 DOCX files with LibreOffice.
 """
 
 from __future__ import annotations
@@ -437,6 +437,15 @@ def synthetic_plan_from_brief(brief: str) -> dict:
             ("项目六 综合项目交付", "完成综合业务报表设计", "综合报表设计", "综合报表成果", "项目验收答辩"),
             ("项目六 综合项目交付", "展示数据库项目并完成答辩", "项目验收答辩", "数据库项目验收包", "课程成果复盘"),
         )
+    elif "会计" in course:
+        specs = (
+            ("项目一 凭证业务准备", "识别原始凭证要素与业务边界", "凭证要素识别", "凭证要素清单", "会计科目判断"),
+            ("项目一 凭证业务准备", "依据业务变化判断会计科目", "会计科目判断", "科目判断分析表", "记账凭证编制"),
+            ("项目二 记账凭证处理", "编制收付转记账凭证", "记账凭证编制", "记账凭证与附件编号表", "凭证审核"),
+            ("项目二 记账凭证处理", "审核凭证并追溯差错", "凭证审核", "凭证审核结果与差错清单", "账簿登记"),
+            ("项目三 账簿登记核算", "登记日记账与明细账", "账簿登记", "日记账明细账登记记录", "账簿核对"),
+            ("项目三 账簿登记核算", "完成账簿核对与成果汇报", "账簿核对", "会计核算成果交付包", "岗位复盘"),
+        )
     else:
         specs = (
             ("项目一 基础护理准备", "完成护理评估与操作准备", "护理评估", "护理评估记录", "基础操作核对"),
@@ -560,7 +569,12 @@ def _export_visual_evidence(output: Path, representative: list[Path], evidence_r
 
 
 def run_case(brief: str, expected_lessons: int) -> dict:
-    label = "database" if "数据库" in brief else "nursing"
+    if "数据库" in brief:
+        label = "database"
+    elif "护理" in brief:
+        label = "nursing"
+    else:
+        label = "accounting"
     with _case_directory(label) as folder:
         evidence_root = folder if os.environ.get("LESSON_V2_SYNTHETIC_EVIDENCE_DIR", "").strip() else None
         source = folder / "brief-derived-input.json"
@@ -631,6 +645,10 @@ def main() -> int:
     )
     run_case(
         "课程：《基础护理技术》\n专业：护理\n总课时：12\n每次：2学时\n没有教材\n允许合理设计",
+        6,
+    )
+    run_case(
+        "课程：《会计凭证与账簿实训》\n专业：大数据与会计\n总课时：12\n每次：2学时\n没有教材\n允许合理设计",
         6,
     )
     return 0

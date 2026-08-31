@@ -4,6 +4,25 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 教案生成器 2.0.1 — 2026-09-01
+
+### 版本关系
+
+```text
+Lesson Skill          2.0.1
+Content Contract      2.0
+Default Word template lesson-plan v1.1.2
+```
+
+### 行为收口
+
+- 任务开始强制一次性确认课程核心信息：课程名称、专业、授课对象和总课时。
+- 单课课时默认 2 学时；教材建议确认但不是阻断字段。
+- 完成一次确认后不再在生成 DOCX 前二次确认，也不询问模板或输出目录。
+- 明确 `references` 是文献/文档来源，`resources` 是教学工具、设备、环境和材料。
+- references 跨课允许完全重复，并退出课程反重复 hard-fail；同课内部重复仍失败。
+- 明确 resources/references 边界，不允许为了降低重复率虚构参考文献。
+
 ## 教案生成器 2.0.0 — 2026-09-01
 
 ### 版本关系

@@ -1,4 +1,5 @@
 interface:
   display_name: "教案生成器"
   short_description: "按项目化模板批量生成中文教案 DOCX"
-  default_prompt: "使用 $lesson-plan-docx-generator 生成符合 Content Contract V2 的项目化中文教案 DOCX；先读取当前会话、已有附件和 SKILL.md，直接采用已提供资料；仅在影响整门课程结果的关键事实仍缺失时集中询问一次，然后先做课程级任务规划并生成完整 JSON。"
+  default_prompt: >-
+    使用 $lesson-plan-docx-generator 生成符合 Content Contract V2 的项目化中文教案 DOCX；先读取当前会话、已有附件和 SKILL.md，正式规划前一次性展示并确认 course_name、major、audience、total_hours，显示 default_hours=2，教材建议确认但不是阻断项；用户确认后直接完成资料检索、课程级 outline、完整 JSON、QA 和 DOCX，不再询问 outline、项目/任务、评分、模板、输出目录或是否开始生成 DOCX；references 只放可阅读/引用的文献或文档，resources 放教学工具/设备/环境/材料，合法 references 可跨课复用，不得为了降重复率虚构书目信息。

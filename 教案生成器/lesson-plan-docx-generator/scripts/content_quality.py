@@ -249,6 +249,30 @@ REFERENCE_EVIDENCE_URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
     r"(?:官方|政府|教育部|国家卫生健康|行业协会).*(?:官网|章节|条款|第[一二三四五六七八九十百0-9]+[章节条]|页|文号|检索|路径)",
 )
+# Keep this boundary deliberately conservative.  A reference is a source that
+# can be read, cited, or used as a course basis; only unmistakable standalone
+# classroom tools/equipment/materials belong in this deny list.  In particular,
+# do not reject technical document titles merely because they contain a product
+# name such as "MySQL".
+REFERENCE_RESOURCE_ONLY_EXACT = frozenset(
+    {
+        "投影仪",
+        "ppt",
+        "课程ppt",
+        "课堂ppt",
+        "教学ppt",
+        "ppt课件",
+        "mysqlworkbench",
+        "血压计",
+        "数据库服务器",
+        "护理模型",
+        "计算机机房",
+        "虚拟机",
+        "实训任务单",
+        "课堂练习材料",
+        "案例数据集",
+    }
+)
 
 BOILERPLATE_PATTERNS = (
     "已具备相关课程基础",
@@ -500,6 +524,17 @@ def _normalize_item(value: Any) -> str:
 
 def _meaningful_length(value: Any) -> int:
     return len(re.sub(r"\s+", "", unicodedata.normalize("NFKC", str(value))).strip())
+
+
+def _reference_looks_like_resource_only(text: Any) -> bool:
+    """Return true only for an unmistakable standalone teaching resource.
+
+    This is intentionally an exact-name check rather than a keyword blocklist:
+    ``MySQL 8.0 Reference Manual`` is a citable document, while ``MySQL
+    Workbench`` is a classroom tool.
+    """
+
+    return _normalize_item(text) in REFERENCE_RESOURCE_ONLY_EXACT
 
 
 def _implementation_items(stage: dict[str, Any], field: str) -> list[Any]:
@@ -2458,8 +2493,11 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
     missing_evidence: list[dict[str, Any]] = []
     invalid_generic: list[dict[str, Any]] = []
     invalid_verified_public: list[dict[str, Any]] = []
+    invalid_resource_only: list[dict[str, Any]] = []
+    same_lesson_duplicates: list[dict[str, Any]] = []
     for lesson_id, lesson in zip(lesson_ids, lessons):
         entries: list[dict[str, Any]] = []
+        seen_references: dict[str, int] = {}
         for index, reference in enumerate(lesson.get("references", []), 1):
             text = _normalize(reference.get("text", ""))
             source_kind = str(reference.get("source_kind", ""))
@@ -2471,6 +2509,19 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
                 "evidence_present": evidence_present,
             }
             entries.append(entry)
+            normalized_item = _normalize_item(text)
+            if normalized_item and normalized_item in seen_references:
+                same_lesson_duplicates.append(
+                    {
+                        "lesson": lesson_id,
+                        "reference": index,
+                        "duplicate_of": seen_references[normalized_item],
+                    }
+                )
+            elif normalized_item:
+                seen_references[normalized_item] = index
+            if _reference_looks_like_resource_only(text):
+                invalid_resource_only.append({"lesson": lesson_id, "reference": index})
             if source_kind in {"provided", "verified_public"} and not evidence_present:
                 missing_evidence.append(
                     {"lesson": lesson_id, "reference": index, "source_kind": source_kind}
@@ -2494,9 +2545,14 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
     return {
         "by_lesson": by_lesson,
         "validation_scope": "contract_and_locator_only",
+        "reuse_policy": REUSE_REFERENCE,
+        "cross_lesson_reuse": "allowed",
+        "same_lesson_duplicate_policy": "hard_fail",
         "missing_evidence": missing_evidence,
         "invalid_generic": invalid_generic,
         "invalid_verified_public": invalid_verified_public,
+        "invalid_resource_only": invalid_resource_only,
+        "same_lesson_duplicates": same_lesson_duplicates,
     }
 
 
@@ -2944,6 +3000,15 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     for item in reference_provenance["invalid_verified_public"]:
         errors.append(
             f"{item['lesson']}.references[{item['reference']}] verified_public evidence is not locatable"
+        )
+    for item in reference_provenance["invalid_resource_only"]:
+        errors.append(
+            f"{item['lesson']}.references[{item['reference']}] is a resource-only item, not a citable document"
+        )
+    for item in reference_provenance["same_lesson_duplicates"]:
+        errors.append(
+            f"{item['lesson']}.references[{item['reference']}] duplicates reference "
+            f"{item['duplicate_of']} within the same lesson"
         )
 
     coverage = {

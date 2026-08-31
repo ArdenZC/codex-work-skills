@@ -2,7 +2,7 @@
 
 一组用于实际教学工作的可复用 AI Skills。目前包含：
 
-- **教案生成器 2.0**：批量生成、整理和校验项目化中文职业教育教案 DOCX；
+- **教案生成器 2.0.1**：批量生成、整理和校验项目化中文职业教育教案 DOCX；
 - **平时成绩记分册生成器**：根据课程成绩单生成并校验平时成绩记分册 XLS。
 
 AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本负责确定性模板写入、格式保护、事务提交和结果 QA。
@@ -15,7 +15,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 
 | Skill | Skill 版本 | 内容合同 | 当前默认模板 | 状态 |
 | --- | --- | --- | --- | --- |
-| [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.0.0** | **Lesson Content Contract 2.0** | `lesson-plan v1.1.2` | 稳定 |
+| [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.0.1** | **Lesson Content Contract 2.0** | `lesson-plan v1.1.2` | 稳定 |
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
 
 **Skill 版本、内容合同版本和模板版本是三个不同概念。** 教案生成器已经进入 **2.0**，但默认 Word 模板仍是经过保护和兼容验证的 `lesson-plan v1.1.2`；升级 Skill 不代表必须把模板版本同步改成 2.0。
@@ -32,7 +32,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 - 增加课程重复 / 相似度、课次递进、单课主语义连通和 implementation 逐项 coherence QA；
 - 教学评价按课生成，显式分数限定为 **85–96**、步长 **0.5**，并提供 13 项逐课评价备注；
 - 支持护理、会计等非 IT 课程，避免固定 IT 场景和模板套话污染；
-- references 增加 `provided / generic / verified_public` 来源合同，避免虚构教材、作者、ISBN 或来源；
+- references 增加 `provided / generic / verified_public` 来源合同，明确 references 是文献/文档、resources 是教学工具/设备/环境/材料；合法 references 可跨课复用，避免虚构教材、作者、ISBN 或来源；
 - 输出采用 candidate → QA → atomic commit，生成失败不会静默覆盖正式文件；
 - 项目内 Full Engine 增加 runtime fingerprint / stale detection，避免新规则配旧 runtime；
 - Windows、macOS CI 均执行 Lesson Content、Lesson Package 和 Hardening 回归。
@@ -46,7 +46,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 | 教案生成器 | 课程名称、专业、授课对象、总课时，以及能力图谱、章节任务拆解、课程标准、教材目录、旧教案或其他课程资料 | 项目化 `.docx` 教案 + QA 报告 |
 | 平时成绩记分册生成器 | `课程成绩单.xls` 或包含该文件的班级目录 | 平时成绩记分册 `.xls` + QA 报告 |
 
-教案资料不完整时可以继续：Agent 会先一次性核对真正影响整门课程的关键缺口，用户允许合理推断后按课程结构完成规划。成绩册不能凭空生成成绩，必须提供真实课程成绩单。
+教案资料不完整时可以继续：Agent 会先读取会话和附件，再一次性确认课程名称、专业、授课对象、总课时（单课默认 2 学时；教材建议确认但不阻断），确认后按课程结构完成规划和生成，不再询问模板、输出目录或是否开始生成 DOCX。成绩册不能凭空生成成绩，必须提供真实课程成绩单。
 
 ## 快速安装
 
@@ -181,7 +181,7 @@ Windows 和 macOS 是当前 CI 与交付验收平台。
 教案生成器目前同时存在三种版本号：
 
 ```text
-Lesson Skill          2.0.0
+Lesson Skill          2.0.1
 Content Contract      2.0
 Word template         lesson-plan v1.1.2
 ```

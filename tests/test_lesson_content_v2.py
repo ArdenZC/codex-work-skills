@@ -185,6 +185,17 @@ def load_fixture(name: str) -> dict:
     return json.loads((ROOT / "tests" / "fixtures" / name).read_text(encoding="utf-8"))
 
 
+def reference_reuse_fixture(references: list[dict[str, str]]) -> dict:
+    """Build the six-lesson reference reuse regression fixture from the real V2 baseline."""
+
+    data = copy.deepcopy(load_fixture("lesson-plan-content-v2-it.json"))
+    data["lessons"] = data["lessons"][:6]
+    data["total_hours"] = 12
+    for lesson in data["lessons"]:
+        lesson["references"] = copy.deepcopy(references)
+    return data
+
+
 def write_payload(folder: Path, payload: dict, name: str = "tasks.json") -> Path:
     source = folder / name
     source.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -1288,6 +1299,127 @@ class LessonContentV2Mixin:
                 report["content_quality"]["reference_provenance"]["validation_scope"],
                 "contract_and_locator_only",
             )
+
+    def test_reference_reuse_fixture_allows_same_source_across_six_lessons(self) -> None:
+        cases = (
+            (
+                "provided",
+                [{"text": "核心教材 A", "source_kind": "provided", "evidence": "用户上传教材：核心教材A.pdf"}],
+            ),
+            (
+                "verified_public",
+                [{"text": "MySQL 8.0 Reference Manual", "source_kind": "verified_public", "evidence": "https://dev.mysql.com/doc/refman/8.0/en/"}],
+            ),
+            (
+                "generic",
+                [{"text": "数据库课程标准相关章节", "source_kind": "generic"}],
+            ),
+            (
+                "provided-and-generic",
+                [
+                    {"text": "核心教材 A", "source_kind": "provided", "evidence": "用户上传教材：核心教材A.pdf"},
+                    {"text": "课程标准 B 相关章节", "source_kind": "generic"},
+                ],
+            ),
+        )
+        for label, references in cases:
+            with self.subTest(reference_kind=label):
+                report = assess_content_quality(reference_reuse_fixture(references))
+                self.assertEqual(report["status"], "passed", report)
+                provenance = report["reference_provenance"]
+                self.assertEqual(provenance["reuse_policy"], "reference_reusable")
+                self.assertEqual(provenance["cross_lesson_reuse"], "allowed")
+                self.assertEqual(provenance["same_lesson_duplicates"], [])
+                self.assertEqual(provenance["invalid_resource_only"], [])
+                self.assertFalse(any("references" in error for error in report["errors"]), report)
+
+    def test_reference_reuse_exemption_does_not_leak_into_narrative_or_implementation(self) -> None:
+        base = reference_reuse_fixture(
+            [{"text": "核心教材 A", "source_kind": "provided", "evidence": "用户上传教材：核心教材A.pdf"}]
+        )
+        cases = (
+            ("teaching_content", lambda lesson: lesson["teaching_content"].__setitem__(0, "相同教学内容重复回归样本")),
+            (
+                "teacher_actions",
+                lambda lesson: lesson["implementation"][3]["teacher_actions"].__setitem__(0, "相同教师动作重复回归样本"),
+            ),
+            (
+                "student_actions",
+                lambda lesson: lesson["implementation"][3]["student_actions"].__setitem__(0, "相同学生动作重复回归样本"),
+            ),
+            ("reflection", lambda lesson: lesson["reflection"].__setitem__("summary", "相同反思摘要重复回归样本")),
+        )
+        for field, mutate in cases:
+            with self.subTest(field=field):
+                data = copy.deepcopy(base)
+                for lesson in data["lessons"]:
+                    mutate(lesson)
+                report = assess_content_quality(data)
+                self.assertEqual(report["status"], "failed", report)
+                duplicate_fields = {
+                    item["field"]
+                    for item in (
+                        report["exact_duplicates"]
+                        + report["item_duplicates"]
+                        + report["adjacent_item_duplicates"]
+                        + report["frequency_item_duplicates"]
+                        + report["implementation_duplicates"]
+                    )
+                }
+                self.assertTrue(any(field in item for item in duplicate_fields), duplicate_fields)
+                self.assertTrue(any(field in error for error in report["errors"]), report["errors"])
+                self.assertFalse(any("references" in error for error in report["errors"]), report)
+
+    def test_reference_source_and_resource_boundary_is_conservative(self) -> None:
+        base = load_fixture("lesson-plan-content-v2-it.json")
+        resource_only = ("投影仪", "PPT", "MySQL Workbench", "血压计", "数据库服务器", "护理模型", "计算机机房")
+        for text in resource_only:
+            with self.subTest(resource=text):
+                data = copy.deepcopy(base)
+                data["lessons"][0]["references"] = [{"text": text, "source_kind": "generic"}]
+                report = assess_content_quality(data)
+                self.assertEqual(report["status"], "failed", report)
+                self.assertEqual(report["reference_provenance"]["invalid_resource_only"], [{"lesson": "L01", "reference": 1}])
+                self.assertTrue(any("resource-only" in error for error in report["errors"]), report["errors"])
+
+        document_reference = copy.deepcopy(base)
+        document_reference["lessons"][0]["references"] = [
+            {
+                "text": "MySQL 8.0 Reference Manual",
+                "source_kind": "verified_public",
+                "evidence": "https://dev.mysql.com/doc/refman/8.0/en/",
+            }
+        ]
+        document_report = assess_content_quality(document_reference)
+        self.assertEqual(document_report["status"], "passed", document_report)
+        self.assertEqual(document_report["reference_provenance"]["invalid_resource_only"], [])
+
+        provided = copy.deepcopy(base)
+        provided["lessons"][0]["references"] = [
+            {"text": "用户上传教材", "source_kind": "provided", "evidence": "用户上传：教材.pdf"}
+        ]
+        self.assertEqual(assess_content_quality(provided)["status"], "passed")
+
+        duplicate = copy.deepcopy(base)
+        duplicate["lessons"][0]["references"] = [
+            {"text": "数据库课程标准相关章节", "source_kind": "generic"},
+            {"text": "数据库课程标准相关章节", "source_kind": "generic"},
+        ]
+        duplicate_report = assess_content_quality(duplicate)
+        self.assertEqual(duplicate_report["status"], "failed", duplicate_report)
+        self.assertEqual(
+            duplicate_report["reference_provenance"]["same_lesson_duplicates"],
+            [{"lesson": "L01", "reference": 2, "duplicate_of": 1}],
+        )
+        self.assertTrue(any("within the same lesson" in error for error in duplicate_report["errors"]))
+
+        invented_generic = copy.deepcopy(base)
+        invented_generic["lessons"][0]["references"] = [
+            {"text": "《数据库原理》作者甲，某出版社，2024年第2版 ISBN 978-7-0000-0000-0", "source_kind": "generic"}
+        ]
+        invented_report = assess_content_quality(invented_generic)
+        self.assertEqual(invented_report["status"], "failed", invented_report)
+        self.assertEqual(invented_report["reference_provenance"]["invalid_generic"], [{"lesson": "L01", "reference": 1}])
 
     def test_evaluation_remark_contract_limit_applies_to_all_template_versions(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")

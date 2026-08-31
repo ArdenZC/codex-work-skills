@@ -5,7 +5,8 @@
 执行约束：
 
 - 先读取用户会话、上传资料、能力图谱/任务拆解、课程标准、教材和旧教案；课程级规划先于逐课生成。
-- 一次核对课程名、专业/对象、总课时、单次课时和输出目录。资料不足且用户允许推断时继续，不把推断说明写进 DOCX。
+- 正式规划前必须一次性展示并确认 `course_name`、`major`、`audience`、`total_hours`；摘要固定写 `default_hours=2`（单课课时默认 2 学时），并建议确认教材但不把教材缺失作为阻断。确认后不得再次询问 outline、项目/任务、评分、模板、输出目录或是否开始生成 DOCX；除用户主动改变要求、无法解决的直接冲突或安全/覆盖决策外不再打断。
+- `references` 只放可阅读、查阅、引用或作为课程依据的文献/文档；`resources` 放教学工具、设备、环境和材料。课程级 reference pool 中的合法来源可跨课复用，但同课内部重复 reference 和纯工具/设备名作为 reference 必须失败；禁止为了降重复率虚构书目信息或公开文献。
 - 生成严格的 `content_contract_version: "2.0"` JSON。旧 sparse input（只含 task/hours/flows 等）不得用于生产生成。
 - 所有正文、9 个实施阶段、逐课评价备注和三段反思由 JSON 提供；Python 只格式化、映射和校验，不创作正文、不截断、不使用旧默认套话。
 - 运行 Content QA、模板 QA、输出保真 QA，并在可用时运行 Windows/macOS 本地 render smoke；正式目录只接受通过 QA 的 candidate 原子提交。
