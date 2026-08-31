@@ -43,6 +43,7 @@ def render_docx_directory(output_dir: Path | str, *, timeout: int = 180) -> dict
             "files_checked": 0,
             "page_count": 0,
             "page_counts": {},
+            "page_count_method": "pdf_page_object_regex",
             "errors": [],
         }
     if not files:
@@ -54,6 +55,7 @@ def render_docx_directory(output_dir: Path | str, *, timeout: int = 180) -> dict
             "files_checked": 0,
             "page_count": 0,
             "page_counts": {},
+            "page_count_method": "pdf_page_object_regex",
             "errors": ["no DOCX files were available for rendering"],
         }
 
@@ -106,5 +108,6 @@ def render_docx_directory(output_dir: Path | str, *, timeout: int = 180) -> dict
         "files_checked": len(files),
         "page_count": sum(page_counts.values()),
         "page_counts": page_counts,
+        "page_count_method": "pdf_page_object_regex",
         "errors": errors,
     }

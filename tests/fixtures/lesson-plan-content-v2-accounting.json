@@ -1,0 +1,213 @@
+{
+  "content_contract_version": "2.0",
+  "course_name": "会计凭证与账簿实训",
+  "major": "大数据与会计",
+  "audience": "高职一年级",
+  "default_hours": 2,
+  "total_hours": 12,
+  "lessons": [
+    {
+      "lesson_id": "A01",
+      "unit": "项目一 原始凭证整理",
+      "task": "辨识业务单据并建立原始凭证清单",
+      "hours": 2,
+      "progression": {
+        "prior_lesson_id": null,
+        "prior_learning": "能读取企业采购、销售和费用报销的基本业务叙述",
+        "capability_stage": "认知",
+        "deliverable": "原始凭证清单、单据用途标注和缺失项记录",
+        "next_bridge": "下一课依据原始凭证清单识别会计要素与科目"
+      },
+      "student_analysis": {
+        "base": ["学生见过发票和费用报销单", "能按日期和业务类型整理纸质材料"],
+        "problems": ["容易把业务说明当作原始凭证", "对签章、金额和附件的完整性缺少检查顺序"],
+        "strategies": ["用真实形态的单据包进行分类", "以缺失项记录反推原始凭证审查要点"]
+      },
+      "teaching_content": ["原始凭证的来源与作用", "外来凭证和自制凭证的辨识", "金额、日期、签章与附件的完整性检查"],
+      "goals": {
+        "knowledge": ["说明原始凭证对会计核算的证明作用", "区分外来凭证与自制凭证"],
+        "ability": ["从混合单据包中筛选有效原始凭证", "编制带缺失项说明的凭证清单"],
+        "quality": ["保持对金额和签章的谨慎态度", "养成原始资料不随意涂改的职业习惯"]
+      },
+      "key_point": {"content": ["原始凭证的辨识与分类"], "strategy": ["对照业务叙述、单据形态和签章三组证据判断"]},
+      "difficult_point": {"content": ["发现单据包中不完整或不匹配的证据"], "strategy": ["将每个疑点定位到日期、金额、对方或审批信息"]},
+      "teaching_methods": ["任务驱动法", "实物单据分类法"],
+      "resources": ["模拟企业业务单据包", "原始凭证清单模板", "计算器"],
+      "references": [{"text": "会计基础课程配套原始凭证学习资源", "source_kind": "generic"}],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 10, "modality": "个人预习", "content": ["拍摄或描述生活中见过的一张票据"], "teacher_actions": ["发布单据特征观察提示"], "student_actions": ["标出票据上的日期、金额和签章"], "objective": "激活对原始凭证外观特征的经验"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "情境判断", "content": ["出纳交来一包待处理单据的工作情境"], "teacher_actions": ["展示混入通知、合同和票据的材料包"], "student_actions": ["提出哪些材料能支持记账的初步判断"], "objective": "明确筛选原始凭证的任务边界"},
+        {"id": "operation_demonstration", "label": "方法示范", "minutes": 20, "modality": "对照示范", "content": ["一张采购发票的用途判断和完整性检查"], "teacher_actions": ["按业务来源、凭证类型、必备要素逐层示范"], "student_actions": ["跟随示例在检查表上留下判断证据"], "objective": "建立可重复执行的单据辨识顺序"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "分组分类", "content": ["对十二张业务材料进行取舍与编号"], "teacher_actions": ["只对学生的争议单据追问业务证据"], "student_actions": ["将有效凭证归类并在清单中记录用途"], "objective": "产出可追溯的原始凭证初选结果"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "异常诊断", "content": ["金额涂改与缺少签章的双重疑点"], "teacher_actions": ["补充一张信息冲突的报销单"], "student_actions": ["写出退回补正或暂缓处理的理由"], "objective": "区分类型判断与合规性疑点"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "独立整理", "content": ["个人完成剩余单据的清单录入"], "teacher_actions": ["检查编号连续性和缺失项描述"], "student_actions": ["提交按业务类型排序的凭证清单"], "objective": "巩固从单据辨识到清单交付的完整链条"},
+        {"id": "peer_review", "label": "同伴互评", "minutes": 5, "modality": "交叉核对", "content": ["抽查两张有争议的凭证"], "teacher_actions": ["要求评审者引用具体单据要素"], "student_actions": ["为保留或退回结论补充一条证据"], "objective": "用证据而非印象说明凭证判断"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "清单回收", "content": ["归纳来源、类型、要素和疑点四步检查法"], "teacher_actions": ["将常见错误定位到检查步骤"], "student_actions": ["在清单末尾写下个人易错环节"], "objective": "形成下一课可直接调用的凭证清单"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 15, "modality": "成果修订", "content": ["根据互评意见补齐缺失项和用途说明"], "teacher_actions": ["收集争议凭证作为下课科目判断素材"], "student_actions": ["上传修订版原始凭证清单"], "objective": "确保凭证清单能支持后续会计要素分析"}
+      ],
+      "evaluation": {
+        "score": 89,
+        "remarks": {
+          "attendance": "出勤完整且准时",
+          "participation": "主动辨识争议单据",
+          "online_learning": "预习标注票据要素准确",
+          "discussion": "能引用单据特征说明取舍",
+          "homework": "修订后的凭证清单完整",
+          "practice": "分类结果与业务来源一致",
+          "presentation": "对缺失项的口头说明清晰",
+          "improvement": "采纳互评意见补齐证据",
+          "attention": "单据编号与清单顺序对应",
+          "values": "争议处理时能倾听对方依据",
+          "compliance": "遵守资料保密与保管要求",
+          "habits": "保持金额和日期复核习惯",
+          "ethics": "对票据疑点如实标注不掩盖"
+        }
+      },
+      "reflection": {
+        "summary": "单据混合包迫使学生用业务证据做取舍，能暴露只凭外观分类的问题。",
+        "innovation": "把缺失项记录作为可见产出，让审查思维在首课就进入实训。",
+        "improvement": "下次增加两张业务真实但要素缺失的单据，检验学生能否区分真实性与完整性。"
+      }
+    },
+    {
+      "lesson_id": "A02",
+      "unit": "项目二 会计要素判断",
+      "task": "解析原始凭证并选择会计科目",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "A01", "prior_learning": "承接原始凭证清单中的业务用途和缺失项标注", "capability_stage": "理解", "deliverable": "会计要素分析表、科目选择理由和借贷方向草案", "next_bridge": "下一课使用会计要素分析表编制记账凭证"},
+      "student_analysis": {"base": ["已能辨识原始凭证的业务来源", "知道资产、负债和所有者权益的基本含义"], "problems": ["会计要素与科目名称容易混淆", "借贷方向常被机械记忆"], "strategies": ["先判断业务对要素的增减再选科目", "用资金来源与去向图解释借贷方向"]},
+      "teaching_content": ["经济业务对会计要素的影响", "会计科目的对象和层级", "借贷记账法下的增减方向"],
+      "goals": {"knowledge": ["解释会计要素、科目和账户的关系", "说明主要科目的借贷增减规则"], "ability": ["从原始凭证提取涉及的会计要素", "为常见业务选择科目并写出方向"], "quality": ["选择科目时保留推理依据", "面对歧义主动查询科目用途"]},
+      "key_point": {"content": ["业务变化、会计要素与科目的对应"], "strategy": ["按业务对象、增减方向和科目用途三步定位"]},
+      "difficult_point": {"content": ["不同性质账户的借贷方向"], "strategy": ["用业务前后资源与权益的变化检验方向"]},
+      "teaching_methods": ["案例分析法", "任务驱动法"],
+      "resources": ["原始凭证清单", "会计科目卡", "资金流向图"],
+      "references": [{"text": "会计要素与借贷记账课程学习资源", "source_kind": "generic"}],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 12, "modality": "卡片匹配", "content": ["将六个会计要素与日常业务现象配对"], "teacher_actions": ["提供不含科目名称的业务短句"], "student_actions": ["提交要素判断和一句理由"], "objective": "在课前暴露要素概念的混淆点"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "流向推演", "content": ["从银行存款支付采购款的业务变化"], "teacher_actions": ["隐去科目答案并追问资源去向"], "student_actions": ["用箭头画出资产内部的增减"], "objective": "将科目选择建立在业务变化上"},
+        {"id": "operation_demonstration", "label": "案例解析", "minutes": 20, "modality": "思路外显", "content": ["购入材料并以银行存款支付的科目判断"], "teacher_actions": ["分别写出业务对象、要素变化和借贷方向"], "student_actions": ["在要素分析表上同步填写推理链"], "objective": "掌握从凭证信息到科目方向的过渡"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "案例轮换", "content": ["销售、收款、预付和报销四类业务的科目选择"], "teacher_actions": ["对选择正确但理由空泛的结果继续追问"], "student_actions": ["每组轮换完成一类业务并留下理由"], "objective": "形成可审核的会计要素分析表"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "反例辨析", "content": ["预收货款与销售收入的科目边界"], "teacher_actions": ["对比是否已履行交付义务的两个时点"], "student_actions": ["修正只看现金流入就确认收入的判断"], "objective": "用权责发生事实校验科目选择"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "个人决策", "content": ["独立完成两张原始凭证的要素分析"], "teacher_actions": ["根据置信度标记选择需要讲评的样本"], "student_actions": ["写出科目、方向以及不选其他科目的理由"], "objective": "验证学生能独立完成科目推理"},
+        {"id": "peer_review", "label": "同伴互评", "minutes": 5, "modality": "理由质询", "content": ["只审查科目选择理由而不先看答案"], "teacher_actions": ["规定质询必须指向一个要素变化"], "student_actions": ["回应质询并决定保留或更改方向"], "objective": "提高会计判断的可解释性"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "概念联结", "content": ["从凭证事实到要素、科目和方向的四格链条"], "teacher_actions": ["以一个错误方向反推前端判断漏洞"], "student_actions": ["为个人错题标记是要素、科目还是方向错误"], "objective": "把要素分析表转化为凭证编制依据"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 18, "modality": "错因修订", "content": ["完善科目选择理由并补充错因标签"], "teacher_actions": ["反馈不同错因在下课凭证编制中的风险"], "student_actions": ["提交可用于记账凭证的最终分析表"], "objective": "为下一课借贷分录编制准备可信输入"}
+      ],
+      "evaluation": {"score": 90.5, "remarks": {"attendance": "出勤完整且准时", "participation": "愿意公开展示科目推理", "online_learning": "课前要素配对完成认真", "discussion": "质询能指向业务变化", "homework": "错因标签与修订内容一致", "practice": "科目与借贷方向选择准确", "presentation": "讲解要素到科目的链条完整", "improvement": "能根据反例修正收入判断", "attention": "分析表层次清楚便于复核", "values": "回应同伴质疑时依据具体", "compliance": "遵守资料保密与保管要求", "habits": "保持金额和日期复核习惯", "ethics": "不为迎合答案省略会计判断依据"}},
+      "reflection": {"summary": "先判断要素变化再选科目，显著减少了学生机械背借贷方向的情况。", "innovation": "互评阶段隐藏答案只审理由，使学生必须展示会计判断过程。", "improvement": "下次对预收与收入反例增加时间轴，帮助基础薄弱学生辨认履约时点。"}
+    },
+    {
+      "lesson_id": "A03",
+      "unit": "项目三 记账凭证编制",
+      "task": "编制收付转记账凭证并整理附件",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "A02", "prior_learning": "根据会计要素分析表确认科目、借贷方向和业务金额", "capability_stage": "模仿", "deliverable": "收款、付款和转账记账凭证、附件编号表", "next_bridge": "下一课对记账凭证进行审核并形成凭证审核结果"},
+      "student_analysis": {"base": ["已能为常见业务选择科目方向", "会按原始凭证清单查找附件"], "problems": ["摘要容易照抄原始业务而不简明", "分录正确时仍可能出现凭证类型或附件错位"], "strategies": ["用一句业务结果检验摘要", "把类型、分录、金额和附件分四次复核"]},
+      "teaching_content": ["收款、付款与转账凭证的使用边界", "摘要、科目、金额和附件的填制规范", "记账凭证的编号与更正要求"],
+      "goals": {"knowledge": ["说明三类记账凭证的适用业务", "解释摘要与附件对分录的证据作用"], "ability": ["独立填制一张要素齐全的记账凭证", "按业务顺序整理凭证号码和附件"], "quality": ["填制后主动做借贷平衡检查", "对更正痕迹保持真实与可追溯"]},
+      "key_point": {"content": ["记账凭证要素的完整填制"], "strategy": ["以原始凭证、要素分析表和凭证表头逐项对照"]},
+      "difficult_point": {"content": ["记账凭证类型、摘要和附件之间的一致性"], "strategy": ["先读业务结果，再反查资金流向和附件证据"]},
+      "teaching_methods": ["示范操作法", "差错诊断法"],
+      "resources": ["空白记账凭证", "会计要素分析表", "原始凭证附件包"],
+      "references": [{"text": "记账凭证填制与更正课程资源", "source_kind": "generic"}],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 15, "modality": "凭证找错", "content": ["在一张故意错配附件的付款凭证上圈出疑点"], "teacher_actions": ["提供不给出错误数量的凭证图"], "student_actions": ["提交疑点位置和需要回查的原始证据"], "objective": "建立填制前必须回到原始证据的意识"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 8, "modality": "岗位交接", "content": ["会计主管要求当日业务当日制证"], "teacher_actions": ["交付按时间排序的三笔业务"], "student_actions": ["判断每笔业务应选的凭证类型"], "objective": "明确制证任务的时效与交付要求"},
+        {"id": "operation_demonstration", "label": "操作示范", "minutes": 22, "modality": "分栏演示", "content": ["从报销单到付款凭证的完整填制"], "teacher_actions": ["先填业务日期与摘要，再引入分录和附件编号"], "student_actions": ["用不同颜色关联原始单据与凭证栏目"], "objective": "看清每个凭证栏目的证据来源"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "流水制证", "content": ["分别编制收款、付款和转账凭证"], "teacher_actions": ["按工作台巡回检查摘要与附件关联"], "student_actions": ["每完成一张就做类型、平衡和附件三项自检"], "objective": "在连续业务中稳定保持凭证完整性"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "更正比较", "content": ["划线更正与重新制证的适用情形"], "teacher_actions": ["展示金额错误和摘要错别字两类样本"], "student_actions": ["选择更正方式并说明为何保留痕迹"], "objective": "避免为追求整洁而破坏凭证可追溯性"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "限时制证", "content": ["十分钟内完成一笔临时借款归还业务的制证"], "teacher_actions": ["记录时间压力下仍然出现的复核动作"], "student_actions": ["在提交前完成最后一次借贷平衡与附件核对"], "objective": "检验制证步骤是否已形成稳定习惯"},
+        {"id": "peer_review", "label": "同伴互评", "minutes": 5, "modality": "盲审凭证", "content": ["遮蔽制证人姓名后审查凭证和附件"], "teacher_actions": ["统一用错误位置而不是笼统评语做反馈"], "student_actions": ["在被审凭证上标注一个最高风险点"], "objective": "从审核者视角检验制证成果"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "路径复盘", "content": ["原始凭证、分录、记账凭证和附件的证据链"], "teacher_actions": ["从一个附件错位回溯到制证步骤"], "student_actions": ["为本组凭证列出审核时最应先看的两项"], "objective": "交付可供下课审核的记账凭证包"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 20, "modality": "凭证归档", "content": ["按编号整理修订后凭证与附件"], "teacher_actions": ["公布下课凭证审核的五类错误标签"], "student_actions": ["形成包含更正说明的记账凭证包"], "objective": "保证凭证包的编号、附件和更正痕迹齐全"}
+      ],
+      "evaluation": {"score": 88.5, "remarks": {"attendance": "出勤完整且准时", "participation": "连续制证过程投入稳定", "online_learning": "课前凭证找错定位有依据", "discussion": "更正方式辩论关注留痕", "homework": "凭证归档顺序与附件对应", "practice": "收付转凭证类型选择合理", "presentation": "能说明凭证栏目的证据来源", "improvement": "修订时保留必要更正痕迹", "attention": "凭证与附件编号清晰连续", "values": "盲审反馈能精确到错误位置", "compliance": "遵守资料保密与保管要求", "habits": "保持金额和日期复核习惯", "ethics": "更正凭证时不消除真实差错痕迹"}},
+      "reflection": {"summary": "学生在连续制证中已能维持借贷平衡，但摘要与附件一致性仍是主要失分点。", "innovation": "遮蔽制证人的盲审让学生从表面整洁转向检查证据链和更正痕迹。", "improvement": "下次在示范中增加一张分录正确但凭证类型错误的样本，强化类型选择。"}
+    },
+    {
+      "lesson_id": "A04",
+      "unit": "项目四 凭证审核与纠错",
+      "task": "审核记账凭证并出具差错清单",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "A03", "prior_learning": "使用收付转记账凭证、附件编号表和更正说明开展审核", "capability_stage": "独立", "deliverable": "会计凭证审核结果、差错清单和复核签字记录", "next_bridge": "下一课根据凭证审核结果登记日记账与明细账"},
+      "student_analysis": {"base": ["已完成三类记账凭证的填制", "能将凭证栏目回溯到原始附件"], "problems": ["审核时容易只重新计算金额", "发现错误后差错类型和处理建议表达不清"], "strategies": ["按真实、合法、完整、正确四类标准审查", "差错清单强制填写证据位置和处理责任人"]},
+      "teaching_content": ["记账凭证审核的责任与顺序", "真实性、合法性、完整性和正确性证据", "差错分类、退回处理与复核留痕"],
+      "goals": {"knowledge": ["阐明凭证审核四类标准的证据差异", "说明退回修订和复核签字的责任边界"], "ability": ["按固定顺序审核一组记账凭证", "出具能定位、能整改、能复核的差错清单"], "quality": ["审核时保持独立判断与职业怀疑", "反馈差错时尊重制证人并对事不对人"]},
+      "key_point": {"content": ["凭证审核标准与证据位置的对应"], "strategy": ["每一个差错结论必须同时指向凭证栏目或附件"]},
+      "difficult_point": {"content": ["把形式完整但业务不真实的凭证识别出来"], "strategy": ["从业务时间、对方单位和资金流向交叉验证"]},
+      "teaching_methods": ["差错诊断法", "角色互审法"],
+      "resources": ["待审记账凭证包", "凭证差错清单", "审核印章模拟卡"],
+      "references": [{"text": "记账凭证审核与纠错课程学习资源", "source_kind": "generic"}],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 10, "modality": "标准阅读", "content": ["把四类审核标准各写成一个可观察问题"], "teacher_actions": ["反馈问题是否能用凭证或附件回答"], "student_actions": ["将抽象标准改写为检查句"], "objective": "为课堂审核准备可执行的判断问题"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "责任会话", "content": ["一张已签字凭证仍被发现附件伪造的情境"], "teacher_actions": ["分配制证、审核和记账三个角色"], "student_actions": ["界定各角色应在什么节点发现风险"], "objective": "理解审核不是简单签字而是独立责任"},
+        {"id": "operation_demonstration", "label": "审核示范", "minutes": 18, "modality": "证据标注", "content": ["对一张差旅费凭证执行四类标准审核"], "teacher_actions": ["一边检查一边在差错清单记录位置、标准和建议"], "student_actions": ["判断每个审核动作属于哪类标准"], "objective": "掌握从审核发现到差错记录的规范表达"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 27, "modality": "双人互审", "content": ["两人分别审核对方的记账凭证包"], "teacher_actions": ["观察审核者是否跳过业务真实性直接算平衡"], "student_actions": ["根据四类标准完成差错清单和处理建议"], "objective": "产出完整的凭证审核结果"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "风险升级", "content": ["金额正确但附件时间晚于报销日期的凭证"], "teacher_actions": ["引导学生区分形式错误与真实性风险"], "student_actions": ["评估是退回补件还是上报会计主管"], "objective": "对高风险凭证做出分级处理"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "审核轮岗", "content": ["将复核者从原来凭证包中分离出来再审一次"], "teacher_actions": ["比较初审与复核的差异项"], "student_actions": ["对每个差异项决定维持、撤销或补充证据"], "objective": "验证审核结论的稳定性和可复核性"},
+        {"id": "peer_review", "label": "同伴互评", "minutes": 5, "modality": "清单质检", "content": ["检查差错清单是否同时具备位置、标准和建议"], "teacher_actions": ["只评价清单可执行性而不重复审凭证"], "student_actions": ["将一条含糊评语改成可直接整改的指令"], "objective": "提高差错反馈的清晰度"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "责任闭环", "content": ["发现、记录、退回、修订和复核的凭证纠错链"], "teacher_actions": ["强调复核签字必须发生在修订完成之后"], "student_actions": ["按处理状态给差错清单排序"], "objective": "形成可用于登账的凭证审核结果"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 15, "modality": "闭环跟踪", "content": ["跟踪制证人修订并完成复核签字"], "teacher_actions": ["对未闭环差错单独列出原因"], "student_actions": ["提交差错清单、修订凭证和复核记录"], "objective": "把审核发现真正转化为可登账成果"}
+      ],
+      "evaluation": {"score": 91, "remarks": {"attendance": "出勤完整且准时", "participation": "审核轮岗中敢于提出疑点", "online_learning": "课前审核问题可观察可回答", "discussion": "风险升级理由针对真实性", "homework": "差错闭环材料齐全可追溯", "practice": "四类审核标准应用完整", "presentation": "能定位差错证据与责任节点", "improvement": "将含糊评语改成可整改指令", "attention": "差错清单按状态管理有序", "values": "反馈错误时尊重制证人", "compliance": "遵守资料保密与保管要求", "habits": "保持金额和日期复核习惯", "ethics": "不因同伴关系放弃独立审核结论"}},
+      "reflection": {"summary": "四类标准的顺序化审核使学生不再只关注借贷平衡，真实性疑点数明显增加。", "innovation": "初审与复核的人员分离，让学生看到审核结论也需要被验证而非绝对正确。", "improvement": "下次对真实性风险增加一份相互矛盾的外部证据，训练学生交叉验证。"}
+    },
+    {
+      "lesson_id": "A05",
+      "unit": "项目五 账簿登记与对账",
+      "task": "根据审核凭证登记账簿并完成日终对账",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "A04", "prior_learning": "根据凭证审核结果只接收已复核签字的记账凭证", "capability_stage": "综合", "deliverable": "现金日记账、银行存款日记账、明细账和日终对账表", "next_bridge": "下一课依据账簿与对账表编制试算平衡表并解释异常"},
+      "student_analysis": {"base": ["能确认凭证是否已完成审核闭环", "知道日记账与明细账的基本用途"], "problems": ["连续登记时容易串行或借贷方向写反", "对账不平时往往直接改余额而不追溯凭证"], "strategies": ["采用登一笔、勾一笔、算一次的节奏", "对账差异必须定位到凭证号和账簿行"]},
+      "teaching_content": ["日记账与明细账的登记规则", "凭证号、日期、摘要和余额的贯通", "账证、账账与账实核对的差异定位"],
+      "goals": {"knowledge": ["比较日记账和明细账的登记依据", "阐明账证与账账核对的目的"], "ability": ["连续登记现金、银行存款和往来明细账", "根据对账差异回查凭证与账簿行"], "quality": ["登账过程保持逐笔勾稽习惯", "不通过平账式修改掩盖原始差错"]},
+      "key_point": {"content": ["审核凭证到账簿行的准确迁移"], "strategy": ["以凭证号为主键同时核对日期、摘要、方向和金额"]},
+      "difficult_point": {"content": ["对账不平时快速缩小差错范围"], "strategy": ["先比总额和笔数，再用凭证号定位错行"]},
+      "teaching_methods": ["岗位流程法", "差异追溯法"],
+      "resources": ["已审核记账凭证包", "日记账与明细账账页", "对账表"],
+      "references": [{"text": "账簿登记与对账实训配套资源", "source_kind": "generic"}],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 15, "modality": "账页定位", "content": ["在空白账页上标出日期、凭证号、摘要、借贷与余额栏"], "teacher_actions": ["检查学生是否能解释各栏来源"], "student_actions": ["用箭头将凭证信息与账页栏目配对"], "objective": "提前建立凭证到账页的字段映射"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "日终情境", "content": ["出纳将当日审核凭证交给登账人员"], "teacher_actions": ["设定下班前必须完成对账的时限"], "student_actions": ["清点凭证笔数并确认只接收已签字凭证"], "objective": "明确登账输入的审核状态和数量"},
+        {"id": "operation_demonstration", "label": "登账示范", "minutes": 20, "modality": "逐笔勾稽", "content": ["一张收款凭证同时登记银行存款日记账和应收账款明细账"], "teacher_actions": ["每完成一个账簿行就在凭证上做勾记"], "student_actions": ["核对两个账户的方向、金额和余额计算"], "objective": "掌握一笔凭证同时进入相关账簿的方法"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "连续登记", "content": ["将八张审核凭证登入日记账和三个明细账户"], "teacher_actions": ["监测学生是否在每笔业务后更新余额"], "student_actions": ["按凭证号顺序登记、勾稽并重算余额"], "objective": "产出编号连续且余额可复算的账簿"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "差错注入", "content": ["在一个明细账行中注入借贷方向错误"], "teacher_actions": ["只告知对账不平而不给出错行"], "student_actions": ["通过总额、笔数和凭证号缩小搜索范围"], "objective": "训练不盲目改余额的差错追溯"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "日终对账", "content": ["核对日记账、明细账与审核凭证的当日发生额"], "teacher_actions": ["要求每个差异结论都附凭证号和账簿行号"], "student_actions": ["填写对账表并说明差异是如何被消除的"], "objective": "完成账证和账账核对闭环"},
+        {"id": "peer_review", "label": "同伴互评", "minutes": 5, "modality": "余额抽查", "content": ["从中间一行重新计算同伴账页后续余额"], "teacher_actions": ["指定抽查起点避免只看期末数"], "student_actions": ["记录重算余额与账面余额的差异"], "objective": "以局部重算验证账簿连续性"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "证据链回收", "content": ["审核凭证、账簿行、余额与对账结论的串联"], "teacher_actions": ["演示任一期末余额如何回溯到一组凭证"], "student_actions": ["为对账表中一个数标注证据路径"], "objective": "交付可用于试算平衡的账簿与对账表"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 20, "modality": "差错档案", "content": ["将本课发现的错行、原因和更正证据整理成档"], "teacher_actions": ["按差错来源分为凭证输入错与登记错"], "student_actions": ["提交日终对账表和差错处理记录"], "objective": "为试算平衡异常分析留下可检索经验"}
+      ],
+      "evaluation": {"score": 89.5, "remarks": {"attendance": "出勤完整且准时", "participation": "连续登账中保持勾稽动作", "online_learning": "课前字段映射准确清晰", "discussion": "对账差异分析有缩小范围思路", "homework": "差错档案记录原因与证据", "practice": "账簿行与审核凭证一致", "presentation": "能说明期末余额的回溯路径", "improvement": "对账不平时不再盲目改数", "attention": "账页顺序和勾稽标记规范", "values": "余额抽查反馈包含具体行号", "compliance": "遵守资料保密与保管要求", "habits": "保持金额和日期复核习惯", "ethics": "不通过直改余额掩盖登记差错"}},
+      "reflection": {"summary": "逐笔勾稽节奏使多数学生能维持账页连续，对账差异也能回到凭证号定位。", "innovation": "教师只通知对账不平而不给错行，迫使学生实际使用笔数和总额缩小范围。", "improvement": "下次将一个错误设计为凭证本身已错，防止学生把所有差异都归因于登账。"}
+    },
+    {
+      "lesson_id": "A06",
+      "unit": "项目六 试算平衡与报告",
+      "task": "编制试算平衡表并完成核算成果汇报",
+      "hours": 2,
+      "progression": {"prior_lesson_id": "A05", "prior_learning": "承接日记账、明细账和日终对账表中已核对的发生额与余额", "capability_stage": "优化", "deliverable": "试算平衡表、异常追溯记录和核算成果汇报摘要", "next_bridge": "将试算平衡和异常追溯经验迁移到后续期末结账与报表学习"},
+      "student_analysis": {"base": ["已完成凭证审核、账簿登记和日终对账", "能将账簿余额回溯到凭证号"], "problems": ["常把试算平衡当作全部无错的证明", "汇报时容易堆叠数据而不说明核算风险"], "strategies": ["设置借贷平衡但科目串户的反例", "汇报按结论、证据、异常和建议组织"]},
+      "teaching_content": ["期初、本期发生额与期末余额的试算关系", "借贷不平和平衡下隐藏错误的追溯", "核算成果汇报的结论、证据与改进建议"],
+      "goals": {"knowledge": ["解释试算平衡能发现与不能发现的错误", "说明账簿数据进入核算汇报的证据路径"], "ability": ["根据已对账账簿编制并校验试算平衡表", "对异常差额或串户迹象进行回溯并汇报"], "quality": ["不把数据平衡简化为核算质量通过", "在汇报中如实披露尚未消除的风险"]},
+      "key_point": {"content": ["试算平衡表的编制与勾稽检查"], "strategy": ["将每个合计数反向定位到账户余额和对账表"]},
+      "difficult_point": {"content": ["识别借贷仍平衡但科目串户的错误"], "strategy": ["把账户性质、摘要语义和异常变动幅度结合审查"]},
+      "teaching_methods": ["综合项目法", "异常追溯法"],
+      "resources": ["已对账账簿包", "试算平衡表模板", "核算成果汇报提纲"],
+      "references": [{"text": "试算平衡与会计核算综合学习资源", "source_kind": "generic"}],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 20, "modality": "数据清点", "content": ["汇总各账户期初、借方、贷方和期末数据"], "teacher_actions": ["发布账户清单与对账状态确认要求"], "student_actions": ["标记未完成对账或数据缺失的账户"], "objective": "确保试算平衡输入来自已核对账簿"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "管理汇报", "content": ["会计主管要求回答本期账簿是否具备结账条件"], "teacher_actions": ["设置一个借贷平衡但存在串户的隐藏条件"], "student_actions": ["列出除平衡外还需要的三类证据"], "objective": "把试算平衡放在核算质量判断中"},
+        {"id": "operation_demonstration", "label": "编表示范", "minutes": 18, "modality": "勾稽演示", "content": ["从账户余额列表生成一张试算平衡表"], "teacher_actions": ["边录入边核对期初与期末、借方与贷方合计"], "student_actions": ["在模板上标出每组勾稽关系的来源"], "objective": "掌握试算平衡表的数据录入与自检方法"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 22, "modality": "独立编表", "content": ["完成全部账户的试算平衡表并标识异常"], "teacher_actions": ["对合计不平学生只提供差额特征而不给错账户"], "student_actions": ["完成编表、重算与账户漏项检查"], "objective": "产出勾稽完整的试算平衡表"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 15, "modality": "隐藏错误", "content": ["将一笔费用错记为另一费用科目但保持借贷平衡"], "teacher_actions": ["要求学生结合摘要语义和变动幅度找异常"], "student_actions": ["比较账户性质与业务内容并回查凭证"], "objective": "认识试算平衡对串户错误的局限"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 10, "modality": "异常追溯", "content": ["对一个差额和一个平衡下异常分别建立追溯记录"], "teacher_actions": ["检查追溯路径是否通过账簿行到达凭证"], "student_actions": ["记录异常现象、定位过程、原因和处理结果"], "objective": "完成两类会计异常的证据化追溯"},
+        {"id": "peer_review", "label": "同伴互评", "minutes": 5, "modality": "汇报试讲", "content": ["用三分钟说明一个核算结论和一个剩余风险"], "teacher_actions": ["要求评审者检查结论后是否有可定位证据"], "student_actions": ["删除无法由试算表或追溯记录支持的表述"], "objective": "把核算数据组织为诚实可核查的汇报"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "全程串联", "content": ["原始凭证、科目判断、记账凭证、账簿和试算平衡的成果链"], "teacher_actions": ["回收六课每个成果在下一环节的用途"], "student_actions": ["用一张流程图连接凭证、账簿和汇报证据"], "objective": "建立从业务证据到核算汇报的整体视角"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 25, "modality": "成果封装", "content": ["整理试算表、追溯记录、汇报摘要和个人复盘"], "teacher_actions": ["按证据完整性和风险披露给出终结反馈"], "student_actions": ["提交核算成果包并标记后续结账学习问题"], "objective": "完成可追溯、不隐瞒剩余风险的项目交付"}
+      ],
+      "evaluation": {"score": 92, "remarks": {"attendance": "出勤完整且准时", "participation": "综合编表与追溯全程主动", "online_learning": "课前账户数据清点完整", "discussion": "能说明平衡下仍存在的风险", "homework": "核算成果包证据完整", "practice": "试算平衡勾稽和异常追溯准确", "presentation": "汇报结论、证据和风险层次分明", "improvement": "能删除无证据支持的过度结论", "attention": "项目成果包目录和版本清楚", "values": "互评能聚焦证据与剩余风险", "compliance": "遵守资料保密与保管要求", "habits": "保持金额和日期复核习惯", "ethics": "汇报时如实披露尚未消除的核算风险"}},
+      "reflection": {"summary": "学生能完成试算平衡并追溯不平差额，对平衡下隐藏错误的识别体现出明显差异。", "innovation": "同时设置不平差额和平衡下串户两类异常，避免把试算平衡异化为简单合计。", "improvement": "后续结账课程应继续使用本课追溯记录，检验学生能否将异常分析迁移到期末调整。"}
+    }
+  ]
+}

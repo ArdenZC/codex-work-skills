@@ -660,12 +660,14 @@ def _base_qa_report(
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
+            "page_count_method": "pdf_page_object_regex",
             "errors": [],
         },
         "visual_inspection": {
             "status": "not_executed",
             "reason": "visual inspection is performed by the calling Agent after render smoke",
             "scope": "agent",
+            "evidence_file": "visual-inspection.json",
             "pages_checked": [],
             "errors": [],
         },
@@ -774,6 +776,7 @@ def write_skipped_report(
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
+            "page_count_method": "pdf_page_object_regex",
             "errors": [],
         }
     _write_qa_report(report)

@@ -70,6 +70,12 @@ EVALUATION_REMARK_FIXED_CRITERIA = frozenset({"attendance", "compliance", "habit
 EVALUATION_REMARK_CONTENT_CRITERIA = frozenset(
     {"participation", "discussion", "homework", "practice", "presentation", "improvement"}
 )
+REUSE_NARRATIVE_STRICT = "narrative_strict"
+REUSE_TERMINOLOGY = "terminology_reusable"
+REUSE_RESOURCE = "resource_reusable"
+REUSE_REFERENCE = "reference_reusable"
+REUSE_FIXED_RUBRIC = "fixed_rubric_reusable"
+REUSE_IGNORE = "ignore"
 PROGRESSION_STOPWORDS = (
     "完成",
     "任务",
@@ -85,6 +91,21 @@ PROGRESSION_STOPWORDS = (
     "依据",
     "形成",
     "方案",
+)
+PROGRESSION_GENERIC_ANCHOR_VOCABULARY = frozenset(
+    {
+        *PROGRESSION_STOPWORDS,
+        "设计",
+        "操作",
+        "分析",
+        "检查",
+        "流程",
+        "使用",
+        "开展",
+        "执行",
+        "处理",
+        "实施",
+    }
 )
 ACTION_MARKERS = (
     "分析",
@@ -111,9 +132,112 @@ ACTION_MARKERS = (
     "维护",
     "训练",
     "演示",
+    "说明",
+    "解释",
+    "理解",
+    "掌握",
+    "识别",
+    "阐明",
+    "描述",
+    "区分",
     "检查",
     "核验",
     "编排",
+)
+ENTITY_ACTION_WORDS = frozenset(
+    {
+        *ACTION_MARKERS,
+        "比较",
+        "标注",
+        "定位",
+        "确认",
+        "检验",
+        "证明",
+        "支持",
+        "说明",
+        "复核",
+        "追查",
+        "回看",
+        "保持",
+        "留下",
+        "发现",
+        "拆解",
+        "拆开",
+        "补充",
+        "调整",
+        "联系",
+        "涉及",
+        "接触",
+        "转成",
+        "写入",
+        "安排",
+        "保留",
+        "落实",
+        "对应",
+        "要求",
+        "需要",
+        "可以",
+        "能够",
+        "为什么",
+        "如何",
+        "怎样",
+    }
+)
+ENTITY_NOUN_SUFFIXES = (
+    "数据库",
+    "任务单",
+    "检查表",
+    "记录表",
+    "成果包",
+    "数据集",
+    "清单",
+    "字典",
+    "日志",
+    "矩阵",
+    "报告",
+    "方案",
+    "计划",
+    "策略",
+    "流程",
+    "工具",
+    "模型",
+    "对象",
+    "字段",
+    "类型",
+    "规则",
+    "约束",
+    "视图",
+    "索引",
+    "事务",
+    "权限",
+    "备份",
+    "指标",
+    "样例",
+    "凭证",
+    "账簿",
+    "科目",
+    "账户",
+    "报表",
+    "余额",
+    "差错",
+    "患者",
+    "护理",
+    "血压",
+    "体温",
+    "药物",
+    "皮肤",
+    "风险",
+    "关系",
+    "边界",
+    "证据",
+    "资料",
+    "材料",
+    "系统",
+    "接口",
+    "代码",
+    "资源",
+    "业务",
+    "结果",
 )
 REFERENCE_SPECIFIC_PATTERN = re.compile(
     r"(?:isbn\s*[-:]?\s*[0-9x-]+|gb\s*[/-]?\s*t|标准编号|文件编号|出版社|作者|"
@@ -222,24 +346,35 @@ def _course_terms(lessons: list[dict[str, Any]]) -> set[str]:
     return terms
 
 
+def reuse_policy(field: str) -> str:
+    """Return the single authoritative reuse class for every QA detector."""
+
+    if field in {"course_name", "major", "audience", "stage_id", "rubric_label", "bookmark_name"}:
+        return REUSE_IGNORE
+    if field == "teaching_methods":
+        return REUSE_TERMINOLOGY
+    if field == "resources":
+        return REUSE_RESOURCE
+    if field == "references":
+        return REUSE_REFERENCE
+    if field.startswith("evaluation.remarks."):
+        criterion = field.rsplit(".", 1)[-1]
+        if criterion in EVALUATION_REMARK_FIXED_CRITERIA:
+            return REUSE_FIXED_RUBRIC
+    return REUSE_NARRATIVE_STRICT
+
+
 def _is_allowed_repeated_item(field: str, value: str, course_terms: set[str]) -> bool:
-    """Allow metadata-like reuse while keeping substantive teaching prose strict."""
+    """Apply the shared policy; short-term exemptions never enter narrative fields."""
 
     normalized = _normalize_item(value)
     if not normalized:
         return True
-    if field == "teaching_methods":
-        return True
-    if field == "references":
-        return True
-    if field == "resources":
-        return True
-    if field.startswith("evaluation.remarks."):
-        criterion = field.rsplit(".", 1)[-1]
-        return criterion in EVALUATION_REMARK_FIXED_CRITERIA
-    if len(normalized) <= 8 and any(normalized in term or term in normalized for term in course_terms):
-        return True
-    return False
+    # course_terms remains in the signature for compatibility with callers,
+    # but can only inform reusable categories.  A short course term in a
+    # narrative field is still subject to duplicate and skeleton detection.
+    _ = course_terms
+    return reuse_policy(field) != REUSE_NARRATIVE_STRICT
 
 
 def _sentences(value: Any) -> list[str]:
@@ -296,15 +431,11 @@ def _field_groups(lesson: dict[str, Any]) -> dict[str, str]:
 
 
 def _lesson_narrative(lesson: dict[str, Any]) -> str:
-    values = lesson_content_field_values(lesson)
-    values["progression"] = _joined(
-        {
-            key: lesson["progression"][key]
-            for key in ("prior_learning", "capability_stage", "deliverable", "next_bridge")
-        }
-    )
-    values["reflection"] = _joined(lesson["reflection"])
-    values["evaluation_remarks"] = _joined(lesson["evaluation"]["remarks"])
+    values = {
+        field: value
+        for field, value in _field_groups(lesson).items()
+        if reuse_policy(field) == REUSE_NARRATIVE_STRICT
+    }
     values["implementation"] = "\n".join(
         "\n".join(
             _joined(stage[field_name])
@@ -349,15 +480,51 @@ def _entity_fragments(lesson: dict[str, Any]) -> set[str]:
         str(lesson.get("progression", {}).get("next_bridge", "")),
     ]
     candidates.extend(str(value) for value in lesson.get("resources", []))
+    candidates.extend(str(value) for value in lesson.get("teaching_content", []))
+    candidates.extend(str(value) for value in lesson.get("key_point", {}).get("content", []))
+    candidates.extend(str(value) for value in lesson.get("difficult_point", {}).get("content", []))
+    candidates.extend(str(value) for value in lesson.get("goals", {}).get("knowledge", []))
     fragments: set[str] = set()
+    split_words = sorted(
+        {
+            *ENTITY_ACTION_WORDS,
+            *PROGRESSION_GENERIC_ANCHOR_VOCABULARY,
+            "提交",
+            "完成",
+            "形成",
+            "编写",
+            "整理",
+            "输出",
+            "建立",
+            "制作",
+            "记录",
+            "依据",
+            "针对",
+            "使用",
+            "进入",
+            "围绕",
+            "通过",
+        },
+        key=lambda item: (-len(item), item),
+    )
+    split_pattern = "|".join(re.escape(word) for word in split_words)
     for candidate in candidates:
         normalized = _normalize(candidate)
         for fragment in re.split(
-            r"[，,、。；;：:（）()\[\]【】/\\\s]+|提交|完成|形成|编写|整理|输出|建立|制作|记录|依据|针对|使用|进入|并|以及|和|与|将|按",
+            rf"[，,、。；;：:（）()\[\]【】/\\\s]+|{split_pattern}|并|以及|和|与|将|按",
             normalized,
         ):
-            fragment = _normalize(fragment)
-            if _meaningful_length(fragment) >= 3 and fragment not in PROGRESSION_STOPWORDS:
+            fragment = re.sub(r"^第(?:\d+|[一二三四五六七八九十百]+)课", "", _normalize(fragment))
+            fragment = fragment.strip("的地得了在中内外前后上下")
+            if (
+                3 <= _meaningful_length(fragment) <= 12
+                and fragment not in PROGRESSION_GENERIC_ANCHOR_VOCABULARY
+                and not any(word in fragment for word in ENTITY_ACTION_WORDS)
+                and (
+                    fragment.endswith(ENTITY_NOUN_SUFFIXES)
+                    or bool(re.fullmatch(r"[A-Za-z][A-Za-z0-9_.+-]{1,11}", fragment))
+                )
+            ):
                 fragments.add(fragment)
     return fragments
 
@@ -408,6 +575,7 @@ def _structural_record(
         "top_fragments": _top_fragments(masked_left, masked_right),
         "top_repeated_fragments": _top_fragments(masked_left, masked_right),
         "adjacent": adjacent,
+        "reuse_policy": reuse_policy(field),
     }
     if indices is not None:
         record["item_indices"] = list(indices)
@@ -427,6 +595,8 @@ def _structural_item_pairs(
     pairs: list[dict[str, Any]] = []
     positions = {lesson_id: index for index, lesson_id in enumerate(lesson_ids)}
     for field, per_lesson in values.items():
+        if reuse_policy(field) != REUSE_NARRATIVE_STRICT:
+            continue
         for left_index, left_id in enumerate(lesson_ids):
             for right_id in lesson_ids[left_index + 1 :]:
                 adjacent = _is_adjacent(left_index, positions[right_id])
@@ -446,6 +616,11 @@ def _structural_item_pairs(
                         masked_sequence, masked_jaccard = _similarity(masked_left, masked_right)
                         masked_score = _similarity_score(masked_sequence, masked_jaccard)
                         if masked_score < effective_threshold:
+                            continue
+                        # Entity masking must reveal a shared skeleton, not
+                        # manufacture one by reducing two unrelated short
+                        # phrases to the same pair of placeholders.
+                        if raw_sequence < 0.45 and raw_jaccard < 0.25:
                             continue
                         pairs.append(
                             _structural_record(
@@ -481,7 +656,14 @@ def _record_duplicate_groups(values: dict[str, dict[str, str]], minimum: int = 2
                 by_value.setdefault(normalized, []).append(lesson_id)
         for value, lesson_ids in by_value.items():
             if len(lesson_ids) >= minimum:
-                groups.append({"field": field, "lessons": sorted(lesson_ids), "text": value})
+                groups.append(
+                    {
+                        "field": field,
+                        "lessons": sorted(lesson_ids),
+                        "text": value,
+                        "reuse_policy": reuse_policy(field),
+                    }
+                )
     return sorted(groups, key=lambda item: (item["field"], item["lessons"]))
 
 
@@ -665,6 +847,7 @@ def _similarity_record(
     }
     if field is not None:
         record["field"] = field
+        record["reuse_policy"] = reuse_policy(field)
     if stage is not None:
         record["stage"] = stage
     return record
@@ -691,9 +874,11 @@ def _adjacent_exact_duplicates(
                     {
                         "lessons": [left_id, right_id],
                         "field": field,
+                        "text": left_text,
                         "score": 1.0,
                         "top_fragments": [left_text[:120]],
                         "top_repeated_fragments": [left_text[:120]],
+                        "reuse_policy": reuse_policy(field),
                     }
                 )
     return sorted(records, key=lambda item: (item["lessons"], item.get("field", "")))
@@ -732,6 +917,7 @@ def _item_duplicate_reports(
                     for lesson_id, item_index, _text in entries
                 ],
                 "allowed": _is_allowed_repeated_item(field, entries[0][2], course_terms),
+                "reuse_policy": reuse_policy(field),
             }
             all_duplicates.append(record)
             if record["allowed"]:
@@ -801,6 +987,94 @@ def _progression_signal_text(value: Any) -> str:
     return re.sub(r"\s+", "", text)
 
 
+def _progression_anchor_text(value: Any) -> str:
+    text = _joined(value) if isinstance(value, (list, tuple, dict)) else _normalize(value)
+    return re.sub(r"[^0-9A-Za-z\u3400-\u9fff]+", "", text).casefold()
+
+
+def _anchor_residual(fragment: str) -> str:
+    residual = fragment
+    for word in sorted(PROGRESSION_GENERIC_ANCHOR_VOCABULARY, key=lambda item: (-len(item), item)):
+        residual = residual.replace(word.casefold(), "")
+    return re.sub(r"[^0-9a-z\u3400-\u9fff]+", "", residual)
+
+
+def _technical_acronyms(value: Any) -> dict[str, str]:
+    text = _joined(value) if isinstance(value, (list, tuple, dict)) else _normalize(value)
+    result: dict[str, str] = {}
+    for match in re.finditer(r"(?<![A-Za-z0-9])[A-Za-z][A-Za-z0-9]*(?:[-/][A-Za-z0-9]+)*(?![A-Za-z0-9])", text):
+        display = match.group(0)
+        key = re.sub(r"[-/]", "", display).casefold()
+        if len(key) >= 2:
+            result.setdefault(key, display)
+    return result
+
+
+def _progression_anchor_evidence(upstream: Any, downstream: Any) -> dict[str, Any]:
+    """Prove that a progression link shares a concrete object, artifact, or acronym."""
+
+    left = _progression_anchor_text(upstream)
+    right = _progression_anchor_text(downstream)
+    shorter, longer = (left, right) if len(left) <= len(right) else (right, left)
+    candidates = {
+        shorter[index : index + size]
+        for size in range(2, min(12, len(shorter)) + 1)
+        for index in range(0, len(shorter) - size + 1)
+        if shorter[index : index + size] in longer
+    }
+    matched_fragments = sorted(
+        (
+            fragment
+            for fragment in candidates
+            if not any(fragment != other and fragment in other for other in candidates)
+        ),
+        key=lambda item: (-len(item), item),
+    )
+    substantive: list[tuple[str, str]] = []
+    generic_only: list[str] = []
+    for fragment in matched_fragments:
+        residual = _anchor_residual(fragment)
+        if len(residual) >= 2:
+            substantive.append((fragment, residual))
+        else:
+            generic_only.append(fragment)
+
+    left_acronyms = _technical_acronyms(upstream)
+    right_acronyms = _technical_acronyms(downstream)
+    acronym_matches = [left_acronyms[key] for key in sorted(left_acronyms.keys() & right_acronyms.keys())]
+    unique_residuals = {residual for _fragment, residual in substantive}
+    residual_total = sum(len(value) for value in unique_residuals)
+    longest_pair = max(substantive, key=lambda item: (len(item[0]), len(item[1]), item[0]), default=("", ""))
+    # A three-character-or-longer shared phrase with a concrete two-character
+    # core is substantive (for example 需求分析 or 监测记录). Two
+    # distinct concrete two-character fragments also establish the same link.
+    chinese_anchor = bool(substantive) and (
+        len(longest_pair[0]) >= 3 or residual_total >= 4
+    )
+    status = "passed" if chinese_anchor or acronym_matches else "failed"
+    if acronym_matches:
+        reason = "shared technical acronym"
+    elif chinese_anchor:
+        reason = "shared substantive artifact fragment"
+    elif generic_only:
+        reason = "overlap contains only generic progression actions"
+    else:
+        reason = "no shared substantive artifact anchor"
+    return {
+        "status": status,
+        "matched_fragments": sorted(matched_fragments, key=lambda item: (-len(item), item))[:8],
+        "longest_substantive_match": longest_pair[0],
+        "acronym_matches": acronym_matches,
+        "generic_only_matches": sorted(set(generic_only), key=lambda item: (-len(item), item))[:8],
+        "substantive_residuals": sorted(unique_residuals, key=lambda item: (-len(item), item)),
+        "evidence_strength": max(
+            [len(longest_pair[1]), residual_total, *(len(re.sub(r"[-/]", "", item)) for item in acronym_matches)],
+            default=0,
+        ),
+        "reason": reason,
+    }
+
+
 def _jaccard(left: set[str], right: set[str]) -> float:
     union = left | right
     return len(left & right) / len(union) if union else 0.0
@@ -809,13 +1083,14 @@ def _jaccard(left: set[str], right: set[str]) -> float:
 def _progression_gate(upstream: Any, downstream: Any, threshold: float) -> dict[str, Any]:
     """Evaluate one directional progression claim with independent evidence."""
 
-    upstream = _progression_signal_text(upstream)
-    downstream = _progression_signal_text(downstream)
-    sequence, _ = _similarity(upstream, downstream)
-    bigrams_left = _character_ngrams(upstream, 2)
-    bigrams_right = _character_ngrams(downstream, 2)
-    trigrams_left = _character_ngrams(upstream, 3)
-    trigrams_right = _character_ngrams(downstream, 3)
+    anchor_evidence = _progression_anchor_evidence(upstream, downstream)
+    upstream_signal = _progression_signal_text(upstream)
+    downstream_signal = _progression_signal_text(downstream)
+    sequence, _ = _similarity(upstream_signal, downstream_signal)
+    bigrams_left = _character_ngrams(upstream_signal, 2)
+    bigrams_right = _character_ngrams(downstream_signal, 2)
+    trigrams_left = _character_ngrams(upstream_signal, 3)
+    trigrams_right = _character_ngrams(downstream_signal, 3)
     bigram_jaccard = _jaccard(bigrams_left, bigrams_right)
     trigram_jaccard = _jaccard(trigrams_left, trigrams_right)
     weighted = 0.20 * sequence + 0.45 * bigram_jaccard + 0.35 * trigram_jaccard
@@ -827,6 +1102,7 @@ def _progression_gate(upstream: Any, downstream: Any, threshold: float) -> dict[
         )
     )
     overlap = sorted(bigrams_left & bigrams_right, key=lambda value: (-len(value), value))[:5]
+    lexical_status = "passed" if weighted >= threshold and signal_count >= 2 else "failed"
     return {
         "score": weighted,
         "sequence_matcher": sequence,
@@ -834,7 +1110,13 @@ def _progression_gate(upstream: Any, downstream: Any, threshold: float) -> dict[
         "character_3gram_jaccard": trigram_jaccard,
         "signal_count": signal_count,
         "top_overlap": overlap,
-        "status": "passed" if weighted >= threshold and signal_count >= 2 else "failed",
+        "lexical_status": lexical_status,
+        "substantive_anchor": anchor_evidence,
+        "status": (
+            "passed"
+            if lexical_status == "passed" and anchor_evidence["status"] == "passed"
+            else "failed"
+        ),
     }
 
 
@@ -848,11 +1130,30 @@ def _progression_gates(previous: dict[str, Any], current: dict[str, Any], thresh
         current_progression["prior_learning"],
         threshold,
     )
-    forward_transition = _progression_gate(
-        previous_progression["next_bridge"],
-        [current.get("task", ""), *current.get("teaching_content", []), current_progression["deliverable"]],
-        threshold,
+    forward_candidates = {
+        "task_and_deliverable": _progression_gate(
+            previous_progression["next_bridge"],
+            [current.get("task", ""), current_progression["deliverable"]],
+            threshold,
+        ),
+        "teaching_content_and_deliverable": _progression_gate(
+            previous_progression["next_bridge"],
+            [*current.get("teaching_content", []), current_progression["deliverable"]],
+            threshold,
+        ),
+    }
+    selected_scope, selected_gate = max(
+        forward_candidates.items(),
+        key=lambda item: (item[1]["status"] == "passed", item[1]["score"], item[0]),
     )
+    forward_transition = {
+        **selected_gate,
+        "candidate_scope": selected_scope,
+        "candidate_results": {
+            scope: {"status": gate["status"], "score": gate["score"]}
+            for scope, gate in forward_candidates.items()
+        },
+    }
     return {
         "artifact_inheritance": artifact_inheritance,
         "forward_transition": forward_transition,
@@ -966,35 +1267,51 @@ def progression_gate_calibration() -> list[dict[str, Any]]:
 # pairs share a concrete artifact or clinical action; the negative pairs only
 # share generic teaching language and must not pass by one accidental n-gram.
 PROGRESSION_CALIBRATION_CORPUS = (
-    ("测试需求分析结果", "依据测试需求分析结果设计测试用例", "通过"),
-    ("实体关系模型", "根据实体关系模型建立表结构", "通过"),
-    ("表结构约束", "利用表结构约束编写SQL查询", "通过"),
-    ("护理评估记录", "依据护理评估记录完成无菌操作准备", "通过"),
-    ("生命体征监测", "结合生命体征监测开展异常护理判断", "通过"),
-    ("数据库设计方案", "制定植物病害防治方案", "失败"),
-    ("无菌护理流程", "开展索引优化操作", "失败"),
-    ("会计凭证审核", "完成Java接口测试", "失败"),
+    ("er_model", "E-R图", "根据 E-R 图设计关系模式", "通过"),
+    ("requirements_report", "数据库需求分析报告", "承接需求分析成果设计后续结构", "通过"),
+    ("vital_signs", "生命体征监测记录", "根据监测记录判断异常护理", "通过"),
+    ("accounting_voucher", "会计凭证审核结果", "根据凭证审核结果登记账簿", "通过"),
+    ("sql_results", "SQL查询结果", "根据 SQL 查询结果进行性能分析", "通过"),
+    ("generic_operation", "护理操作流程", "数据库操作与索引维护", "失败"),
+    ("generic_design", "患者风险评估与护理方案设计", "数据库索引设计", "失败"),
+    ("generic_analysis", "会计数据分析", "软件缺陷分析", "失败"),
+    ("generic_check_record", "机械检查记录", "护理检查记录", "失败"),
+    ("generic_implementation", "项目实施方案", "无菌护理实施", "失败"),
+    ("generic_flow_design", "流程设计结果", "Java 接口设计", "失败"),
 )
 
 
 def progression_calibration() -> list[dict[str, Any]]:
     calibrated: list[dict[str, Any]] = []
-    for upstream, downstream, expected in PROGRESSION_CALIBRATION_CORPUS:
+    for label, upstream, downstream, expected in PROGRESSION_CALIBRATION_CORPUS:
         signals = _progression_gate(upstream, downstream, PROGRESSION_DECLARED_BOUNDARY_THRESHOLD)
         calibrated.append(
             {
+                "case": label,
                 "upstream": upstream,
                 "downstream": downstream,
                 "expected": expected,
                 "signals": signals,
-                "calibrated_status": (
-                    "通过"
-                    if signals["score"] >= PROGRESSION_DECLARED_BOUNDARY_THRESHOLD and signals["signal_count"] >= 2
-                    else "失败"
-                ),
+                "evidence_score": round(signals["score"] if signals["status"] == "passed" else 0.0, 4),
+                "calibrated_status": "通过" if signals["status"] == "passed" else "失败",
             }
         )
     return calibrated
+
+
+def progression_calibration_margin() -> dict[str, Any]:
+    cases = progression_calibration()
+    positives = [item["evidence_score"] for item in cases if item["expected"] == "通过"]
+    negatives = [item["evidence_score"] for item in cases if item["expected"] == "失败"]
+    positive_minimum = min(positives) if positives else 0.0
+    negative_maximum = max(negatives) if negatives else 0.0
+    return {
+        "positive_minimum": round(positive_minimum, 4),
+        "negative_maximum": round(negative_maximum, 4),
+        "margin": round(positive_minimum - negative_maximum, 4),
+        "positive_count": len(positives),
+        "hard_negative_count": len(negatives),
+    }
 
 
 def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
@@ -1003,6 +1320,10 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
         "all_same": len(scores) > 1 and len(set(scores)) == 1,
         "simple_cycle": False,
         "cycle_period": None,
+        "cycle_confidence": 0.0,
+        "full_cycles": 0,
+        "tail_length": 0,
+        "tail_fraction": 0.0,
         "arithmetic_progression": False,
         "arithmetic_step": None,
         "strict_monotonic": False,
@@ -1012,17 +1333,24 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
         if value < float(EVALUATION_SCORE_MIN) or value > float(EVALUATION_SCORE_MAX) or (value * 2) % 1:
             score_pattern["range_valid"] = False
             errors.append(f"evaluation score {value} is outside 85-96 half-point contract")
-    # A mechanically repeated pattern may contain one complete period followed
-    # by a two-or-more-value tail, so the period can be longer than half the
-    # observed sequence (for example, A B C D A B C).
+    # A partial tail is only mechanical when it repeats a substantial portion
+    # of the initial period. Two coincidental values at the end of a long,
+    # otherwise natural sequence are not sufficient evidence.
     for period in range(1, len(scores) - 1):
         repeated = all(scores[index] == scores[index % period] for index in range(period, len(scores)))
-        complete_cycle = len(scores) >= 2 * period and repeated
-        tail_length = len(scores) - period
-        partial_tail_cycle = 2 <= tail_length < period and repeated
+        full_cycles, tail_length = divmod(len(scores), period)
+        complete_cycle = full_cycles >= 2 and repeated
+        minimum_tail = max(3, (period + 1) // 2)
+        partial_tail_cycle = full_cycles == 1 and tail_length >= minimum_tail and repeated
         if complete_cycle or partial_tail_cycle:
             score_pattern["simple_cycle"] = True
             score_pattern["cycle_period"] = period
+            score_pattern["full_cycles"] = full_cycles
+            score_pattern["tail_length"] = tail_length
+            score_pattern["tail_fraction"] = round(tail_length / period, 4) if period else 0.0
+            score_pattern["cycle_confidence"] = (
+                1.0 if complete_cycle else round(tail_length / period, 4)
+            )
             break
     if len(scores) >= 4:
         steps = [round(scores[index + 1] - scores[index], 6) for index in range(len(scores) - 1)]
@@ -1083,6 +1411,7 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
         by_lesson[lesson_id] = entries
     return {
         "by_lesson": by_lesson,
+        "validation_scope": "contract_and_locator_only",
         "missing_evidence": missing_evidence,
         "invalid_generic": invalid_generic,
         "invalid_verified_public": invalid_verified_public,
@@ -1158,7 +1487,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     similarity_values = {
         field: values
         for field, values in duplicate_values.items()
-        if field != "teaching_methods"
+        if reuse_policy(field) == REUSE_NARRATIVE_STRICT
     }
     field_similarity_pairs, adjacent_field_similarity_pairs = _pairwise_similarity(
         similarity_values,
@@ -1236,7 +1565,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             for field, values in item_values.items()
             if not field.startswith("implementation.")
             and not field.startswith("progression.")
-            and field != "resources"
+            and reuse_policy(field) == REUSE_NARRATIVE_STRICT
         },
         lesson_ids,
         lessons_by_id,
@@ -1279,14 +1608,29 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             _is_adjacent(lesson_ids.index(left_id), lesson_ids.index(right_id))
             for left_id, right_id in zip(ordered_locations, ordered_locations[1:])
         )
-        if len(locations) >= REPEATED_SENTENCE_LESSON_COUNT or adjacent:
+        strict_locations = {
+            lesson_id: sorted(
+                field for field in fields if reuse_policy(field) == REUSE_NARRATIVE_STRICT
+            )
+            for lesson_id, fields in locations.items()
+        }
+        strict_locations = {
+            lesson_id: fields for lesson_id, fields in strict_locations.items() if fields
+        }
+        strict_ordered = [lesson_id for lesson_id in lesson_ids if lesson_id in strict_locations]
+        strict_adjacent = any(
+            _is_adjacent(lesson_ids.index(left_id), lesson_ids.index(right_id))
+            for left_id, right_id in zip(strict_ordered, strict_ordered[1:])
+        )
+        if len(strict_locations) >= REPEATED_SENTENCE_LESSON_COUNT or strict_adjacent:
             repeated_sentences.append(
                 {
                     "sentence": sentence,
-                    "lessons": ordered_locations,
-                    "count": len(locations),
-                    "fields": {lesson_id: sorted(locations[lesson_id]) for lesson_id in ordered_locations},
-                    "adjacent": adjacent,
+                    "lessons": strict_ordered,
+                    "count": len(strict_locations),
+                    "fields": strict_locations,
+                    "adjacent": strict_adjacent,
+                    "reuse_policy": REUSE_NARRATIVE_STRICT,
                     "score": 1.0,
                     "top_fragments": [sentence],
                 }
@@ -1374,6 +1718,10 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
                 "top_overlap": sorted(set(artifact["top_overlap"] + forward["top_overlap"]))[:5],
                 "artifact_inheritance": artifact,
                 "forward_transition": forward,
+                "substantive_anchor": {
+                    "artifact_inheritance": artifact["substantive_anchor"],
+                    "forward_transition": forward["substantive_anchor"],
+                },
             }
             declared_prior_links.append(link)
             if link["status"] == "failed":
@@ -1407,6 +1755,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
                 "hard_failure": hard_failure,
                 "top_overlap": signal["top_overlap"],
                 "forward_transition": signal,
+                "substantive_anchor": signal["substantive_anchor"],
             }
             sequence_links.append(link)
             if hard_failure:
@@ -1418,6 +1767,19 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     progression_variety = len(set(progression_stages)) > 1 if len(progression_stages) >= 4 else True
     if not progression_variety:
         errors.append("progression capability_stage is identical across all lessons")
+    review_items = [
+        {
+            "from": item["from"],
+            "to": item["to"],
+            "reason": item["forward_transition"]["substantive_anchor"]["reason"]
+            if item["forward_transition"]["substantive_anchor"]["status"] == "failed"
+            else "physical sequence lexical coherence requires Agent confirmation",
+            "score": item["score"],
+            "declared_prior": lessons_by_id[item["to"]]["progression"].get("prior_lesson_id"),
+        }
+        for item in sequence_links
+        if item["status"] == "review"
+    ]
     progression = {
         "status": "passed"
         if progression_variety
@@ -1432,6 +1794,12 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "links": declared_prior_links or sequence_links,
         "declared_prior_links": declared_prior_links,
         "sequence_links": sequence_links,
+        "requires_agent_review": bool(review_items),
+        "agent_review_items": review_items,
+        "calibration": {
+            "cases": progression_calibration(),
+            "margin": progression_calibration_margin(),
+        },
         "thresholds": {
             "declared_same_unit": PROGRESSION_DECLARED_SAME_UNIT_THRESHOLD,
             "declared_project_boundary": PROGRESSION_DECLARED_BOUNDARY_THRESHOLD,
@@ -1500,6 +1868,18 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "status": "failed" if errors else "passed",
         "errors": errors,
         "warnings": sorted(set(warnings)),
+        "reuse_policy": {
+            "classes": {
+                "narrative_strict": REUSE_NARRATIVE_STRICT,
+                "teaching_methods": REUSE_TERMINOLOGY,
+                "resources": REUSE_RESOURCE,
+                "references": REUSE_REFERENCE,
+                "fixed_rubric": REUSE_FIXED_RUBRIC,
+                "metadata": REUSE_IGNORE,
+            },
+            "fixed_rubric_criteria": sorted(EVALUATION_REMARK_FIXED_CRITERIA),
+            "allowed_reuse": [item for item in item_duplicates if item["allowed"]],
+        },
         "exact_duplicates": exact_duplicates,
         "adjacent_exact_duplicates": adjacent_exact_duplicates,
         "item_duplicates": item_duplicates,

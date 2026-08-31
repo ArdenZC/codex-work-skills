@@ -775,6 +775,7 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
         hours = Decimal(str(lesson["hours"]))
         lesson_hours += hours
         classroom_minutes = Decimal("0")
+        out_of_class_minutes: list[tuple[str, int]] = []
         stages = lesson["implementation"]
         stage_ids = [str(stage["id"]) for stage in stages]
         if stage_ids != expected_stage_ids:
@@ -788,6 +789,8 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
                 if minutes <= 0:
                     raise ValueError(f"lessons[{index}].implementation[{stage_index}].minutes must be positive for in-class stages")
                 classroom_minutes += Decimal(minutes)
+            else:
+                out_of_class_minutes.append((str(stage["id"]), minutes))
         expected_minutes = hours * Decimal(MINUTES_PER_LESSON_HOUR)
         if expected_minutes != expected_minutes.to_integral_value():
             raise ValueError(f"lessons[{index}].hours must produce whole classroom minutes: {lesson['hours']}")
@@ -795,6 +798,21 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
             raise ValueError(
                 f"lessons[{index}] in-class implementation minutes must equal hours*45: "
                 f"expected {int(expected_minutes)}, got {int(classroom_minutes)}"
+            )
+        out_of_class_limit = max(60, int(expected_minutes))
+        for stage_id, minutes in out_of_class_minutes:
+            if minutes < 0 or minutes > out_of_class_limit:
+                raise ValueError(
+                    "out-of-class minutes sanity failed: "
+                    f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
+                )
+        out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
+        total_limit = 2 * int(expected_minutes)
+        if out_of_class_total > total_limit:
+            raise ValueError(
+                "out-of-class minutes sanity failed: "
+                f"lesson_id={lesson_id} stage=out_of_class_total "
+                f"actual={out_of_class_total} limit={total_limit}"
             )
         progression = lesson["progression"]
         prior_lesson_id = progression["prior_lesson_id"]

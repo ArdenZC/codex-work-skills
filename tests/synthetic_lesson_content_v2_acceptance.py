@@ -66,6 +66,7 @@ def _lesson(
     focus: str,
     artifact: str,
     next_focus: str,
+    next_task: str,
     previous_artifact: str | None,
     score: float,
 ) -> dict:
@@ -73,7 +74,7 @@ def _lesson(
     prior_learning = (
         f"课程开始前完成需求情境梳理，明确本课将围绕{focus}建立工作入口"
         if previous_artifact is None
-        else f"承接上一课的{previous_artifact}，能够据此定位本课{focus}的关键条件"
+        else f"已将{previous_artifact}带入本课的{focus}，据此补充新的判断条件"
     )
     methods = [
         f"{focus}任务驱动法",
@@ -105,8 +106,29 @@ def _lesson(
                 "objective": f"{lesson_marker}；通过{activity}掌握{focus}并推进{artifact}",
             }
         )
+    assessment_signals = (
+        "用边界清单逐项圈出未覆盖条件",
+        "在关系草图上标注依赖方向并说明取舍",
+        "用初始化日志复核环境参数和执行次序",
+        "拿字段字典逐列核对类型与空值规则",
+        "沿约束检查表追查一条失败记录的来源",
+        "用校验记录对照录入前后的异常数量",
+        "根据检索结果解释筛选条件的实际作用",
+        "从关联结果中定位连接条件造成的遗漏",
+        "借分组统计表说明口径变化带来的差异",
+        "以视图说明核对暴露字段和使用边界",
+        "根据执行计划比较索引调整前后的代价",
+        "通过提交回滚记录证明事务边界有效",
+        "按权限矩阵复核角色可以访问的对象",
+        "依据恢复演练日志确认备份链条可用",
+        "结合性能采样记录定位主要等待环节",
+        "沿成果清单复现跨模块操作路径",
+        "用对照结果说明验收问题的修订依据",
+        "按答辩追问逐项补齐最终交付证据",
+    )
+    assessment_signal = assessment_signals[index - 1]
     remarks = {
-        key: f"在{focus}任务中{suffix}，本课落实{lesson_marker}"
+        key: f"在{focus}任务中{suffix}；{assessment_signal}"
         for key, suffix in {
             "attendance": "按时完成到课与准备",
             "attention": "持续关注关键条件",
@@ -150,7 +172,7 @@ def _lesson(
         ),
     )
     chosen_reflection = reflection_forms[(index - 1) % len(reflection_forms)]
-    chosen_reflection = tuple(f"{text}本课特别落实{lesson_marker}。" for text in chosen_reflection)
+    chosen_reflection = tuple(f"{text}本课特别要求学生{assessment_signal}。" for text in chosen_reflection)
     quality_principles = (
         "先核对输入边界再开始操作",
         "把条件分支写进处理记录",
@@ -350,22 +372,22 @@ def _lesson(
             "prior_learning": prior_learning,
             "capability_stage": ("认知", "理解", "模仿", "独立", "迁移")[min(index - 1, 4)],
             "deliverable": artifact,
-            "next_bridge": f"将{artifact}带入下一课的{next_focus}，继续完善项目成果",
+            "next_bridge": f"下一课以{artifact}为输入，{next_task}，重点衔接{next_focus}",
         },
         "student_analysis": {
-            "base": [f"能够{knowledge_pattern}，并识别{focus}涉及的基本对象", f"接触过{knowledge_artifact_pattern}对应的简单记录"],
+            "base": [f"能够{knowledge_pattern}，并识别{focus}涉及的基本对象；还能{assessment_signal}", f"接触过{knowledge_artifact_pattern}对应的简单记录"],
             "problems": [f"容易在{key_content_pattern}中遗漏条件", f"成果说明常缺少{key_strategy_pattern}形成的依据关联"],
             "strategies": [f"采用{difficulty_strategy}来拆解本课处理步骤", f"按照{key_strategy_pattern}互评并核对任务要求"],
         },
         "teaching_content": [
             f"{lesson_marker}；分析{focus}的任务边界与工作条件",
             f"{lesson_marker}；示范形成{artifact}的关键步骤",
-            f"{lesson_marker}；比较不同情境下{focus}的处理结果",
+            f"{lesson_marker}；通过{assessment_signal}比较不同情境下{focus}的处理结果",
         ],
         "goals": {
             "knowledge": [f"{knowledge_pattern}，并联系{focus}的核心依据", f"{knowledge_artifact_pattern}，对应{artifact}"],
             "ability": [ability_pattern, delivery_pattern],
-            "quality": [f"{quality_principle}，并在任务中留下可追溯依据", f"对{focus}结果保持{quality_principle}"],
+            "quality": [f"{quality_principle}，并以{assessment_signal}留下可追溯依据", f"对{focus}结果保持{quality_principle}，能够{assessment_signal}"],
         },
         "key_point": {"content": [f"{key_content_pattern}，对应{focus}的成果要求"], "strategy": [f"{key_strategy_pattern}，再核对{artifact}"]},
         "difficult_point": {"content": [f"{difficulty_content_pattern}，最后落到{focus}步骤"], "strategy": [f"{difficulty_strategy}，再回看{artifact}的依据和边界"]},
@@ -397,10 +419,10 @@ def synthetic_plan_from_brief(brief: str) -> dict:
     if "数据库" in course:
         specs = (
             ("项目一 数据库项目准备", "梳理业务需求与数据边界", "需求边界", "需求范围清单", "数据对象建模"),
-            ("项目一 数据库项目准备", "建立业务实体关系草图", "数据对象建模", "实体关系草图", "表结构设计"),
+            ("项目一 数据库项目准备", "建立业务实体关系草图", "数据对象建模", "实体关系草图", "项目初始化"),
             ("项目一 数据库项目准备", "完成数据库项目初始化", "项目初始化", "数据库初始化记录", "字段与类型规划"),
             ("项目二 数据库结构设计", "规划字段与数据类型", "字段与类型规划", "数据库字段字典", "约束规则配置"),
-            ("项目二 数据库结构设计", "配置主键外键与约束", "约束规则配置", "数据库约束检查表", "单表数据检索"),
+            ("项目二 数据库结构设计", "配置主键外键与约束", "约束规则配置", "数据库约束检查表", "样例数据校验"),
             ("项目二 数据库结构设计", "录入样例数据并校验", "样例数据校验", "数据校验记录", "多表业务关联"),
             ("项目三 业务查询实现", "实现多表业务关联查询", "多表业务关联", "关联查询脚本", "分组统计查询"),
             ("项目三 业务查询实现", "完成分组统计与汇总", "分组统计查询", "业务统计结果表", "嵌套查询设计"),
@@ -439,6 +461,7 @@ def synthetic_plan_from_brief(brief: str) -> dict:
                 focus=focus,
                 artifact=artifact,
                 next_focus=next_focus,
+                next_task=(specs[index][1] if index < len(specs) else f"复盘{course}课程成果"),
                 previous_artifact=previous_artifact,
                 score=scores[(index - 1) % len(scores)],
             )

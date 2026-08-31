@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Iterable
 
 
+IS_WINDOWS = os.name == "nt"
+
+
 def _absolute_lexical(path: Path) -> Path:
     return Path(os.path.abspath(os.path.expanduser(str(path))))
 
@@ -20,7 +23,7 @@ def _long_existing_ancestor(path: Path) -> Path:
     """Expand an existing Windows ancestor, including short 8.3 aliases."""
 
     absolute = _absolute_lexical(path)
-    if os.name != "nt":
+    if not IS_WINDOWS:
         return absolute
     missing: list[str] = []
     current = absolute
@@ -48,9 +51,9 @@ def _long_existing_ancestor(path: Path) -> Path:
 
 
 def filesystem_case_sensitive(path: Path | str) -> bool:
-    """Probe the current Darwin volume without changing Linux case semantics."""
+    """Detect Darwin case semantics without ever probing inside the target tree."""
 
-    if os.name == "nt":
+    if IS_WINDOWS:
         return False
     if sys.platform != "darwin":
         return True
@@ -60,23 +63,38 @@ def filesystem_case_sensitive(path: Path | str) -> bool:
     while not parent.exists() and parent != parent.parent:
         parent = parent.parent
     if not parent.exists():
-        return True
+        return False
     try:
         device = os.stat(parent).st_dev
     except OSError:
-        return True
+        return False
     cached = _DARWIN_CASE_SENSITIVITY.get(device)
     if cached is not None:
         return cached
 
+    # The system temporary directory is the only permitted probe root. It must
+    # be on the same device and lexically independent from the target tree.
+    # When that cannot be proved, fail closed by treating the volume as
+    # case-insensitive; protection may broaden, but it can never weaken.
+    temp_root = _absolute_lexical(Path(tempfile.gettempdir()))
+    try:
+        temp_device = os.stat(temp_root).st_dev
+        independent = not _lexical_overlap(temp_root, parent)
+    except OSError:
+        temp_device = None
+        independent = False
+    if temp_device != device or not independent or not temp_root.is_dir():
+        _DARWIN_CASE_SENSITIVITY[device] = False
+        return False
+
     probe: Path | None = None
     try:
-        probe = Path(tempfile.mkdtemp(prefix=".codex-case-probe-", dir=str(parent)))
+        probe = Path(tempfile.mkdtemp(prefix=".codex-case-probe-", dir=str(temp_root)))
         marker = probe / "CaseProbe"
         marker.mkdir()
         result = not (probe / "caseprobe").exists()
     except OSError:
-        result = True
+        result = False
     finally:
         if probe is not None:
             try:
@@ -88,6 +106,16 @@ def filesystem_case_sensitive(path: Path | str) -> bool:
 
 
 _DARWIN_CASE_SENSITIVITY: dict[int, bool] = {}
+
+
+def _lexical_overlap(left: Path, right: Path) -> bool:
+    left_text = os.path.normpath(str(_absolute_lexical(left)))
+    right_text = os.path.normpath(str(_absolute_lexical(right)))
+    return (
+        left_text == right_text
+        or _contains(left_text, right_text)
+        or _contains(right_text, left_text)
+    )
 
 
 def _variants(path: Path) -> set[str]:
@@ -107,7 +135,7 @@ def _variants(path: Path) -> set[str]:
             )
         )
     values = set(path_values)
-    case_insensitive = os.name == "nt" or (
+    case_insensitive = IS_WINDOWS or (
         sys.platform == "darwin" and not filesystem_case_sensitive(lexical)
     )
     if case_insensitive:

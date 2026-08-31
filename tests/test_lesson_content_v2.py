@@ -41,6 +41,7 @@ _LESSON_DEPENDENCIES = {
     "content_quality": ("content_contract",),
     "path_safety": (),
     "render_qa": (),
+    "record_visual_inspection": (),
     "package_common": ("semantic_bookmarks", "content_contract"),
     "validate_template": ("bookmark_utils", "package_common"),
     "validate_output": (
@@ -125,6 +126,7 @@ lesson_content_contract = _load_lesson_module("content_contract")
 lesson_content_quality = _load_lesson_module("content_quality")
 lesson_package_common = _load_lesson_module("package_common")
 lesson_path_safety = _load_lesson_module("path_safety")
+lesson_visual_inspection = _load_lesson_module("record_visual_inspection")
 lesson_validate_template = _load_lesson_module("validate_template")
 lesson_output = _load_lesson_module("validate_output")
 lesson_generator = _load_lesson_module("generate_lesson_plans")
@@ -154,6 +156,7 @@ assert_output_path_safe = lesson_path_safety.assert_output_path_safe
 paths_equal = lesson_path_safety.paths_equal
 paths_overlap = lesson_path_safety.paths_overlap
 filesystem_case_sensitive = lesson_path_safety.filesystem_case_sensitive
+write_visual_inspection_evidence = lesson_visual_inspection.write_visual_inspection_evidence
 manifest_field_text = lesson_output.manifest_field_text
 
 
@@ -320,6 +323,71 @@ class LessonContentV2Mixin:
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(expected, result.stderr)
                 self.assertFalse(output.exists())
+
+    def test_out_of_class_minutes_use_dynamic_sanity_bounds(self) -> None:
+        base = load_fixture("lesson-plan-input.json")
+
+        def one_lesson(hours: int, classroom: tuple[int, ...]) -> dict:
+            payload = copy.deepcopy(base)
+            payload["lessons"] = [payload["lessons"][0]]
+            payload["lessons"][0]["hours"] = hours
+            payload["total_hours"] = hours
+            for stage, minutes in zip(payload["lessons"][0]["implementation"][1:-1], classroom):
+                stage["minutes"] = minutes
+            return payload
+
+        for hours, classroom in (
+            (1, (5, 10, 10, 5, 5, 5, 5)),
+            (2, (10, 20, 25, 10, 10, 5, 10)),
+            (4, (20, 40, 50, 20, 20, 10, 20)),
+        ):
+            with self.subTest(hours=hours):
+                lesson_generator.validate_content_v2_input(one_lesson(hours, classroom))
+
+        before = one_lesson(2, (10, 20, 25, 10, 10, 5, 10))
+        before["lessons"][0]["implementation"][0]["minutes"] = 999
+        with self.assertRaisesRegex(
+            ValueError,
+            r"lesson_id=L01 stage=before_class_preparation actual=999 limit=90",
+        ):
+            lesson_generator.validate_content_v2_input(before)
+
+        after = one_lesson(2, (10, 20, 25, 10, 10, 5, 10))
+        after["lessons"][0]["implementation"][-1]["minutes"] = 999
+        with self.assertRaisesRegex(
+            ValueError,
+            r"lesson_id=L01 stage=after_class_improvement actual=999 limit=90",
+        ):
+            lesson_generator.validate_content_v2_input(after)
+
+        total = one_lesson(1, (5, 10, 10, 5, 5, 5, 5))
+        total["lessons"][0]["implementation"][0]["minutes"] = 50
+        total["lessons"][0]["implementation"][-1]["minutes"] = 50
+        with self.assertRaisesRegex(
+            ValueError,
+            r"lesson_id=L01 stage=out_of_class_total actual=100 limit=90",
+        ):
+            lesson_generator.validate_content_v2_input(total)
+
+        zero_middle = one_lesson(1, (5, 10, 10, 5, 5, 5, 5))
+        zero_middle["lessons"][0]["implementation"][1]["minutes"] = 0
+        zero_middle["lessons"][0]["implementation"][2]["minutes"] = 15
+        with self.assertRaisesRegex(ValueError, "must be positive for in-class stages"):
+            lesson_generator.validate_content_v2_input(zero_middle)
+
+    def test_positive_number_schema_treats_numeric_and_decimal_strings_consistently(self) -> None:
+        base = load_fixture("lesson-plan-input.json")
+        for value in (0.5, "0.5", 2, "2", "2.5"):
+            with self.subTest(valid=value):
+                payload = copy.deepcopy(base)
+                payload["default_hours"] = value
+                lesson_generator.validate_content_v2_input(payload)
+        for value in (0, "0", "0.0", -1, "-1", "abc", "", "NaN", "Infinity"):
+            with self.subTest(invalid=value):
+                payload = copy.deepcopy(base)
+                payload["default_hours"] = value
+                with self.assertRaises(ValueError):
+                    lesson_generator.validate_content_v2_input(payload)
 
     def test_evaluation_score_boundaries_use_half_point_contract(self) -> None:
         cases = ((84.5, False), (85, True), (85.5, True), (96, True), (96.5, False))
@@ -686,8 +754,21 @@ class LessonContentV2Mixin:
         self.assertEqual(declared_report["progression"]["sequence_links"][2]["to"], "L04")
 
         calibration = lesson_content_quality.progression_calibration()
-        self.assertEqual(len(calibration), 8)
+        self.assertEqual(len(calibration), 11)
         self.assertTrue(all(item["expected"] == item["calibrated_status"] for item in calibration), calibration)
+        margin = lesson_content_quality.progression_calibration_margin()
+        self.assertEqual(margin["positive_count"], 5)
+        self.assertEqual(margin["hard_negative_count"], 6)
+        self.assertGreater(margin["positive_minimum"], margin["negative_maximum"])
+        self.assertGreater(margin["margin"], 0)
+        for item in calibration:
+            anchor = item["signals"]["substantive_anchor"]
+            self.assertIn("matched_fragments", anchor)
+            self.assertIn("longest_substantive_match", anchor)
+            self.assertIn("acronym_matches", anchor)
+            self.assertIn("generic_only_matches", anchor)
+            if item["expected"] == "失败":
+                self.assertEqual(anchor["status"], "failed", item)
 
         gate_calibration = lesson_content_quality.progression_gate_calibration()
         self.assertEqual(len(gate_calibration), 3)
@@ -797,6 +878,24 @@ class LessonContentV2Mixin:
         self.assertEqual(both_pass_link["status"], "passed")
         self.assertEqual(both_pass_report["progression"]["status"], "passed")
 
+    def test_nonadjacent_physical_sequence_review_requires_agent_acceptance(self) -> None:
+        data = load_fixture("lesson-plan-content-v2-it.json")
+        data["lessons"] = data["lessons"][:4]
+        data["total_hours"] = 8
+        data["lessons"][1]["progression"]["next_bridge"] = "依据功能用例集执行功能测试并分析缺陷影响，后续形成缺陷报告"
+        data["lessons"][2]["progression"]["next_bridge"] = "进入园艺病虫害观察"
+        data["lessons"][3]["progression"]["prior_lesson_id"] = "L02"
+        data["lessons"][3]["progression"]["prior_learning"] = "承接L02功能用例集分析缺陷影响"
+        report = assess_content_quality(data)
+        self.assertEqual(report["progression"]["status"], "passed", report)
+        self.assertTrue(report["progression"]["requires_agent_review"], report)
+        review = report["progression"]["agent_review_items"][0]
+        self.assertEqual(review["from"], "L03")
+        self.assertEqual(review["to"], "L04")
+        self.assertEqual(review["declared_prior"], "L02")
+        self.assertIn("reason", review)
+        self.assertIn("score", review)
+
     def test_resource_reuse_is_domain_neutral_but_narrative_reuse_still_fails(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
         resource_cases = (
@@ -827,6 +926,50 @@ class LessonContentV2Mixin:
             narrative_report,
         )
 
+    def test_unified_reuse_policy_allows_terms_but_keeps_narrative_strict(self) -> None:
+        data = load_fixture("lesson-plan-content-v2-it.json")
+        repeated_method = "基于案例分析与任务执行的分组研讨教学法"
+        for lesson in data["lessons"]:
+            lesson["teaching_methods"][0] = repeated_method
+            lesson["resources"][0] = "数据库客户端工具"
+            lesson["references"] = [{"text": "课程配套教学资源", "source_kind": "generic"}]
+            lesson["evaluation"]["remarks"]["attendance"] = "出勤完整且准时"
+        report = assess_content_quality(data)
+        self.assertEqual(report["status"], "passed", report)
+        policies = report["reuse_policy"]["classes"]
+        self.assertEqual(policies["narrative_strict"], "narrative_strict")
+        allowed = report["reuse_policy"]["allowed_reuse"]
+        self.assertTrue(any(item["field"] == "teaching_methods" for item in allowed), allowed)
+        self.assertTrue(any(item["field"] == "resources" for item in allowed), allowed)
+        self.assertTrue(any(item["field"] == "references" for item in allowed), allowed)
+        self.assertTrue(any(item["field"] == "evaluation.remarks.attendance" for item in allowed), allowed)
+        self.assertFalse(any(item["field"] == "teaching_methods" for item in report["structural_similarity_pairs"]))
+
+        short_narrative = copy.deepcopy(data)
+        for lesson in short_narrative["lessons"]:
+            lesson["goals"]["quality"][0] = "规范操作"
+        short_report = assess_content_quality(short_narrative)
+        self.assertEqual(short_report["status"], "failed", short_report)
+        self.assertTrue(
+            any(item["field"] == "goals.quality" for item in short_report["frequency_item_duplicates"]),
+            short_report,
+        )
+
+    def test_structural_entities_from_teaching_content_do_not_hide_a_copied_skeleton(self) -> None:
+        data = load_fixture("lesson-plan-content-v2-it.json")
+        data["lessons"] = data["lessons"][:2]
+        data["total_hours"] = 4
+        left, right = data["lessons"]
+        left["teaching_content"][0] = "围绕护理脉搏对象分析关键条件并记录护理脉搏结果"
+        right["teaching_content"][0] = "围绕会计凭证对象分析关键条件并记录会计凭证结果"
+        report = assess_content_quality(data)
+        self.assertEqual(report["status"], "failed", report)
+        pair = next(
+            item for item in report["structural_similarity_pairs"]
+            if item["field"] == "teaching_content"
+        )
+        self.assertGreaterEqual(pair["masked_score"], pair["raw_score"])
+
     def test_score_cycle_detection_rejects_partial_tails_and_keeps_natural_variation(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
 
@@ -855,7 +998,23 @@ class LessonContentV2Mixin:
                 report = assess_content_quality(scored_data(scores))
                 self.assertTrue(report["coverage"]["score_pattern"]["simple_cycle"], report)
                 self.assertEqual(report["coverage"]["score_pattern"]["cycle_period"], period)
+                self.assertGreater(report["coverage"]["score_pattern"]["cycle_confidence"], 0)
+                self.assertGreaterEqual(report["coverage"]["score_pattern"]["full_cycles"], 1)
+                self.assertIn("tail_length", report["coverage"]["score_pattern"])
+                self.assertIn("tail_fraction", report["coverage"]["score_pattern"])
                 self.assertEqual(report["status"], "failed")
+
+        natural_tail_cases = (
+            (89, 90, 93, 88, 92, 89, 90),
+            (89, 90.5, 89.5, 91, 90, 92, 89, 90.5),
+        )
+        for scores in natural_tail_cases:
+            with self.subTest(natural_tail=scores):
+                score_errors: list[str] = []
+                pattern = lesson_content_quality._score_pattern(list(scores), score_errors)
+                self.assertFalse(pattern["simple_cycle"], pattern)
+                self.assertEqual(pattern["cycle_confidence"], 0.0)
+                self.assertFalse(any("repeating cycle" in error for error in score_errors))
 
         natural = copy.deepcopy(base)
         natural_scores = (89, 90.5, 89.5, 91, 90, 92)
@@ -960,10 +1119,11 @@ class LessonContentV2Mixin:
             with self.assertRaisesRegex(ValueError, "meaningful"):
                 lesson_generator.validate_content_v2_input(whitespace)
 
-    def test_distinct_it_and_non_it_fixtures_generate_without_contamination(self) -> None:
+    def test_distinct_cross_domain_fixtures_generate_without_contamination(self) -> None:
         fixtures = (
             "lesson-plan-content-v2-it.json",
             "lesson-plan-content-v2-non-it.json",
+            "lesson-plan-content-v2-accounting.json",
         )
         with tempfile.TemporaryDirectory(prefix="lesson-v2-cross-domain-") as temp_name:
             folder = Path(temp_name)
@@ -1079,6 +1239,11 @@ class LessonContentV2Mixin:
             text = "\n".join(document_text(Document(path)) for path in output.glob("*.docx"))
             self.assertNotIn("source_kind", text)
             self.assertNotIn("generic", text)
+            report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                report["content_quality"]["reference_provenance"]["validation_scope"],
+                "contract_and_locator_only",
+            )
 
     def test_evaluation_remark_contract_limit_applies_to_all_template_versions(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
@@ -1179,6 +1344,65 @@ class LessonContentV2Mixin:
         self.assertIn("render smoke", skill_text.lower())
         self.assertIn("not pagination", contract_text.lower())
         self.assertNotIn("--render 做真实分页检查", skill_text)
+
+    def test_darwin_case_probe_uses_independent_same_device_temp_root(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-darwin-probe-") as temp_name:
+            folder = Path(temp_name)
+            protected = folder / "protected"
+            safe_temp = folder / "safe-temp"
+            protected.mkdir()
+            safe_temp.mkdir()
+            created_under: list[Path] = []
+            real_mkdtemp = tempfile.mkdtemp
+
+            def tracked_mkdtemp(*args, **kwargs):
+                created_under.append(Path(kwargs["dir"]).resolve())
+                return real_mkdtemp(*args, **kwargs)
+
+            lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
+            with (
+                patch.object(lesson_path_safety.sys, "platform", "darwin"),
+                patch.object(lesson_path_safety, "IS_WINDOWS", False),
+                patch.object(lesson_path_safety.tempfile, "gettempdir", return_value=str(safe_temp)),
+                patch.object(lesson_path_safety.tempfile, "mkdtemp", side_effect=tracked_mkdtemp),
+            ):
+                self.assertFalse(filesystem_case_sensitive(protected))
+            self.assertEqual(created_under, [safe_temp.resolve()])
+            self.assertEqual(list(protected.iterdir()), [])
+            self.assertFalse(paths_overlap(safe_temp, protected))
+
+    def test_darwin_case_probe_failure_is_conservative_and_zero_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-darwin-failed-probe-") as temp_name:
+            folder = Path(temp_name)
+            protected = folder / "protected"
+            safe_temp = folder / "safe-temp"
+            protected.mkdir()
+            safe_temp.mkdir()
+            lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
+            with (
+                patch.object(lesson_path_safety.sys, "platform", "darwin"),
+                patch.object(lesson_path_safety, "IS_WINDOWS", False),
+                patch.object(lesson_path_safety.tempfile, "gettempdir", return_value=str(safe_temp)),
+                patch.object(lesson_path_safety.tempfile, "mkdtemp", side_effect=OSError("read only")),
+            ):
+                self.assertFalse(filesystem_case_sensitive(protected))
+            self.assertEqual(list(protected.iterdir()), [])
+
+    def test_darwin_probe_refuses_protected_ancestor_or_descendant(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-darwin-overlap-probe-") as temp_name:
+            protected = Path(temp_name) / "protected"
+            descendant = protected / "temp"
+            descendant.mkdir(parents=True)
+            lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
+            with (
+                patch.object(lesson_path_safety.sys, "platform", "darwin"),
+                patch.object(lesson_path_safety, "IS_WINDOWS", False),
+                patch.object(lesson_path_safety.tempfile, "gettempdir", return_value=str(descendant)),
+                patch.object(lesson_path_safety.tempfile, "mkdtemp") as mocked_probe,
+            ):
+                self.assertFalse(filesystem_case_sensitive(protected))
+            mocked_probe.assert_not_called()
+            self.assertEqual(list(descendant.iterdir()), [])
 
     @unittest.skipUnless(sys.platform == "darwin", "Darwin path aliases are only exercised on macOS")
     def test_macos_unicode_and_case_aliases_are_real_path_contracts(self) -> None:
@@ -1542,6 +1766,43 @@ class LessonContentV2Mixin:
             self.assertEqual(report["render"]["status"], "failed")
             self.assertEqual(report["render"]["errors"], failed_render["errors"])
 
+    def test_visual_inspection_evidence_is_explicit_durable_and_fingerprinted(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-visual-evidence-") as temp_name:
+            output = Path(temp_name) / "output"
+            output.mkdir()
+            lesson = output / "教案01_示例.docx"
+            lesson.write_bytes(b"explicit visual fixture")
+            qa_report = output / "qa-report.json"
+            qa_report.write_text('{"status":"passed"}\n', encoding="utf-8")
+            destination = output / "visual-inspection.json"
+            checks = {name: "passed" for name in lesson_visual_inspection.CHECK_NAMES}
+            evidence = write_visual_inspection_evidence(
+                output_dir=output,
+                qa_report=qa_report,
+                destination=destination,
+                status="passed",
+                inspected_pages={lesson.name: [1, 2]},
+                checks=checks,
+                notes="Agent inspected representative rendered pages.",
+            )
+            persisted = json.loads(destination.read_text(encoding="utf-8"))
+            self.assertEqual(persisted, evidence)
+            self.assertEqual(persisted["status"], "passed")
+            self.assertEqual(persisted["inspected_files"], [lesson.name])
+            self.assertEqual(persisted["inspected_pages"][lesson.name], [1, 2])
+            self.assertEqual(len(persisted["output_fingerprint"]), 64)
+            self.assertTrue(persisted["timestamp"].endswith("+00:00"))
+            with self.assertRaisesRegex(ValueError, "identify at least one failed check"):
+                write_visual_inspection_evidence(
+                    output_dir=output,
+                    qa_report=qa_report,
+                    destination=destination,
+                    status="failed",
+                    inspected_pages={lesson.name: [1]},
+                    checks=checks,
+                    notes="",
+                )
+
     def test_path_safety_rejects_protected_real_cli_paths_and_allows_sibling(self) -> None:
         payload = load_fixture("lesson-plan-input.json")
         with tempfile.TemporaryDirectory(prefix="lesson-v2-paths-") as temp_name:
@@ -1626,7 +1887,9 @@ class LessonContentV2Mixin:
             report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertIn(report["render"]["status"], {"passed", "not_executed"})
             self.assertEqual(report["render"]["scope"], "smoke")
+            self.assertEqual(report["render"]["page_count_method"], "pdf_page_object_regex")
             self.assertEqual(report["visual_inspection"]["status"], "not_executed")
+            self.assertEqual(report["visual_inspection"]["evidence_file"], "visual-inspection.json")
             if report["render"]["status"] == "passed":
                 self.assertEqual(report["render"]["files_checked"], 2)
                 self.assertGreater(report["render"]["page_count"], 0)
