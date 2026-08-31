@@ -17,7 +17,12 @@ ENGINE_NAME = ".lesson-plan-docx-generator"
 MARKER_ID = "lesson-plan-docx-generator"
 MARKER_START = f"<!-- codex-skill: {MARKER_ID}:start -->"
 MARKER_END = f"<!-- codex-skill: {MARKER_ID}:end -->"
-MINIMAL_ENGINE_FILES = (Path("SKILL.md"), Path("通用提示词.md"), Path("AGENTS.md"))
+MINIMAL_ENGINE_FILES = (
+    Path("SKILL.md"),
+    Path("通用提示词.md"),
+    Path("AGENTS.md"),
+    Path("CONVENTIONS.md"),
+)
 SHARED_SOURCES = {
     "AGENTS.md": "AGENTS.md",
     "CLAUDE.md": "CLAUDE.md",
@@ -57,20 +62,41 @@ def _backup_path(path: Path) -> Path:
             return candidate
 
 
-def _rewrite_references(text: str) -> str:
-    """Point adapter instructions at the installed namespaced engine."""
+def _rewrite_references(text: str, *, copy_engine: bool = True, namespace: bool = True) -> str:
+    """Point adapter instructions at files available in the installed engine."""
 
-    replacements = {
-        "SKILL.md": f"{ENGINE_NAME}/SKILL.md",
-        "通用提示词.md": f"{ENGINE_NAME}/通用提示词.md",
-        "AGENTS.md": f"{ENGINE_NAME}/AGENTS.md",
-        "CLAUDE.md": f"{ENGINE_NAME}/CLAUDE.md",
-        "GEMINI.md": f"{ENGINE_NAME}/GEMINI.md",
-        "CONVENTIONS.md": f"{ENGINE_NAME}/CONVENTIONS.md",
-        "scripts/generate_lesson_plans.py": f"{ENGINE_NAME}/scripts/generate_lesson_plans.py",
-        "docs/content-contract-v2.md": f"{ENGINE_NAME}/docs/content-contract-v2.md",
-        "examples/tasks.example.json": f"{ENGINE_NAME}/examples/tasks.example.json",
-    }
+    replacements = {}
+    if namespace:
+        replacements.update(
+            {
+                "SKILL.md": f"{ENGINE_NAME}/SKILL.md",
+                "通用提示词.md": f"{ENGINE_NAME}/通用提示词.md",
+                "AGENTS.md": f"{ENGINE_NAME}/AGENTS.md",
+                "CLAUDE.md": f"{ENGINE_NAME}/CLAUDE.md",
+                "GEMINI.md": f"{ENGINE_NAME}/GEMINI.md",
+                "CONVENTIONS.md": f"{ENGINE_NAME}/CONVENTIONS.md",
+            }
+        )
+    if copy_engine:
+        replacements.update(
+            {
+                "scripts/generate_lesson_plans.py": f"{ENGINE_NAME}/scripts/generate_lesson_plans.py",
+                "docs/content-contract-v2.md": f"{ENGINE_NAME}/docs/content-contract-v2.md",
+                "examples/tasks.example.json": f"{ENGINE_NAME}/examples/tasks.example.json",
+            }
+        )
+    else:
+        # The default install is intentionally a small instruction-only engine.
+        # Do not leave executable/documentation paths that are absent until the
+        # caller opts into ``--copy-engine``.
+        unavailable = "the full Lesson runtime (install with --copy-engine)"
+        replacements.update(
+            {
+                "scripts/generate_lesson_plans.py": unavailable,
+                "docs/content-contract-v2.md": unavailable,
+                "examples/tasks.example.json": unavailable,
+            }
+        )
     for bare, namespaced in replacements.items():
         # Do not rewrite an already namespaced path a second time.
         text = re.sub(rf"(?<![./\w-]){re.escape(bare)}", namespaced, text)
@@ -189,7 +215,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         target = target_root / relative
         if target.is_symlink():
             raise ValueError(f"Refusing to replace symlinked adapter file: {target}")
-        payload = _rewrite_references(source.read_text(encoding="utf-8"))
+        payload = _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=copy_engine)
         merged = merge_marker_section(_read_text(target), payload)
         if not target.exists() or target.read_bytes() != merged.encode("utf-8"):
             files[target] = merged.encode("utf-8")
@@ -206,7 +232,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
                 merged = merge_aider_config(_read_text(target))
                 payload = merged.encode("utf-8")
             else:
-                payload = _rewrite_references(source.read_text(encoding="utf-8")).encode("utf-8")
+                payload = _rewrite_references(source.read_text(encoding="utf-8"), copy_engine=copy_engine).encode("utf-8")
             if target.exists() and not replace and target.read_bytes() != payload:
                 # Adapter files are intentionally additive only through their
                 # marker-managed shared counterparts; plain files need opt-in.
@@ -226,7 +252,14 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
     for relative in engine_files:
         source = source_root / relative
         target = engine_target / relative
-        payload = source.read_bytes()
+        if not copy_engine:
+            payload = _rewrite_references(
+                source.read_text(encoding="utf-8"),
+                copy_engine=False,
+                namespace=False,
+            ).encode("utf-8")
+        else:
+            payload = source.read_bytes()
         if not target.exists() or replace or target.read_bytes() != payload:
             files[target] = payload
     # Validate every destination's parent chain before the transaction creates
@@ -243,14 +276,34 @@ def _remove_path(path: Path) -> None:
         path.unlink()
 
 
-def _apply_files(files: dict[Path, bytes], target_root: Path, *, dry_run: bool = False) -> list[Path]:
+def _apply_files(
+    files: dict[Path, bytes],
+    target_root: Path,
+    *,
+    dry_run: bool = False,
+    replace_engine: Path | None = None,
+) -> list[Path]:
     if dry_run:
         for target in sorted(files):
             print(f"write {target}")
+        if replace_engine is not None:
+            print(f"replace-tree {replace_engine}")
         return []
     target_root.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".lesson-adapters.stage-", dir=str(target_root)))
     staged: dict[Path, Path] = {}
+    staged_engine: Path | None = None
+    engine_targets = (
+        {target for target in files if replace_engine is not None and target == replace_engine}
+        if replace_engine is not None
+        else set()
+    )
+    if replace_engine is not None:
+        engine_targets = {
+            target
+            for target in files
+            if target == replace_engine or replace_engine in target.parents
+        }
     backups: list[tuple[Path, Path]] = []
     applied: list[Path] = []
     try:
@@ -262,7 +315,12 @@ def _apply_files(files: dict[Path, bytes], target_root: Path, *, dry_run: bool =
             stage_path = stage / relative
             stage_path.parent.mkdir(parents=True, exist_ok=True)
             stage_path.write_bytes(payload)
-            staged[target] = stage_path
+            if target not in engine_targets:
+                staged[target] = stage_path
+        if replace_engine is not None:
+            staged_engine = stage / replace_engine.relative_to(target_root)
+            if not staged_engine.is_dir():
+                raise RuntimeError(f"staged engine tree is missing: {replace_engine}")
         for target in sorted(staged):
             target.parent.mkdir(parents=True, exist_ok=True)
             if _exists(target):
@@ -271,6 +329,12 @@ def _apply_files(files: dict[Path, bytes], target_root: Path, *, dry_run: bool =
                 backups.append((target, backup))
             os.replace(str(staged[target]), str(target))
             applied.append(target)
+        if replace_engine is not None and staged_engine is not None:
+            backup = _backup_path(replace_engine)
+            os.replace(str(replace_engine), str(backup))
+            backups.append((replace_engine, backup))
+            os.replace(str(staged_engine), str(replace_engine))
+            applied.append(replace_engine)
         return applied
     except Exception as commit_error:
         rollback_error: Exception | None = None
@@ -304,7 +368,8 @@ def install(source_root: Path, target_root: Path, *, adapters: list[str] | None 
     if dry_run:
         _apply_files(files, target_root, dry_run=True)
         return
-    _apply_files(files, target_root)
+    replace_engine = engine_target if copy_engine and replace and engine_target.exists() else None
+    _apply_files(files, target_root, replace_engine=replace_engine)
     print(f"installed-engine={engine_target} ({len(engine_files)} files)")
 
 

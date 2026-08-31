@@ -80,8 +80,24 @@ class LessonSkillHardeningTests(unittest.TestCase):
             agents = (target / "AGENTS.md").read_text(encoding="utf-8")
             self.assertEqual(agents.count(install_adapters.MARKER_START), 1)
             self.assertIn(".lesson-plan-docx-generator/SKILL.md", agents)
-            self.assertIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents)
+            self.assertNotIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents)
+            self.assertIn("--copy-engine", agents)
             self.assertTrue((target / ".lesson-plan-docx-generator" / "SKILL.md").is_file())
+            self.assertTrue((target / ".lesson-plan-docx-generator" / "CONVENTIONS.md").is_file())
+            for minimal_name in ("SKILL.md", "通用提示词.md", "AGENTS.md", "CONVENTIONS.md"):
+                minimal_text = (target / ".lesson-plan-docx-generator" / minimal_name).read_text(encoding="utf-8")
+                self.assertNotIn("scripts/generate_lesson_plans.py", minimal_text)
+                self.assertNotIn("docs/content-contract-v2.md", minimal_text)
+                self.assertNotIn("examples/tasks.example.json", minimal_text)
+            full_target = Path(temp_name) / "full-project"
+            install_adapters.install(LESSON, full_target, adapters=["all"], copy_engine=True)
+            full_agents = (full_target / "AGENTS.md").read_text(encoding="utf-8")
+            self.assertIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", full_agents)
+            stale = full_target / ".lesson-plan-docx-generator" / "obsolete-helper.py"
+            stale.write_text("stale", encoding="utf-8")
+            install_adapters.install(LESSON, full_target, adapters=["all"], copy_engine=True, replace=True)
+            self.assertFalse(stale.exists())
+            self.assertTrue(any(path.name.startswith(".lesson-plan-docx-generator.backup_") for path in full_target.iterdir()))
             install_adapters.install(LESSON, target, adapters=["agents"])
             self.assertEqual((target / "AGENTS.md").read_text(encoding="utf-8").count(install_adapters.MARKER_START), 1)
             aider = target / ".aider.conf.yml"
@@ -141,6 +157,14 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 notes="Agent inspected representative pages.",
             )
             validate_visual_inspection(output, qa_report, evidence_path)
+            valid_evidence = evidence_path.read_bytes()
+            empty_evidence = json.loads(valid_evidence.decode("utf-8"))
+            empty_evidence["inspected_files"] = []
+            empty_evidence["inspected_pages"] = {}
+            evidence_path.write_text(json.dumps(empty_evidence, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "at least one inspected"):
+                validate_visual_inspection(output, qa_report, evidence_path)
+            evidence_path.write_bytes(valid_evidence)
             lesson.write_bytes(b"changed")
             with self.assertRaisesRegex(ValueError, "stale"):
                 validate_visual_inspection(output, qa_report, evidence_path)

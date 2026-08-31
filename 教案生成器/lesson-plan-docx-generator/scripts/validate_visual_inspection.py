@@ -66,6 +66,15 @@ def validate_visual_inspection(
     available = {path.name for path in directory.glob("*.docx") if path.is_file() and not path.is_symlink()}
     if set(inspected_files) != set(inspected_pages) or not set(inspected_files) <= available:
         raise ValueError("visual evidence references missing or unexpected DOCX files")
+    if not inspected_files or not inspected_pages:
+        raise ValueError("visual evidence must include at least one inspected DOCX and page")
+    if any(
+        not isinstance(pages, list)
+        or not pages
+        or any(not isinstance(page, int) or page <= 0 for page in pages)
+        for pages in inspected_pages.values()
+    ):
+        raise ValueError("visual evidence must include positive inspected page numbers")
 
     page_counts = report.get("render", {}).get("page_counts")
     if not evidence.get("page_bounds_verified"):
