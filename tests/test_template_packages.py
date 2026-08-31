@@ -181,6 +181,15 @@ def run_script(
     *args: str,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    if env is None:
+        env = os.environ.copy()
+        if (
+            script.resolve().is_relative_to(LESSON.resolve())
+            and ("--skip-template-validation" in args or "--skip-output-validation" in args)
+        ):
+            # Legacy compatibility tests exercise these switches explicitly;
+            # production callers still need to opt in through the environment.
+            env.setdefault("LESSON_ALLOW_UNSAFE_VALIDATION_SKIP", "1")
     return subprocess.run(
         [str(PYTHON), str(script), *args],
         cwd=ROOT,

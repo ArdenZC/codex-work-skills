@@ -286,6 +286,191 @@ INTRA_GENERIC_TWO_CHAR_ANCHORS = frozenset(
     {"数据", "结果", "记录", "流程", "内容", "方法", "任务", "方案", "问题", "过程", "系统", "项目", "要求", "工作"}
 )
 
+# Implementation coherence is deliberately narrower than a general-purpose
+# language classifier.  Only stable pedagogical labels/modalities and a small
+# set of facilitation sentence shapes may stand on their own; domain-bearing
+# items still have to connect to the lesson's main semantic component.
+IMPLEMENTATION_ITEM_FIELDS = (
+    "label",
+    "modality",
+    "content",
+    "teacher_actions",
+    "student_actions",
+    "objective",
+)
+IMPLEMENTATION_GENERIC_PEDAGOGICAL_ITEMS = frozenset(
+    {
+        "课前准备",
+        "任务导入",
+        "案例导入",
+        "任务介绍",
+        "方法示范",
+        "方法演示",
+        "操作演示",
+        "写法示范",
+        "任务实施",
+        "任务拓展",
+        "诊断拓展",
+        "项目实训",
+        "组间互评",
+        "小组诊断",
+        "同伴校审",
+        "成果展示",
+        "课堂小结",
+        "课堂总结",
+        "课后完善",
+        "线上",
+        "线下",
+        "线上线下",
+        "线上+线下",
+        "讲授",
+        "演示",
+        "实训",
+        "实践",
+        "小组实训",
+        "小组研讨",
+        "小组讨论",
+        "小组协作",
+        "任务驱动",
+        "情境模拟",
+        "教师巡视",
+        "教师指导",
+        "教师演示",
+        "教师讲授",
+        "教师点评",
+        "教师总结",
+        "教师组织课堂活动",
+        "组织课堂活动",
+        "组织快速互审",
+        "学生讨论",
+        "学生实践",
+        "学生展示",
+        "学生记录",
+        "学生复述",
+        "分组展示",
+        "完成练习",
+        "提交成果",
+        "形成成果",
+        "形成阶段成果",
+        "形成可复核成果",
+        "记录",
+        "总结",
+    }
+)
+IMPLEMENTATION_GENERIC_PEDAGOGICAL_SUFFIXES = (
+    "准备",
+    "导入",
+    "介绍",
+    "示范",
+    "演示",
+    "练习",
+    "演练",
+    "实训",
+    "实践",
+    "研讨",
+    "讨论",
+    "协作",
+    "复核",
+    "交付",
+    "互评",
+    "互查",
+    "互审",
+    "校审",
+    "观察",
+    "诊断",
+    "判断",
+    "核对",
+    "复盘",
+    "总结",
+    "推演",
+    "外显",
+    "轮换",
+    "辨析",
+    "决策",
+    "联结",
+    "修订",
+    "跟踪",
+    "回收",
+    "封装",
+    "整理",
+    "交接",
+    "制证",
+    "编表",
+    "勾稽",
+    "清点",
+    "串联",
+    "升级",
+    "匹配",
+    "预习",
+)
+IMPLEMENTATION_SUBSTANTIVE_MARKERS = (
+    "sql",
+    "数据库",
+    "索引",
+    "患者",
+    "血压",
+    "java",
+    "er图",
+    "代码",
+    "凭证",
+    "记账",
+    "会计",
+    "账簿",
+    "科目",
+    "账户",
+    "制证",
+    "编表",
+    "票据",
+    "单据",
+)
+IMPLEMENTATION_GENERIC_ACTION_PATTERNS = tuple(
+    re.compile(pattern)
+    for pattern in (
+        r"^(?:教师|学生)?(?:巡视|指导|点评|总结)",
+        r"^(?:熟悉|示范|指出|批注|组织|连接|逐项示范|提升.+能力)",
+        r"^(?:根据|分配|提出|复述|把|提供|将|核验|掌握|引导|归纳|标注|追问|给出|为|建立|分工|依据|按|让|口头|串联|说明|尝试)",
+        r"^反馈.+",
+        r"^呈现.+",
+        r"^记录分类依据",
+        r"^形成.+(?:信息|成果)$",
+        r"^(?:提交|上传).*(?:修订|成果|疑点|报告|记录)",
+        r"^记录.+(?:口述|材料|顺序|时间压力|个人贡献|后续能力目标|措辞)",
+        r"^收集.+(?:材料|经验)$",
+        r"^收集材料",
+        r"^记录材料",
+        r"^呈现.+(?:要求|问题)$",
+        r"^复盘.+(?:贡献|目标)$",
+        r"^展示.+材料包$",
+        r"^提出哪些.+",
+        r"^补充一张.+",
+        r"^写出.+理由$",
+        r"^对比是否.+",
+        r"^修正.+判断$",
+        r"^交付.+业务$",
+        r"^明确.+(?:任务|要求)$",
+        r"^检验.+(?:步骤|习惯|成果)$",
+        r"^统一.+反馈.+",
+        r"^从审核者.+",
+        r"^从案例中.+",
+        r"^界定.+",
+        r"^将.+(?:评语|证据|档|步骤|指令)$",
+        r"^指定.+",
+        r"^回收.+",
+        r"^完成一次.+(?:成果展示|项目交付)$",
+    )
+)
+
+# Existing accounting fixtures use conventional aliases (票据/单据,
+# 制证/凭证, 账户/核算).  These are deterministic anchor equivalences, not
+# a new semantic classifier, and are used only for implementation items.
+IMPLEMENTATION_ANCHOR_ALIAS_GROUPS = (
+    frozenset({"票据", "单据", "凭证"}),
+    frozenset({"制证", "凭证", "记账"}),
+    frozenset({"编表", "试算", "平衡表", "核算", "账户"}),
+    frozenset({"会计", "账簿", "科目", "借贷", "核算", "账户", "凭证"}),
+    frozenset({"错行", "差错", "错误", "差异", "更正", "审核", "复核"}),
+)
+
 
 def _diagnostic_fragment(value: Any, *, limit: int = DIAGNOSTIC_PREVIEW_MAX_CHARS) -> dict[str, str]:
     """Expose only a bounded preview plus a stable digest in QA diagnostics."""
@@ -315,6 +500,63 @@ def _normalize_item(value: Any) -> str:
 
 def _meaningful_length(value: Any) -> int:
     return len(re.sub(r"\s+", "", unicodedata.normalize("NFKC", str(value))).strip())
+
+
+def _implementation_items(stage: dict[str, Any], field: str) -> list[Any]:
+    value = stage.get(field, "")
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    return [value] if value is not None and str(value).strip() else []
+
+
+def _is_generic_implementation_item(field: str, value: Any) -> bool:
+    """Return whether one implementation item is a stable generic action."""
+
+    normalized = _normalize_item(value)
+    if not normalized:
+        return True
+    if normalized in {
+        _normalize_item(item) for item in IMPLEMENTATION_GENERIC_PEDAGOGICAL_ITEMS
+    }:
+        return True
+    if any(marker in normalized for marker in IMPLEMENTATION_SUBSTANTIVE_MARKERS):
+        return False
+    if field in {"label", "modality"} and any(
+        normalized.endswith(suffix) for suffix in IMPLEMENTATION_GENERIC_PEDAGOGICAL_SUFFIXES
+    ):
+        return True
+    if field in {"teacher_actions", "student_actions", "objective"}:
+        return any(pattern.search(normalized) for pattern in IMPLEMENTATION_GENERIC_ACTION_PATTERNS)
+    return False
+
+
+def _implementation_anchor_evidence(left: Any, right: Any) -> dict[str, Any]:
+    """Add only deterministic domain aliases to the existing intra anchor gate."""
+
+    evidence = _intra_anchor_evidence(left, right)
+    if evidence["status"] == "passed":
+        return evidence
+    left_text = _normalize_item(left)
+    right_text = _normalize_item(right)
+    for group in IMPLEMENTATION_ANCHOR_ALIAS_GROUPS:
+        left_matches = sorted(term for term in group if _normalize_item(term) in left_text)
+        right_matches = sorted(term for term in group if _normalize_item(term) in right_text)
+        if not left_matches or not right_matches:
+            continue
+        result = dict(evidence)
+        result.update(
+            {
+                "status": "passed",
+                "reason": "shared deterministic implementation domain alias",
+                "matched_fragments": [f"{left_matches[0]}/{right_matches[0]}"],
+                "longest_substantive_match": left_matches[0],
+                "substantive_residuals": [left_matches[0]],
+                "evidence_strength": max(2, len(left_matches[0])),
+                "score": round(min(1.0, max(2, len(left_matches[0])) / 12), 4),
+            }
+        )
+        return result
+    return evidence
 
 
 def _item_values(lesson: dict[str, Any]) -> dict[str, list[str]]:
@@ -1428,12 +1670,8 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
         for stage in lesson.get("implementation", []):
             stage_id = str(stage.get("id", ""))
             stage_values: list[Any] = []
-            for field in IMPLEMENTATION_STAGE_FIELDS:
-                value = stage.get(field, [])
-                if isinstance(value, (list, tuple)):
-                    stage_values.extend(value)
-                elif value:
-                    stage_values.append(value)
+            for field in IMPLEMENTATION_ITEM_FIELDS:
+                stage_values.extend(_implementation_items(stage, field))
             stage_summary = "\n".join(str(value) for value in stage_values if str(value).strip())
             component_matches: list[tuple[str, dict[str, Any]]] = []
             for core_id in sorted(task_component_ids):
@@ -1446,13 +1684,89 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
                     stage_evidence = _intra_anchor_evidence(stage_summary, progression_values.get(field, ""))
                     if stage_evidence["status"] == "passed":
                         progression_matches.append((field, core_id, stage_evidence))
-            stage_passed = bool(component_matches or progression_matches)
+            item_records: list[dict[str, Any]] = []
+            for field in IMPLEMENTATION_ITEM_FIELDS:
+                for item_index, item in enumerate(_implementation_items(stage, field)):
+                    diagnostic = _diagnostic_fragment(item)
+                    if _is_generic_implementation_item(field, item):
+                        item_records.append(
+                            {
+                                "field": field,
+                                "item_index": item_index,
+                                "status": "passed",
+                                "reason": "generic pedagogical item exempt from substantive anchor",
+                                "diagnostic": diagnostic,
+                                "generic": True,
+                            }
+                        )
+                        continue
+
+                    item_component_matches: list[tuple[str, dict[str, Any]]] = []
+                    for core_id in sorted(task_component_ids):
+                        evidence = _implementation_anchor_evidence(item, node_by_id[core_id]["value"])
+                        if evidence["status"] == "passed":
+                            item_component_matches.append((core_id, evidence))
+                    item_progression_matches: list[tuple[str, str, dict[str, Any]]] = []
+                    if stage_id in boundary_stage_ids:
+                        for progression_field, _value, core_id, _progression_evidence in eligible_progression:
+                            item_evidence = _implementation_anchor_evidence(
+                                item,
+                                progression_values.get(progression_field, ""),
+                            )
+                            if item_evidence["status"] == "passed":
+                                item_progression_matches.append((progression_field, core_id, item_evidence))
+                    item_passed = bool(item_component_matches or item_progression_matches)
+                    item_record = {
+                        "field": field,
+                        "item_index": item_index,
+                        "status": "passed" if item_passed else "failed",
+                        "reason": (
+                            "substantive item is connected to lesson main semantic component"
+                            if item_passed
+                            else "substantive item is disconnected from lesson main semantic component"
+                        ),
+                        "diagnostic": diagnostic,
+                        "generic": False,
+                        "matched_component_members": [match[0] for match in item_component_matches],
+                        "matched_progression_fields": [match[0] for match in item_progression_matches],
+                        "evidence": [
+                            {"target": target, "evidence": _intra_diagnostic_evidence(evidence)}
+                            for target, evidence in item_component_matches
+                        ]
+                        + [
+                            {
+                                "target": progression_field,
+                                "component_member": core_id,
+                                "evidence": _intra_diagnostic_evidence(evidence),
+                            }
+                            for progression_field, core_id, evidence in item_progression_matches
+                        ],
+                    }
+                    item_records.append(item_record)
+                    if not item_passed:
+                        implementation_failures.append(
+                            {
+                                "lesson_id": lesson_id,
+                                "failed_gate": "implementation_item_coherence",
+                                "stage": stage_id,
+                                "stage_id": stage_id,
+                                "field": field,
+                                "item_index": item_index,
+                                "status": "failed",
+                                "score": 0.0,
+                                "anchor_status": "failed",
+                                "reason": item_record["reason"],
+                                "diagnostic": diagnostic,
+                            }
+                        )
+            stage_passed = bool(item_records) and all(item["status"] == "passed" for item in item_records)
             stage_record = {
                 "stage_id": stage_id,
                 "status": "passed" if stage_passed else "failed",
                 "matched_component_members": [item[0] for item in component_matches],
                 "matched_progression_fields": [item[0] for item in progression_matches],
                 "aggregate_diagnostic": _diagnostic_fragment(stage_summary),
+                "items": item_records,
                 "evidence": [
                     {"target": target, "evidence": _intra_diagnostic_evidence(evidence)}
                     for target, evidence in component_matches
@@ -1463,15 +1777,22 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
                 ],
             }
             implementation_records.append(stage_record)
-            if not stage_passed:
+            if not stage_passed and not any(
+                failure.get("stage_id") == stage_id for failure in implementation_failures
+            ):
                 implementation_failures.append(
                     {
                         "lesson_id": lesson_id,
                         "failed_gate": "implementation_stage_coherence",
+                        "stage": stage_id,
                         "stage_id": stage_id,
+                        "field": None,
+                        "item_index": None,
+                        "status": "failed",
                         "score": 0.0,
                         "anchor_status": "failed",
                         "reason": "implementation stage has no substantive anchor to the task main component",
+                        "diagnostic": _diagnostic_fragment(stage_summary),
                     }
                 )
 
@@ -1497,7 +1818,7 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
             "implementation": {
                 "status": "passed" if not implementation_failures else "failed",
                 "stages": implementation_records,
-                "rule": "each stage aggregate must anchor to a task-component core node; boundary stages may use anchored progression",
+                "rule": "each substantive implementation item must anchor to a task-component core node; generic pedagogical items are exempt and boundary items may use anchored progression",
             },
         }
         checks.append(record)
@@ -1522,7 +1843,7 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
             "technical_acronym_allowed": True,
             "gate_a": "task must have a direct substantive edge to an instructional body node",
             "gate_b": "task and deliverable must belong to the same connected core component",
-            "implementation": "stage aggregate content/actions/objective must anchor to task component",
+            "implementation": "each substantive stage item, including label and modality, must anchor to task component; generic pedagogical items are exempt",
         },
     }
 
@@ -1530,6 +1851,8 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
 def _intra_calibration_stage(stage_id: str, text: str) -> dict[str, Any]:
     return {
         "id": stage_id,
+        "label": "任务实施",
+        "modality": "小组实训",
         "content": [text],
         "teacher_actions": ["组织课堂活动"],
         "student_actions": ["完成练习"],

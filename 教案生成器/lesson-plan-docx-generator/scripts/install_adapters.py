@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import shutil
@@ -15,6 +17,9 @@ from path_safety import paths_overlap
 
 
 ENGINE_NAME = ".lesson-plan-docx-generator"
+ENGINE_STATE_FILE = Path(".engine-state.json")
+ENGINE_STATE_SCHEMA_VERSION = 1
+CONTENT_CONTRACT_VERSION = "2.0"
 MARKER_ID = "lesson-plan-docx-generator"
 MARKER_START = f"<!-- codex-skill: {MARKER_ID}:start -->"
 MARKER_END = f"<!-- codex-skill: {MARKER_ID}:end -->"
@@ -36,6 +41,7 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("scripts/render_qa.py"),
     Path("scripts/semantic_bookmarks.py"),
     Path("scripts/bookmark_utils.py"),
+    Path("scripts/check_dependencies.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
@@ -44,6 +50,7 @@ FULL_ENGINE_RUNTIME_FILES = (
 # tuple; it now represents the complete health inventory rather than three
 # representative files.
 FULL_ENGINE_SENTINELS = FULL_ENGINE_RUNTIME_FILES
+FULL_ENGINE_INVENTORY_FILES = tuple(dict.fromkeys((*MINIMAL_ENGINE_FILES, *FULL_ENGINE_RUNTIME_FILES)))
 REFERENCE_TEXT_SUFFIXES = {".md", ".mdc", ".yml", ".yaml"}
 RUNTIME_REFERENCE = re.compile(
     r"(?<![./\w-])"
@@ -130,6 +137,83 @@ def _payload_for_engine(source: Path, *, copy_engine: bool) -> bytes:
     return source.read_bytes()
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _runtime_inventory_from_source(source_root: Path) -> dict[str, str]:
+    """Hash the bytes that a full installed engine actually receives."""
+
+    inventory: dict[str, str] = {}
+    for relative in FULL_ENGINE_INVENTORY_FILES:
+        source = source_root / relative
+        if source.is_symlink() or not source.is_file():
+            raise FileNotFoundError(f"Lesson engine source is missing or unsafe: {source}")
+        inventory[relative.as_posix()] = _sha256_bytes(_payload_for_engine(source, copy_engine=True))
+    return dict(sorted(inventory.items()))
+
+
+def _runtime_fingerprint(inventory: dict[str, str]) -> str:
+    canonical = json.dumps(inventory, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return _sha256_bytes(canonical)
+
+
+def _engine_state_payload(source_root: Path) -> bytes:
+    inventory = _runtime_inventory_from_source(source_root)
+    state = {
+        "schema_version": ENGINE_STATE_SCHEMA_VERSION,
+        "skill": "lesson-plan-docx-generator",
+        "content_contract_version": CONTENT_CONTRACT_VERSION,
+        "runtime_fingerprint": _runtime_fingerprint(inventory),
+        "runtime_inventory": inventory,
+    }
+    return (json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def _read_engine_state(engine_target: Path) -> dict[str, object] | None:
+    state_path = engine_target / ENGINE_STATE_FILE
+    if state_path.is_symlink() or not state_path.is_file():
+        return None
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    return state if isinstance(state, dict) else None
+
+
+def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) -> bool:
+    inventory = state.get("runtime_inventory")
+    if not isinstance(inventory, dict):
+        return False
+    expected_keys = {relative.as_posix() for relative in FULL_ENGINE_INVENTORY_FILES}
+    if set(inventory) != expected_keys:
+        return False
+    if any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in inventory.values()):
+        return False
+    if state.get("schema_version") != ENGINE_STATE_SCHEMA_VERSION:
+        return False
+    if state.get("skill") != "lesson-plan-docx-generator":
+        return False
+    if state.get("content_contract_version") != CONTENT_CONTRACT_VERSION:
+        return False
+    if state.get("runtime_fingerprint") != _runtime_fingerprint(inventory):
+        return False
+    for relative_name, expected_hash in inventory.items():
+        relative = Path(relative_name)
+        path = engine_target / relative
+        if path.is_symlink() or not path.is_file() or _sha256_file(path) != expected_hash:
+            return False
+    return True
+
+
 def _marker_block(payload: str) -> str:
     body = payload.strip("\r\n")
     return f"{MARKER_START}\n{body}\n{MARKER_END}"
@@ -207,13 +291,27 @@ def _assert_no_symlink_ancestor(target_root: Path, path: Path) -> None:
 
 def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
     if copy_engine:
-        return [path.relative_to(source_root) for path in source_root.rglob("*") if path.is_file() and not path.is_symlink() and not ignore_patterns("", [path.name])]
+        return sorted(
+            (
+                path.relative_to(source_root)
+                for path in source_root.rglob("*")
+                if path.is_file()
+                and not path.is_symlink()
+                and path.name != ENGINE_STATE_FILE.name
+                and not ignore_patterns("", [path.name])
+            ),
+            key=lambda path: path.as_posix(),
+        )
     return list(MINIMAL_ENGINE_FILES)
 
 
 def _required_engine_files(source_root: Path, copy_engine: bool) -> tuple[Path, ...]:
-    required = (*MINIMAL_ENGINE_FILES, *(FULL_ENGINE_RUNTIME_FILES if copy_engine else ()))
-    missing = [source_root / relative for relative in required if not (source_root / relative).is_file()]
+    required = FULL_ENGINE_INVENTORY_FILES if copy_engine else MINIMAL_ENGINE_FILES
+    missing = [
+        source_root / relative
+        for relative in required
+        if (source_root / relative).is_symlink() or not (source_root / relative).is_file()
+    ]
     if missing:
         raise FileNotFoundError(
             "Lesson adapter source is incomplete; missing critical runtime files: "
@@ -222,7 +320,7 @@ def _required_engine_files(source_root: Path, copy_engine: bool) -> tuple[Path, 
     return required
 
 
-def _detect_existing_engine_mode(engine_target: Path) -> str:
+def _detect_existing_engine_mode(engine_target: Path, source_root: Path | None = None) -> str:
     """Classify an existing project-local engine without following symlinks."""
 
     if not _exists(engine_target):
@@ -237,9 +335,28 @@ def _detect_existing_engine_mode(engine_target: Path) -> str:
     minimal = all(real_file(relative) for relative in MINIMAL_ENGINE_FILES)
     full_states = [real_file(relative) for relative in FULL_ENGINE_RUNTIME_FILES]
     if minimal and all(full_states):
-        return "full"
+        state_path = engine_target / ENGINE_STATE_FILE
+        if state_path.is_symlink():
+            return "inconsistent"
+        if not state_path.exists():
+            return "full-stale"
+        state = _read_engine_state(engine_target)
+        if state is None or not _installed_inventory_matches(engine_target, state):
+            return "inconsistent"
+        if source_root is None:
+            return "full-current"
+        try:
+            source_inventory = _runtime_inventory_from_source(source_root)
+        except (FileNotFoundError, OSError, UnicodeError):
+            return "full-stale"
+        return (
+            "full-current"
+            if state.get("runtime_fingerprint") == _runtime_fingerprint(source_inventory)
+            and state.get("runtime_inventory") == source_inventory
+            else "full-stale"
+        )
     if minimal and not any(full_states):
-        return "minimal"
+        return "minimal" if not (engine_target / ENGINE_STATE_FILE).exists() else "inconsistent"
     return "inconsistent"
 
 
@@ -276,15 +393,20 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         raise ValueError(f"Namespaced engine target must not be a symlink: {engine_target}")
     if engine_target.exists() and not engine_target.is_dir():
         raise ValueError(f"Namespaced engine target is not a directory: {engine_target}")
-    existing_engine_mode = _detect_existing_engine_mode(engine_target)
+    existing_engine_mode = _detect_existing_engine_mode(engine_target, source_root)
     if existing_engine_mode == "inconsistent" and not (copy_engine and replace):
         raise ValueError(
             f"Namespaced engine is inconsistent: {engine_target}; refusing to mutate it"
         )
+    if existing_engine_mode == "full-stale" and not (copy_engine and replace):
+        raise ValueError(
+            "A full Lesson engine is installed but is older/different from the current source. "
+            "Run with --copy-engine --replace to upgrade it."
+        )
     if copy_engine and existing_engine_mode != "none" and not replace:
         # A full engine replacement can otherwise leave stale files behind.
         raise FileExistsError(f"Namespaced engine already exists: {engine_target}; use --replace")
-    adapter_runtime_available = copy_engine or existing_engine_mode == "full"
+    adapter_runtime_available = copy_engine or existing_engine_mode == "full-current"
 
     files: dict[Path, bytes] = {}
     shared_targets = {relative for name in selected for relative in ADAPTER_PATHS[name] if relative in SHARED_SOURCES}
@@ -319,7 +441,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
                 files[target] = payload
 
     engine_files = _source_files(source_root, copy_engine)
-    if not copy_engine and existing_engine_mode == "full":
+    if not copy_engine and existing_engine_mode == "full-current":
         # Default installs update project-root adapter rules but preserve a
         # complete runtime byte-for-byte.  Never downgrade or rewrite it.
         engine_files = []
@@ -329,6 +451,12 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         payload = _payload_for_engine(source, copy_engine=copy_engine)
         if not target.exists() or replace or target.read_bytes() != payload:
             files[target] = payload
+    if copy_engine:
+        state_target = engine_target / ENGINE_STATE_FILE
+        state_payload = _engine_state_payload(source_root)
+        if not state_target.exists() or replace or state_target.read_bytes() != state_payload:
+            files[state_target] = state_payload
+        engine_files = [*engine_files, ENGINE_STATE_FILE]
     # Validate every destination's parent chain before the transaction creates
     # its staging directory or any missing project directories.
     for target in files:
@@ -457,7 +585,8 @@ def install(source_root: Path, target_root: Path, *, adapters: list[str] | None 
     files, engine_target, engine_files = build_plan(source_root, target_root, names, replace=replace, copy_engine=copy_engine)
     print(f"source={source_root}")
     print(f"target={target_root}")
-    existing_engine_mode = _detect_existing_engine_mode(engine_target)
+    existing_engine_mode = _detect_existing_engine_mode(engine_target, source_root)
+    print(f"engine_mode={existing_engine_mode}")
     print(f"engine={engine_target}")
     print(f"planned_files={len(files)}")
     if dry_run:
@@ -465,7 +594,7 @@ def install(source_root: Path, target_root: Path, *, adapters: list[str] | None 
         return
     replace_engine = engine_target if copy_engine and replace and engine_target.exists() else None
     _apply_files(files, target_root, replace_engine=replace_engine)
-    if not copy_engine and existing_engine_mode == "full":
+    if not copy_engine and existing_engine_mode == "full-current":
         print(f"preserved-full-engine={engine_target}")
     else:
         print(f"installed-engine={engine_target} ({len(engine_files)} files)")

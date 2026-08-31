@@ -30,6 +30,7 @@ from validate_template import validate_template
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
+UNSAFE_VALIDATION_SKIP_ENV = "LESSON_ALLOW_UNSAFE_VALIDATION_SKIP"
 
 
 
@@ -353,6 +354,18 @@ def _unique_file_backup_path(path: Path) -> Path:
     raise FileExistsError(f"Unable to allocate a backup path beside {path}")
 
 
+def _best_effort_post_commit_cleanup(path: Path | None, label: str) -> str | None:
+    """Clean an old backup after publication without changing its outcome."""
+
+    if path is None:
+        return None
+    try:
+        _remove_path(path)
+    except Exception as exc:  # pragma: no cover - filesystem failures vary by platform
+        return f"cleanup failed for {label}: {exc}; residual backup path: {path}"
+    return None
+
+
 def atomic_commit_candidate_with_external_qa(
     candidate: Path,
     out_dir: Path,
@@ -385,12 +398,24 @@ def atomic_commit_candidate_with_external_qa(
         os.replace(str(external_candidate), str(external_qa))
         qa_swapped = True
 
+        # Publication is complete once both new paths are in place.  Cleanup
+        # is intentionally outside rollback: a filesystem failure while
+        # deleting an old backup must leave the new output and QA available.
+        cleanup_diagnostics = []
         if displaced_output is not None and not backup_existing:
-            _remove_path(displaced_output)
-            displaced_output = None
+            cleanup_error = _best_effort_post_commit_cleanup(displaced_output, "old output backup")
+            if cleanup_error:
+                cleanup_diagnostics.append(cleanup_error)
+            else:
+                displaced_output = None
         if displaced_qa is not None:
-            _remove_path(displaced_qa)
-            displaced_qa = None
+            cleanup_error = _best_effort_post_commit_cleanup(displaced_qa, "old external QA backup")
+            if cleanup_error:
+                cleanup_diagnostics.append(cleanup_error)
+            else:
+                displaced_qa = None
+        for diagnostic in cleanup_diagnostics:
+            print(f"WARNING: {diagnostic}", file=sys.stderr)
         return displaced_output
     except Exception as commit_error:
         rollback_errors: list[str] = []
@@ -432,6 +457,8 @@ def main() -> None:
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
     parser.add_argument("--qa-report", default="")
     args = parser.parse_args()
+    if (args.skip_template_validation or args.skip_output_validation) and os.environ.get(UNSAFE_VALIDATION_SKIP_ENV) != "1":
+        raise RuntimeError("Unsafe validation bypass is disabled.")
 
     template, manifest_path, manifest = resolve_template_package(
         args.template or None,

@@ -28,6 +28,7 @@ REQUIRED_RELATIVE_FILES = (
     Path("scripts/render_qa.py"),
     Path("scripts/semantic_bookmarks.py"),
     Path("scripts/bookmark_utils.py"),
+    Path("scripts/check_dependencies.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),

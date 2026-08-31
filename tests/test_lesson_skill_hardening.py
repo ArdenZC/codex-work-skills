@@ -5,6 +5,7 @@ import importlib
 import importlib.util
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -100,6 +101,71 @@ class LessonSkillHardeningTests(unittest.TestCase):
         cases = content_quality.intra_lesson_coherence_calibration()
         self.assertGreaterEqual(len(cases), 8)
         self.assertTrue(all(item["expected"] == item["actual"] for item in cases), cases)
+
+    def test_implementation_item_coherence_checks_all_fields_and_bounded_diagnostics(self) -> None:
+        def lesson(domain: str, **stage_overrides):
+            if domain == "nursing":
+                task = "完成患者生命体征测量与护理记录"
+                body = ["测量患者血压、体温并判断异常", "记录护理结果并形成生命体征测量记录"]
+                deliverable = "生命体征测量记录与护理结果"
+            else:
+                task = "完成数据库查询与索引维护"
+                body = ["编写 SQL 查询语句并分析查询结果", "形成数据库查询报告"]
+                deliverable = "数据库查询报告"
+            stage = {
+                "id": "task_implementation",
+                "label": "任务实施",
+                "modality": "小组实训",
+                "content": [body[0], body[1]],
+                "teacher_actions": ["教师巡视"],
+                "student_actions": ["学生讨论"],
+                "objective": body[0],
+            }
+            stage.update(stage_overrides)
+            return {
+                "lesson_id": "L01",
+                "task": task,
+                "teaching_content": body,
+                "key_point": {"content": [body[0]]},
+                "difficult_point": {"content": [body[1]]},
+                "progression": {"deliverable": deliverable},
+                "implementation": [stage],
+            }
+
+        cases = (
+            ("nursing mixed content", lesson("nursing", content=["完成血压测量", "记录护理结果", "使用 SQL 创建数据库索引"]), "content", 2),
+            ("nursing mixed teacher action", lesson("nursing", teacher_actions=["教师巡视", "演示数据库索引优化"]), "teacher_actions", 1),
+            ("database mixed student action", lesson("database", student_actions=["完成 SQL 查询", "测量患者血压"]), "student_actions", 1),
+            ("nursing domain label", lesson("nursing", label="数据库索引优化"), "label", 0),
+            ("nursing domain modality", lesson("nursing", modality="SQL数据库查询实训"), "modality", 0),
+        )
+        for name, payload, field, item_index in cases:
+            with self.subTest(case=name):
+                report = content_quality._intra_lesson_coherence([payload], ["L01"])
+                failures = [
+                    item
+                    for item in report["failures"]
+                    if item.get("failed_gate") == "implementation_item_coherence"
+                ]
+                failure = next(item for item in failures if item["field"] == field and item["item_index"] == item_index)
+                self.assertEqual(failure["status"], "failed")
+                self.assertEqual(failure["reason"], "substantive item is disconnected from lesson main semantic component")
+                self.assertEqual(set(failure["diagnostic"]), {"preview", "text_sha256"})
+                value = payload["implementation"][0][field]
+                value = value if isinstance(value, str) else value[item_index]
+                if len(str(value)) > content_quality.DIAGNOSTIC_PREVIEW_MAX_CHARS:
+                    self.assertNotIn(str(value), failure["diagnostic"]["preview"])
+
+        for name, payload in (
+            ("nursing positive", lesson("nursing", content=["完成血压测量", "记录护理结果"])),
+            ("database positive", lesson("database", content=["编写 SQL 查询", "分析查询结果"])),
+        ):
+            with self.subTest(case=name):
+                report = content_quality._intra_lesson_coherence([payload], ["L01"])
+                self.assertEqual(report["status"], "passed", report)
+                items = report["lessons"][0]["implementation"]["stages"][0]["items"]
+                self.assertTrue(any(item["generic"] for item in items))
+                self.assertTrue(all(item["status"] == "passed" for item in items))
 
     def test_intra_lesson_gate_b_requires_the_main_semantic_component(self) -> None:
         fixture = json.loads(
@@ -398,7 +464,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             with redirect_stdout(output):
                 install_adapters.install(LESSON, full, adapters=["all"], copy_engine=True)
             full_engine = full / install_adapters.ENGINE_NAME
-            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine), "full")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine, LESSON), "full-current")
             full_before = engine_snapshot(full_engine)
             agents = full / "AGENTS.md"
             agents.write_text("project-owned notes\n", encoding="utf-8")
@@ -413,13 +479,41 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents_text)
             self.assertNotIn("the full Lesson runtime (install with --copy-engine)", agents_text)
 
+            legacy = folder / "legacy-full"
+            install_adapters.install(LESSON, legacy, adapters=["all"], copy_engine=True)
+            legacy_engine = legacy / install_adapters.ENGINE_NAME
+            (legacy_engine / install_adapters.ENGINE_STATE_FILE).unlink()
+            self.assertEqual(install_adapters._detect_existing_engine_mode(legacy_engine, LESSON), "full-stale")
+            legacy_before = tree_snapshot(legacy)
+            with self.assertRaisesRegex(ValueError, "A full Lesson engine is installed but is older/different"):
+                install_adapters.install(LESSON, legacy, adapters=["agents"])
+            self.assertEqual(tree_snapshot(legacy), legacy_before)
+            install_adapters.install(LESSON, legacy, adapters=["all"], copy_engine=True, replace=True)
+            self.assertEqual(install_adapters._detect_existing_engine_mode(legacy_engine, LESSON), "full-current")
+
             stale = full_engine / "scripts" / "obsolete-helper.py"
             stale.write_text("stale", encoding="utf-8")
             install_adapters.install(LESSON, full, adapters=["all"], copy_engine=True, replace=True)
             self.assertFalse(stale.exists())
-            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine), "full")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine, LESSON), "full-current")
             install_adapters.install(LESSON, full, adapters=["all"], copy_engine=True, replace=True)
-            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine), "full")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine, LESSON), "full-current")
+
+            modified_source = folder / "modified-source"
+            shutil.copytree(LESSON, modified_source)
+            runtime_source = modified_source / "scripts" / "content_quality.py"
+            runtime_source.write_text(runtime_source.read_text(encoding="utf-8") + "\n# source fingerprint probe\n", encoding="utf-8")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine, modified_source), "full-stale")
+            before = tree_snapshot(full)
+            with self.assertRaisesRegex(ValueError, "A full Lesson engine is installed but is older/different"):
+                install_adapters.install(modified_source, full, adapters=["agents"])
+            self.assertEqual(tree_snapshot(full), before)
+            install_adapters.install(modified_source, full, adapters=["all"], copy_engine=True, replace=True)
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine, modified_source), "full-current")
+
+            installed_runtime = full_engine / "scripts" / "content_quality.py"
+            installed_runtime.write_text(installed_runtime.read_text(encoding="utf-8") + "\n# installed mutation\n", encoding="utf-8")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(full_engine, modified_source), "inconsistent")
 
             inconsistent = folder / "inconsistent"
             inconsistent_engine = inconsistent / install_adapters.ENGINE_NAME
@@ -429,14 +523,14 @@ class LessonSkillHardeningTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "inconsistent"):
                 install_adapters.install(LESSON, inconsistent, adapters=["agents"])
             self.assertEqual(tree_snapshot(inconsistent), before)
-            self.assertEqual(install_adapters._detect_existing_engine_mode(inconsistent_engine), "inconsistent")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(inconsistent_engine, LESSON), "inconsistent")
 
             incomplete_full = folder / "incomplete-full"
             install_adapters.install(LESSON, incomplete_full, adapters=["all"], copy_engine=True)
             incomplete_engine = incomplete_full / install_adapters.ENGINE_NAME
             (incomplete_engine / "scripts" / "content_quality.py").unlink()
             before = tree_snapshot(incomplete_full)
-            self.assertEqual(install_adapters._detect_existing_engine_mode(incomplete_engine), "inconsistent")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(incomplete_engine, LESSON), "inconsistent")
             with self.assertRaisesRegex(ValueError, "inconsistent"):
                 install_adapters.install(LESSON, incomplete_full, adapters=["agents"])
             self.assertEqual(tree_snapshot(incomplete_full), before)
@@ -605,9 +699,10 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 "_cleanup_path",
                 return_value="cleanup failed for candidate directory: candidate is locked; residual path: candidate",
             ):
-                with patch.object(sys, "argv", argv):
-                    with redirect_stderr(diagnostics):
-                        lesson_generator.main()
+                with patch.dict(os.environ, {"LESSON_ALLOW_UNSAFE_VALIDATION_SKIP": "1"}):
+                    with patch.object(sys, "argv", argv):
+                        with redirect_stderr(diagnostics):
+                            lesson_generator.main()
             self.assertTrue(output.is_dir())
             self.assertIn("WARNING:", diagnostics.getvalue())
             self.assertIn("residual path:", diagnostics.getvalue())

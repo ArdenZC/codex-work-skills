@@ -165,6 +165,10 @@ def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    if "--skip-template-validation" in args or "--skip-output-validation" in args:
+        # Existing compatibility tests exercise the legacy switches explicitly;
+        # the dedicated unsafe-skip test overrides this to assert fail-closed.
+        env.setdefault("LESSON_ALLOW_UNSAFE_VALIDATION_SKIP", "1")
     return subprocess.run(
         [sys.executable, str(script), *args],
         cwd=ROOT,
@@ -885,6 +889,9 @@ class LessonContentV2Mixin:
         current["teaching_content"] = ["依据SQL查询设计的表结构编写查询语句", "验证查询结果", "整理查询证据"]
         for stage in current["implementation"]:
             stage["content"] = [f"围绕SQL查询设计，{stage['content'][0]}"]
+            stage["teacher_actions"] = ["教师检查SQL查询设计与执行条件"]
+            stage["student_actions"] = ["完成SQL查询并记录查询结果"]
+            stage["objective"] = "形成SQL查询执行依据"
         false_inheritance_report = assess_content_quality(false_inheritance)
         false_inheritance_link = false_inheritance_report["progression"]["declared_prior_links"][0]
         self.assertEqual(false_inheritance_link["artifact_inheritance"]["status"], "failed")
@@ -905,6 +912,9 @@ class LessonContentV2Mixin:
         current["teaching_content"] = ["主键、外键与关系表映射", "依据E-R图确定字段", "检查关系模式约束"]
         for stage in current["implementation"]:
             stage["content"] = [f"围绕关系模式设计，{stage['content'][0]}"]
+            stage["teacher_actions"] = ["教师检查关系模式设计与执行条件"]
+            stage["student_actions"] = ["完成关系模式设计并记录查询结果"]
+            stage["objective"] = "形成关系模式设计依据"
         both_pass_report = assess_content_quality(both_pass)
         both_pass_link = both_pass_report["progression"]["declared_prior_links"][0]
         self.assertEqual(both_pass_link["artifact_inheritance"]["status"], "passed")
@@ -1628,6 +1638,80 @@ class LessonContentV2Mixin:
                     shutil.rmtree(path, ignore_errors=True)
                 else:
                     path.unlink(missing_ok=True)
+
+    def test_external_qa_backup_cleanup_failure_keeps_successful_publication(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-external-cleanup-") as temp_name:
+            folder = Path(temp_name)
+            output = folder / "output"
+            output.mkdir()
+            (output / "old.txt").write_bytes(b"old-output")
+            external = folder / "qa-report.json"
+            external.write_bytes(b"old-qa")
+            candidate = folder / "candidate"
+            candidate.mkdir()
+            (candidate / "new.txt").write_bytes(b"new-output")
+            external_candidate = folder / "qa-candidate.tmp"
+            external_candidate.write_bytes(b"new-qa")
+            real_remove = lesson_generator._remove_path
+            diagnostics = io.StringIO()
+
+            def fail_old_qa_cleanup(path: Path) -> None:
+                if path.name.startswith("_qa-report.json_backup_"):
+                    raise OSError("injected old QA cleanup failure")
+                real_remove(path)
+
+            with patch.object(lesson_generator, "_remove_path", side_effect=fail_old_qa_cleanup):
+                with redirect_stderr(diagnostics):
+                    backup = atomic_commit_candidate_with_external_qa(
+                        candidate,
+                        output,
+                        external_candidate,
+                        external,
+                        backup_existing=True,
+                    )
+            self.assertIsNotNone(backup)
+            self.assertEqual((output / "new.txt").read_bytes(), b"new-output")
+            self.assertEqual(external.read_bytes(), b"new-qa")
+            residual = list(folder.glob("_qa-report.json_backup_*"))
+            self.assertEqual(len(residual), 1)
+            self.assertIn("WARNING:", diagnostics.getvalue())
+            self.assertIn("residual backup path:", diagnostics.getvalue())
+
+    def test_unsafe_validation_skips_require_explicit_test_environment(self) -> None:
+        payload = load_fixture("lesson-plan-input.json")
+        with tempfile.TemporaryDirectory(prefix="lesson-v2-unsafe-skip-") as temp_name:
+            folder = Path(temp_name)
+            source = write_payload(folder, payload)
+            output = folder / "rejected-output"
+            with patch.dict(os.environ, {"LESSON_ALLOW_UNSAFE_VALIDATION_SKIP": "0"}):
+                rejected = run_script(
+                    LESSON / "scripts" / "generate_lesson_plans.py",
+                    "--tasks-json",
+                    str(source),
+                    "--output-dir",
+                    str(output),
+                    "--skip-template-validation",
+                    "--skip-output-validation",
+                )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("Unsafe validation bypass is disabled.", rejected.stderr)
+            self.assertFalse(output.exists())
+
+            allowed_output = folder / "allowed-output"
+            with patch.dict(os.environ, {"LESSON_ALLOW_UNSAFE_VALIDATION_SKIP": "1"}):
+                allowed = run_script(
+                    LESSON / "scripts" / "generate_lesson_plans.py",
+                    "--tasks-json",
+                    str(source),
+                    "--output-dir",
+                    str(allowed_output),
+                    "--skip-template-validation",
+                    "--skip-output-validation",
+                )
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+            report = json.loads((allowed_output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "skipped")
+            self.assertEqual(report["validation_skipped"], ["template", "output"])
 
     def test_content_failure_preserves_existing_output_and_cleans_candidate(self) -> None:
         payload = load_fixture("lesson-plan-input.json")

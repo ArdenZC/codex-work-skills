@@ -128,7 +128,14 @@ scripts/validate_output.py --input-json tasks.json --output-dir output --render
 scripts/validate_visual_inspection.py --output-dir output --qa-report output/qa-report.json --evidence output/visual-inspection.json
 ```
 
-跳过参数只影响相应 QA 层，并必须在报告中明确为 `skipped`；输入契约、内容质量和路径保护不能被跳过。临时 JSON、PDF、图片和 candidate 目录在任务结束后清理，不提交生成 DOCX。
+手动安装及依赖检查（安装器不会自动修改 Python 环境）：
+
+```text
+python scripts/install.py --skills-dir <skills-dir>
+python <skills-dir>\lesson-plan-docx-generator\scripts\check_dependencies.py
+```
+
+`check_dependencies.py` 只读检查 `docx`、`yaml`、`jsonschema`；缺失时提示 `pip install -r requirements.txt`。Agent 生产流程禁止使用 `--skip-template-validation` 或 `--skip-output-validation`；这两个兼容参数只有在显式设置 `LESSON_ALLOW_UNSAFE_VALIDATION_SKIP=1` 时才可用于受控测试，并必须在报告中明确为 `skipped`。输入契约、内容质量和路径保护不能被跳过。临时 JSON、PDF、图片和 candidate 目录在任务结束后清理，不提交生成 DOCX。
 
 ## 模板文件
 
