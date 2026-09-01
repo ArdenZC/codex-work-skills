@@ -1,0 +1,23 @@
+skill:
+  id: practice-task-workorder-generator
+  name: 实践任务工单生成器
+  phase: 1
+template:
+  id: practice-work-order
+  name: 实践任务学习工单模板
+  version: 1.0.0
+  format: docx
+  file: assets/templates/practice-work-order/v1.0.0/template.docx
+generator:
+  version: 1.0.0
+  content_contract: Practice Work Order Content V1
+  lesson_handoff: Practice Task Contract V1
+schema: schemas/work-order-content.schema.json
+fingerprint:
+  algorithm: sha256
+  sha256: F20308238D07C7BFB9B1F9D2A25591D6EE09F13EC5855B7C57FA914CEE9457BD
+  value: F20308238D07C7BFB9B1F9D2A25591D6EE09F13EC5855B7C57FA914CEE9457BD
+validation:
+  require_docx_open: true
+  top_level_tables: 3
+  require_render_check: false

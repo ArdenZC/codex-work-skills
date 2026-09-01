@@ -4,6 +4,13 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 实践任务工单生成器 Phase 1 — 2026-09-01
+
+- 新增独立的 `practice-task-workorder-generator` Skill，消费 `Practice Work Order Content V1` 或 Lesson 的 `Practice Task Contract V1` handoff。
+- 默认真实模板为 `practice-work-order v1.0.0`；固定出勤 10 分、任务 90 分、总分 100，学生任务结果栏保持空白，并保留模板固定的学生/教师评价。
+- 提供基础 Contract QA、Output QA、原子 DOCX 生成、安装器和软件/护理样例；不包含 Phase 2 的 Cross Artifact QA、CI/release 或教师答案。
+- 本阶段不创建 tag、GitHub Release 或 template release。
+
 ## 教案生成器 2.1.0 — 2026-09-01
 
 ### 版本关系

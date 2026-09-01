@@ -1,0 +1,137 @@
+[
+  {
+    "content_contract_version": "1.0",
+    "course_name": "基础护理技术",
+    "major": "护理",
+    "class_or_audience": "高职护理一年级",
+    "practice_task_id": "NU-WO-01",
+    "lesson_ids": ["L02", "L03"],
+    "granularity": "per_task",
+    "project_name": "完成生命体征测量记录",
+    "practice_hours": 2,
+    "group": {
+      "name": "第____组",
+      "leader_placeholder": "组长：____________",
+      "member_placeholder": "成员：____________"
+    },
+    "task_items": [
+      {
+        "title": "核对测量准备",
+        "description": "根据操作要求核对测量对象、用品和环境，记录操作前需要确认的事项。",
+        "score": 30,
+        "tools_or_materials": ["生命体征测量用品", "操作核对表"],
+        "steps": ["核对对象信息", "检查用品状态和环境要求"],
+        "deliverables": ["操作前核对记录"],
+        "acceptance_criteria": ["核对项目完整", "记录能够说明异常处理方式"]
+      },
+      {
+        "title": "实施测量操作",
+        "description": "按操作流程实施生命体征测量，观察过程并记录关键操作节点。",
+        "score": 35,
+        "tools_or_materials": ["血压计", "体温计", "计时工具"],
+        "steps": ["按流程实施测量", "观察并记录关键操作节点"],
+        "deliverables": ["测量过程记录单"],
+        "acceptance_criteria": ["步骤顺序符合要求", "记录内容与观察过程一致"]
+      },
+      {
+        "title": "整理结果与交接",
+        "description": "整理测量记录，核对记录完整性并完成小组交接说明。",
+        "score": 25,
+        "tools_or_materials": ["护理记录单", "交接记录表"],
+        "steps": ["核对记录项目", "完成交接说明并签名确认"],
+        "deliverables": ["护理记录单", "交接说明"],
+        "acceptance_criteria": ["记录项目齐全", "交接说明可追溯到记录"]
+      }
+    ]
+  },
+  {
+    "content_contract_version": "1.0",
+    "course_name": "基础护理技术",
+    "major": "护理",
+    "class_or_audience": "高职护理一年级",
+    "practice_task_id": "NU-WO-02",
+    "lesson_ids": ["L06", "L07"],
+    "granularity": "per_task",
+    "project_name": "整理无菌操作检查记录",
+    "practice_hours": 2,
+    "group": {
+      "name": "第____组",
+      "leader_placeholder": "组长：____________",
+      "member_placeholder": "成员：____________"
+    },
+    "task_items": [
+      {
+        "title": "检查操作环境",
+        "description": "按照操作规范检查环境、用品和人员准备情况，记录需要整改的项目。",
+        "score": 30,
+        "tools_or_materials": ["无菌操作用品", "环境检查表"],
+        "steps": ["检查环境条件", "核对用品和人员准备"],
+        "deliverables": ["环境与准备检查表"],
+        "acceptance_criteria": ["检查项目齐全", "整改项目有具体位置说明"]
+      },
+      {
+        "title": "实施规范操作",
+        "description": "按规范完成无菌操作演练，观察操作过程并记录关键控制点。",
+        "score": 35,
+        "tools_or_materials": ["无菌包", "操作模型", "操作记录表"],
+        "steps": ["按流程实施演练", "记录关键控制点和观察情况"],
+        "deliverables": ["操作过程记录表"],
+        "acceptance_criteria": ["操作顺序符合规范", "关键控制点均有记录"]
+      },
+      {
+        "title": "完成同伴复核",
+        "description": "依据复核表检查操作记录，与同伴沟通问题并整理改进记录。",
+        "score": 25,
+        "tools_or_materials": ["同伴复核表", "改进记录表"],
+        "steps": ["逐项复核操作记录", "记录问题和改进措施"],
+        "deliverables": ["同伴复核表", "改进记录"],
+        "acceptance_criteria": ["复核意见具体", "改进措施与问题逐项对应"]
+      }
+    ]
+  },
+  {
+    "content_contract_version": "1.0",
+    "course_name": "基础护理技术",
+    "major": "护理",
+    "class_or_audience": "高职护理一年级",
+    "practice_task_id": "NU-WO-03",
+    "lesson_ids": ["L10", "L11"],
+    "granularity": "per_task",
+    "project_name": "完成患者护理观察记录",
+    "practice_hours": 2,
+    "group": {
+      "name": "第____组",
+      "leader_placeholder": "组长：____________",
+      "member_placeholder": "成员：____________"
+    },
+    "task_items": [
+      {
+        "title": "收集观察信息",
+        "description": "根据观察任务单收集相关信息，区分直接观察内容与需要进一步核对的内容。",
+        "score": 30,
+        "tools_or_materials": ["观察任务单", "护理观察记录表"],
+        "steps": ["阅读观察任务", "收集并分类观察信息"],
+        "deliverables": ["观察信息分类表"],
+        "acceptance_criteria": ["信息分类清晰", "每条信息都有记录时间"]
+      },
+      {
+        "title": "记录观察过程",
+        "description": "按时间顺序记录观察过程和沟通要点，保持记录内容客观、完整、可追溯。",
+        "score": 35,
+        "tools_or_materials": ["护理观察记录表", "沟通记录表"],
+        "steps": ["按时间记录观察过程", "核对沟通要点和记录对象"],
+        "deliverables": ["护理观察记录", "沟通要点记录"],
+        "acceptance_criteria": ["记录按时间可追溯", "描述客观且没有遗漏关键项目"]
+      },
+      {
+        "title": "整理交接材料",
+        "description": "依据交接要求整理观察材料，核对记录一致性并完成小组交接说明。",
+        "score": 25,
+        "tools_or_materials": ["交接清单", "小组记录表"],
+        "steps": ["核对观察记录", "整理材料并完成交接说明"],
+        "deliverables": ["观察材料包", "交接说明"],
+        "acceptance_criteria": ["材料与记录一致", "交接说明能指向具体观察记录"]
+      }
+    ]
+  }
+]

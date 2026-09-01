@@ -1,0 +1,42 @@
+template:
+  id: practice-work-order
+  name: 实践任务学习工单模板
+  version: 1.0.0
+  format: docx
+  file: template.docx
+generator:
+  version: 1.0.0
+  supported_major: 1
+  content_contract: Practice Work Order Content V1
+  lesson_handoff: Practice Task Contract V1
+schema: schemas/work-order-content.schema.json
+structure:
+  top_level_tables: 3
+  work_order_table:
+    header: [任务对象, 任务项, 任务描述, 任务结果, 分值]
+    attendance_score: 10
+    task_score_total: 90
+    total_score: 100
+  student_evaluation:
+    fixed_weights: [20, 30, 50]
+  teacher_evaluation:
+    fixed_criteria: [A, B, C]
+allowed_changes:
+  - project titles
+  - group metadata
+  - task rows cloned from the canonical row pattern
+  - task descriptions and scores
+protected:
+  - page setup, margins, headers, footers and base styles
+  - canonical package parts and embedded resources
+  - student evaluation rubric and 20/30/50 weights
+  - teacher evaluation questions and A/B/C criteria
+  - student task result cells, which must remain blank
+validation:
+  require_docx_open: true
+  top_level_tables: 3
+  require_render_check: false
+fingerprint:
+  algorithm: sha256
+  sha256: F20308238D07C7BFB9B1F9D2A25591D6EE09F13EC5855B7C57FA914CEE9457BD
+  value: F20308238D07C7BFB9B1F9D2A25591D6EE09F13EC5855B7C57FA914CEE9457BD

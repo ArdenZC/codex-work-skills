@@ -1,0 +1,137 @@
+[
+  {
+    "content_contract_version": "1.0",
+    "course_name": "数据库技术",
+    "major": "软件技术",
+    "class_or_audience": "高职软件技术一年级",
+    "practice_task_id": "DB-WO-01",
+    "lesson_ids": ["L03", "L04"],
+    "granularity": "per_task",
+    "project_name": "设计客户订单数据模型",
+    "practice_hours": 2,
+    "group": {
+      "name": "第____组",
+      "leader_placeholder": "组长：____________",
+      "member_placeholder": "成员：____________"
+    },
+    "task_items": [
+      {
+        "title": "分析业务对象与关系",
+        "description": "根据给定订单业务说明，分析客户、订单和商品之间的业务关系并记录判断依据。",
+        "score": 30,
+        "tools_or_materials": ["业务说明单", "建模记录表"],
+        "steps": ["圈定业务对象", "记录对象之间的关系及其依据"],
+        "deliverables": ["业务对象与关系分析表"],
+        "acceptance_criteria": ["对象命名统一", "每条关系都能回指业务说明"]
+      },
+      {
+        "title": "绘制概念模型",
+        "description": "依据已确认的对象和关系绘制概念模型，标注实体、联系和主要属性。",
+        "score": 35,
+        "tools_or_materials": ["建模工具", "概念模型检查表"],
+        "steps": ["建立实体和联系", "补充主要属性并核对基数"],
+        "deliverables": ["概念模型图", "模型说明页"],
+        "acceptance_criteria": ["图中对象与分析表一致", "关系基数有业务依据"]
+      },
+      {
+        "title": "整理提交材料",
+        "description": "检查模型材料的一致性，整理文件并提交小组版本记录。",
+        "score": 25,
+        "tools_or_materials": ["文件清单", "版本记录表"],
+        "steps": ["核对图表名称和版本", "整理材料并记录小组修改点"],
+        "deliverables": ["小组提交包", "版本记录表"],
+        "acceptance_criteria": ["提交包文件齐全", "版本记录能够说明本次修改"]
+      }
+    ]
+  },
+  {
+    "content_contract_version": "1.0",
+    "course_name": "数据库技术",
+    "major": "软件技术",
+    "class_or_audience": "高职软件技术一年级",
+    "practice_task_id": "DB-WO-02",
+    "lesson_ids": ["L07", "L08"],
+    "granularity": "per_task",
+    "project_name": "建立图书借阅数据表",
+    "practice_hours": 2,
+    "group": {
+      "name": "第____组",
+      "leader_placeholder": "组长：____________",
+      "member_placeholder": "成员：____________"
+    },
+    "task_items": [
+      {
+        "title": "整理字段需求",
+        "description": "从借阅业务资料中整理读者、图书和借阅记录所需字段，记录字段含义和来源。",
+        "score": 30,
+        "tools_or_materials": ["借阅业务资料", "字段分析表"],
+        "steps": ["提取业务字段", "核对字段含义和取值要求"],
+        "deliverables": ["字段分析表"],
+        "acceptance_criteria": ["字段覆盖业务资料", "每个字段都有清晰含义"]
+      },
+      {
+        "title": "设计数据表结构",
+        "description": "依据字段分析结果设计数据表结构，区分标识字段与业务字段并记录设计理由。",
+        "score": 35,
+        "tools_or_materials": ["表结构设计表", "数据库客户端"],
+        "steps": ["划分数据表", "设置字段类型和标识字段", "记录设计理由"],
+        "deliverables": ["数据表结构设计表"],
+        "acceptance_criteria": ["字段类型与业务含义匹配", "表间关系表达清楚"]
+      },
+      {
+        "title": "核对设计并提交",
+        "description": "按照检查表核对表结构和命名，整理设计材料并提交可追溯的版本记录。",
+        "score": 25,
+        "tools_or_materials": ["结构检查表", "版本记录表"],
+        "steps": ["核对结构和命名", "整理提交文件并记录修改点"],
+        "deliverables": ["结构检查记录", "设计提交包"],
+        "acceptance_criteria": ["检查项均有记录", "提交材料与最终记录一致"]
+      }
+    ]
+  },
+  {
+    "content_contract_version": "1.0",
+    "course_name": "数据库技术",
+    "major": "软件技术",
+    "class_or_audience": "高职软件技术一年级",
+    "practice_task_id": "DB-WO-03",
+    "lesson_ids": ["L12", "L13"],
+    "granularity": "per_task",
+    "project_name": "检查数据查询需求",
+    "practice_hours": 2,
+    "group": {
+      "name": "第____组",
+      "leader_placeholder": "组长：____________",
+      "member_placeholder": "成员：____________"
+    },
+    "task_items": [
+      {
+        "title": "拆解查询条件",
+        "description": "阅读查询需求单，拆解查询对象、条件和排序要求，记录每项需求的依据。",
+        "score": 30,
+        "tools_or_materials": ["查询需求单", "需求记录表"],
+        "steps": ["标记查询对象", "整理条件和排序要求"],
+        "deliverables": ["查询需求拆解表"],
+        "acceptance_criteria": ["需求项没有遗漏", "每项需求均有来源说明"]
+      },
+      {
+        "title": "设计验证样例",
+        "description": "根据拆解后的需求设计验证样例，说明样例覆盖的条件和预期观察点。",
+        "score": 35,
+        "tools_or_materials": ["案例数据集", "验证记录表"],
+        "steps": ["选择代表性数据", "整理验证样例并标注观察点"],
+        "deliverables": ["验证样例表", "观察点记录"],
+        "acceptance_criteria": ["样例覆盖关键条件", "观察点与需求对应"]
+      },
+      {
+        "title": "完成检查记录",
+        "description": "按检查表复核需求拆解和验证样例，整理小组意见并提交检查记录。",
+        "score": 25,
+        "tools_or_materials": ["查询检查表", "小组记录表"],
+        "steps": ["复核需求与样例对应关系", "记录小组意见和修改点"],
+        "deliverables": ["查询检查记录", "小组意见记录"],
+        "acceptance_criteria": ["每项检查有结论依据", "修改点可定位到具体材料"]
+      }
+    ]
+  }
+]

@@ -22,6 +22,7 @@ DOC_EXACT = frozenset(
 DOC_PREFIX = "docs/"
 LESSON_ROOT = "教案生成器/lesson-plan-docx-generator"
 GRADEBOOK_ROOT = "平时成绩记分册生成器/course-gradebook-generator"
+WORK_ORDER_ROOT = "实践任务工单生成器/practice-task-workorder-generator"
 ZERO_SHA = "0" * 40
 BOOLEAN_KEYS = (
     "docs_only",
@@ -114,7 +115,7 @@ def _full_result(
 def _classification(labels: set[str]) -> str:
     if not labels:
         return "full"
-    order = ("docs", "lesson", "gradebook", "tooling", "release")
+    order = ("docs", "lesson", "gradebook", "workorder", "tooling", "release")
     return "+".join(label for label in order if label in labels)
 
 
@@ -177,6 +178,16 @@ def classify(
                 _mark(result, "run_tooling", "run_release")
                 labels.update({"tooling", "release"})
                 reasons.append("gradebook package contract")
+            continue
+
+        if _under(path, WORK_ORDER_ROOT):
+            _mark(result, "run_package_contracts")
+            labels.add("workorder")
+            reasons.append("practice work-order package")
+            if _is_package_risk(path):
+                _mark(result, "run_tooling", "run_release")
+                labels.update({"tooling", "release"})
+                reasons.append("practice work-order package contract")
             continue
 
         if path == "tools/template_package.py" or _under(path, "tools/template_tooling"):

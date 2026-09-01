@@ -57,6 +57,22 @@ class ChangeClassifierTests(unittest.TestCase):
         )
         self.assert_flags(template, run_gradebook=True, run_package_contracts=True, run_tooling=True, run_release=True, run_lesson=False, force_full=False)
 
+    def test_work_order_business_changes_run_package_contracts_without_core_skills(self) -> None:
+        result = classify(
+            ["实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py"],
+            event_name="pull_request",
+        )
+        self.assert_flags(
+            result,
+            run_package_contracts=True,
+            run_tooling=False,
+            run_release=False,
+            run_lesson=False,
+            run_gradebook=False,
+            force_full=False,
+        )
+        self.assertEqual(result["classification"], "workorder")
+
     def test_tooling_and_release_paths_do_not_run_both_core_skills(self) -> None:
         tooling = classify(["tools/template_tooling/archive.py"], event_name="pull_request")
         self.assert_flags(tooling, run_tooling=True, run_release=True, run_package_contracts=True, run_lesson=False, run_gradebook=False, force_full=False)
