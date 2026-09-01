@@ -52,21 +52,27 @@ KNOWN_SOFTWARE_MODELING_64H_BOUNDARIES = (
 _DUPLICATE_DETECTORS = (
     "exact_duplicates",
     "adjacent_exact_duplicates",
+    "item_duplicates",
+    "adjacent_item_duplicates",
+    "frequency_item_duplicates",
+    "adjacent_similarity_pairs",
     "repeated_sentences",
     "field_similarity_pairs",
     "structural_similarity_pairs",
     "whole_lesson_similarity_pairs",
-    "frequency_duplicates",
     "implementation_duplicates",
     "adjacent_implementation_exact_duplicates",
     "implementation_similarity_pairs",
+    "implementation_structural_similarity_pairs",
     "evaluation_remark_duplicates",
 )
 _PAIR_SOURCES = {
     "whole_lesson": "whole_lesson_similarity_pairs",
     "adjacent_lesson": "adjacent_similarity_pairs",
     "fields": "field_similarity_pairs",
+    "structural": "structural_similarity_pairs",
     "implementation": "implementation_similarity_pairs",
+    "implementation_structural": "implementation_structural_similarity_pairs",
     "evaluation_remarks": "evaluation_remark_duplicates",
 }
 _HALLUCINATION_KEYS = {
@@ -335,7 +341,9 @@ def content_quality_evidence(qa_report: Mapping[str, Any]) -> dict[str, Any]:
                 field: _pair_summary(quality.get(_PAIR_SOURCES["fields"]), field)
                 for field in fields
             },
+            "structural": _pair_summary(quality.get(_PAIR_SOURCES["structural"])),
             "implementation": _pair_summary(quality.get(_PAIR_SOURCES["implementation"])),
+            "implementation_structural": _pair_summary(quality.get(_PAIR_SOURCES["implementation_structural"])),
             "evaluation_remarks": _pair_summary(quality.get(_PAIR_SOURCES["evaluation_remarks"])),
         },
         "reference_reuse": _json_safe(quality.get("reference_provenance", {})),
@@ -813,10 +821,11 @@ def _final_status(
     visual: Mapping[str, Any],
     design: Mapping[str, Any],
     teacher: Mapping[str, Any],
+    negative: Mapping[str, Any],
 ) -> str:
     if structural.get("status") == "FAIL":
         return "FAILED"
-    if any(str(item.get("status", "")).lower() in {"failed", "fail"} for item in (visual, design, teacher)):
+    if any(str(item.get("status", "")).lower() in {"failed", "fail", "rejected"} for item in (visual, design, teacher, negative)):
         return "FAILED"
     teacher_status = str(teacher.get("status", "not_executed")).lower()
     if teacher_status in {"passed", "pass", "completed"}:
@@ -887,6 +896,7 @@ def build_acceptance_report(
     }
     if teacher_payload:
         teacher.update(_json_safe(teacher_payload))
+    negative = negative_controls(negative_payload)
     structural = structural_hard_gates(
         data,
         qa_report,
@@ -914,7 +924,7 @@ def build_acceptance_report(
         "render_status": render.get("status", "not_executed"),
         "visual_status": visual_status,
     }
-    final_status = _final_status(structural, visual, design, teacher)
+    final_status = _final_status(structural, visual, design, teacher, negative)
     report = {
         "acceptance_schema_version": ACCEPTANCE_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -943,7 +953,7 @@ def build_acceptance_report(
         "course_scope_review": course_scope_review(data, scope_payload),
         "content_length": content_length_report(lessons),
         "visual_review": visual,
-        "negative_controls": negative_controls(negative_payload),
+        "negative_controls": negative,
         "hallucination_review": hallucination_review(data),
         "teaching_design_review": design,
         "teacher_usability": teacher,
@@ -960,7 +970,7 @@ def build_acceptance_report(
                 ("visual_review", visual),
                 ("teaching_design_review", design),
                 ("teacher_usability", teacher),
-                ("negative_controls", negative_controls(negative_payload)),
+                ("negative_controls", negative),
             )
             if str(value.get("status", "")).lower() == "not_executed"
         ],

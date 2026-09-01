@@ -181,10 +181,18 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 "errors": [],
                 "exact_duplicates": [],
                 "adjacent_exact_duplicates": [],
+                "item_duplicates": [],
+                "adjacent_item_duplicates": [],
+                "frequency_item_duplicates": [],
                 "adjacent_similarity_pairs": [],
+                "repeated_sentences": [],
                 "whole_lesson_similarity_pairs": [],
                 "field_similarity_pairs": [],
+                "structural_similarity_pairs": [],
+                "implementation_duplicates": [],
+                "adjacent_implementation_exact_duplicates": [],
                 "implementation_similarity_pairs": [],
+                "implementation_structural_similarity_pairs": [],
                 "evaluation_remark_duplicates": [],
                 "reference_provenance": {
                     "reuse_policy": "reference_reusable",
@@ -266,6 +274,26 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 report_dir=folder / "report",
             )
             evidence = report["content_quality_evidence"]
+            self.assertEqual(
+                set(evidence["detector_counts"]),
+                {
+                    "exact_duplicates",
+                    "adjacent_exact_duplicates",
+                    "item_duplicates",
+                    "adjacent_item_duplicates",
+                    "frequency_item_duplicates",
+                    "adjacent_similarity_pairs",
+                    "repeated_sentences",
+                    "whole_lesson_similarity_pairs",
+                    "field_similarity_pairs",
+                    "structural_similarity_pairs",
+                    "implementation_duplicates",
+                    "adjacent_implementation_exact_duplicates",
+                    "implementation_similarity_pairs",
+                    "implementation_structural_similarity_pairs",
+                    "evaluation_remark_duplicates",
+                },
+            )
             self.assertEqual(evidence["similarity"]["whole_lesson"]["max"], 0.31)
             self.assertEqual(evidence["similarity"]["fields"]["teaching_content"]["count"], 1)
             self.assertEqual(evidence["similarity"]["implementation"]["count"], 1)
@@ -311,6 +339,16 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertEqual(controls["status"], "not_executed")
         self.assertEqual(controls["transaction_safety"]["candidate_cleanup"], "not_executed")
         self.assertEqual(controls["transaction_safety"]["old_output_preserved"], "not_executed")
+        self.assertEqual(
+            lesson_acceptance._final_status(
+                {"status": "PASS"},
+                {"status": "not_executed"},
+                {"status": "not_executed"},
+                {"status": "not_executed"},
+                {"status": "failed"},
+            ),
+            "FAILED",
+        )
         scope = lesson_acceptance.course_scope_review({"lessons": [{"unit": "P1"}, {"unit": "P2"}]})
         self.assertFalse(scope["hard_gate"])
         self.assertEqual(scope["allowed_classifications"], ["CORE", "EXTENSION", "POSSIBLE_SCOPE_DRIFT"])
