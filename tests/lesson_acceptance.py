@@ -1,4 +1,4 @@
-"""Read-only Lesson Acceptance V2 evidence collector.
+"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0/2.1.
 
 The production Lesson Content QA remains the authority for structural,
 similarity, progression, and implementation checks.  This module only reads
@@ -27,7 +27,8 @@ from typing import Any
 
 
 ACCEPTANCE_SCHEMA_VERSION = "2.0"
-CONTENT_CONTRACT_VERSION = "2.0"
+CONTENT_CONTRACT_VERSION = "2.1"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1")
 DEFAULT_TEMPLATE_ID = "lesson-plan"
 DEFAULT_TEMPLATE_VERSION = "v1.1.2"
 SOURCE_TYPES = ("real_agent", "synthetic_fixture", "human_authored", "mixed")
@@ -135,6 +136,48 @@ _NEGATIVE_CONTROL_CATALOG = (
         "description": "评价备注低于现有最小长度",
         "expected": "reject",
         "detector": "existing evaluation-remark contract QA",
+    },
+    {
+        "id": "v21_reference_placeholder",
+        "description": "2.1 reference pool 使用泛化占位文献名称",
+        "expected": "reject",
+        "detector": "Content 2.1 reference document-likeness QA",
+    },
+    {
+        "id": "v21_textbook_overlap",
+        "description": "2.1 reference pool 未经 override 重复课程教材",
+        "expected": "reject",
+        "detector": "Content 2.1 textbook-overlap hard gate",
+    },
+    {
+        "id": "v21_same_lesson_reference_id",
+        "description": "同一课次重复使用相同 reference_id",
+        "expected": "reject",
+        "detector": "Content 2.1 same-lesson reference ID hard gate",
+    },
+    {
+        "id": "v21_unresolved_reference_id",
+        "description": "2.1 课次引用不存在的 reference_id",
+        "expected": "reject",
+        "detector": "Content 2.1 unresolved reference ID hard gate",
+    },
+    {
+        "id": "v21_resource_only_reference",
+        "description": "把投影仪、血压计等纯教学资源写入 reference pool",
+        "expected": "reject",
+        "detector": "references/resources document-likeness boundary",
+    },
+    {
+        "id": "v21_delivery_hour_mismatch",
+        "description": "2.1 delivery_plan 与课次理论/实践课时不守恒",
+        "expected": "reject",
+        "detector": "Content 2.1 delivery-hour hard gate",
+    },
+    {
+        "id": "v21_practice_link_mismatch",
+        "description": "实践任务链接到理论课或任务学时不一致",
+        "expected": "reject",
+        "detector": "Practice Task Contract V1 handoff hard gate",
     },
 )
 
@@ -347,6 +390,7 @@ def content_quality_evidence(qa_report: Mapping[str, Any]) -> dict[str, Any]:
             "evaluation_remarks": _pair_summary(quality.get(_PAIR_SOURCES["evaluation_remarks"])),
         },
         "reference_reuse": _json_safe(quality.get("reference_provenance", {})),
+        "practice_handoff": _json_safe(quality.get("practice_handoff", {})),
     }
 
 
@@ -372,6 +416,120 @@ def _anchor_observation(qa_report: Mapping[str, Any]) -> dict[str, Any]:
         "unexpected_names": qa_report.get("unexpected_anchor_names", anchors.get("unexpected_names", [])),
         "invalid_ids": qa_report.get("invalid_anchor_ids", anchors.get("invalid_ids", [])),
         "boundary_errors": qa_report.get("anchor_boundary_errors", anchors.get("boundary_errors", [])),
+    }
+
+
+def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
+    """Report 2.1 theory/practice delivery accounting without changing QA thresholds."""
+
+    lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
+    if data.get("content_contract_version") != "2.1":
+        return {
+            "status": "not_applicable",
+            "contract_version": data.get("content_contract_version"),
+            "expected": {},
+            "actual": {},
+            "lesson_counts": {},
+            "mismatches": [],
+        }
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
+    expected = {
+        "total_hours": _number(plan.get("total_hours")),
+        "theory_hours": _number(plan.get("theory_hours")),
+        "practice_hours": _number(plan.get("practice_hours")),
+    }
+    actual = {
+        "total_hours": sum((_number(lesson.get("hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping)),
+        "theory_hours": sum((_number(lesson.get("theory_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping)),
+        "practice_hours": sum((_number(lesson.get("practice_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping)),
+    }
+    counts = {
+        lesson_type: sum(1 for lesson in lessons if isinstance(lesson, Mapping) and lesson.get("lesson_type") == lesson_type)
+        for lesson_type in ("theory", "practice", "integrated")
+    }
+    mismatches = [
+        key for key in expected
+        if expected[key] is None or not math.isclose(expected[key], actual[key], abs_tol=0.01)
+    ]
+    return {
+        "status": "PASS" if not mismatches else "FAIL",
+        "contract_version": "2.1",
+        "mode": plan.get("mode"),
+        "expected": expected,
+        "actual": actual,
+        "lesson_counts": counts,
+        "mismatches": mismatches,
+        "consistency": not mismatches,
+    }
+
+
+def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Summarise 2.1 material/reference gates; cross-lesson reuse is statistics only."""
+
+    lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
+    quality = qa_report.get("content_quality", {}) if isinstance(qa_report, Mapping) else {}
+    provenance = quality.get("reference_provenance", {}) if isinstance(quality, Mapping) else {}
+    if data.get("content_contract_version") != "2.1":
+        return {
+            "status": "not_applicable",
+            "textbook_present": False,
+            "pool_size": None,
+            "lessons_with_references": None,
+            "lessons_without_references": None,
+            "reuse_frequency": {},
+            "placeholder_count": 0,
+            "textbook_overlap_count": 0,
+            "same_lesson_duplicate_count": len(provenance.get("same_lesson_duplicates", [])) if isinstance(provenance, Mapping) else 0,
+            "unresolved_id_count": 0,
+            "cross_lesson_reuse_allowed": True,
+        }
+    ids_by_lesson = [
+        [str(value) for value in lesson.get("reference_ids", [])]
+        for lesson in lessons if isinstance(lesson, Mapping)
+    ]
+    frequency: dict[str, int] = {}
+    for ids in ids_by_lesson:
+        for reference_id in set(ids):
+            frequency[reference_id] = frequency.get(reference_id, 0) + 1
+    textbook = (data.get("course_materials") or {}).get("textbook") if isinstance(data.get("course_materials"), Mapping) else None
+    placeholder_count = len(provenance.get("placeholder_items", [])) if isinstance(provenance, Mapping) else 0
+    overlap_count = len(provenance.get("textbook_overlap", [])) if isinstance(provenance, Mapping) else 0
+    duplicate_count = len(provenance.get("same_lesson_duplicates", [])) if isinstance(provenance, Mapping) else 0
+    unresolved_count = len(provenance.get("unresolved_ids", [])) if isinstance(provenance, Mapping) else 0
+    failures = placeholder_count + overlap_count + duplicate_count + unresolved_count
+    return {
+        "status": "PASS" if failures == 0 else "FAIL",
+        "textbook_present": textbook is not None,
+        "pool_size": len(data.get("reference_pool", [])) if isinstance(data.get("reference_pool"), list) else 0,
+        "lessons_with_references": sum(bool(ids) for ids in ids_by_lesson),
+        "lessons_without_references": sum(not ids for ids in ids_by_lesson),
+        "reuse_frequency": dict(sorted(frequency.items())),
+        "placeholder_count": placeholder_count,
+        "textbook_overlap_count": overlap_count,
+        "same_lesson_duplicate_count": duplicate_count,
+        "unresolved_id_count": unresolved_count,
+        "cross_lesson_reuse_allowed": True,
+        "hard_gate_failures": failures,
+    }
+
+
+def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    quality = qa_report.get("content_quality", {}) if isinstance(qa_report, Mapping) else {}
+    existing = quality.get("practice_handoff") if isinstance(quality, Mapping) else None
+    if isinstance(existing, Mapping) and existing:
+        return _json_safe(existing)
+    if data.get("content_contract_version") != "2.1":
+        return {"status": "not_applicable", "task_count": 0, "hour_consistent": True}
+    contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
+    expected = _number((data.get("delivery_plan") or {}).get("practice_hours")) or 0
+    tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []
+    actual = sum((_number(item.get("practice_hours")) or 0) for item in tasks if isinstance(item, Mapping))
+    return {
+        "status": "PASS" if math.isclose(expected, actual, abs_tol=0.01) else "FAIL",
+        "task_count": len(tasks),
+        "expected_practice_hours": expected,
+        "actual_practice_hours": actual,
+        "hour_consistent": math.isclose(expected, actual, abs_tol=0.01),
     }
 
 
@@ -411,6 +569,9 @@ def structural_hard_gates(
             and anchor_lists_empty
         )
     )
+    delivery = delivery_metrics(data)
+    references = reference_metrics(data, qa_report)
+    practice = practice_handoff_metrics(data, qa_report)
     gates = [
         _gate(
             "docx_inventory",
@@ -432,9 +593,27 @@ def structural_hard_gates(
         ),
         _gate(
             "content_contract",
-            contract == CONTENT_CONTRACT_VERSION and qa_report.get("content_contract_version") == CONTENT_CONTRACT_VERSION,
-            {"input": contract, "qa": qa_report.get("content_contract_version")},
-            "Acceptance V2 consumes Content Contract 2.0; it does not create 2.1.",
+            contract in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and qa_report.get("content_contract_version") in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and contract == qa_report.get("content_contract_version"),
+            {"input": contract, "qa": qa_report.get("content_contract_version"), "current": CONTENT_CONTRACT_VERSION},
+            "Acceptance V2 reads Content Contract 2.0 compatibility and current Content Contract 2.1; it does not author content.",
+        ),
+        _gate(
+            "delivery_consistency",
+            delivery.get("status") in {"PASS", "not_applicable"},
+            delivery,
+            "2.1 total/theory/practice hours and lesson type accounting must reconcile.",
+        ),
+        _gate(
+            "reference_hard_gates",
+            references.get("status") in {"PASS", "not_applicable"},
+            references,
+            "Reference placeholders, textbook overlap, same-lesson duplicates, and unresolved IDs must be zero; cross-lesson reuse is allowed.",
+        ),
+        _gate(
+            "practice_handoff",
+            practice.get("status") in {"PASS", "not_applicable"},
+            practice,
+            "Practice Task Contract task links and practice-hour sums must reconcile.",
         ),
         _gate(
             "template_identity",
@@ -905,6 +1084,9 @@ def build_acceptance_report(
         template_version=template_version,
     )
     contract_version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
+    delivery = delivery_metrics(data)
+    references = reference_metrics(data, qa_report)
+    practice = practice_handoff_metrics(data, qa_report)
     observed_total_hours = _number(data.get("total_hours"))
     visual_status = str(visual.get("status", "not_executed"))
     metadata = {
@@ -923,6 +1105,9 @@ def build_acceptance_report(
         "output_inventory_fingerprint": inventory.get("fingerprint"),
         "render_status": render.get("status", "not_executed"),
         "visual_status": visual_status,
+        "delivery_mode": (data.get("delivery_plan") or {}).get("mode") if isinstance(data.get("delivery_plan"), Mapping) else None,
+        "theory_hours": _number((data.get("delivery_plan") or {}).get("theory_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
+        "practice_hours": _number((data.get("delivery_plan") or {}).get("practice_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
     }
     final_status = _final_status(structural, visual, design, teacher, negative)
     report = {
@@ -957,6 +1142,9 @@ def build_acceptance_report(
         "hallucination_review": hallucination_review(data),
         "teaching_design_review": design,
         "teacher_usability": teacher,
+        "delivery_metrics": delivery,
+        "reference_metrics": references,
+        "practice_handoff_metrics": practice,
         "historical_baseline": {
             "status": "provided_for_comparison_only" if baseline_payload else "not_provided",
             "hard_gate": False,
@@ -994,6 +1182,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
         f"- Lessons/hours: {metadata.get('lesson_count')} / {metadata.get('total_hours')}",
         f"- Source: `{metadata.get('source_type')}`; master: `{metadata.get('master_commit')}`",
         f"- Content Contract: `{metadata.get('content_contract_version')}`; template: `{metadata.get('template_version')}`",
+        f"- Delivery: `{(report.get('delivery_metrics') or {}).get('status')}`; reference gates: `{(report.get('reference_metrics') or {}).get('status')}`; practice handoff: `{(report.get('practice_handoff_metrics') or {}).get('status')}`",
         f"- Input SHA256: `{metadata.get('input_sha256')}`",
         f"- QA SHA256: `{metadata.get('qa_report_sha256')}`",
         f"- Output inventory SHA256: `{metadata.get('output_inventory_fingerprint')}`",

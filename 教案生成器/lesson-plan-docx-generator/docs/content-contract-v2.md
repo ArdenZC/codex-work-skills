@@ -1,6 +1,32 @@
-# Lesson Content V2
+# Lesson Content V2 / V2.1
 
-Content Contract V2 (`2.0`) describes teaching content. It is independent of the Word template version (`1.1.2` by default). The production generator accepts only a V2 document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message.
+## 2.1 production addendum
+
+Content Contract `2.1` is the current production contract. Runtime continues to read `2.0` inputs for compatibility; a 2.0 input keeps its lesson-level `references` objects and does not get silently rewritten. The default Word template remains `lesson-plan v1.1.2`.
+
+Before planning, the Agent makes one concentrated confirmation containing `course_name`, `major`, `audience`, `total_hours`, `theory_hours`, `practice_hours`, theory/practice organization, `default_hours=2`, textbook, auxiliary references, and whether practice work orders are wanted. After that confirmation it does not ask again about outline, template, output directory, or DOCX generation.
+
+The 2.1 course fields add:
+
+```text
+delivery_plan: mode, total_hours, theory_hours, practice_hours
+course_materials: textbook (object or null)
+reference_pool: concrete document/source objects (the Agent's course_reference_pool planning concept)
+artifact_plan: lesson_plans=true, practice_work_orders=boolean
+outline: lesson_id, unit, task, lesson_type, hours, theory_hours,
+         practice_hours, prior_learning, capability_stage, deliverable,
+         next_bridge, practice_task_ids
+```
+
+Each lesson adds `lesson_type` (`theory`, `practice`, or `integrated`), `theory_hours`, `practice_hours`, `reference_ids`, and `practice_task_ids`. All hour values are integer hours; lesson components and course totals must reconcile. A theory lesson cannot carry practice task IDs.
+
+`course_materials.textbook` is not automatically a reference. It is rendered in a lesson only when `allow_textbook_as_reference: true` explicitly allows the same source in `reference_pool`. A 2.1 lesson may use `reference_ids: []`; the Word reference cell is blank, not a placeholder such as “无” or “资料不足”. `reference_pool` entries use `reference_type` (`book`, `standard`, `official_manual`, `official_documentation`, `guideline`, `paper`, `formal_course_document`) and concrete `title`/evidence. Generic placeholder phrases such as “统一建模语言相关公开文档” are rejected; real named organization/title documents are not rejected by that pattern. Pure tools and equipment remain resources, not references.
+
+The same document reference may be reused in every lesson. Cross-lesson reference reuse is a reusable category and is excluded from exact, item, sentence, field, structural, frequency, and whole-course repetition hard-fails. Duplicate IDs inside one lesson and unresolved IDs remain hard failures. Do not invent different bibliographic identities merely to reduce repetition.
+
+When `delivery_plan.practice_hours` is positive, `practice_task_contract` uses the independent [Practice Task Contract V1](practice-task-contract-v1.md) schema and must reconcile task hours and lesson links. If no work-order generator is available, the Lesson generator writes `practice-task-contract.json` as a handoff only.
+
+Content Contract V2 (`2.0`) describes the compatibility teaching-content contract, while Content Contract `2.1` is the current production contract. Both are independent of the Word template version (`1.1.2` by default). The production generator accepts a complete V2.1 document or a complete V2.0 compatibility document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message. A 2.0 document is not silently rewritten to 2.1.
 
 ## Course fields
 
@@ -68,7 +94,7 @@ References are objects with a visible `text`, internal `source_kind` (`provided`
 
 ## Agent workflow
 
-Read all supplied course material once, then make one concentrated confirmation of `course_name`, `major`, `audience`, and `total_hours`; show `default_hours=2` and the non-blocking textbook recommendation. After that confirmation, create the course outline and author all lessons in JSON without asking again about the outline, template, output directory, or DOCX generation. Python formats existing values with numbering and line breaks. It must not author teaching prose, fall back to `flows`, cycle scores, or silently truncate over-capacity content.
+Read all supplied course material once, then make one concentrated confirmation of `course_name`, `major`, `audience`, `total_hours`, `theory_hours`, `practice_hours`, theory/practice organization, `default_hours=2`, textbook, auxiliary references, and practice-work-order preference. Textbook confirmation is recommended but not blocking. After that confirmation, create the course outline and author all lessons in JSON without asking again about the outline, template, output directory, or DOCX generation. Python formats existing values with numbering and line breaks. It must not author teaching prose, fall back to `flows`, cycle scores, or silently truncate over-capacity content.
 
 After schema validation, run `scripts/content_quality.py` for adjacent and non-adjacent exact/item duplicates, calibrated field/implementation/whole-lesson and entity-masked structural similarity, repeated sentences, old boilerplate, independent intra-lesson task/body/deliverable coherence, separate artifact-inheritance and forward-transition progression gates, completeness, the 48-character evaluation remark contract, score patterns, and lesson-scoped domain contamination. `non_it_contamination` is scoped to IT-default terms absent from the input but injected into the rendered output by a template or generator; it is not a general course-domain classifier. Every detector uses one reuse policy: narrative fields are strict; teaching terminology, resources, references, and attendance/compliance/habits rubric remarks are reusable; metadata labels are ignored. References are excluded from every cross-lesson duplicate/similarity hard-fail path, while same-lesson duplicate references and conservative resource-only reference checks remain hard failures. Repetition diagnostics expose only limited fragments (maximum 120 characters) with stable SHA-256 digests. Short course-term exemptions never apply to narrative fields.
 

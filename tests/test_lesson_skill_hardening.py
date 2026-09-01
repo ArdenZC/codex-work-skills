@@ -333,6 +333,13 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 "mechanical_scores",
                 "generic_fabricated_reference",
                 "short_remark",
+                "v21_reference_placeholder",
+                "v21_textbook_overlap",
+                "v21_same_lesson_reference_id",
+                "v21_unresolved_reference_id",
+                "v21_resource_only_reference",
+                "v21_delivery_hour_mismatch",
+                "v21_practice_link_mismatch",
             },
         )
         controls = lesson_acceptance.negative_controls()

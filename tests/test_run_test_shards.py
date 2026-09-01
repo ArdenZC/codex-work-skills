@@ -29,7 +29,9 @@ class TestShardManifest(unittest.TestCase):
     def test_lesson_content_and_package_are_an_exact_partition(self) -> None:
         content = set(run_test_shards._lesson_content_ids())
         package = set(run_test_shards._lesson_package_ids())
-        lesson = set(run_test_shards._class_test_ids("LessonTemplatePackageTests"))
+        lesson = set(run_test_shards._class_test_ids("LessonTemplatePackageTests")) | set(
+            run_test_shards._module_test_ids(run_test_shards.LESSON_V21_TEST_MODULE)
+        )
         self.assertEqual(content & package, set())
         self.assertEqual(content | package, lesson)
 

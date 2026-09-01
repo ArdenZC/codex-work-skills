@@ -1,24 +1,50 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.json",
-  "title": "Lesson Content V2 input",
+  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.1.json",
+  "title": "Lesson Content V2/V2.1 input",
   "type": "object",
   "additionalProperties": false,
   "required": ["content_contract_version", "course_name", "major", "audience", "default_hours", "total_hours", "lessons"],
   "properties": {
-    "content_contract_version": {"const": "2.0"},
+    "content_contract_version": {"enum": ["2.0", "2.1"]},
     "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
     "major": {"type": "string", "minLength": 1, "maxLength": 32},
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
     "default_hours": {"$ref": "#/$defs/positiveNumber"},
     "total_hours": {"$ref": "#/$defs/positiveNumber"},
-    "lessons": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lesson"}}
+    "delivery_plan": {"$ref": "#/$defs/deliveryPlan"},
+    "course_materials": {"$ref": "#/$defs/courseMaterials"},
+    "reference_pool": {"type": "array", "items": {"$ref": "#/$defs/referencePoolItem"}},
+    "allow_textbook_as_reference": {"type": "boolean"},
+    "artifact_plan": {"$ref": "#/$defs/artifactPlan"},
+    "practice_task_contract": {"$ref": "#/$defs/practiceTaskContract"},
+    "outline": {"type": "array", "items": {"$ref": "#/$defs/outlineItem"}},
+    "lessons": {"type": "array", "minItems": 1}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"content_contract_version": {"const": "2.0"}}, "required": ["content_contract_version"]},
+      "then": {"properties": {"lessons": {"items": {"$ref": "#/$defs/lesson"}}}}
+    },
+    {
+      "if": {"properties": {"content_contract_version": {"const": "2.1"}}, "required": ["content_contract_version"]},
+      "then": {
+        "required": ["delivery_plan", "course_materials", "reference_pool", "artifact_plan", "outline"],
+        "properties": {"lessons": {"items": {"$ref": "#/$defs/lessonV21"}}}
+      }
+    }
+  ],
   "$defs": {
     "positiveNumber": {
       "anyOf": [
         {"type": "number", "minimum": 1, "multipleOf": 1},
         {"type": "string", "pattern": "^[1-9][0-9]*(?:\\.0+)?$"}
+      ]
+    },
+    "nonNegativeNumber": {
+      "anyOf": [
+        {"type": "number", "minimum": 0, "multipleOf": 1},
+        {"type": "string", "pattern": "^(?:0|[1-9][0-9]*(?:\\.0+)?)$"}
       ]
     },
     "textList": {
@@ -171,6 +197,149 @@
         "teaching_methods": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"type": "string", "minLength": 1, "maxLength": 80}},
         "resources": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 160}},
         "references": {"type": "array", "minItems": 1, "maxItems": 6, "items": {"$ref": "#/$defs/reference"}},
+        "implementation": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/implementationStage"}},
+        "evaluation": {"$ref": "#/$defs/evaluation"},
+        "reflection": {"$ref": "#/$defs/reflection"}
+      }
+    },
+    "deliveryPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "total_hours", "theory_hours", "practice_hours"],
+      "properties": {
+        "mode": {"type": "string", "enum": ["theory_only", "practice_only", "split_lessons", "integrated_lessons", "hybrid"]},
+        "total_hours": {"$ref": "#/$defs/positiveNumber"},
+        "theory_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"}
+      }
+    },
+    "citationAuthors": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {"type": "string", "minLength": 1, "maxLength": 120}
+    },
+    "referencePoolItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference_id", "reference_type", "title", "source_kind"],
+      "properties": {
+        "reference_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
+        "reference_type": {"type": "string", "enum": ["book", "standard", "official_manual", "official_documentation", "guideline", "paper", "formal_course_document"]},
+        "authors": {"$ref": "#/$defs/citationAuthors"},
+        "title": {"type": "string", "minLength": 2, "maxLength": 240},
+        "edition": {"type": "string", "minLength": 1, "maxLength": 80},
+        "publisher": {"type": "string", "minLength": 1, "maxLength": 160},
+        "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
+        "evidence": {"type": ["string", "null"], "maxLength": 800}
+      }
+    },
+    "textbook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "source_kind"],
+      "properties": {
+        "authors": {"$ref": "#/$defs/citationAuthors"},
+        "title": {"type": "string", "minLength": 2, "maxLength": 240},
+        "edition": {"type": "string", "minLength": 1, "maxLength": 80},
+        "publisher": {"type": "string", "minLength": 1, "maxLength": 160},
+        "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
+        "evidence": {"type": ["string", "null"], "maxLength": 800}
+      }
+    },
+    "courseMaterials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textbook"],
+      "properties": {"textbook": {"type": ["object", "null"], "oneOf": [{"$ref": "#/$defs/textbook"}, {"type": "null"}]}}
+    },
+    "artifactPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lesson_plans", "practice_work_orders"],
+      "properties": {
+        "lesson_plans": {"const": true},
+        "practice_work_orders": {"type": "boolean"}
+      }
+    },
+    "practiceTextList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": {"type": "string", "minLength": 1, "maxLength": 500}
+    },
+    "practiceTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_id", "project_id", "title", "lesson_ids", "practice_hours", "scenario", "objectives", "required_inputs", "tools_or_materials", "steps", "deliverables", "acceptance_criteria", "safety_or_compliance"],
+      "properties": {
+        "task_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
+        "project_id": {"type": "string", "minLength": 1, "maxLength": 64},
+        "title": {"type": "string", "minLength": 2, "maxLength": 180},
+        "lesson_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"}},
+        "practice_hours": {"$ref": "#/$defs/positiveNumber"},
+        "scenario": {"type": "string", "minLength": 1, "maxLength": 800},
+        "objectives": {"$ref": "#/$defs/practiceTextList"},
+        "required_inputs": {"$ref": "#/$defs/practiceTextList"},
+        "tools_or_materials": {"$ref": "#/$defs/practiceTextList"},
+        "steps": {"$ref": "#/$defs/practiceTextList"},
+        "deliverables": {"$ref": "#/$defs/practiceTextList"},
+        "acceptance_criteria": {"$ref": "#/$defs/practiceTextList"},
+        "safety_or_compliance": {"$ref": "#/$defs/practiceTextList"}
+      }
+    },
+    "practiceTaskContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_version", "course_name", "practice_hours", "granularity", "tasks"],
+      "properties": {
+        "contract_version": {"const": "1.0"},
+        "course_name": {"type": "string", "minLength": 1, "maxLength": 64},
+        "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "granularity": {"type": "string", "enum": ["per_lesson", "per_task", "per_project"]},
+        "tasks": {"type": "array", "items": {"$ref": "#/$defs/practiceTask"}}
+      }
+    },
+    "outlineItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lesson_id", "unit", "task", "lesson_type", "hours", "theory_hours", "practice_hours", "prior_learning", "capability_stage", "deliverable", "next_bridge", "practice_task_ids"],
+      "properties": {
+        "lesson_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"},
+        "unit": {"type": "string", "minLength": 3, "maxLength": 60},
+        "task": {"type": "string", "minLength": 2, "maxLength": 80},
+        "lesson_type": {"type": "string", "enum": ["theory", "practice", "integrated"]},
+        "hours": {"$ref": "#/$defs/positiveNumber"},
+        "theory_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "prior_learning": {"type": "string", "minLength": 6, "maxLength": 240},
+        "capability_stage": {"type": "string", "enum": ["认知", "理解", "模仿", "独立", "综合", "优化", "迁移"]},
+        "deliverable": {"type": "string", "minLength": 6, "maxLength": 240},
+        "next_bridge": {"type": "string", "minLength": 6, "maxLength": 240},
+        "practice_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}}
+      }
+    },
+    "lessonV21": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lesson_id", "unit", "task", "lesson_type", "hours", "theory_hours", "practice_hours", "progression", "student_analysis", "teaching_content", "goals", "key_point", "difficult_point", "teaching_methods", "resources", "reference_ids", "practice_task_ids", "implementation", "evaluation", "reflection"],
+      "properties": {
+        "lesson_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"},
+        "unit": {"type": "string", "pattern": "^项目[^\\s]*.*", "minLength": 3, "maxLength": 60},
+        "task": {"type": "string", "minLength": 2, "maxLength": 80},
+        "lesson_type": {"type": "string", "enum": ["theory", "practice", "integrated"]},
+        "hours": {"$ref": "#/$defs/positiveNumber"},
+        "theory_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "progression": {"$ref": "#/$defs/progression"},
+        "student_analysis": {"$ref": "#/$defs/studentAnalysis"},
+        "teaching_content": {"type": "array", "minItems": 3, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 240}},
+        "goals": {"$ref": "#/$defs/goals"},
+        "key_point": {"$ref": "#/$defs/point"},
+        "difficult_point": {"$ref": "#/$defs/point"},
+        "teaching_methods": {"type": "array", "minItems": 2, "maxItems": 5, "items": {"type": "string", "minLength": 1, "maxLength": 80}},
+        "resources": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "string", "minLength": 1, "maxLength": 160}},
+        "reference_ids": {"type": "array", "maxItems": 8, "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}},
+        "practice_task_ids": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}},
         "implementation": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/implementationStage"}},
         "evaluation": {"$ref": "#/$defs/evaluation"},
         "reflection": {"$ref": "#/$defs/reflection"}

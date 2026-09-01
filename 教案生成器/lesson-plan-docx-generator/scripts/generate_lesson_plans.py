@@ -203,7 +203,7 @@ def build_lesson(template: Path, out_dir: Path, meta: dict[str, Any], item: dict
     major = header_values["major"]
     audience = header_values["audience"]
     hours = header_values["hours"]
-    lesson_content = lesson_content_field_values(item)
+    lesson_content = lesson_content_field_values(item, meta)
     score = float(item["evaluation"]["score"])
 
     doc = Document(str(template))
@@ -515,6 +515,12 @@ def main() -> None:
     operation_error: BaseException | None = None
     try:
         content_quality = validate_content_quality(meta, manifest)
+        practice_contract = meta.get("practice_task_contract")
+        if practice_contract is not None:
+            (candidate / "practice-task-contract.json").write_text(
+                json.dumps(practice_contract, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
         generated_filenames: list[str] = []
         for seq, item in enumerate(lessons, 1):
             generated_filenames.append(build_lesson(template, candidate, meta, item, seq, manifest).name)

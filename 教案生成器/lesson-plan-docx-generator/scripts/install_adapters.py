@@ -19,7 +19,7 @@ from path_safety import paths_overlap
 ENGINE_NAME = ".lesson-plan-docx-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
-CONTENT_CONTRACT_VERSION = "2.0"
+CONTENT_CONTRACT_VERSION = "2.1"
 MARKER_ID = "lesson-plan-docx-generator"
 MARKER_START = f"<!-- codex-skill: {MARKER_ID}:start -->"
 MARKER_END = f"<!-- codex-skill: {MARKER_ID}:end -->"
@@ -43,6 +43,7 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("scripts/bookmark_utils.py"),
     Path("scripts/check_dependencies.py"),
     Path("schemas/lesson-plan-input.schema.json"),
+    Path("schemas/practice-task-contract.schema.json"),
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
 )

@@ -4,6 +4,34 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 教案生成器 2.1.0 — 2026-09-01
+
+### 版本关系
+
+```text
+Lesson Skill          2.1.0
+Content Contract      2.1
+Default Word template lesson-plan v1.1.2
+```
+
+### 课程基础与交付
+
+- 任务开始必须一次性确认课程名称、专业、授课对象、总课时、理论/实践学时、组织方式、教材、辅助资料和实践工单需求；单课课时默认 2 学时，确认后不再二次打断。
+- 新增 `delivery_plan`、课次 `lesson_type`/理论实践学时、完整课程 outline 和 Practice Task Contract V1；课程、课次和实践任务学时必须守恒。
+- `course_materials.textbook` 单独保存教材；教材默认不进入 Word references，也不因课程重复率被迫重复引用。
+
+### Reference 合同
+
+- 2.1 逐课只使用 `reference_ids`，从课程级 `reference_pool` 选择具体、可识别、可核实的文献/文档来源；空数组合法并渲染为空白。
+- references 与 resources 边界明确：前者是可阅读/引用的文献或文档，后者是教学工具、设备、环境和材料。
+- 合法 reference 可跨课完全重复，退出课程反重复 hard-fail；同课重复 ID、未解析 ID、纯资源名和 generic 占位来源仍失败。
+- 禁止为了降低重复率虚构教材、作者、ISBN、出版社、标准编号或公开文献；同一教材重复多课优于编造不同资料。
+
+### 兼容性
+
+- 默认 Content Contract 升为 2.1，运行时继续兼容读取 2.0；Content 2.0 不被静默改写。
+- 默认 Word 模板仍为 `lesson-plan v1.1.2`，本版本不修改模板二进制、manifest、fingerprint 或模板 Release。
+
 ## 教案生成器 2.0.1 — 2026-09-01
 
 ### 版本关系

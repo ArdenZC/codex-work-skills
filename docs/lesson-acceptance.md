@@ -1,5 +1,7 @@
 # Lesson Acceptance V2
 
+Lesson Acceptance V2 兼容读取 Content Contract 2.0，并对当前生产 Content Contract 2.1 增加课程交付、reference pool 和 Practice Task handoff 门禁。Acceptance schema 仍保持 `2.0`，因为这是验收报告格式版本，不是 Lesson Content 版本。
+
 Lesson Acceptance V2 是一个本地、只读的验收证据汇总器。它读取已经生成的 Content V2 JSON、现有 `qa-report.json` 和 DOCX 输出目录，把结构门禁、Content QA 证据、课程级人工复核和可追溯指纹汇总为：
 
 - `lesson-acceptance-report.json`
@@ -27,7 +29,17 @@ $head = git rev-parse HEAD
 
 `--source-type` 只能是 `real_agent`、`synthetic_fixture`、`human_authored` 或 `mixed`。如果暂时没有人工 JSON，报告会明确写 `PENDING_MANUAL_REVIEW`，不会把 render smoke 冒充视觉验收，也不会把结构 PASS 冒充课程整体 PASS。
 
-报告结构 schema 见 [`lesson-acceptance-report.schema.json`](lesson-acceptance-report.schema.json)。`acceptance_schema_version` 为 `2.0`；Content Contract 仍为 `2.0`，默认模板仍为 `v1.1.2`。
+报告结构 schema 见 [`lesson-acceptance-report.schema.json`](lesson-acceptance-report.schema.json)。`acceptance_schema_version` 为 `2.0`；当前 Content Contract 为 `2.1`（兼容 `2.0`），默认模板仍为 `v1.1.2`。
+
+## Content 2.1 hard gates
+
+报告新增 `delivery_metrics`、`reference_metrics` 和 `practice_handoff_metrics`，并在 `structural_hard_gates.gates` 中记录：
+
+- `delivery_plan` 总课时、理论/实践课时、课次类型及其实际合计必须一致；
+- reference pool 占位文本、教材重叠（未显式 override）、同课重复 ID 和未解析 ID 必须为零；跨课重复只记录 reuse frequency，不失败；
+- Practice Task Contract 的任务数量、实践学时、任务 ID 和实践/综合课链接必须一致；理论课不得被任务占用。
+
+这些门禁不改变既有 Content QA 的正文重复、progression 或 implementation coherence 算法；它们只收口 2.1 新增的课程基础合同。
 
 ## 四层验收
 
@@ -49,7 +61,7 @@ $head = git rev-parse HEAD
 
 报告只汇总现有 QA 的 whole-lesson、adjacent、字段、implementation、evaluation remark 相似度，以及 duplicate detector 计数和错误证据。它不增加新的相似度阈值，也不要求每课必须不同。
 
-`references` 的课程级重复由 Content QA 的 `reference_reusable` 证据表示；同一课内部重复项和 resource-only 项仍按生产 QA 结果处理。
+2.1 的 `course_materials.textbook` 与 `reference_pool` 分离，教材默认不进入 Word references。课次只携带 `reference_ids`；`reference_provenance` 负责报告 pool reuse frequency、placeholder、textbook overlap、same-lesson duplicate 和 unresolved ID。`references` 的课程级重复由 Content QA 的 `reference_reusable` 证据表示；同一课内部重复项和 resource-only 项仍按生产 QA 结果处理。空 `reference_ids` 在 Word 中是空白，不写“无/暂无/资料不足”。
 
 ### 3. Teaching design review
 

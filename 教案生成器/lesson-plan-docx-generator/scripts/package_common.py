@@ -27,7 +27,13 @@ from semantic_bookmarks import (
     reflection_bookmark_names,
 )
 from content_contract import (
+    COMPATIBLE_CONTENT_CONTRACT_VERSIONS,
     CONTENT_CONTRACT_VERSION,
+    DELIVERY_MODES,
+    LESSON_TYPES,
+    REFERENCE_SOURCE_KINDS,
+    REFERENCE_TYPES,
+    PRACTICE_TASK_GRANULARITIES,
     CAPABILITY_STAGES,
     EVALUATION_CRITERIA,
     EVALUATION_SCORE_MAX,
@@ -35,6 +41,11 @@ from content_contract import (
     EVALUATION_SCORE_STEP,
     IMPLEMENTATION_STAGE_IDS,
     IN_CLASS_STAGE_IDS,
+    format_reference,
+    lesson_references,
+    reference_identity,
+    reference_looks_like_placeholder,
+    reference_looks_like_resource_only,
 )
 
 
@@ -64,6 +75,7 @@ REFERENCE_EVIDENCE_URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
     r"(?:官方|政府|教育部|国家卫生健康|行业协会).*(?:官网|章节|条款|第[一二三四五六七八九十百0-9]+[章节条]|页|文号|检索|路径)",
 )
+PRACTICE_CONTRACT_SCHEMA = SKILL_DIR / "schemas" / "practice-task-contract.schema.json"
 
 
 def require_meaningful_text(value: Any, field_name: str, minimum: int = 1) -> str:
@@ -625,6 +637,233 @@ def _schema_errors(data: dict[str, Any], schema_path: Path | str) -> None:
         raise ValueError(f"Input schema validation failed: {details}")
 
 
+def _decimal_hours(value: Any, field_name: str, *, allow_zero: bool = False) -> Decimal:
+    """Parse the contract's integer-hour vocabulary with fail-closed errors."""
+
+    _validate_positive_number(value, field_name) if not allow_zero else None
+    if allow_zero:
+        if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
+            raise ValueError(f"{field_name} must be a non-negative integer hour value; received {value!r}")
+        if isinstance(value, str) and value != value.strip():
+            raise ValueError(f"{field_name} must be a non-negative integer hour value; received {value!r}")
+        try:
+            parsed = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            raise ValueError(f"{field_name} must be a non-negative integer hour value; received {value!r}") from None
+        if not parsed.is_finite() or parsed < 0 or parsed != parsed.to_integral_value():
+            raise ValueError(f"{field_name} must be a non-negative integer hour value; received {value!r}")
+        return parsed
+    return Decimal(str(value))
+
+
+def _validate_locator_evidence(reference: dict[str, Any], prefix: str, *, allow_generic: bool) -> None:
+    title = require_meaningful_text(reference.get("title", reference.get("text", "")), f"{prefix}.title", 2)
+    source_kind = reference.get("source_kind")
+    if source_kind not in REFERENCE_SOURCE_KINDS:
+        raise ValueError(f"{prefix}.source_kind must be one of {', '.join(REFERENCE_SOURCE_KINDS)}")
+    if reference_looks_like_resource_only(title):
+        raise ValueError(f"{prefix} is a resource-only item, not a citable document")
+    if reference_looks_like_placeholder(title):
+        raise ValueError(f"{prefix}.title is a generic reference placeholder and is not renderable")
+    evidence = reference.get("evidence")
+    evidence_text = require_meaningful_text(evidence, f"{prefix}.evidence") if evidence is not None else None
+    if source_kind == "generic":
+        if not allow_generic:
+            raise ValueError(f"{prefix}.generic is compatibility-only and is not renderable in Content Contract 2.1")
+        if REFERENCE_SPECIFIC_PATTERN.search(title) or REFERENCE_TITLE_PATTERN.search(title):
+            raise ValueError(
+                f"{prefix}.generic cannot claim a specific bibliographic identity; "
+                "use provided or verified_public only for a real source"
+            )
+        if evidence_text is not None:
+            raise ValueError(f"{prefix}.generic references must not declare evidence")
+        return
+    if evidence_text is None:
+        raise ValueError(f"{prefix}.{source_kind} requires evidence identifying the source")
+    if source_kind == "verified_public" and not (
+        REFERENCE_EVIDENCE_URL_PATTERN.search(evidence_text)
+        or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence_text)
+    ):
+        raise ValueError(f"{prefix}.verified_public evidence must contain a URL or an official locatable source")
+
+
+def _validate_materials_v21(data: dict[str, Any]) -> None:
+    materials = data["course_materials"]
+    textbook = materials.get("textbook") if isinstance(materials, dict) else None
+    if textbook is not None:
+        _validate_locator_evidence(textbook, "course_materials.textbook", allow_generic=False)
+
+    pool = data.get("reference_pool", [])
+    reference_ids: set[str] = set()
+    for index, reference in enumerate(pool, 1):
+        prefix = f"reference_pool[{index}]"
+        reference_id = require_meaningful_text(reference["reference_id"], f"{prefix}.reference_id")
+        if reference_id in reference_ids:
+            raise ValueError(f"{prefix}.reference_id must be unique; duplicate {reference_id!r}")
+        reference_ids.add(reference_id)
+        if reference.get("reference_type") not in REFERENCE_TYPES:
+            raise ValueError(f"{prefix}.reference_type must be one of {', '.join(REFERENCE_TYPES)}")
+        _validate_locator_evidence(reference, prefix, allow_generic=True)
+
+    textbook_identity = reference_identity(textbook) if textbook is not None else ""
+    if textbook_identity and not data.get("allow_textbook_as_reference", False):
+        for reference in pool:
+            if reference_identity(reference) == textbook_identity:
+                raise ValueError(
+                    "reference_pool contains the course textbook; set allow_textbook_as_reference=true "
+                    "only when the textbook should also be rendered as a lesson reference"
+                )
+
+    for index, lesson in enumerate(data["lessons"]):
+        prefix = f"lessons[{index}]"
+        ids = [str(value) for value in lesson.get("reference_ids", [])]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{prefix}.reference_ids must not contain duplicate IDs within one lesson")
+        missing = [value for value in ids if value not in reference_ids]
+        if missing:
+            raise ValueError(f"{prefix}.reference_ids contains unresolved IDs: {', '.join(missing)}")
+        seen_reference_content: dict[str, str] = {}
+        for reference_id in ids:
+            reference = next(item for item in pool if str(item.get("reference_id")) == reference_id)
+            normalized_text = re.sub(r"\s+", "", unicodedata.normalize("NFKC", format_reference(reference))).casefold()
+            if normalized_text and normalized_text in seen_reference_content:
+                raise ValueError(
+                    f"{prefix}.reference_ids contains duplicate reference content: "
+                    f"{reference_id!r} duplicates {seen_reference_content[normalized_text]!r} within the same lesson"
+                )
+            if normalized_text:
+                seen_reference_content[normalized_text] = reference_id
+        task_ids = [str(value) for value in lesson.get("practice_task_ids", [])]
+        if lesson["lesson_type"] == "theory" and task_ids:
+            raise ValueError(f"{prefix}.theory lessons must have practice_task_ids=[]")
+
+
+def _validate_practice_contract_v21(data: dict[str, Any]) -> None:
+    plan = data["delivery_plan"]
+    total = _decimal_hours(plan["total_hours"], "delivery_plan.total_hours")
+    theory = _decimal_hours(plan["theory_hours"], "delivery_plan.theory_hours", allow_zero=True)
+    practice = _decimal_hours(plan["practice_hours"], "delivery_plan.practice_hours", allow_zero=True)
+    if theory + practice != total:
+        raise ValueError("delivery_plan.theory_hours + practice_hours must equal delivery_plan.total_hours")
+    if total != _decimal_hours(data["total_hours"], "total_hours"):
+        raise ValueError("delivery_plan.total_hours must equal total_hours")
+
+    lesson_ids: list[str] = []
+    lesson_id_set: set[str] = set()
+    actual_theory = Decimal("0")
+    actual_practice = Decimal("0")
+    lesson_by_id: dict[str, dict[str, Any]] = {}
+    for index, lesson in enumerate(data["lessons"]):
+        prefix = f"lessons[{index}]"
+        lesson_id = str(lesson["lesson_id"])
+        if lesson_id in lesson_id_set:
+            raise ValueError(f"{prefix}.lesson_id must be unique; duplicate {lesson_id!r}")
+        lesson_ids.append(lesson_id)
+        lesson_id_set.add(lesson_id)
+        lesson_by_id[lesson_id] = lesson
+        hours = _decimal_hours(lesson["hours"], f"{prefix}.hours")
+        lesson_theory = _decimal_hours(lesson["theory_hours"], f"{prefix}.theory_hours", allow_zero=True)
+        lesson_practice = _decimal_hours(lesson["practice_hours"], f"{prefix}.practice_hours", allow_zero=True)
+        if lesson_theory + lesson_practice != hours:
+            raise ValueError(f"{prefix}.theory_hours + practice_hours must equal hours")
+        lesson_type = lesson["lesson_type"]
+        if lesson_type == "theory" and (lesson_theory != hours or lesson_practice != 0):
+            raise ValueError(f"{prefix}.theory must have theory_hours=hours and practice_hours=0")
+        if lesson_type == "practice" and (lesson_practice != hours or lesson_theory != 0):
+            raise ValueError(f"{prefix}.practice must have practice_hours=hours and theory_hours=0")
+        if lesson_type == "integrated" and (lesson_theory <= 0 or lesson_practice <= 0):
+            raise ValueError(f"{prefix}.integrated must contain positive theory_hours and practice_hours")
+        actual_theory += lesson_theory
+        actual_practice += lesson_practice
+    if actual_theory != theory or actual_practice != practice:
+        raise ValueError(
+            "lesson theory/practice hour sums must equal delivery_plan: "
+            f"expected {theory}/{practice}, got {actual_theory}/{actual_practice}"
+        )
+    mode = plan["mode"]
+    lesson_types = {lesson["lesson_type"] for lesson in data["lessons"]}
+    if mode == "theory_only" and practice != 0:
+        raise ValueError("delivery_plan.mode=theory_only requires practice_hours=0")
+    if mode == "practice_only" and theory != 0:
+        raise ValueError("delivery_plan.mode=practice_only requires theory_hours=0")
+    if mode == "split_lessons" and "integrated" in lesson_types:
+        raise ValueError("delivery_plan.mode=split_lessons cannot contain integrated lessons")
+    if mode == "integrated_lessons" and lesson_types - {"integrated"}:
+        raise ValueError("delivery_plan.mode=integrated_lessons requires every lesson to be integrated")
+
+    outline = data.get("outline", [])
+    if len(outline) != len(data["lessons"]):
+        raise ValueError("outline must contain exactly one entry for each lesson")
+    for index, (item, lesson) in enumerate(zip(outline, data["lessons"])):
+        expected_outline = {
+            "lesson_id": lesson.get("lesson_id"),
+            "unit": lesson.get("unit"),
+            "task": lesson.get("task"),
+            "lesson_type": lesson.get("lesson_type"),
+            "hours": lesson.get("hours"),
+            "theory_hours": lesson.get("theory_hours"),
+            "practice_hours": lesson.get("practice_hours"),
+            "prior_learning": lesson["progression"].get("prior_learning"),
+            "capability_stage": lesson["progression"].get("capability_stage"),
+            "deliverable": lesson["progression"].get("deliverable"),
+            "next_bridge": lesson["progression"].get("next_bridge"),
+            "practice_task_ids": lesson.get("practice_task_ids", []),
+        }
+        for field_name, expected in expected_outline.items():
+            if item.get(field_name) != expected:
+                raise ValueError(f"outline[{index}].{field_name} must match lessons[{index}]")
+
+    practice_contract = data.get("practice_task_contract")
+    if practice == 0:
+        if practice_contract is not None and _decimal_hours(practice_contract["practice_hours"], "practice_task_contract.practice_hours", allow_zero=True) != 0:
+            raise ValueError("practice_task_contract.practice_hours must be 0 when delivery_plan.practice_hours=0")
+        return
+    if not isinstance(practice_contract, dict):
+        raise ValueError("practice_task_contract is required when delivery_plan.practice_hours is positive")
+    if practice_contract["course_name"] != data["course_name"]:
+        raise ValueError("practice_task_contract.course_name must equal course_name")
+    contract_hours = _decimal_hours(practice_contract["practice_hours"], "practice_task_contract.practice_hours", allow_zero=True)
+    if contract_hours != practice:
+        raise ValueError("practice_task_contract.practice_hours must equal delivery_plan.practice_hours")
+    tasks = practice_contract.get("tasks", [])
+    task_by_id: dict[str, dict[str, Any]] = {}
+    task_hours = Decimal("0")
+    for index, task in enumerate(tasks):
+        prefix = f"practice_task_contract.tasks[{index}]"
+        task_id = str(task["task_id"])
+        if task_id in task_by_id:
+            raise ValueError(f"{prefix}.task_id must be unique; duplicate {task_id!r}")
+        task_by_id[task_id] = task
+        task_hours += _decimal_hours(task["practice_hours"], f"{prefix}.practice_hours")
+        for lesson_id in task["lesson_ids"]:
+            linked = lesson_by_id.get(str(lesson_id))
+            if linked is None:
+                raise ValueError(f"{prefix}.lesson_ids contains unknown lesson {lesson_id!r}")
+            if linked["lesson_type"] == "theory":
+                raise ValueError(f"{prefix}.lesson_ids cannot point to a theory lesson: {lesson_id}")
+    if task_hours != practice:
+        raise ValueError(
+            "practice task hours must equal delivery_plan.practice_hours: "
+            f"expected {practice}, got {task_hours}"
+        )
+    linked_task_ids = {str(value) for lesson in data["lessons"] for value in lesson.get("practice_task_ids", [])}
+    unresolved_task_ids = sorted(linked_task_ids - set(task_by_id))
+    if unresolved_task_ids:
+        raise ValueError("lessons.practice_task_ids contains unresolved task IDs: " + ", ".join(unresolved_task_ids))
+    for lesson in data["lessons"]:
+        ids = [str(value) for value in lesson.get("practice_task_ids", [])]
+        lesson_practice_hours = _decimal_hours(
+            lesson["practice_hours"],
+            f"lessons[{lesson['lesson_id']}].practice_hours",
+            allow_zero=True,
+        )
+        if lesson["lesson_type"] in {"practice", "integrated"} and lesson_practice_hours > 0 and not ids:
+            raise ValueError(f"{lesson['lesson_id']} practice/integrated lesson must declare practice_task_ids")
+    unlinked_task_ids = sorted(set(task_by_id) - linked_task_ids)
+    if unlinked_task_ids:
+        raise ValueError("practice tasks must be linked by lesson.practice_task_ids: " + ", ".join(unlinked_task_ids))
+
+
 def _validate_meaningful_contract(data: dict[str, Any]) -> None:
     """Apply semantic text rules that JSON Schema cannot express for whitespace."""
 
@@ -679,47 +918,54 @@ def _validate_meaningful_contract(data: dict[str, Any]) -> None:
                 f"{prefix}.evaluation.remarks.{criterion}",
                 4,
             )
-        for reference_index, reference in enumerate(lesson["references"], 1):
-            reference_prefix = f"{prefix}.references[{reference_index}]"
-            reference_text = require_meaningful_text(reference["text"], f"{reference_prefix}.text")
-            source_kind = reference["source_kind"]
-            evidence = reference.get("evidence")
-            if evidence is not None:
-                evidence = require_meaningful_text(evidence, f"{reference_prefix}.evidence")
-            if source_kind == "generic":
+        if data.get("content_contract_version") != "2.1":
+            for reference_index, reference in enumerate(lesson["references"], 1):
+                reference_prefix = f"{prefix}.references[{reference_index}]"
+                reference_text = require_meaningful_text(reference["text"], f"{reference_prefix}.text")
+                source_kind = reference["source_kind"]
+                evidence = reference.get("evidence")
                 if evidence is not None:
-                    raise ValueError(f"{reference_prefix}.generic references must not declare evidence")
-                if REFERENCE_SPECIFIC_PATTERN.search(reference_text) or REFERENCE_TITLE_PATTERN.search(reference_text):
-                    raise ValueError(
-                        f"{reference_prefix} uses source_kind=generic for a specific citation; "
-                        "mark it provided or verified_public only when the source is real"
-                    )
-            elif source_kind == "provided":
-                if evidence is None:
-                    raise ValueError(
-                        f"{reference_prefix}.provided requires evidence identifying the supplied material"
-                    )
-            elif source_kind == "verified_public":
-                if evidence is None:
-                    raise ValueError(
-                        f"{reference_prefix}.verified_public requires evidence such as a URL or an official locator"
-                    )
-                if not (
-                    REFERENCE_EVIDENCE_URL_PATTERN.search(evidence)
-                    or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence)
-                ):
-                    raise ValueError(
-                        f"{reference_prefix}.verified_public evidence must contain a URL or an official locatable source"
-                    )
+                    evidence = require_meaningful_text(evidence, f"{reference_prefix}.evidence")
+                if source_kind == "generic":
+                    if evidence is not None:
+                        raise ValueError(f"{reference_prefix}.generic references must not declare evidence")
+                    if REFERENCE_SPECIFIC_PATTERN.search(reference_text) or REFERENCE_TITLE_PATTERN.search(reference_text):
+                        raise ValueError(
+                            f"{reference_prefix} uses source_kind=generic for a specific citation; "
+                            "mark it provided or verified_public only when the source is real"
+                        )
+                elif source_kind == "provided":
+                    if evidence is None:
+                        raise ValueError(
+                            f"{reference_prefix}.provided requires evidence identifying the supplied material"
+                        )
+                elif source_kind == "verified_public":
+                    if evidence is None:
+                        raise ValueError(
+                            f"{reference_prefix}.verified_public requires evidence such as a URL or an official locator"
+                        )
+                    if not (
+                        REFERENCE_EVIDENCE_URL_PATTERN.search(evidence)
+                        or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence)
+                    ):
+                        raise ValueError(
+                            f"{reference_prefix}.verified_public evidence must contain a URL or an official locatable source"
+                        )
 
 
 def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
     version = data.get("content_contract_version")
-    if version != CONTENT_CONTRACT_VERSION:
+    if version not in COMPATIBLE_CONTENT_CONTRACT_VERSIONS:
         raise ValueError(
             "Legacy sparse lesson content is no longer accepted for production generation. "
-            "Regenerate tasks JSON using the Lesson Content V2 Skill workflow."
+            "Regenerate tasks JSON using the Lesson Content V2 Skill workflow. Content V2.1 is the current contract."
         )
+    if version == "2.1":
+        _schema_errors(data, schema_path)
+        _validate_meaningful_contract(data)
+        _validate_materials_v21(data)
+        _validate_practice_contract_v21(data)
+        return
     for field_name in ("default_hours", "total_hours"):
         if field_name in data:
             _validate_positive_number(data[field_name], field_name)

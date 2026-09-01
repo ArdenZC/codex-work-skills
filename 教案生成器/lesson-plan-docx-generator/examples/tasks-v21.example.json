@@ -1,0 +1,110 @@
+{
+  "content_contract_version": "2.1",
+  "course_name": "数据库技术",
+  "major": "软件技术",
+  "audience": "高职一年级",
+  "default_hours": 2,
+  "total_hours": 2,
+  "delivery_plan": {
+    "mode": "theory_only",
+    "total_hours": 2,
+    "theory_hours": 2,
+    "practice_hours": 0
+  },
+  "course_materials": {"textbook": null},
+  "reference_pool": [
+    {
+      "reference_id": "REF-MYSQL",
+      "reference_type": "official_manual",
+      "title": "MySQL 8.0 Reference Manual",
+      "source_kind": "verified_public",
+      "evidence": "https://dev.mysql.com/doc/refman/8.0/en/"
+    }
+  ],
+  "artifact_plan": {"lesson_plans": true, "practice_work_orders": false},
+  "outline": [
+    {
+      "lesson_id": "L01",
+      "unit": "项目一 数据库基础",
+      "task": "识别业务数据与表结构",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "prior_learning": "学生已经接触过业务数据和基本信息分类",
+      "capability_stage": "认知",
+      "deliverable": "业务对象清单和表结构识别说明",
+      "next_bridge": "使用对象清单进入下一课的数据关系分析",
+      "practice_task_ids": []
+    }
+  ],
+  "lessons": [
+    {
+      "lesson_id": "L01",
+      "unit": "项目一 数据库基础",
+      "task": "识别业务数据与表结构",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "progression": {
+        "prior_lesson_id": null,
+        "prior_learning": "学生已经接触过业务数据和基本信息分类",
+        "capability_stage": "认知",
+        "deliverable": "业务对象清单和表结构识别说明",
+        "next_bridge": "使用对象清单进入下一课的数据关系分析"
+      },
+      "student_analysis": {
+        "base": ["接触过常见业务信息表", "能够按字段名称区分简单数据项"],
+        "problems": ["容易把业务对象和字段混为一谈", "尚未形成从业务描述提取结构的习惯"],
+        "strategies": ["用订单案例逐项标注对象和属性", "通过同伴核对修正分类依据"]
+      },
+      "teaching_content": ["解析业务场景中的实体与属性", "比较业务对象和关系表字段的对应关系", "形成表结构识别说明"],
+      "goals": {
+        "knowledge": ["说明实体、属性和表字段的基本含义", "识别业务描述中的关键数据对象"],
+        "ability": ["从案例中整理业务对象清单", "用字段证据解释表结构判断"],
+        "quality": ["养成依据证据分类的习惯", "形成认真核对数据含义的责任意识"]
+      },
+      "key_point": {"content": ["业务对象与表字段的对应关系"], "strategy": ["使用案例字段卡片进行对照"]},
+      "difficult_point": {"content": ["从自然语言描述中区分对象和属性"], "strategy": ["通过反例追问字段是否能独立描述对象"]},
+      "teaching_methods": ["案例分析法", "任务驱动法"],
+      "resources": ["业务订单案例", "字段卡片与投影设备"],
+      "reference_ids": ["REF-MYSQL"],
+      "practice_task_ids": [],
+      "implementation": [
+        {"id": "before_class_preparation", "label": "课前准备", "minutes": 0, "modality": "线上", "content": ["阅读订单案例中的业务对象与表结构"], "teacher_actions": ["发布业务对象与表结构案例和阅读提示"], "student_actions": ["标记不理解的业务对象或字段"], "objective": "带着业务结构问题进入课堂"},
+        {"id": "task_introduction", "label": "任务导入", "minutes": 10, "modality": "线下", "content": ["比较订单记录中对象和字段的混淆案例"], "teacher_actions": ["呈现业务对象案例并说明任务边界"], "student_actions": ["说出一处对象或字段分类疑点"], "objective": "建立业务描述与数据结构的联系"},
+        {"id": "operation_demonstration", "label": "方法示范", "minutes": 15, "modality": "线下", "content": ["示范从业务句子提取对象和属性"], "teacher_actions": ["演示业务对象与表字段的标注顺序并解释判断证据"], "student_actions": ["记录对象属性的判断方法"], "objective": "掌握案例结构识别方法"},
+        {"id": "task_implementation", "label": "任务实施", "minutes": 25, "modality": "小组研讨", "content": ["整理订单案例的业务对象清单"], "teacher_actions": ["巡视小组标注并追问依据"], "student_actions": ["分工标注对象、属性和字段"], "objective": "把业务描述转化为结构化清单"},
+        {"id": "task_extension", "label": "任务拓展", "minutes": 10, "modality": "小组研讨", "content": ["分析一个新增业务字段的归属"], "teacher_actions": ["提供边界案例并组织比较"], "student_actions": ["说明新增字段的归属理由"], "objective": "提升对边界数据含义的判断能力"},
+        {"id": "project_practice", "label": "项目实训", "minutes": 15, "modality": "线下", "content": ["完成表结构识别说明"], "teacher_actions": ["按交付清单核对说明完整性"], "student_actions": ["提交对象清单和判断依据"], "objective": "形成可供后续建模使用的成果"},
+        {"id": "peer_review", "label": "组间互评", "minutes": 5, "modality": "线下", "content": ["互审对象与字段的对应关系"], "teacher_actions": ["分配互审对象并记录共性问题"], "student_actions": ["提出一条可执行的修改意见"], "objective": "用同伴视角检验结构识别结果"},
+        {"id": "lesson_summary", "label": "课堂小结", "minutes": 10, "modality": "线下", "content": ["回顾对象、属性和字段的识别线索"], "teacher_actions": ["归纳判断步骤并连接下一课"], "student_actions": ["口头复述一条判断线索"], "objective": "巩固从业务到结构的分析路径"},
+        {"id": "after_class_improvement", "label": "课后完善", "minutes": 0, "modality": "线上", "content": ["根据互评修订识别说明"], "teacher_actions": ["提供修订提交入口"], "student_actions": ["完善并保存最终说明"], "objective": "为下一课关系分析保留可靠输入"}
+      ],
+      "evaluation": {
+        "score": 90,
+        "remarks": {
+          "attendance": "按时参加课堂活动",
+          "attention": "关注案例字段差异",
+          "participation": "主动说明分类依据",
+          "compliance": "按清单完成标注",
+          "values": "对数据含义负责",
+          "ethics": "如实呈现判断结果",
+          "habits": "保持材料整理有序",
+          "online_learning": "完成课前案例阅读",
+          "discussion": "能回应同伴质疑",
+          "homework": "提交结构识别说明",
+          "practice": "完成对象字段对照",
+          "presentation": "说明重点清楚",
+          "improvement": "依据互评完成修订"
+        }
+      },
+      "reflection": {
+        "summary": "本课通过订单案例建立业务对象、属性和表字段之间的联系，学生能够形成第一版识别说明。",
+        "innovation": "用字段卡片和边界案例组织同伴互审，让抽象结构判断转化为可观察的证据比较。",
+        "improvement": "下一课继续使用对象清单分析数据关系，并提前收集分类分歧较大的案例进行讲解。"
+      }
+    }
+  ]
+}

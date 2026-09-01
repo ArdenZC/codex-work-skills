@@ -1,4 +1,4 @@
-"""Pure formatters for Lesson Content V2.
+"""Pure formatters for Lesson Content V2/V2.1.
 
 This module deliberately does not invent teaching language.  It only maps
 validated JSON values to the text representations used by the existing Word
@@ -9,16 +9,66 @@ from __future__ import annotations
 
 import hashlib
 import re
+import unicodedata
 from decimal import Decimal
 from typing import Any, Iterable
 
 
-CONTENT_CONTRACT_VERSION = "2.0"
+CONTENT_CONTRACT_VERSION = "2.1"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1")
+LEGACY_CONTENT_CONTRACT_VERSION = "2.0"
 EVALUATION_SCORE_MIN = Decimal("85")
 EVALUATION_SCORE_MAX = Decimal("96")
 EVALUATION_SCORE_STEP = Decimal("0.5")
 CAPABILITY_STAGES = ("认知", "理解", "模仿", "独立", "综合", "优化", "迁移")
+LESSON_TYPES = ("theory", "practice", "integrated")
+DELIVERY_MODES = (
+    "theory_only",
+    "practice_only",
+    "split_lessons",
+    "integrated_lessons",
+    "hybrid",
+)
+REFERENCE_TYPES = (
+    "book",
+    "standard",
+    "official_manual",
+    "official_documentation",
+    "guideline",
+    "paper",
+    "formal_course_document",
+)
+REFERENCE_SOURCE_KINDS = ("provided", "generic", "verified_public")
+PRACTICE_TASK_GRANULARITIES = ("per_lesson", "per_task", "per_project")
 MAX_FILENAME_BYTES = 255
+
+# This is intentionally a small, conservative boundary check.  It catches
+# standalone classroom tools without rejecting document titles that happen to
+# contain a product name (for example, "MySQL 8.0 Reference Manual").
+REFERENCE_RESOURCE_ONLY_EXACT = frozenset(
+    {
+        "投影仪",
+        "ppt",
+        "课程ppt",
+        "课堂ppt",
+        "教学ppt",
+        "ppt课件",
+        "mysqlworkbench",
+        "血压计",
+        "数据库服务器",
+        "护理模型",
+        "计算机机房",
+        "虚拟机",
+        "实训任务单",
+        "课堂练习材料",
+        "案例数据集",
+    }
+)
+REFERENCE_PLACEHOLDER_PATTERN = re.compile(
+    r"(?:^(?:相关|有关|本课程|课程)(?:的)?(?:公开)?(?:网络)?(?:资料|文献|文档|指南|教材|参考资料|网络资源)$)"
+    r"|(?:相关|有关)(?:的)?(?:公开)?(?:网络)?(?:资料|文献|文档|指南|教材|参考资料|网络资源)$",
+    re.IGNORECASE,
+)
 
 IMPLEMENTATION_STAGE_IDS = (
     "before_class_preparation",
@@ -113,10 +163,101 @@ def format_numbered_list(items: Iterable[Any]) -> str:
     return "\n".join(f"{index}. {value}" for index, value in enumerate(values, 1))
 
 
-def format_reference_list(references: Iterable[dict[str, Any]]) -> str:
-    """Write only reference text; source provenance is an internal contract field."""
+def _normalize_reference_title(value: Any) -> str:
+    title = _clean(value)
+    title = re.sub(r"^[《<【\[]|[》>】\]]$", "", title)
+    return re.sub(r"\s+", "", title).casefold()
 
-    return format_numbered_list(reference["text"] for reference in references)
+
+def reference_identity(reference: dict[str, Any]) -> str:
+    """Return a conservative source identity used for textbook-overlap checks."""
+
+    title = _normalize_reference_title(reference.get("title", reference.get("text", "")))
+    if title:
+        return title
+    authors = reference.get("authors", [])
+    if isinstance(authors, (list, tuple)):
+        author_text = "".join(_clean(value) for value in authors)
+    else:
+        author_text = _clean(authors)
+    return re.sub(r"\s+", "", author_text).casefold()
+
+
+def reference_looks_like_resource_only(text: Any) -> bool:
+    """Return true only for an unmistakable standalone teaching resource."""
+
+    normalized = unicodedata.normalize("NFKC", str(text))
+    normalized = re.sub(r"\s+", "", normalized).strip().casefold()
+    normalized = "".join(char for char in normalized if not unicodedata.category(char).startswith("P"))
+    return normalized in REFERENCE_RESOURCE_ONLY_EXACT
+
+
+def reference_looks_like_placeholder(text: Any) -> bool:
+    """Detect generic placeholder wording without blocking real named documents."""
+
+    normalized = re.sub(r"\s+", "", unicodedata.normalize("NFKC", str(text)).strip())
+    return bool(REFERENCE_PLACEHOLDER_PATTERN.search(normalized))
+
+
+def format_reference(reference: dict[str, Any]) -> str:
+    """Format a 2.1 reference as formal citation text, omitting evidence."""
+
+    if "text" in reference and "reference_type" not in reference:
+        return _clean(reference.get("text", ""))
+    authors = reference.get("authors", [])
+    if isinstance(authors, (list, tuple)):
+        author_text = "、".join(_clean(value) for value in authors if _clean(value))
+    else:
+        author_text = _clean(authors) if authors else ""
+    title = _clean(reference.get("title", ""))
+    title = re.sub(r"^[《<【\[]|[》>】\]]$", "", title)
+    reference_type = reference.get("reference_type")
+    if reference_type in {"official_manual", "official_documentation", "paper"}:
+        title_text = title
+    else:
+        title_text = f"《{title}》" if title else ""
+    parts = [value for value in (author_text, title_text) if value]
+    for field_name in ("edition", "publisher"):
+        value = _clean(reference.get(field_name, ""))
+        if value:
+            parts.append(value)
+    return "，".join(parts)
+
+
+def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> list[dict[str, Any]]:
+    """Resolve a lesson's renderable references for either contract version."""
+
+    if not data or data.get("content_contract_version") != "2.1":
+        return list(lesson.get("references", []))
+    pool = {
+        str(reference.get("reference_id")): reference
+        for reference in data.get("reference_pool", [])
+        if isinstance(reference, dict) and reference.get("reference_id")
+    }
+    resolved: list[dict[str, Any]] = []
+    for reference_id in lesson.get("reference_ids", []):
+        reference = pool.get(str(reference_id))
+        if reference is None:
+            resolved.append(
+                {
+                    "reference_id": str(reference_id),
+                    "reference_type": "formal_course_document",
+                    "title": str(reference_id),
+                    "source_kind": "",
+                    "text": str(reference_id),
+                }
+            )
+            continue
+        item = dict(reference)
+        item["text"] = format_reference(item)
+        resolved.append(item)
+    return resolved
+
+
+def format_reference_list(references: Iterable[dict[str, Any]]) -> str:
+    """Write only formal citation text; provenance/evidence stays internal."""
+
+    return format_numbered_list(format_reference(reference) for reference in references)
 
 
 def format_student_analysis(analysis: dict[str, Any]) -> dict[str, str]:
@@ -161,8 +302,11 @@ def format_reflection(reflection: dict[str, Any]) -> list[str]:
     ]
 
 
-def lesson_content_field_values(lesson: dict[str, Any]) -> dict[str, str]:
-    """Map a V2 lesson to all non-header cells in the canonical template."""
+def lesson_content_field_values(
+    lesson: dict[str, Any],
+    data: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    """Map a V2/V2.1 lesson to all non-header cells in the canonical template."""
 
     values: dict[str, str] = {}
     values.update(format_student_analysis(lesson["student_analysis"]))
@@ -174,7 +318,7 @@ def lesson_content_field_values(lesson: dict[str, Any]) -> dict[str, str]:
     values["difficult_strategy"] = format_numbered_list(lesson["difficult_point"]["strategy"])
     values["teaching_methods"] = format_numbered_list(lesson["teaching_methods"])
     values["resources"] = format_numbered_list(lesson["resources"])
-    values["references"] = format_reference_list(lesson["references"])
+    values["references"] = format_reference_list(lesson_references(data, lesson))
     return values
 
 

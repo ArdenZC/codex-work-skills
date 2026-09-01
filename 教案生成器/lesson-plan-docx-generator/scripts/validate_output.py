@@ -760,6 +760,7 @@ def write_skipped_report(
         False,
         warnings,
     )
+    report["content_contract_version"] = data.get("content_contract_version", "2.0")
     content_quality = assess_content_quality(data, manifest)
     content_quality["coverage"]["non_it_contamination"] = []
     report["content_quality"] = content_quality
@@ -849,6 +850,7 @@ def validate_output_dir(
         output_validation,
         extra_warnings,
     )
+    report["content_contract_version"] = data.get("content_contract_version", "2.0")
     errors: list[str] = report["errors"]
     checks: dict[str, Any] = report["checks"]
 
@@ -973,7 +975,7 @@ def validate_output_dir(
             item_errors.append("unit field mismatch")
         if field_values["task"] != expected_headers["task"]:
             item_errors.append("task field mismatch")
-        expected_content = lesson_content_field_values(item)
+        expected_content = lesson_content_field_values(item, data)
         for name, expected in expected_content.items():
             try:
                 actual = manifest_field_text(document, table, manifest, name)

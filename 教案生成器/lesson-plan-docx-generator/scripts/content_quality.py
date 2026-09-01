@@ -20,10 +20,16 @@ from content_contract import (
     IMPLEMENTATION_STAGE_FIELDS,
     IN_CLASS_STAGE_IDS,
     IMPLEMENTATION_STAGE_IDS,
+    REFERENCE_SOURCE_KINDS,
+    format_reference,
     format_implementation_stage,
     format_reflection,
     format_title,
     lesson_content_field_values,
+    lesson_references,
+    reference_identity,
+    reference_looks_like_placeholder,
+    reference_looks_like_resource_only,
 )
 
 
@@ -594,7 +600,7 @@ def _implementation_anchor_evidence(left: Any, right: Any) -> dict[str, Any]:
     return evidence
 
 
-def _item_values(lesson: dict[str, Any]) -> dict[str, list[str]]:
+def _item_values(lesson: dict[str, Any], data: dict[str, Any] | None = None) -> dict[str, list[str]]:
     """Expose list items individually so short repeated items cannot hide in a joined field."""
 
     result: dict[str, list[str]] = {
@@ -611,7 +617,7 @@ def _item_values(lesson: dict[str, Any]) -> dict[str, list[str]]:
         "difficult_point.strategy": list(lesson["difficult_point"]["strategy"]),
         "teaching_methods": list(lesson["teaching_methods"]),
         "resources": list(lesson["resources"]),
-        "references": [reference["text"] for reference in lesson["references"]],
+        "references": [format_reference(reference) for reference in lesson_references(data, lesson)],
     }
     for stage in lesson["implementation"]:
         stage_id = str(stage["id"])
@@ -974,8 +980,8 @@ def _record_duplicate_groups(values: dict[str, dict[str, str]], minimum: int = 2
     return sorted(groups, key=lambda item: (item["field"], item["lessons"]))
 
 
-def _all_content_strings(lesson: dict[str, Any]) -> dict[str, list[str]]:
-    values = lesson_content_field_values(lesson)
+def _all_content_strings(lesson: dict[str, Any], data: dict[str, Any] | None = None) -> dict[str, list[str]]:
+    values = lesson_content_field_values(lesson, data)
     result = {name: [values[name]] for name in CONTENT_FIELD_NAMES}
     result["progression"] = [_joined(lesson["progression"])]
     result["reflection"] = format_reflection(lesson["reflection"])
@@ -1021,7 +1027,7 @@ def _completeness_report(data: dict[str, Any]) -> tuple[dict[str, Any], list[str
             "quality_goals": len(goals["quality"]),
             "teaching_methods": len(lesson["teaching_methods"]),
             "resources": len(lesson["resources"]),
-            "references": len(lesson["references"]),
+            "references": len(lesson_references(data, lesson)),
             "implementation_stages": len(lesson["implementation"]),
         }
         for field_name in ("base", "problems", "strategies"):
@@ -1030,8 +1036,8 @@ def _completeness_report(data: dict[str, Any]) -> tuple[dict[str, Any], list[str
         for field_name in ("teaching_content", "teaching_methods", "resources"):
             for item_index, value in enumerate(lesson[field_name], 1):
                 check_text(lesson_id, f"{field_name}[{item_index}]", value)
-        for item_index, reference in enumerate(lesson["references"], 1):
-            check_text(lesson_id, f"references[{item_index}]", reference["text"])
+        for item_index, reference in enumerate(lesson_references(data, lesson), 1):
+            check_text(lesson_id, f"references[{item_index}]", format_reference(reference))
         for goal_name in ("knowledge", "ability", "quality"):
             for item_index, value in enumerate(goals[goal_name], 1):
                 check_text(lesson_id, f"goals.{goal_name}[{item_index}]", value)
@@ -1074,7 +1080,7 @@ def _density_report(data: dict[str, Any], manifest: dict[str, Any] | None) -> tu
         title_limit = title_spec.get("max_chars")
         if title_limit is not None and len(title) > int(title_limit):
             errors.append({"lesson": lesson_id, "field": "title", "actual_chars": len(title), "limit": int(title_limit)})
-        values = lesson_content_field_values(lesson)
+        values = lesson_content_field_values(lesson, data)
         for field_name, value in values.items():
             total_chars += len(value)
             spec = fields.get(field_name, {})
@@ -2488,40 +2494,82 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
     return score_pattern
 
 
-def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list[str]) -> dict[str, Any]:
+def _reference_provenance_report(
+    lessons: list[dict[str, Any]],
+    lesson_ids: list[str],
+    data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Validate source metadata while explicitly exempting cross-lesson reuse."""
+
     by_lesson: dict[str, list[dict[str, Any]]] = {}
     missing_evidence: list[dict[str, Any]] = []
     invalid_generic: list[dict[str, Any]] = []
     invalid_verified_public: list[dict[str, Any]] = []
     invalid_resource_only: list[dict[str, Any]] = []
     same_lesson_duplicates: list[dict[str, Any]] = []
+    unresolved_ids: list[dict[str, Any]] = []
+    placeholder_items: list[dict[str, Any]] = []
+    textbook_overlap: list[dict[str, Any]] = []
+    is_v21 = bool(data and data.get("content_contract_version") == "2.1")
+    pool = {
+        str(reference.get("reference_id")): reference
+        for reference in (data or {}).get("reference_pool", [])
+        if isinstance(reference, dict) and reference.get("reference_id")
+    }
+    textbook = ((data or {}).get("course_materials") or {}).get("textbook")
+    textbook_key = reference_identity(textbook) if isinstance(textbook, dict) else ""
+    reuse_frequency: dict[str, int] = {}
     for lesson_id, lesson in zip(lesson_ids, lessons):
         entries: list[dict[str, Any]] = []
         seen_references: dict[str, int] = {}
-        for index, reference in enumerate(lesson.get("references", []), 1):
-            text = _normalize(reference.get("text", ""))
+        raw_ids = [str(value) for value in lesson.get("reference_ids", [])] if is_v21 else []
+        references = lesson_references(data, lesson)
+        for index, reference in enumerate(references, 1):
+            reference_id = raw_ids[index - 1] if is_v21 and index <= len(raw_ids) else None
+            if is_v21 and reference_id not in pool:
+                unresolved_ids.append({"lesson": lesson_id, "reference_id": reference_id, "index": index})
+            text = _normalize(reference.get("text") or format_reference(reference))
             source_kind = str(reference.get("source_kind", ""))
             evidence = reference.get("evidence")
             evidence_present = _meaningful_length(evidence or "") > 0
             entry = {
                 "index": index,
+                "reference_id": reference_id,
+                "reference_type": reference.get("reference_type"),
                 "source_kind": source_kind,
                 "evidence_present": evidence_present,
             }
             entries.append(entry)
+            identity = reference_id or _normalize_item(text)
+            if identity:
+                reuse_frequency[identity] = reuse_frequency.get(identity, 0) + 1
             normalized_item = _normalize_item(text)
-            if normalized_item and normalized_item in seen_references:
-                same_lesson_duplicates.append(
-                    {
-                        "lesson": lesson_id,
-                        "reference": index,
-                        "duplicate_of": seen_references[normalized_item],
-                    }
-                )
-            elif normalized_item:
-                seen_references[normalized_item] = index
+            duplicate_keys = (
+                [f"id:{reference_id}", f"text:{normalized_item}"]
+                if is_v21
+                else [normalized_item]
+            )
+            duplicate_of = next(
+                (seen_references[key] for key in duplicate_keys if key and key in seen_references),
+                None,
+            )
+            if duplicate_of is not None:
+                duplicate_record = {
+                    "lesson": lesson_id,
+                    "reference": index,
+                    "duplicate_of": duplicate_of,
+                }
+                if is_v21:
+                    duplicate_record["reference_id"] = reference_id
+                same_lesson_duplicates.append(duplicate_record)
+            else:
+                for duplicate_key in duplicate_keys:
+                    if duplicate_key:
+                        seen_references[duplicate_key] = index
             if _reference_looks_like_resource_only(text):
                 invalid_resource_only.append({"lesson": lesson_id, "reference": index})
+            if is_v21 and reference_looks_like_placeholder(reference.get("title", text)):
+                placeholder_items.append({"lesson": lesson_id, "reference": index, "reference_id": reference_id})
             if source_kind in {"provided", "verified_public"} and not evidence_present:
                 missing_evidence.append(
                     {"lesson": lesson_id, "reference": index, "source_kind": source_kind}
@@ -2532,15 +2580,16 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
                     REFERENCE_EVIDENCE_URL_PATTERN.search(evidence_text)
                     or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence_text)
                 ):
-                    invalid_verified_public.append(
-                        {"lesson": lesson_id, "reference": index}
-                    )
+                    invalid_verified_public.append({"lesson": lesson_id, "reference": index})
+            generic_identity = reference.get("title", text) if is_v21 else text
             if source_kind == "generic" and (
-                REFERENCE_SPECIFIC_PATTERN.search(text)
-                or re.search(r"《[^》]{2,}》", text)
-                or re.search(r"(?:isbn|gb\s*[/-]?\s*t|出版社|作者|标准编号|文件编号|版次)", text, re.IGNORECASE)
+                REFERENCE_SPECIFIC_PATTERN.search(str(generic_identity))
+                or re.search(r"《[^》]{2,}》", str(generic_identity))
+                or re.search(r"(?:isbn|gb\s*[/-]?\s*t|出版社|作者|标准编号|文件编号|版次)", str(generic_identity), re.IGNORECASE)
             ):
                 invalid_generic.append({"lesson": lesson_id, "reference": index})
+            if is_v21 and textbook_key and reference_identity(reference) == textbook_key:
+                textbook_overlap.append({"lesson": lesson_id, "reference": index, "reference_id": reference_id})
         by_lesson[lesson_id] = entries
     return {
         "by_lesson": by_lesson,
@@ -2553,6 +2602,75 @@ def _reference_provenance_report(lessons: list[dict[str, Any]], lesson_ids: list
         "invalid_verified_public": invalid_verified_public,
         "invalid_resource_only": invalid_resource_only,
         "same_lesson_duplicates": same_lesson_duplicates,
+        "unresolved_ids": unresolved_ids,
+        "placeholder_items": placeholder_items,
+        "textbook_overlap": textbook_overlap,
+        "textbook_overlap_allowed": bool((data or {}).get("allow_textbook_as_reference", False)),
+        "reuse_frequency": dict(sorted(reuse_frequency.items())),
+    }
+
+
+def _practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
+    """Summarize Practice Task Contract V1 handoff gates for Acceptance V2."""
+
+    if data.get("content_contract_version") != "2.1":
+        return {
+            "status": "not_applicable",
+            "contract_version": None,
+            "task_count": 0,
+            "expected_practice_hours": None,
+            "actual_practice_hours": None,
+            "unresolved_task_ids": [],
+            "invalid_practice_lesson_links": [],
+            "hour_consistent": True,
+        }
+    plan = data.get("delivery_plan") or {}
+    expected = plan.get("practice_hours", 0)
+    contract = data.get("practice_task_contract") or {}
+    tasks = contract.get("tasks", []) if isinstance(contract, dict) else []
+    task_ids = {str(task.get("task_id")) for task in tasks if isinstance(task, dict)}
+    lesson_map = {
+        str(lesson.get("lesson_id")): lesson
+        for lesson in data.get("lessons", [])
+        if isinstance(lesson, dict)
+    }
+    unresolved: list[dict[str, Any]] = []
+    invalid_links: list[dict[str, Any]] = []
+    linked_ids: set[str] = set()
+    for lesson in data.get("lessons", []):
+        lesson_id = str(lesson.get("lesson_id"))
+        for task_id in lesson.get("practice_task_ids", []):
+            task_id = str(task_id)
+            linked_ids.add(task_id)
+            if task_id not in task_ids:
+                unresolved.append({"lesson_id": lesson_id, "task_id": task_id})
+    task_hours = sum(float(task.get("practice_hours", 0)) for task in tasks if isinstance(task, dict))
+    expected_float = float(expected or 0)
+    for task in tasks:
+        if not isinstance(task, dict):
+            continue
+        for lesson_id in task.get("lesson_ids", []):
+            lesson = lesson_map.get(str(lesson_id))
+            if lesson is None or lesson.get("lesson_type") == "theory":
+                invalid_links.append(
+                    {"task_id": str(task.get("task_id")), "lesson_id": str(lesson_id)}
+                )
+    unlinked_tasks = sorted(task_ids - linked_ids)
+    consistent = abs(task_hours - expected_float) < 1e-9 and abs(float(contract.get("practice_hours", expected_float)) - expected_float) < 1e-9
+    errors = len(unresolved) + len(invalid_links) + (0 if consistent else 1)
+    return {
+        "status": "failed" if errors else "passed",
+        "contract_version": contract.get("contract_version"),
+        "granularity": contract.get("granularity"),
+        "task_count": len(tasks),
+        "expected_practice_hours": expected,
+        "actual_practice_hours": contract.get("practice_hours"),
+        "sum_task_practice_hours": task_hours,
+        "unresolved_task_ids": unresolved,
+        "unlinked_task_ids": unlinked_tasks,
+        "invalid_practice_lesson_links": invalid_links,
+        "hour_consistent": consistent,
+        "artifact_plan": data.get("artifact_plan", {}),
     }
 
 
@@ -2579,7 +2697,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         lesson_id = _lesson_id(lesson, index)
         for field, value in _field_groups(lesson).items():
             duplicate_values.setdefault(field, {})[lesson_id] = value
-        for field, values in _item_values(lesson).items():
+        for field, values in _item_values(lesson, data).items():
             item_values.setdefault(field, {})[lesson_id] = values
 
     exact_duplicates = _record_duplicate_groups(duplicate_values)
@@ -2742,7 +2860,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     sentence_locations: dict[str, dict[str, set[str]]] = {}
     for index, lesson in enumerate(lessons, 1):
         lesson_id = _lesson_id(lesson, index)
-        for field, values in _all_content_strings(lesson).items():
+        for field, values in _all_content_strings(lesson, data).items():
             for value in values:
                 for sentence in _sentences(value):
                     sentence_locations.setdefault(sentence, {}).setdefault(lesson_id, set()).add(field)
@@ -2793,7 +2911,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     boilerplate_hits: list[dict[str, str]] = []
     for index, lesson in enumerate(lessons, 1):
         lesson_id = _lesson_id(lesson, index)
-        for field, values in _all_content_strings(lesson).items():
+        for field, values in _all_content_strings(lesson, data).items():
             text = "\n".join(values)
             for pattern in BOILERPLATE_PATTERNS:
                 if pattern in text:
@@ -2990,7 +3108,8 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         # secondary coherence diagnostics for the same malformed payload.
         errors = density_messages + errors
 
-    reference_provenance = _reference_provenance_report(lessons, lesson_ids)
+    reference_provenance = _reference_provenance_report(lessons, lesson_ids, data)
+    practice_handoff = _practice_handoff_report(data)
     for item in reference_provenance["missing_evidence"]:
         errors.append(
             f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence"
@@ -3010,6 +3129,27 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             f"{item['lesson']}.references[{item['reference']}] duplicates reference "
             f"{item['duplicate_of']} within the same lesson"
         )
+    for item in reference_provenance.get("unresolved_ids", []):
+        errors.append(
+            f"{item['lesson']}.reference_ids[{item['index']}] unresolved reference ID {item['reference_id']}"
+        )
+    for item in reference_provenance.get("placeholder_items", []):
+        errors.append(
+            f"{item['lesson']}.reference_ids[{item['index']}] is a non-renderable reference placeholder"
+        )
+    if not reference_provenance.get("textbook_overlap_allowed", False):
+        for item in reference_provenance.get("textbook_overlap", []):
+            errors.append(
+                f"{item['lesson']}.reference_ids[{item['index']}] overlaps the textbook without explicit override"
+            )
+    for item in practice_handoff.get("unresolved_task_ids", []):
+        errors.append(f"{item['lesson_id']}.practice_task_ids unresolved task ID {item['task_id']}")
+    for item in practice_handoff.get("invalid_practice_lesson_links", []):
+        errors.append(
+            f"practice task {item['task_id']} cannot link to theory or unknown lesson {item['lesson_id']}"
+        )
+    if practice_handoff.get("status") == "failed" and not practice_handoff.get("unresolved_task_ids") and not practice_handoff.get("invalid_practice_lesson_links"):
+        errors.append("practice task hours do not match delivery_plan.practice_hours")
 
     coverage = {
         "lesson_count": len(lessons),
@@ -3027,6 +3167,24 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         },
         "capability_stage_vocabulary": list(CAPABILITY_STAGES),
         "completeness": completeness,
+        "reference_metrics": {
+            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") == "2.1" else False),
+            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") == "2.1" else None,
+            "lessons_with_references": sum(1 for lesson in lessons if lesson_references(data, lesson)),
+            "lessons_without_references": sum(1 for lesson in lessons if not lesson_references(data, lesson)),
+            "reuse_frequency": reference_provenance.get("reuse_frequency", {}),
+            "placeholder_count": len(reference_provenance.get("placeholder_items", [])),
+            "textbook_overlap_count": len(reference_provenance.get("textbook_overlap", [])),
+            "same_lesson_duplicate_count": len(reference_provenance.get("same_lesson_duplicates", [])),
+            "unresolved_id_count": len(reference_provenance.get("unresolved_ids", [])),
+        },
+        "practice_handoff": {
+            "status": practice_handoff.get("status"),
+            "task_count": practice_handoff.get("task_count", 0),
+            "expected_practice_hours": practice_handoff.get("expected_practice_hours"),
+            "actual_practice_hours": practice_handoff.get("actual_practice_hours"),
+            "hour_consistent": practice_handoff.get("hour_consistent", True),
+        },
         "non_it_contamination_terms": list(NON_IT_CONTAMINATION_TERMS),
         "non_it_contamination_scope": NON_IT_CONTAMINATION_SCOPE,
         "similarity_thresholds": {
@@ -3086,6 +3244,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "progression": progression,
         "intra_lesson_coherence": intra_lesson_coherence,
         "reference_provenance": reference_provenance,
+        "practice_handoff": practice_handoff,
         "coverage": coverage,
         "completeness": completeness,
         "density_errors": density_errors,

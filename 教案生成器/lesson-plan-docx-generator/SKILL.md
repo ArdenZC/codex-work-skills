@@ -1,61 +1,68 @@
 ---
 name: lesson-plan-docx-generator
-description: Generate projectized Chinese vocational-course lesson plan DOCX files from a strict Lesson Content V2 JSON contract, using the protected Word template, semantic bookmarks, output QA, and optional local render smoke. Use for creating, converting, batching, or revising 教案, 教学单元设计, and 实训教案 files.
+description: Generate projectized Chinese vocational-course lesson plan DOCX files from the Lesson Content Contract V2.1 (with V2 compatibility), using the protected Word template, output QA, and optional local render smoke. Use for creating, converting, batching, or revising 教案、教学单元设计 and 实训教案 files.
 ---
 
 # 教案生成器
 
-本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 V2 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。
+本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 Content 2.1 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。
 
 ## 任务入口
 
 任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。正式开始课程规划前，必须把当前理解整理成一次集中的课程基本信息确认；即使信息已经从会话或附件中推断出来，也必须展示并请求用户确认一次。
 
-一次确认必须同时包含以下四个核心字段：
+一次确认必须同时包含以下课程基础字段：
 
 ```text
 course_name  课程名称
 major        专业
 audience     授课对象
 total_hours  总课时 / 总学时
+theory_hours  理论学时
+practice_hours  实践学时
+delivery_mode  理论/实践组织方式
 ```
 
-确认摘要同时显示 `default_hours=2`（单课课时：默认 2 学时），但默认值不是另一个必答问题。只有用户明确指定“每课 4 学时”“部分课次 1 学时”或按章节实际拆分时，才覆盖默认值；现有正整数课时合同不变。摘要还必须显示教材：用户已提供文件或书名时直接列出；未提供时写“未指定（如有指定教材请告诉我；没有也可以继续）”。教材是 recommended, not required，缺失不能阻断生成。
+确认摘要还必须显示 `default_hours=2`（单课课时：默认 2 学时）、教材、辅助参考资料，以及“是否需要实践任务工单”。理论/实践学时和组织方式必须与总学时一致；没有明确拆分时如实显示当前理解并一次性请用户补充。教材、辅助参考资料和实践工单偏好要在同一条确认中集中呈现，不拆成多轮问题。教材是 recommended, not required，缺失不能阻断生成；没有工单生成器时只交付 Practice Task Contract handoff，不伪造工单 DOCX。
 
-用户完成这一次课程基本信息确认后，Agent 自主完成资料检索、课程级 outline、Content V2、QA 和 DOCX。不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”；默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
+这一次课程基本信息确认是唯一一次必要确认。用户完成后，Agent 自主完成资料检索、课程级 outline、Content 2.1、Practice Task Contract、QA 和 DOCX。不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”；默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
 
 资料检索优先使用用户提供的教材/课程资料和用户指定教材；有联网能力时再查找出版社或学校官方页、标准/指南、官方技术文档和可核实公开文献。只给出书名时只能写入真实核实的作者、出版社、ISBN、版次或年份；网络不可用时正常继续，不因无法联网中断生成。
 
 - 用户允许合理推断后，按项目化教学补齐项目、任务、教学内容、评价和预生成反思；
 - 正式 DOCX 不出现“资料不足、推断、AI、QA、similarity、confidence”等内部说明。
 
-没有任务资料时也必须先形成课程级 outline，再生成逐课内容。outline 至少包含 lesson sequence、项目/任务、prior learning、capability stage、deliverable、next bridge。长课程可以内部按 4 至 6 课一批生成，但最终必须用完整课程上下文统一 QA。
+没有任务资料时也必须先形成课程级 outline，再生成逐课内容。outline 至少包含 `lesson_id`、`unit`、`task`、`lesson_type`、`hours`、`theory_hours`、`practice_hours`、`prior_learning`、`capability_stage`、`deliverable`、`next_bridge` 和 `practice_task_ids`。长课程可以内部按 4 至 6 课一批生成，但最终必须用完整课程上下文统一 QA。
 
-## Content Contract V2
+## Content Contract V2.1
 
 默认使用 `assets/templates/lesson-plan/v1.1.2/template.docx`。
 
-正式生产输入必须是 `content_contract_version: "2.0"`，与 Word 模板版本独立。默认 Word 模板为 `lesson-plan v1.1.2`，并继续支持 v1.0 legacy-coordinate、v1.1.0/v1.1.1 semantic-bookmark 与旧 compatibility 模板路径；旧 sparse JSON 不再生产生成。
+正式生产输入默认是 `content_contract_version: "2.1"`，与 Word 模板版本独立；运行时继续兼容读取 `"2.0"`。默认 Word 模板为 `lesson-plan v1.1.2`，并继续支持 v1.0 legacy-coordinate、v1.1.0/v1.1.1 semantic-bookmark 与旧 compatibility 模板路径；旧 sparse JSON 不再生产生成。
 
 课程级必填字段：
 
 ```text
 content_contract_version, course_name, major, audience,
-default_hours, total_hours, lessons
+default_hours, total_hours, delivery_plan, course_materials,
+reference_pool, artifact_plan, outline, lessons
 ```
 
-每课必须直接提供：
+每个 2.1 课次必须直接提供：
 
 ```text
-lesson_id, unit, task, hours, progression,
+lesson_id, unit, task, lesson_type, hours, theory_hours, practice_hours,
+progression, reference_ids, practice_task_ids,
 student_analysis, teaching_content, goals,
-key_point, difficult_point, teaching_methods, resources, references,
+key_point, difficult_point, teaching_methods, resources,
 implementation, evaluation, reflection
 ```
 
+2.0 输入仍读取课次内的 `references` 对象；2.1 不接受课次自由填写 `references`，只通过课程级 `reference_pool` 的 `reference_ids` 选取来源。`theory` 课的 `practice_task_ids` 必须为空；`practice`/`integrated` 课按实践学时关联任务。`delivery_plan` 支持 `theory_only`、`practice_only`、`split_lessons`、`integrated_lessons`、`hybrid`，课程、outline、课次和 Practice Task Contract 的理论/实践学时必须相互守恒。
+
 `default_hours` 是 Agent 创建每课时使用的默认单课学时；某课显式提供的 `hours` 可以覆盖它，`default_hours` 不要求等于所有 `lessons.hours`。`default_hours`、`total_hours` 和每课 `hours` 都必须是正整数课时：数值可为 `1`、`2`、`4`、`12` 等整数，字符串可为 `"1"`、`"2"`、`"2.0"`；不接受空白字符串、分数、零、负数、`NaN` 或 `Infinity`。`unit` 使用项目化名称（如“项目一……”）；`progression` 包含 `prior_lesson_id`、具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。`capability_stage` 只能使用 `认知`、`理解`、`模仿`、`独立`、`综合`、`优化`、`迁移`，不要求机械线性递增。第一课的 `prior_lesson_id` 必须为 `null`，后续课次只能引用已经出现的前序课次。四课及以上不得所有能力阶段完全相同。
 
-`student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项，references 至少一项。
+`student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项。2.1 允许 `reference_ids: []`，渲染为空白，不写“无/暂无/资料不足”。
 
 每课 `implementation` 必须按以下九个 ID、固定顺序完整提供，且每个阶段的 `label`、`minutes`、`modality`、`content`、`teacher_actions`、`student_actions`、`objective` 全部来自 JSON：
 
@@ -75,11 +82,15 @@ after_class_improvement
 
 评价必须显式提供 85–96 的 `evaluation.score`，使用 0.5 分步进，并提供 canonical 13 个 criterion IDs 的逐课 `remarks`。每条 remark 必须有实质内容；所有 Content V2 模板版本统一执行不超过 48 个有意义字符的合同上限，manifest 只能进一步收紧，超限必须失败而不能截断。未指定分数时建议自然集中在 88–94，但不得全为 90、任意短周期循环、严格递增或递减。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
 
-`references` 使用 `{text, source_kind, evidence?}` 对象；`references` 只表示可以阅读、查阅、引用或作为课程依据的文献/文档来源，包括教材、课程/教学标准、国家/行业/职业标准、指南/规范、论文、公开文献、官方技术文档、官方产品手册和用户提供的正式教学文档。`resources` 表示实施教学时使用的工具、设备、环境和材料，例如 MySQL Workbench、数据库服务器、PPT、投影仪、护理模型、虚拟机、实训任务单和案例数据集；这些默认不能为了凑数写入 `references`。同一个课程级来源可放入内部 `course_reference_pool`，再按课选择真正相关的引用，不必为了课次差异虚构资料。
+2.1 的 `course_materials.textbook` 单独表示教材，可为对象或 `null`；它默认不会自动写入 Word 的 references 单元格。课程级 `reference_pool` 的每项必须有 `reference_id`、`reference_type`、可识别的 `title`、`source_kind` 和可定位证据（`provided`/`verified_public`）；逐课只写 `reference_ids`。Agent 在逐课生成前先形成 `course_reference_pool` planning concept，落盘字段仍是 `reference_pool`，不是新的 JSON 字段。`allow_textbook_as_reference` 默认 false，只有显式为 true 时教材才允许进入 references。`references` 只表示可以阅读、查阅、引用或作为课程依据的文献/文档来源，包括专著、课程/教学标准、国家/行业/职业标准、指南/规范、论文、公开文献、官方技术文档、官方产品手册和用户提供的正式教学文档。`resources` 表示实施教学时使用的工具、设备、环境和材料，例如 MySQL Workbench、数据库服务器、PPT、投影仪、护理模型、虚拟机、实训任务单和案例数据集；这些不能为了凑数写入 references。
 
-`source_kind` 为 `provided`、`generic` 或 `verified_public`。没有用户材料时使用泛化的文献/文档类名称，不能虚构教材、作者、出版社、ISBN、标准编号、年份、版次或文件编号；`generic` 不得伪装为具体书名，`verified_public` 必须提供 URL 或可定位的官方来源证据，`provided` 必须提供真实用户资料标识。没有真实附件或资料标识时不得自报 `provided`，只能使用 `generic` 或完成公开来源验证后使用 `verified_public`。同一 reference 跨课重复完全允许，属于 `reference_reusable`，不参与任何课程反重复 hard-fail；同一课内部的 exact duplicate reference 仍必须 fail-fast，不能静默删除。禁止为了降低课程重复率编造不同教材、作者、ISBN、出版社、标准编号或公开文献；同一教材重复 18 次优于编造 18 本教材。信任边界为 `contract_and_locator_only`：Python 只验证 evidence 存在与 locator 形式，不证明用户真的上传了文件，也不证明公开资料真实；Agent 必须在写 JSON 前完成资料核对。evidence 只用于输入和 QA，DOCX 只写 `text`。
+`source_kind` 仍保留 `provided`、`generic`、`verified_public` 以兼容 2.0；2.1 可渲染 reference 优先使用 `provided` 或 `verified_public`，2.1 的 generic 占位来源不渲染。禁止“统一建模语言相关公开文档”“相关网络资源”“相关公开文献”等泛化占位文本；但真实机构和真实标题组成的正式文档名称可以通过。reference 跨课完全重复允许，属于 `reference_reusable`，不参与 exact/item/sentence/field/structural/frequency/whole-course 反重复 hard-fail；同一课内部重复 ID 仍 hard-fail。禁止为了降低课程重复率编造不同教材、作者、ISBN、出版社、标准编号或公开文献；同一教材重复 18 次优于编造 18 本教材。evidence 只用于输入和 QA，DOCX 只写按 `reference_type` 确定性格式化的正式引用文本，不写 evidence 元数据。
 
-完整可运行示例见 `examples/tasks.example.json`，字段说明见 `docs/content-contract-v2.md`，机器约束见 `schemas/lesson-plan-input.schema.json`。
+### Practice Task Contract V1
+
+课程实践学时大于 0 时，2.1 输入必须提供 `practice_task_contract`，版本为 `1.0`，默认 `granularity: "per_task"`。任务字段是 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。一个任务可跨多个课次，不能假设一课一个任务。当前没有独立工单生成器时生成器只输出 `practice-task-contract.json` handoff，不伪造实践工单 DOCX。
+
+当前 2.1 完整示例见 `examples/tasks-v21.example.json`；`examples/tasks.example.json` 保留为 2.0 兼容示例。字段说明见 `docs/content-contract-v2.md` 和 `docs/practice-task-contract-v1.md`，机器约束见 `schemas/lesson-plan-input.schema.json` 与 `schemas/practice-task-contract.schema.json`。
 
 ## Python 与 Agent 的边界
 

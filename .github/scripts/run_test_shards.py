@@ -30,6 +30,7 @@ from typing import Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
 TEST_MODULE = "tests.test_template_packages"
+LESSON_V21_TEST_MODULE = "tests.test_lesson_content_v21"
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
@@ -71,12 +72,30 @@ def _class_test_ids(class_name: str, *, include: Iterable[str] | None = None, ex
     return tuple(prefix + name for name in sorted(names))
 
 
+def _module_test_ids(module_name: str) -> tuple[str, ...]:
+    """Return every concrete test ID in a module for exact shard coverage."""
+
+    suite = unittest.defaultTestLoader.loadTestsFromName(module_name)
+    result: list[str] = []
+
+    def visit(value: unittest.TestSuite | unittest.TestCase) -> None:
+        if isinstance(value, unittest.TestSuite):
+            for child in value:
+                visit(child)
+        else:
+            result.append(value.id())
+
+    visit(suite)
+    return tuple(sorted(result))
+
+
 def _lesson_content_ids() -> tuple[str, ...]:
     mixin = importlib.import_module("tests.test_lesson_content_v2").LessonContentV2Mixin
-    return _class_test_ids(
+    legacy_ids = _class_test_ids(
         "LessonTemplatePackageTests",
         include=(name for name in vars(mixin) if name.startswith("test_")),
     )
+    return tuple(sorted((*legacy_ids, *_module_test_ids(LESSON_V21_TEST_MODULE))))
 
 
 def _lesson_package_ids() -> tuple[str, ...]:
