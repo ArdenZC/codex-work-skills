@@ -19,7 +19,27 @@ from content_contract import WorkOrderContractError, load_work_order_content, no
 
 _IT_TERMS = ("sql", "mysql", "java", "ide", "api", "数据库", "索引")
 _NURSING_TERMS = ("护理", "患者", "血压", "体温", "无菌", "生命体征", "护理模拟")
-_GENERIC_ANCHORS = {"完成", "进行", "任务", "实践", "操作", "项目", "设计", "整理", "记录"}
+_GENERIC_ANCHORS = {
+    "完成",
+    "进行",
+    "任务",
+    "实践",
+    "操作",
+    "项目",
+    "设计",
+    "整理",
+    "记录",
+    "数据",
+    "信息",
+    "内容",
+    "结果",
+    "检查",
+    "系统",
+    "要求",
+    "材料",
+    "工作",
+    "说明",
+}
 
 
 def _compact(value: Any) -> str:
@@ -93,12 +113,27 @@ def _number(value: Any, field: str) -> int:
 
 
 def _anchors(value: Any) -> set[str]:
-    text = _compact(value)
+    normalized = unicodedata.normalize("NFKC", normalise_text(value)).casefold()
+    text = _compact(normalized)
     if not text:
         return set()
-    anchors = {token.casefold() for token in re.findall(r"[a-z0-9]+", str(value))}
-    anchors.update(text[index : index + 2] for index in range(len(text) - 1))
-    return {anchor for anchor in anchors if anchor not in _GENERIC_ANCHORS and len(anchor) >= 2}
+    anchors: set[str] = set()
+    if len(text) >= 4:
+        anchors.add(text)
+    anchors.update(
+        token
+        for token in re.findall(r"[a-z0-9]+", normalized)
+        if len(token) >= 3 and token not in _GENERIC_ANCHORS
+    )
+    for run in re.findall(r"[\u4e00-\u9fff]+", normalized):
+        compact_run = _compact(run)
+        for width in (2, 3, 4):
+            anchors.update(
+                compact_run[index : index + width]
+                for index in range(len(compact_run) - width + 1)
+                if compact_run[index : index + width] not in _GENERIC_ANCHORS
+            )
+    return {anchor for anchor in anchors if len(anchor) >= 2}
 
 
 def _covered(source: Any, targets: Iterable[Any]) -> bool:
@@ -107,11 +142,24 @@ def _covered(source: Any, targets: Iterable[Any]) -> bool:
         return False
     for target in targets:
         target_text = _compact(target)
-        if source_text in target_text or target_text in source_text:
+        if source_text == target_text or (len(source_text) >= 4 and source_text in target_text):
             return True
         source_anchors = _anchors(source)
         overlap = source_anchors & _anchors(target)
-        if len(overlap) >= (2 if len(source_text) >= 8 else 1):
+        if len(overlap) >= (2 if len(source_text) >= 4 else 1):
+            return True
+    return False
+
+
+def _preserved(source: Any, targets: Iterable[Any]) -> bool:
+    """Match required tools/materials by normalized identity, not broad text."""
+
+    source_text = _compact(source)
+    if not source_text:
+        return False
+    for target in targets:
+        target_text = _compact(target)
+        if source_text == target_text or (len(source_text) >= 3 and source_text in target_text):
             return True
     return False
 
@@ -182,7 +230,7 @@ def validate_cross_artifact(
 
     source_title = normalise_text(source.get("title"))
     target_title = normalise_text(downstream.get("task_title") or downstream.get("project_name"))
-    title_pass = bool(_anchors(source_title) & _anchors(target_title)) or _compact(source_title) in _compact(target_title)
+    title_pass = _covered(source_title, [target_title])
     _check("task_title_intent", title_pass, f"source={source_title!r}, work_order={target_title!r}", errors=errors, checks=checks)
 
     task_items = downstream.get("task_items", [])
@@ -207,6 +255,25 @@ def validate_cross_artifact(
         checks=checks,
     )
 
+    source_tools = _text_values(source.get("tools_or_materials", []))
+    downstream_tools = [
+        value
+        for item in task_items
+        for value in item.get("tools_or_materials", [])
+    ]
+    missing_tools = [
+        value for value in source_tools if not _preserved(value, downstream_tools)
+    ]
+    _check(
+        "tools_materials_preservation",
+        not missing_tools,
+        "missing upstream tool/material: " + ", ".join(missing_tools)
+        if missing_tools
+        else "all upstream tools/materials are preserved",
+        errors=errors,
+        checks=checks,
+    )
+
     source_text = " ".join(
         _text_values(
             [source.get("title"), source.get("scenario"), *source.get("tools_or_materials", []), *source.get("objectives", [])]
@@ -225,6 +292,9 @@ def validate_cross_artifact(
         errors=errors,
         checks=checks,
     )
+    # Keep the pre-Phase-2.1 check name as the compatibility surface while
+    # exposing the more precise semantic label to newer callers.
+    checks["tools_materials_domain"] = checks["tools_materials"]
 
     source_safety = _text_values(source.get("safety_or_compliance", []))
     target_safety = _text_values(downstream.get("safety_or_compliance", []))
@@ -249,6 +319,7 @@ def validate_cross_artifact(
             "practice_hours": source_hours,
             "deliverable_count": len(source_deliverables),
             "acceptance_criteria_count": len(source_criteria),
+            "tool_material_count": len(source_tools),
             "work_order_task_item_count": len(task_items),
         },
     }
