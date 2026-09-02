@@ -2,7 +2,7 @@
 
 所有 agent 和模型共用同一份规范：先读取 `SKILL.md` 和 `通用提示词.md`，再生成符合 `content_contract_version: "2.0"`/`"2.1"` 的 `tasks.json`，最后调用同一套 Python 生成器和 QA。不要在工具专用规则中复制 Content V2 字段或另造 DOCX 写入逻辑。Practice Task Contract V1 使用仓库 canonical `schemas/shared/practice-task-contract.schema.json`，WorkOrder Skill 也消费同一份 schema。
 
-Lesson 任务正式规划前必须一次性确认 `course_name`、`major`、`audience`、`total_hours`，显示 `default_hours=2`，并把教材作为建议确认项而非阻断项。一次确认完成后不再询问 outline、项目/任务、评分、模板、输出目录或 DOCX 生成。`references` 是可阅读、查阅、引用或作为课程依据的文献/文档，`resources` 是教学工具、设备、环境和材料；课程级 reference pool 中的合法 reference 可跨课复用，不得为了降低重复率编造书目信息，同课重复和纯资源名仍失败。
+Lesson 任务正式规划前必须一次性确认 `course_name`、`major`、`audience`、`total_hours`，显示 `default_hours=2`，并把教材作为建议确认项而非阻断项。一次确认完成后不再询问 outline、项目/任务、评分、模板、输出目录或 DOCX 生成。若用户确认 `practice_work_orders=true`，Lesson Agent 完成 Lesson QA/DOCX 后必须检测并调用 WorkOrder Skill Agent，统一交付；不可用时明确 `WorkOrder Skill unavailable; handoff generated.`，不得由 Lesson Python 生成或伪造工单 DOCX。`references` 是可阅读、查阅、引用或作为课程依据的文献/文档，`resources` 是教学工具、设备、环境和材料；课程级 reference pool 中的合法 reference 可跨课复用，不得为了降低重复率编造书目信息，同课重复和纯资源名仍失败。
 
 ## 可用入口
 
