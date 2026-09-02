@@ -92,7 +92,7 @@ class PracticeTaskWorkOrderPackageTests(unittest.TestCase):
                     "tools_or_materials": ["需求记录表"],
                     "steps": ["分析业务对象", "记录对象关系", "核对需求记录"],
                     "deliverables": ["需求分析表"],
-                    "acceptance_criteria": ["对象关系与业务资料一致"],
+                    "acceptance_criteria": ["需求分析表中的对象关系与业务资料一致"],
                     "safety_or_compliance": ["遵守资料保密要求"],
                 }
             ],
@@ -101,7 +101,7 @@ class PracticeTaskWorkOrderPackageTests(unittest.TestCase):
             path = Path(temp) / "practice-task-contract.json"
             path.write_text(json.dumps(handoff, ensure_ascii=False), encoding="utf-8")
             loaded = load_practice_task_contract(path)
-            contents = practice_tasks_to_content(loaded, major="软件技术", class_or_audience="一年级")
+            contents = practice_tasks_to_content(loaded, major="软件技术", class_or_audience="一年级", allow_non_production=True)
         self.assertEqual(len(contents), 1)
         self.assertEqual(contents[0]["lesson_ids"], ["L03", "L04"])
         self.assertEqual(sum(item["score"] for item in contents[0]["task_items"]), 90)
