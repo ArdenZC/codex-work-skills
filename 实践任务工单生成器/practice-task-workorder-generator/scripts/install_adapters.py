@@ -67,7 +67,7 @@ ADAPTER_PAYLOAD = """Practice Task WorkOrder integration rules:
 - Read the canonical Practice Task Contract V1 first; it is the upstream fact source.
 - Do not redesign or silently edit the upstream Practice Task.
 - Preserve practice_task_id, lesson_ids, practice_hours, deliverables, acceptance criteria, tools/materials, and safety/compliance constraints.
-- Keep classroom attendance at 10 points and task items at 90 points; total is 100.
+- Keep classroom attendance at 10 points and task items at 90 points; total is 100. The Agent assigns individual task-item scores; Python only validates their sum.
 - Leave the student task-result area blank and never generate a teacher answer, standard SQL, or final clinical/accounting result.
 - Run WorkOrder Content QA, Cross-Artifact QA, and Output QA before delivering the DOCX.
 - Use the canonical practice-work-order v1.0.0 template; Phase 3 / 64-hour expansion is out of scope.
@@ -377,7 +377,15 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
     return files, engine_action, mode
 
 
-def _apply_plan(source_root: Path, target_root: Path, files: dict[Path, bytes], *, replace_engine: str | None, mode: str) -> None:
+def _apply_plan(
+    source_root: Path,
+    target_root: Path,
+    files: dict[Path, bytes],
+    *,
+    replace_engine: str | None,
+    mode: str,
+    keep_backup: bool = False,
+) -> None:
     target_root.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".practice-workorder-adapters.stage-", dir=str(target_root)))
     committed: list[tuple[Path, Path | None]] = []
@@ -421,12 +429,24 @@ def _apply_plan(source_root: Path, target_root: Path, files: dict[Path, bytes], 
             except Exception:
                 pass
         raise
+    else:
+        if not keep_backup:
+            for _, backup in committed:
+                _remove(backup)
     finally:
         _remove(stage)
-        # Successful backups are retained for recoverability and explicit cleanup.
 
 
-def install(source_root: Path, target_root: Path, *, adapters: list[str] | None = None, replace: bool = False, copy_engine: bool = False, dry_run: bool = False) -> dict[str, str]:
+def install(
+    source_root: Path,
+    target_root: Path,
+    *,
+    adapters: list[str] | None = None,
+    replace: bool = False,
+    copy_engine: bool = False,
+    dry_run: bool = False,
+    keep_backup: bool = False,
+) -> dict[str, str]:
     source_root, target_root = _absolute(source_root), _absolute(target_root)
     selected = adapters or ["all"]
     files, replace_engine, mode = build_plan(source_root, target_root, selected, replace=replace, copy_engine=copy_engine)
@@ -441,7 +461,14 @@ def install(source_root: Path, target_root: Path, *, adapters: list[str] | None 
         if replace_engine is not None:
             print(f"would-update={target_root / ENGINE_NAME}")
         return {"mode": next_mode, "status": "dry-run"}
-    _apply_plan(source_root, target_root, files, replace_engine=replace_engine, mode=mode)
+    _apply_plan(
+        source_root,
+        target_root,
+        files,
+        replace_engine=replace_engine,
+        mode=mode,
+        keep_backup=keep_backup,
+    )
     for relative in sorted(files):
         print(f"updated={target_root / relative}")
     if replace_engine is not None:
@@ -456,9 +483,22 @@ def main() -> None:
     parser.add_argument("--adapter", action="append", choices=[*ADAPTER_PATHS, "all"], dest="adapters")
     parser.add_argument("--replace", action="store_true")
     parser.add_argument("--copy-engine", action="store_true")
+    parser.add_argument(
+        "--keep-backup",
+        action="store_true",
+        help="retain previous adapter files/runtime after a successful replacement",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    install(args.source_root, args.target_dir, adapters=args.adapters, replace=args.replace, copy_engine=args.copy_engine, dry_run=args.dry_run)
+    install(
+        args.source_root,
+        args.target_dir,
+        adapters=args.adapters,
+        replace=args.replace,
+        copy_engine=args.copy_engine,
+        dry_run=args.dry_run,
+        keep_backup=args.keep_backup,
+    )
 
 
 if __name__ == "__main__":
