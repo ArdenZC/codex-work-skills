@@ -28,7 +28,7 @@ Content 2.1 还要求课程级 `artifact_plan`：
 {"lesson_plans": true, "practice_work_orders": false}
 ```
 
-Lesson Skill 负责课程组织和本合同；未来的 `practice-task-workorder-generator` 负责把同一 Course Outline 转成可执行任务工单。当前没有工单生成器时，只输出 `practice-task-contract.json` 作为 handoff，不虚构工单 DOCX。
+Lesson Skill 负责课程组织和本合同；当 `artifact_plan.practice_work_orders=true` 且 WorkOrder Skill 可用时，Lesson Agent 在完成 Lesson QA/DOCX 后调用 WorkOrder Skill Agent，由其根据本 handoff 创作完整 WorkOrder Content V1、执行 QA 并生成工单 DOCX，最后统一交付。当前没有工单生成器时，只输出 `practice-task-contract.json` 作为 handoff，并明确 `WorkOrder Skill unavailable; handoff generated.`，不虚构工单 DOCX；Lesson Python generator 不得 subprocess 调用 WorkOrder Python。
 
 ## 生成边界
 

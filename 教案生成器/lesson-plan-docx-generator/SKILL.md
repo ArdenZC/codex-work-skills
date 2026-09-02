@@ -23,7 +23,7 @@ practice_hours  实践学时
 delivery_mode  理论/实践组织方式
 ```
 
-确认摘要还必须显示 `default_hours=2`（单课课时：默认 2 学时）、教材、辅助参考资料，以及“是否需要实践任务工单”。理论/实践学时和组织方式必须与总学时一致；没有明确拆分时如实显示当前理解并一次性请用户补充。教材、辅助参考资料和实践工单偏好要在同一条确认中集中呈现，不拆成多轮问题。教材是 recommended, not required，缺失不能阻断生成；没有工单生成器时只交付 Practice Task Contract handoff，不伪造工单 DOCX。
+确认摘要还必须显示 `default_hours=2`（单课课时：默认 2 学时）、教材、辅助参考资料，以及“是否需要实践任务工单”。理论/实践学时和组织方式必须与总学时一致；没有明确拆分时如实显示当前理解并一次性请用户补充。教材、辅助参考资料和实践工单偏好要在同一条确认中集中呈现，不拆成多轮问题。教材是 recommended, not required，缺失不能阻断生成。确认 `practice_work_orders=true` 后，Lesson Agent 在完成 Lesson QA/DOCX 和 Practice Task Contract handoff 后检测并调用可用的 WorkOrder Skill，由 WorkOrder Agent 创作完整 Content V1、执行 QA 并生成工单，最后统一交付；不可用时正常交付 Lesson 与 handoff，并明确 `WorkOrder Skill unavailable; handoff generated.`，不伪造工单 DOCX。
 
 这一次课程基本信息确认是唯一一次必要确认。用户完成后，Agent 自主完成资料检索、课程级 outline、Content 2.1、Practice Task Contract、QA 和 DOCX。不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”；默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
 
@@ -88,7 +88,7 @@ after_class_improvement
 
 ### Practice Task Contract V1
 
-课程实践学时大于 0 时，2.1 输入必须提供 `practice_task_contract`，版本为 `1.0`，默认 `granularity: "per_task"`。任务字段是 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。一个任务可跨多个课次，不能假设一课一个任务。当前没有独立工单生成器时生成器只输出 `practice-task-contract.json` handoff，不伪造实践工单 DOCX。
+课程实践学时大于 0 时，2.1 输入必须提供 `practice_task_contract`，版本为 `1.0`，默认 `granularity: "per_task"`。任务字段是 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。一个任务可跨多个课次，不能假设一课一个任务。`practice_work_orders=true` 时，Lesson 只负责生成并 QA canonical handoff，再由已检测到的 WorkOrder Skill 通过 Agent orchestration 消费 handoff；Lesson Python generator 不得 subprocess 调用 WorkOrder Python，也不得自动映射成工单正文。WorkOrder Skill 不可用时只输出 `practice-task-contract.json` handoff，并明确 unavailable 状态，不伪造实践工单 DOCX。
 
 当前 2.1 完整示例见 `examples/tasks-v21.example.json`；`examples/tasks.example.json` 保留为 2.0 兼容示例。字段说明见 `docs/content-contract-v2.md` 和 `docs/practice-task-contract-v1.md`，机器约束见 `schemas/lesson-plan-input.schema.json` 与仓库 canonical `schemas/shared/practice-task-contract.schema.json`；`schemas/practice-task-contract.schema.json` 仅为兼容入口。
 
@@ -109,6 +109,7 @@ Agent 负责课程级规划和所有逐课教学正文；生成器只做 schema 
   -> Output Structure + Content-to-DOCX Fidelity QA
   -> optional LibreOffice render smoke
   -> atomic commit to final output and external QA report
+  -> when practice_work_orders=true, detect and call WorkOrder Skill Agent, then unify Lesson + WorkOrder delivery
   -> Agent representative-page visual inspection
 ```
 

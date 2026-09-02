@@ -1,4 +1,4 @@
-"""Load and deterministically map Practice Work Order Content V1 inputs."""
+"""Load and validate WorkOrder inputs without authoring production prose."""
 
 from __future__ import annotations
 
@@ -150,19 +150,62 @@ def _as_positive_hours(value: Any, field: str) -> int:
     return int(number)
 
 
-def _score_split(count: int, total: int = 90) -> list[int]:
+def practice_tasks_to_authoring_skeleton(contract: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extract an Agent authoring handoff without creating WorkOrder content.
+
+    The returned objects intentionally contain only upstream facts and an
+    explicit authoring checklist.  They do not contain ``task_items`` and
+    cannot be passed to the DOCX generator as Content V1.
+    """
+
+    course_name = normalise_text(contract.get("course_name"))
+    if not course_name:
+        raise WorkOrderContractError("Practice Task Contract V1 requires course_name")
+    skeletons: list[dict[str, Any]] = []
+    for task in contract["tasks"]:
+        skeletons.append(
+            {
+                "practice_task_id": normalise_text(task["task_id"]),
+                "course_name": course_name,
+                "project_id": normalise_text(task["project_id"]),
+                "task_title": normalise_text(task["title"]),
+                "lesson_ids": [normalise_text(item) for item in task["lesson_ids"]],
+                "practice_hours": _as_positive_hours(
+                    task["practice_hours"], f"{task['task_id']}.practice_hours"
+                ),
+                "scenario": normalise_text(task["scenario"]),
+                "objectives": [normalise_text(item) for item in task["objectives"]],
+                "required_inputs": [normalise_text(item) for item in task["required_inputs"]],
+                "tools_or_materials": [normalise_text(item) for item in task["tools_or_materials"]],
+                "steps": [normalise_text(item) for item in task["steps"]],
+                "deliverables": [normalise_text(item) for item in task["deliverables"]],
+                "acceptance_criteria": [normalise_text(item) for item in task["acceptance_criteria"]],
+                "safety_or_compliance": [
+                    normalise_text(item) for item in task["safety_or_compliance"]
+                ],
+                "authoring_requirements": {
+                    "task_items": "Agent must author 1-5 executable task items and all student-facing prose.",
+                    "scores": "Agent assigns positive integer task-item scores from workload, difficulty and deliverables; their sum must be 90.",
+                    "content_contract": "Agent must return a complete Practice Work Order Content V1 object before DOCX generation.",
+                },
+            }
+        )
+    return skeletons
+
+
+def _legacy_score_split(count: int, total: int = 90) -> list[int]:
     if count < 1 or count > 5:
         raise WorkOrderContractError("a work order supports 1 to 5 task items")
     base, remainder = divmod(total, count)
     return [base + (1 if index < remainder else 0) for index in range(count)]
 
 
-def _task_items_from_handoff(task: dict[str, Any]) -> list[dict[str, Any]]:
+def _legacy_task_items_from_handoff(task: dict[str, Any]) -> list[dict[str, Any]]:
     steps = [normalise_text(item) for item in task["steps"]]
     # Keep the mapping lossless and bounded by the template's five task rows.
     if len(steps) > 5:
         steps = steps[:4] + ["；".join(steps[4:])]
-    scores = _score_split(len(steps))
+    scores = _legacy_score_split(len(steps))
     common = [normalise_text(item) for item in task["tools_or_materials"]]
     deliverables = [normalise_text(item) for item in task["deliverables"]]
     criteria = [normalise_text(item) for item in task["acceptance_criteria"]]
@@ -199,8 +242,21 @@ def practice_tasks_to_content(
     *,
     major: str,
     class_or_audience: str,
+    allow_non_production: bool = False,
 ) -> list[dict[str, Any]]:
-    """Map each Lesson handoff task to one independent Content V1 document."""
+    """Legacy fixture/migration mapper; never use it for production generation.
+
+    The old deterministic expansion remains available only to explicitly
+    marked tests or migrations.  The production CLI requires Agent-authored
+    Content V1 and never calls this function.
+    """
+
+    if not allow_non_production:
+        raise WorkOrderContractError(
+            "Practice Task handoff is not production WorkOrder Content; "
+            "Agent must author complete Content V1 before DOCX generation "
+            "(use allow_non_production=True only for fixtures or migration)."
+        )
 
     course_name = normalise_text(contract.get("course_name"))
     if not course_name:
@@ -227,7 +283,7 @@ def practice_tasks_to_content(
                     "leader_placeholder": "组长：____________",
                     "member_placeholder": "成员：____________",
                 },
-                "task_items": _task_items_from_handoff(task),
+                "task_items": _legacy_task_items_from_handoff(task),
                 "safety_or_compliance": [normalise_text(item) for item in task["safety_or_compliance"]],
                 "teacher_evaluation": {
                     "description": "沿用 canonical 模板固定教师评价，不在 Content V1 中重写。"

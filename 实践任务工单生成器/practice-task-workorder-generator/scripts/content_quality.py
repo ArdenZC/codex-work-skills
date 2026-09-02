@@ -74,6 +74,15 @@ _ACTION_MARKERS = (
     "收集",
     "分类",
     "标记",
+    "执行",
+    "检查",
+    "提交",
+    "阅读",
+    "圈定",
+    "选择",
+    "补充",
+    "签名",
+    "完成",
 )
 _IT_MARKERS = ("sql", "数据库索引", "java", "ide", "mysql", "api")
 _NURSING_MARKERS = ("患者", "血压", "无菌", "生命体征", "护理操作")
@@ -180,11 +189,32 @@ def _has_coverage(source: Any, targets: Iterable[Any]) -> bool:
     source_anchors = _coverage_anchor(source)
     for target in targets:
         target_text = _compact(target)
-        if source_text in target_text or target_text in source_text:
+        if source_text == target_text or (len(source_text) >= 3 and source_text in target_text):
             return True
         if any(len(anchor) >= 2 for anchor in source_anchors & _coverage_anchor(target)):
             return True
     return False
+
+
+def _step_has_action_and_object(text: Any) -> bool:
+    """Apply the minimum deterministic action + object step gate."""
+
+    value = normalise_text(text)
+    if _is_vague_only(value):
+        return False
+    compact = _compact(value)
+    actions = [
+        (compact.find(_compact(marker)), _compact(marker))
+        for marker in _ACTION_MARKERS
+        if _compact(marker) in compact
+    ]
+    if not actions:
+        return False
+    position, action = min(actions, key=lambda item: item[0])
+    remainder = compact[:position] + compact[position + len(action) :]
+    # A concrete target may be short (for example, “结果” in “检查结果”),
+    # but an action by itself must not pass.
+    return len(remainder) >= 2
 
 
 def validate_content(content: dict[str, Any]) -> dict[str, Any]:
@@ -223,6 +253,12 @@ def validate_content(content: dict[str, Any]) -> dict[str, Any]:
             executability_errors.append(f"task_items[{index}] has no substantive action")
         if len(_compact(combined)) < 8:
             executability_errors.append(f"task_items[{index}] does not name a professional object")
+        for step_index, step in enumerate(item.get("steps", []), start=1):
+            if not _step_has_action_and_object(step):
+                executability_errors.append(
+                    f"{content.get('practice_task_id', '<unknown>')} task_item[{index}] "
+                    f"step[{step_index}] is vague or lacks action/object: {normalise_text(step)!r}"
+                )
 
         for deliverable in item.get("deliverables", []):
             if _is_vague_deliverable(deliverable):
@@ -230,16 +266,23 @@ def validate_content(content: dict[str, Any]) -> dict[str, Any]:
                     f"task_items[{index}] has an unobservable deliverable: {deliverable}"
                 )
         criteria = item.get("acceptance_criteria", [])
-        if not criteria or all(_is_vague_criterion(value) for value in criteria):
-            acceptance_errors.append(f"task_items[{index}] has no observable acceptance criterion")
-        elif not any(
-            _has_coverage(
-                deliverable,
-                [*criteria, item.get("description", ""), *item.get("steps", [])],
+        observable_criteria = [value for value in criteria if not _is_vague_criterion(value)]
+        if not criteria or not observable_criteria:
+            acceptance_errors.append(
+                f"{content.get('practice_task_id', '<unknown>')} task_item[{index}]: "
+                "missing observable acceptance criterion (category=acceptance)"
             )
-            for deliverable in item.get("deliverables", [])
-        ):
-            acceptance_errors.append(f"task_items[{index}] deliverables have no acceptance coverage")
+        else:
+            for deliverable in item.get("deliverables", []):
+                if _is_vague_deliverable(deliverable):
+                    continue
+                if not _has_coverage(deliverable, observable_criteria):
+                    acceptance_errors.append(
+                        f"{content.get('practice_task_id', '<unknown>')} task_item[{index}]: "
+                        f"deliverable {normalise_text(deliverable)!r} has no observable "
+                        f"acceptance coverage; missing_deliverable={normalise_text(deliverable)!r} "
+                        "(category=acceptance)"
+                    )
 
     errors.extend(executability_errors)
     errors.extend(deliverable_errors)

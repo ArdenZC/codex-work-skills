@@ -4,6 +4,18 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 实践任务工单生成器 2.1.0 — 2026-09-02
+
+### Phase 2.1 Hardening
+
+- `--practice-task-json` 收紧为 handoff/schema 校验和 authoring skeleton 输出；正式 WorkOrder Content V1 与学生-facing prose、任务分值必须由 Agent 提供，Python 不再自动创作或机械均分。
+- WorkOrder 批量生成改为 candidate → 全部 Content/Cross-Artifact/Output QA → 全部真实 Render Smoke → batch atomic publication；任一失败都保持正式输出原状。
+- 每个 substantive deliverable 必须有可观察验收覆盖，主要步骤必须包含动作和对象/产物/目标；补充工具/材料 preservation gate 并保留领域污染 gate。
+- Lesson 在 `practice_work_orders=true` 时通过 Agent orchestration 调用 WorkOrder Skill；不可用时交付 Lesson 与 handoff 并明确状态，不伪造工单 DOCX。
+- WorkOrder CI 在 Windows/macOS 安装 LibreOffice 并断言 `render.status=pass`；`skipped` 不再构成成功。
+- 安装器统一默认清理成功替换后的临时 backup，显式 `--keep-backup` 才保留；README、简介、manifest 和 install entry 增加门面合同检查。
+- 继续使用 `practice-work-order v1.0.0`，不修改模板 binary/fingerprint，不创建模板 tag、GitHub Release 或 Phase 3 产物。
+
 ## 实践任务工单生成器 2.0.0 — 2026-09-02
 
 ### Phase 2 / 联动候选

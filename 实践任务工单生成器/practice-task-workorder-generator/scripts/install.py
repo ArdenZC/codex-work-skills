@@ -99,7 +99,14 @@ def _remove(path: Path | None) -> None:
         path.unlink()
 
 
-def install(source: Path, skills_dir: Path, *, replace: bool = False, dry_run: bool = False) -> Path:
+def install(
+    source: Path,
+    skills_dir: Path,
+    *,
+    replace: bool = False,
+    dry_run: bool = False,
+    keep_backup: bool = False,
+) -> Path:
     source = source.expanduser().resolve()
     skills_dir = skills_dir.expanduser().resolve()
     target = skills_dir / SKILL_NAME
@@ -149,6 +156,8 @@ def install(source: Path, skills_dir: Path, *, replace: bool = False, dry_run: b
                 moved_backup = False
             raise RuntimeError(f"installation commit failed; previous installation restored: {commit_error}") from commit_error
         print(f"installed={target}")
+        if backup is not None and not keep_backup:
+            _remove(backup)
         return target
     except BaseException as exc:
         operation_error = exc
@@ -167,9 +176,20 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skills-dir", type=Path, default=Path.home() / ".codex" / "skills")
     parser.add_argument("--replace", action="store_true")
+    parser.add_argument(
+        "--keep-backup",
+        action="store_true",
+        help="retain the previous installation after a successful replacement",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-    install(Path(__file__).resolve().parents[1], args.skills_dir, replace=args.replace, dry_run=args.dry_run)
+    install(
+        Path(__file__).resolve().parents[1],
+        args.skills_dir,
+        replace=args.replace,
+        dry_run=args.dry_run,
+        keep_backup=args.keep_backup,
+    )
 
 
 if __name__ == "__main__":

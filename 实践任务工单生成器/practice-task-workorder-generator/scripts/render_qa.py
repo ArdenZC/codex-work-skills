@@ -55,10 +55,16 @@ def main() -> int:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--timeout", type=int, default=45)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--require-render",
+        action="store_true",
+        help="treat a missing LibreOffice renderer as a failure",
+    )
     args = parser.parse_args()
     report = render_file(args.input, args.output_dir, timeout=args.timeout)
     print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else report["status"])
-    return 0 if report["status"] in {"pass", "skipped"} else 1
+    allowed = {"pass"} if args.require_render else {"pass", "skipped"}
+    return 0 if report["status"] in allowed else 1
 
 
 if __name__ == "__main__":

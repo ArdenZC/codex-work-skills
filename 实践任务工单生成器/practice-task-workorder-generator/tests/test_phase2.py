@@ -73,7 +73,7 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         self.assertEqual(lesson_entry["$ref"], shared["$id"])
         self.assertNotIn("$defs", lesson_entry)
         handoff = _handoff()
-        content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级")[0]
+        content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级", allow_non_production=True)[0]
         self.assertEqual(content["practice_task_id"], "PT-REAL-01")
         self.assertEqual(content["lesson_ids"], ["L03", "L04"])
         self.assertEqual(content["practice_hours"], 4)
@@ -82,7 +82,7 @@ class WorkOrderPhase2Tests(unittest.TestCase):
 
     def test_cross_artifact_valid_and_each_hard_gate_rejects_mismatch(self) -> None:
         handoff = _handoff()
-        content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级")[0]
+        content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级", allow_non_production=True)[0]
         report = validate_cross_artifact(handoff, content)
         self.assertEqual(report["status"], "pass", report)
         for field, replacement in (
@@ -101,7 +101,7 @@ class WorkOrderPhase2Tests(unittest.TestCase):
             item["deliverables"] = ["无关材料"]
         self.assertEqual(validate_cross_artifact(handoff, missing_deliverable)["status"], "fail")
         nursing = _handoff("nursing")
-        nursing_content = practice_tasks_to_content(nursing, major="护理", class_or_audience="高职一年级")[0]
+        nursing_content = practice_tasks_to_content(nursing, major="护理", class_or_audience="高职一年级", allow_non_production=True)[0]
         nursing_content["task_items"][0]["tools_or_materials"] = ["MySQL Workbench"]
         self.assertEqual(validate_cross_artifact(nursing, nursing_content)["status"], "fail")
 
