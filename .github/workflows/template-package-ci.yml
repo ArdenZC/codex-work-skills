@@ -301,12 +301,7 @@ jobs:
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          started=$(date +%s)
-          brew install --cask libreoffice
-          echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
-          "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
-          echo "- LibreOffice setup: $(( $(date +%s) - started ))s" >> "$GITHUB_STEP_SUMMARY"
+        run: .github/scripts/install_libreoffice_macos.sh
 
       - name: Install LibreOffice on Windows
         if: runner.os == 'Windows'
@@ -472,12 +467,7 @@ jobs:
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          started=$(date +%s)
-          brew install --cask libreoffice
-          echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
-          "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
-          echo "- LibreOffice setup: $(( $(date +%s) - started ))s" >> "$GITHUB_STEP_SUMMARY"
+        run: .github/scripts/install_libreoffice_macos.sh
 
       - name: Install LibreOffice on Windows
         if: runner.os == 'Windows'
@@ -580,12 +570,7 @@ jobs:
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          started=$(date +%s)
-          brew install --cask libreoffice
-          echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
-          "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
-          echo "- WorkOrder LibreOffice setup: $(( $(date +%s) - started ))s" >> "$GITHUB_STEP_SUMMARY"
+        run: .github/scripts/install_libreoffice_macos.sh
 
       - name: Install LibreOffice on Windows
         if: runner.os == 'Windows'
@@ -718,12 +703,7 @@ jobs:
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          started=$(date +%s)
-          brew install --cask libreoffice
-          echo "/Applications/LibreOffice.app/Contents/MacOS" >> "$GITHUB_PATH"
-          "/Applications/LibreOffice.app/Contents/MacOS/soffice" --version | head -n 1
-          echo "- LibreOffice setup: $(( $(date +%s) - started ))s" >> "$GITHUB_STEP_SUMMARY"
+        run: .github/scripts/install_libreoffice_macos.sh
 
       - name: Install LibreOffice on Windows
         if: runner.os == 'Windows'
