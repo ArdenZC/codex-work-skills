@@ -1545,7 +1545,11 @@ class TemplatePackageReleaseTests(unittest.TestCase):
             )
             if os.name == "nt":
                 executable = bin_dir / "gh.exe"
-                shutil.copy2(PYTHON, executable)
+                # A relocated venv launcher still looks for pyvenv.cfg beside itself.
+                # Use the base interpreter so the fake CLI remains executable from
+                # its temporary bin directory on Windows.
+                launcher_python = Path(getattr(sys, "_base_executable", sys.executable))
+                shutil.copy2(launcher_python, executable)
                 (root / "api").write_text(fake_code, encoding="utf-8")
                 (root / "release").write_text(fake_code, encoding="utf-8")
             else:
