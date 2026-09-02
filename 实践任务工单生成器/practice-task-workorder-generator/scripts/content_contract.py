@@ -12,6 +12,7 @@ from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA_PATH = ROOT / "schemas" / "work-order-content.schema.json"
+PRACTICE_TASK_SCHEMA_ID = "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"
 
 
 class WorkOrderContractError(ValueError):
@@ -31,6 +32,32 @@ def _load_json(path: Path) -> Any:
 
 def _schema_errors(value: dict[str, Any]) -> list[str]:
     validator = Draft202012Validator(json.loads(SCHEMA_PATH.read_text(encoding="utf-8")))
+    return [error.message for error in sorted(validator.iter_errors(value), key=lambda item: list(item.path))]
+
+
+def _practice_task_schema_path() -> Path:
+    """Resolve the one repository/shared schema or an installed local copy."""
+
+    candidates = (
+        ROOT / "schemas" / "shared" / "practice-task-contract.schema.json",
+        ROOT.parents[1] / "schemas" / "shared" / "practice-task-contract.schema.json",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise WorkOrderContractError(
+        "Practice Task Contract V1 shared schema is unavailable; "
+        "install the complete repository/Skill package before using --practice-task-json"
+    )
+
+
+def _practice_task_schema_errors(value: dict[str, Any]) -> list[str]:
+    schema_path = _practice_task_schema_path()
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise WorkOrderContractError(f"cannot read shared Practice Task schema {schema_path}: {exc}") from exc
+    validator = Draft202012Validator(schema)
     return [error.message for error in sorted(validator.iter_errors(value), key=lambda item: list(item.path))]
 
 
@@ -77,6 +104,12 @@ def load_practice_task_contract(path: Path) -> dict[str, Any]:
         value = value["practice_task_contract"]
     if not isinstance(value, dict) or value.get("contract_version") != "1.0":
         raise WorkOrderContractError("Practice Task Contract V1 requires contract_version=1.0")
+    schema_errors = _practice_task_schema_errors(value)
+    if schema_errors:
+        raise WorkOrderContractError(
+            "Practice Task Contract V1 failed canonical schema validation: "
+            + "; ".join(schema_errors[:8])
+        )
     tasks = value.get("tasks")
     if not isinstance(tasks, list) or not tasks:
         raise WorkOrderContractError("Practice Task Contract V1 requires a non-empty tasks array")
@@ -89,7 +122,22 @@ def load_practice_task_contract(path: Path) -> dict[str, Any]:
         for key in ("objectives", "required_inputs", "tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
             if not isinstance(task[key], list) or not task[key] or not all(normalise_text(item) for item in task[key]):
                 raise WorkOrderContractError(f"handoff task {index}.{key} must be a non-empty text list")
+    task_ids = [normalise_text(task["task_id"]) for task in tasks]
+    if len(task_ids) != len(set(task_ids)):
+        raise WorkOrderContractError("Practice Task Contract V1 task_id values must be unique")
+    total_hours = _as_nonnegative_hours(value["practice_hours"], "practice_hours")
+    task_hours = sum(_as_positive_hours(task["practice_hours"], f"{task['task_id']}.practice_hours") for task in tasks)
+    if total_hours != task_hours:
+        raise WorkOrderContractError(
+            f"Practice Task Contract V1 practice_hours must equal task sum: expected {total_hours}, got {task_hours}"
+        )
     return value
+
+
+def _as_nonnegative_hours(value: Any, field: str) -> int:
+    if value == 0 or value == "0" or value == "0.0":
+        return 0
+    return _as_positive_hours(value, field)
 
 
 def _as_positive_hours(value: Any, field: str) -> int:
@@ -168,6 +216,8 @@ def practice_tasks_to_content(
                 "major": normalise_text(major),
                 "class_or_audience": normalise_text(class_or_audience),
                 "practice_task_id": task_id,
+                "task_title": normalise_text(task["title"]),
+                "project_id": normalise_text(task["project_id"]),
                 "lesson_ids": lesson_ids,
                 "granularity": contract.get("granularity", "per_task"),
                 "project_name": normalise_text(task["title"]),
@@ -178,6 +228,7 @@ def practice_tasks_to_content(
                     "member_placeholder": "成员：____________",
                 },
                 "task_items": _task_items_from_handoff(task),
+                "safety_or_compliance": [normalise_text(item) for item in task["safety_or_compliance"]],
                 "teacher_evaluation": {
                     "description": "沿用 canonical 模板固定教师评价，不在 Content V1 中重写。"
                 },

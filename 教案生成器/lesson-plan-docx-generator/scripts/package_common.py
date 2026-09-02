@@ -10,6 +10,7 @@ from typing import Any
 
 import yaml
 from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
 
 from semantic_bookmarks import (
     IMPLEMENTATION_STAGES,
@@ -75,7 +76,9 @@ REFERENCE_EVIDENCE_URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
     r"(?:官方|政府|教育部|国家卫生健康|行业协会).*(?:官网|章节|条款|第[一二三四五六七八九十百0-9]+[章节条]|页|文号|检索|路径)",
 )
-PRACTICE_CONTRACT_SCHEMA = SKILL_DIR / "schemas" / "practice-task-contract.schema.json"
+REPOSITORY_ROOT = SKILL_DIR.parents[1]
+PRACTICE_CONTRACT_SCHEMA = REPOSITORY_ROOT / "schemas" / "shared" / "practice-task-contract.schema.json"
+PRACTICE_CONTRACT_SCHEMA_ID = "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"
 
 
 def require_meaningful_text(value: Any, field_name: str, minimum: int = 1) -> str:
@@ -613,6 +616,28 @@ def load_schema(path: Path | str = DEFAULT_SCHEMA) -> dict[str, Any]:
     return schema
 
 
+def _schema_store(schema_path: Path) -> dict[str, dict[str, Any]]:
+    """Load the small set of local external schemas used by Lesson input."""
+
+    candidates = (
+        schema_path.parent / "shared" / "practice-task-contract.schema.json",
+        PRACTICE_CONTRACT_SCHEMA,
+    )
+    store: dict[str, dict[str, Any]] = {}
+    for candidate in dict.fromkeys(path.resolve() for path in candidates):
+        if not candidate.is_file():
+            continue
+        with candidate.open("r", encoding="utf-8") as stream:
+            value = json.load(stream)
+        if not isinstance(value, dict):
+            raise ValueError(f"External schema must be a JSON object: {candidate}")
+        store[candidate.as_uri()] = value
+        identifier = value.get("$id")
+        if identifier:
+            store[str(identifier)] = value
+    return store
+
+
 def _validate_positive_number(value: Any, field_name: str) -> None:
     if isinstance(value, bool) or not isinstance(value, (str, int, float, Decimal)):
         raise ValueError(f"{field_name} must be a positive number; received {value}. Lesson hours must be a positive integer.")
@@ -627,8 +652,22 @@ def _validate_positive_number(value: Any, field_name: str) -> None:
 
 
 def _schema_errors(data: dict[str, Any], schema_path: Path | str) -> None:
-    schema = load_schema(schema_path)
-    errors = sorted(Draft202012Validator(schema).iter_errors(data), key=lambda error: list(error.path))
+    resolved_schema_path = Path(schema_path).expanduser().resolve()
+    schema = load_schema(resolved_schema_path)
+    resources = [(resolved_schema_path.as_uri(), Resource.from_contents(schema))]
+    schema_id = schema.get("$id")
+    if schema_id and schema_id != resolved_schema_path.as_uri():
+        resources.append((str(schema_id), Resource.from_contents(schema)))
+    resources.extend(
+        (uri, Resource.from_contents(value))
+        for uri, value in _schema_store(resolved_schema_path).items()
+        if uri not in {item[0] for item in resources}
+    )
+    registry = Registry().with_resources(resources)
+    errors = sorted(
+        Draft202012Validator(schema, registry=registry).iter_errors(data),
+        key=lambda error: list(error.path),
+    )
     if errors:
         details = "; ".join(
             f"{'.'.join(str(part) for part in error.path) or '<root>'}: {error.message}"

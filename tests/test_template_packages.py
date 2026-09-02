@@ -3607,6 +3607,7 @@ class WorkflowContractTests(unittest.TestCase):
             "template-tooling",
             "template-lesson",
             "template-gradebook",
+            "template-workorder",
             "template-release",
             "ci-gate",
         ):
@@ -3614,7 +3615,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertEqual(jobs["classify-changes"]["runs-on"], "ubuntu-latest")
         self.assertEqual(jobs["package-contracts"]["runs-on"], "ubuntu-latest")
         self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
-        for job_name in ("template-tooling", "template-lesson", "template-gradebook", "template-release"):
+        for job_name in ("template-tooling", "template-lesson", "template-gradebook", "template-workorder", "template-release"):
             self.assertEqual(jobs[job_name]["timeout-minutes"], 30)
             setup_python = next(
                 step
@@ -3626,10 +3627,13 @@ class WorkflowContractTests(unittest.TestCase):
         tooling_text = str(jobs["template-tooling"]).lower()
         lesson_text = str(jobs["template-lesson"]).lower()
         gradebook_text = str(jobs["template-gradebook"]).lower()
+        workorder_text = str(jobs["template-workorder"]).lower()
         release_text = str(jobs["template-release"]).lower()
         self.assertIn("libreoffice", tooling_text)
         self.assertNotIn("libreoffice", lesson_text)
         self.assertIn("libreoffice", gradebook_text)
+        self.assertIn("practice-task-workorder-generator", workorder_text)
+        self.assertIn("cross_artifact", workorder_text)
         gradebook_steps = "\n".join(step.get("run", "") for step in jobs["template-gradebook"]["steps"])
         self.assertIn("run_gradebook_shards.py", gradebook_steps)
         self.assertIn("--group contracts", gradebook_steps)
@@ -3678,6 +3682,7 @@ class WorkflowContractTests(unittest.TestCase):
             "run_docs",
             "run_lesson",
             "run_gradebook",
+            "run_workorder",
             "run_tooling",
             "run_release",
             "run_package_contracts",
@@ -3720,6 +3725,7 @@ class WorkflowContractTests(unittest.TestCase):
             ("template-tooling", "run_tooling"),
             ("template-lesson", "run_lesson"),
             ("template-gradebook", "run_gradebook"),
+            ("template-workorder", "run_workorder"),
             ("template-release", "run_release"),
         ):
             self.assertIn("always()", jobs[heavy_job]["if"])
@@ -3736,6 +3742,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("needs.package-contracts.result == 'success'", jobs["template-release"]["if"])
         self.assertEqual(jobs["template-lesson"]["needs"], "classify-changes")
         self.assertEqual(jobs["template-gradebook"]["needs"], "classify-changes")
+        self.assertIn("package-contracts", jobs["template-workorder"]["needs"])
+        self.assertIn("needs.package-contracts.result == 'success'", jobs["template-workorder"]["if"])
 
         self.assertEqual(
             set(jobs["ci-gate"]["needs"]),
@@ -3746,6 +3754,7 @@ class WorkflowContractTests(unittest.TestCase):
                 "template-tooling",
                 "template-lesson",
                 "template-gradebook",
+                "template-workorder",
                 "template-release",
             },
         )

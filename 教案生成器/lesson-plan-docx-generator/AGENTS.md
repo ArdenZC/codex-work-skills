@@ -13,4 +13,4 @@
 - 运行 Content QA、模板 QA、输出保真 QA，并在可用时运行 Windows/macOS 本地 render smoke；正式目录只接受通过 QA 的 candidate 原子提交。
 - Agent 生产流程禁止使用 `--skip-template-validation` 或 `--skip-output-validation`；依赖安装后用 `scripts/check_dependencies.py` 做只读检查，缺失时按提示由用户决定是否安装。
 
-使用 `scripts/generate_lesson_plans.py`，完整字段与命令见 `SKILL.md`、`docs/content-contract-v2.md`、`docs/practice-task-contract-v1.md`、两个 schema 和 `examples/tasks-v21.example.json`；`examples/tasks.example.json` 仅保留为 2.0 兼容示例。
+使用 `scripts/generate_lesson_plans.py`，完整字段与命令见 `SKILL.md`、`docs/content-contract-v2.md`、`docs/practice-task-contract-v1.md`、`schemas/lesson-plan-input.schema.json`、仓库 canonical `schemas/shared/practice-task-contract.schema.json` 和 `examples/tasks-v21.example.json`；`schemas/practice-task-contract.schema.json` 仅为兼容入口，`examples/tasks.example.json` 仅保留为 2.0 兼容示例。

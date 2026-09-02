@@ -90,7 +90,7 @@ after_class_improvement
 
 课程实践学时大于 0 时，2.1 输入必须提供 `practice_task_contract`，版本为 `1.0`，默认 `granularity: "per_task"`。任务字段是 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。一个任务可跨多个课次，不能假设一课一个任务。当前没有独立工单生成器时生成器只输出 `practice-task-contract.json` handoff，不伪造实践工单 DOCX。
 
-当前 2.1 完整示例见 `examples/tasks-v21.example.json`；`examples/tasks.example.json` 保留为 2.0 兼容示例。字段说明见 `docs/content-contract-v2.md` 和 `docs/practice-task-contract-v1.md`，机器约束见 `schemas/lesson-plan-input.schema.json` 与 `schemas/practice-task-contract.schema.json`。
+当前 2.1 完整示例见 `examples/tasks-v21.example.json`；`examples/tasks.example.json` 保留为 2.0 兼容示例。字段说明见 `docs/content-contract-v2.md` 和 `docs/practice-task-contract-v1.md`，机器约束见 `schemas/lesson-plan-input.schema.json` 与仓库 canonical `schemas/shared/practice-task-contract.schema.json`；`schemas/practice-task-contract.schema.json` 仅为兼容入口。
 
 ## Python 与 Agent 的边界
 

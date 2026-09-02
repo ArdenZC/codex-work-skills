@@ -1,19 +1,20 @@
-# Phase 1 验收范围
+# Phase 2 验收范围
 
 ## 必过检查
 
-- manifest fingerprint 与 canonical DOCX SHA-256 一致；
-- canonical 文档能打开，包含三张表和固定表头；
-- 生成文档保留 canonical 的学生/教师评价结构；
-- 出勤为 10 分，任务项合计 90 分，总分 100；
-- 每个任务都写入标题、说明、分值、工具/材料、步骤、交付物和验收标准；
-- 学生结果列为空；
-- candidate、Output QA、atomic commit 任一环节失败都不产生半成品正式输出。
+- canonical Practice Task schema、WorkOrder Content V1 schema 和 handoff 映射通过；
+- Practice Task → WorkOrder 的 `practice_task_id`、`lesson_ids`、`practice_hours`、标题意图、交付物、验收、工具/材料和安全/合规通过 Cross-Artifact QA；
+- 任务可执行，交付物可观察，验收标准有覆盖，跨专业明显污染被拒绝；
+- 课堂考勤为 10 分，任务项合计 90 分，总分 100，支持 1–5 个任务项；
+- 生成 DOCX 可打开，保留三张主体表、动态任务行、学生/教师评价和 20/30/50 rubric；
+- 学生任务结果区为空，未写入教师答案；
+- canonical WorkOrder template SHA-256 为 `F20308238D07C7BFB9B1F9D2A25591D6EE09F13EC5855B7C57FA914CEE9457BD`，不修改原模板版式；
+- 安装器、依赖 doctor、五类适配器和 WorkOrder CI job 通过对应合同测试。
 
-## Phase 1 样例
+## E2E
 
-本阶段用软件类 3 份和护理类 3 份样例做结构与输出 QA。样例输出放在仓库之外，不作为产品资料提交。
+用小型 8 学时软件和非 IT 课程分别走 Lesson Content 2.1 → Practice Task Contract V1 → WorkOrder → Cross-Artifact QA → DOCX。提交的 synthetic fixture 与一次真实 Agent-authored 小型验收必须在报告中区分；本阶段不生成完整 64 学时课程。
 
-## 明确未实现
+## 明确边界
 
-Phase 1 不宣称实现 Lesson DOCX 与工单的全链路 Cross Artifact QA，不宣称 CI/release，不生成教师答案，也不把工单结果写回成绩册。上述内容留待单独的 Phase 2 work order。
+Phase 2 不修改 Lesson 或 WorkOrder canonical Word template，不新增模板版本，不发布 GitHub Release，不开发教师答案版，不做成绩册回写，也不进入 Phase 3 64 学时验收。Render Smoke 只是 PDF 转换/页数证据；人工逐页查看才可称为 visual inspection。

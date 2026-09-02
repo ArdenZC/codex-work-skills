@@ -25,6 +25,7 @@ from content_contract import (  # noqa: E402
     safe_filename,
 )
 from content_quality import validate_collection, validate_content  # noqa: E402
+from cross_artifact_quality import validate_cross_artifact  # noqa: E402
 from validate_output import validate_document  # noqa: E402
 
 
@@ -136,18 +137,43 @@ def _write_document(template: Path, output: Path, content: dict[str, Any]) -> No
     _set_title_paragraphs(document, old_project, project_name)
     work_table, student_table, teacher_table = document.tables
     _clone_task_rows(work_table, content["task_items"])
-    metadata = (
-        f"{content['course_name']}\n"
-        f"专业：{content['major']}\n"
-        f"对象：{content['class_or_audience']}\n"
-        f"实践学时：{content['practice_hours']}\n"
-        f"{content['group']['name']}\n"
-        f"{content['group']['leader_placeholder']}\n"
-        f"{content['group']['member_placeholder']}"
+    metadata_parts = [
+        content["course_name"],
+        f"专业：{content['major']}",
+        f"对象：{content['class_or_audience']}",
+        f"实践任务ID：{content['practice_task_id']}",
+        f"任务标题：{content.get('task_title', content['project_name'])}",
+    ]
+    if content.get("project_id"):
+        metadata_parts.append(f"项目ID：{content['project_id']}")
+    metadata_parts.extend(
+        [
+            f"实践学时：{content['practice_hours']}",
+            content["group"]["name"],
+            content["group"]["leader_placeholder"],
+            content["group"]["member_placeholder"],
+        ]
     )
+    metadata = "\n".join(metadata_parts)
+    if content.get("safety_or_compliance"):
+        metadata += "\n安全/合规：" + "；".join(content["safety_or_compliance"])
     _replace_cell_text(work_table.rows[1].cells[0], metadata)
     _replace_in_table(student_table, old_project, project_name)
     _replace_in_table(teacher_table, old_project, project_name)
+    document.core_properties.title = f"《{project_name}》学习工单"
+    document.core_properties.subject = (
+        f"Practice Task {content['practice_task_id']} / "
+        f"{content.get('task_title', project_name)}"
+    )
+    document.core_properties.keywords = " ".join(
+        value
+        for value in (
+            content["course_name"],
+            content["practice_task_id"],
+            content.get("project_id", ""),
+        )
+        if value
+    )
     document.save(str(output))
 
 
@@ -217,6 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
+        cross_reports: list[dict[str, Any]] = []
         if args.content_json:
             contents = load_work_order_content(args.content_json)
         else:
@@ -228,6 +255,14 @@ def main(argv: list[str] | None = None) -> int:
                 major=args.major,
                 class_or_audience=args.class_or_audience,
             )
+            for content in contents:
+                cross_report = validate_cross_artifact(handoff, content)
+                cross_reports.append(cross_report)
+                if cross_report["status"] != "pass":
+                    raise WorkOrderContractError(
+                        f"Cross-Artifact QA failed for {content['practice_task_id']}: "
+                        + "; ".join(cross_report["errors"])
+                    )
         report = generate(
             contents,
             output_dir=args.output_dir,
@@ -235,6 +270,8 @@ def main(argv: list[str] | None = None) -> int:
             replace=args.replace,
             render=args.render,
         )
+        if cross_reports:
+            report["cross_artifact_qa"] = cross_reports
     except Exception as exc:
         report = {"status": "fail", "errors": [str(exc)]}
     if args.json:

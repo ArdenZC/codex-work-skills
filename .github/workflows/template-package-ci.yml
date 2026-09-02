@@ -30,6 +30,7 @@ jobs:
       run_docs: ${{ steps.classify.outputs.run_docs }}
       run_lesson: ${{ steps.classify.outputs.run_lesson }}
       run_gradebook: ${{ steps.classify.outputs.run_gradebook }}
+      run_workorder: ${{ steps.classify.outputs.run_workorder }}
       run_tooling: ${{ steps.classify.outputs.run_tooling }}
       run_release: ${{ steps.classify.outputs.run_release }}
       run_package_contracts: ${{ steps.classify.outputs.run_package_contracts }}
@@ -221,15 +222,17 @@ jobs:
           cache-dependency-path: |
             教案生成器/lesson-plan-docx-generator/requirements.txt
             平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+            实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
       - name: Install Python dependencies
         run: >-
           python .github/scripts/run_timed.py
           --label "dependency setup"
           --
-          python -m pip install
-          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
-          -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+           python -m pip install
+           -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+           -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+           -r 实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
       - name: Validate static package contracts
         run: >-
@@ -287,6 +290,7 @@ jobs:
           cache-dependency-path: |
             教案生成器/lesson-plan-docx-generator/requirements.txt
             平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+            实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
@@ -324,6 +328,7 @@ jobs:
           python -m pip install
           -r 教案生成器/lesson-plan-docx-generator/requirements.txt
           -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+          -r 实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
       - name: Compile template tooling sources
         run: python -m compileall -q "tools" ".github/scripts" "tests/test_template_package_tooling.py"
@@ -532,6 +537,96 @@ jobs:
           $status = git status --porcelain
           if ($status) { $status; throw "Tests left changes in the worktree." }
 
+  template-workorder:
+    name: Practice WorkOrder / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs:
+      - classify-changes
+      - package-contracts
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      needs.package-contracts.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_workorder == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: 实践任务工单生成器/practice-task-workorder-generator/requirements.txt
+
+      - name: Install Python dependencies
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "workorder dependency setup"
+          --
+          python -m pip install -r 实践任务工单生成器/practice-task-workorder-generator/requirements.txt
+
+      - name: Check WorkOrder dependencies
+        run: python 实践任务工单生成器/practice-task-workorder-generator/scripts/check_dependencies.py --json
+
+      - name: Compile WorkOrder sources
+        run: python -m compileall -q 实践任务工单生成器/practice-task-workorder-generator
+
+      - name: Run WorkOrder package and QA tests
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "workorder package tests"
+          --
+          python -m unittest discover
+          -s 实践任务工单生成器/practice-task-workorder-generator/tests
+          -p "test_*.py" -v
+
+      - name: Check Cross-Artifact QA entrypoint
+        run: python 实践任务工单生成器/practice-task-workorder-generator/scripts/cross_artifact_quality.py --help
+
+      - name: Validate canonical WorkOrder template
+        run: >-
+          python 实践任务工单生成器/practice-task-workorder-generator/scripts/validate_template.py
+          --template 实践任务工单生成器/practice-task-workorder-generator/assets/templates/practice-work-order/v1.0.0/template.docx
+          --manifest 实践任务工单生成器/practice-task-workorder-generator/assets/templates/practice-work-order/v1.0.0/manifest.yaml
+
+      - name: Generate software and nursing samples with render smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          workorder_dir="$RUNNER_TEMP/workorder-phase2"
+          mkdir -p "$workorder_dir"
+          python "实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py" \
+            --content-json "实践任务工单生成器/practice-task-workorder-generator/examples/software.example.json" \
+            --output-dir "$workorder_dir/software" --replace --render --json
+          python "实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py" \
+            --content-json "实践任务工单生成器/practice-task-workorder-generator/examples/nursing.example.json" \
+            --output-dir "$workorder_dir/nursing" --replace --render --json
+
+      - name: Verify WorkOrder worktree is clean on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
+      - name: Verify WorkOrder worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) { $status; throw "Tests left changes in the worktree." }
+
   template-release:
     name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs:
@@ -568,6 +663,7 @@ jobs:
           cache-dependency-path: |
             教案生成器/lesson-plan-docx-generator/requirements.txt
             平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+            实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
       - name: Install LibreOffice on macOS
         if: runner.os == 'macOS'
@@ -605,6 +701,7 @@ jobs:
           python -m pip install
           -r 教案生成器/lesson-plan-docx-generator/requirements.txt
           -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
+          -r 实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
       - name: Validate template package release lifecycle
         run: >-
@@ -638,6 +735,7 @@ jobs:
       - template-tooling
       - template-lesson
       - template-gradebook
+      - template-workorder
       - template-release
     runs-on: ubuntu-latest
     steps:
@@ -649,12 +747,14 @@ jobs:
           TOOLING_RESULT: ${{ needs.template-tooling.result }}
           LESSON_RESULT: ${{ needs.template-lesson.result }}
           GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
+          WORKORDER_RESULT: ${{ needs.template-workorder.result }}
           RELEASE_RESULT: ${{ needs.template-release.result }}
           RUN_DOCS: ${{ needs.classify-changes.outputs.run_docs }}
           RUN_PACKAGE: ${{ needs.classify-changes.outputs.run_package_contracts }}
           RUN_TOOLING: ${{ needs.classify-changes.outputs.run_tooling }}
           RUN_LESSON: ${{ needs.classify-changes.outputs.run_lesson }}
           RUN_GRADEBOOK: ${{ needs.classify-changes.outputs.run_gradebook }}
+          RUN_WORKORDER: ${{ needs.classify-changes.outputs.run_workorder }}
           RUN_RELEASE: ${{ needs.classify-changes.outputs.run_release }}
           FORCE_FULL: ${{ needs.classify-changes.outputs.force_full }}
           CLASSIFICATION: ${{ needs.classify-changes.outputs.classification }}
@@ -689,6 +789,7 @@ jobs:
           check_job template-tooling "$RUN_TOOLING" "$TOOLING_RESULT"
           check_job template-lesson "$RUN_LESSON" "$LESSON_RESULT"
           check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
+          check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"
           check_job template-release "$RUN_RELEASE" "$RELEASE_RESULT"
 
           {

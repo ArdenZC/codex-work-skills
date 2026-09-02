@@ -29,6 +29,7 @@ BOOLEAN_KEYS = (
     "run_docs",
     "run_lesson",
     "run_gradebook",
+    "run_workorder",
     "run_tooling",
     "run_release",
     "run_package_contracts",
@@ -84,6 +85,7 @@ def _base_result(paths: Iterable[str]) -> dict[str, object]:
         "run_docs": False,
         "run_lesson": False,
         "run_gradebook": False,
+        "run_workorder": False,
         "run_tooling": False,
         "run_release": False,
         "run_package_contracts": False,
@@ -106,7 +108,7 @@ def _full_result(
     classification: str = "full",
 ) -> dict[str, object]:
     result = _base_result(paths)
-    _mark(result, "force_full", "run_lesson", "run_gradebook", "run_tooling", "run_release", "run_package_contracts")
+    _mark(result, "force_full", "run_lesson", "run_gradebook", "run_workorder", "run_tooling", "run_release", "run_package_contracts")
     result["classification"] = classification
     result["reason"] = reason
     return result
@@ -181,7 +183,7 @@ def classify(
             continue
 
         if _under(path, WORK_ORDER_ROOT):
-            _mark(result, "run_package_contracts")
+            _mark(result, "run_workorder", "run_package_contracts")
             labels.add("workorder")
             reasons.append("practice work-order package")
             if _is_package_risk(path):
@@ -308,6 +310,8 @@ def _required_jobs(result: dict[str, object]) -> list[str]:
         jobs.append("template-lesson")
     if result["run_gradebook"]:
         jobs.append("template-gradebook")
+    if result["run_workorder"]:
+        jobs.append("template-workorder")
     if result["run_release"]:
         jobs.append("template-release")
     return jobs
@@ -323,6 +327,7 @@ def _write_outputs(result: dict[str, object], output_path: Path | None, summary_
             "template-tooling",
             "template-lesson",
             "template-gradebook",
+            "template-workorder",
             "template-release",
         )
         if name not in required

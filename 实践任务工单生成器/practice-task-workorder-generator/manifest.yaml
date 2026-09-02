@@ -1,7 +1,7 @@
 skill:
   id: practice-task-workorder-generator
   name: 实践任务工单生成器
-  phase: 1
+  phase: 2
 template:
   id: practice-work-order
   name: 实践任务学习工单模板
@@ -9,7 +9,7 @@ template:
   format: docx
   file: assets/templates/practice-work-order/v1.0.0/template.docx
 generator:
-  version: 1.0.0
+  version: 2.0.0
   content_contract: Practice Work Order Content V1
   lesson_handoff: Practice Task Contract V1
 schema: schemas/work-order-content.schema.json

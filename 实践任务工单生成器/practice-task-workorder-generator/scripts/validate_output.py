@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,9 @@ from docx import Document
 
 class WorkOrderOutputError(ValueError):
     pass
+
+
+_UNANSWERED_RESULT_RE = re.compile(r"^[\s_＿\-—–·.…。．]+$")
 
 
 def _cell_text(cell: Any) -> str:
@@ -24,6 +28,13 @@ def _table_text(table: Any) -> str:
 
 def _normalise(value: str) -> str:
     return " ".join(value.split())
+
+
+def _is_unanswered_result_area(value: str) -> bool:
+    """Allow an empty or placeholder-only student writing area, never prose."""
+
+    normalized = value.strip()
+    return not normalized or bool(_UNANSWERED_RESULT_RE.fullmatch(normalized))
 
 
 def validate_document(path: Path, content: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -44,8 +55,8 @@ def validate_document(path: Path, content: dict[str, Any] | None = None) -> dict
         errors.append("work-order table has no attendance row")
     else:
         attendance = tables[0].rows[1]
-        if not any(marker in _cell_text(attendance.cells[1]) for marker in ("出勤", "考勤")):
-            errors.append("attendance row is missing")
+        if _normalise(_cell_text(attendance.cells[1])) != "课堂考勤":
+            errors.append("attendance row title must remain 课堂考勤")
         if _normalise(_cell_text(attendance.cells[4])) != "10":
             errors.append("attendance score must be 10")
     expected_items = content.get("task_items", []) if content else []
@@ -69,14 +80,32 @@ def validate_document(path: Path, content: dict[str, Any] | None = None) -> dict
                     errors.append(f"task row {index + 1} missing {key} value")
         if _normalise(_cell_text(row.cells[4])) != str(item["score"]):
             errors.append(f"task row {index + 1} score does not match Content V1")
-        if _cell_text(row.cells[3]):
-            errors.append(f"task row {index + 1} student result cell must be blank")
+        if not _is_unanswered_result_area(_cell_text(row.cells[3])):
+            errors.append(f"task row {index + 1} student result cell contains answer text")
     work_order_text = _table_text(tables[0])
-    for field in ("course_name", "major", "class_or_audience"):
+    for field in ("course_name", "major", "class_or_audience", "practice_task_id"):
         if content and _normalise(str(content[field])) not in _normalise(work_order_text):
             errors.append(f"work-order metadata missing {field}")
+    if content and content.get("task_title") and _normalise(str(content["task_title"])) not in _normalise(
+        "\n".join(paragraph.text for paragraph in document.paragraphs)
+    ):
+        errors.append("document title is missing task_title")
+    if content:
+        properties = document.core_properties
+        trace_text = " ".join(
+            str(value or "")
+            for value in (properties.title, properties.subject, properties.keywords)
+        )
+        if str(content["practice_task_id"]) not in trace_text:
+            errors.append("document core metadata is missing practice_task_id")
+    if content and content.get("project_id") and _normalise(str(content["project_id"])) not in _normalise(work_order_text):
+        errors.append("work-order metadata missing project_id")
     if content and f"实践学时：{content['practice_hours']}" not in work_order_text:
         errors.append("work-order metadata missing practice_hours")
+    if content and content.get("safety_or_compliance"):
+        for value in content["safety_or_compliance"]:
+            if _normalise(str(value)) not in _normalise(work_order_text):
+                errors.append("work-order metadata missing safety_or_compliance value")
     student_text = _table_text(tables[1])
     full_text = "\n".join(paragraph.text for paragraph in document.paragraphs) + "\n" + student_text
     for marker in ("自我评价", "小组评价", "教师评价"):
@@ -90,6 +119,10 @@ def validate_document(path: Path, content: dict[str, Any] | None = None) -> dict
         errors.append(f"teacher evaluation table must have 4 rows, got {len(tables[2].rows)}")
     if teacher_text.count("A") < 3 or teacher_text.count("B") < 3 or teacher_text.count("C") < 3:
         errors.append("teacher evaluation fixed A/B/C criteria are incomplete")
+    if content:
+        score_total = 10 + sum(int(item["score"]) for item in expected_items)
+        if score_total != 100:
+            errors.append(f"work-order total score must be 100, got {score_total}")
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,
@@ -97,6 +130,9 @@ def validate_document(path: Path, content: dict[str, Any] | None = None) -> dict
             "tables": len(tables),
             "task_rows": len(task_rows),
             "student_result_cells_blank": sum(not _cell_text(row.cells[3]) for row in task_rows),
+            "student_result_cells_unanswered": sum(
+                _is_unanswered_result_area(_cell_text(row.cells[3])) for row in task_rows
+            ),
         },
     }
 

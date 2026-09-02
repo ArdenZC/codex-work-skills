@@ -4,7 +4,7 @@
 
 - **教案生成器 2.1.0**：批量生成、整理和校验项目化中文职业教育教案 DOCX；
 - **平时成绩记分册生成器**：根据课程成绩单生成并校验平时成绩记分册 XLS。
-- **实践任务工单生成器 Phase 1**：将结构化实践任务写入真实 Word 学习工单模板（实验性）。
+- **实践任务工单生成器 Phase 2**：将 Lesson Practice Task Contract 联动写入真实 Word 学习工单模板（联动候选）。
 
 AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本负责确定性模板写入、格式保护、事务提交和结果 QA。
 
@@ -18,7 +18,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 | --- | --- | --- | --- | --- |
 | [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.1.0** | **Lesson Content Contract 2.1**（兼容 2.0） | `lesson-plan v1.1.2` | 稳定 |
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
-| [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 1 / 1.0.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 实验 |
+| [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 2 / 2.0.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 联动候选 |
 
 **Skill 版本、内容合同版本和模板版本是三个不同概念。** 教案生成器已经进入 **2.1**，但默认 Word 模板仍是经过保护和兼容验证的 `lesson-plan v1.1.2`；升级 Skill 不代表必须把模板版本同步改成 2.1。
 
@@ -45,13 +45,19 @@ Lesson Acceptance V2 的本地验收、报告和人工复核协议见 [docs/less
 
 默认 Word 模板仍为 `lesson-plan v1.1.2`，并继续保留 v1.0、v1.1.0、v1.1.1 的兼容路径。
 
+## 实践任务工单生成器 Phase 2
+
+WorkOrder 以仓库 `schemas/shared/practice-task-contract.schema.json` 定义的 Practice Task Contract V1 为唯一上游事实源，保留任务 ID、课次集合、实践学时、交付物、验收、工具/材料和安全约束。它增加 WorkOrder Content QA、Practice Task → WorkOrder Cross-Artifact QA、事务式安装/依赖 doctor，以及 Codex/Claude/Gemini/Copilot/Aider 适配器；评分仍固定为课堂考勤 10 + 任务项 90 = 100，学生任务结果保持空白。
+
+它使用现有 `practice-work-order v1.0.0` 模板，不新增模板版本，不生成教师答案，不做成绩册回写，也不进入完整 64 学时 Phase 3 验收。
+
 ## 三个 Skill 能做什么
 
 | Skill | 主要输入 | 输出 |
 | --- | --- | --- |
 | 教案生成器 | 课程名称、专业、授课对象、总课时，以及能力图谱、章节任务拆解、课程标准、教材目录、旧教案或其他课程资料 | 项目化 `.docx` 教案 + QA 报告 |
 | 平时成绩记分册生成器 | `课程成绩单.xls` 或包含该文件的班级目录 | 平时成绩记分册 `.xls` + QA 报告 |
-| 实践任务工单生成器 Phase 1 | Practice Work Order Content V1，或 Lesson 的 Practice Task Contract V1 handoff | 学习工单 `.docx` + Contract/Output QA |
+| 实践任务工单生成器 Phase 2 | Practice Work Order Content V1，或 Lesson 的 Practice Task Contract V1 handoff | 学习工单 `.docx` + Content/Cross-Artifact/Output QA |
 
 教案资料不完整时可以继续：Agent 会先读取会话和附件，再一次性确认课程基础（单课默认 2 学时；教材建议确认但不阻断），确认后按课程结构完成规划和生成，不再询问模板、输出目录或是否开始生成 DOCX。成绩册不能凭空生成成绩，必须提供真实课程成绩单。实践工单不能代写答案，学生任务结果栏保持空白。
 
@@ -81,14 +87,14 @@ https://github.com/ArdenZC/codex-work-skills
 如果缺少依赖，请明确告诉我缺少什么以及如何安装。
 ```
 
-实践任务工单生成器目前为独立 Phase 1 实验 Skill，可按需单独安装：
+实践任务工单生成器目前为独立 Phase 2 联动候选 Skill，可按需单独安装：
 
 ```text
-请帮我安装这个仓库中的「实践任务工单生成器 Phase 1」：
+请帮我安装这个仓库中的「实践任务工单生成器 Phase 2」：
 https://github.com/ArdenZC/codex-work-skills
 
 请阅读仓库 README、根目录 AGENTS.md，以及实践任务工单生成器下的简介.md、AGENTS.md、通用提示词.md 和 SKILL.md。
-使用真实 Practice Work Order Content V1 或 Lesson 的 Practice Task Contract V1 handoff 生成工单；固定 10+90=100，学生结果区留空，不生成答案。Phase 2 的 Cross Artifact QA、CI/release 和教师答案不在本阶段。
+使用真实 Practice Work Order Content V1 或 Lesson 的 Practice Task Contract V1 handoff 生成工单；固定 10+90=100，保留上游 ID/课次/学时，运行 Content/Cross-Artifact/Output QA，学生结果区留空，不生成教师答案。
 ```
 
 只安装教案生成器：
@@ -180,7 +186,7 @@ macOS 使用 `python3`。共享 `AGENTS.md`、Claude、Gemini、Copilot 和 Aide
 生成实践任务工单：
 
 ```text
-使用实践任务工单生成器 Phase 1，根据这份 Practice Task Contract V1 handoff 生成学习工单；结果栏留空，不生成答案。
+使用实践任务工单生成器 Phase 2，根据这份 Practice Task Contract V1 handoff 生成学习工单；结果栏留空，不生成答案。
 ```
 
 普通用户通常不需要直接运行 `generate_*.py` / `generate_*.ps1`，由 Agent 调用 Skill 即可。

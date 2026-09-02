@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections import Counter
+import unicodedata
 from typing import Any, Iterable
 
 from content_contract import normalise_text
@@ -23,7 +23,32 @@ _ANSWER_MARKERS = (
     "最终er图",
     "操作结论",
 )
-_VAGUE_ONLY = {"完成任务", "按要求完成", "进行实践", "提交作业", "完成练习"}
+_VAGUE_ONLY = {
+    "完成任务",
+    "按照要求完成任务",
+    "按要求完成",
+    "认真操作",
+    "认真完成任务",
+    "完成相关工作",
+    "完成相关内容",
+    "进行实践",
+    "提交作业",
+    "提交任务成果",
+    "完成练习",
+    "检查任务结果",
+}
+_VAGUE_FRAGMENTS = (
+    "认真",
+    "按要求",
+    "按照要求",
+    "相关工作",
+    "相关内容",
+    "完成任务",
+    "进行实践",
+    "提交作业",
+    "提交任务成果",
+    "检查任务结果",
+)
 _ACTION_MARKERS = (
     "创建",
     "设计",
@@ -42,9 +67,16 @@ _ACTION_MARKERS = (
     "验证",
     "操作",
     "建立",
+    "提取",
+    "划分",
+    "设置",
+    "复核",
+    "收集",
+    "分类",
+    "标记",
 )
-_IT_MARKERS = ("sql", "数据库索引", "java", "ide", "mysql")
-_NURSING_MARKERS = ("患者血压", "无菌护理", "生命体征")
+_IT_MARKERS = ("sql", "数据库索引", "java", "ide", "mysql", "api")
+_NURSING_MARKERS = ("患者", "血压", "无菌", "生命体征", "护理操作")
 _RESOURCE_ONLY = (
     "投影仪",
     "ppt",
@@ -56,80 +88,196 @@ _RESOURCE_ONLY = (
 )
 
 
+def _compact(text: Any) -> str:
+    value = unicodedata.normalize("NFKC", normalise_text(text)).casefold()
+    return re.sub(r"[\s\W_]+", "", value, flags=re.UNICODE)
+
+
 def _all_text(content: dict[str, Any]) -> str:
-    values: list[str] = [
-        content["course_name"],
-        content["major"],
-        content["class_or_audience"],
-        content["project_name"],
+    values: list[Any] = [
+        content.get("course_name", ""),
+        content.get("major", ""),
+        content.get("class_or_audience", ""),
+        content.get("project_name", ""),
+        content.get("task_title", ""),
+        content.get("project_id", ""),
+        *content.get("safety_or_compliance", []),
     ]
-    for item in content["task_items"]:
-        values.extend([item["title"], item["description"]])
+    for item in content.get("task_items", []):
+        values.extend([item.get("title", ""), item.get("description", "")])
         for key in ("tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
-            values.extend(item[key])
+            values.extend(item.get(key, []))
     return " ".join(normalise_text(value) for value in values).casefold()
 
 
 def _reference_looks_like_resource_only(text: str) -> bool:
-    """Reject only exact/obvious standalone tool names, not document titles."""
+    """Compatibility helper; WorkOrder has no reference field of its own."""
 
     cleaned = normalise_text(text).casefold().strip("。；;:：")
-    if cleaned in {item.casefold() for item in _RESOURCE_ONLY}:
+    return cleaned in {item.casefold() for item in _RESOURCE_ONLY}
+
+
+def _is_vague_only(text: Any) -> bool:
+    compact = _compact(text)
+    if not compact:
         return True
+    if compact in {_compact(value) for value in _VAGUE_ONLY}:
+        return True
+    remainder = compact
+    for fragment in _VAGUE_FRAGMENTS:
+        remainder = remainder.replace(_compact(fragment), "")
+    return len(remainder) < 4
+
+
+def _is_vague_deliverable(text: Any) -> bool:
+    return _compact(text) in {
+        "完成任务",
+        "实验结果",
+        "学习成果",
+        "任务成果",
+        "相关材料",
+        "提交成果",
+        "结果",
+    }
+
+
+def _is_vague_criterion(text: Any) -> bool:
+    return _compact(text) in {
+        "认真完成任务",
+        "按照要求完成",
+        "按要求完成",
+        "符合要求",
+        "质量合格",
+        "完成任务",
+        "结果正确",
+    }
+
+
+def _narrative_key(item: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        _compact(item.get("title", "")),
+        _compact(item.get("description", "")),
+        tuple(_compact(value) for value in item.get("deliverables", [])),
+        tuple(_compact(value) for value in item.get("acceptance_criteria", [])),
+    )
+
+
+def _coverage_anchor(value: Any) -> set[str]:
+    compact = _compact(value)
+    if not compact:
+        return set()
+    anchors = {compact}
+    if len(compact) >= 2:
+        anchors.update(compact[index : index + 2] for index in range(len(compact) - 1))
+    anchors.update(token.casefold() for token in re.findall(r"[a-z0-9]+", str(value)))
+    return anchors
+
+
+def _has_coverage(source: Any, targets: Iterable[Any]) -> bool:
+    source_text = _compact(source)
+    if not source_text:
+        return False
+    source_anchors = _coverage_anchor(source)
+    for target in targets:
+        target_text = _compact(target)
+        if source_text in target_text or target_text in source_text:
+            return True
+        if any(len(anchor) >= 2 for anchor in source_anchors & _coverage_anchor(target)):
+            return True
     return False
-
-
-def _meaningful(field: str, values: Iterable[str], errors: list[str]) -> None:
-    items = [normalise_text(value) for value in values]
-    if not items or any(not item for item in items):
-        errors.append(f"{field} must contain non-empty text")
 
 
 def validate_content(content: dict[str, Any]) -> dict[str, Any]:
     """Run semantic checks after JSON Schema validation."""
 
     errors: list[str] = []
-    if content.get("content_contract_version") != "1.0":
-        errors.append("content_contract_version must be 1.0")
+    executability_errors: list[str] = []
+    deliverable_errors: list[str] = []
+    acceptance_errors: list[str] = []
+    cross_domain_errors: list[str] = []
     total_task_score = 0
     major_text = normalise_text(content.get("major", "")).casefold()
+
     for index, item in enumerate(content.get("task_items", []), start=1):
         for key in ("title", "description"):
             if not normalise_text(item.get(key)):
                 errors.append(f"task_items[{index}].{key} is empty")
         for key in ("tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
-            _meaningful(f"task_items[{index}].{key}", item.get(key, []), errors)
+            values = item.get(key, [])
+            if not values or any(not normalise_text(value) for value in values):
+                errors.append(f"task_items[{index}].{key} must contain non-empty text")
         total_task_score += int(item.get("score", 0) or 0)
         combined = " ".join(
             [normalise_text(item.get("title")), normalise_text(item.get("description"))]
-            + [normalise_text(value) for key in ("steps", "deliverables", "acceptance_criteria") for value in item.get(key, [])]
+            + [
+                normalise_text(value)
+                for key in ("steps", "deliverables", "acceptance_criteria")
+                for value in item.get(key, [])
+            ]
         ).casefold()
-        if any(marker in combined for marker in _ANSWER_MARKERS):
+        if any(marker.casefold() in combined for marker in _ANSWER_MARKERS):
             errors.append(f"task_items[{index}] contains answer/key leakage")
-        if normalise_text(item.get("description")) in _VAGUE_ONLY or not any(
-            marker.casefold() in combined for marker in _ACTION_MARKERS
+        if _is_vague_only(item.get("description")) or _is_vague_only(item.get("title")):
+            executability_errors.append(f"task_items[{index}] is only a generic task phrase")
+        if not any(marker.casefold() in combined for marker in _ACTION_MARKERS):
+            executability_errors.append(f"task_items[{index}] has no substantive action")
+        if len(_compact(combined)) < 8:
+            executability_errors.append(f"task_items[{index}] does not name a professional object")
+
+        for deliverable in item.get("deliverables", []):
+            if _is_vague_deliverable(deliverable):
+                deliverable_errors.append(
+                    f"task_items[{index}] has an unobservable deliverable: {deliverable}"
+                )
+        criteria = item.get("acceptance_criteria", [])
+        if not criteria or all(_is_vague_criterion(value) for value in criteria):
+            acceptance_errors.append(f"task_items[{index}] has no observable acceptance criterion")
+        elif not any(
+            _has_coverage(
+                deliverable,
+                [*criteria, item.get("description", ""), *item.get("steps", [])],
+            )
+            for deliverable in item.get("deliverables", [])
         ):
-            errors.append(f"task_items[{index}] is not an executable action description")
-        for resource in item.get("tools_or_materials", []):
-            if _reference_looks_like_resource_only(resource):
-                # Tools/materials are expected here; this helper is deliberately
-                # exposed for reference-boundary tests but not applied to them.
-                continue
+            acceptance_errors.append(f"task_items[{index}] deliverables have no acceptance coverage")
+
+    errors.extend(executability_errors)
+    errors.extend(deliverable_errors)
+    errors.extend(acceptance_errors)
     if total_task_score != 90:
         errors.append(f"task item scores must total 90, got {total_task_score}")
-    if major_text and any(marker in major_text for marker in ("护理", "临床", "助产")):
-        if any(marker in _all_text(content) for marker in _IT_MARKERS):
-            errors.append("nursing content contains unrelated IT terminology")
-    if major_text and any(marker in major_text for marker in ("软件", "计算机", "信息", "数据库")):
-        if any(marker in _all_text(content) for marker in _NURSING_MARKERS):
-            errors.append("software content contains unrelated nursing terminology")
-    if any(_reference_looks_like_resource_only(value) for item in content.get("task_items", []) for value in item.get("deliverables", [])):
-        errors.append("a deliverable is only a teaching resource; name the student artifact")
+
+    all_text = _all_text(content)
+    if any(marker in major_text for marker in ("护理", "临床", "助产")):
+        if any(marker in all_text for marker in _IT_MARKERS):
+            cross_domain_errors.append("nursing content contains unrelated IT terminology")
+    if any(marker in major_text for marker in ("软件", "计算机", "信息", "数据库")):
+        if any(marker in all_text for marker in _NURSING_MARKERS):
+            cross_domain_errors.append("software content contains unrelated nursing terminology")
+    errors.extend(cross_domain_errors)
+
+    safety_values = content.get("safety_or_compliance", [])
+    if safety_values and any(not normalise_text(value) for value in safety_values):
+        errors.append("safety_or_compliance contains empty text")
+
+    narrative_keys = [_narrative_key(item) for item in content.get("task_items", [])]
+    repetition_failed = len(narrative_keys) != len(set(narrative_keys))
+    if repetition_failed:
+        errors.append("task item narrative duplicates are not allowed within one work order")
+
     total_score = 10 + total_task_score
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,
         "warnings": [],
+        "categories": {
+            "executability": "fail" if executability_errors else "pass",
+            "deliverable": "fail" if deliverable_errors else "pass",
+            "acceptance": "fail" if acceptance_errors else "pass",
+            "cross_domain": "fail" if cross_domain_errors else "pass",
+            "repetition": "fail" if repetition_failed else "pass",
+            "score": "pass" if total_task_score == 90 else "fail",
+        },
         "metrics": {
             "task_count": len(content.get("task_items", [])),
             "attendance_score": 10,
@@ -138,27 +286,42 @@ def validate_content(content: dict[str, Any]) -> dict[str, Any]:
         },
     }
 
+
 def validate_collection(contents: list[dict[str, Any]]) -> dict[str, Any]:
+    """Check each work order and only its student-facing narrative for reuse."""
+
     reports = [validate_content(content) for content in contents]
-    errors = [f"content[{index}]: {error}" for index, report in enumerate(reports) for error in report["errors"]]
-    skeletons = []
-    for content in contents:
-        skeletons.append(
-            tuple(
-                (
-                    normalise_text(item["title"]).casefold(),
-                    normalise_text(item["description"]).casefold(),
-                    tuple(normalise_text(value).casefold() for value in item["steps"]),
-                )
-                for item in content["task_items"]
-            )
-        )
+    errors = [
+        f"content[{index}]: {error}"
+        for index, report in enumerate(reports)
+        for error in report["errors"]
+    ]
+    skeletons = [
+        tuple(_narrative_key(item) for item in content["task_items"])
+        for content in contents
+    ]
     if len(skeletons) > 1 and len(set(skeletons)) == 1:
-        errors.append("all generated work orders have the same task skeleton")
+        errors.append("all generated work orders have the same task narrative skeleton")
+    all_narratives = [
+        _narrative_key(item)
+        for content in contents
+        for item in content["task_items"]
+    ]
+    if len(all_narratives) != len(set(all_narratives)):
+        errors.append("duplicate task narrative is not allowed across work orders")
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,
         "warnings": [],
         "reports": reports,
-        "metrics": {"content_count": len(contents), "total_score": 100},
+        "metrics": {
+            "content_count": len(contents),
+            "total_score": 100,
+            "repetition_scope": [
+                "task_items.title",
+                "task_items.description",
+                "task_items.deliverables",
+                "task_items.acceptance_criteria",
+            ],
+        },
     }

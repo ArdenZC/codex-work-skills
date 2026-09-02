@@ -611,7 +611,7 @@ def structural_hard_gates(
         ),
         _gate(
             "practice_handoff",
-            practice.get("status") in {"PASS", "not_applicable"},
+            str(practice.get("status", "")).lower() in {"pass", "passed", "ok", "not_applicable"},
             practice,
             "Practice Task Contract task links and practice-hour sums must reconcile.",
         ),

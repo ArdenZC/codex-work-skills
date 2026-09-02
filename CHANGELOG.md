@@ -4,6 +4,16 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 实践任务工单生成器 2.0.0 — 2026-09-02
+
+### Phase 2 / 联动候选
+
+- 以 canonical Practice Task Contract V1 为唯一上游事实源，新增 Practice Task → WorkOrder 确定性合同映射和 Cross-Artifact QA，保留 `practice_task_id`、`lesson_ids`、`practice_hours`、交付物、验收、工具/材料及安全/合规约束。
+- 增强 WorkOrder Content QA：检查可执行性、可观察交付物、验收覆盖、有限跨专业污染和任务叙述反重复；固定考勤 10、任务项 90、总分 100，学生结果区仍为空。
+- 完善独立安装器、共享 schema 依赖 doctor、Codex/Claude/Gemini/Copilot/Aider 适配器和 minimal/full-current/full-stale/inconsistent 运行时识别。
+- 增加 WorkOrder 双平台 CI job、classifier routing、Package Contract 和 Cross-Artifact regression；使用现有 `practice-work-order v1.0.0`，不创建模板版本或发布。
+- 本阶段不生成教师答案，不进入完整 64 学时 Phase 3，不回写成绩册。
+
 ## 实践任务工单生成器 Phase 1 — 2026-09-01
 
 - 新增独立的 `practice-task-workorder-generator` Skill，消费 `Practice Work Order Content V1` 或 Lesson 的 `Practice Task Contract V1` handoff。

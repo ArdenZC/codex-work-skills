@@ -13,6 +13,7 @@ from path_safety import paths_overlap
 
 
 SKILL_NAME = "lesson-plan-docx-generator"
+SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")
 REQUIRED_RELATIVE_FILES = (
     Path("SKILL.md"),
     Path("通用提示词.md"),
@@ -66,7 +67,14 @@ def _required_source_files(source: Path) -> list[Path]:
             "Lesson Skill source is incomplete; missing required files: "
             + ", ".join(str(path) for path in missing)
         )
-    return [source / relative for relative in REQUIRED_RELATIVE_FILES]
+    shared_candidates = (source / SHARED_SCHEMA, source.parents[1] / SHARED_SCHEMA, source.parents[2] / SHARED_SCHEMA)
+    shared = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
+    if shared is None:
+        raise FileNotFoundError(
+            "Lesson Skill source is missing canonical shared Practice Task schema: "
+            "schemas/shared/practice-task-contract.schema.json"
+        )
+    return [*(source / relative for relative in REQUIRED_RELATIVE_FILES), shared]
 
 
 def _sha256(path: Path) -> str:
@@ -84,6 +92,11 @@ def _verify_stage(source: Path, stage: Path) -> None:
             raise RuntimeError(f"staged installation is missing required file: {relative}")
         if _sha256(source_file) != _sha256(staged_file):
             raise RuntimeError(f"staged installation integrity check failed: {relative}")
+    shared_candidates = (source / SHARED_SCHEMA, source.parents[1] / SHARED_SCHEMA, source.parents[2] / SHARED_SCHEMA)
+    shared_source = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
+    staged_shared = stage / SHARED_SCHEMA
+    if shared_source is None or not staged_shared.is_file() or _sha256(shared_source) != _sha256(staged_shared):
+        raise RuntimeError("staged installation integrity check failed: canonical shared Practice Task schema")
 
 
 def _preflight(source: Path, target_root: Path, target: Path, replace: bool) -> None:
@@ -144,6 +157,13 @@ def install(source: Path, target_root: Path, *, replace: bool = False, dry_run: 
         stage = Path(tempfile.mkdtemp(prefix=f".{SKILL_NAME}.stage-", dir=str(target_root)))
         stage.rmdir()
         shutil.copytree(source, stage, ignore=ignore_patterns, symlinks=False)
+        shared_candidates = (source / SHARED_SCHEMA, source.parents[1] / SHARED_SCHEMA, source.parents[2] / SHARED_SCHEMA)
+        shared_source = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
+        if shared_source is None:
+            raise FileNotFoundError("canonical shared Practice Task schema is unavailable")
+        shared_target = stage / SHARED_SCHEMA
+        shared_target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(shared_source, shared_target)
         _verify_stage(source, stage)
         if backup is not None:
             os.replace(str(target), str(backup))

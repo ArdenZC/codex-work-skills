@@ -65,6 +65,7 @@ class ChangeClassifierTests(unittest.TestCase):
         self.assert_flags(
             result,
             run_package_contracts=True,
+            run_workorder=True,
             run_tooling=False,
             run_release=False,
             run_lesson=False,
@@ -105,21 +106,22 @@ class ChangeClassifierTests(unittest.TestCase):
             "unknown/new-module.py",
         ):
             result = classify([path], event_name="pull_request")
-            self.assert_flags(result, force_full=True, run_lesson=True, run_gradebook=True, run_tooling=True, run_release=True, run_package_contracts=True)
+            self.assert_flags(result, force_full=True, run_lesson=True, run_gradebook=True, run_workorder=True, run_tooling=True, run_release=True, run_package_contracts=True)
 
     def test_empty_deleted_or_renamed_inputs_fail_closed(self) -> None:
-        self.assert_flags(classify([], event_name="push"), force_full=True, run_lesson=True, run_gradebook=True)
+        self.assert_flags(classify([], event_name="push"), force_full=True, run_lesson=True, run_gradebook=True, run_workorder=True)
         self.assert_flags(
             classify(["README.md", "new-name.md"], event_name="push", ambiguous=True),
             force_full=True,
             run_lesson=True,
             run_gradebook=True,
+            run_workorder=True,
         )
 
     def test_manual_and_schedule_are_full(self) -> None:
         for event in ("workflow_dispatch", "schedule"):
             result = classify(["README.md"], event_name=event)
-            self.assert_flags(result, docs_only=False, run_docs=False, force_full=True, run_lesson=True, run_gradebook=True, run_tooling=True, run_release=True, run_package_contracts=True)
+            self.assert_flags(result, docs_only=False, run_docs=False, force_full=True, run_lesson=True, run_gradebook=True, run_workorder=True, run_tooling=True, run_release=True, run_package_contracts=True)
 
     def test_git_z_status_decodes_quoted_unicode_paths(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ci-classifier-git-paths-") as temp_name:

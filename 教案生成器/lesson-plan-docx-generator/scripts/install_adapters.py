@@ -20,6 +20,7 @@ ENGINE_NAME = ".lesson-plan-docx-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
 CONTENT_CONTRACT_VERSION = "2.1"
+SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")
 MARKER_ID = "lesson-plan-docx-generator"
 MARKER_START = f"<!-- codex-skill: {MARKER_ID}:start -->"
 MARKER_END = f"<!-- codex-skill: {MARKER_ID}:end -->"
@@ -44,6 +45,7 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("scripts/check_dependencies.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("schemas/practice-task-contract.schema.json"),
+    SHARED_SCHEMA,
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
 )
@@ -155,7 +157,10 @@ def _runtime_inventory_from_source(source_root: Path) -> dict[str, str]:
 
     inventory: dict[str, str] = {}
     for relative in FULL_ENGINE_INVENTORY_FILES:
-        source = source_root / relative
+        candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
+        source = next((candidate for candidate in candidates if candidate.is_file() and not candidate.is_symlink()), None) if relative == SHARED_SCHEMA else source_root / relative
+        if source is None:
+            source = source_root / relative
         if source.is_symlink() or not source.is_file():
             raise FileNotFoundError(f"Lesson engine source is missing or unsafe: {source}")
         inventory[relative.as_posix()] = _sha256_bytes(_payload_for_engine(source, copy_engine=True))
@@ -292,7 +297,7 @@ def _assert_no_symlink_ancestor(target_root: Path, path: Path) -> None:
 
 def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
     if copy_engine:
-        return sorted(
+        files = sorted(
             (
                 path.relative_to(source_root)
                 for path in source_root.rglob("*")
@@ -303,15 +308,22 @@ def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
             ),
             key=lambda path: path.as_posix(),
         )
+        if SHARED_SCHEMA not in files:
+            files.append(SHARED_SCHEMA)
+        return files
     return list(MINIMAL_ENGINE_FILES)
 
 
 def _required_engine_files(source_root: Path, copy_engine: bool) -> tuple[Path, ...]:
     required = FULL_ENGINE_INVENTORY_FILES if copy_engine else MINIMAL_ENGINE_FILES
+    shared_candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
+    shared_source = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
+    if shared_source is None:
+        raise FileNotFoundError("Lesson adapter source is missing canonical shared Practice Task schema")
     missing = [
         source_root / relative
         for relative in required
-        if (source_root / relative).is_symlink() or not (source_root / relative).is_file()
+        if relative != SHARED_SCHEMA and ((source_root / relative).is_symlink() or not (source_root / relative).is_file())
     ]
     if missing:
         raise FileNotFoundError(
@@ -446,8 +458,10 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         # Default installs update project-root adapter rules but preserve a
         # complete runtime byte-for-byte.  Never downgrade or rewrite it.
         engine_files = []
+    shared_candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
+    shared_source = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
     for relative in engine_files:
-        source = source_root / relative
+        source = shared_source if relative == SHARED_SCHEMA else source_root / relative
         target = engine_target / relative
         payload = _payload_for_engine(source, copy_engine=copy_engine)
         if not target.exists() or replace or target.read_bytes() != payload:

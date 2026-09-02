@@ -17,7 +17,7 @@
     "reference_pool": {"type": "array", "items": {"$ref": "#/$defs/referencePoolItem"}},
     "allow_textbook_as_reference": {"type": "boolean"},
     "artifact_plan": {"$ref": "#/$defs/artifactPlan"},
-    "practice_task_contract": {"$ref": "#/$defs/practiceTaskContract"},
+    "practice_task_contract": {"$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"},
     "outline": {"type": "array", "items": {"$ref": "#/$defs/outlineItem"}},
     "lessons": {"type": "array", "minItems": 1}
   },
@@ -259,44 +259,6 @@
       "properties": {
         "lesson_plans": {"const": true},
         "practice_work_orders": {"type": "boolean"}
-      }
-    },
-    "practiceTextList": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 12,
-      "items": {"type": "string", "minLength": 1, "maxLength": 500}
-    },
-    "practiceTask": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["task_id", "project_id", "title", "lesson_ids", "practice_hours", "scenario", "objectives", "required_inputs", "tools_or_materials", "steps", "deliverables", "acceptance_criteria", "safety_or_compliance"],
-      "properties": {
-        "task_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
-        "project_id": {"type": "string", "minLength": 1, "maxLength": 64},
-        "title": {"type": "string", "minLength": 2, "maxLength": 180},
-        "lesson_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"}},
-        "practice_hours": {"$ref": "#/$defs/positiveNumber"},
-        "scenario": {"type": "string", "minLength": 1, "maxLength": 800},
-        "objectives": {"$ref": "#/$defs/practiceTextList"},
-        "required_inputs": {"$ref": "#/$defs/practiceTextList"},
-        "tools_or_materials": {"$ref": "#/$defs/practiceTextList"},
-        "steps": {"$ref": "#/$defs/practiceTextList"},
-        "deliverables": {"$ref": "#/$defs/practiceTextList"},
-        "acceptance_criteria": {"$ref": "#/$defs/practiceTextList"},
-        "safety_or_compliance": {"$ref": "#/$defs/practiceTextList"}
-      }
-    },
-    "practiceTaskContract": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["contract_version", "course_name", "practice_hours", "granularity", "tasks"],
-      "properties": {
-        "contract_version": {"const": "1.0"},
-        "course_name": {"type": "string", "minLength": 1, "maxLength": 64},
-        "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"},
-        "granularity": {"type": "string", "enum": ["per_lesson", "per_task", "per_project"]},
-        "tasks": {"type": "array", "items": {"$ref": "#/$defs/practiceTask"}}
       }
     },
     "outlineItem": {

@@ -54,6 +54,8 @@ def validate(template: Path, manifest_path: Path) -> dict[str, Any]:
             score_values.append(int(_text(row.cells[4])))
         except ValueError:
             errors.append("work-order score column contains a non-integer")
+    if len(work.rows) > 1 and _text(work.rows[1].cells[1]) != "课堂考勤":
+        errors.append("canonical attendance title must be 课堂考勤")
     if score_values and score_values[0] != 10:
         errors.append("canonical attendance score must be 10")
     if score_values and sum(score_values) != 100:

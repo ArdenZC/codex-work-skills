@@ -2,7 +2,8 @@ interface:
   display_name: "实践任务工单生成器"
   short_description: "将实践任务写入真实 Word 学习工单模板"
   default_prompt: >-
-    使用 practice-task-workorder-generator Phase 1，将 Practice Work Order Content V1
-    或 Lesson Skill 的 Practice Task Contract V1 handoff 写入默认 practice-work-order v1.0.0
-    模板；固定出勤10分、任务90分、总分100，学生任务结果区留空，保留模板固定的学生/教师评价；
-    不生成答案，不反向解析 Lesson DOCX，不扩大到 Phase 2 的 Cross Artifact QA、CI、release 或教师答案。
+    使用 practice-task-workorder-generator Phase 2，将 canonical Practice Task Contract V1
+    或 Practice Work Order Content V1 写入默认 practice-work-order v1.0.0 模板；保留
+    practice_task_id、lesson_ids、practice_hours、交付物、验收、工具/材料和安全约束；
+    固定出勤10分、任务90分、总分100，学生任务结果区留空，保留模板固定评价；完成
+    WorkOrder Content QA、Cross-Artifact QA 和 Output QA，不生成教师答案，不修改上游 Lesson。

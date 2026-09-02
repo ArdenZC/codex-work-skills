@@ -38,6 +38,16 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
     },
+    "task_title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 180
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
     "lesson_ids": {
       "type": "array",
       "items": {"type": "string", "minLength": 1},
@@ -110,6 +120,12 @@
           }
         }
       }
+    },
+    "safety_or_compliance": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1, "maxLength": 500},
+      "minItems": 1,
+      "maxItems": 12
     },
     "teacher_evaluation": {
       "type": "object",
