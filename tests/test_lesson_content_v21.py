@@ -173,6 +173,48 @@ class LessonContentV21Tests(unittest.TestCase):
         self.assertEqual(report["reference_provenance"]["reuse_frequency"]["REF-A"], 6)
         self.assertNotIn("reference_ids", " ".join(report["errors"]))
 
+        cross_lesson_duplicate_detectors = (
+            "exact_duplicates",
+            "adjacent_exact_duplicates",
+            "item_duplicates",
+            "adjacent_item_duplicates",
+            "frequency_item_duplicates",
+            "repeated_sentences",
+            "adjacent_similarity_pairs",
+            "field_similarity_pairs",
+            "adjacent_field_similarity_pairs",
+            "structural_similarity_pairs",
+            "whole_lesson_similarity_pairs",
+            "high_similarity_pairs",
+        )
+        for detector in cross_lesson_duplicate_detectors:
+            with self.subTest(detector=detector):
+                for item in report[detector]:
+                    if "reference" in json.dumps(item, ensure_ascii=False).lower():
+                        self.assertTrue(item.get("allowed"), item)
+                        self.assertEqual(item.get("reuse_policy"), "reference_reusable")
+
+    def test_reference_exemption_does_not_exempt_teaching_content(self) -> None:
+        payload = make_v21_fixture()
+        payload["lessons"][1]["teaching_content"] = copy.deepcopy(payload["lessons"][0]["teaching_content"])
+        report = assess_content_quality(payload)
+        self.assertEqual(report["status"], "failed", report)
+        duplicate_records = []
+        for detector in (
+            "exact_duplicates",
+            "adjacent_exact_duplicates",
+            "item_duplicates",
+            "adjacent_item_duplicates",
+            "frequency_item_duplicates",
+            "field_similarity_pairs",
+            "whole_lesson_similarity_pairs",
+        ):
+            duplicate_records.extend(report[detector])
+        self.assertTrue(
+            any("teaching_content" in json.dumps(item, ensure_ascii=False) for item in duplicate_records),
+            duplicate_records,
+        )
+
     def test_reference_gate_accepts_twenty_and_thirty_two_lesson_reuse(self) -> None:
         pool = [
             {

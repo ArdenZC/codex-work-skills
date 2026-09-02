@@ -1,0 +1,17 @@
+skill:
+  id: lesson-plan-docx-generator
+  name: 教案生成器
+  version: 2.1.1
+  phase: stable
+  content_contract: "2.1"
+  compatibility:
+    - "2.0"
+template:
+  id: lesson-plan
+  version: 1.1.2
+  format: docx
+  file: assets/templates/lesson-plan/v1.1.2/template.docx
+intake:
+  contract: docs/intake-contract-v2.1.1.json
+generator:
+  entrypoint: scripts/generate_lesson_plans.py

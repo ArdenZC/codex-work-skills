@@ -2,7 +2,7 @@
 
 一组用于实际教学工作的可复用 AI Skills。目前包含：
 
-- **教案生成器 2.1.0**：批量生成、整理和校验项目化中文职业教育教案 DOCX；
+- **教案生成器 2.1.1**：批量生成、整理和校验项目化中文职业教育教案 DOCX；
 - **平时成绩记分册生成器**：根据课程成绩单生成并校验平时成绩记分册 XLS。
 - **实践任务工单生成器 2.1.0**：由 Agent 将 Lesson Practice Task Contract 创作成 WorkOrder Content，再写入真实 Word 学习工单模板（Phase 2.1 Hardening）。
 
@@ -16,7 +16,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 
 | Skill | Skill 版本 | 内容合同 | 当前默认模板 | 状态 |
 | --- | --- | --- | --- | --- |
-| [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.1.0** | **Lesson Content Contract 2.1**（兼容 2.0） | `lesson-plan v1.1.2` | 稳定 |
+| [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.1.1** | **Lesson Content Contract 2.1**（兼容 2.0） | `lesson-plan v1.1.2` | 稳定 |
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
 | [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 2.1 / 2.1.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 联动候选 |
 
@@ -26,11 +26,12 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 
 Lesson Acceptance V2 的本地验收、报告和人工复核协议见 [docs/lesson-acceptance.md](docs/lesson-acceptance.md)。
 
-## 教案生成器 2.1
+## 教案生成器 2.1.1
 
 2.1 是在 2.0 内容生成链上的课程基础合同收口，不是单纯的模板更新：
 
-- 先一次性确认课程基础、理论/实践学时、组织方式、教材、辅助资料和实践工单需求，再做整门课程规划；
+- 先进入 `INTAKE_PENDING`，用中文一次性确认课程名称、专业、授课对象和总课时；理论/实践学时、组织方式和实践工单偏好未提供时保持“待确认”，不按 50/50、综合式或“否”推断；
+- 确认后进入 `INTAKE_CONFIRMED` 并自主完成整门课程规划；不再询问 outline、模板、输出目录或是否开始生成 DOCX；
 - 先做整门课程的项目 / 任务规划，再逐课生成完整 Content 2.1；
 - 正式路径不再接受旧 sparse JSON 作为生产输入；
 - Python 不替模型创作教学正文，只负责校验、格式化、模板映射和文件生成；
@@ -100,7 +101,7 @@ https://github.com/ArdenZC/codex-work-skills
 只安装教案生成器：
 
 ```text
-请帮我安装这个仓库中的「教案生成器 2.1」：
+请帮我安装这个仓库中的「教案生成器 2.1.1」：
 https://github.com/ArdenZC/codex-work-skills
 
 请阅读 README、根目录 AGENTS.md、教案生成器/简介.md，以及 lesson-plan-docx-generator 下的 AGENTS.md、通用提示词.md 和 SKILL.md。
@@ -173,7 +174,7 @@ macOS 使用 `python3`。共享 `AGENTS.md`、Claude、Gemini、Copilot 和 Aide
 生成教案：
 
 ```text
-使用教案生成器 2.1，根据这份课程标准和教材目录，
+使用教案生成器 2.1.1，根据这份课程标准和教材目录，
 帮我生成《数据库技术》的项目化教案。
 ```
 
@@ -214,7 +215,7 @@ Windows 和 macOS 是当前 CI 与交付验收平台。
 教案生成器目前同时存在三种版本号：
 
 ```text
-Lesson Skill          2.1.0
+Lesson Skill          2.1.1
 Content Contract      2.1 (reads 2.0)
 Word template         lesson-plan v1.1.2
 ```

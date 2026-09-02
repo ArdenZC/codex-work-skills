@@ -3,29 +3,41 @@ name: lesson-plan-docx-generator
 description: Generate projectized Chinese vocational-course lesson plan DOCX files from the Lesson Content Contract V2.1 (with V2 compatibility), using the protected Word template, output QA, and optional local render smoke. Use for creating, converting, batching, or revising 教案、教学单元设计 and 实训教案 files.
 ---
 
-# 教案生成器
+# 教案生成器 Skill 2.1.1
 
 本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 Content 2.1 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。
 
-## 任务入口
+## 任务入口与 Intake Runtime 2.1.1
 
-任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。正式开始课程规划前，必须把当前理解整理成一次集中的课程基本信息确认；即使信息已经从会话或附件中推断出来，也必须展示并请求用户确认一次。
+任务开始时先读取当前会话、用户上传文件和可用课程资料：能力图谱、章节任务拆解、课程标准、教材目录、旧教案及用户指定的 Word 模板。正式规划前必须进入 `INTAKE_PENDING`，把当前理解整理成一次集中、全中文的课程基本信息确认；即使信息已经从会话或附件中推断出来，也必须展示并请求用户确认一次。确认完成后进入 `INTAKE_CONFIRMED`，直接开始资料检索、课程级 outline、Content 2.1、QA 和 DOCX。
 
-一次确认必须同时包含以下课程基础字段：
+用户界面只使用中文标签，不把内部字段名当作提问内容。一次确认的必含课程基本盘是：课程名称、专业、授课对象、总课时。确认摘要还必须包含以下非阻断信息：理论课时、实践课时、理论与实践组织方式、单课课时默认 2 学时、使用教材、辅助参考资料、是否同时生成实践任务工单。
+
+当四个核心字段中有信息缺失时，在同一确认摘要中显示“待补充”；总课时只能接受用户明确提供的事实。若专业或授课对象只是 Agent 的推断，必须标注“当前理解 / 如不准确请修改”。当理论/实践拆分、组织方式或实践任务工单偏好没有明确提供时，必须显示“待确认”，不能按 50/50、综合式或“否”自动补齐。`default_hours=2` 只能用于说明按 2 学时估算约有多少课次，不能据此推断理论/实践比例。内部字段 `course_name`、`major`、`audience`、`total_hours`、`theory_hours`、`practice_hours`、`delivery_mode`、`default_hours`、`textbook`、`auxiliary_references`、`practice_work_orders` 与中文标签的机器映射见 `docs/intake-contract-v2.1.1.json`。
+
+首次响应应类似：
 
 ```text
-course_name  课程名称
-major        专业
-audience     授课对象
-total_hours  总课时 / 总学时
-theory_hours  理论学时
-practice_hours  实践学时
-delivery_mode  理论/实践组织方式
+我先确认一下课程基本信息：
+- 课程名称：《数据结构高级》
+- 专业：当前理解 / 如不准确请修改
+- 授课对象：当前理解 / 如不准确请修改
+- 总课时：40 学时
+- 理论课时：待确认
+- 实践课时：待确认
+- 理论与实践组织方式：待确认（可选：全部理论 / 全部实践 / 分段组织 / 综合组织）
+- 单课课时：默认 2 学时
+- 使用教材：未指定（如有指定教材请告诉我；没有也可以继续）
+- 辅助参考资料：未指定
+- 是否同时生成实践任务工单：待确认
+以上信息是否正确？如需调整，请一次性告诉我。
 ```
 
-确认摘要还必须显示 `default_hours=2`（单课课时：默认 2 学时）、教材、辅助参考资料，以及“是否需要实践任务工单”。理论/实践学时和组织方式必须与总学时一致；没有明确拆分时如实显示当前理解并一次性请用户补充。教材、辅助参考资料和实践工单偏好要在同一条确认中集中呈现，不拆成多轮问题。教材是 recommended, not required，缺失不能阻断生成。确认 `practice_work_orders=true` 后，Lesson Agent 在完成 Lesson QA/DOCX 和 Practice Task Contract handoff 后检测并调用可用的 WorkOrder Skill，由 WorkOrder Agent 创作完整 Content V1、执行 QA 并生成工单，最后统一交付；不可用时正常交付 Lesson 与 handoff，并明确 `WorkOrder Skill unavailable; handoff generated.`，不伪造工单 DOCX。
+教材是 recommended, not required：已提供文件或书名直接展示，未提供也不能阻断生成。`practice_work_orders` 未提供时保持待确认；只有用户明确选择后才联动 WorkOrder Skill。确认 `practice_work_orders=true` 后，Lesson Agent 在完成 Lesson QA/DOCX 和 Practice Task Contract handoff 后检测并调用可用的 WorkOrder Skill，由 WorkOrder Agent 创作完整 Content V1、执行 QA 并生成工单，最后统一交付；不可用时正常交付 Lesson 与 handoff，并明确 `WorkOrder Skill unavailable; handoff generated.`，不伪造工单 DOCX。
 
-这一次课程基本信息确认是唯一一次必要确认。用户完成后，Agent 自主完成资料检索、课程级 outline、Content 2.1、Practice Task Contract、QA 和 DOCX。不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”；默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
+Intake 未确认前，不得确定项目数量或名称、理论/实践课次结构、实践任务数量、逐课教学内容或生成 DOCX；除非用户已经明确提供了相应事实。确认一次后不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”。默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
+
+若用户明确选择“全部理论”，归一化为 theory_hours=total_hours、practice_hours=0、delivery_mode=theory_only，并将实践任务工单设为 false；若明确选择“全部实践”，归一化为 theory_hours=0、practice_hours=total_hours、delivery_mode=practice_only。其他拆分必须满足 theory_hours + practice_hours = total_hours；不相等时先报告冲突，不得开始 outline。
 
 资料检索优先使用用户提供的教材/课程资料和用户指定教材；有联网能力时再查找出版社或学校官方页、标准/指南、官方技术文档和可核实公开文献。只给出书名时只能写入真实核实的作者、出版社、ISBN、版次或年份；网络不可用时正常继续，不因无法联网中断生成。
 

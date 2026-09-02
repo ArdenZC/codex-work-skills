@@ -2,7 +2,7 @@
 
 所有 agent 和模型共用同一份规范：先读取 `SKILL.md` 和 `通用提示词.md`，再生成符合 `content_contract_version: "2.0"`/`"2.1"` 的 `tasks.json`，最后调用同一套 Python 生成器和 QA。不要在工具专用规则中复制 Content V2 字段或另造 DOCX 写入逻辑。Practice Task Contract V1 使用仓库 canonical `schemas/shared/practice-task-contract.schema.json`，WorkOrder Skill 也消费同一份 schema。
 
-Lesson 任务正式规划前必须一次性确认 `course_name`、`major`、`audience`、`total_hours`，显示 `default_hours=2`，并把教材作为建议确认项而非阻断项。一次确认完成后不再询问 outline、项目/任务、评分、模板、输出目录或 DOCX 生成。若用户确认 `practice_work_orders=true`，Lesson Agent 完成 Lesson QA/DOCX 后必须检测并调用 WorkOrder Skill Agent，统一交付；不可用时明确 `WorkOrder Skill unavailable; handoff generated.`，不得由 Lesson Python 生成或伪造工单 DOCX。`references` 是可阅读、查阅、引用或作为课程依据的文献/文档，`resources` 是教学工具、设备、环境和材料；课程级 reference pool 中的合法 reference 可跨课复用，不得为了降低重复率编造书目信息，同课重复和纯资源名仍失败。
+Lesson 任务正式规划前必须进入 `INTAKE_PENDING`，用中文一次性确认课程名称、专业、授课对象、总课时，并在同一摘要显示理论课时、实践课时、理论与实践组织方式（全部理论、全部实践、分段组织或综合组织）、单课默认 2 学时、教材、辅助参考资料和实践任务工单偏好。四个核心字段缺失时显示“待补充”，总课时必须由用户明确提供；未明确提供的结构显示“待确认”，不能按 50/50、综合式或“否”推断；推断的专业/对象标注“当前理解 / 如不准确请修改”。确认后进入 `INTAKE_CONFIRMED`，不再询问 outline、项目/任务、评分、模板、输出目录或 DOCX 生成。若用户确认需要实践工单，Lesson Agent 完成 Lesson QA/DOCX 后必须检测并调用 WorkOrder Skill Agent，统一交付；不可用时明确 `WorkOrder Skill unavailable; handoff generated.`，不得由 Lesson Python 生成或伪造工单 DOCX。`references` 是可阅读、查阅、引用或作为课程依据的文献/文档，`resources` 是教学工具、设备、环境和材料；课程级 reference pool 中的合法 reference 可跨课复用，不得为了降低重复率编造书目信息，同课重复和纯资源名仍失败。完整映射见 `docs/intake-contract-v2.1.1.json`。
 
 ## 可用入口
 

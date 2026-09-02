@@ -1,0 +1,144 @@
+{
+  "contract": "Lesson Intake Runtime",
+  "version": "2.1.1",
+  "ui_language": "zh-CN",
+  "states": [
+    "INTAKE_PENDING",
+    "INTAKE_CONFIRMED"
+  ],
+  "source_semantics": [
+    "EXPLICIT",
+    "DERIVED",
+    "INFERRED",
+    "PENDING"
+  ],
+  "default_hours": 2,
+  "textbook_required": false,
+  "confirmation_fields": [
+    {
+      "internal": "course_name",
+      "label": "课程名称",
+      "required": true,
+      "unknown_state": "PENDING"
+    },
+    {
+      "internal": "major",
+      "label": "专业",
+      "required": true,
+      "unknown_state": "PENDING",
+      "inference_label": "当前理解 / 如不准确请修改"
+    },
+    {
+      "internal": "audience",
+      "label": "授课对象",
+      "required": true,
+      "unknown_state": "PENDING",
+      "inference_label": "当前理解 / 如不准确请修改"
+    },
+    {
+      "internal": "total_hours",
+      "label": "总课时",
+      "required": true,
+      "unknown_state": "PENDING",
+      "explicit_only": true
+    },
+    {
+      "internal": "theory_hours",
+      "label": "理论课时",
+      "required": false,
+      "unknown_state": "PENDING"
+    },
+    {
+      "internal": "practice_hours",
+      "label": "实践课时",
+      "required": false,
+      "unknown_state": "PENDING"
+    },
+    {
+      "internal": "delivery_mode",
+      "label": "理论与实践组织方式",
+      "required": false,
+      "unknown_state": "PENDING"
+    },
+    {
+      "internal": "default_hours",
+      "label": "单课课时",
+      "value": 2,
+      "source": "DERIVED"
+    },
+    {
+      "internal": "textbook",
+      "label": "使用教材",
+      "required": false,
+      "recommended": true
+    },
+    {
+      "internal": "auxiliary_references",
+      "label": "辅助参考资料",
+      "required": false
+    },
+    {
+      "internal": "practice_work_orders",
+      "label": "是否同时生成实践任务工单",
+      "required": false,
+      "unknown_state": "PENDING"
+    }
+  ],
+  "pending_structural_fields": [
+    "theory_hours",
+    "practice_hours",
+    "delivery_mode",
+    "practice_work_orders"
+  ],
+  "forbidden_before_confirmation": [
+    "project_count",
+    "project_names",
+    "lesson_count_by_type",
+    "practice_task_count",
+    "lesson_content",
+    "docx_generation"
+  ],
+  "post_confirmation_questions_forbidden": [
+    "outline",
+    "project_name",
+    "lesson_task",
+    "score",
+    "template",
+    "output_directory",
+    "docx_generation"
+  ],
+  "pure_course_normalization": {
+    "theory_only": {
+      "theory_hours": "total_hours",
+      "practice_hours": 0,
+      "delivery_mode": "theory_only",
+      "practice_work_orders": false
+    },
+    "practice_only": {
+      "theory_hours": 0,
+      "practice_hours": "total_hours",
+      "delivery_mode": "practice_only"
+    }
+  },
+  "invariants": [
+    "theory_hours + practice_hours == total_hours",
+    "total_hours_is_explicit",
+    "inferred_major_and_audience_are_labeled_for_confirmation",
+    "no_fifty_fifty_default",
+    "no_implicit_practice_work_orders_false",
+    "no_implicit_delivery_mode"
+  ],
+  "user_visible_errors": {
+    "intake_pending": "课程基本信息尚未确认，暂不开始课程规划。",
+    "hours_conflict": "理论课时与实践课时之和必须等于总课时。",
+    "missing_explicit_total_hours": "总课时必须由用户明确提供。",
+    "second_confirmation_forbidden": "课程信息已确认，继续完成任务，不再次询问模板、输出目录或 DOCX 生成。"
+  },
+  "reference_policy": {
+    "references_are": "document_or_citable_sources",
+    "resources_are": "teaching_tools_equipment_environment_and_materials",
+    "cross_lesson_reuse": "allowed",
+    "same_lesson_duplicate": "fail",
+    "fabrication_for_deduplication": "forbidden"
+  }
+}
