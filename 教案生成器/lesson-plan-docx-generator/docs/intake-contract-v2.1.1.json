@@ -133,12 +133,5 @@
     "hours_conflict": "理论课时与实践课时之和必须等于总课时。",
     "missing_explicit_total_hours": "总课时必须由用户明确提供。",
     "second_confirmation_forbidden": "课程信息已确认，继续完成任务，不再次询问模板、输出目录或 DOCX 生成。"
-  },
-  "reference_policy": {
-    "references_are": "document_or_citable_sources",
-    "resources_are": "teaching_tools_equipment_environment_and_materials",
-    "cross_lesson_reuse": "allowed",
-    "same_lesson_duplicate": "fail",
-    "fabrication_for_deduplication": "forbidden"
   }
 }

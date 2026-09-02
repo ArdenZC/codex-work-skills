@@ -13,8 +13,6 @@
 - 教材建议确认但不是阻断字段；用户确认后不再在生成 DOCX 前二次确认。
 - Intake 用户界面统一使用中文标签，推断的专业/授课对象明确标注当前理解。
 - references 明确为可阅读、查阅、引用或作为课程依据的文献/文档来源；resources 明确为教学工具、设备、环境和材料。
-- 合法 references 跨课允许完全重复并退出课程反重复 hard-fail；同课内部重复和纯资源名仍失败。
-- 禁止为了降低重复率虚构教材、作者、ISBN、出版社、标准编号或公开文献。
 - 安装完整性和 runtime fingerprint 覆盖 OpenAI facade，并提供 current/stale/inconsistent/missing doctor 状态。
 
 版本关系：

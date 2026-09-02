@@ -158,8 +158,6 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertEqual(contract["pure_course_normalization"]["practice_only"]["theory_hours"], 0)
         self.assertIn("docx_generation", contract["forbidden_before_confirmation"])
         self.assertIn("docx_generation", contract["post_confirmation_questions_forbidden"])
-        self.assertEqual(contract["reference_policy"]["cross_lesson_reuse"], "allowed")
-        self.assertEqual(contract["reference_policy"]["same_lesson_duplicate"], "fail")
         self.assertIn("intake_pending", contract["user_visible_errors"])
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
