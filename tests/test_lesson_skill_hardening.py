@@ -114,6 +114,92 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("同一课内部", canonical)
         self.assertIn("禁止为了降低课程重复率编造", canonical)
 
+        self.assertIn("INTAKE_PENDING", canonical)
+        self.assertIn("INTAKE_CONFIRMED", canonical)
+        for label in (
+            "课程名称",
+            "专业",
+            "授课对象",
+            "总课时",
+            "理论课时",
+            "实践课时",
+            "理论与实践组织方式",
+            "单课课时",
+            "使用教材",
+            "辅助参考资料",
+            "是否同时生成实践任务工单",
+        ):
+            self.assertIn(label, canonical)
+        for rule in ("待确认", "50/50", "当前理解 / 如不准确请修改"):
+            self.assertIn(rule, canonical)
+        openai_prompt = openai.split("default_prompt:", 1)[1]
+        for internal_key in ("course_name", "major", "audience", "total_hours", "theory_hours", "practice_hours"):
+            self.assertNotIn(internal_key, openai_prompt)
+
+    def test_lesson_intake_machine_contract_matches_canonical_facades(self) -> None:
+        contract_path = LESSON / "docs" / "intake-contract-v2.1.1.json"
+        contract = json.loads(contract_path.read_text(encoding="utf-8"))
+        self.assertEqual(contract["version"], "2.1.1")
+        self.assertEqual(contract["ui_language"], "zh-CN")
+        self.assertEqual(contract["states"], ["INTAKE_PENDING", "INTAKE_CONFIRMED"])
+        self.assertEqual(contract["source_semantics"], ["EXPLICIT", "DERIVED", "INFERRED", "PENDING"])
+        self.assertEqual(contract["default_hours"], 2)
+        fields = {item["internal"]: item for item in contract["confirmation_fields"]}
+        for field in ("course_name", "major", "audience", "total_hours"):
+            self.assertTrue(fields[field]["required"])
+            self.assertEqual(fields[field]["unknown_state"], "PENDING")
+        self.assertTrue(fields["total_hours"]["explicit_only"])
+        for field in ("major", "audience"):
+            self.assertEqual(fields[field]["inference_label"], "当前理解 / 如不准确请修改")
+        for field in ("theory_hours", "practice_hours", "delivery_mode", "practice_work_orders"):
+            self.assertEqual(fields[field]["unknown_state"], "PENDING")
+        self.assertTrue(fields["textbook"]["recommended"])
+        self.assertEqual(contract["pure_course_normalization"]["theory_only"]["practice_hours"], 0)
+        self.assertEqual(contract["pure_course_normalization"]["practice_only"]["theory_hours"], 0)
+        self.assertIn("docx_generation", contract["forbidden_before_confirmation"])
+        self.assertIn("docx_generation", contract["post_confirmation_questions_forbidden"])
+        self.assertIn("intake_pending", contract["user_visible_errors"])
+        self.assertIn("hours_conflict", contract["user_visible_errors"])
+        self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
+        self.assertEqual(
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.1.1"),
+            1,
+        )
+
+    def test_lesson_installer_doctor_tracks_facade_staleness_and_replacement(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-installer-doctor-") as temp_name:
+            folder = Path(temp_name)
+            source = folder / "source"
+            shutil.copytree(LESSON, source)
+            shared_source = ROOT / "schemas" / "shared" / "practice-task-contract.schema.json"
+            shared_target = source / "schemas" / "shared" / "practice-task-contract.schema.json"
+            shared_target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(shared_source, shared_target)
+            skills_root = folder / "skills"
+
+            missing = lesson_install.inspect_installation(source, skills_root)
+            self.assertEqual(missing["status"], "missing")
+            lesson_install.install(source, skills_root)
+            target = skills_root / lesson_install.SKILL_NAME
+            current = lesson_install.inspect_installation(source, skills_root)
+            self.assertEqual(current["status"], "current", current)
+            self.assertTrue((target / lesson_install.INSTALL_MANIFEST).is_file())
+
+            openai_source = source / "agents" / "openai.yaml"
+            openai_source.write_text(openai_source.read_text(encoding="utf-8") + "\n# facade fingerprint probe\n", encoding="utf-8")
+            stale = lesson_install.inspect_installation(source, skills_root)
+            self.assertEqual(stale["status"], "stale", stale)
+            lesson_install.install(source, skills_root, replace=True)
+            replaced = lesson_install.inspect_installation(source, skills_root)
+            self.assertEqual(replaced["status"], "current", replaced)
+
+            (target / "agents" / "openai.yaml").write_text(
+                (target / "agents" / "openai.yaml").read_text(encoding="utf-8") + "\n# installed mutation\n",
+                encoding="utf-8",
+            )
+            inconsistent = lesson_install.inspect_installation(source, skills_root)
+            self.assertEqual(inconsistent["status"], "inconsistent", inconsistent)
+
     def _acceptance_fixture(self, folder: Path, lesson_count: int = 3) -> tuple[Path, Path, Path, dict]:
         lessons = []
         for index in range(1, lesson_count + 1):

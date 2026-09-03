@@ -3576,6 +3576,170 @@ class GradebookPowerShellContractTests(unittest.TestCase):
 
 
 class WorkflowContractTests(unittest.TestCase):
+    def _run_macos_libreoffice_helper(
+        self,
+        *,
+        fresh_exit: int,
+        still_exit: int,
+        fresh_creates_soffice: bool = False,
+        still_creates_soffice: bool = False,
+    ) -> tuple[subprocess.CompletedProcess[str], list[str], str]:
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("bash is required for the macOS LibreOffice helper contract")
+
+        helper = ROOT / ".github" / "scripts" / "install_libreoffice_macos.sh"
+        with tempfile.TemporaryDirectory(prefix="libreoffice-helper-contract-") as temp_name:
+            folder = Path(temp_name)
+            fake_bin = folder / "bin"
+            fake_bin.mkdir()
+            soffice = folder / "LibreOffice.app" / "Contents" / "MacOS" / "soffice"
+            brew_log = folder / "brew.log"
+            github_path = folder / "github-path"
+            fake_brew = fake_bin / "brew"
+            fake_brew.write_text(
+                r"""#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >> "$BREW_LOG"
+case "$*" in
+  "update-reset")
+    exit 0
+    ;;
+  "update")
+    exit 0
+    ;;
+  "install --cask libreoffice")
+    if [[ "$FAKE_FRESH_CREATE" == "1" ]]; then
+      mkdir -p "$(dirname "$SOFFICE")"
+      printf '#!/usr/bin/env bash\nprintf "%s\\n" "LibreOffice fake test"\n' > "$SOFFICE"
+      chmod +x "$SOFFICE"
+    fi
+    exit "$FAKE_FRESH_EXIT"
+    ;;
+  "install --cask libreoffice-still")
+    if [[ "$FAKE_STILL_CREATE" == "1" ]]; then
+      mkdir -p "$(dirname "$SOFFICE")"
+      printf '#!/usr/bin/env bash\nprintf "%s\\n" "LibreOffice fake test"\n' > "$SOFFICE"
+      chmod +x "$SOFFICE"
+    fi
+    exit "$FAKE_STILL_EXIT"
+    ;;
+  *)
+    echo "unexpected brew command: $*" >&2
+    exit 99
+    ;;
+esac
+""".lstrip(),
+                encoding="utf-8",
+            )
+            fake_brew.chmod(0o755)
+            environment = os.environ.copy()
+            environment.update(
+                {
+                    "PATH": str(fake_bin) + os.pathsep + environment.get("PATH", ""),
+                    "BREW_LOG": str(brew_log),
+                    "SOFFICE": str(soffice),
+                    "LIBREOFFICE_SOFFICE": str(soffice),
+                    "GITHUB_PATH": str(github_path),
+                    "FAKE_FRESH_EXIT": str(fresh_exit),
+                    "FAKE_STILL_EXIT": str(still_exit),
+                    "FAKE_FRESH_CREATE": "1" if fresh_creates_soffice else "0",
+                    "FAKE_STILL_CREATE": "1" if still_creates_soffice else "0",
+                }
+            )
+            result = subprocess.run(
+                [bash, str(helper)],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=environment,
+            )
+            calls = brew_log.read_text(encoding="utf-8").splitlines() if brew_log.exists() else []
+            path_entries = github_path.read_text(encoding="utf-8") if github_path.exists() else ""
+            return result, calls, path_entries
+
+    def test_macos_libreoffice_workflows_use_one_shared_fail_closed_helper(self) -> None:
+        ci_path = ROOT / ".github" / "workflows" / "template-package-ci.yml"
+        ci_workflow = ci_path.read_text(encoding="utf-8")
+        ci_data = yaml.safe_load(ci_workflow)
+        helper_run = ".github/scripts/install_libreoffice_macos.sh"
+
+        for job_name in ("template-gradebook", "template-workorder", "template-tooling", "template-release"):
+            with self.subTest(job=job_name):
+                mac_steps = [
+                    step
+                    for step in ci_data["jobs"][job_name]["steps"]
+                    if step.get("name") == "Install LibreOffice on macOS"
+                    and step.get("if") == "runner.os == 'macOS'"
+                ]
+                self.assertEqual(len(mac_steps), 1)
+                self.assertEqual(mac_steps[0].get("shell"), "bash")
+                self.assertEqual(mac_steps[0].get("run"), helper_run)
+
+        release_path = ROOT / ".github" / "workflows" / "template-release.yml"
+        release_workflow = release_path.read_text(encoding="utf-8")
+        release_data = yaml.safe_load(release_workflow)
+        release_step = next(
+            step
+            for step in release_data["jobs"]["release"]["steps"]
+            if step.get("name") == "Install LibreOffice on macOS"
+        )
+        self.assertEqual(release_step.get("shell"), "bash")
+        self.assertEqual(release_step.get("run"), helper_run)
+
+        self.assertNotIn("brew install --cask libreoffice", ci_workflow)
+        self.assertNotIn("brew install --cask libreoffice", release_workflow)
+        self.assertNotIn("continue-on-error", ci_workflow + release_workflow)
+
+        helper = ROOT / ".github" / "scripts" / "install_libreoffice_macos.sh"
+        helper_text = helper.read_text(encoding="utf-8")
+        self.assertIn("brew update-reset || true", helper_text)
+        self.assertIn("brew update", helper_text)
+        self.assertIn("brew install --cask libreoffice", helper_text)
+        self.assertIn("brew install --cask libreoffice-still", helper_text)
+        self.assertIn('[[ ! -x "$SOFFICE" ]]', helper_text)
+        self.assertIn("GITHUB_PATH", helper_text)
+
+    def test_macos_libreoffice_helper_uses_fresh_cask_without_fallback_when_verified(self) -> None:
+        result, calls, path_entries = self._run_macos_libreoffice_helper(
+            fresh_exit=0,
+            still_exit=0,
+            fresh_creates_soffice=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(calls, ["update-reset", "update", "install --cask libreoffice"])
+        self.assertNotIn("libreoffice-still", calls)
+        self.assertTrue(path_entries.strip())
+
+    def test_macos_libreoffice_helper_falls_back_to_still_after_fresh_failure(self) -> None:
+        result, calls, path_entries = self._run_macos_libreoffice_helper(
+            fresh_exit=1,
+            still_exit=0,
+            still_creates_soffice=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            calls,
+            ["update-reset", "update", "install --cask libreoffice", "install --cask libreoffice-still"],
+        )
+        self.assertTrue(path_entries.strip())
+
+    def test_macos_libreoffice_helper_fails_when_both_casks_fail(self) -> None:
+        result, calls, _ = self._run_macos_libreoffice_helper(fresh_exit=1, still_exit=1)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(
+            calls,
+            ["update-reset", "update", "install --cask libreoffice", "install --cask libreoffice-still"],
+        )
+
+    def test_macos_libreoffice_helper_fails_when_fresh_install_has_no_soffice(self) -> None:
+        result, calls, _ = self._run_macos_libreoffice_helper(fresh_exit=0, still_exit=0)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(calls, ["update-reset", "update", "install --cask libreoffice"])
+        self.assertNotIn("libreoffice-still", calls)
+
     def test_template_package_ci_lesson_jobs_run_hardening_suite(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "template-package-ci.yml").read_text(encoding="utf-8")
         workflow_data = yaml.safe_load(workflow)

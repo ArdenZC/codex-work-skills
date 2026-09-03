@@ -4,6 +4,27 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 教案生成器 2.1.1 — 2026-09-02
+
+### Lesson Intake Runtime Hotfix
+
+- 任务开始强制一次性确认课程核心信息；Intake 未确认前不提前确定项目、课次结构、实践任务数量、正文或 DOCX。
+- 单课课时默认 2 学时；未知理论/实践结构、组织方式和实践任务工单偏好保持待确认，不再自动按 1:1 推断。
+- 教材建议确认但不是阻断字段；用户确认后不再在生成 DOCX 前二次确认。
+- Intake 用户界面统一使用中文标签，推断的专业/授课对象明确标注当前理解。
+- references 明确为可阅读、查阅、引用或作为课程依据的文献/文档来源；resources 明确为教学工具、设备、环境和材料。
+- 安装完整性和 runtime fingerprint 覆盖 OpenAI facade，并提供 current/stale/inconsistent/missing doctor 状态。
+
+版本关系：
+
+```text
+Lesson Skill          2.1.1
+Content Contract      2.1
+Default Word template lesson-plan v1.1.2
+```
+
+本版本不修改 Content Contract、Word 模板 binary/manifest/fingerprint，不创建 template tag、GitHub Release 或 template release。
+
 ## 实践任务工单生成器 2.1.0 — 2026-09-02
 
 ### Phase 2.1 Hardening

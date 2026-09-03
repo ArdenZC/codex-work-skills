@@ -19,7 +19,9 @@ from path_safety import paths_overlap
 ENGINE_NAME = ".lesson-plan-docx-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
+SKILL_VERSION = "2.1.1"
 CONTENT_CONTRACT_VERSION = "2.1"
+TEMPLATE_VERSION = "1.1.2"
 SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")
 MARKER_ID = "lesson-plan-docx-generator"
 MARKER_START = f"<!-- codex-skill: {MARKER_ID}:start -->"
@@ -29,8 +31,11 @@ MINIMAL_ENGINE_FILES = (
     Path("通用提示词.md"),
     Path("AGENTS.md"),
     Path("CONVENTIONS.md"),
+    Path("agents/openai.yaml"),
 )
 FULL_ENGINE_RUNTIME_FILES = (
+    Path("manifest.yaml"),
+    Path("docs/intake-contract-v2.1.1.json"),
     Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
     Path("scripts/content_contract.py"),
@@ -43,6 +48,8 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("scripts/semantic_bookmarks.py"),
     Path("scripts/bookmark_utils.py"),
     Path("scripts/check_dependencies.py"),
+    Path("scripts/install.py"),
+    Path("scripts/install_adapters.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("schemas/practice-task-contract.schema.json"),
     SHARED_SCHEMA,
@@ -177,7 +184,9 @@ def _engine_state_payload(source_root: Path) -> bytes:
     state = {
         "schema_version": ENGINE_STATE_SCHEMA_VERSION,
         "skill": "lesson-plan-docx-generator",
+        "skill_version": SKILL_VERSION,
         "content_contract_version": CONTENT_CONTRACT_VERSION,
+        "template_version": TEMPLATE_VERSION,
         "runtime_fingerprint": _runtime_fingerprint(inventory),
         "runtime_inventory": inventory,
     }
@@ -208,7 +217,11 @@ def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) 
         return False
     if state.get("skill") != "lesson-plan-docx-generator":
         return False
+    if state.get("skill_version") != SKILL_VERSION:
+        return False
     if state.get("content_contract_version") != CONTENT_CONTRACT_VERSION:
+        return False
+    if state.get("template_version") != TEMPLATE_VERSION:
         return False
     if state.get("runtime_fingerprint") != _runtime_fingerprint(inventory):
         return False
