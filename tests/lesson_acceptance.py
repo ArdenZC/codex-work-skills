@@ -394,13 +394,24 @@ def content_quality_evidence(qa_report: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _gate(name: str, passed: bool, observed: Any, details: str) -> dict[str, Any]:
+def _gate(
+    name: str,
+    passed: bool,
+    observed: Any,
+    details: str,
+    *,
+    status: str | None = None,
+) -> dict[str, Any]:
     return {
         "name": name,
-        "status": "PASS" if passed else "FAIL",
+        "status": status or ("PASS" if passed else "FAIL"),
         "observed": _json_safe(observed),
         "details": details,
     }
+
+
+def _not_applicable_gate(name: str, observed: Any, details: str) -> dict[str, Any]:
+    return _gate(name, True, observed, details, status="NOT_APPLICABLE")
 
 
 def _anchor_observation(qa_report: Mapping[str, Any]) -> dict[str, Any]:
@@ -628,6 +639,24 @@ def structural_hard_gates(
     render = qa_report.get("render") if isinstance(qa_report.get("render"), Mapping) else {}
     validation = qa_report.get("validation") if isinstance(qa_report.get("validation"), Mapping) else {}
     anchors = _anchor_observation(qa_report)
+    lesson_docx_not_applicable = (
+        expected_count == 0
+        and bool(output_inventory.get("exists"))
+        and _number(output_inventory.get("docx_count")) == 0
+        and _number(file_count.get("actual")) == 0
+        and _number(qa_report.get("files_checked")) == 0
+        and not qa_report.get("errors")
+    )
+
+    def lesson_docx_gate(name: str, passed: bool, observed: Any, details: str) -> dict[str, Any]:
+        if lesson_docx_not_applicable:
+            return _not_applicable_gate(
+                name,
+                {"expected_lesson_docx_count": expected_count, "observed": observed},
+                f"{details} No Lesson DOCX is expected; this gate is not applicable.",
+            )
+        return _gate(name, passed, observed, details)
+
     template_observed = {
         "template_id": qa_report.get("template_id"),
         "template_version": _normalise_version(qa_report.get("template_version")),
@@ -647,13 +676,13 @@ def structural_hard_gates(
     references = reference_metrics(data, qa_report)
     practice = practice_handoff_metrics(data, qa_report)
     gates = [
-        _gate(
+        lesson_docx_gate(
             "docx_inventory",
             bool(output_inventory.get("exists")) and output_inventory.get("docx_count") == expected_count,
             {"expected": expected_count, "actual": output_inventory.get("docx_count")},
             "DOCX inventory must contain exactly one output for every lesson.",
         ),
-        _gate(
+        lesson_docx_gate(
             "qa_files_checked",
             qa_report.get("files_checked") == expected_count and file_count.get("actual") == expected_count,
             {"qa_files_checked": qa_report.get("files_checked"), "qa_file_count": file_count.get("actual")},
@@ -712,13 +741,13 @@ def structural_hard_gates(
             template_observed,
             f"Selected template must be {template_id} {_normalise_version(template_version)}.",
         ),
-        _gate(
+        lesson_docx_gate(
             "template_names_and_fidelity",
             bool(validation.get("template", True)) and bool(validation.get("output", True)) and not lesson_errors and not any("filename" in str(error).lower() or "layout" in str(error).lower() for error in qa_report.get("errors", [])),
             {"validation": validation, "lesson_error_count": len(lesson_errors), "qa_error_count": len(qa_report.get("errors", [])) if isinstance(qa_report.get("errors"), list) else None},
             "Names, protected layout, writable-field fidelity, and existing QA errors must be clean.",
         ),
-        _gate(
+        lesson_docx_gate(
             "semantic_bookmarks",
             anchor_pass,
             anchors,
@@ -730,7 +759,7 @@ def structural_hard_gates(
             {"qa_status": qa_report.get("status"), "content_quality_status": (qa_report.get("content_quality") or {}).get("status") if isinstance(qa_report.get("content_quality"), Mapping) else None},
             "Content QA status is read from the production qa-report.json.",
         ),
-        _gate(
+        lesson_docx_gate(
             "render_smoke",
             render.get("status") == "passed",
             {"status": render.get("status"), "files_checked": render.get("files_checked"), "page_count": render.get("page_count")},
@@ -738,8 +767,9 @@ def structural_hard_gates(
         ),
     ]
     return {
-        "status": "PASS" if all(gate["status"] == "PASS" for gate in gates) else "FAIL",
+        "status": "PASS" if all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in gates) else "FAIL",
         "hard_gate": True,
+        "lesson_docx_applicable": not lesson_docx_not_applicable,
         "gates": gates,
     }
 

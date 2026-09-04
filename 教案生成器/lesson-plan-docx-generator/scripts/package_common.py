@@ -833,6 +833,77 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
                 seen_reference_content[normalized_text] = reference_id
 
 
+def _validate_implementation_stage_invariants(lessons: list[dict[str, Any]]) -> None:
+    """Validate the canonical nine-stage schedule shared by every V2 contract."""
+
+    expected_stage_ids = list(IMPLEMENTATION_STAGE_IDS)
+    for index, lesson in enumerate(lessons):
+        prefix = f"lessons[{index}]"
+        lesson_id = str(lesson.get("lesson_id", f"L{index + 1:02d}"))
+        stages = lesson.get("implementation")
+        if not isinstance(stages, list):
+            raise ValueError(f"{prefix}.implementation must be a list of exactly 9 stages")
+        if len(stages) != len(expected_stage_ids):
+            raise ValueError(
+                f"{prefix}.implementation must contain exactly {len(expected_stage_ids)} stages; "
+                f"got {len(stages)}"
+            )
+        if not all(isinstance(stage, dict) for stage in stages):
+            raise ValueError(f"{prefix}.implementation stages must be objects")
+
+        stage_ids = [str(stage["id"]) for stage in stages]
+        duplicate_stage_ids = sorted({stage_id for stage_id in stage_ids if stage_ids.count(stage_id) > 1})
+        if duplicate_stage_ids:
+            raise ValueError(
+                f"{prefix}.implementation stage IDs must be unique; "
+                f"duplicate {', '.join(duplicate_stage_ids)}"
+            )
+        if stage_ids != expected_stage_ids:
+            raise ValueError(
+                f"{prefix}.implementation stage IDs must be in canonical order: "
+                f"expected {', '.join(expected_stage_ids)}, got {', '.join(stage_ids)}"
+            )
+
+        hours = _decimal_hours(lesson["hours"], f"{prefix}.hours")
+        classroom_minutes = Decimal("0")
+        out_of_class_minutes: list[tuple[str, int]] = []
+        for stage_index, stage in enumerate(stages):
+            minutes = int(stage["minutes"])
+            if stage["id"] in IN_CLASS_STAGE_IDS:
+                if minutes <= 0:
+                    raise ValueError(
+                        f"{prefix}.implementation[{stage_index}].minutes must be positive for in-class stages"
+                    )
+                classroom_minutes += Decimal(minutes)
+            else:
+                out_of_class_minutes.append((str(stage["id"]), minutes))
+
+        expected_minutes = hours * Decimal(MINUTES_PER_LESSON_HOUR)
+        if expected_minutes != expected_minutes.to_integral_value():
+            raise ValueError(f"{prefix}.hours must produce whole classroom minutes: {lesson['hours']}")
+        if classroom_minutes != expected_minutes:
+            raise ValueError(
+                f"{prefix} in-class implementation minutes must equal hours*45: "
+                f"expected {int(expected_minutes)}, got {int(classroom_minutes)}"
+            )
+
+        out_of_class_limit = max(60, int(expected_minutes))
+        for stage_id, minutes in out_of_class_minutes:
+            if minutes < 0 or minutes > out_of_class_limit:
+                raise ValueError(
+                    "out-of-class minutes sanity failed: "
+                    f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
+                )
+        out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
+        total_limit = 2 * int(expected_minutes)
+        if out_of_class_total > total_limit:
+            raise ValueError(
+                "out-of-class minutes sanity failed: "
+                f"lesson_id={lesson_id} stage=out_of_class_total "
+                f"actual={out_of_class_total} limit={total_limit}"
+            )
+
+
 def _validate_practice_contract_v21(data: dict[str, Any]) -> None:
     plan = data["delivery_plan"]
     total = _decimal_hours(plan["total_hours"], "delivery_plan.total_hours")
@@ -908,6 +979,8 @@ def _validate_practice_contract_v21(data: dict[str, Any]) -> None:
             if item.get(field_name) != expected:
                 raise ValueError(f"outline[{index}].{field_name} must match lessons[{index}]")
 
+    _validate_implementation_stage_invariants(data["lessons"])
+
     practice_contract = data.get("practice_task_contract")
     if practice == 0:
         if practice_contract is not None and _decimal_hours(practice_contract["practice_hours"], "practice_task_contract.practice_hours", allow_zero=True) != 0:
@@ -930,7 +1003,10 @@ def _validate_practice_contract_v21(data: dict[str, Any]) -> None:
             raise ValueError(f"{prefix}.task_id must be unique; duplicate {task_id!r}")
         task_by_id[task_id] = task
         task_hours += _decimal_hours(task["practice_hours"], f"{prefix}.practice_hours")
-        for lesson_id in task["lesson_ids"]:
+        linked_ids = [str(value) for value in task["lesson_ids"]]
+        if not linked_ids:
+            raise ValueError(f"{prefix}.lesson_ids must contain at least one linked lesson for Content Contract 2.1")
+        for lesson_id in linked_ids:
             linked = lesson_by_id.get(str(lesson_id))
             if linked is None:
                 raise ValueError(f"{prefix}.lesson_ids contains unknown lesson {lesson_id!r}")
@@ -1044,6 +1120,8 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
         for field_name, expected in expected_outline.items():
             if item.get(field_name) != expected:
                 raise ValueError(f"outline[{index}].{field_name} must match lessons[{index}]")
+
+    _validate_implementation_stage_invariants(data["lessons"])
 
     practice_contract = data.get("practice_task_contract")
     if practice == 0:
@@ -1258,10 +1336,11 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
             f"received {data.get('total_hours')}. Lesson hours must be a positive integer."
         )
 
+    _validate_implementation_stage_invariants(data["lessons"])
+
     lesson_ids: set[str] = set()
     ordered_lesson_ids: list[str] = []
     lesson_hours = Decimal("0")
-    expected_stage_ids = list(IMPLEMENTATION_STAGE_IDS)
     placeholder_values = {"已有一定基础", "完成相应任务", "为下一课打基础"}
     for index, lesson in enumerate(data["lessons"]):
         lesson_id = str(lesson["lesson_id"])
@@ -1272,46 +1351,6 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
         ordered_lesson_ids.append(lesson_id)
         hours = Decimal(str(lesson["hours"]))
         lesson_hours += hours
-        classroom_minutes = Decimal("0")
-        out_of_class_minutes: list[tuple[str, int]] = []
-        stages = lesson["implementation"]
-        stage_ids = [str(stage["id"]) for stage in stages]
-        if stage_ids != expected_stage_ids:
-            raise ValueError(
-                f"lessons[{index}].implementation must contain stages in canonical order: "
-                f"{', '.join(expected_stage_ids)}"
-            )
-        for stage_index, stage in enumerate(stages):
-            minutes = int(stage["minutes"])
-            if stage["id"] in IN_CLASS_STAGE_IDS:
-                if minutes <= 0:
-                    raise ValueError(f"lessons[{index}].implementation[{stage_index}].minutes must be positive for in-class stages")
-                classroom_minutes += Decimal(minutes)
-            else:
-                out_of_class_minutes.append((str(stage["id"]), minutes))
-        expected_minutes = hours * Decimal(MINUTES_PER_LESSON_HOUR)
-        if expected_minutes != expected_minutes.to_integral_value():
-            raise ValueError(f"lessons[{index}].hours must produce whole classroom minutes: {lesson['hours']}")
-        if classroom_minutes != expected_minutes:
-            raise ValueError(
-                f"lessons[{index}] in-class implementation minutes must equal hours*45: "
-                f"expected {int(expected_minutes)}, got {int(classroom_minutes)}"
-            )
-        out_of_class_limit = max(60, int(expected_minutes))
-        for stage_id, minutes in out_of_class_minutes:
-            if minutes < 0 or minutes > out_of_class_limit:
-                raise ValueError(
-                    "out-of-class minutes sanity failed: "
-                    f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
-                )
-        out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
-        total_limit = 2 * int(expected_minutes)
-        if out_of_class_total > total_limit:
-            raise ValueError(
-                "out-of-class minutes sanity failed: "
-                f"lesson_id={lesson_id} stage=out_of_class_total "
-                f"actual={out_of_class_total} limit={total_limit}"
-            )
         progression = lesson["progression"]
         prior_lesson_id = progression["prior_lesson_id"]
         if index == 0:
