@@ -31,6 +31,7 @@ from typing import Iterable, Sequence
 ROOT = Path(__file__).resolve().parents[2]
 TEST_MODULE = "tests.test_template_packages"
 LESSON_V21_TEST_MODULE = "tests.test_lesson_content_v21"
+LESSON_V22_TEST_MODULE = "tests.test_lesson_content_v22"
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
@@ -95,7 +96,7 @@ def _lesson_content_ids() -> tuple[str, ...]:
         "LessonTemplatePackageTests",
         include=(name for name in vars(mixin) if name.startswith("test_")),
     )
-    return tuple(sorted((*legacy_ids, *_module_test_ids(LESSON_V21_TEST_MODULE))))
+    return tuple(sorted((*legacy_ids, *_module_test_ids(LESSON_V21_TEST_MODULE), *_module_test_ids(LESSON_V22_TEST_MODULE))))
 
 
 def _lesson_package_ids() -> tuple[str, ...]:

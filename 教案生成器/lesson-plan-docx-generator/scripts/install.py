@@ -14,8 +14,8 @@ from path_safety import paths_overlap
 
 
 SKILL_NAME = "lesson-plan-docx-generator"
-SKILL_VERSION = "2.1.1"
-CONTENT_CONTRACT_VERSION = "2.1"
+SKILL_VERSION = "2.2.0"
+CONTENT_CONTRACT_VERSION = "2.2"
 TEMPLATE_VERSION = "1.1.2"
 INSTALL_MANIFEST = Path("install-manifest.json")
 SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")

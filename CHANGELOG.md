@@ -4,6 +4,27 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 教案生成器 2.2.0 — 2026-09-04
+
+### Theory / Practice Artifact Split 与 Domestic-first References
+
+- Lesson DOCX 只承载理论课时；实践课时由 Practice Task Contract / WorkOrder handoff 表达，课程、理论 Lesson 和实践任务课时严格守恒，理论余数按向上取整保留。
+- 任务开始前强制一次性确认课程核心信息；单课课时默认 2 学时，教材建议确认但不是阻断字段；确认后不再询问模板、输出目录或是否开始生成 DOCX。
+- 建立课程级 reference catalog，理论 Lesson 每课至少引用一项具体文献/文档；参考资料按国内出版物、高校资料、国家/行业/职业标准和国内权威来源优先，国内占比是质量信号而非硬失败。
+- 明确 references 与 resources 边界；教材默认不进入 references，真实 reference 允许跨课复用，同课重复、纯资源名、泛化占位和虚构书目信息仍失败。
+- Practice Task Contract 版本仍为 V1，WorkOrder 数量与项目/Lesson 数量独立规划；不扩大评分、progression、implementation coherence、重复算法或 WorkOrder 业务合同。
+
+版本关系：
+
+```text
+Lesson Skill          2.2.0
+Content Contract      2.2
+Default Word template lesson-plan v1.1.2
+Practice Task Contract V1
+```
+
+本版本不修改 Lesson 或 WorkOrder 模板 binary、manifest、fingerprint，不创建 template tag、GitHub Release 或 template release。
+
 ## 教案生成器 2.1.1 — 2026-09-02
 
 ### Lesson Intake Runtime Hotfix
