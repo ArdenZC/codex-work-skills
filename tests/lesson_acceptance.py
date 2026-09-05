@@ -1,4 +1,4 @@
-"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0/2.1.
+"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0/2.1/2.2.
 
 The production Lesson Content QA remains the authority for structural,
 similarity, progression, and implementation checks.  This module only reads
@@ -27,8 +27,8 @@ from typing import Any
 
 
 ACCEPTANCE_SCHEMA_VERSION = "2.0"
-CONTENT_CONTRACT_VERSION = "2.1"
-COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1")
+CONTENT_CONTRACT_VERSION = "2.2"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2")
 DEFAULT_TEMPLATE_ID = "lesson-plan"
 DEFAULT_TEMPLATE_VERSION = "v1.1.2"
 SOURCE_TYPES = ("real_agent", "synthetic_fixture", "human_authored", "mixed")
@@ -394,13 +394,24 @@ def content_quality_evidence(qa_report: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _gate(name: str, passed: bool, observed: Any, details: str) -> dict[str, Any]:
+def _gate(
+    name: str,
+    passed: bool,
+    observed: Any,
+    details: str,
+    *,
+    status: str | None = None,
+) -> dict[str, Any]:
     return {
         "name": name,
-        "status": "PASS" if passed else "FAIL",
+        "status": status or ("PASS" if passed else "FAIL"),
         "observed": _json_safe(observed),
         "details": details,
     }
+
+
+def _not_applicable_gate(name: str, observed: Any, details: str) -> dict[str, Any]:
+    return _gate(name, True, observed, details, status="NOT_APPLICABLE")
 
 
 def _anchor_observation(qa_report: Mapping[str, Any]) -> dict[str, Any]:
@@ -420,13 +431,14 @@ def _anchor_observation(qa_report: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
-    """Report 2.1 theory/practice delivery accounting without changing QA thresholds."""
+    """Report delivery accounting without changing Content QA thresholds."""
 
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
-    if data.get("content_contract_version") != "2.1":
+    version = data.get("content_contract_version")
+    if version not in {"2.1", "2.2"}:
         return {
             "status": "not_applicable",
-            "contract_version": data.get("content_contract_version"),
+            "contract_version": version,
             "expected": {},
             "actual": {},
             "lesson_counts": {},
@@ -447,6 +459,34 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
         lesson_type: sum(1 for lesson in lessons if isinstance(lesson, Mapping) and lesson.get("lesson_type") == lesson_type)
         for lesson_type in ("theory", "practice", "integrated")
     }
+    if version == "2.2":
+        contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
+        tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []
+        lesson_hours = sum((_number(lesson.get("hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
+        task_hours = sum((_number(task.get("practice_hours")) or 0) for task in tasks if isinstance(task, Mapping))
+        actual = {
+            "total_hours": lesson_hours + task_hours,
+            "theory_hours": sum((_number(lesson.get("theory_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping)),
+            "practice_hours": task_hours,
+            "lesson_hours": lesson_hours,
+            "practice_task_hours": task_hours,
+        }
+        mismatches = [
+            key for key in ("total_hours", "theory_hours", "practice_hours")
+            if expected[key] is None or not math.isclose(expected[key], actual[key], abs_tol=0.01)
+        ]
+        if expected["theory_hours"] is None or not math.isclose(expected["theory_hours"], actual["lesson_hours"], abs_tol=0.01):
+            mismatches.append("lesson_hours")
+        return {
+            "status": "PASS" if not mismatches else "FAIL",
+            "contract_version": "2.2",
+            "mode": plan.get("mode"),
+            "expected": expected,
+            "actual": actual,
+            "lesson_counts": counts,
+            "mismatches": mismatches,
+            "consistency": not mismatches,
+        }
     mismatches = [
         key for key in expected
         if expected[key] is None or not math.isclose(expected[key], actual[key], abs_tol=0.01)
@@ -464,12 +504,13 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    """Summarise 2.1 material/reference gates; cross-lesson reuse is statistics only."""
+    """Summarise material/reference gates; cross-lesson reuse is statistics only."""
 
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     quality = qa_report.get("content_quality", {}) if isinstance(qa_report, Mapping) else {}
     provenance = quality.get("reference_provenance", {}) if isinstance(quality, Mapping) else {}
-    if data.get("content_contract_version") != "2.1":
+    version = data.get("content_contract_version")
+    if version not in {"2.1", "2.2"}:
         return {
             "status": "not_applicable",
             "textbook_present": False,
@@ -496,7 +537,46 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     overlap_count = len(provenance.get("textbook_overlap", [])) if isinstance(provenance, Mapping) else 0
     duplicate_count = len(provenance.get("same_lesson_duplicates", [])) if isinstance(provenance, Mapping) else 0
     unresolved_count = len(provenance.get("unresolved_ids", [])) if isinstance(provenance, Mapping) else 0
-    failures = placeholder_count + overlap_count + duplicate_count + unresolved_count
+    resource_only_count = len(provenance.get("invalid_resource_only", [])) if isinstance(provenance, Mapping) else 0
+    invalid_generic_count = len(provenance.get("invalid_generic", [])) if isinstance(provenance, Mapping) else 0
+    empty_count = len(provenance.get("empty_reference_lessons", [])) if isinstance(provenance, Mapping) else 0
+    domestic = int(provenance.get("catalog_source_regions", {}).get("domestic", 0)) if isinstance(provenance, Mapping) else 0
+    foreign = int(provenance.get("catalog_source_regions", {}).get("foreign", 0)) if isinstance(provenance, Mapping) else 0
+    unknown = int(provenance.get("catalog_source_regions", {}).get("unknown", 0)) if isinstance(provenance, Mapping) else 0
+    known = domestic + foreign
+    domestic_share = domestic / known if known else None
+    textbook_overlap_failure = 0 if data.get("allow_textbook_as_reference", False) else overlap_count
+    failures = placeholder_count + textbook_overlap_failure + duplicate_count + unresolved_count + resource_only_count + invalid_generic_count + empty_count
+    if version == "2.2":
+        return {
+            "status": "PASS" if failures == 0 else "FAIL",
+            "contract_version": "2.2",
+            "textbook_present": textbook is not None,
+            "textbook_excluded": overlap_count == 0 or bool(data.get("allow_textbook_as_reference", False)),
+            "pool_size": len(data.get("reference_pool", [])) if isinstance(data.get("reference_pool"), list) else 0,
+            "lessons_with_references": sum(bool(ids) for ids in ids_by_lesson),
+            "lessons_without_references": sum(not ids for ids in ids_by_lesson),
+            "empty_reference_lesson_count": empty_count,
+            "reference_count_by_lesson": [len(ids) for ids in ids_by_lesson],
+            "reuse_frequency": dict(sorted(frequency.items())),
+            "placeholder_count": placeholder_count,
+            "generic_reference_count": sum(
+                1 for reference in data.get("reference_pool", [])
+                if isinstance(reference, Mapping) and reference.get("source_kind") == "generic"
+            ),
+            "invalid_generic_count": invalid_generic_count,
+            "resource_only_count": resource_only_count,
+            "textbook_overlap_count": overlap_count,
+            "same_lesson_duplicate_count": duplicate_count,
+            "unresolved_id_count": unresolved_count,
+            "domestic_source_count": domestic,
+            "foreign_source_count": foreign,
+            "unknown_source_count": unknown,
+            "domestic_share": domestic_share,
+            "domestic_share_quality": "warning" if domestic_share is not None and domestic_share < 0.7 else "pass",
+            "cross_lesson_reuse_allowed": True,
+            "hard_gate_failures": failures,
+        }
     return {
         "status": "PASS" if failures == 0 else "FAIL",
         "textbook_present": textbook is not None,
@@ -518,7 +598,7 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
     existing = quality.get("practice_handoff") if isinstance(quality, Mapping) else None
     if isinstance(existing, Mapping) and existing:
         return _json_safe(existing)
-    if data.get("content_contract_version") != "2.1":
+    if data.get("content_contract_version") not in {"2.1", "2.2"}:
         return {"status": "not_applicable", "task_count": 0, "hour_consistent": True}
     contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
     expected = _number((data.get("delivery_plan") or {}).get("practice_hours")) or 0
@@ -543,10 +623,15 @@ def structural_hard_gates(
 ) -> dict[str, Any]:
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     expected_count = len(lessons)
-    declared_hours = _number(data.get("total_hours"))
+    version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
+    declared_course_hours = _number(data.get("total_hours"))
+    declared_lesson_hours = _number(plan.get("theory_hours")) if version == "2.2" else declared_course_hours
     qa_checks = qa_report.get("checks") if isinstance(qa_report.get("checks"), Mapping) else {}
     total_hours_check = qa_checks.get("total_hours") if isinstance(qa_checks.get("total_hours"), Mapping) else {}
     actual_hours = _number(total_hours_check.get("actual"))
+    course_hours_check = qa_checks.get("course_hours") if isinstance(qa_checks.get("course_hours"), Mapping) else {}
+    actual_course_hours = _number(course_hours_check.get("actual")) if version == "2.2" else actual_hours
     contract = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     file_count = qa_checks.get("file_count") if isinstance(qa_checks.get("file_count"), Mapping) else {}
     lesson_checks = qa_checks.get("lessons") if isinstance(qa_checks.get("lessons"), list) else []
@@ -554,6 +639,24 @@ def structural_hard_gates(
     render = qa_report.get("render") if isinstance(qa_report.get("render"), Mapping) else {}
     validation = qa_report.get("validation") if isinstance(qa_report.get("validation"), Mapping) else {}
     anchors = _anchor_observation(qa_report)
+    lesson_docx_not_applicable = (
+        expected_count == 0
+        and bool(output_inventory.get("exists"))
+        and _number(output_inventory.get("docx_count")) == 0
+        and _number(file_count.get("actual")) == 0
+        and _number(qa_report.get("files_checked")) == 0
+        and not qa_report.get("errors")
+    )
+
+    def lesson_docx_gate(name: str, passed: bool, observed: Any, details: str) -> dict[str, Any]:
+        if lesson_docx_not_applicable:
+            return _not_applicable_gate(
+                name,
+                {"expected_lesson_docx_count": expected_count, "observed": observed},
+                f"{details} No Lesson DOCX is expected; this gate is not applicable.",
+            )
+        return _gate(name, passed, observed, details)
+
     template_observed = {
         "template_id": qa_report.get("template_id"),
         "template_version": _normalise_version(qa_report.get("template_version")),
@@ -573,13 +676,13 @@ def structural_hard_gates(
     references = reference_metrics(data, qa_report)
     practice = practice_handoff_metrics(data, qa_report)
     gates = [
-        _gate(
+        lesson_docx_gate(
             "docx_inventory",
             bool(output_inventory.get("exists")) and output_inventory.get("docx_count") == expected_count,
             {"expected": expected_count, "actual": output_inventory.get("docx_count")},
             "DOCX inventory must contain exactly one output for every lesson.",
         ),
-        _gate(
+        lesson_docx_gate(
             "qa_files_checked",
             qa_report.get("files_checked") == expected_count and file_count.get("actual") == expected_count,
             {"qa_files_checked": qa_report.get("files_checked"), "qa_file_count": file_count.get("actual")},
@@ -587,21 +690,38 @@ def structural_hard_gates(
         ),
         _gate(
             "total_hours",
-            declared_hours is not None and actual_hours is not None and math.isclose(declared_hours, actual_hours, abs_tol=0.01),
-            {"expected": declared_hours, "actual": actual_hours},
-            "Declared and QA-observed total hours must agree.",
+            (
+                declared_lesson_hours is not None
+                and actual_hours is not None
+                and math.isclose(declared_lesson_hours, actual_hours, abs_tol=0.01)
+                and (
+                    version != "2.2"
+                    or (
+                        declared_course_hours is not None
+                        and actual_course_hours is not None
+                        and math.isclose(declared_course_hours, actual_course_hours, abs_tol=0.01)
+                    )
+                )
+            ),
+            {
+                "expected": declared_lesson_hours if version == "2.2" else declared_course_hours,
+                "actual": actual_hours,
+                "course_expected": declared_course_hours if version == "2.2" else None,
+                "course_actual": actual_course_hours if version == "2.2" else None,
+            },
+            "Declared Lesson theory hours and, for Content 2.2, course hours must agree with QA evidence.",
         ),
         _gate(
             "content_contract",
             contract in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and qa_report.get("content_contract_version") in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and contract == qa_report.get("content_contract_version"),
             {"input": contract, "qa": qa_report.get("content_contract_version"), "current": CONTENT_CONTRACT_VERSION},
-            "Acceptance V2 reads Content Contract 2.0 compatibility and current Content Contract 2.1; it does not author content.",
+            "Acceptance V2 reads Content Contract 2.0/2.1 compatibility and current Content Contract 2.2; it does not author content.",
         ),
         _gate(
             "delivery_consistency",
             delivery.get("status") in {"PASS", "not_applicable"},
             delivery,
-            "2.1 total/theory/practice hours and lesson type accounting must reconcile.",
+            "Content 2.1/2.2 delivery hours and lesson/artifact accounting must reconcile.",
         ),
         _gate(
             "reference_hard_gates",
@@ -621,13 +741,13 @@ def structural_hard_gates(
             template_observed,
             f"Selected template must be {template_id} {_normalise_version(template_version)}.",
         ),
-        _gate(
+        lesson_docx_gate(
             "template_names_and_fidelity",
             bool(validation.get("template", True)) and bool(validation.get("output", True)) and not lesson_errors and not any("filename" in str(error).lower() or "layout" in str(error).lower() for error in qa_report.get("errors", [])),
             {"validation": validation, "lesson_error_count": len(lesson_errors), "qa_error_count": len(qa_report.get("errors", [])) if isinstance(qa_report.get("errors"), list) else None},
             "Names, protected layout, writable-field fidelity, and existing QA errors must be clean.",
         ),
-        _gate(
+        lesson_docx_gate(
             "semantic_bookmarks",
             anchor_pass,
             anchors,
@@ -639,7 +759,7 @@ def structural_hard_gates(
             {"qa_status": qa_report.get("status"), "content_quality_status": (qa_report.get("content_quality") or {}).get("status") if isinstance(qa_report.get("content_quality"), Mapping) else None},
             "Content QA status is read from the production qa-report.json.",
         ),
-        _gate(
+        lesson_docx_gate(
             "render_smoke",
             render.get("status") == "passed",
             {"status": render.get("status"), "files_checked": render.get("files_checked"), "page_count": render.get("page_count")},
@@ -647,8 +767,9 @@ def structural_hard_gates(
         ),
     ]
     return {
-        "status": "PASS" if all(gate["status"] == "PASS" for gate in gates) else "FAIL",
+        "status": "PASS" if all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in gates) else "FAIL",
         "hard_gate": True,
+        "lesson_docx_applicable": not lesson_docx_not_applicable,
         "gates": gates,
     }
 

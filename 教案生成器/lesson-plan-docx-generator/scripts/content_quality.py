@@ -543,6 +543,13 @@ def _reference_looks_like_resource_only(text: Any) -> bool:
     return _normalize_item(text) in REFERENCE_RESOURCE_ONLY_EXACT
 
 
+def _reference_region(reference: dict[str, Any]) -> str:
+    """Return the explicit 2.2 source-region label without guessing provenance."""
+
+    region = str(reference.get("source_region", "unknown")).strip().casefold()
+    return region if region in {"domestic", "foreign", "unknown"} else "unknown"
+
+
 def _implementation_items(stage: dict[str, Any], field: str) -> list[Any]:
     value = stage.get(field, "")
     if isinstance(value, (list, tuple)):
@@ -2510,7 +2517,10 @@ def _reference_provenance_report(
     unresolved_ids: list[dict[str, Any]] = []
     placeholder_items: list[dict[str, Any]] = []
     textbook_overlap: list[dict[str, Any]] = []
-    is_v21 = bool(data and data.get("content_contract_version") == "2.1")
+    is_reference_pool_contract = bool(
+        data and data.get("content_contract_version") in {"2.1", "2.2"}
+    )
+    is_v22 = bool(data and data.get("content_contract_version") == "2.2")
     pool = {
         str(reference.get("reference_id")): reference
         for reference in (data or {}).get("reference_pool", [])
@@ -2519,14 +2529,20 @@ def _reference_provenance_report(
     textbook = ((data or {}).get("course_materials") or {}).get("textbook")
     textbook_key = reference_identity(textbook) if isinstance(textbook, dict) else ""
     reuse_frequency: dict[str, int] = {}
+    catalog_source_regions = {"domestic": 0, "foreign": 0, "unknown": 0}
+    for reference in pool.values():
+        catalog_source_regions[_reference_region(reference)] += 1
+    empty_reference_lessons: list[str] = []
     for lesson_id, lesson in zip(lesson_ids, lessons):
         entries: list[dict[str, Any]] = []
         seen_references: dict[str, int] = {}
-        raw_ids = [str(value) for value in lesson.get("reference_ids", [])] if is_v21 else []
+        raw_ids = [str(value) for value in lesson.get("reference_ids", [])] if is_reference_pool_contract else []
         references = lesson_references(data, lesson)
+        if is_v22 and not references:
+            empty_reference_lessons.append(lesson_id)
         for index, reference in enumerate(references, 1):
-            reference_id = raw_ids[index - 1] if is_v21 and index <= len(raw_ids) else None
-            if is_v21 and reference_id not in pool:
+            reference_id = raw_ids[index - 1] if is_reference_pool_contract and index <= len(raw_ids) else None
+            if is_reference_pool_contract and reference_id not in pool:
                 unresolved_ids.append({"lesson": lesson_id, "reference_id": reference_id, "index": index})
             text = _normalize(reference.get("text") or format_reference(reference))
             source_kind = str(reference.get("source_kind", ""))
@@ -2537,6 +2553,7 @@ def _reference_provenance_report(
                 "reference_id": reference_id,
                 "reference_type": reference.get("reference_type"),
                 "source_kind": source_kind,
+                "source_region": _reference_region(reference),
                 "evidence_present": evidence_present,
             }
             entries.append(entry)
@@ -2546,7 +2563,7 @@ def _reference_provenance_report(
             normalized_item = _normalize_item(text)
             duplicate_keys = (
                 [f"id:{reference_id}", f"text:{normalized_item}"]
-                if is_v21
+                if is_reference_pool_contract
                 else [normalized_item]
             )
             duplicate_of = next(
@@ -2559,7 +2576,7 @@ def _reference_provenance_report(
                     "reference": index,
                     "duplicate_of": duplicate_of,
                 }
-                if is_v21:
+                if is_reference_pool_contract:
                     duplicate_record["reference_id"] = reference_id
                 same_lesson_duplicates.append(duplicate_record)
             else:
@@ -2568,7 +2585,7 @@ def _reference_provenance_report(
                         seen_references[duplicate_key] = index
             if _reference_looks_like_resource_only(text):
                 invalid_resource_only.append({"lesson": lesson_id, "reference": index})
-            if is_v21 and reference_looks_like_placeholder(reference.get("title", text)):
+            if is_reference_pool_contract and reference_looks_like_placeholder(reference.get("title", text)):
                 placeholder_items.append({"lesson": lesson_id, "reference": index, "reference_id": reference_id})
             if source_kind in {"provided", "verified_public"} and not evidence_present:
                 missing_evidence.append(
@@ -2581,14 +2598,14 @@ def _reference_provenance_report(
                     or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence_text)
                 ):
                     invalid_verified_public.append({"lesson": lesson_id, "reference": index})
-            generic_identity = reference.get("title", text) if is_v21 else text
+            generic_identity = reference.get("title", text) if is_reference_pool_contract else text
             if source_kind == "generic" and (
                 REFERENCE_SPECIFIC_PATTERN.search(str(generic_identity))
                 or re.search(r"《[^》]{2,}》", str(generic_identity))
                 or re.search(r"(?:isbn|gb\s*[/-]?\s*t|出版社|作者|标准编号|文件编号|版次)", str(generic_identity), re.IGNORECASE)
             ):
                 invalid_generic.append({"lesson": lesson_id, "reference": index})
-            if is_v21 and textbook_key and reference_identity(reference) == textbook_key:
+            if is_reference_pool_contract and textbook_key and reference_identity(reference) == textbook_key:
                 textbook_overlap.append({"lesson": lesson_id, "reference": index, "reference_id": reference_id})
         by_lesson[lesson_id] = entries
     return {
@@ -2604,8 +2621,10 @@ def _reference_provenance_report(
         "same_lesson_duplicates": same_lesson_duplicates,
         "unresolved_ids": unresolved_ids,
         "placeholder_items": placeholder_items,
+        "empty_reference_lessons": empty_reference_lessons,
         "textbook_overlap": textbook_overlap,
         "textbook_overlap_allowed": bool((data or {}).get("allow_textbook_as_reference", False)),
+        "catalog_source_regions": catalog_source_regions,
         "reuse_frequency": dict(sorted(reuse_frequency.items())),
     }
 
@@ -2613,7 +2632,8 @@ def _reference_provenance_report(
 def _practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     """Summarize Practice Task Contract V1 handoff gates for Acceptance V2."""
 
-    if data.get("content_contract_version") != "2.1":
+    version = data.get("content_contract_version")
+    if version not in {"2.1", "2.2"}:
         return {
             "status": "not_applicable",
             "contract_version": None,
@@ -2651,7 +2671,12 @@ def _practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
             continue
         for lesson_id in task.get("lesson_ids", []):
             lesson = lesson_map.get(str(lesson_id))
-            if lesson is None or lesson.get("lesson_type") == "theory":
+            invalid_link = lesson is None or (
+                version == "2.1" and lesson.get("lesson_type") == "theory"
+            ) or (
+                version == "2.2" and lesson is not None and lesson.get("lesson_type") != "theory"
+            )
+            if invalid_link:
                 invalid_links.append(
                     {"task_id": str(task.get("task_id")), "lesson_id": str(lesson_id)}
                 )
@@ -3110,6 +3135,20 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
 
     reference_provenance = _reference_provenance_report(lessons, lesson_ids, data)
     practice_handoff = _practice_handoff_report(data)
+    if data.get("content_contract_version") == "2.2":
+        for lesson_id in reference_provenance.get("empty_reference_lessons", []):
+            errors.append(f"{lesson_id}.reference_ids must contain at least one citable reference")
+        regions = reference_provenance.get("catalog_source_regions", {})
+        known_region_count = int(regions.get("domestic", 0)) + int(regions.get("foreign", 0))
+        if known_region_count:
+            domestic_share = int(regions.get("domestic", 0)) / known_region_count
+            if domestic_share < 0.7:
+                warnings.append(
+                    f"reference catalog domestic share is below 70%: {domestic_share:.1%}; "
+                    "review foreign-source use and domestic availability"
+                )
+        elif lessons:
+            warnings.append("reference catalog has no domestic/foreign source-region signal")
     for item in reference_provenance["missing_evidence"]:
         errors.append(
             f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence"
@@ -3145,9 +3184,14 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     for item in practice_handoff.get("unresolved_task_ids", []):
         errors.append(f"{item['lesson_id']}.practice_task_ids unresolved task ID {item['task_id']}")
     for item in practice_handoff.get("invalid_practice_lesson_links", []):
-        errors.append(
-            f"practice task {item['task_id']} cannot link to theory or unknown lesson {item['lesson_id']}"
-        )
+        if data.get("content_contract_version") == "2.2":
+            errors.append(
+                f"practice task {item['task_id']} must link only to known theory lesson {item['lesson_id']}"
+            )
+        else:
+            errors.append(
+                f"practice task {item['task_id']} cannot link to theory or unknown lesson {item['lesson_id']}"
+            )
     if practice_handoff.get("status") == "failed" and not practice_handoff.get("unresolved_task_ids") and not practice_handoff.get("invalid_practice_lesson_links"):
         errors.append("practice task hours do not match delivery_plan.practice_hours")
 
@@ -3168,8 +3212,8 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "capability_stage_vocabulary": list(CAPABILITY_STAGES),
         "completeness": completeness,
         "reference_metrics": {
-            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") == "2.1" else False),
-            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") == "2.1" else None,
+            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") in {"2.1", "2.2"} else False),
+            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") in {"2.1", "2.2"} else None,
             "lessons_with_references": sum(1 for lesson in lessons if lesson_references(data, lesson)),
             "lessons_without_references": sum(1 for lesson in lessons if not lesson_references(data, lesson)),
             "reuse_frequency": reference_provenance.get("reuse_frequency", {}),
@@ -3177,6 +3221,26 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             "textbook_overlap_count": len(reference_provenance.get("textbook_overlap", [])),
             "same_lesson_duplicate_count": len(reference_provenance.get("same_lesson_duplicates", [])),
             "unresolved_id_count": len(reference_provenance.get("unresolved_ids", [])),
+            "empty_reference_lesson_count": len(reference_provenance.get("empty_reference_lessons", [])),
+            "generic_reference_count": sum(
+                1
+                for reference in data.get("reference_pool", [])
+                if isinstance(reference, dict) and reference.get("source_kind") == "generic"
+            ),
+            "domestic_source_count": reference_provenance.get("catalog_source_regions", {}).get("domestic", 0),
+            "foreign_source_count": reference_provenance.get("catalog_source_regions", {}).get("foreign", 0),
+            "unknown_source_count": reference_provenance.get("catalog_source_regions", {}).get("unknown", 0),
+            "domestic_share": (
+                reference_provenance.get("catalog_source_regions", {}).get("domestic", 0)
+                / max(
+                    1,
+                    reference_provenance.get("catalog_source_regions", {}).get("domestic", 0)
+                    + reference_provenance.get("catalog_source_regions", {}).get("foreign", 0),
+                )
+                if reference_provenance.get("catalog_source_regions", {}).get("domestic", 0)
+                + reference_provenance.get("catalog_source_regions", {}).get("foreign", 0)
+                else None
+            ),
         },
         "practice_handoff": {
             "status": practice_handoff.get("status"),

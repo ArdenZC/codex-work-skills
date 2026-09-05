@@ -102,6 +102,10 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("recommended, not required", canonical)
         self.assertRegex(canonical, r"一次(?:性)?(?:.*)确认")
         self.assertIn("course_reference_pool", canonical)
+        self.assertIn("Content Contract 2.2", canonical)
+        self.assertIn("Lesson DOCX", canonical)
+        self.assertIn("Practice Task", canonical)
+        self.assertIn("source_region", canonical)
         self.assertIn("reference_reusable", canonical)
         self.assertIn("references", canonical)
         self.assertIn("resources", canonical)
@@ -162,7 +166,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
         self.assertEqual(
-            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.1.1"),
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.0"),
             1,
         )
 

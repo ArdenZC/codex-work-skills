@@ -1,4 +1,4 @@
-"""Pure formatters for Lesson Content V2/V2.1.
+"""Pure formatters for Lesson Content V2/V2.1/V2.2.
 
 This module deliberately does not invent teaching language.  It only maps
 validated JSON values to the text representations used by the existing Word
@@ -14,8 +14,8 @@ from decimal import Decimal
 from typing import Any, Iterable
 
 
-CONTENT_CONTRACT_VERSION = "2.1"
-COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1")
+CONTENT_CONTRACT_VERSION = "2.2"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2")
 LEGACY_CONTENT_CONTRACT_VERSION = "2.0"
 EVALUATION_SCORE_MIN = Decimal("85")
 EVALUATION_SCORE_MAX = Decimal("96")
@@ -200,7 +200,7 @@ def reference_looks_like_placeholder(text: Any) -> bool:
 
 
 def format_reference(reference: dict[str, Any]) -> str:
-    """Format a 2.1 reference as formal citation text, omitting evidence."""
+    """Format a reference as formal citation text, omitting internal evidence."""
 
     if "text" in reference and "reference_type" not in reference:
         return _clean(reference.get("text", ""))
@@ -227,7 +227,7 @@ def format_reference(reference: dict[str, Any]) -> str:
 def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> list[dict[str, Any]]:
     """Resolve a lesson's renderable references for either contract version."""
 
-    if not data or data.get("content_contract_version") != "2.1":
+    if not data or data.get("content_contract_version") not in {"2.1", "2.2"}:
         return list(lesson.get("references", []))
     pool = {
         str(reference.get("reference_id")): reference

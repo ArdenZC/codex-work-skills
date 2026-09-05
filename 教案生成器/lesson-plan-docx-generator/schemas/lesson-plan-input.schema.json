@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.1.json",
-  "title": "Lesson Content V2/V2.1 input",
+  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.2.json",
+  "title": "Lesson Content V2/V2.1/V2.2 input",
   "type": "object",
   "additionalProperties": false,
   "required": ["content_contract_version", "course_name", "major", "audience", "default_hours", "total_hours", "lessons"],
   "properties": {
-    "content_contract_version": {"enum": ["2.0", "2.1"]},
+    "content_contract_version": {"enum": ["2.0", "2.1", "2.2"]},
     "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
     "major": {"type": "string", "minLength": 1, "maxLength": 32},
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
@@ -19,18 +19,36 @@
     "artifact_plan": {"$ref": "#/$defs/artifactPlan"},
     "practice_task_contract": {"$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"},
     "outline": {"type": "array", "items": {"$ref": "#/$defs/outlineItem"}},
-    "lessons": {"type": "array", "minItems": 1}
+    "lessons": {"type": "array"}
   },
   "allOf": [
     {
       "if": {"properties": {"content_contract_version": {"const": "2.0"}}, "required": ["content_contract_version"]},
-      "then": {"properties": {"lessons": {"items": {"$ref": "#/$defs/lesson"}}}}
+      "then": {
+        "properties": {
+          "artifact_plan": {"$ref": "#/$defs/artifactPlanLegacy"},
+          "lessons": {"minItems": 1, "items": {"$ref": "#/$defs/lesson"}}
+        }
+      }
     },
     {
       "if": {"properties": {"content_contract_version": {"const": "2.1"}}, "required": ["content_contract_version"]},
       "then": {
         "required": ["delivery_plan", "course_materials", "reference_pool", "artifact_plan", "outline"],
-        "properties": {"lessons": {"items": {"$ref": "#/$defs/lessonV21"}}}
+        "properties": {
+          "artifact_plan": {"$ref": "#/$defs/artifactPlanLegacy"},
+          "lessons": {"minItems": 1, "items": {"$ref": "#/$defs/lessonV21"}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"content_contract_version": {"const": "2.2"}}, "required": ["content_contract_version"]},
+      "then": {
+        "required": ["delivery_plan", "course_materials", "reference_pool", "artifact_plan", "outline"],
+        "properties": {
+          "reference_pool": {"items": {"$ref": "#/$defs/referencePoolItemV22"}},
+          "lessons": {"minItems": 0, "items": {"$ref": "#/$defs/lessonV22"}}
+        }
       }
     }
   ],
@@ -230,8 +248,21 @@
         "edition": {"type": "string", "minLength": 1, "maxLength": 80},
         "publisher": {"type": "string", "minLength": 1, "maxLength": 160},
         "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
+        "source_region": {"type": "string", "enum": ["domestic", "foreign", "unknown"]},
         "evidence": {"type": ["string", "null"], "maxLength": 800}
       }
+    },
+    "referencePoolItemV22": {
+      "allOf": [
+        {"$ref": "#/$defs/referencePoolItem"},
+        {
+          "type": "object",
+          "required": ["source_region"],
+          "properties": {
+            "source_region": {"type": "string", "enum": ["domestic", "foreign", "unknown"]}
+          }
+        }
+      ]
     },
     "textbook": {
       "type": "object",
@@ -257,9 +288,18 @@
       "additionalProperties": false,
       "required": ["lesson_plans", "practice_work_orders"],
       "properties": {
-        "lesson_plans": {"const": true},
+        "lesson_plans": {"type": "boolean"},
         "practice_work_orders": {"type": "boolean"}
       }
+    },
+    "artifactPlanLegacy": {
+      "allOf": [
+        {"$ref": "#/$defs/artifactPlan"},
+        {
+          "type": "object",
+          "properties": {"lesson_plans": {"const": true}}
+        }
+      ]
     },
     "outlineItem": {
       "type": "object",
@@ -306,6 +346,23 @@
         "evaluation": {"$ref": "#/$defs/evaluation"},
         "reflection": {"$ref": "#/$defs/reflection"}
       }
+    },
+    "lessonV22": {
+      "allOf": [
+        {"$ref": "#/$defs/lessonV21"},
+        {
+          "type": "object",
+          "required": ["reference_ids"],
+          "properties": {
+            "reference_ids": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}
+            }
+          }
+        }
+      ]
     }
   }
 }

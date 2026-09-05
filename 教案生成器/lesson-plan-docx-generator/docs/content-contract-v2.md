@@ -1,8 +1,39 @@
-# Lesson Content V2 / V2.1
+# Lesson Content V2 / V2.1 / V2.2
+
+## 2.2 production addendum
+
+Content Contract `2.2` is the current production contract. Runtime continues to read `2.1` and `2.0` inputs for compatibility; those versions retain their existing lesson semantics. The default Word template remains `lesson-plan v1.1.2`, and the Practice Task Contract remains V1.
+
+Before planning, the Agent enters `INTAKE_PENDING` and makes exactly one concentrated Chinese confirmation containing course name, major, audience, and total hours. The same confirmation displays theory hours, practice hours, organization, default single-lesson duration of 2 hours, textbook, auxiliary references, and work-order preference. Textbook confirmation is recommended but not blocking. After the user confirms, the Agent enters `INTAKE_CONFIRMED` and completes retrieval, course outline, Content 2.2, Practice Task handoff, QA, and DOCX without asking again about outline, projects/tasks, scores, template, output directory, or whether to start DOCX generation. Only a user change, an unresolvable direct conflict, or a real safety/file-overwrite decision may pause the workflow again.
+
+Content 2.2 separates artifact ownership:
+
+```text
+theory hours  -> theory Lessons -> Lesson DOCX
+practice hours -> Practice Task Contract V1 -> WorkOrder Content/DOCX
+```
+
+The invariants are:
+
+```text
+sum(lesson.hours) == delivery_plan.theory_hours
+sum(practice_tasks.practice_hours) == delivery_plan.practice_hours
+theory_hours + practice_hours == total_hours
+```
+
+Every 2.2 Lesson is a theory Lesson with `practice_hours=0`; practice does not create a practice Lesson DOCX. `delivery_plan.mode` describes organization only and does not change this count/hour contract. `integrated_lessons` means artifact-level integration between theory Lessons and related practice tasks, not a fixed 1+1 split or a requirement to turn all course hours into Lesson DOCX.
+
+The number of theory Lessons is `ceil(theory_hours / default_hours)`. The final Lesson uses the true remainder, so 21 theory hours at default 2 means ten 2-hour Lessons plus one 1-hour Lesson. Hours are never rounded to 20 or 22; if the selected template/contract cannot express the remainder, generation fails closed. Project count, Lesson count, Practice Task count, and WorkOrder count are independently planned; WorkOrder count is never derived mechanically from practice hours/default hours.
+
+For every theory Lesson, `reference_ids` must select at least one citable source, normally one to three. Before lesson authoring the Agent forms a course-level `reference_catalog`/`course_reference_pool` planning concept; the persisted contract field remains `reference_pool`. References are concrete readable/citable documents or sources, while `resources` are teaching tools, equipment, environments, and materials. The textbook is a separate `course_materials.textbook` object and is excluded from references unless `allow_textbook_as_reference=true` is explicit.
+
+Reference priority is domestic-first: user-provided material, domestic published books/monographs, domestic university references, national/industry/occupational standards and authoritative domestic documents, then foreign classics or international sources when relevant. `source_region` is `domestic`, `foreign`, or `unknown`; a catalog domestic share below 70% is a quality warning, not a hard failure. `source_kind` remains `provided`, `generic`, or `verified_public`: provided and verified public sources need evidence, generic sources must stay document-like and must not invent authors, publishers, ISBNs, editions, years, or standard numbers. If no auxiliary material is supplied, the Agent still builds a credible catalog and never emits a shortage placeholder.
+
+The same reference may be reused across any number of Lessons. It is `reference_reusable` and is excluded from exact/item/sentence/field/structural/frequency/whole-course repetition hard-fails. Duplicate references within one Lesson still fail. A resource-only item such as a projector, PPT, MySQL Workbench, blood-pressure monitor, database server, nursing model, or computer room is not a reference; a document such as `MySQL 8.0 Reference Manual` remains valid. Reference repetition is not teaching-body repetition: never fabricate different bibliographic identities merely to lower a course repetition rate.
 
 ## 2.1 production addendum
 
-Content Contract `2.1` is the current production contract. Runtime continues to read `2.0` inputs for compatibility; a 2.0 input keeps its lesson-level `references` objects and does not get silently rewritten. The default Word template remains `lesson-plan v1.1.2`.
+Content Contract `2.1` is the compatibility contract below. Runtime continues to read `2.0` inputs; a 2.0 input keeps its lesson-level `references` objects and does not get silently rewritten. The default Word template remains `lesson-plan v1.1.2`.
 
 Before planning, the Agent enters `INTAKE_PENDING` and makes one concentrated, Chinese-language confirmation containing the course name, major, audience, and total hours, while also displaying theory hours, practice hours, theory/practice organization, default single-lesson duration of 2 hours, textbook, auxiliary references, and whether practice work orders are wanted. Unknown theory/practice structure, organization, and work-order preference remain pending; no 50/50, integrated, or false default is allowed. After the user confirms, the Agent enters `INTAKE_CONFIRMED` and does not ask again about outline, template, output directory, or DOCX generation. The internal field mapping is defined by `intake-contract-v2.1.1.json`.
 
@@ -26,7 +57,7 @@ The same document reference may be reused in every lesson. Cross-lesson referenc
 
 When `delivery_plan.practice_hours` is positive, `practice_task_contract` uses the independent [Practice Task Contract V1](practice-task-contract-v1.md) schema and must reconcile task hours and lesson links. If no work-order generator is available, the Lesson generator writes `practice-task-contract.json` as a handoff only.
 
-Content Contract V2 (`2.0`) describes the compatibility teaching-content contract, while Content Contract `2.1` is the current production contract. Both are independent of the Word template version (`1.1.2` by default). The production generator accepts a complete V2.1 document or a complete V2.0 compatibility document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message. A 2.0 document is not silently rewritten to 2.1.
+Content Contract V2 (`2.0`) describes the compatibility teaching-content contract, Content Contract `2.1` is the previous production contract, and Content Contract `2.2` is current. All are independent of the Word template version (`1.1.2` by default). The production generator accepts a complete V2.2 document or a complete compatible V2.1/V2.0 document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message. A compatibility document is not silently rewritten to 2.2.
 
 ## Course fields
 
