@@ -460,16 +460,37 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
         for lesson_type in ("theory", "practice", "integrated")
     }
     if version == "2.2":
+        artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
+        workorders_requested = bool(artifact_plan.get("practice_work_orders"))
         contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
         tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []
         lesson_hours = sum((_number(lesson.get("hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
         task_hours = sum((_number(task.get("practice_hours")) or 0) for task in tasks if isinstance(task, Mapping))
+        declared_practice_hours = expected["practice_hours"] or 0
+        practice_hours = task_hours if workorders_requested else declared_practice_hours
+        default_hours = _number(data.get("default_hours")) or 0
+        expected_lesson_count = (
+            math.ceil((expected["theory_hours"] or 0) / default_hours)
+            if default_hours > 0
+            else None
+        )
+        expected_task_count = (
+            int(declared_practice_hours / 2)
+            if workorders_requested
+            and declared_practice_hours > 0
+            and declared_practice_hours.is_integer()
+            and int(declared_practice_hours) % 2 == 0
+            else 0 if not workorders_requested else None
+        )
         actual = {
-            "total_hours": lesson_hours + task_hours,
+            "total_hours": lesson_hours + practice_hours,
             "theory_hours": sum((_number(lesson.get("theory_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping)),
-            "practice_hours": task_hours,
+            "practice_hours": practice_hours,
             "lesson_hours": lesson_hours,
             "practice_task_hours": task_hours,
+            "practice_work_orders_requested": workorders_requested,
+            "practice_task_count": len(tasks),
+            "workorder_count": len(tasks) if workorders_requested else 0,
         }
         mismatches = [
             key for key in ("total_hours", "theory_hours", "practice_hours")
@@ -477,6 +498,12 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
         ]
         if expected["theory_hours"] is None or not math.isclose(expected["theory_hours"], actual["lesson_hours"], abs_tol=0.01):
             mismatches.append("lesson_hours")
+        if expected_lesson_count is None or len(lessons) != expected_lesson_count:
+            mismatches.append("lesson_count")
+        if expected_task_count is not None and len(tasks) != expected_task_count:
+            mismatches.append("practice_task_count")
+        if expected_task_count is None and workorders_requested:
+            mismatches.append("practice_hours_unit")
         return {
             "status": "PASS" if not mismatches else "FAIL",
             "contract_version": "2.2",
@@ -484,6 +511,9 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
             "expected": expected,
             "actual": actual,
             "lesson_counts": counts,
+            "expected_lesson_count": expected_lesson_count,
+            "expected_practice_task_count": expected_task_count,
+            "expected_workorder_count": expected_task_count if workorders_requested else 0,
             "mismatches": mismatches,
             "consistency": not mismatches,
         }
@@ -600,6 +630,51 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
         return _json_safe(existing)
     if data.get("content_contract_version") not in {"2.1", "2.2"}:
         return {"status": "not_applicable", "task_count": 0, "hour_consistent": True}
+    if data.get("content_contract_version") == "2.2":
+        artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
+        workorders_requested = bool(artifact_plan.get("practice_work_orders"))
+        expected = _number((data.get("delivery_plan") or {}).get("practice_hours")) or 0
+        contract_value = data.get("practice_task_contract")
+        if not workorders_requested and contract_value is None:
+            return {
+                "status": "not_applicable",
+                "workorders_requested": False,
+                "contract_required": False,
+                "task_count": 0,
+                "expected_task_count": 0,
+                "expected_workorder_count": 0,
+                "expected_practice_hours": expected,
+                "actual_practice_hours": None,
+                "hour_consistent": True,
+            }
+        contract = contract_value if isinstance(contract_value, Mapping) else {}
+        tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []
+        actual = sum((_number(item.get("practice_hours")) or 0) for item in tasks if isinstance(item, Mapping))
+        even = expected > 0 and expected.is_integer() and int(expected) % 2 == 0
+        expected_task_count = int(expected / 2) if even else None
+        invalid_unit = any(
+            not math.isclose((_number(item.get("practice_hours")) or 0), 2, abs_tol=0.01)
+            for item in tasks
+            if isinstance(item, Mapping)
+        )
+        task_count_ok = expected_task_count is not None and len(tasks) == expected_task_count
+        hours_ok = math.isclose(expected, actual, abs_tol=0.01) and math.isclose(
+            expected, _number(contract.get("practice_hours")) or 0, abs_tol=0.01
+        )
+        return {
+            "status": "PASS" if even and task_count_ok and not invalid_unit and hours_ok else "FAIL",
+            "workorders_requested": workorders_requested,
+            "contract_required": workorders_requested,
+            "task_count": len(tasks),
+            "expected_task_count": expected_task_count,
+            "expected_workorder_count": expected_task_count,
+            "expected_practice_hours": expected,
+            "actual_practice_hours": _number(contract.get("practice_hours")) if contract else None,
+            "sum_task_practice_hours": actual,
+            "invalid_task_unit": invalid_unit,
+            "task_count_consistent": task_count_ok,
+            "hour_consistent": hours_ok,
+        }
     contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
     expected = _number((data.get("delivery_plan") or {}).get("practice_hours")) or 0
     tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []

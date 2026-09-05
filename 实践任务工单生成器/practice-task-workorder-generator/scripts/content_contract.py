@@ -126,7 +126,28 @@ def load_practice_task_contract(path: Path) -> dict[str, Any]:
     if len(task_ids) != len(set(task_ids)):
         raise WorkOrderContractError("Practice Task Contract V1 task_id values must be unique")
     total_hours = _as_nonnegative_hours(value["practice_hours"], "practice_hours")
-    task_hours = sum(_as_positive_hours(task["practice_hours"], f"{task['task_id']}.practice_hours") for task in tasks)
+    if value.get("granularity") != "per_task":
+        raise WorkOrderContractError(
+            "Practice Task Contract V1 granularity must be per_task for WorkOrder generation"
+        )
+    if total_hours <= 0 or total_hours % 2:
+        raise WorkOrderContractError(
+            "Practice Task Contract V1 practice_hours must be a positive even number"
+        )
+    expected_task_count = total_hours // 2
+    if len(tasks) != expected_task_count:
+        raise WorkOrderContractError(
+            "Practice Task Contract V1 task count must equal practice_hours / 2: "
+            f"expected {expected_task_count}, got {len(tasks)}"
+        )
+    task_hours = 0
+    for task in tasks:
+        item_hours = _as_positive_hours(task["practice_hours"], f"{task['task_id']}.practice_hours")
+        if item_hours != 2:
+            raise WorkOrderContractError(
+                f"{task['task_id']}.practice_hours must equal 2 for one WorkOrder; got {item_hours}"
+            )
+        task_hours += item_hours
     if total_hours != task_hours:
         raise WorkOrderContractError(
             f"Practice Task Contract V1 practice_hours must equal task sum: expected {total_hours}, got {task_hours}"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import hashlib
 import unicodedata
@@ -2646,6 +2647,186 @@ def _practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
         }
     plan = data.get("delivery_plan") or {}
     expected = plan.get("practice_hours", 0)
+    artifact_plan = data.get("artifact_plan") or {}
+    workorders_requested = bool(artifact_plan.get("practice_work_orders"))
+
+    if version == "2.2" and not workorders_requested:
+        contract = data.get("practice_task_contract")
+        lesson_task_ids = [
+            str(task_id)
+            for lesson in data.get("lessons", [])
+            if isinstance(lesson, dict)
+            for task_id in lesson.get("practice_task_ids", [])
+        ]
+        contract_not_allowed = contract is not None or bool(lesson_task_ids)
+        tasks = contract.get("tasks", []) if isinstance(contract, dict) else []
+        task_hours = sum(
+            float(task.get("practice_hours", 0))
+            for task in tasks
+            if isinstance(task, dict)
+        )
+        return {
+            "status": "failed" if contract_not_allowed else "not_applicable",
+            "contract_version": contract.get("contract_version") if isinstance(contract, dict) else None,
+            "granularity": contract.get("granularity") if isinstance(contract, dict) else None,
+            "task_count": len(tasks),
+            "expected_practice_hours": expected,
+            "actual_practice_hours": contract.get("practice_hours") if isinstance(contract, dict) else None,
+            "sum_task_practice_hours": task_hours,
+            "expected_task_count": 0,
+            "expected_workorder_count": 0,
+            "actual_workorder_count": 0,
+            "unresolved_task_ids": [],
+            "unlinked_task_ids": [],
+            "invalid_practice_lesson_links": [],
+            "invalid_task_hours": [],
+            "task_count_consistent": True,
+            "odd_practice_hours": False,
+            "hour_consistent": not contract_not_allowed,
+            "workorders_requested": False,
+            "contract_required": False,
+            "contract_not_allowed": contract_not_allowed,
+            "contract_errors": (
+                [
+                    "practice task contract and lesson.practice_task_ids are forbidden when "
+                    "artifact_plan.practice_work_orders=false"
+                ]
+                if contract_not_allowed
+                else []
+            ),
+            "artifact_plan": artifact_plan,
+        }
+
+    if version == "2.2" and workorders_requested:
+        expected_float = float(expected or 0)
+        expected_task_count = (
+            int(expected_float / 2)
+            if expected_float > 0 and expected_float.is_integer() and int(expected_float) % 2 == 0
+            else None
+        )
+        contract = data.get("practice_task_contract")
+        if not isinstance(contract, dict):
+            return {
+                "status": "failed",
+                "contract_version": None,
+                "granularity": None,
+                "task_count": 0,
+                "expected_practice_hours": expected,
+                "actual_practice_hours": None,
+                "sum_task_practice_hours": 0,
+                "expected_task_count": expected_task_count,
+                "expected_workorder_count": expected_task_count,
+                "actual_workorder_count": 0,
+                "unresolved_task_ids": [],
+                "unlinked_task_ids": [],
+                "invalid_practice_lesson_links": [],
+                "invalid_task_hours": [],
+                "task_count_consistent": False,
+                "odd_practice_hours": expected_task_count is None,
+                "hour_consistent": False,
+                "workorders_requested": True,
+                "contract_required": True,
+                "contract_not_allowed": False,
+                "contract_errors": [
+                    "practice_task_contract is required when artifact_plan.practice_work_orders=true"
+                ],
+                "artifact_plan": artifact_plan,
+            }
+
+        tasks = contract.get("tasks", []) if isinstance(contract.get("tasks"), list) else []
+        task_ids = {str(task.get("task_id")) for task in tasks if isinstance(task, dict)}
+        lesson_map = {
+            str(lesson.get("lesson_id")): lesson
+            for lesson in data.get("lessons", [])
+            if isinstance(lesson, dict)
+        }
+        unresolved: list[dict[str, Any]] = []
+        invalid_links: list[dict[str, Any]] = []
+        linked_ids: set[str] = set()
+        for lesson in data.get("lessons", []):
+            lesson_id = str(lesson.get("lesson_id"))
+            for task_id in lesson.get("practice_task_ids", []):
+                task_id = str(task_id)
+                linked_ids.add(task_id)
+                if task_id not in task_ids:
+                    unresolved.append({"lesson_id": lesson_id, "task_id": task_id})
+
+        task_hours = 0.0
+        invalid_task_hours: list[dict[str, Any]] = []
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            try:
+                item_hours = float(task.get("practice_hours", 0))
+            except (TypeError, ValueError):
+                item_hours = 0.0
+            task_hours += item_hours
+            if not math.isclose(item_hours, 2.0, abs_tol=1e-9):
+                invalid_task_hours.append(
+                    {
+                        "task_id": str(task.get("task_id")),
+                        "actual_hours": task.get("practice_hours"),
+                        "expected_hours": 2,
+                    }
+                )
+            for lesson_id in task.get("lesson_ids", []):
+                lesson = lesson_map.get(str(lesson_id))
+                if lesson is None:
+                    invalid_links.append(
+                        {"task_id": str(task.get("task_id")), "lesson_id": str(lesson_id)}
+                    )
+
+        try:
+            contract_hours = float(contract.get("practice_hours", 0))
+        except (TypeError, ValueError):
+            contract_hours = 0.0
+        odd_practice_hours = expected_task_count is None
+        task_count_consistent = expected_task_count is not None and len(tasks) == expected_task_count
+        hour_consistent = (
+            not odd_practice_hours
+            and math.isclose(contract_hours, expected_float, abs_tol=1e-9)
+            and math.isclose(task_hours, expected_float, abs_tol=1e-9)
+        )
+        contract_errors: list[str] = []
+        if contract.get("granularity") != "per_task":
+            contract_errors.append("practice_task_contract.granularity must be per_task")
+        if odd_practice_hours:
+            contract_errors.append("practice_hours must be divisible by 2 when practice_work_orders=true")
+        if not task_count_consistent:
+            contract_errors.append(
+                "practice task count must equal practice_hours / 2: "
+                f"expected {expected_task_count}, got {len(tasks)}"
+            )
+        if invalid_task_hours:
+            contract_errors.append("every practice task must contain exactly 2 practice hours")
+        if not hour_consistent:
+            contract_errors.append("practice task hours do not match delivery_plan.practice_hours")
+        errors = len(unresolved) + len(invalid_links) + len(contract_errors)
+        return {
+            "status": "failed" if errors else "passed",
+            "contract_version": contract.get("contract_version"),
+            "granularity": contract.get("granularity"),
+            "task_count": len(tasks),
+            "expected_practice_hours": expected,
+            "actual_practice_hours": contract.get("practice_hours"),
+            "sum_task_practice_hours": task_hours,
+            "expected_task_count": expected_task_count,
+            "expected_workorder_count": expected_task_count,
+            "actual_workorder_count": len(tasks),
+            "unresolved_task_ids": unresolved,
+            "unlinked_task_ids": sorted(task_ids - linked_ids),
+            "invalid_practice_lesson_links": invalid_links,
+            "invalid_task_hours": invalid_task_hours,
+            "task_count_consistent": task_count_consistent,
+            "odd_practice_hours": odd_practice_hours,
+            "hour_consistent": hour_consistent,
+            "workorders_requested": True,
+            "contract_required": True,
+            "contract_not_allowed": False,
+            "contract_errors": contract_errors,
+            "artifact_plan": artifact_plan,
+        }
+
     contract = data.get("practice_task_contract") or {}
     tasks = contract.get("tasks", []) if isinstance(contract, dict) else []
     task_ids = {str(task.get("task_id")) for task in tasks if isinstance(task, dict)}
@@ -3192,7 +3373,20 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             errors.append(
                 f"practice task {item['task_id']} cannot link to theory or unknown lesson {item['lesson_id']}"
             )
-    if practice_handoff.get("status") == "failed" and not practice_handoff.get("unresolved_task_ids") and not practice_handoff.get("invalid_practice_lesson_links"):
+    for message in practice_handoff.get("contract_errors", []):
+        errors.append(f"practice handoff: {message}")
+    for item in practice_handoff.get("invalid_task_hours", []):
+        errors.append(
+            f"practice task {item['task_id']} must use exactly 2 practice hours; "
+            f"got {item.get('actual_hours')}"
+        )
+    if (
+        practice_handoff.get("status") == "failed"
+        and not practice_handoff.get("unresolved_task_ids")
+        and not practice_handoff.get("invalid_practice_lesson_links")
+        and not practice_handoff.get("contract_errors")
+        and not practice_handoff.get("invalid_task_hours")
+    ):
         errors.append("practice task hours do not match delivery_plan.practice_hours")
 
     coverage = {
@@ -3245,9 +3439,12 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "practice_handoff": {
             "status": practice_handoff.get("status"),
             "task_count": practice_handoff.get("task_count", 0),
+            "expected_task_count": practice_handoff.get("expected_task_count"),
+            "expected_workorder_count": practice_handoff.get("expected_workorder_count"),
             "expected_practice_hours": practice_handoff.get("expected_practice_hours"),
             "actual_practice_hours": practice_handoff.get("actual_practice_hours"),
             "hour_consistent": practice_handoff.get("hour_consistent", True),
+            "workorders_requested": practice_handoff.get("workorders_requested"),
         },
         "non_it_contamination_terms": list(NON_IT_CONTAMINATION_TERMS),
         "non_it_contamination_scope": NON_IT_CONTAMINATION_SCOPE,

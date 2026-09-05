@@ -8,7 +8,7 @@ from pathlib import Path
 
 from tests.test_lesson_content_v21 import make_v21_fixture
 from tests.test_lesson_content_v2 import lesson_generator
-from tests.test_lesson_content_v22 import LESSON, make_v22_payload, run_script
+from tests.test_lesson_content_v22 import LESSON, assess_content_quality, make_v22_payload, run_script
 from tests.test_lesson_skill_hardening import lesson_acceptance
 
 
@@ -64,11 +64,23 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
         v21_empty["practice_task_contract"]["tasks"][0]["lesson_ids"] = []
         self.assert_rejected(v21_empty, "Content Contract 2.1")
 
-        v22_pure = make_v22_payload(theory_hours=0, practice_hours=8, lesson_count=0, task_hours=[8])
+        v22_pure = make_v22_payload(
+            theory_hours=0,
+            practice_hours=8,
+            lesson_count=0,
+            task_hours=[2, 2, 2, 2],
+            practice_work_orders=True,
+        )
         lesson_generator.validate_content_v2_input(v22_pure)
         self.assertEqual(v22_pure["practice_task_contract"]["tasks"][0]["lesson_ids"], [])
 
-        v22_linked = make_v22_payload(theory_hours=2, practice_hours=8, lesson_count=1, task_hours=[8])
+        v22_linked = make_v22_payload(
+            theory_hours=2,
+            practice_hours=8,
+            lesson_count=1,
+            task_hours=[2, 2, 2, 2],
+            practice_work_orders=True,
+        )
         lesson_generator.validate_content_v2_input(v22_linked)
         v22_empty = copy.deepcopy(v22_linked)
         v22_empty["practice_task_contract"]["tasks"][0]["lesson_ids"] = []
@@ -81,7 +93,6 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             theory_hours=0,
             practice_hours=8,
             lesson_count=0,
-            task_hours=[8],
             practice_work_orders=True,
         )
         with tempfile.TemporaryDirectory(prefix="lesson-22-hardening-pure-practice-") as temp_name:
@@ -123,6 +134,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
 
             handoff = json.loads((output / "practice-task-contract.json").read_text(encoding="utf-8"))
             self.assertEqual(handoff["practice_hours"], 8)
+            self.assertEqual(len(handoff["tasks"]), 4)
             self.assertEqual(sum(task["practice_hours"] for task in handoff["tasks"]), 8)
 
     def test_eight_hour_split_smoke_generates_lesson_and_practice_artifacts(self) -> None:
@@ -133,7 +145,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             practice_hours=4,
             lesson_count=2,
             lesson_hours=[2, 2],
-            task_hours=[4],
+            task_hours=[2, 2],
             practice_work_orders=True,
         )
         self.assertTrue(all(lesson["reference_ids"] for lesson in payload["lessons"]))
@@ -156,6 +168,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             self.assertEqual(handoff["practice_hours"], 4)
             self.assertEqual(sum(task["practice_hours"] for task in handoff["tasks"]), 4)
             self.assertEqual(handoff["tasks"][0]["lesson_ids"], ["L01", "L02"])
+            self.assertEqual(len(handoff["tasks"]), 2)
 
             report = lesson_acceptance.build_acceptance_report(
                 source,
@@ -210,6 +223,83 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             self.assertTrue(report["structural_hard_gates"]["lesson_docx_applicable"])
             self.assertEqual(gates["semantic_bookmarks"]["status"], "PASS")
             self.assertIn(gates["render_smoke"]["status"], {"PASS", "FAIL"})
+
+    def test_practice_hours_without_workorders_require_no_contract(self) -> None:
+        payload = make_v22_payload(
+            theory_hours=4,
+            practice_hours=20,
+            lesson_count=2,
+            practice_work_orders=False,
+        )
+        lesson_generator.validate_content_v2_input(payload)
+        report = lesson_acceptance.delivery_metrics(payload)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["actual"]["practice_hours"], 20)
+        self.assertEqual(report["actual"]["practice_task_count"], 0)
+        self.assertEqual(assess_content_quality(payload)["practice_handoff"]["status"], "not_applicable")
+        self.assertNotIn("practice_task_contract", payload)
+
+    def test_workorders_true_uses_exact_two_hour_task_units(self) -> None:
+        payload = make_v22_payload(
+            theory_hours=4,
+            practice_hours=20,
+            lesson_count=2,
+            practice_work_orders=True,
+        )
+        lesson_generator.validate_content_v2_input(payload)
+        tasks = payload["practice_task_contract"]["tasks"]
+        self.assertEqual(len(tasks), 10)
+        self.assertTrue(all(task["practice_hours"] == 2 for task in tasks))
+        self.assertEqual(
+            len({task["task_id"] for task in tasks}),
+            len(tasks),
+        )
+        self.assertEqual(assess_content_quality(payload)["practice_handoff"]["task_count"], 10)
+
+    def test_odd_practice_hours_fail_closed_when_workorders_are_enabled(self) -> None:
+        payload = make_v22_payload(
+            theory_hours=2,
+            practice_hours=14,
+            lesson_count=1,
+            practice_work_orders=True,
+        )
+        payload["total_hours"] = 17
+        payload["delivery_plan"]["total_hours"] = 17
+        payload["delivery_plan"]["practice_hours"] = 15
+        payload["practice_task_contract"]["practice_hours"] = 15
+        self.assert_rejected(payload, r"divisible by 2")
+
+    def test_workorder_preference_can_be_enabled_without_changing_confirmed_hours(self) -> None:
+        pending_choice = make_v22_payload(
+            theory_hours=4,
+            practice_hours=4,
+            lesson_count=2,
+            practice_work_orders=False,
+        )
+        enabled = copy.deepcopy(pending_choice)
+        enabled["artifact_plan"]["practice_work_orders"] = True
+        source_with_handoff = make_v22_payload(
+            theory_hours=4,
+            practice_hours=4,
+            lesson_count=2,
+            practice_work_orders=True,
+        )
+        enabled["practice_task_contract"] = source_with_handoff["practice_task_contract"]
+        enabled["lessons"][0]["practice_task_ids"] = [
+            task["task_id"] for task in enabled["practice_task_contract"]["tasks"]
+        ]
+        enabled["outline"][0]["practice_task_ids"] = list(enabled["lessons"][0]["practice_task_ids"])
+        lesson_generator.validate_content_v2_input(enabled)
+        self.assertEqual(
+            {
+                key: enabled["delivery_plan"][key]
+                for key in ("total_hours", "theory_hours", "practice_hours", "mode")
+            },
+            {
+                key: pending_choice["delivery_plan"][key]
+                for key in ("total_hours", "theory_hours", "practice_hours", "mode")
+            },
+        )
 
 
 if __name__ == "__main__":

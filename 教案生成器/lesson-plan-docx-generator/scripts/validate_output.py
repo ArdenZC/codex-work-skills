@@ -87,6 +87,22 @@ def parse_number(value: Any, label: str) -> float:
         raise ValueError(f"{label} is not numeric: {value!r}") from exc
 
 
+def practice_output_hours(data: dict[str, Any]) -> float:
+    """Account for declared practice hours without inventing a handoff artifact."""
+
+    plan = data.get("delivery_plan") or {}
+    declared = parse_number(plan.get("practice_hours", 0), "delivery_plan.practice_hours")
+    artifact_plan = data.get("artifact_plan") or {}
+    contract = data.get("practice_task_contract")
+    if bool(artifact_plan.get("practice_work_orders")) and isinstance(contract, dict):
+        return sum(
+            float(task.get("practice_hours", 0))
+            for task in contract.get("tasks", [])
+            if isinstance(task, dict)
+        )
+    return declared
+
+
 def parse_decimal(value: Any, label: str) -> Decimal:
     try:
         number = Decimal(str(value).strip())
@@ -777,14 +793,7 @@ def write_skipped_report(
         if is_v22
         else data.get("total_hours")
     )
-    practice_hours = 0.0
-    contract = data.get("practice_task_contract")
-    if is_v22 and isinstance(contract, dict):
-        practice_hours = sum(
-            float(task.get("practice_hours", 0))
-            for task in contract.get("tasks", [])
-            if isinstance(task, dict)
-        )
+    practice_hours = practice_output_hours(data) if is_v22 else 0.0
     report["checks"]["file_count"] = {"expected": len(data["lessons"]), "actual": len(list(out_dir.glob("*.docx")))}
     report["checks"]["total_hours"] = {
         "expected": expected_lesson_hours,
@@ -1181,16 +1190,8 @@ def validate_output_dir(
         }
 
     expected_total = data.get("total_hours")
-    practice_output_hours = 0.0
-    if is_v22:
-        contract = data.get("practice_task_contract")
-        if isinstance(contract, dict):
-            practice_output_hours = sum(
-                float(task.get("practice_hours", 0))
-                for task in contract.get("tasks", [])
-                if isinstance(task, dict)
-            )
-    course_actual_hours = total_hours + practice_output_hours if is_v22 else total_hours
+    practice_hours = practice_output_hours(data) if is_v22 else 0.0
+    course_actual_hours = total_hours + practice_hours if is_v22 else total_hours
     if expected_total is not None:
         try:
             if not math.isclose(course_actual_hours, parse_number(expected_total, "total_hours"), abs_tol=0.01):
@@ -1204,7 +1205,7 @@ def validate_output_dir(
             "expected": expected_total,
             "actual": course_actual_hours,
             "lesson_hours": total_hours,
-            "practice_hours": practice_output_hours,
+            "practice_hours": practice_hours,
         }
     checks["lessons"] = lesson_checks
     report["files_checked"] = len(files)

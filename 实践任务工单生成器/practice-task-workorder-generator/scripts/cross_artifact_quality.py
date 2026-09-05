@@ -179,11 +179,91 @@ def _check(name: str, passed: bool, detail: str, *, errors: list[str], checks: d
         errors.append(f"{name}: {detail}")
 
 
+def validate_cross_artifact_collection(
+    practice_task_contract: dict[str, Any],
+    work_order_content: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Validate the complete Lesson-task to WorkOrder one-to-one mapping."""
+
+    errors: list[str] = []
+    checks: dict[str, Any] = {}
+    contract = (
+        practice_task_contract.get("practice_task_contract")
+        if isinstance(practice_task_contract.get("practice_task_contract"), dict)
+        else practice_task_contract
+    )
+    source_tasks = contract.get("tasks") if isinstance(contract, dict) else None
+    source_ids = [
+        normalise_text(task.get("task_id"))
+        for task in source_tasks or []
+        if isinstance(task, dict)
+    ]
+    target_ids = [
+        normalise_text(item.get("practice_task_id"))
+        for item in work_order_content
+        if isinstance(item, dict)
+    ]
+    source_unique = len(source_ids) == len(set(source_ids))
+    target_unique = len(target_ids) == len(set(target_ids))
+    mapping_ok = (
+        bool(source_ids)
+        and bool(work_order_content)
+        and source_unique
+        and target_unique
+        and len(source_ids) == len(target_ids)
+        and set(source_ids) == set(target_ids)
+    )
+    _check(
+        "one_to_one_mapping",
+        mapping_ok,
+        f"practice_tasks={len(source_ids)}, work_orders={len(target_ids)}, "
+        f"same_ids={set(source_ids) == set(target_ids)}, "
+        f"unique_source={source_unique}, unique_work_orders={target_unique}",
+        errors=errors,
+        checks=checks,
+    )
+    reports: list[dict[str, Any]] = []
+    for index, item in enumerate(work_order_content):
+        if not isinstance(item, dict):
+            errors.append(f"work_order[{index}] must be an object")
+            continue
+        report = validate_cross_artifact(practice_task_contract, item)
+        reports.append(report)
+        if report.get("status") != "pass":
+            errors.extend(
+                f"work_order[{index}] {message}"
+                for message in report.get("errors", [])
+            )
+    return {
+        "status": "pass" if not errors else "fail",
+        "errors": errors,
+        "warnings": [],
+        "checks": checks,
+        "reports": reports,
+        "metrics": {
+            "practice_task_count": len(source_ids),
+            "work_order_count": len(target_ids),
+            "one_to_one": mapping_ok,
+        },
+    }
+
+
 def validate_cross_artifact(
     practice_task_contract: dict[str, Any],
     work_order_content: dict[str, Any] | list[dict[str, Any]],
 ) -> dict[str, Any]:
     """Return a cross-artifact report without mutating either input."""
+
+    if isinstance(work_order_content, list):
+        contract = (
+            practice_task_contract.get("practice_task_contract")
+            if isinstance(practice_task_contract.get("practice_task_contract"), dict)
+            else practice_task_contract
+        )
+        source_tasks = contract.get("tasks") if isinstance(contract, dict) else []
+        if len(work_order_content) != 1 or len(source_tasks) != 1:
+            return validate_cross_artifact_collection(practice_task_contract, work_order_content)
+        work_order_content = work_order_content[0]
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -225,6 +305,13 @@ def validate_cross_artifact(
     source_hours = _number(source.get("practice_hours"), "Practice Task practice_hours")
     target_hours = _number(downstream.get("practice_hours"), "Work Order practice_hours")
     _check("practice_hours", source_hours == target_hours, f"source={source_hours}, work_order={target_hours}", errors=errors, checks=checks)
+    _check(
+        "practice_hours_unit",
+        source_hours == 2 and target_hours == 2,
+        f"source={source_hours}, work_order={target_hours}; each mapping must represent exactly 2 hours",
+        errors=errors,
+        checks=checks,
+    )
     if target_hours > max(1, len(downstream.get("task_items", [])) * 4):
         warnings.append("workload review required: task breadth may exceed the declared practice hours")
 

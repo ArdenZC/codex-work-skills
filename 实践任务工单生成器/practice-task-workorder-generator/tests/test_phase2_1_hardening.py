@@ -328,7 +328,7 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
         text = "\n".join(path.read_text(encoding="utf-8") for path in sources)
         self.assertIn("practice_work_orders=true", text)
         self.assertIn("调用 WorkOrder Skill", text)
-        self.assertIn("WorkOrder Skill unavailable; handoff generated.", text)
+        self.assertIn("实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。", text)
         self.assertIn("不得 subprocess 调用 WorkOrder Python", text)
         self.assertIn("不伪造工单 DOCX", text)
         self.assertIn("practice_work_orders", text)

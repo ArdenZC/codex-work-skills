@@ -3,9 +3,9 @@ name: lesson-plan-docx-generator
 description: Generate projectized Chinese vocational-course lesson plan DOCX files from the Lesson Content Contract V2.2 (with V2.1/V2 compatibility), using the protected Word template, output QA, and optional local render smoke. Use for creating, converting, batching, or revising 教案、教学单元设计 and 实训教案 files.
 ---
 
-# 教案生成器 Skill 2.2.0
+# 教案生成器 Skill 2.2.1
 
-本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 Content 2.2 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。
+本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 Content 2.2 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。2.2.1 是 Lesson / WorkOrder 交付契约修正版，不修改 Word 模板、正文质量算法或 WorkOrder 评分合同。
 
 ## 任务入口与 Intake Runtime 2.1.1
 
@@ -33,7 +33,7 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 以上信息是否正确？如需调整，请一次性告诉我。
 ```
 
-教材是 recommended, not required：已提供文件或书名直接展示，未提供也不能阻断生成。`practice_work_orders` 未提供时保持待确认；只有用户明确选择后才联动 WorkOrder Skill。确认 `practice_work_orders=true` 后，Lesson Agent 在完成 Lesson QA/DOCX 和 Practice Task Contract handoff 后检测并调用可用的 WorkOrder Skill，由 WorkOrder Agent 创作完整 Content V1、执行 QA 并生成工单，最后统一交付；不可用时正常交付 Lesson 与 handoff，并明确 `WorkOrder Skill unavailable; handoff generated.`，不伪造工单 DOCX。
+教材是 recommended, not required：已提供文件或书名直接展示，未提供也不能阻断生成。`practice_work_orders` 未提供时保持待确认；只有用户明确选择后才决定是否联动 WorkOrder Skill。明确选择 false 时，实践学时仍计入课程总课时，但不生成 Practice Task Contract、handoff、WorkOrder 或实践侧额外文件。明确选择 true 后，Lesson Agent 在完成 Lesson QA/DOCX 和 Practice Task Contract handoff 后检测并调用可用的 WorkOrder Skill，由 WorkOrder Agent 创作完整 Content V1、执行 QA 并生成工单，最后统一交付；不可用时仅交付 Lesson 与 handoff，并明确 `实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`，不伪造工单 DOCX。
 
 Intake 未确认前，不得确定项目数量或名称、理论/实践课次结构、实践任务数量、逐课教学内容或生成 DOCX；除非用户已经明确提供了相应事实。确认一次后不得再次询问 outline、项目名称、逐课任务、评分、模板、输出目录或“是否开始生成 DOCX”。默认模板和默认输出规则直接采用。只有用户主动改变要求、确认信息出现无法合理解决的直接冲突，或遇到安全/文件覆盖等真正需要用户决定的事项，才允许再次停下。
 
@@ -70,11 +70,11 @@ key_point, difficult_point, teaching_methods, resources,
 implementation, evaluation, reflection
 ```
 
-2.0 输入仍读取课次内的 `references` 对象；2.1 兼容输入保留原有课次语义。2.2 只通过课程级 `reference_pool` 的 `reference_ids` 选取来源，且每个理论 Lesson 至少有 1 项 reference。2.2 的 Lesson DOCX 只承载理论：`sum(lesson.hours) == theory_hours`，所有 Lesson 为 `lesson_type=theory`、`practice_hours=0`；实践只能进入 Practice Task Contract / WorkOrder handoff。`practice_task_ids` 表示与理论课次关联的实践任务，不表示要生成实践 Lesson DOCX。`delivery_plan` 支持 `theory_only`、`practice_only`、`split_lessons`、`integrated_lessons`、`hybrid`，并且 `theory_hours + practice_hours == total_hours`、Practice Task 总学时与 `practice_hours` 相等。`integrated` 只描述 artifact-level 理实一体组织，不把实践小时塞进 Lesson DOCX，也不固定 1+1。
+2.0 输入仍读取课次内的 `references` 对象；2.1 兼容输入保留原有课次语义。2.2 只通过课程级 `reference_pool` 的 `reference_ids` 选取来源，且每个理论 Lesson 至少有 1 项 reference。2.2 的 Lesson DOCX 只承载理论：`sum(lesson.hours) == theory_hours`，所有 Lesson 为 `lesson_type=theory`、`practice_hours=0`；实践不进入 Lesson DOCX。仅当 `artifact_plan.practice_work_orders=true` 时，实践才进入 Practice Task Contract / WorkOrder handoff；false 时不得携带 contract 或任何任务 ID，`practice_task_ids` 仅保留 schema 要求的空数组。`practice_task_ids` 表示与理论课次关联的实践任务，不表示要生成实践 Lesson DOCX。`delivery_plan` 支持 `theory_only`、`practice_only`、`split_lessons`、`integrated_lessons`、`hybrid`，并且 `theory_hours + practice_hours == total_hours`。`integrated` 只描述 artifact-level 理实一体组织，不把实践小时塞进 Lesson DOCX，也不固定 1+1。
 
 `default_hours` 是 Agent 创建每课时使用的默认单课学时；某课显式提供的 `hours` 可以覆盖它，`default_hours` 不要求等于所有 `lessons.hours`。`default_hours`、`total_hours` 和每课 `hours` 都必须是正整数课时：数值可为 `1`、`2`、`4`、`12` 等整数，字符串可为 `"1"`、`"2"`、`"2.0"`；不接受空白字符串、分数、零、负数、`NaN` 或 `Infinity`。`unit` 使用项目化名称（如“项目一……”）；`progression` 包含 `prior_lesson_id`、具体的 `prior_learning`、`capability_stage`、`deliverable`、`next_bridge`。`capability_stage` 只能使用 `认知`、`理解`、`模仿`、`独立`、`综合`、`优化`、`迁移`，不要求机械线性递增。第一课的 `prior_lesson_id` 必须为 `null`，后续课次只能引用已经出现的前序课次。四课及以上不得所有能力阶段完全相同。
 
-`student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项。2.2 理论 Lesson 的 `reference_ids` 不得为空；空 reference 直接失败。纯实践课程可以没有 Lesson DOCX，但必须用 Practice Task handoff 表达实践学时，不能虚构理论课次。
+`student_analysis` 的 base/problems/strategies、三类 goals 均至少两项；teaching_content 至少三项；重难点均须有 content 和 strategy；methods 至少两项，resources 至少两项。2.2 理论 Lesson 的 `reference_ids` 不得为空；空 reference 直接失败。纯实践课程可以没有 Lesson DOCX；只有明确选择生成实践工单时才必须用 Practice Task handoff 表达实践学时，明确不生成时不创建 handoff，也不能虚构理论课次。
 
 每课 `implementation` 必须按以下九个 ID、固定顺序完整提供，且每个阶段的 `label`、`minutes`、`modality`、`content`、`teacher_actions`、`student_actions`、`objective` 全部来自 JSON：
 
@@ -100,7 +100,7 @@ after_class_improvement
 
 ### Practice Task Contract V1
 
-课程实践学时大于 0 时，2.2 输入必须提供 `practice_task_contract`，版本为 `1.0`，默认 `granularity: "per_task"`。任务字段是 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。`lesson_ids` 是提供理论准备/前置知识的理论 Lesson ID，可跨多个课次；纯实践课程没有理论 Lesson 时为空数组。不能假设一课一个任务，也不能假设 WorkOrder 数量等于实践小时数或 Lesson 数量。`practice_work_orders=true` 时，Lesson 只负责生成并 QA canonical handoff，再由已检测到的 WorkOrder Skill 通过 Agent orchestration 消费 handoff；Lesson Python generator 不得 subprocess 调用 WorkOrder Python，也不得自动映射成工单正文。WorkOrder Skill 不可用时只输出 `practice-task-contract.json` handoff，并明确 unavailable 状态，不伪造实践工单 DOCX。
+仅当 `artifact_plan.practice_work_orders=true` 时，2.2 输入必须提供 `practice_task_contract`，版本为 `1.0`、`granularity: "per_task"`。实践学时必须为正偶数；任务字段是 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。每个 Practice Task 固定 2 学时，任务数严格等于 `practice_hours / 2`；每个任务对应一个 WorkOrder，`project_id` 只用于分组，不能重新规划粒度。`lesson_ids` 是提供理论准备/前置知识的理论 Lesson ID，可跨多个课次；纯实践课程没有理论 Lesson 时为空数组。`practice_work_orders=false` 时不允许 contract 或 handoff，所有 `practice_task_ids` 必须保持为空数组。true 时 Lesson 只负责生成并 QA canonical handoff，再由已检测到的 WorkOrder Skill 通过 Agent orchestration 消费 handoff；Lesson Python generator 不得 subprocess 调用 WorkOrder Python，也不得自动映射成工单正文。WorkOrder Skill 不可用时只输出 `practice-task-contract.json` handoff，并明确 unavailable 状态，不伪造实践工单 DOCX。
 
 当前 2.2 完整规则见 `docs/content-contract-v2.md`；`examples/tasks-v21.example.json` 保留为 2.1 兼容示例，`examples/tasks.example.json` 保留为 2.0 兼容示例。字段说明见 `docs/content-contract-v2.md` 和 `docs/practice-task-contract-v1.md`，机器约束见 `schemas/lesson-plan-input.schema.json` 与仓库 canonical `schemas/shared/practice-task-contract.schema.json`；`schemas/practice-task-contract.schema.json` 仅为兼容入口。
 

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import copy
+from contextlib import redirect_stdout
 import hashlib
+import io
 import json
 import sys
 import tempfile
@@ -20,7 +22,7 @@ from check_dependencies import check_dependencies  # noqa: E402
 from content_contract import load_practice_task_contract, practice_tasks_to_content  # noqa: E402
 from content_quality import validate_collection, validate_content  # noqa: E402
 from cross_artifact_quality import validate_cross_artifact  # noqa: E402
-from generate_work_orders import DEFAULT_TEMPLATE, generate  # noqa: E402
+from generate_work_orders import DEFAULT_TEMPLATE, generate, main as generate_work_orders_main  # noqa: E402
 from install import install as install_skill  # noqa: E402
 from validate_output import validate_document  # noqa: E402
 
@@ -34,7 +36,7 @@ def _handoff(domain: str = "software") -> dict:
     return {
         "contract_version": "1.0",
         "course_name": "基础护理技术" if nursing else "数据库技术",
-        "practice_hours": 4,
+        "practice_hours": 2,
         "granularity": "per_task",
         "tasks": [
             {
@@ -42,7 +44,7 @@ def _handoff(domain: str = "software") -> dict:
                 "project_id": "P-REAL-01",
                 "title": "完成生命体征测量记录" if nursing else "设计客户订单数据模型",
                 "lesson_ids": ["L03", "L04"],
-                "practice_hours": 4,
+                "practice_hours": 2,
                 "scenario": "在护理模拟环境中完成测量并形成记录。" if nursing else "根据客户订单业务说明设计数据模型。",
                 "objectives": ["按规范完成记录" if nursing else "识别业务对象和关系"],
                 "required_inputs": ["操作任务单" if nursing else "订单业务说明"],
@@ -76,7 +78,7 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级", allow_non_production=True)[0]
         self.assertEqual(content["practice_task_id"], "PT-REAL-01")
         self.assertEqual(content["lesson_ids"], ["L03", "L04"])
-        self.assertEqual(content["practice_hours"], 4)
+        self.assertEqual(content["practice_hours"], 2)
         self.assertEqual(content["project_id"], "P-REAL-01")
         self.assertEqual(content["safety_or_compliance"], ["遵守数据保密要求"])
 
@@ -85,10 +87,12 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级", allow_non_production=True)[0]
         report = validate_cross_artifact(handoff, content)
         self.assertEqual(report["status"], "pass", report)
+        single_list_report = validate_cross_artifact(handoff, [content])
+        self.assertEqual(single_list_report["status"], "pass", single_list_report)
         for field, replacement in (
             ("practice_task_id", "PT-WRONG"),
             ("lesson_ids", ["L99"]),
-            ("practice_hours", 2),
+            ("practice_hours", 1),
             ("task_title", "编制会计凭证"),
             ("safety_or_compliance", []),
         ):
@@ -104,6 +108,76 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         nursing_content = practice_tasks_to_content(nursing, major="护理", class_or_audience="高职一年级", allow_non_production=True)[0]
         nursing_content["task_items"][0]["tools_or_materials"] = ["MySQL Workbench"]
         self.assertEqual(validate_cross_artifact(nursing, nursing_content)["status"], "fail")
+
+    def test_collection_cross_artifact_enforces_one_to_one_workorders(self) -> None:
+        handoff = _handoff()
+        second = copy.deepcopy(handoff["tasks"][0])
+        second["task_id"] = "PT-REAL-02"
+        second["project_id"] = "P-REAL-02"
+        second["title"] = "设计库存商品数据模型"
+        second["scenario"] = "根据库存商品业务资料设计数据模型。"
+        handoff["practice_hours"] = 4
+        handoff["tasks"] = [handoff["tasks"][0], second]
+        contents = practice_tasks_to_content(
+            handoff,
+            major="软件技术",
+            class_or_audience="高职一年级",
+            allow_non_production=True,
+        )
+        report = validate_cross_artifact(handoff, contents)
+        self.assertEqual(report["status"], "pass", report)
+        self.assertEqual(report["metrics"]["practice_task_count"], 2)
+        self.assertEqual(report["metrics"]["work_order_count"], 2)
+        self.assertTrue(report["checks"]["one_to_one_mapping"]["status"] == "pass")
+        missing = validate_cross_artifact(handoff, contents[:1])
+        self.assertEqual(missing["status"], "fail")
+        self.assertEqual(missing["checks"]["one_to_one_mapping"]["status"], "fail")
+
+    def test_cli_collection_handoff_emits_one_workorder_per_practice_task(self) -> None:
+        handoff = _handoff()
+        second = copy.deepcopy(handoff["tasks"][0])
+        second["task_id"] = "PT-REAL-02"
+        second["project_id"] = "P-REAL-02"
+        second["title"] = "设计库存商品数据模型"
+        second["scenario"] = "根据库存商品业务资料设计数据模型。"
+        handoff["practice_hours"] = 4
+        handoff["tasks"] = [handoff["tasks"][0], second]
+        contents = practice_tasks_to_content(
+            handoff,
+            major="软件技术",
+            class_or_audience="高职一年级",
+            allow_non_production=True,
+        )
+        with tempfile.TemporaryDirectory(prefix="workorder-phase2-cli-collection-") as temp_name:
+            root = Path(temp_name)
+            handoff_path = root / "handoff.json"
+            content_path = root / "content.json"
+            output_dir = root / "output"
+            handoff_path.write_text(json.dumps(handoff, ensure_ascii=False), encoding="utf-8")
+            content_path.write_text(json.dumps(contents, ensure_ascii=False), encoding="utf-8")
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                status = generate_work_orders_main(
+                    [
+                        "--content-json",
+                        str(content_path),
+                        "--practice-task-json",
+                        str(handoff_path),
+                        "--output-dir",
+                        str(output_dir),
+                        "--replace",
+                        "--json",
+                    ]
+                )
+            self.assertEqual(status, 0, stdout.getvalue())
+            report = json.loads(stdout.getvalue())
+            self.assertEqual(report["status"], "pass", report)
+            self.assertEqual(len(report["outputs"]), 2)
+            self.assertEqual(
+                {item["practice_task_id"] for item in report["outputs"]},
+                {"PT-REAL-01", "PT-REAL-02"},
+            )
+            self.assertEqual(len(list(output_dir.glob("*.docx"))), 2)
 
     def test_executability_deliverable_acceptance_domain_and_repetition_categories(self) -> None:
         valid = _valid_content()
@@ -124,6 +198,13 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         nursing["course_name"] = "基础护理技术"
         nursing["task_items"][0]["tools_or_materials"] = ["MySQL Workbench"]
         self.assertEqual(validate_content(nursing)["categories"]["cross_domain"], "fail")
+
+    def test_workorder_content_is_one_two_hour_practice_task(self) -> None:
+        invalid = _valid_content()
+        invalid["practice_hours"] = 4
+        report = validate_content(invalid)
+        self.assertEqual(report["categories"]["practice_hours_unit"], "fail")
+        self.assertTrue(any("exactly one 2-hour" in error for error in report["errors"]))
 
     def test_dynamic_one_to_five_rows_keep_scores_results_and_template_hash(self) -> None:
         before = _digest(DEFAULT_TEMPLATE)

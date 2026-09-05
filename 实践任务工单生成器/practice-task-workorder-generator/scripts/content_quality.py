@@ -227,6 +227,14 @@ def validate_content(content: dict[str, Any]) -> dict[str, Any]:
     cross_domain_errors: list[str] = []
     total_task_score = 0
     major_text = normalise_text(content.get("major", "")).casefold()
+    try:
+        practice_hours = int(content.get("practice_hours"))
+    except (TypeError, ValueError):
+        practice_hours = 0
+    if practice_hours != 2:
+        errors.append(
+            "practice_hours must equal 2 because one WorkOrder represents exactly one 2-hour Practice Task"
+        )
 
     for index, item in enumerate(content.get("task_items", []), start=1):
         for key in ("title", "description"):
@@ -314,6 +322,7 @@ def validate_content(content: dict[str, Any]) -> dict[str, Any]:
         "errors": errors,
         "warnings": [],
         "categories": {
+            "practice_hours_unit": "pass" if practice_hours == 2 else "fail",
             "executability": "fail" if executability_errors else "pass",
             "deliverable": "fail" if deliverable_errors else "pass",
             "acceptance": "fail" if acceptance_errors else "pass",
@@ -322,6 +331,7 @@ def validate_content(content: dict[str, Any]) -> dict[str, Any]:
             "score": "pass" if total_task_score == 90 else "fail",
         },
         "metrics": {
+            "practice_hours": practice_hours,
             "task_count": len(content.get("task_items", [])),
             "attendance_score": 10,
             "task_score": total_task_score,
