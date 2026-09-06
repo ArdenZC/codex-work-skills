@@ -554,7 +554,7 @@ class LessonContentV22Tests(unittest.TestCase):
             for path in (files[0], files[1], files[-1]):
                 document = Document(path)
                 references = bookmark_text(document, field_bookmark(manifest, "references"))
-                self.assertIn("数据结构（C语言版）", references)
+                self.assertIn("数据结构（C语言版·第2版）", references)
                 self.assertIn("数据结构课程标准", references)
                 self.assertNotIn("投影仪", references)
 
