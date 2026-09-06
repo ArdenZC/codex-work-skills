@@ -12,6 +12,7 @@
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
     "default_hours": {"$ref": "#/$defs/positiveNumber"},
     "total_hours": {"$ref": "#/$defs/positiveNumber"},
+    "confirmed_course_info": {"$ref": "#/$defs/confirmedCourseInfo"},
     "delivery_plan": {"$ref": "#/$defs/deliveryPlan"},
     "course_materials": {"$ref": "#/$defs/courseMaterials"},
     "reference_pool": {"type": "array", "items": {"$ref": "#/$defs/referencePoolItem"}},
@@ -231,10 +232,30 @@
         "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"}
       }
     },
+    "confirmedCourseInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["course_name", "major", "audience", "total_hours", "theory_hours", "practice_hours", "delivery_mode"],
+      "properties": {
+        "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
+        "major": {"type": "string", "minLength": 1, "maxLength": 32},
+        "audience": {"type": "string", "minLength": 1, "maxLength": 32},
+        "total_hours": {"$ref": "#/$defs/positiveNumber"},
+        "theory_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"},
+        "delivery_mode": {"type": "string", "enum": ["theory_only", "practice_only", "split_lessons", "integrated_lessons", "hybrid"]}
+      }
+    },
     "citationAuthors": {
       "type": "array",
       "maxItems": 12,
       "items": {"type": "string", "minLength": 1, "maxLength": 120}
+    },
+    "citationYear": {
+      "anyOf": [
+        {"type": "integer", "minimum": 1000, "maximum": 3000},
+        {"type": "string", "pattern": "^[12][0-9]{3}$"}
+      ]
     },
     "referencePoolItem": {
       "type": "object",
@@ -244,9 +265,11 @@
         "reference_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
         "reference_type": {"type": "string", "enum": ["book", "standard", "official_manual", "official_documentation", "guideline", "paper", "formal_course_document"]},
         "authors": {"$ref": "#/$defs/citationAuthors"},
+        "institution": {"type": "string", "minLength": 2, "maxLength": 160},
         "title": {"type": "string", "minLength": 2, "maxLength": 240},
         "edition": {"type": "string", "minLength": 1, "maxLength": 80},
         "publisher": {"type": "string", "minLength": 1, "maxLength": 160},
+        "year": {"$ref": "#/$defs/citationYear"},
         "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
         "source_region": {"type": "string", "enum": ["domestic", "foreign", "unknown"]},
         "evidence": {"type": ["string", "null"], "maxLength": 800}
@@ -260,7 +283,23 @@
           "required": ["source_region"],
           "properties": {
             "source_region": {"type": "string", "enum": ["domestic", "foreign", "unknown"]}
-          }
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"reference_type": {"const": "book"}}, "required": ["reference_type"]},
+              "then": {
+                "required": ["authors", "publisher", "year"],
+                "properties": {"authors": {"minItems": 1}}
+              }
+            },
+            {
+              "if": {"properties": {"reference_type": {"const": "formal_course_document"}}, "required": ["reference_type"]},
+              "then": {
+                "required": ["authors", "institution", "publisher"],
+                "properties": {"authors": {"minItems": 1}}
+              }
+            }
+          ]
         }
       ]
     },
@@ -273,6 +312,7 @@
         "title": {"type": "string", "minLength": 2, "maxLength": 240},
         "edition": {"type": "string", "minLength": 1, "maxLength": 80},
         "publisher": {"type": "string", "minLength": 1, "maxLength": 160},
+        "year": {"$ref": "#/$defs/citationYear"},
         "source_kind": {"type": "string", "enum": ["provided", "generic", "verified_public"]},
         "evidence": {"type": ["string", "null"], "maxLength": 800}
       }
