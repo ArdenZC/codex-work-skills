@@ -3813,6 +3813,10 @@ esac
         self.assertIn("browser_smoke.mjs", practice_class_text)
         self.assertIn("playwright", practice_class_text)
         self.assertIn("validate_practice.py", practice_class_text)
+        self.assertEqual(
+            {item["os"] for item in jobs["practice-class-html"]["strategy"]["matrix"]["include"]},
+            {"windows-latest", "macos-14"},
+        )
         gradebook_steps = "\n".join(step.get("run", "") for step in jobs["template-gradebook"]["steps"])
         self.assertIn("run_gradebook_shards.py", gradebook_steps)
         self.assertIn("--group contracts", gradebook_steps)
