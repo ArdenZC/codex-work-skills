@@ -241,8 +241,8 @@ def make_v22_payload(
 
     total_hours = theory_hours + practice_hours
     tasks: list[dict[str, object]] = []
-    if practice_hours:
-        task_hours = list(task_hours or [practice_hours])
+    if practice_work_orders:
+        task_hours = list(task_hours or [2] * (practice_hours // 2))
         if sum(task_hours) != practice_hours:
             raise AssertionError("fixture task hours must equal practice_hours")
         related_lessons = [lesson["lesson_id"] for lesson in lessons[: min(2, len(lessons))]]
@@ -293,7 +293,7 @@ def make_v22_payload(
         "outline": outline,
         "lessons": lessons,
     }
-    if practice_hours:
+    if practice_work_orders:
         payload["practice_task_contract"] = {
             "contract_version": "1.0",
             "course_name": course,
@@ -315,10 +315,10 @@ class LessonContentV22Tests(unittest.TestCase):
         self.assertEqual(report["status"], "passed", report)
         return report
 
-    def test_40h_and_64h_artifact_hours_are_decoupled_from_workorder_count(self) -> None:
+    def test_40h_and_64h_artifact_hours_have_fixed_two_hour_workorders(self) -> None:
         cases = (
-            (40, 20, 20, 10, [4, 6, 10], DB_SPECS),
-            (64, 32, 32, 16, [6, 10, 16], SOFTWARE_SPECS),
+            (40, 20, 20, 10, [2] * 10, DB_SPECS),
+            (64, 32, 32, 16, [2] * 16, SOFTWARE_SPECS),
         )
         for total, theory, practice, count, task_hours, specs in cases:
             with self.subTest(total=total):
@@ -328,16 +328,18 @@ class LessonContentV22Tests(unittest.TestCase):
                     practice_hours=practice,
                     lesson_count=count,
                     task_hours=task_hours,
+                    practice_work_orders=True,
                     specs=specs,
                 )
                 report = self.assert_valid_and_qa(payload)
                 self.assertEqual(len(payload["lessons"]), count)
                 self.assertEqual(sum(lesson["hours"] for lesson in payload["lessons"]), theory)
                 self.assertEqual(sum(task["practice_hours"] for task in payload["practice_task_contract"]["tasks"]), practice)
+                self.assertEqual(len(payload["practice_task_contract"]["tasks"]), practice // 2)
+                self.assertTrue(all(task["practice_hours"] == 2 for task in payload["practice_task_contract"]["tasks"]))
                 self.assertEqual(lesson_acceptance.delivery_metrics(payload)["status"], "PASS")
                 self.assertEqual(report["reference_provenance"]["reuse_policy"], "reference_reusable")
                 self.assertNotIn("project_count=8", json.dumps(payload, ensure_ascii=False))
-                self.assertNotEqual(len(payload["practice_task_contract"]["tasks"]), practice // 2)
 
     def test_theory_remainder_uses_ceil_and_one_hour_lesson(self) -> None:
         payload = make_v22_payload(theory_hours=21, lesson_hours=[2] * 10 + [1], specs=DB_SPECS)
@@ -363,7 +365,7 @@ class LessonContentV22Tests(unittest.TestCase):
             theory_hours=0,
             practice_hours=32,
             lesson_count=0,
-            task_hours=[8, 10, 14],
+            task_hours=[2] * 16,
             practice_work_orders=True,
             specs=NURSING_SPECS,
         )
@@ -371,17 +373,18 @@ class LessonContentV22Tests(unittest.TestCase):
         lesson_generator.validate_content_v2_input(practice)
         self.assertEqual(practice["lessons"], [])
         self.assertEqual(sum(task["practice_hours"] for task in practice["practice_task_contract"]["tasks"]), 32)
+        self.assertEqual(len(practice["practice_task_contract"]["tasks"]), 16)
         self.assertTrue(all(task["lesson_ids"] == [] for task in practice["practice_task_contract"]["tasks"]))
+        self.assertTrue(all(task["practice_hours"] == 2 for task in practice["practice_task_contract"]["tasks"]))
         self.assertEqual(report["practice_handoff"]["status"], "passed")
 
-    def test_pure_practice_output_keeps_handoff_without_lesson_docx(self) -> None:
+    def test_pure_practice_output_has_no_handoff_without_workorder_request(self) -> None:
         payload = make_v22_payload(
             course="护理技能实训",
             major="护理专业",
             theory_hours=0,
             practice_hours=32,
             lesson_count=0,
-            task_hours=[8, 10, 14],
             practice_work_orders=False,
             specs=NURSING_SPECS,
         )
@@ -403,8 +406,7 @@ class LessonContentV22Tests(unittest.TestCase):
             self.assertEqual(qa["checks"]["file_count"], {"expected": 0, "actual": 0})
             self.assertEqual(qa["checks"]["total_hours"]["actual"], 0)
             self.assertEqual(qa["checks"]["course_hours"]["actual"], 32)
-            handoff = json.loads((output / "practice-task-contract.json").read_text(encoding="utf-8"))
-            self.assertEqual(handoff["practice_hours"], 32)
+            self.assertFalse((output / "practice-task-contract.json").exists())
             self.assertEqual(list(output.glob("*.docx")), [])
 
     def test_same_reference_reuse_across_six_lessons_passes_for_all_source_kinds(self) -> None:
@@ -521,7 +523,7 @@ class LessonContentV22Tests(unittest.TestCase):
         self.assertTrue(report["item_duplicates"] or report["exact_duplicates"] or report["field_similarity_pairs"])
 
     def test_generated_docx_references_are_visible_in_first_middle_last_lessons(self) -> None:
-        payload = make_v22_payload(theory_hours=6, practice_hours=2, lesson_count=3, task_hours=[2], specs=DB_SPECS)
+        payload = make_v22_payload(theory_hours=6, practice_hours=2, lesson_count=3, specs=DB_SPECS)
         with tempfile.TemporaryDirectory(prefix="lesson-v22-output-") as temp_name:
             root = Path(temp_name)
             source = root / "content.json"

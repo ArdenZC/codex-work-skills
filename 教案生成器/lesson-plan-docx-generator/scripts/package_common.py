@@ -1123,20 +1123,43 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
 
     _validate_implementation_stage_invariants(data["lessons"])
 
+    workorders_requested = bool(artifact_plan.get("practice_work_orders"))
     practice_contract = data.get("practice_task_contract")
-    if practice == 0:
-        if practice_contract is not None and _decimal_hours(
-            practice_contract["practice_hours"],
-            "practice_task_contract.practice_hours",
-            allow_zero=True,
-        ) != 0:
-            raise ValueError("practice_task_contract.practice_hours must be 0 when practice_hours=0")
+    lesson_task_ids = [
+        str(task_id)
+        for lesson in lessons
+        for task_id in lesson.get("practice_task_ids", [])
+    ]
+    if not workorders_requested:
+        if practice_contract is not None:
+            raise ValueError(
+                "practice_task_contract is forbidden when artifact_plan.practice_work_orders=false"
+            )
+        if lesson_task_ids:
+            raise ValueError(
+                "lessons.practice_task_ids are forbidden when artifact_plan.practice_work_orders=false"
+            )
         return
 
+    if practice <= 0:
+        raise ValueError(
+            "artifact_plan.practice_work_orders=true requires positive practice_hours"
+        )
+    if practice % Decimal("2"):
+        raise ValueError(
+            "practice_hours must be divisible by 2 when practice_work_orders=true; "
+            f"got {practice}"
+        )
     if not isinstance(practice_contract, dict):
-        raise ValueError("practice_task_contract is required when practice_hours is positive")
+        raise ValueError(
+            "practice_task_contract is required when artifact_plan.practice_work_orders=true"
+        )
     if practice_contract["course_name"] != data["course_name"]:
         raise ValueError("practice_task_contract.course_name must equal course_name")
+    if practice_contract.get("granularity") != "per_task":
+        raise ValueError(
+            "practice_task_contract.granularity must be per_task when practice_work_orders=true"
+        )
     contract_hours = _decimal_hours(
         practice_contract["practice_hours"],
         "practice_task_contract.practice_hours",
@@ -1145,15 +1168,28 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
     if contract_hours != practice:
         raise ValueError("practice_task_contract.practice_hours must equal delivery_plan.practice_hours")
 
+    expected_task_count = int(practice // Decimal("2"))
+    tasks = practice_contract.get("tasks", [])
+    if len(tasks) != expected_task_count:
+        raise ValueError(
+            "practice_task_contract.tasks count must equal practice_hours / 2: "
+            f"expected {expected_task_count}, got {len(tasks)}"
+        )
+
     task_by_id: dict[str, dict[str, Any]] = {}
     task_hours = Decimal("0")
-    for index, task in enumerate(practice_contract.get("tasks", [])):
+    for index, task in enumerate(tasks):
         prefix = f"practice_task_contract.tasks[{index}]"
         task_id = str(task["task_id"])
         if task_id in task_by_id:
             raise ValueError(f"{prefix}.task_id must be unique; duplicate {task_id!r}")
         task_by_id[task_id] = task
-        task_hours += _decimal_hours(task["practice_hours"], f"{prefix}.practice_hours")
+        item_hours = _decimal_hours(task["practice_hours"], f"{prefix}.practice_hours")
+        if item_hours != Decimal("2"):
+            raise ValueError(
+                f"{prefix}.practice_hours must equal 2 for one 2-hour WorkOrder; got {item_hours}"
+            )
+        task_hours += item_hours
         linked_ids = [str(value) for value in task.get("lesson_ids", [])]
         if theory > 0 and not linked_ids:
             raise ValueError(f"{prefix}.lesson_ids must identify related theory Lessons")

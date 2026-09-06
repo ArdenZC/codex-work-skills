@@ -399,14 +399,17 @@ def main(argv: list[str] | None = None) -> int:
             cross_reports: list[dict[str, Any]] = []
             if args.practice_task_json:
                 handoff = load_practice_task_contract(args.practice_task_json)
-                for content in contents:
-                    cross_report = validate_cross_artifact(handoff, content)
-                    cross_reports.append(cross_report)
-                    if cross_report["status"] != "pass":
-                        raise WorkOrderContractError(
-                            f"Cross-Artifact QA failed for {content['practice_task_id']}: "
-                            + "; ".join(cross_report["errors"])
-                        )
+                collection_report = validate_cross_artifact(handoff, contents)
+                if collection_report["status"] != "pass":
+                    raise WorkOrderContractError(
+                        "Cross-Artifact QA failed: " + "; ".join(collection_report["errors"])
+                    )
+                nested_reports = collection_report.get("reports")
+                cross_reports = (
+                    nested_reports
+                    if isinstance(nested_reports, list)
+                    else [collection_report]
+                )
             report = generate(
                 contents,
                 output_dir=args.output_dir,

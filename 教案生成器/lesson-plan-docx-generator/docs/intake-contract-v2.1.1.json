@@ -126,7 +126,9 @@
     "inferred_major_and_audience_are_labeled_for_confirmation",
     "no_fifty_fifty_default",
     "no_implicit_practice_work_orders_false",
-    "no_implicit_delivery_mode"
+    "no_implicit_delivery_mode",
+    "requested_work_orders_require_even_practice_and_two_hour_tasks",
+    "declined_work_orders_forbid_practice_handoff"
   ],
   "user_visible_errors": {
     "intake_pending": "课程基本信息尚未确认，暂不开始课程规划。",

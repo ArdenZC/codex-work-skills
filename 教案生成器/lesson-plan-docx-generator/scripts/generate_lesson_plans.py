@@ -516,7 +516,12 @@ def main() -> None:
     try:
         content_quality = validate_content_quality(meta, manifest)
         practice_contract = meta.get("practice_task_contract")
-        if practice_contract is not None:
+        artifact_plan = meta.get("artifact_plan") or {}
+        writes_practice_handoff = (
+            meta.get("content_contract_version") != "2.2"
+            or bool(artifact_plan.get("practice_work_orders"))
+        )
+        if writes_practice_handoff and isinstance(practice_contract, dict):
             (candidate / "practice-task-contract.json").write_text(
                 json.dumps(practice_contract, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8",

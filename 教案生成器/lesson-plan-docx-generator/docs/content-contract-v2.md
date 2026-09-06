@@ -1,29 +1,39 @@
 # Lesson Content V2 / V2.1 / V2.2
 
-## 2.2 production addendum
+## 2.2.1 production addendum
 
-Content Contract `2.2` is the current production contract. Runtime continues to read `2.1` and `2.0` inputs for compatibility; those versions retain their existing lesson semantics. The default Word template remains `lesson-plan v1.1.2`, and the Practice Task Contract remains V1.
+Content Contract `2.2` is the current production contract and its Lesson / WorkOrder integration is fixed by Skill `2.2.1`. Runtime continues to read `2.1` and `2.0` inputs for compatibility; those versions retain their existing lesson semantics. The default Word template remains `lesson-plan v1.1.2`, and the shared Practice Task Contract remains V1 and reusable outside this integration.
 
-Before planning, the Agent enters `INTAKE_PENDING` and makes exactly one concentrated Chinese confirmation containing course name, major, audience, and total hours. The same confirmation displays theory hours, practice hours, organization, default single-lesson duration of 2 hours, textbook, auxiliary references, and work-order preference. Textbook confirmation is recommended but not blocking. After the user confirms, the Agent enters `INTAKE_CONFIRMED` and completes retrieval, course outline, Content 2.2, Practice Task handoff, QA, and DOCX without asking again about outline, projects/tasks, scores, template, output directory, or whether to start DOCX generation. Only a user change, an unresolvable direct conflict, or a real safety/file-overwrite decision may pause the workflow again.
+Before planning, the Agent enters `INTAKE_PENDING` and makes exactly one concentrated Chinese confirmation containing course name, major, audience, and total hours. The same confirmation displays theory hours, practice hours, organization, default single-lesson duration of 2 hours, textbook, auxiliary references, and work-order preference. Textbook confirmation is recommended but not blocking. After the user confirms, the Agent enters `INTAKE_CONFIRMED` and completes retrieval, course outline, Content 2.2, the Practice Task handoff only when work orders were explicitly requested, QA, and DOCX without asking again about outline, projects/tasks, scores, template, output directory, or whether to start DOCX generation. Only a user change, an unresolvable direct conflict, or a real safety/file-overwrite decision may pause the workflow again.
 
 Content 2.2 separates artifact ownership:
 
 ```text
 theory hours  -> theory Lessons -> Lesson DOCX
-practice hours -> Practice Task Contract V1 -> WorkOrder Content/DOCX
+practice hours -> (only when explicitly requested) Practice Task Contract V1 -> WorkOrder Content/DOCX
+practice hours -> (when explicitly declined) course-hour accounting only; no practice artifact
 ```
 
 The invariants are:
 
 ```text
 sum(lesson.hours) == delivery_plan.theory_hours
-sum(practice_tasks.practice_hours) == delivery_plan.practice_hours
 theory_hours + practice_hours == total_hours
 ```
 
+When `artifact_plan.practice_work_orders=true`, also require:
+
+```text
+practice_hours is a positive even number
+each Practice Task.practice_hours == 2
+Practice Task count == WorkOrder count == practice_hours / 2
+```
+
+When `artifact_plan.practice_work_orders=false`, `practice_task_contract` is absent and every `lesson.practice_task_ids` array is empty (no task IDs). The declared practice hours still participate in course reconciliation; they do not create a JSON handoff or a practice-side extra file.
+
 Every 2.2 Lesson is a theory Lesson with `practice_hours=0`; practice does not create a practice Lesson DOCX. `delivery_plan.mode` describes organization only and does not change this count/hour contract. `integrated_lessons` means artifact-level integration between theory Lessons and related practice tasks, not a fixed 1+1 split or a requirement to turn all course hours into Lesson DOCX.
 
-The number of theory Lessons is `ceil(theory_hours / default_hours)`. The final Lesson uses the true remainder, so 21 theory hours at default 2 means ten 2-hour Lessons plus one 1-hour Lesson. Hours are never rounded to 20 or 22; if the selected template/contract cannot express the remainder, generation fails closed. Project count, Lesson count, Practice Task count, and WorkOrder count are independently planned; WorkOrder count is never derived mechanically from practice hours/default hours.
+The number of theory Lessons is `ceil(theory_hours / default_hours)`. The final Lesson uses the true remainder, so 21 theory hours at default 2 means ten 2-hour Lessons plus one 1-hour Lesson. Hours are never rounded to 20 or 22; if the selected template/contract cannot express the remainder, generation fails closed. The default Lesson duration is 2 hours. Under the 2.2.1 WorkOrder integration, WorkOrder count is not a free planning variable: each 2-hour Practice Task maps to exactly one WorkOrder, while `project_id` may group tasks.
 
 For every theory Lesson, `reference_ids` must select at least one citable source, normally one to three. Before lesson authoring the Agent forms a course-level `reference_catalog`/`course_reference_pool` planning concept; the persisted contract field remains `reference_pool`. References are concrete readable/citable documents or sources, while `resources` are teaching tools, equipment, environments, and materials. The textbook is a separate `course_materials.textbook` object and is excluded from references unless `allow_textbook_as_reference=true` is explicit.
 

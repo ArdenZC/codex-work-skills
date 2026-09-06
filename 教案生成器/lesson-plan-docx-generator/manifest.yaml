@@ -1,7 +1,7 @@
 skill:
   id: lesson-plan-docx-generator
   name: 教案生成器
-  version: 2.2.0
+  version: 2.2.1
   phase: stable
   content_contract: "2.2"
   compatibility:

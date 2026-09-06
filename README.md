@@ -2,7 +2,7 @@
 
 一组用于实际教学工作的可复用 AI Skills。目前包含：
 
-- **教案生成器 2.2.0**：批量生成、整理和校验项目化中文职业教育教案 DOCX；Lesson DOCX 只承载理论，实践通过 Practice Task/WorkOrder 交付；
+- **教案生成器 2.2.1**：批量生成、整理和校验项目化中文职业教育教案 DOCX；Lesson DOCX 只承载理论，实践工单按明确选择交付；
 - **平时成绩记分册生成器**：根据课程成绩单生成并校验平时成绩记分册 XLS。
 - **实践任务工单生成器 2.1.0**：由 Agent 将 Lesson Practice Task Contract 创作成 WorkOrder Content，再写入真实 Word 学习工单模板（Phase 2.1 Hardening）。
 
@@ -16,7 +16,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 
 | Skill | Skill 版本 | 内容合同 | 当前默认模板 | 状态 |
 | --- | --- | --- | --- | --- |
-| [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.0** | **Lesson Content Contract 2.2**（兼容 2.1/2.0） | `lesson-plan v1.1.2` | 稳定 |
+| [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.1** | **Lesson Content Contract 2.2**（兼容 2.1/2.0） | `lesson-plan v1.1.2` | 稳定 |
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
 | [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 2.1 / 2.1.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 联动候选 |
 
@@ -26,14 +26,14 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 
 Lesson Acceptance V2 的本地验收、报告和人工复核协议见 [docs/lesson-acceptance.md](docs/lesson-acceptance.md)。
 
-## 教案生成器 2.2.0
+## 教案生成器 2.2.1
 
-2.2 是在 2.1 课程基础合同上的理论/实践产物边界和课程参考资料收口，不是模板更新：
+2.2.1 是在 2.1 课程基础合同上的理论/实践产物边界和课程参考资料收口，不是模板更新：
 
 - 先进入 `INTAKE_PENDING`，在正式规划前一次性确认课程名称、专业、授课对象和总课时；单课课时默认 2 学时，教材建议确认但不是阻断字段；
 - 确认后进入 `INTAKE_CONFIRMED` 并自主完成整门课程规划；不再询问 outline、模板、输出目录或是否开始生成 DOCX；
-- Lesson DOCX 只承载理论课时，理论课次数量按默认单课课时向上取整并保留余数；实践课时只通过 Practice Task/WorkOrder handoff 交付；
-- 项目数、Lesson 数、Practice Task 数和 WorkOrder 数独立规划，不把项目数写死为 8 或按实践课时机械计算工单数；
+- Lesson DOCX 只承载理论课时，理论课次数量按默认单课课时向上取整并保留余数；只有明确需要实践工单时才生成 Practice Task Contract/handoff；明确不需要时实践学时仍计入课程总账，但不生成实践侧文件；
+- 明确需要实践工单时，实践学时必须为正偶数，每个 Practice Task 固定 2 学时，Practice Task 数和 WorkOrder 数严格等于 `practice_hours / 2`；`project_id` 只用于分组，不改变一任务一工单映射；
 - 先做整门课程的项目 / 任务规划，再逐课生成完整 Content 2.2；
 - 正式路径不再接受旧 sparse JSON 作为生产输入；
 - Python 不替模型创作教学正文，只负责校验、格式化、模板映射和文件生成；
@@ -42,7 +42,7 @@ Lesson Acceptance V2 的本地验收、报告和人工复核协议见 [docs/less
 - 支持护理、会计等非 IT 课程，避免固定 IT 场景和模板套话污染；
 - `course_materials.textbook` 与 `reference_pool` 分离，逐课只写 `reference_ids`，教材默认不写入 Word references；每个理论 Lesson 至少有 1 项具体 reference；合法文献 references 可跨课复用，纯资源名、泛化占位和虚构书目信息失败；
 - references 只表示可阅读/查阅/引用的文献或文档，resources 表示教学工具、设备、环境和材料；参考资料优先使用国内出版物、高校资料、国家/行业/职业标准和国内权威文件，国内占比是质量信号而非硬失败；
-- 引入 Practice Task Contract V1，实践任务可以跨多个课次；`practice_work_orders=true` 时由 Lesson Agent 检测并调用 WorkOrder Agent 统一交付；不可用时只输出 JSON handoff 并明确状态，不伪造工单 DOCX；
+- 引入条件式 Practice Task Contract V1，实践任务可以跨多个理论课次；`practice_work_orders=true` 时由 Lesson Agent 检测并调用 WorkOrder Agent 统一交付；不可用时只输出 JSON handoff 并明确状态，不伪造工单 DOCX；false 时不得有 contract 或 handoff；`practice_task_ids` 仅保留 schema 要求的空数组，不得包含任何任务 ID；
 - 输出采用 candidate → QA → atomic commit，生成失败不会静默覆盖正式文件；
 - 项目内 Full Engine 增加 runtime fingerprint / stale detection，避免新规则配旧 runtime；
 - Windows、macOS CI 均执行 Lesson Content、Lesson Package 和 Hardening 回归。
@@ -63,7 +63,7 @@ WorkOrder 以仓库 `schemas/shared/practice-task-contract.schema.json` 定义�
 | 平时成绩记分册生成器 | `课程成绩单.xls` 或包含该文件的班级目录 | 平时成绩记分册 `.xls` + QA 报告 |
 | 实践任务工单生成器 2.1 | Agent-authored Practice Work Order Content V1，或用于 authoring 的 Lesson Practice Task Contract V1 handoff | 学习工单 `.docx` + Content/Cross-Artifact/Output QA |
 
-教案资料不完整时可以继续：Agent 会先读取会话和附件，再一次性确认课程基础（单课默认 2 学时；教材建议确认但不阻断），确认后按课程结构完成规划和生成，不再询问模板、输出目录或是否开始生成 DOCX。Lesson DOCX 不替代实践工单；成绩册不能凭空生成成绩，必须提供真实课程成绩单。实践工单不能代写答案，学生任务结果栏保持空白。
+教案资料不完整时可以继续：Agent 会先读取会话和附件，再一次性确认课程基础（单课默认 2 学时；教材建议确认但不阻断）；理论/实践结构和工单偏好未提供时保持“待确认”，确认后按已确认选择完成规划和生成，不再询问模板、输出目录或是否开始生成 DOCX。Lesson DOCX 不替代实践工单；成绩册不能凭空生成成绩，必须提供真实课程成绩单。实践工单不能代写答案，学生任务结果栏保持空白。
 
 ## 快速安装
 
@@ -104,7 +104,7 @@ https://github.com/ArdenZC/codex-work-skills
 只安装教案生成器：
 
 ```text
-请帮我安装这个仓库中的「教案生成器 2.2.0」：
+请帮我安装这个仓库中的「教案生成器 2.2.1」：
 https://github.com/ArdenZC/codex-work-skills
 
 请阅读 README、根目录 AGENTS.md、教案生成器/简介.md，以及 lesson-plan-docx-generator 下的 AGENTS.md、通用提示词.md 和 SKILL.md。
@@ -177,7 +177,7 @@ macOS 使用 `python3`。共享 `AGENTS.md`、Claude、Gemini、Copilot 和 Aide
 生成教案：
 
 ```text
-使用教案生成器 2.2.0，根据这份课程标准和教材目录，
+使用教案生成器 2.2.1，根据这份课程标准和教材目录，
 帮我生成《数据库技术》的项目化教案。
 ```
 
@@ -218,7 +218,7 @@ Windows 和 macOS 是当前 CI 与交付验收平台。
 教案生成器目前同时存在三种版本号：
 
 ```text
-Lesson Skill          2.2.0
+Lesson Skill          2.2.1
 Content Contract      2.2 (reads 2.1/2.0)
 Word template         lesson-plan v1.1.2
 ```

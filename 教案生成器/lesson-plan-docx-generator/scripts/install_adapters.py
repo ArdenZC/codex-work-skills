@@ -19,7 +19,7 @@ from path_safety import paths_overlap
 ENGINE_NAME = ".lesson-plan-docx-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
-SKILL_VERSION = "2.2.0"
+SKILL_VERSION = "2.2.1"
 CONTENT_CONTRACT_VERSION = "2.2"
 TEMPLATE_VERSION = "1.1.2"
 SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")

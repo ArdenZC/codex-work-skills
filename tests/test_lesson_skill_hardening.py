@@ -136,6 +136,14 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertIn(label, canonical)
         for rule in ("待确认", "50/50", "当前理解 / 如不准确请修改"):
             self.assertIn(rule, canonical)
+        for rule in (
+            "practice_work_orders=true",
+            "practice_work_orders=false",
+            "practice_hours / 2",
+            "每个 Practice Task 固定 2 学时",
+            "实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。",
+        ):
+            self.assertIn(rule, canonical)
         openai_prompt = openai.split("default_prompt:", 1)[1]
         for internal_key in ("course_name", "major", "audience", "total_hours", "theory_hours", "practice_hours"):
             self.assertNotIn(internal_key, openai_prompt)
@@ -157,6 +165,11 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertEqual(fields[field]["inference_label"], "当前理解 / 如不准确请修改")
         for field in ("theory_hours", "practice_hours", "delivery_mode", "practice_work_orders"):
             self.assertEqual(fields[field]["unknown_state"], "PENDING")
+        for invariant in (
+            "requested_work_orders_require_even_practice_and_two_hour_tasks",
+            "declined_work_orders_forbid_practice_handoff",
+        ):
+            self.assertIn(invariant, contract["invariants"])
         self.assertTrue(fields["textbook"]["recommended"])
         self.assertEqual(contract["pure_course_normalization"]["theory_only"]["practice_hours"], 0)
         self.assertEqual(contract["pure_course_normalization"]["practice_only"]["theory_hours"], 0)
@@ -166,7 +179,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
         self.assertEqual(
-            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.0"),
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.1"),
             1,
         )
 

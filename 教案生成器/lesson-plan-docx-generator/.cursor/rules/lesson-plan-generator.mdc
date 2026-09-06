@@ -3,4 +3,4 @@ description: 生成项目化中文教案 DOCX 的统一入口
 alwaysApply: true
 ---
 
-先读取 `SKILL.md` 和 `通用提示词.md`。它们定义 Content Contract V2、课程级 outline、一次性资料核对、Content QA、模板/输出保真 QA、路径保护和 candidate 原子提交。所有教学正文、实施活动、评价 remarks 和反思来自 JSON；禁止 sparse input、旧生成函数、IT 默认污染和静默删减。
+先读取 `SKILL.md` 和 `通用提示词.md`。它们定义 Lesson Skill 2.2.1 / Content Contract V2、课程级 outline、一次性资料核对、Content QA、模板/输出保真 QA、路径保护和 candidate 原子提交。所有教学正文、实施活动、评价 remarks 和反思来自 JSON；明确需要实践工单时 Practice Task 与 WorkOrder 一一对应且每个为 2 学时，明确不需要时不创建 handoff；禁止 sparse input、旧生成函数、IT 默认污染和静默删减。

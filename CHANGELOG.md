@@ -4,6 +4,15 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## Lesson / WorkOrder Contract Fix 2.2.1 — 2026-09-05
+
+- Intake 未明确的理论/实践学时、组织方式和实践工单偏好保持“待确认”，不再隐含 50/50、综合组织或 false；确认前不规划课次、任务或生成文件。
+- Lesson DOCX 只生成理论学时，默认每课 2 学时并保留理论余数；实践学时始终参与总课时核对，但只有明确需要实践工单时才创建 handoff。
+- `practice_work_orders=true` 时，实践学时必须为正偶数，每个 Practice Task 固定 2 学时，Practice Task 数量与 WorkOrder 数量均为 `practice_hours / 2`，`project_id` 只用于分组；`false` 时禁止 contract、handoff、WorkOrder 和实践侧额外文件。
+- WorkOrder 批量 Cross-Artifact QA 增加任务数、WorkOrder 数和任务 ID 集合的一一对应校验，并保持单个工单的 10 + 90 评分与学生结果空白。
+
+本次仅修复 Lesson / WorkOrder 2.2.1 集成合同；不修改 Lesson/WorkOrder Word 模板、共享 Reference Contract、既有 Lesson 重复/渐进/评分/反思 QA、WorkOrder 业务合同、LibreOffice helper、CI 并发、Gradebook、Release 语义或 Phase 3。WorkOrder Skill 版本保持 2.1.0。
+
 ## 教案生成器 2.2.0 — 2026-09-04
 
 ### Theory / Practice Artifact Split 与 Domestic-first References

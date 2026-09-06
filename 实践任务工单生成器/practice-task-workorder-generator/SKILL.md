@@ -21,7 +21,7 @@ Practice Task Contract V1 → schema / semantic validation → Agent authoring s
 
 Python 只做 schema validation、确定性一致性检查、有限字段格式化、模板映射、事务和 QA，不重新创作任务正文，不生成答案，不决定 task item 标题、描述、步骤、交付物表述、验收表述或评分语义。`--practice-task-json` 可以读取合同并输出 authoring skeleton，但不会生成 Content V1 或 DOCX；生产 DOCX 必须使用 Agent 完整创作的 `--content-json`，并可同时提供 `--practice-task-json` 执行 Cross-Artifact QA。Practice Task 是事实源；发生冲突时 WorkOrder Content 失败并要求重新生成，不能修改 Lesson 或上游合同来迁就错误工单。
 
-WorkOrder Content V1 保留 `content_contract_version=1.0`，并承载 `practice_task_id`、`task_title`、`project_id`、`lesson_ids`、`practice_hours`、任务项、工具/材料、安全/合规和教师评价占位。上游任务 ID、课次集合和实践学时必须原样贯穿，不能随机生成替代 ID 或偷偷改变课次/学时。
+WorkOrder Content V1 保留 `content_contract_version=1.0`，并承载 `practice_task_id`、`task_title`、`project_id`、`lesson_ids`、`practice_hours`、任务项、工具/材料、安全/合规和教师评价占位。当前 Lesson 2.2.1 集成中，每个 WorkOrder 的 `practice_hours` 必须为 2，且一个上游 Practice Task 只能映射一个 WorkOrder；批量 Cross-Artifact QA 必须同时检查任务数、WorkOrder 数和任务 ID 集合完全一致。上游任务 ID、课次集合和实践学时必须原样贯穿，不能随机生成替代 ID 或偷偷改变课次/学时。
 
 ## 固定产品合同
 
@@ -30,12 +30,13 @@ WorkOrder Content V1 保留 `content_contract_version=1.0`，并承载 `practice
 - 学生评价表和教师评价表沿用 canonical 模板固定内容，不纳入工单正文反重复检查，也不新建评分体系。
 - 每项必须说明做什么、需要什么、怎么开始、步骤、交付物和可观察验收标准。每个 substantive deliverable 都必须至少被一条可观察 acceptance criterion 覆盖；一条 criterion 可以覆盖多个相关交付物。泛化短语不能独立构成任务、交付物、验收标准或主要操作步骤；主要步骤至少包含动作和对象/产物/目标。
 - 任务项应由 Agent 依据上游任务展开，但仍属于同一个 Practice Task；禁止为了降低重复率编造新任务、标准、工具、教材或技术结果。重复的合法上游事实不是正文反重复问题，禁止为了降重复率虚构不同教材、作者、ISBN、出版社、标准编号或公开文献。
+- 每个 Practice Task 固定为 2 学时；WorkOrder 数量严格等于上游 Practice Task 数量，不能按项目或 Agent 偏好合并、拆分或重新规划。
 
 ## Cross-Artifact QA
 
-`scripts/cross_artifact_quality.py` 生成 `cross-artifact-report.json`，只使用 ID equality、lesson set equality、小时一致性、有限词锚覆盖和明显领域冲突规则，禁止 embedding、在线模型和外部 NLP 服务。它检查：
+`scripts/cross_artifact_quality.py` 生成 `cross-artifact-report.json`，只使用 ID equality、lesson set equality、小时一致性、有限词锚覆盖和明显领域冲突规则，禁止 embedding、在线模型和外部 NLP 服务。传入批量 Content V1 时，它还必须检查 Practice Task / WorkOrder 数量相等、ID 集合相等且每个 ID 恰好出现一次。它检查：
 
-- `practice_task_id`、`lesson_ids` 集合、`practice_hours`；
+- `practice_task_id`、`lesson_ids` 集合、`practice_hours`（每份固定 2 学时）；
 - task title / intent；
 - 上游 deliverables 是否在工单任务项和验收中得到承载；
 - 上游 acceptance criteria 是否仍可定位；
