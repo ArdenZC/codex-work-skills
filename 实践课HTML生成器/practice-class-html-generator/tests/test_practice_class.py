@@ -123,19 +123,125 @@ class PracticeClassPackageTests(unittest.TestCase):
             report = generate(practice, output, self.courseware_for("data-structures.practice.json"))
             self.assertEqual(report["status"], "pass", report)
             self.assertEqual({path.name for path in output.iterdir()}, {"student", "teacher", "practice-content.json", "qa-report.json"})
-            self.assertEqual({path.name for path in (output / "student").iterdir() if path.is_file()}, {"student-task.html", "learning-center.html", "study-guide.html", "foundation-kit.html"})
-            self.assertEqual({path.name for path in (output / "teacher").iterdir()}, {"teacher-guide.html", "teacher-reference.html"})
+            self.assertEqual(
+                {path.name for path in (output / "student").iterdir() if path.is_file()},
+                {"student-task.html", "learning-center.html", "study-guide.html", "foundation-kit.html"},
+            )
+            self.assertEqual(
+                {path.name for path in (output / "teacher").iterdir() if path.is_file()},
+                {"teacher-guide.html", "teacher-reference.html"},
+            )
+            self.assertEqual(len(list((output / "student" / "tasks").glob("*.html"))), 8)
+            self.assertEqual(len(list((output / "student" / "learning").glob("*.html"))), 7)
+            self.assertEqual(len(list((output / "student" / "guides").glob("*.html"))), 7)
+            self.assertEqual(len(list((output / "student" / "kit").glob("*.html"))), 7)
+            self.assertEqual(len(list((output / "teacher" / "references").glob("*.html"))), 8)
             qa = validate(practice, output, self.courseware_for("data-structures.practice.json"))
             self.assertEqual(qa["status"], "pass", qa)
-            student = (output / "student" / "student-task.html").read_text(encoding="utf-8")
-            self.assertIn('data-task-id="ds-fill-core"', student)
-            self.assertIn("search-02", student)
-            self.assertIn("核心必做", student)
-            self.assertNotIn("teacher-guide", student)
-            self.assertNotIn("教师参考", student)
+            student_index = (output / "student" / "student-task.html").read_text(encoding="utf-8")
+            task_detail = (output / "student" / "tasks" / "ds-fill-core.html").read_text(encoding="utf-8")
+            visible_index = re.sub(r"<[^>]+>", " ", student_index)
+            self.assertNotIn("ds-fill-core", visible_index)
+            self.assertNotIn("search-02", visible_index)
+            self.assertIn("核心必做", visible_index)
+            self.assertIn('data-task-id="ds-fill-core"', task_detail)
+            self.assertIn('data-source-slide-ids="search-02 search-05"', task_detail)
+            self.assertNotIn("教师参考", student_index)
+            self.assertNotIn("teacher-guide", student_index)
+            self.assertIn("\u5b9e\u8df5\u8def\u7ebf", task_detail)
+            self.assertIn('href="../tasks/ds-trace-core.html"', task_detail)
+            self.assertIn('href="../tasks/ds-run-core.html"', task_detail)
+            self.assertIn("detail-main", task_detail)
             self.assertIn("教师参考", (output / "teacher" / "teacher-reference.html").read_text(encoding="utf-8"))
             self.assertTrue((output / "student" / "starter" / "binary-search.c").is_file())
             self.assertIn("TODO 1", (output / "student" / "starter" / "binary-search.c").read_text(encoding="utf-8"))
+
+    def test_fixture_specific_quality_requirements_are_explicit(self) -> None:
+        data = self.fixture("data-structures.practice.json")
+        interval = next(item for item in data["learning_center"] if item["id"] == "ds-interval-lab")["interaction"]
+        self.assertEqual(len(interval["rounds"]), 2)
+        self.assertEqual(interval["rounds"][-1]["status"], "found")
+        self.assertNotIn("next_left", interval["rounds"][-1])
+        self.assertNotIn("next_right", interval["rounds"][-1])
+        self.assertIn("37", interval["rounds"][-1]["feedback"])
+        run_task = next(item for item in data["tasks"] if item["id"] == "ds-run-core")
+        self.assertIn("binary_search(values, 0, target)", json.dumps(run_task, ensure_ascii=False))
+        asset_ids = {asset["id"] for asset in data["starter_assets"]}
+        debug_task = next(item for item in data["tasks"] if item["id"] == "ds-debug-core")
+        self.assertTrue(set(debug_task["starter_asset_ids"]) <= asset_ids)
+        self.assertTrue(all("int binary_search" in next(a for a in data["starter_assets"] if a["id"] == asset_id)["content"] for asset_id in debug_task["starter_asset_ids"]))
+
+        uml = self.fixture("uml.practice.json")
+        uml_courseware = load_courseware(self.courseware_for("uml.practice.json"))
+        slides = {slide["id"]: json.dumps(slide, ensure_ascii=False) for slide in uml_courseware["slides"]}
+        for slide_id, phrase in {
+            "uml-03": "0..*",
+            "uml-04": "Entity",
+            "uml-05": "checkAvailability",
+        }.items():
+            self.assertIn(phrase, slides[slide_id])
+        drawio = next(asset for asset in uml["starter_assets"] if asset["path"].endswith(".drawio"))["content"]
+        self.assertEqual(drawio.count("<diagram "), 2)
+        self.assertIn("requestReservation()", drawio)
+        self.assertIn("confirmReservation()", drawio)
+        self.assertIn("cancelReservation()", drawio)
+        self.assertIn("checkAvailability()", drawio)
+        self.assertIn("Student", drawio)
+        self.assertIn("TimeSlot → ReservationService", drawio)
+
+        database = self.fixture("database.practice.json")
+        setup = next(asset for asset in database["starter_assets"] if asset["path"].endswith("setup.sql"))["content"]
+        for token in ("2025-01-31", "2025-02-01", "2025-02-28", "2025-03-01", "A", "B", "C", "completed", "pending"):
+            self.assertIn(token, setup)
+        query = next(asset for asset in database["starter_assets"] if asset["path"].endswith("query.sql"))["content"]
+        self.assertEqual(len(re.findall(r"TODO [1-4]", query)), 4)
+        er = next(asset for asset in database["starter_assets"] if asset["path"].endswith(".drawio"))["content"]
+        self.assertIn('edge="1"', er)
+        self.assertIn("待补关系 A", er)
+        self.assertIn("待标注 FK", er)
+        self.assertNotIn('"id": "db-null"', json.dumps(database, ensure_ascii=False))
+
+    def test_database_setup_and_query_semantics_are_non_trivial(self) -> None:
+        database = self.fixture("database.practice.json")
+        setup = next(asset for asset in database["starter_assets"] if asset["path"].endswith("setup.sql"))["content"]
+        rows = [
+            {"customer_id": int(customer_id), "status": status, "date": order_date}
+            for customer_id, status, order_date in re.findall(
+                r"\(\d+,\s*(\d+),\s*'([^']+)',\s*'([^']+)',\s*[\d.]+\)", setup
+            )
+        ]
+        self.assertEqual(len(rows), 6)
+        self.assertEqual(
+            {row["customer_id"]: sum(1 for item in rows if item["customer_id"] == row["customer_id"] and item["status"] == "completed" and "2025-02-01" <= item["date"] < "2025-03-01") for row in rows if row["customer_id"] in (1, 2)},
+            {1: 2, 2: 1},
+        )
+
+        def result(status: str, lower: str, upper: str, distinct: bool = False) -> dict[int, int]:
+            selected = [
+                row for row in rows
+                if row["status"] == status and lower <= row["date"] < upper
+            ]
+            if distinct:
+                return {customer_id: 1 for customer_id in sorted({row["customer_id"] for row in selected})}
+            return {
+                customer_id: sum(1 for row in selected if row["customer_id"] == customer_id)
+                for customer_id in sorted({row["customer_id"] for row in selected})
+            }
+
+        self.assertEqual(result("completed", "2025-02-01", "2025-03-01"), {1: 2, 2: 1})
+        self.assertNotEqual(result("completed", "2025-02-01", "2025-03-01", distinct=True), {1: 2, 2: 1})
+        self.assertNotEqual(result("pending", "2025-02-01", "2025-03-01"), {1: 2, 2: 1})
+        self.assertNotEqual(result("completed", "2025-03-01", "2025-03-01"), {1: 2, 2: 1})
+        self.assertNotEqual(result("completed", "2025-02-01", "2025-02-01"), {1: 2, 2: 1})
+
+        query = next(asset for asset in database["starter_assets"] if asset["path"].endswith("query.sql"))["content"]
+        self.assertIn("COUNT(DISTINCT o.customer_id)", query)
+        self.assertIn("'pending'", query)
+        self.assertIn("'2025-03-01'", query)
+        self.assertIn("'2025-02-01'", query)
+        reference = next(item for item in database["teacher_reference"]["task_references"] if item["task_id"] == "db-sql-core")["reference_result"]
+        self.assertIn("A=2", reference)
+        self.assertIn("B=1", reference)
 
     def test_installer_and_namespaced_adapter_are_minimal_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory(prefix="practice-class-install-") as temp:

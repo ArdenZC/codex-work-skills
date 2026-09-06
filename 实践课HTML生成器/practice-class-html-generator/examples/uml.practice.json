@@ -26,7 +26,10 @@
     "chapter_title": "预约系统的领域对象与时序责任",
     "taught_slide_ids": [
       "uml-01",
-      "uml-02"
+      "uml-02",
+      "uml-03",
+      "uml-04",
+      "uml-05"
     ]
   },
   "knowledge_links": [
@@ -44,7 +47,8 @@
       "title": "稳定领域对象与属性",
       "summary": "领域类图关注长期存在的对象、属性和业务关系，不把一次操作名称误画成类。",
       "source_slide_ids": [
-        "uml-01"
+        "uml-01",
+        "uml-04"
       ],
       "student_can_do": "能从预约场景提取 Student、Reservation、TimeSlot 等领域类。"
     },
@@ -53,8 +57,7 @@
       "title": "关联、多重性与关系语义",
       "summary": "关系线要表达业务规则，多重性要能从场景中的数量约束解释出来。",
       "source_slide_ids": [
-        "uml-01",
-        "uml-02"
+        "uml-03"
       ],
       "student_can_do": "能为核心关系补方向和多重性，并说明依据。"
     },
@@ -63,7 +66,8 @@
       "title": "时序消息与执行顺序",
       "summary": "时序图按时间表达请求、检查、返回和确认，消息接收者必须能承担该动作。",
       "source_slide_ids": [
-        "uml-02"
+        "uml-02",
+        "uml-05"
       ],
       "student_can_do": "能把预约成功与冲突分支排成可执行的消息链。"
     },
@@ -72,7 +76,8 @@
       "title": "对象责任与服务协调",
       "summary": "领域对象持有状态，服务/控制对象编排流程，边界对象负责与用户或外部系统交互。",
       "source_slide_ids": [
-        "uml-02"
+        "uml-04",
+        "uml-05"
       ],
       "student_can_do": "能解释 Student 在不同视图中的角色差异，并修正责任错位。"
     }
@@ -127,7 +132,8 @@
         "uml-domain"
       ],
       "source_slide_ids": [
-        "uml-01"
+        "uml-01",
+        "uml-04"
       ],
       "modality": "modeling",
       "overview": "在分类互动和领域 starter 中区分实体、边界、协调/控制服务，以及只在用例语境中作为参与者出现的 Student。",
@@ -173,11 +179,12 @@
       ],
       "source_slide_ids": [
         "uml-01",
-        "uml-02"
+        "uml-03",
+        "uml-04"
       ],
       "modality": "modeling",
       "overview": "在可编辑 draw.io starter 中补齐预约、时段和学生之间的关系，使用场景数量约束解释每个多重性。",
-      "scaffold": "已有 Student—Reservation 示例线、四个类和两个待补关系槽；学生补关系，不需从空白画布开始。",
+      "scaffold": "已有 Student、Reservation、TimeSlot 三个领域类和两个待补关系槽；交互/责任视图另有页面与服务分区，学生补关系，不需从空白画布开始。",
       "steps": [
         {
           "title": "读对象",
@@ -218,7 +225,9 @@
         "uml-responsibility"
       ],
       "source_slide_ids": [
-        "uml-02"
+        "uml-02",
+        "uml-04",
+        "uml-05"
       ],
       "modality": "modeling",
       "overview": "用消息卡表达请求、可用性检查、返回状态和成功分支，保证消息接收者承担得起动作。",
@@ -265,11 +274,14 @@
       ],
       "source_slide_ids": [
         "uml-01",
-        "uml-02"
+        "uml-02",
+        "uml-03",
+        "uml-04",
+        "uml-05"
       ],
       "modality": "modeling-tool",
       "overview": "把前四个任务的对象、关系和消息落入可编辑模型，形成一个教师可直接检查的最小预约模型。",
-      "scaffold": "draw.io starter 已有类框、属性和一个示例关系；sequence-card 给出消息文字。学生完成缺口并保存可编辑状态即可。",
+      "scaffold": "draw.io starter 分成领域类图页与交互/责任视图页，已有类框、属性和一个示例关系；sequence-card 给出消息文字。学生完成缺口并保存可编辑状态即可。",
       "steps": [
         {
           "title": "整理类图",
@@ -317,7 +329,9 @@
         "uml-responsibility"
       ],
       "source_slide_ids": [
-        "uml-02"
+        "uml-02",
+        "uml-04",
+        "uml-05"
       ],
       "modality": "model-critique",
       "overview": "对一份含有“TimeSlot 直接创建 Reservation”和“页面持有容量状态”的模型做诊断，修复一处责任错位。",
@@ -362,7 +376,8 @@
       ],
       "source_slide_ids": [
         "uml-01",
-        "uml-02"
+        "uml-03",
+        "uml-04"
       ],
       "modality": "modeling",
       "overview": "把 Student 在用例参与者语境和领域类图语境分别表示，比较两种视图各自回答的问题。",
@@ -408,7 +423,9 @@
       ],
       "source_slide_ids": [
         "uml-01",
-        "uml-02"
+        "uml-03",
+        "uml-04",
+        "uml-05"
       ],
       "modality": "model-critique",
       "overview": "在已有预约模型上增加取消预约场景，只扩展必要的消息和状态变化，不重画整套系统。",
@@ -1234,7 +1251,8 @@
         "task_id": "uml-role-core",
         "title": "区分领域类与视图角色",
         "source_slide_ids": [
-          "uml-01"
+          "uml-01",
+          "uml-04"
         ],
         "reference_answer": "Student（领域类图）= Entity/class；Student（用例参与者）= Actor-in-use-case-context；ReservationService=Control/Service；Reservation=Entity；ReservationPage=Boundary。",
         "reference_result": "Student 在 draw.io 领域模型中使用 class/domain object，而非 umlActor。",
@@ -1259,7 +1277,8 @@
         "title": "补出预约领域关系与多重性",
         "source_slide_ids": [
           "uml-01",
-          "uml-02"
+          "uml-03",
+          "uml-04"
         ],
         "reference_answer": "保留 Student 1—Reservation 0..* 示例；补 Reservation—TimeSlot 关系，并以题设数量规则决定多重性。",
         "reference_result": "关系线和标注可编辑，学生能解释至少两处数量约束。",
@@ -1282,7 +1301,9 @@
         "task_id": "uml-sequence-core",
         "title": "把预约流程排成可执行消息链",
         "source_slide_ids": [
-          "uml-02"
+          "uml-02",
+          "uml-04",
+          "uml-05"
         ],
         "reference_answer": "ReservationPage -> ReservationService: requestReservation()；ReservationService -> TimeSlot: checkAvailability()；TimeSlot --> ReservationService: available/conflict；available 时 ReservationService -> Reservation: create/confirm(...)；ReservationService --> ReservationPage: result。",
         "reference_result": "成功路径创建/确认 Reservation，冲突路径不创建，并最终返回页面。",
@@ -1307,9 +1328,12 @@
         "title": "在建模工具中完成可编辑模型",
         "source_slide_ids": [
           "uml-01",
-          "uml-02"
+          "uml-02",
+          "uml-03",
+          "uml-04",
+          "uml-05"
         ],
-        "reference_answer": "可编辑 draw.io 最小模型含 Student、Reservation、TimeSlot、ReservationService、ReservationPage；关系和时序能走通成功/冲突。",
+        "reference_answer": "可编辑 draw.io 最小模型把 Student、Reservation、TimeSlot 放在领域类图页，把 ReservationPage、ReservationService、TimeSlot、Reservation 放在交互/责任视图页；关系和时序能走通成功/冲突。",
         "reference_result": "文件可重新打开并继续编辑，学生能现场解释一条关系和一条消息。",
         "key_steps": [
           "整理类框",
@@ -1332,7 +1356,9 @@
         "task_id": "uml-critique-optional",
         "title": "诊断并修复责任错位",
         "source_slide_ids": [
-          "uml-02"
+          "uml-02",
+          "uml-04",
+          "uml-05"
         ],
         "reference_answer": "修正为 TimeSlot 返回可用性给 ReservationService；服务根据结果创建/确认 Reservation 或返回冲突。",
         "reference_result": "责任从状态对象与协调服务分离，消息链可执行。",
@@ -1356,7 +1382,8 @@
         "title": "同一概念换一个视图仍保持语义",
         "source_slide_ids": [
           "uml-01",
-          "uml-02"
+          "uml-03",
+          "uml-04"
         ],
         "reference_answer": "用例视图中的 Student 可作为参与者；领域类图中的 Student 是 class/domain object。两者是语境不同，不是概念矛盾。",
         "reference_result": "两种视图各自回答自己的问题，模型没有把角色混为一谈。",
@@ -1380,7 +1407,9 @@
         "title": "综合迁移：为取消预约加一条分支",
         "source_slide_ids": [
           "uml-01",
-          "uml-02"
+          "uml-03",
+          "uml-04",
+          "uml-05"
         ],
         "reference_answer": "取消分支：Student -> ReservationPage: cancel；Page -> ReservationService: cancelReservation；Service -> Reservation: setCancelled；Service -> Page: result。",
         "reference_result": "Reservation 持有取消状态，Service 协调，原预约成功链仍然成立。",
@@ -1408,7 +1437,7 @@
       "path": "reservation-domain.drawio",
       "language": "UML 2.x / draw.io",
       "task_id": "uml-role-core",
-      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"reservation-domain\" name=\"Reservation domain starter\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" guides=\"1\" tooltips=\"1\" connect=\"1\" arrows=\"1\" fold=\"1\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"student\" value=\"Student&#xa;---&#xa;studentId&#xa;name\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"50\" y=\"80\" width=\"170\" height=\"100\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"reservation\" value=\"Reservation&#xa;---&#xa;reservationId&#xa;status&#xa;date\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"330\" y=\"80\" width=\"190\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"timeslot\" value=\"TimeSlot&#xa;---&#xa;start&#xa;end&#xa;capacity\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"650\" y=\"80\" width=\"170\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"service\" value=\"ReservationService&#xa;---&#xa;checkAvailability()&#xa;confirm()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f2eafa;strokeColor=#7e67a3;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"330\" y=\"300\" width=\"220\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"page\" value=\"ReservationPage&#xa;---&#xa;selectSlot()&#xa;showResult()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f7ece7;strokeColor=#a56a52;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"50\" y=\"300\" width=\"190\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student-reservation\" value=\"1        0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;\" edge=\"1\" parent=\"1\" source=\"student\" target=\"reservation\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-a\" value=\"待补关系 A：Reservation 与 TimeSlot 的业务关联/多重性\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"620\" y=\"280\" width=\"230\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-b\" value=\"待补多重性 B：一次预约是否只能对应一个时段？\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"30\" y=\"500\" width=\"260\" height=\"70\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n",
+      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"reservation-domain\" name=\"Reservation domain view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"domain-title\" value=\"领域类图：稳定业务对象\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"25\" width=\"300\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student\" value=\"Student&#xa;---&#xa;studentId&#xa;name\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"90\" width=\"190\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"reservation\" value=\"Reservation&#xa;---&#xa;reservationId&#xa;status&#xa;date\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"350\" y=\"90\" width=\"210\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"timeslot\" value=\"TimeSlot&#xa;---&#xa;start&#xa;end&#xa;capacity\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"680\" y=\"90\" width=\"190\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student-reservation\" value=\"1        0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;\" edge=\"1\" parent=\"1\" source=\"student\" target=\"reservation\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-a\" value=\"待补关系 A：Reservation 与 TimeSlot 的业务关联/多重性\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"640\" y=\"290\" width=\"280\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-b\" value=\"待补多重性 B：一次预约是否只能对应一个时段？\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"310\" width=\"300\" height=\"70\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n  <diagram id=\"reservation-interaction\" name=\"Reservation interaction view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"2\"/><mxCell id=\"3\" parent=\"2\"/>\n        <mxCell id=\"interaction-title\" value=\"交互/责任视图：页面与服务编排\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"page\" value=\"ReservationPage&#xa;---&#xa;selectSlot()&#xa;showResult()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f7ece7;strokeColor=#a56a52;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"50\" y=\"100\" width=\"210\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"service\" value=\"ReservationService&#xa;---&#xa;requestReservation()&#xa;confirmReservation()&#xa;cancelReservation()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f2eafa;strokeColor=#7e67a3;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"340\" y=\"100\" width=\"260\" height=\"145\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-timeslot\" value=\"TimeSlot&#xa;---&#xa;checkAvailability()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"680\" y=\"100\" width=\"220\" height=\"100\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-reservation\" value=\"Reservation&#xa;---&#xa;create() / confirm()&#xa;status\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"360\" y=\"350\" width=\"220\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-1\" value=\"ReservationPage → ReservationService : requestReservation()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"520\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-2\" value=\"ReservationService → TimeSlot : checkAvailability()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"580\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-3\" value=\"TimeSlot → ReservationService : available / conflict\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#f8eade;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"640\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-4\" value=\"available → ReservationService → Reservation : create/confirm()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"520\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-5\" value=\"ReservationService → ReservationPage : result\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"580\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
       "editable_gaps": [
         {
           "marker": "待补关系 A",

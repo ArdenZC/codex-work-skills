@@ -16,9 +16,10 @@
 - 同一个核心知识点至少使用两种不同互动/操作形态；学习中心必须包含动态过程、诊断/Debug、连续多题或场景挑战，不能退化为几张单选卡。
 - 默认课堂验收是完成、运行/操作正确、能解释；除非用户明确要求，不写统一提交、截图、报告或收走产物。
 - Gold Sample 只提供内容质量标尺；不要复制其中的数据结构知识、案例、代码或历史提交要求。
+- Gold 标尺同时检查任务颗粒度、互动深度、资料密度、基础补给、自助路径和课堂节奏；入口索引只放摘要，详情页单列聚焦一个教学对象，自动化 PASS 不等于内容验收通过。
 - 互动必须解释一个知识点或帮助完成一个任务；没有教学目的的动画不合格。
 - 非编程课程的 foundation kit 不得自动出现 C 语言、代码模板或编程脚手架污染。
 
 ## 交付
 
-至少生成 `student/student-task.html`、`student/learning-center.html`、`student/study-guide.html`、`student/foundation-kit.html`、`teacher/teacher-guide.html`、`teacher/teacher-reference.html`、`practice-content.json` 和 `qa-report.json`。如果合同提供 starter，则生成 `student/starter/`。交付前运行自身测试、内容/链接 QA 和真实浏览器 smoke；学生页面不得链接或泄露教师参考。
+至少生成四个学生入口索引 `student/student-task.html`、`student/learning-center.html`、`student/study-guide.html`、`student/foundation-kit.html`，并按合同生成 `student/tasks/`、`student/learning/`、`student/guides/`、`student/kit/` 详情页；另有 `teacher/teacher-guide.html`、`teacher/teacher-reference.html`、`teacher/references/`、`practice-content.json` 和 `qa-report.json`。如果合同提供 starter，则生成 `student/starter/`。交付前运行自身测试、内容/链接 QA 和真实浏览器 smoke；学生页面不得链接或泄露教师参考、原始 ID、合同版本或互动类型。

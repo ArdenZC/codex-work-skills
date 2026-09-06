@@ -101,7 +101,7 @@
       ],
       "modality": "modeling",
       "overview": "把“客户下过订单”拆成实体、属性和关系，先在 ER starter 中核对一对多语义。",
-      "scaffold": "draw.io 文件已给出 Customer、Order、主外键字段和示例关系；学生只补待核对槽，不从空白建模。",
+      "scaffold": "draw.io 文件已给出 Customer、Order、主键字段和可编辑的待补关系线；学生要在图上连线并把 Order.customer_id 标成外键，不从空白建模。打开同一套 setup SQL 可获得本节样例数据。",
       "steps": [
         {
           "title": "圈实体",
@@ -115,8 +115,8 @@
         },
         {
           "title": "核 starter",
-          "instruction": "打开 orders-er.drawio，检查主键、外键和关系线。",
-          "check": "文件可继续编辑。"
+          "instruction": "打开 orders-er.drawio，补出 Customer—Order 关系线和一端多重性，再把 Order.customer_id 的 FK 标识补进字段标签。",
+          "check": "关系线、基数和字段角色都是真实可编辑结果，文件可继续编辑。"
         }
       ],
       "acceptance": [
@@ -130,7 +130,8 @@
       ],
       "estimated_minutes": 10,
       "starter_asset_ids": [
-        "db-orders-er"
+        "db-orders-er",
+        "db-orders-setup"
       ]
     },
     {
@@ -171,7 +172,10 @@
         "db-join",
         "db-er-tool"
       ],
-      "estimated_minutes": 12
+      "estimated_minutes": 12,
+      "starter_asset_ids": [
+        "db-orders-setup"
+      ]
     },
     {
       "id": "db-grain-core",
@@ -211,7 +215,10 @@
         "db-grain",
         "db-results"
       ],
-      "estimated_minutes": 10
+      "estimated_minutes": 10,
+      "starter_asset_ids": [
+        "db-orders-setup"
+      ]
     },
     {
       "id": "db-sql-core",
@@ -228,7 +235,7 @@
       ],
       "modality": "sql",
       "overview": "在 MySQL 8.0 查询框架中修正 4 个真实关键空位，得到 2025-02 月有已完成订单的客户及其订单数。",
-      "scaffold": "starter 已给出 SELECT、JOIN、WHERE、GROUP BY 和 ORDER BY 外壳；TODO 对应计数对象、状态和月份半开区间。",
+      "scaffold": "starter 已给出 SELECT、JOIN、WHERE、GROUP BY 和 ORDER BY 外壳；四个 TODO 都是会改变样例结果的错误值，setup SQL 会创建同一套可运行数据。",
       "steps": [
         {
           "title": "读问题",
@@ -253,7 +260,7 @@
       ],
       "acceptance": [
         "4 个真实 SQL 编辑点已修改。",
-        "无 `= NULL`，状态为 completed。",
+        "四个编辑点都改成题目要求的状态、月份和订单计数语义。",
         "按客户分组且月份为半开区间。"
       ],
       "help_refs": [
@@ -263,7 +270,8 @@
       ],
       "estimated_minutes": 18,
       "starter_asset_ids": [
-        "db-orders-sql"
+        "db-orders-sql",
+        "db-orders-setup"
       ],
       "todo_count": 4
     },
@@ -306,7 +314,11 @@
         "db-debug",
         "db-results"
       ],
-      "estimated_minutes": 12
+      "estimated_minutes": 12,
+      "starter_asset_ids": [
+        "db-orders-sql",
+        "db-orders-setup"
+      ]
     },
     {
       "id": "db-workbench-optional",
@@ -322,7 +334,7 @@
       ],
       "modality": "tooling",
       "overview": "在 MySQL Workbench 中按连接、筛选、聚合三段运行并核对列、行数和排序。",
-      "scaffold": "提供三段可复制的查询片段和检查表；学生不需要搭建数据库项目，只需使用已有样例表。",
+      "scaffold": "提供 orders-lab-setup.sql、三段可复制的查询片段和检查表；学生先执行 setup SQL，再按段观察同一套样例数据。",
       "steps": [
         {
           "title": "跑连接",
@@ -348,7 +360,11 @@
         "db-workbench",
         "db-results"
       ],
-      "estimated_minutes": 10
+      "estimated_minutes": 10,
+      "starter_asset_ids": [
+        "db-orders-sql",
+        "db-orders-setup"
+      ]
     },
     {
       "id": "db-constraint-optional",
@@ -392,7 +408,8 @@
       ],
       "estimated_minutes": 8,
       "starter_asset_ids": [
-        "db-orders-er"
+        "db-orders-er",
+        "db-orders-setup"
       ]
     },
     {
@@ -436,7 +453,10 @@
         "db-challenge",
         "db-results"
       ],
-      "estimated_minutes": 10
+      "estimated_minutes": 10,
+      "starter_asset_ids": [
+        "db-orders-setup"
+      ]
     }
   ],
   "learning_center": [
@@ -477,7 +497,8 @@
       "title": "主外键 JOIN 路径",
       "knowledge_link_ids": [
         "db-key-join",
-        "db-result-grain"
+        "db-result-grain",
+        "db-entity"
       ],
       "task_ids": [
         "db-key-core",
@@ -512,7 +533,8 @@
       "title": "结果粒度预测器",
       "knowledge_link_ids": [
         "db-result-grain",
-        "db-aggregate"
+        "db-aggregate",
+        "db-cardinality"
       ],
       "task_ids": [
         "db-grain-core",
@@ -856,7 +878,7 @@
       ],
       "common_errors": [
         "TODO 只是注释但 SQL 已经正确。",
-        "用 `= NULL` 表达空值判断。",
+        "把已经正确的日期边界误改成闭区间。",
         "SELECT 非聚合列却不分组。"
       ],
       "checkpoints": [
@@ -1020,7 +1042,7 @@
         "db-sql-core",
         "db-workbench-optional"
       ],
-      "content": "查询骨架包含 SELECT/FROM/JOIN/WHERE/GROUP BY/ORDER BY；按半开日期区间筛选月份，使用 `IS NULL` 而不是 `= NULL`（本题没有空值条件）。",
+      "content": "查询骨架包含 SELECT/FROM/JOIN/WHERE/GROUP BY/ORDER BY；按半开日期区间筛选月份，并把每个条件放回业务问题对应的位置。",
       "when_to_use": "打开 orders-query.sql 或需要拆解整条查询时。",
       "steps": [
         "先读四个 TODO",
@@ -1029,8 +1051,8 @@
         "最后运行聚合"
       ],
       "self_check": [
-        "不出现 `= NULL`。",
-        "状态和月份口径正确。"
+        "状态和月份口径正确。",
+        "能说明四个编辑点各自改变了哪类结果。"
       ]
     },
     {
@@ -1077,23 +1099,24 @@
       ]
     },
     {
-      "id": "db-null",
-      "title": "NULL 与状态值提醒",
-      "kind": "SQL 语义",
+      "id": "db-month",
+      "title": "月份半开区间",
+      "kind": "SQL 日期",
       "task_ids": [
         "db-sql-core",
         "db-constraint-optional"
       ],
-      "content": "NULL 不能用 `= NULL` 比较；需要空值判断时使用 IS NULL/IS NOT NULL。本题业务筛选使用明确的 status 值 completed。",
-      "when_to_use": "看到空值条件或状态口径不清时。",
+      "content": "本实践用 >= 月初和 < 下月月初表达月份范围。这样 2025-02-01 与 2025-02-28 被保留，2025-03-01 被排除，不依赖月底天数。",
+      "when_to_use": "修改 orders-query.sql 的两个日期 TODO，或核对 setup SQL 的边界样例时。",
       "steps": [
-        "先判断是否真要查 NULL。",
-        "使用 IS NULL/IS NOT NULL。",
-        "区分 NULL 与字符串状态。"
+        "写出本题目标月份。",
+        "确定月初下界。",
+        "把下月月初作为开区间上界。",
+        "用 1 月 31 日、2 月 1 日、2 月 28 日、3 月 1 日核对。"
       ],
       "self_check": [
-        "没有写 `= NULL`。",
-        "completed 没有加错引号或拼写。"
+        "2 月 1 日与 2 月 28 日被保留。",
+        "3 月 1 日不进入 2 月结果。"
       ]
     }
   ],
@@ -1178,8 +1201,8 @@
     ],
     "common_errors": [
       {
-        "symptom": "SQL 使用 `= NULL`。",
-        "intervention": "指出 NULL 的三值逻辑，改用 IS NULL/IS NOT NULL；本题优先使用明确 completed 状态。"
+        "symptom": "月份结果少了 2 月 1 日或 2 月 28 日的已完成订单。",
+        "intervention": "先核对下界是否为 2025-02-01、上界是否为 2025-03-01，再用 setup SQL 的边界行复核。"
       },
       {
         "symptom": "同一客户出现多行。",
@@ -1207,7 +1230,7 @@
       "让学生指出 Customer PK 与 Order FK。",
       "随机问一行代表什么以及为什么要 GROUP BY。",
       "抽查 status 和月份上/下界的业务含义。",
-      "让学生说出 `= NULL` 为什么不应使用。"
+      "让学生用 1 月 31 日、2 月 1 日、2 月 28 日、3 月 1 日解释半开区间。"
     ]
   },
   "teacher_reference": {
@@ -1218,8 +1241,8 @@
         "source_slide_ids": [
           "db-01"
         ],
-        "reference_answer": "Customer、Order 为实体；Customer.customer_id 为 PK，Order.customer_id 为 FK；Customer 1 对 Order 0..*（以题设为准）。",
-        "reference_result": "ER starter 可编辑，实体、字段和关系语义一致。",
+        "reference_answer": "Customer、Order 为实体；Customer.customer_id 为 PK，Order.customer_id 为待补 FK；Order.amount 是本节挑战所需的订单金额；Customer 1 对 Order 0..*。学生应在图上补 Customer—Order 关系线并标注基数。",
+        "reference_result": "ER starter 中关系线和 FK 字段标签都经过学生实际编辑，实体、字段和关系语义一致。",
         "key_steps": [
           "识别实体",
           "标注 PK/FK",
@@ -1291,7 +1314,7 @@
           "db-03"
         ],
         "reference_answer": "SELECT c.customer_name, COUNT(o.order_id) AS completed_orders FROM customers AS c JOIN orders AS o ON c.customer_id = o.customer_id WHERE o.status = 'completed' AND o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01' GROUP BY c.customer_id, c.customer_name ORDER BY completed_orders DESC, c.customer_name;",
-        "reference_result": "返回有已完成订单客户，每客户一行，按订单数降序再按姓名排序。",
+        "reference_result": "正确样例返回客户 A=2、客户 B=1，各客户一行；客户 C 只有 pending 订单，因此不出现，按订单数降序再按姓名排序。",
         "key_steps": [
           "修正 COUNT 对象",
           "修正状态",
@@ -1308,7 +1331,7 @@
           "GROUP BY 缺少客户标识。"
         ],
         "acceptance_basis": [
-          "四个真实空位修改，SQL 无 `= NULL`，结果粒度正确。"
+          "四个真实空位修改后，结果粒度和样例数据预期一致。"
         ]
       },
       {
@@ -1367,7 +1390,7 @@
           "db-02",
           "db-03"
         ],
-        "reference_answer": "关键约束：Customer.customer_id 唯一且非空，Order.customer_id 引用 Customer，status 使用统一枚举/值，order_date 可按月筛选。",
+          "reference_answer": "关键约束：Customer.customer_id 唯一且非空，Order.customer_id 引用 Customer，status 使用 completed/pending 统一值，order_date 可按月筛选，amount 可用于金额聚合。",
         "reference_result": "学生指出一个约束缺失会导致错配、重复或空结果的具体风险。",
         "key_steps": [
           "逐字段核对",
@@ -1392,7 +1415,7 @@
           "db-01",
           "db-03"
         ],
-        "reference_answer": "示例：统计 2025-02 月每位客户完成订单的总金额；一行=一客户；路径仍为 Customer JOIN Order，WHERE completed/month，GROUP BY 客户，SUM(order_amount)。",
+        "reference_answer": "示例：统计 2025-02 月有已完成订单的客户总金额；一行=一客户；路径仍为 Customer JOIN Order，WHERE completed/month，GROUP BY 客户，SUM(o.amount)。setup SQL 与 ER starter 都明确提供 amount 字段。",
         "reference_result": "新问题保持客户级粒度，指标、筛选和聚合关系清楚。",
         "key_steps": [
           "选业务指标",
@@ -1417,33 +1440,41 @@
       "path": "orders-er.drawio",
       "language": "ER / draw.io",
       "task_id": "db-map-core",
-      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"orders-er\" name=\"Orders ER starter\">\n    <mxGraphModel dx=\"1000\" dy=\"700\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"customer\" value=\"Customer&#xa;---&#xa;customer_id PK&#xa;customer_name\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"80\" y=\"120\" width=\"220\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"order\" value=\"Order&#xa;---&#xa;order_id PK&#xa;customer_id FK&#xa;status&#xa;order_date\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"500\" y=\"120\" width=\"240\" height=\"140\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer-order\" value=\"1        0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;\" edge=\"1\" parent=\"1\" source=\"customer\" target=\"order\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-a\" value=\"待补关系 A：在工具中核对 Customer—Order 的基数\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"90\" y=\"340\" width=\"260\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-b\" value=\"待补检查 B：status 与订单事实的筛选语义\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"470\" y=\"340\" width=\"260\" height=\"70\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>\n",
+      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"orders-er\" name=\"Orders ER starter\">\n    <mxGraphModel dx=\"1100\" dy=\"720\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"title\" value=\"订单 ER：请在图上完成两个编辑点\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"70\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer\" value=\"Customer&#xa;---&#xa;customer_id PK&#xa;customer_name\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"70\" y=\"100\" width=\"240\" height=\"115\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"order\" value=\"Order&#xa;---&#xa;order_id PK&#xa;customer_id [待标注 FK]&#xa;status&#xa;order_date&#xa;amount\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"520\" y=\"100\" width=\"270\" height=\"150\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer-order-gap\" value=\"待补关系 A：拖出 Customer—Order 连接并标注 1 / 0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;html=1;endArrow=none;strokeColor=#bd8b47;\" edge=\"1\" parent=\"1\" source=\"customer\" target=\"order\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"field-guidance\" value=\"操作提示：编辑 Order.customer_id 字段文字，确认它引用 Customer.customer_id\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"80\" y=\"330\" width=\"330\" height=\"75\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
       "editable_gaps": [
         {
           "marker": "待补关系 A",
           "replacement": "待补关系 A",
-          "instruction": "在工具中核对客户与订单的一对多基数。",
-          "kind": "cardinality-slot"
+          "instruction": "在 draw.io 中编辑待补关系线，保留 Customer—Order 连接并补上 1 / 0..* 基数。",
+          "kind": "editable-relationship"
         },
         {
-          "marker": "待补检查 B",
-          "replacement": "待补检查 B",
-          "instruction": "把订单状态筛选语义与业务问题对照。",
-          "kind": "semantic-check"
+          "marker": "待标注 FK",
+          "replacement": "待标注 FK",
+          "instruction": "编辑 Order.customer_id 字段标签，明确它引用 Customer.customer_id。",
+          "kind": "field-role"
         }
       ]
+    },
+    {
+      "id": "db-orders-setup",
+      "path": "orders-lab-setup.sql",
+      "language": "SQL / MySQL 8.0",
+      "task_id": "db-workbench-optional",
+      "content": "-- 可直接在 MySQL Workbench 执行的本节实验数据\nCREATE DATABASE IF NOT EXISTS practice_orders;\nUSE practice_orders;\n\nDROP TABLE IF EXISTS orders;\nDROP TABLE IF EXISTS customers;\n\nCREATE TABLE customers (\n    customer_id INT PRIMARY KEY,\n    customer_name VARCHAR(50) NOT NULL\n);\n\nCREATE TABLE orders (\n    order_id INT PRIMARY KEY,\n    customer_id INT NOT NULL,\n    status ENUM('completed', 'pending') NOT NULL,\n    order_date DATE NOT NULL,\n    amount DECIMAL(10, 2) NOT NULL,\n    CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers(customer_id)\n);\n\nINSERT INTO customers (customer_id, customer_name) VALUES\n    (1, '客户 A'),\n    (2, '客户 B'),\n    (3, '客户 C');\n\nINSERT INTO orders (order_id, customer_id, status, order_date, amount) VALUES\n    (101, 1, 'completed', '2025-02-01', 120.00),\n    (102, 1, 'completed', '2025-02-28', 50.00),\n    (201, 2, 'completed', '2025-02-01', 70.00),\n    (202, 2, 'pending',   '2025-02-28', 20.00),\n    (301, 3, 'pending',   '2025-01-31', 35.00),\n    (302, 3, 'pending',   '2025-03-01', 40.00);\n",
+      "editable_gaps": []
     },
     {
       "id": "db-orders-sql",
       "path": "orders-query.sql",
       "language": "SQL / MySQL 8.0",
       "task_id": "db-sql-core",
-      "content": "-- MySQL 8.0 starter：统计 2025-02 月有已完成订单的客户及其订单数\nSELECT\n    c.customer_name,\n    COUNT(o.customer_id) AS completed_orders /* TODO 1: count each order row */\nFROM customers AS c\nJOIN orders AS o ON c.customer_id = o.customer_id\nWHERE o.status = 'pending' /* TODO 2: keep only completed orders */\n  AND o.order_date >= '2025-02-01' /* TODO 3: set the requested month lower bound */\n  AND o.order_date < '2025-03-01' /* TODO 4: set the requested month upper bound */\nGROUP BY c.customer_id, c.customer_name\nORDER BY completed_orders DESC, c.customer_name;\n",
+      "content": "-- MySQL 8.0 starter：统计 2025-02 月有已完成订单的客户及其订单数\nSELECT\n    c.customer_name,\n    COUNT(DISTINCT o.customer_id) AS completed_orders /* TODO 1: replace with COUNT(o.order_id) */\nFROM customers AS c\nJOIN orders AS o ON c.customer_id = o.customer_id\nWHERE o.status = 'pending' /* TODO 2: replace with 'completed' */\n  AND o.order_date >= '2025-03-01' /* TODO 3: replace with '2025-02-01' */\n  AND o.order_date < '2025-02-01' /* TODO 4: replace with '2025-03-01' */\nGROUP BY c.customer_id, c.customer_name\nORDER BY completed_orders DESC, c.customer_name;",
       "editable_gaps": [
         {
           "marker": "TODO 1",
-          "replacement": "o.customer_id",
-          "instruction": "把计数对象改成每一行订单的稳定标识。",
+          "replacement": "DISTINCT o.customer_id",
+          "instruction": "把按客户去重的计数改成每一行订单的稳定标识，观察客户 A 的数量变化。",
           "kind": "aggregate-expression"
         },
         {
@@ -1454,14 +1485,14 @@
         },
         {
           "marker": "TODO 3",
-          "replacement": "'2025-02-01'",
-          "instruction": "核对月份下界。",
+          "replacement": "'2025-03-01'",
+          "instruction": "把错误的全年起点改为 2025-02-01，观察 1 月 31 日记录是否被排除。",
           "kind": "date-lower-bound"
         },
         {
           "marker": "TODO 4",
-          "replacement": "'2025-03-01'",
-          "instruction": "核对半开区间的月份上界。",
+          "replacement": "'2025-02-01'",
+          "instruction": "把过早的上界改为 2025-03-01，保留 2 月 1 日和 2 月 28 日。",
           "kind": "date-upper-bound"
         }
       ]

@@ -63,8 +63,8 @@ class CoursewarePackageTests(unittest.TestCase):
 
         report = validate_html_outputs(content, render_student(content), render_teacher(content))
         self.assertEqual(report["status"], "pass", report)
-        self.assertEqual(report["metrics"]["student_pages"], 2)
-        self.assertEqual(report["metrics"]["teacher_pages"], 2)
+        self.assertEqual(report["metrics"]["student_pages"], len(content["slides"]))
+        self.assertEqual(report["metrics"]["teacher_pages"], len(content["slides"]))
 
     def test_invalid_student_phrase_fails_before_output(self) -> None:
         content = self.load_example("data-structures.example.json")

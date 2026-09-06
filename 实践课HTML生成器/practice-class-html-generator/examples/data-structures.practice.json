@@ -239,8 +239,8 @@
         },
         {
           "title": "运行对照",
-          "instruction": "逐项运行并记录返回下标或未找到标志。",
-          "check": "结果与学习指南的边界表一致。"
+          "instruction": "使用已有数组指针调用 binary_search(values, 0, target) 测试空数组，再运行其余输入并记录返回下标或未找到标志。",
+          "check": "空数组从 right=-1 开始且循环不进入，其他结果与学习指南的边界表一致。"
         },
         {
           "title": "定位一项",
@@ -273,7 +273,7 @@
       ],
       "modality": "debugging",
       "overview": "用诊断区先判断故障类型，再回到 starter 中定位造成死循环、越界或错误返回的关键行。",
-      "scaffold": "教师提供三段只改动一处的故障版本；学生先说现象，再决定检查区间、比较或返回值。",
+      "scaffold": "学生包已提供三段只改动一处的 C 故障版本；先说现象，再决定检查区间、比较或返回值，不需要等待教师另发材料。",
       "steps": [
         {
           "title": "读现象",
@@ -282,7 +282,7 @@
         },
         {
           "title": "回到代码",
-          "instruction": "在 starter 中定位对应的 TODO 行或边界更新行。",
+          "instruction": "分别打开 student/starter 中的三个故障版本，定位造成现象的边界更新或返回行。",
           "check": "定位理由能对应一个理论页。"
         },
         {
@@ -303,7 +303,9 @@
       ],
       "estimated_minutes": 14,
       "starter_asset_ids": [
-        "binary-search-c-starter"
+        "binary-search-bug-loop",
+        "binary-search-bug-boundary",
+        "binary-search-bug-return"
       ]
     },
     {
@@ -501,6 +503,7 @@
             "left": 0,
             "right": 7,
             "mid": 3,
+            "status": "continue",
             "next_left": 4,
             "next_right": 7,
             "feedback": "mid=21 小于目标，下一轮只保留右半边 [4,7]。"
@@ -509,17 +512,8 @@
             "left": 4,
             "right": 7,
             "mid": 5,
-            "next_left": 4,
-            "next_right": 4,
-            "feedback": "mid=37 命中；若继续写状态，候选区间只剩 [4,4]。"
-          },
-          {
-            "left": 4,
-            "right": 4,
-            "mid": 4,
-            "next_left": 4,
-            "next_right": 3,
-            "feedback": "边界相遇后命中或排除，下一轮应让区间变空。"
+            "status": "found",
+            "feedback": "mid=37 命中，状态立即终止；不会再进入第三轮。"
           }
         ]
       }
@@ -529,7 +523,8 @@
       "title": "代码关键行对照台",
       "knowledge_link_ids": [
         "search-invariant",
-        "implementation-check"
+        "implementation-check",
+        "ordered-search"
       ],
       "task_ids": [
         "ds-fill-core",
@@ -793,7 +788,7 @@
         "把下一轮边界写成上一轮的 left/right。"
       ],
       "checkpoints": [
-        "完成互动中心两轮状态输入。",
+        "完成互动中心两轮状态输入，命中 37 后确认没有第三轮。",
         "指出哪一行开始排除了不可能区间。"
       ]
     },
@@ -810,7 +805,7 @@
       "body": "可靠性来自边界测试：空数组、单元素、首尾元素、比最小值小、比最大值大、缺失但夹在中间。失败结果必须与合法下标区分。",
       "worked_example": "数组 [3,8] 查 2：第一次区间 [0,1]，mid=0 后 right=-1，循环结束；不能把返回 0 当成命中。",
       "quick_reference": [
-        "空数组：right=-1，循环不进入。",
+        "空数组：不需要定义新数组，调用 binary_search(values, 0, target)，right=-1，循环不进入。",
         "单元素：left=right=0。",
         "未找到：left>right 后返回统一未找到值。"
       ],
@@ -1362,6 +1357,30 @@
     ]
   },
   "starter_assets": [
+    {
+      "id": "binary-search-bug-loop",
+      "path": "bug-loop.c",
+      "language": "C",
+      "task_id": "ds-debug-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (values[mid] == target) return mid;\n        if (values[mid] < target) {\n            left = mid; /* 故障：没有排除已经比较过的 mid */\n        } else {\n            right = mid - 1;\n        }\n    }\n    return -1;\n}\n",
+      "editable_gaps": []
+    },
+    {
+      "id": "binary-search-bug-boundary",
+      "path": "bug-boundary.c",
+      "language": "C",
+      "task_id": "ds-debug-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (values[mid] == target) return mid;\n        if (values[mid] < target) {\n            left = mid + 1;\n        } else {\n            right = mid; /* 故障：没有排除已经比较过的 mid */\n        }\n    }\n    return -1;\n}\n",
+      "editable_gaps": []
+    },
+    {
+      "id": "binary-search-bug-return",
+      "path": "bug-return.c",
+      "language": "C",
+      "task_id": "ds-debug-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (values[mid] == target) return mid;\n        if (values[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return 0; /* 故障：失败结果与首元素下标混淆 */\n}\n",
+      "editable_gaps": []
+    },
     {
       "id": "binary-search-c-starter",
       "path": "binary-search.c",

@@ -56,6 +56,21 @@ MIN_KIT_TOPICS = 5
 MAX_KIT_TOPICS = 10
 MIN_TASK_STEPS = 3
 PROCESS_INTERACTIONS = {"stepper", "trace", "state-simulator"}
+RENDERER_FAMILIES = {
+    "choice": "choice-family",
+    "match": "choice-family",
+    "diagnose": "choice-family",
+    "predict-next": "choice-family",
+    "build-relation": "choice-family",
+    "compare-strategies": "choice-family",
+    "scenario-decision": "choice-family",
+    "stepper": "step-family",
+    "trace": "step-family",
+    "classify": "classify-family",
+    "reorder": "reorder-family",
+    "state-simulator": "state-simulator-family",
+    "multi-question": "multi-question-family",
+}
 CONTEXT_STRING_FIELDS = {
     "course_name",
     "audience",
@@ -235,6 +250,9 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
         errors.append(f"{location}.type must be one of {sorted(INTERACTION_TYPES)}")
     if not _non_empty(interaction.get("prompt")):
         errors.append(f"{location}.prompt must be a non-empty string")
+    for field in ("success_feedback", "retry_feedback", "completion_feedback"):
+        if field in interaction and not _non_empty(interaction.get(field)):
+            errors.append(f"{location}.{field} must be a non-empty string when present")
 
     if kind in OPTION_INTERACTIONS:
         _validate_options(interaction, location, errors)
@@ -272,15 +290,33 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
         if not isinstance(state, dict) or not isinstance(state.get("values"), list) or len(state.get("values", [])) < 2 or "target" not in state:
             errors.append(f"{location}.state needs values, target and a non-empty array")
         rounds = interaction.get("rounds")
-        required_round_fields = ("left", "right", "mid", "next_left", "next_right", "feedback")
+        required_round_fields = ("left", "right", "mid", "status", "feedback")
         if not isinstance(rounds, list) or len(rounds) < 2:
             errors.append(f"{location}.rounds must contain at least two rounds")
         else:
             for index, item in enumerate(rounds):
+                round_location = f"{location}.rounds[{index}]"
                 if not isinstance(item, dict) or any(field not in item for field in required_round_fields) or not _non_empty(item.get("feedback")):
-                    errors.append(f"{location}.rounds[{index}] needs interval values and feedback")
-                elif any(not isinstance(item[field], int) or isinstance(item[field], bool) for field in required_round_fields[:-1]):
+                    errors.append(f"{round_location} needs state values, status and feedback")
+                    continue
+                if item.get("status") not in {"continue", "found", "not-found"}:
+                    errors.append(f"{round_location}.status must be continue, found or not-found")
+                if any(not isinstance(item[field], int) or isinstance(item[field], bool) for field in ("left", "right", "mid")):
                     errors.append(f"{location}.rounds[{index}] interval values must be integers")
+                if item.get("status") == "continue":
+                    if any(not isinstance(item.get(field), int) or isinstance(item.get(field), bool) for field in ("next_left", "next_right")):
+                        errors.append(f"{round_location} with status=continue needs integer next state values")
+                elif "next_left" in item or "next_right" in item:
+                    errors.append(f"{round_location} terminal state must not declare a next state")
+                if item.get("status") != "continue" and index != len(rounds) - 1:
+                    errors.append(f"{round_location} is terminal but later rounds still exist")
+                if index < len(rounds) - 1 and item.get("status") == "continue":
+                    following = rounds[index + 1]
+                    if isinstance(following, dict) and isinstance(item.get("next_left"), int) and isinstance(item.get("next_right"), int):
+                        if following.get("left") != item["next_left"] or following.get("right") != item["next_right"]:
+                            errors.append(f"{round_location} next state does not match the following round")
+            if isinstance(rounds[-1], dict) and rounds[-1].get("status") == "continue":
+                errors.append(f"{location}.rounds must end with a terminal status")
     elif kind == "multi-question":
         questions = interaction.get("questions")
         if not isinstance(questions, list) or len(questions) < 2:
@@ -438,6 +474,9 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "dynamic_interactions": 0,
         "diagnose_interactions": 0,
         "continuous_interactions": 0,
+        "renderer_families": [],
+        "renderer_family_count": 0,
+        "terminal_simulators": 0,
         "guide_sections": 0,
         "foundation_microtopics": 0,
         "core_help_coverage": 0,
@@ -654,6 +693,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     centers = _list(content.get("learning_center"))
     center_ids: set[str] = set()
     interaction_types: set[str] = set()
+    renderer_families: set[str] = set()
     for index, center in enumerate(centers):
         location = f"learning_center[{index}]"
         if not isinstance(center, dict):
@@ -670,32 +710,50 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         interaction = _validate_interaction(center.get("interaction"), f"{location}.interaction", errors)
         if isinstance(interaction.get("type"), str):
             interaction_types.add(interaction["type"])
+            if interaction["type"] in RENDERER_FAMILIES:
+                renderer_families.add(RENDERER_FAMILIES[interaction["type"]])
         metrics["interactions"] += 1
     metrics["interaction_types"] = sorted(interaction_types)
     metrics["interaction_zones"] = len(center_ids)
     metrics["interaction_type_count"] = len(interaction_types)
+    metrics["renderer_families"] = sorted(renderer_families)
+    metrics["renderer_family_count"] = len(renderer_families)
     metrics["dynamic_interactions"] = sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") in PROCESS_INTERACTIONS)
     metrics["diagnose_interactions"] = sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") == "diagnose")
     metrics["continuous_interactions"] = sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") in {"multi-question", "scenario-decision"})
+    metrics["terminal_simulators"] = sum(
+        1
+        for center in centers
+        if isinstance(center, dict)
+        and center.get("interaction", {}).get("type") == "state-simulator"
+        and isinstance(center.get("interaction", {}).get("rounds"), list)
+        and center["interaction"]["rounds"]
+        and isinstance(center["interaction"]["rounds"][-1], dict)
+        and center["interaction"]["rounds"][-1].get("status") in {"found", "not-found"}
+    )
     if len(centers) < MIN_CENTER_ZONES or len(centers) > MAX_CENTER_ZONES:
         errors.append(f"learning_center must contain {MIN_CENTER_ZONES} to {MAX_CENTER_ZONES} distinct experiment zones")
     if len(interaction_types) < MIN_INTERACTION_TYPES:
         errors.append(f"learning_center must use at least {MIN_INTERACTION_TYPES} interaction types")
+    if len(renderer_families) < MIN_INTERACTION_TYPES:
+        errors.append(f"learning_center must use at least {MIN_INTERACTION_TYPES} real renderer families")
     if metrics["dynamic_interactions"] < 1:
         errors.append("learning_center needs at least one dynamic process/state interaction")
     if metrics["diagnose_interactions"] < 1:
         errors.append("learning_center needs at least one diagnose/Debug interaction")
     if metrics["continuous_interactions"] < 1:
         errors.append("learning_center needs at least one continuous question or scenario challenge")
+    if any(isinstance(center, dict) and center.get("interaction", {}).get("type") == "state-simulator" for center in centers) and metrics["terminal_simulators"] < 1:
+        errors.append("state-simulator interactions must include a terminal round")
     core_task_ids = {task_id for task_id, task in task_by_id.items() if task.get("level") == "core"}
     covered_core_task_ids = {task_id for center in centers if isinstance(center, dict) for task_id in _list(center.get("task_ids"))}
     missing_core_centers = sorted(core_task_ids - covered_core_task_ids)
     if missing_core_centers:
         errors.append("learning_center must cover every core task: " + ", ".join(missing_core_centers))
     for knowledge_id in knowledge_ids:
-        knowledge_types = {center.get("interaction", {}).get("type") for center in centers if isinstance(center, dict) and knowledge_id in _list(center.get("knowledge_link_ids"))}
-        knowledge_types.discard(None)
-        if len(knowledge_types) < 2:
+        knowledge_forms = {RENDERER_FAMILIES.get(center.get("interaction", {}).get("type")) for center in centers if isinstance(center, dict) and knowledge_id in _list(center.get("knowledge_link_ids"))}
+        knowledge_forms.discard(None)
+        if len(knowledge_forms) < 2:
             errors.append(f"knowledge link {knowledge_id} must be practiced in at least two interaction forms")
 
     guides = _list(content.get("study_guide"))
@@ -766,6 +824,11 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     for ref in all_help_refs:
         if ref not in valid_help:
             warnings.append(f"help_refs item is not a study guide or foundation kit id: {ref}")
+    timing = content.get("teacher_guide", {}).get("timing", []) if isinstance(content.get("teacher_guide"), dict) else []
+    timing_minutes = sum(item.get("minutes", 0) for item in timing if isinstance(item, dict) and isinstance(item.get("minutes"), int))
+    metrics["teacher_timing_minutes"] = timing_minutes
+    if isinstance(duration, int) and timing_minutes != duration:
+        errors.append(f"teacher_guide.timing total {timing_minutes} must equal duration_minutes {duration}")
     if isinstance(duration, int) and metrics["task_minutes"] != duration:
         warnings.append(f"task minutes total {metrics['task_minutes']} differs from class duration {duration}")
     if source.get("mode") == "courseware" and not source_slide_refs:

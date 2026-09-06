@@ -93,6 +93,9 @@
       "properties": {
         "type": {"enum": ["choice", "match", "stepper", "trace", "classify", "reorder", "diagnose", "predict-next", "build-relation", "state-simulator", "compare-strategies", "multi-question", "scenario-decision"]},
         "prompt": {"$ref": "#/$defs/nonEmpty"},
+        "success_feedback": {"$ref": "#/$defs/nonEmpty"},
+        "retry_feedback": {"$ref": "#/$defs/nonEmpty"},
+        "completion_feedback": {"$ref": "#/$defs/nonEmpty"},
         "options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}},
         "answer_index": {"type": "integer", "minimum": 0},
         "steps": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/stepperStep"}},
@@ -116,8 +119,12 @@
     },
     "round": {
       "type": "object", "additionalProperties": false,
-      "required": ["left", "right", "mid", "next_left", "next_right", "feedback"],
-      "properties": {"left": {"type": "integer"}, "right": {"type": "integer"}, "mid": {"type": "integer"}, "next_left": {"type": "integer"}, "next_right": {"type": "integer"}, "feedback": {"$ref": "#/$defs/nonEmpty"}}
+      "required": ["left", "right", "mid", "status", "feedback"],
+      "properties": {"left": {"type": "integer"}, "right": {"type": "integer"}, "mid": {"type": "integer"}, "status": {"enum": ["continue", "found", "not-found"]}, "next_left": {"type": "integer"}, "next_right": {"type": "integer"}, "feedback": {"$ref": "#/$defs/nonEmpty"}},
+      "allOf": [
+        {"if": {"properties": {"status": {"const": "continue"}}}, "then": {"required": ["next_left", "next_right"]}},
+        {"if": {"properties": {"status": {"enum": ["found", "not-found"]}}}, "then": {"not": {"anyOf": [{"required": ["next_left"]}, {"required": ["next_right"]}]}}}
+      ]
     },
     "question": {
       "type": "object", "additionalProperties": false,
