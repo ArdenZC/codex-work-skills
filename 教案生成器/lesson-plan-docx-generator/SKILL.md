@@ -3,9 +3,17 @@ name: lesson-plan-docx-generator
 description: Generate projectized Chinese vocational-course lesson plan DOCX files from the Lesson Content Contract V2.2 (with V2.1/V2 compatibility), using the protected Word template, output QA, and optional local render smoke. Use for creating, converting, batching, or revising 教案、教学单元设计 and 实训教案 files.
 ---
 
-# 教案生成器 Skill 2.2.1
+# 教案生成器 Skill 2.2.2
 
-本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 Content 2.2 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。2.2.1 是 Lesson / WorkOrder 交付契约修正版，不修改 Word 模板、正文质量算法或 WorkOrder 评分合同。
+本 Skill 的唯一完整行为规范。其他 agent 入口只要求先读取本文件和 `通用提示词.md`，不要复制另一套字段或生成规则。当前支持 Windows 和 macOS。模型负责理解资料并产出完整 Content 2.2 JSON；Python 只负责确定性校验、格式化和模板映射，不能代替模型创作正文。2.2.2 是聚焦 Lesson 内容质量的 hotfix：冻结确认后的课程信息、严格分离教材/教学资源/参考文献、要求有联网能力时先检索真实公开来源，并清理机械主题尾缀；不修改 Word 模板 binary、WorkOrder 合同、事务/路径安全或 CI 架构。
+
+## Lesson Skill 2.2.2 Content Quality Hotfix
+
+- 课程基本信息确认完成后必须冻结为 `confirmed_course_info` 快照；若 JSON 提供该快照，`course_name`、`major`、`audience`、`total_hours`、`theory_hours`、`practice_hours` 和 `delivery_mode` 必须逐项一致。生成器和 DOCX 输出只使用确认值，正文 Agent 不得重新创作这些字段。
+- `course_materials.textbook`、课次 `resources` 和课程级 `reference_pool` 是三类不同数据。教材与教学资源永远不进入 2.2 references；`allow_textbook_as_reference` 不再提供例外。PPT、课件、案例表/案例数据、内部教学资源、任务单和设备名均不是参考文献。
+- 具备联网检索能力时，确认后、编写 `reference_pool` 和逐课正文前必须实际检索公开来源；优先国内出版社、国家高等教育智慧教育平台、高校官方课程、国家/行业标准和权威机构资料。只把检索后能核实的真实来源写入 `reference_pool`，URL/evidence 留在 JSON/QA，Word 只写正常引用；检索不足时少写，不用教材或 PPT 填数，也不编造书目信息。
+- 参考文献通常每课 2–4 条，允许跨课复用。正式出版物必须保留真实作者/编者、出版社和年份；在线课程必须保留真实责任教师/课程团队、开课高校和课程平台/出版社，不能只写平台名。书籍使用“作者：《书名（版本）》，出版社，年份。”格式，在线课程使用“责任者（高校）：《课程名》课程，平台/出版社。”格式；技术 evidence 字段不写进 Word。
+- formatter 会删除正文末尾机械注入的 `（聚焦：…）`、`（聚焦于：…）`、`（围绕：…）`、`（针对：…）` 及同形尾缀；自然表达主题，不把课程标题或任务标题反复塞进每个单元格。
 
 ## 任务入口与 Intake Runtime 2.1.1
 
@@ -39,7 +47,7 @@ Intake 未确认前，不得确定项目数量或名称、理论/实践课次结
 
 若用户明确选择“全部理论”，归一化为 theory_hours=total_hours、practice_hours=0、delivery_mode=theory_only，并将实践任务工单设为 false；若明确选择“全部实践”，归一化为 theory_hours=0、practice_hours=total_hours、delivery_mode=practice_only。其他拆分必须满足 theory_hours + practice_hours = total_hours；不相等时先报告冲突，不得开始 outline。
 
-资料检索优先使用用户提供的教材/课程资料和用户指定教材；有联网能力时再查找出版社或学校官方页、标准/指南、官方技术文档和可核实公开文献。只给出书名时只能写入真实核实的作者、出版社、ISBN、版次或年份；网络不可用时正常继续，不因无法联网中断生成。
+资料检索优先使用用户提供的教材/课程资料和用户指定教材；有联网能力时，在编写 `reference_pool` 和课程正文前必须实际查找出版社或学校官方页、国家/行业标准、官方技术文档和可核实公开文献。只给出书名时只能写入真实核实的作者、出版社、ISBN、版次或年份；在线课程必须同时核实责任者、开课高校和平台/出版社；优先采用至少一项正式出版物与一项高校公开课程的混合来源。网络不可用时正常继续，但不得把教材、PPT、课件、案例或内部教学资源填入 references。
 
 - 用户允许合理推断后，按项目化教学补齐项目、任务、教学内容、评价和预生成反思；
 - 正式 DOCX 不出现“资料不足、推断、AI、QA、similarity、confidence”等内部说明。
@@ -94,7 +102,7 @@ after_class_improvement
 
 评价必须显式提供 85–96 的 `evaluation.score`，使用 0.5 分步进，并提供 canonical 13 个 criterion IDs 的逐课 `remarks`。每条 remark 必须有实质内容；所有 Content V2 模板版本统一执行不超过 48 个有意义字符的合同上限，manifest 只能进一步收紧，超限必须失败而不能截断。未指定分数时建议自然集中在 88–94，但不得全为 90、任意短周期循环、严格递增或递减。`score_breakdown()` 只负责把显式总分确定性拆到既有表格行；Python 不创作备注，不使用三套固定 remarks 循环或机械分数 fallback。反思必须显式提供 summary、innovation、improvement，允许课前预生成，但要围绕本课任务、重难点、组织、预期表现、问题和下一课衔接产生差异。
 
-2.2 的 `course_materials.textbook` 单独表示教材，可为对象或 `null`；它默认不会自动写入 Word 的 references 单元格。Agent 在逐课生成前先形成 `course_reference_pool` / `reference_catalog` planning concept，落盘字段仍是 `reference_pool`，不是新的 JSON contract 字段。每项必须有 `reference_id`、`reference_type`、可识别的具体标题、`source_kind`、`source_region`（`domestic`/`foreign`/`unknown`）和相应 evidence；逐课只写 `reference_ids`。`allow_textbook_as_reference` 默认 false，只有显式为 true 时教材才允许进入 references。`references` 只表示可以阅读、查阅、引用或作为课程依据的文献/文档来源，包括专著、课程/教学标准、国家/行业/职业标准、指南/规范、论文、公开文献、官方技术文档、官方产品手册和用户提供的正式教学文档。`resources` 表示实施教学时使用的工具、设备、环境和材料，例如 MySQL Workbench、数据库服务器、PPT、投影仪、护理模型、虚拟机、实训任务单和案例数据集；这些不能为了凑数写入 references。每课通常选 1–3 项 reference，课程级合法 reference 可重复使用。
+2.2 的 `course_materials.textbook` 单独表示教材，可为对象或 `null`；它永远不会写入 Word 的 references 单元格。Agent 在逐课生成前先形成 `course_reference_pool` / `reference_catalog` planning concept，落盘字段仍是 `reference_pool`，不是新的 JSON contract 字段。每项必须有 `reference_id`、`reference_type`、可识别的具体标题、`source_kind`、`source_region`（`domestic`/`foreign`/`unknown`）和相应 evidence；逐课只写 `reference_ids`。`book` 必须保留真实 `authors`、`publisher`、`year`；`formal_course_document` 必须保留真实责任者 `authors`、开课高校 `institution` 和课程平台/出版社 `publisher`，平台名不能冒充责任者。`allow_textbook_as_reference` 在 2.2.2 中被拒绝。`references` 只表示可以阅读、查阅、引用或作为课程依据的文献/文档来源，包括专著、课程/教学标准、国家/行业/职业标准、指南/规范、论文、公开文献、官方技术文档、官方产品手册和用户提供的正式教学文档。`resources` 表示实施教学时使用的工具、设备、环境和材料，例如 MySQL Workbench、数据库服务器、PPT、投影仪、护理模型、虚拟机、实训任务单、案例表和案例数据集；这些不能为了凑数写入 references。每课通常选 2–4 项 reference，优先混合正式出版物与高校公开课程，真实来源可跨课复用。
 
 `source_kind` 仍保留 `provided`、`generic`、`verified_public`；`provided` 需要用户真实材料 evidence，`verified_public` 需要 URL 或可定位官方来源，`generic` 只可使用具体的文档语义且不得伪造详细书目信息。禁止“统一建模语言相关公开文档”“相关网络资源”“相关公开文献”等泛化占位文本，也禁止猜作者、ISBN、出版社、版次、年份或标准编号。国内来源优先：用户提供资料、国内出版物/专著、国内高校资料、国家/行业/职业标准和国内权威文件优先于外国经典；国内占比低于 70% 只是 quality warning，不是 hard fail，确有国际标准/经典或国内来源不足时可补充外国来源。reference 跨课完全重复允许，属于 `reference_reusable`，明确退出 exact/item/sentence/field/structural/frequency/whole-course 反重复 hard-fail；同一课内部重复 ID 或重复内容仍 hard-fail。References 的重复不属于教案正文重复问题。禁止为了降低课程重复率编造不同教材、作者、ISBN、出版社、标准编号或公开文献；同一教材重复 18 次优于编造 18 本教材。evidence 只用于输入和 QA，DOCX 只写正式引用文本，不写 evidence 元数据。
 
