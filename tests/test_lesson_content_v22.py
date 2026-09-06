@@ -115,6 +115,7 @@ def _pool(*, include_foreign: bool = False, generic: bool = False) -> list[dict[
             "authors": ["严蔚敏", "吴伟民"],
             "edition": "第2版",
             "publisher": "清华大学出版社",
+            "year": 2025,
             "source_kind": "provided",
             "source_region": "domestic",
             "evidence": "用户提供：数据结构教材.pdf",
@@ -122,6 +123,8 @@ def _pool(*, include_foreign: bool = False, generic: bool = False) -> list[dict[
         {
             "reference_id": "REF-STANDARD",
             "reference_type": "formal_course_document",
+            "authors": ["数据结构课程团队"],
+            "institution": "某职业院校",
             "title": "数据结构课程标准",
             "publisher": "某职业院校",
             "source_kind": "verified_public",
@@ -133,7 +136,10 @@ def _pool(*, include_foreign: bool = False, generic: bool = False) -> list[dict[
         items[1] = {
             "reference_id": "REF-STANDARD",
             "reference_type": "formal_course_document",
+            "authors": ["数据结构课程团队"],
+            "institution": "某职业院校",
             "title": "数据结构课程标准相关章节",
+            "publisher": "某职业院校",
             "source_kind": "generic",
             "source_region": "domestic",
         }
@@ -459,6 +465,7 @@ class LessonContentV22Tests(unittest.TestCase):
             "authors": ["严蔚敏", "吴伟民"],
             "edition": "第2版",
             "publisher": "清华大学出版社",
+            "year": 2025,
             "source_kind": "provided",
             "evidence": "用户提供：数据结构教材.pdf",
         }
@@ -475,16 +482,14 @@ class LessonContentV22Tests(unittest.TestCase):
             make_v22_payload(references=[only_textbook], textbook=textbook),
             "course textbook",
         )
-        allowed = make_v22_payload(
-            references=overlap,
-            textbook=textbook,
-            allow_textbook=True,
+        self.assert_rejected(
+            make_v22_payload(
+                references=overlap,
+                textbook=textbook,
+                allow_textbook=True,
+            ),
+            "not supported",
         )
-        allowed_report = self.assert_valid_and_qa(allowed)
-        self.assertTrue(allowed_report["reference_provenance"]["textbook_overlap_allowed"])
-        acceptance_references = lesson_acceptance.reference_metrics(allowed, {"content_quality": allowed_report})
-        self.assertEqual(acceptance_references["status"], "PASS")
-        self.assertEqual(acceptance_references["textbook_overlap_count"], 6)
 
         duplicate = make_v22_payload(references=_pool())
         duplicate["lessons"][0]["reference_ids"] = ["REF-DOMESTIC", "REF-DOMESTIC"]
@@ -500,6 +505,7 @@ class LessonContentV22Tests(unittest.TestCase):
                 "reference_id": "REF-MANUAL",
                 "reference_type": "official_manual",
                 "title": "MySQL 8.0 Reference Manual",
+                "publisher": "Oracle",
                 "source_kind": "verified_public",
                 "source_region": "foreign",
                 "evidence": "https://dev.mysql.com/doc/refman/8.0/en/",
