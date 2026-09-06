@@ -1,0 +1,240 @@
+{
+  "contract_version": "1.0",
+  "course_title": "数据结构",
+  "practice_title": "二分查找：从区间判断到可运行函数",
+  "audience": "高职软件技术专业学生，已完成数组、顺序和复杂度基础学习",
+  "duration_minutes": 90,
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.0",
+    "chapter_title": "查找问题的结构化解法",
+    "taught_slide_ids": ["search-01", "search-02", "search-03", "search-04", "search-05"]
+  },
+  "knowledge_links": [
+    {
+      "id": "search-conditions",
+      "title": "二分查找的适用条件",
+      "summary": "二分查找依赖稳定的比较规则、有序数据和可解释的排除理由，不能只因为数据放在数组里就直接套用。",
+      "source_slide_ids": ["search-02"],
+      "student_can_do": "能用顺序、边界、排除理由三项检查一组数据是否适合二分。"
+    },
+    {
+      "id": "search-interval",
+      "title": "闭区间的收缩过程",
+      "summary": "left 和 right 描述当前仍可能包含目标的闭区间；比较中点后，新的边界必须排除已经证明不可能的位置。",
+      "source_slide_ids": ["search-03", "search-05"],
+      "student_can_do": "能逐轮写出 left、mid、right，并解释每次边界移动排除了哪一段。"
+    },
+    {
+      "id": "search-branch",
+      "title": "命中与未命中的分支",
+      "summary": "相等时返回命中位置，目标更大或更小时收缩一侧，区间为空时明确报告未找到。",
+      "source_slide_ids": ["search-04", "search-05"],
+      "student_can_do": "能用命中、边界命中和未找到样例验证函数的三个主要分支。"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "binary-search-core",
+      "level": "core",
+      "title": "补全闭区间二分查找函数",
+      "knowledge_link_ids": ["search-conditions", "search-interval", "search-branch"],
+      "modality": "coding",
+      "overview": "在完整函数框架中补齐边界初始化、中点计算、分支更新和未找到返回值；每个 TODO 都对应理论页中的一个判断。",
+      "scaffold": "starter 已给出函数签名、循环外形、变量命名和测试入口。先用注释旁的理论锚点解释 TODO，再运行测试，不要一次性重写框架。",
+      "steps": [
+        {"title": "确认区间含义", "instruction": "在 starter 顶部写一句话：left 和 right 都包含在候选区间内；用一个长度为 1 的数组说明初始 right。", "check": "能说明为什么循环条件使用 left <= right。"},
+        {"title": "补齐中点与相等分支", "instruction": "实现不会改变闭区间含义的 mid 计算，并在 data[mid] 等于 target 时返回 mid。", "check": "命中第一个、最后一个和中间元素都能得到正确下标。"},
+        {"title": "补齐两侧边界更新", "instruction": "目标大于中点值时排除 mid 左侧，目标小于中点值时排除 mid 右侧；分别更新 left 或 right。", "check": "每次更新后候选区间严格变小，且没有跳过仍可能命中的位置。"},
+        {"title": "验证未找到状态", "instruction": "运行一个落在两个元素之间、一个小于最小值、一个大于最大值的样例，确认区间为空时返回 -1。", "check": "调用方能区分命中下标 0 与未找到 -1。"}
+      ],
+      "acceptance": [
+        "命中中间元素、首元素、尾元素的测试全部通过。",
+        "未找到三类样例都返回 -1，函数不会越界。",
+        "能够口头解释 while 条件以及 mid + 1 / mid - 1 的排除理由。",
+        "保留 starter 的函数接口和测试入口，提交前删除临时调试输出。"
+      ],
+      "help_refs": ["guide-interval-debug", "kit-python-checks"],
+      "estimated_minutes": 35,
+      "starter_asset_ids": ["binary-search-starter"],
+      "todo_count": 5
+    },
+    {
+      "id": "interval-trace-core",
+      "level": "core",
+      "title": "用 trace 表解释每一轮区间",
+      "knowledge_link_ids": ["search-interval", "search-branch"],
+      "modality": "analysis",
+      "overview": "不改函数，先为数组 [3, 8, 12, 17, 21, 29, 34, 40] 的目标 29 填写每轮 left、mid、right 和排除理由。",
+      "scaffold": "表格已经提供四列和第一行示例。每一行只允许保留一个候选闭区间；如果目标命中，下一行写‘停止—命中’，不要继续虚构边界。",
+      "steps": [
+        {"title": "写出第一轮", "instruction": "根据下标 0 到 7 计算 mid，并抄下中点元素；先不看答案。", "check": "第一轮 mid 为 3，能指出中点元素。"},
+        {"title": "写出排除理由", "instruction": "根据目标 29 与中点值的大小，写出被排除的下标范围和下一轮闭区间。", "check": "理由同时包含比较结果和新边界。"},
+        {"title": "检查结束状态", "instruction": "继续到命中，并补一条目标 30 的未找到 trace，说明区间何时为空。", "check": "能区分命中停止和区间为空停止。"}
+      ],
+      "acceptance": [
+        "29 的 trace 每轮区间都比上一轮更小，最终指向下标 5。",
+        "30 的 trace 能在区间为空时停止，并写出最后一次排除。",
+        "至少两行使用完整句子说明‘为什么可以排除’。"
+      ],
+      "help_refs": ["guide-interval-debug", "kit-trace-language"],
+      "estimated_minutes": 20
+    },
+    {
+      "id": "linear-binary-optional",
+      "level": "optional",
+      "title": "比较线性查找与二分查找",
+      "knowledge_link_ids": ["search-conditions", "search-interval"],
+      "modality": "analysis",
+      "overview": "为‘未排序访客名单’和‘按编号排序的订单表’各选一种查找策略，并估计最坏情况下需要检查的元素数量。",
+      "scaffold": "先填数据是否有序、是否允许预处理、每次比较能否排除一侧三列，再给出选择和理由；不要只写‘二分更快’。",
+      "steps": [
+        {"title": "描述数据条件", "instruction": "给两个场景分别标注顺序状态和比较规则。", "check": "能指出无序名单缺少直接二分的条件。"},
+        {"title": "选择策略", "instruction": "写出线性或二分，并说明是否需要先排序以及成本放在哪里。", "check": "理由与数据条件一致。"}
+      ],
+      "acceptance": ["两种场景均写出策略与条件证据。", "能够说出预处理排序不是免费的。"],
+      "help_refs": ["kit-search-checks"],
+      "estimated_minutes": 20
+    },
+    {
+      "id": "invariant-challenge",
+      "level": "challenge",
+      "title": "写出并迁移循环不变量",
+      "knowledge_link_ids": ["search-interval", "search-branch"],
+      "modality": "reasoning",
+      "overview": "用一句可检查的话表达循环不变量，再把它迁移到一个按编号升序排列的库存表查找问题。",
+      "scaffold": "先完成句式‘循环开始时，若目标存在，它一定在……’，再为库存表标出比较字段、区间端点和未找到状态。",
+      "steps": [
+        {"title": "表达不变量", "instruction": "写出循环开始时候选区间的含义，并说明它为何在三种分支后仍然成立。", "check": "描述包含‘目标存在’和‘当前区间’。"},
+        {"title": "迁移到新场景", "instruction": "把同一检查框架应用到库存编号查找，指出不能直接复用的字段。", "check": "能区分算法结构与业务字段。"}
+      ],
+      "acceptance": ["不变量能覆盖命中和未找到两种结束状态。", "迁移说明包含新场景的比较字段。"],
+      "help_refs": ["guide-interval-debug"],
+      "estimated_minutes": 15
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "center-conditions",
+      "title": "先判断能不能二分",
+      "knowledge_link_ids": ["search-conditions"],
+      "task_ids": ["binary-search-core", "linear-binary-optional"],
+      "purpose": "把‘有序’从口号变成可以检查的前置条件，避免在不适用的数据上开始写函数。",
+      "interaction": {
+        "type": "choice",
+        "prompt": "哪一种材料最适合直接使用二分查找？",
+        "options": [
+          {"label": "按订单号升序排列的订单表", "feedback": "正确：比较规则稳定，每次能根据中点排除一侧。", "correct": true},
+          {"label": "同学们随手写下的无序姓名清单", "feedback": "先确认排序或改用线性扫描；当前不能直接排除一侧。", "correct": false},
+          {"label": "不同记录使用不同排序口径的混合表", "feedback": "比较关系不稳定，先统一字段和排序口径。", "correct": false}
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "center-interval",
+      "title": "一步一步收缩候选区间",
+      "knowledge_link_ids": ["search-interval"],
+      "task_ids": ["interval-trace-core", "binary-search-core"],
+      "purpose": "用过程而不是结果检查边界更新，帮助学生把 trace 表和 starter 中的变量对应起来。",
+      "interaction": {
+        "type": "stepper",
+        "prompt": "观察目标 29 在升序数组中的候选范围变化。",
+        "steps": [
+          {"title": "初始区间", "text": "下标范围为 [0, 7]，mid=3，中点值为 17；目标更大。"},
+          {"title": "排除左侧", "text": "17 及其左侧不可能命中，下一轮保留 [4, 7]，left 更新为 4。"},
+          {"title": "继续判断", "text": "在新区间取中点并重复相同理由，直到 mid=5 命中 29。"}
+        ]
+      }
+    },
+    {
+      "id": "center-branches",
+      "title": "命中和未找到不是同一种结果",
+      "knowledge_link_ids": ["search-branch"],
+      "task_ids": ["binary-search-core", "interval-trace-core"],
+      "purpose": "用边界样例检验返回状态，避免把下标 0、空区间和相等分支混成一个结果。",
+      "interaction": {
+        "type": "match",
+        "prompt": "目标小于当前中点值时，下一步应如何保留候选？",
+        "options": [
+          {"label": "right = mid - 1", "feedback": "正确：mid 及右侧已经不可能，仍保留左侧闭区间。", "correct": true},
+          {"label": "left = mid", "feedback": "这会保留已比较过的 mid，可能导致区间不变。", "correct": false},
+          {"label": "直接返回 0", "feedback": "比较结果不是命中证据，不能直接返回下标。", "correct": false}
+        ],
+        "answer_index": 0
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "guide-interval-debug",
+      "title": "边界调试四问",
+      "knowledge_link_ids": ["search-interval", "search-branch"],
+      "body": "每次调试先问：当前区间是闭区间还是半开区间？mid 是否仍在当前区间？更新后是否排除了已经比较过的位置？区间为空时调用方如何识别未找到？把四问写在 trace 表旁边，能比盯着最终输出更快定位错误。",
+      "checkpoints": ["能说出 left、mid、right 各自代表什么。", "能用一个边界样例验证更新没有跳过目标。", "能区分相等返回和区间为空返回。"]
+    },
+    {
+      "id": "guide-condition-check",
+      "title": "算法选择不是速度口号",
+      "knowledge_link_ids": ["search-conditions"],
+      "body": "先检查数据是否有序、比较规则是否一致、一次判断是否能排除一侧，再谈二分的效率。若必须先排序，记录排序成本；若数据持续变化，重新评估维护顺序是否值得。",
+      "checkpoints": ["为一个真实数据表写出三项前置条件。", "指出不能直接二分的原因，而不是只说‘数据乱’。"]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "kit-python-checks",
+      "title": "Python 函数最小检查表",
+      "kind": "starter 操作",
+      "content": "本次只需要列表下标、while 条件、比较和 return。先保持函数接口不变，再用小输入逐步验证，不要在还没画清区间时引入递归。",
+      "steps": ["先运行已有测试，确认测试入口可用。", "每完成一个 TODO 就运行一个命中或未命中样例。", "最后删除调试输出，保留能解释边界的变量名。"]
+    },
+    {
+      "id": "kit-trace-language",
+      "title": "Trace 表用语",
+      "kind": "推理支架",
+      "content": "推荐使用‘当前区间’、‘中点比较’、‘排除范围’、‘下一轮区间’、‘停止状态’五个词，让表格记录判断而不只是数字。",
+      "steps": ["先填数字，再补排除理由。", "命中时写停止—命中，空区间时写停止—未找到。", "把一行理由读给同伴，检查是否能复现下一行。"]
+    },
+    {
+      "id": "kit-search-checks",
+      "title": "查找策略选择表",
+      "kind": "决策工具",
+      "content": "按顺序记录：是否有序、比较口径、是否允许预处理、每次比较能否排除一侧、结果如何表示。",
+      "steps": ["先描述数据条件。", "再选择线性或二分。", "最后写出最坏情况下的检查量和维护成本。"]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "让学生把二分查找从‘会背模板’转成‘能解释边界并完成测试’；课堂结束时每组至少交出一个通过边界样例的函数和一张可复盘 trace 表。",
+    "theory_bridge": "开场回到 search-02 的三个前置条件，执行时反复指回 search-03 的区间变化，验收时用 search-04/05 的分支和边界表逐项核对。",
+    "timing": [
+      {"minutes": 8, "focus": "用学习中心的条件选择题唤回顺序、边界、排除理由。"},
+      {"minutes": 35, "focus": "学生完成 binary-search-core，教师只追问区间含义和排除证据。"},
+      {"minutes": 20, "focus": "两人互换 interval trace，先解释再对照函数结果。"},
+      {"minutes": 17, "focus": "按进度选择 optional 或 challenge，快组迁移到新场景。"},
+      {"minutes": 10, "focus": "用命中、边界、未找到三项做出口检查。"}
+    ],
+    "task_guidance": [
+      {"task_id": "binary-search-core", "look_for": "学生是否保持闭区间定义，是否能把每个更新和排除理由对应起来。", "ask_when_stuck": "现在 left 和 right 之间仍可能有目标吗？mid 已经比较过，哪一侧可以明确排除？"},
+      {"task_id": "interval-trace-core", "look_for": "trace 是否记录了每轮完整区间，而不是只记录最终下标。", "ask_when_stuck": "目标和中点值谁更大？这句话能排除哪些下标？下一行的两个端点是多少？"},
+      {"task_id": "linear-binary-optional", "look_for": "选择是否由数据条件支撑，是否把排序成本说清楚。", "ask_when_stuck": "如果今天数据只来一次，排序成本值得吗？如果每天查询很多次呢？"},
+      {"task_id": "invariant-challenge", "look_for": "不变量是否覆盖循环开始、分支更新和两种结束状态。", "ask_when_stuck": "如果目标存在，它在这一轮开始时一定在哪里？更新后这句话还成立吗？"}
+    ],
+    "common_errors": [
+      {"symptom": "把 right 初始化为 len(data) 而仍使用闭区间。", "intervention": "让学生用最后一个合法下标检查端点，再比较闭区间和半开区间是否混用。"},
+      {"symptom": "目标更大时写 left = mid，测试偶尔卡住。", "intervention": "回到‘mid 已比较过’的理论句子，要求画出更新前后区间。"},
+      {"symptom": "只测中间值，未找到时返回错误下标。", "intervention": "指定小于最小值、大于最大值和夹在两个值之间的三组输入。"}
+    ],
+    "pace_adjustments": ["进度慢：只保留 core 的函数和两条 trace，教师提供边界句式。", "进度正常：完成 optional 并互换检查表。", "进度快：完成 challenge，要求把不变量迁移到库存编号场景。"],
+    "closing_checks": ["每组展示一次命中和一次未找到的运行结果。", "学生能指出一个 source slide id 以及它改变了任务中的哪个判断。", "收走的 trace 表包含区间、比较、排除理由和停止状态四类信息。"]
+  },
+  "starter_assets": [
+    {
+      "id": "binary-search-starter",
+      "path": "binary_search.py",
+      "language": "python",
+      "task_id": "binary-search-core",
+      "content": "\"\"\"闭区间二分查找练习：保留函数接口，逐个完成 TODO。\"\"\"\n\n\ndef binary_search(data, target):\n    # TODO 1: 设置闭区间的左右端点\n    left = None\n    right = None\n\n    # TODO 2: 写出闭区间仍然有效的循环条件\n    while False:\n        # TODO 3: 计算当前区间的中点\n        mid = None\n\n        if data[mid] == target:\n            return mid\n        if data[mid] < target:\n            # TODO 4: 排除 mid 及其左侧\n            left = None\n        else:\n            # TODO 5: 排除 mid 及其右侧\n            right = None\n\n    return -1\n\n\nif __name__ == \"__main__\":\n    samples = [3, 8, 12, 17, 21, 29, 34, 40]\n    for value in (3, 29, 40, 30):\n        print(value, binary_search(samples, value))\n"
+    }
+  ]
+}

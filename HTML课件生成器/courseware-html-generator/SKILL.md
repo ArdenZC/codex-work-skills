@@ -11,7 +11,7 @@ metadata:
 
 使用本 Skill 时，Agent 负责读取用户资料、理解课程主题、规划页面和创作完整的 `Courseware Content Contract 1.0` JSON。内置 Python 脚本负责确定性校验、布局、CSS/JavaScript、单文件输出和 QA；不要让模型直接拼接最终 HTML，也不要在输入中提交任意 JavaScript。
 
-本 Skill 独立于教案 DOCX 和实践任务工单 Skill。除非用户另行要求，不要解析或修改它们的输出，也不要把本 Skill 绑定到某个课程或数据结构主题。
+本 Skill 仍独立于教案 DOCX 和旧实践任务工单 Skill：不要解析或修改它们的输出，也不依赖 `practice-class-html-generator`。新的实践课 Skill 可以直接消费本 Skill 产出的 Courseware Content Contract 1.0；因此必须保持 `slide.id` 稳定，并且 Courseware 不反向依赖实践课 Skill，也不绑定到某个课程主题。
 
 ## 使用流程
 

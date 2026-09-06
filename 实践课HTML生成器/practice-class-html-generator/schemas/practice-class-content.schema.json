@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/practice-class-html-generator/practice-class-content.schema.json",
+  "title": "Practice Class Content Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "course_title", "practice_title", "audience", "duration_minutes", "source_courseware", "knowledge_links", "tasks", "learning_center", "study_guide", "foundation_kit", "teacher_guide", "starter_assets"],
+  "properties": {
+    "contract_version": {"const": "1.0"},
+    "course_title": {"type": "string", "minLength": 1},
+    "practice_title": {"type": "string", "minLength": 1},
+    "audience": {"type": "string", "minLength": 1},
+    "duration_minutes": {"type": "integer", "minimum": 30},
+    "source_courseware": {"$ref": "#/$defs/source"},
+    "knowledge_links": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/knowledge"}},
+    "tasks": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/task"}},
+    "learning_center": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/center"}},
+    "study_guide": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/guide"}},
+    "foundation_kit": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/kit"}},
+    "teacher_guide": {"$ref": "#/$defs/teacher"},
+    "starter_assets": {"type": "array", "items": {"$ref": "#/$defs/starter"}}
+  },
+  "$defs": {
+    "strings": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "contract_version", "chapter_title", "taught_slide_ids"],
+      "properties": {
+        "mode": {"enum": ["courseware", "independent"]},
+        "contract_version": {"const": "1.0"},
+        "chapter_title": {"type": "string", "minLength": 1},
+        "taught_slide_ids": {"$ref": "#/$defs/strings"}
+      }
+    },
+    "knowledge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "summary", "source_slide_ids", "student_can_do"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "title": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1}, "source_slide_ids": {"$ref": "#/$defs/strings"},
+        "student_can_do": {"type": "string", "minLength": 1}
+      }
+    },
+    "step": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "instruction"],
+      "properties": {"title": {"type": "string", "minLength": 1}, "instruction": {"type": "string", "minLength": 1}, "check": {"type": "string"}}
+    },
+    "task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "level", "title", "knowledge_link_ids", "modality", "overview", "steps", "acceptance", "help_refs", "estimated_minutes", "scaffold"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "level": {"enum": ["core", "optional", "challenge"]},
+        "title": {"type": "string", "minLength": 1}, "knowledge_link_ids": {"$ref": "#/$defs/strings"},
+        "modality": {"type": "string", "minLength": 1}, "overview": {"type": "string", "minLength": 1},
+        "scaffold": {"type": "string", "minLength": 1}, "steps": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/step"}},
+        "acceptance": {"$ref": "#/$defs/strings"}, "help_refs": {"$ref": "#/$defs/strings"},
+        "estimated_minutes": {"type": "integer", "minimum": 5}, "starter_asset_ids": {"$ref": "#/$defs/strings"}, "todo_count": {"type": "integer", "minimum": 0}
+      }
+    },
+    "interaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "prompt"],
+      "properties": {
+        "type": {"enum": ["choice", "match", "stepper"]}, "prompt": {"type": "string", "minLength": 1},
+        "options": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["label", "feedback"], "properties": {"label": {"type": "string"}, "feedback": {"type": "string"}, "correct": {"type": "boolean"}}, "additionalProperties": false}},
+        "answer_index": {"type": "integer", "minimum": 0},
+        "steps": {"type": "array", "minItems": 2, "items": {"type": "object", "required": ["title", "text"], "properties": {"title": {"type": "string"}, "text": {"type": "string"}}, "additionalProperties": false}}
+      }
+    },
+    "center": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "knowledge_link_ids", "task_ids", "purpose", "interaction"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "title": {"type": "string", "minLength": 1},
+        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"},
+        "purpose": {"type": "string", "minLength": 1}, "interaction": {"$ref": "#/$defs/interaction"}
+      }
+    },
+    "guide": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "knowledge_link_ids", "body", "checkpoints"],
+      "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "body": {"type": "string"}, "checkpoints": {"$ref": "#/$defs/strings"}}
+    },
+    "kit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "kind", "content", "steps"],
+      "properties": {"id": {"type": "string"}, "title": {"type": "string"}, "kind": {"type": "string"}, "content": {"type": "string"}, "steps": {"$ref": "#/$defs/strings"}}
+    },
+    "teacher": {
+      "type": "object", "additionalProperties": false,
+      "required": ["purpose", "theory_bridge", "timing", "task_guidance", "common_errors", "pace_adjustments", "closing_checks"],
+      "properties": {
+        "purpose": {"type": "string"}, "theory_bridge": {"type": "string"}, "timing": {"type": "array", "items": {"type": "object", "required": ["minutes", "focus"], "properties": {"minutes": {"type": "integer"}, "focus": {"type": "string"}}, "additionalProperties": false}},
+        "task_guidance": {"type": "array", "items": {"type": "object", "required": ["task_id", "look_for", "ask_when_stuck"], "properties": {"task_id": {"type": "string"}, "look_for": {"type": "string"}, "ask_when_stuck": {"type": "string"}}, "additionalProperties": false}},
+        "common_errors": {"type": "array", "items": {"type": "object", "required": ["symptom", "intervention"], "properties": {"symptom": {"type": "string"}, "intervention": {"type": "string"}}, "additionalProperties": false}},
+        "pace_adjustments": {"$ref": "#/$defs/strings"}, "closing_checks": {"$ref": "#/$defs/strings"}
+      }
+    },
+    "starter": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "path", "language", "task_id", "content"],
+      "properties": {"id": {"type": "string"}, "path": {"type": "string"}, "language": {"type": "string"}, "task_id": {"type": "string"}, "content": {"type": "string"}}
+    }
+  }
+}

@@ -4,6 +4,12 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 实践课 HTML 生成器 1.0.0 — 2026-09-06
+
+- 新增 `practice-class-html-generator` 1.0.0：以 Courseware Content Contract 1.0 为首选上游，生成学生任务、学习中心、学习指南、动态基础工具包和教师指南，并输出合同/内链/互动 QA。
+- 加入数据结构、软件建模/UML、数据库三套内容差异明显的真实 fixture，覆盖代码 starter、建模脚手架和 ER/SQL/工具操作。
+- Courseware Skill 仅补充下游消费说明并保持稳定 `slide.id` 约束，不建立反向依赖。
+
 ## HTML 课件生成器 1.0.0 — 2026-09-06
 
 - 新增独立的 `HTML课件生成器/courseware-html-generator` Skill，使用 `Courseware Content Contract 1.0` 将教材、PPT、讲义、教案或其他课程资料渲染为学生课堂展示版和教师逐页备课版。

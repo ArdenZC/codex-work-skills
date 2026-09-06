@@ -2,6 +2,8 @@
 
 可复用的离线 HTML 课件生成 Skill。它把 Agent 创作的结构化内容渲染为学生课堂展示版和教师逐页备课版，不绑定数据结构或某一门课程。
 
+下游实践课联动：`实践课HTML生成器/practice-class-html-generator` 以本 Skill 的 Courseware Content Contract 1.0 为首选上游输入，并通过稳定的 `slide.id` 关联理论页。课件 Skill 不依赖或反向修改实践课 Skill。
+
 ## 目录
 
 ```text

@@ -3773,6 +3773,7 @@ esac
             "template-gradebook",
             "template-workorder",
             "template-courseware",
+            "practice-class-html",
             "template-release",
             "ci-gate",
         ):
@@ -3794,6 +3795,7 @@ esac
         gradebook_text = str(jobs["template-gradebook"]).lower()
         workorder_text = str(jobs["template-workorder"]).lower()
         courseware_text = str(jobs["template-courseware"]).lower()
+        practice_class_text = str(jobs["practice-class-html"]).lower()
         release_text = str(jobs["template-release"]).lower()
         self.assertIn("libreoffice", tooling_text)
         self.assertNotIn("libreoffice", lesson_text)
@@ -3807,6 +3809,10 @@ esac
         self.assertIn("browser_smoke.mjs", courseware_text)
         self.assertIn("playwright", courseware_text)
         self.assertIn("file://", courseware_text)
+        self.assertIn("practice-class-html-generator", practice_class_text)
+        self.assertIn("browser_smoke.mjs", practice_class_text)
+        self.assertIn("playwright", practice_class_text)
+        self.assertIn("validate_practice.py", practice_class_text)
         gradebook_steps = "\n".join(step.get("run", "") for step in jobs["template-gradebook"]["steps"])
         self.assertIn("run_gradebook_shards.py", gradebook_steps)
         self.assertIn("--group contracts", gradebook_steps)
@@ -3857,6 +3863,7 @@ esac
             "run_gradebook",
             "run_workorder",
             "run_courseware",
+            "run_practice_class",
             "run_tooling",
             "run_release",
             "run_package_contracts",
@@ -3872,6 +3879,7 @@ esac
             "教案生成器/简介.md",
             "平时成绩记分册生成器/简介.md",
             "HTML课件生成器/简介.md",
+            "实践课HTML生成器/简介.md",
             "多Agent兼容规范.md",
         ):
             self.assertIn(allowed_path, classifier)
@@ -3902,6 +3910,7 @@ esac
             ("template-gradebook", "run_gradebook"),
             ("template-workorder", "run_workorder"),
             ("template-courseware", "run_courseware"),
+            ("practice-class-html", "run_practice_class"),
             ("template-release", "run_release"),
         ):
             self.assertIn("always()", jobs[heavy_job]["if"])
@@ -3932,6 +3941,7 @@ esac
                 "template-gradebook",
                 "template-workorder",
                 "template-courseware",
+                "practice-class-html",
                 "template-release",
             },
         )

@@ -1,0 +1,250 @@
+{
+  "contract_version": "1.0",
+  "course_title": "数据库原理与应用",
+  "practice_title": "订单分析：从 ER 草图到可验证 SQL",
+  "audience": "高职软件技术专业学生，已学习关系模型、基本查询和数据库客户端操作",
+  "duration_minutes": 90,
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.0",
+    "chapter_title": "从业务事实到可执行查询",
+    "taught_slide_ids": ["db-01", "db-02", "db-03"]
+  },
+  "knowledge_links": [
+    {
+      "id": "db-er-facts",
+      "title": "业务事实与 ER 结构",
+      "summary": "从客户、订单、商品和明细等稳定业务事实中识别实体、关系和约束，避免只按页面罗列表。",
+      "source_slide_ids": ["db-01"],
+      "student_can_do": "能把订单场景转成实体、关系和一条可检查的业务约束。"
+    },
+    {
+      "id": "db-keys-joins",
+      "title": "主键、外键与连接",
+      "summary": "主键稳定识别记录，外键保存实体之间的引用；连接条件要依据业务语义对齐键值。",
+      "source_slide_ids": ["db-02"],
+      "student_can_do": "能在 ER 草图和查询中标出主键、外键以及对应连接条件。"
+    },
+    {
+      "id": "db-aggregation",
+      "title": "筛选、分组与聚合",
+      "summary": "先把业务问题说清，再选择记录来源，用 WHERE 限定范围、GROUP BY 确定结果粒度，最后用聚合函数计算指标。",
+      "source_slide_ids": ["db-03"],
+      "student_can_do": "能写出每位客户订单统计查询，并用一条手算记录核对结果。"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "orders-er-core",
+      "level": "core",
+      "title": "绘制订单分析 ER 草图",
+      "knowledge_link_ids": ["db-er-facts", "db-keys-joins"],
+      "modality": "modeling",
+      "overview": "把客户、订单、商品、订单明细四类业务事实画成可解释的 ER 草图，补齐主键、外键和关键多重性。",
+      "scaffold": "starter 提供业务事实卡、实体栏和关系栏。先填表格再在工具中连线，避免从空白画布猜表结构。",
+      "steps": [
+        {"title": "分离业务事实", "instruction": "从订单场景中标出客户、订单、商品和订单明细，并为每类事实写一句保存理由。", "check": "每个实体只表达一种清晰的记录。"},
+        {"title": "标出键", "instruction": "为每个实体选择稳定主键，在引用处标出外键并写出键的来源。", "check": "订单明细能够同时指向订单和商品。"},
+        {"title": "标多重性", "instruction": "补充客户—订单、订单—明细、商品—明细之间的多重性，并说明为什么。", "check": "能解释一张订单为何可以有多条明细。"},
+        {"title": "连接业务问题", "instruction": "在图旁写出‘每位客户完成了多少订单’需要经过哪些实体。", "check": "路径能自然支持后续 SQL 连接。"}
+      ],
+      "acceptance": [
+        "四类核心实体或等价命名均出现，且各自有稳定业务含义。",
+        "主键、外键和至少三组多重性清楚可见。",
+        "订单明细同时连接订单和商品，能承载数量事实。",
+        "ER 草图能指向 db-03 的客户订单统计问题。"
+      ],
+      "help_refs": ["guide-er-to-query", "kit-er-checks"],
+      "estimated_minutes": 30,
+      "starter_asset_ids": ["orders-er-template"]
+    },
+    {
+      "id": "orders-sql-core",
+      "level": "core",
+      "title": "完成客户订单统计查询",
+      "knowledge_link_ids": ["db-keys-joins", "db-aggregation"],
+      "modality": "sql",
+      "overview": "在完整查询骨架中补齐连接、筛选、分组和统计四处关键 TODO，回答每位客户在指定月份完成的订单数量。",
+      "scaffold": "starter 已提供表别名、业务问题、输出列和测试数据说明。每个 TODO 旁标注了应回看的理论点；先在客户端运行小样例，再检查结果粒度。",
+      "steps": [
+        {"title": "补连接条件", "instruction": "依据 ER 草图把 customers 与 orders 对齐，确认连接字段含义一致。", "check": "没有用姓名等显示字段代替键。"},
+        {"title": "补时间筛选", "instruction": "只保留目标月份的已完成订单，先写 WHERE 条件并说明范围。", "check": "筛选发生在统计前，边界日期有明确口径。"},
+        {"title": "补分组粒度", "instruction": "让结果每行代表一位客户，并选择订单数量聚合。", "check": "GROUP BY 与 SELECT 中的非聚合字段一致。"},
+        {"title": "用手算核对", "instruction": "挑一位客户列出参与统计的订单，再与查询结果对比。", "check": "能解释一行结果代表谁以及统计了哪些记录。"}
+      ],
+      "acceptance": [
+        "查询包含正确的主键连接和目标月份筛选。",
+        "结果每行代表一位客户，订单数量与手算样例一致。",
+        "空结果和只有一条订单的客户不会被错误合并。",
+        "能说明 WHERE、GROUP BY、COUNT 分别回答什么问题。"
+      ],
+      "help_refs": ["guide-sql-debug", "kit-sql-runbook"],
+      "estimated_minutes": 25,
+      "starter_asset_ids": ["orders-query-starter"],
+      "todo_count": 4
+    },
+    {
+      "id": "orders-constraints-optional",
+      "level": "optional",
+      "title": "为订单模型补充约束",
+      "knowledge_link_ids": ["db-er-facts", "db-keys-joins"],
+      "modality": "database-tooling",
+      "overview": "在数据库工具中为订单模型补充非空、唯一或引用约束，选择一条不满足约束的样例并记录系统反馈。",
+      "scaffold": "按‘业务规则—模型位置—工具设置—验证样例’四栏填写；工具操作可以使用课堂提供的建模软件或数据库客户端。",
+      "steps": [
+        {"title": "选一条规则", "instruction": "从客户标识唯一、订单必须有客户、明细必须有数量中选择一条。", "check": "规则能回到 db-01 的业务事实。"},
+        {"title": "配置并验证", "instruction": "在工具中设置约束，插入或模拟一条违反规则的记录，记录反馈。", "check": "反馈能够证明约束真的生效。"}
+      ],
+      "acceptance": ["约束有业务来源并落在正确实体或关系上。", "验证样例和工具反馈被记录。"],
+      "help_refs": ["kit-er-checks"],
+      "estimated_minutes": 20
+    },
+    {
+      "id": "orders-plan-challenge",
+      "level": "challenge",
+      "title": "解释统计查询的执行代价",
+      "knowledge_link_ids": ["db-keys-joins", "db-aggregation"],
+      "modality": "analysis",
+      "overview": "对客户订单统计查询提出一个可验证的优化假设，说明索引字段、筛选位置和结果粒度之间的关系。",
+      "scaffold": "使用‘数据量—过滤字段—连接字段—结果粒度’四格卡片，先做证据推断，再提出一种索引或数据准备策略。",
+      "steps": [
+        {"title": "定位工作量", "instruction": "指出查询需要扫描、连接和分组的主要记录集合。", "check": "描述能回到 SQL 的 FROM、WHERE、GROUP BY。"},
+        {"title": "提出并验证假设", "instruction": "选择一个时间或连接字段提出优化方向，并说明如何用小数据或执行计划观察变化。", "check": "不把‘加索引’当成没有条件的答案。"}
+      ],
+      "acceptance": ["优化假设有字段和查询位置证据。", "能说明验证方式与可能的副作用。"],
+      "help_refs": ["guide-sql-debug"],
+      "estimated_minutes": 15
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "center-er-path",
+      "title": "ER 路径能否回答业务问题",
+      "knowledge_link_ids": ["db-er-facts"],
+      "task_ids": ["orders-er-core", "orders-sql-core"],
+      "purpose": "把 ER 图从符号练习变成对客户订单统计问题的可追溯路径。",
+      "interaction": {
+        "type": "stepper",
+        "prompt": "沿着‘每位客户完成了多少订单’检查业务路径。",
+        "steps": [
+          {"title": "确定统计对象", "text": "结果每行代表一位客户，因此需要从 customers 出发。"},
+          {"title": "找到业务事件", "text": "订单数量来自 orders，客户与订单通过客户键发生关系。"},
+          {"title": "检查范围", "text": "指定月份和完成状态先筛选订单，再按客户分组统计。"}
+        ]
+      }
+    },
+    {
+      "id": "center-keys",
+      "title": "键和连接条件辨析",
+      "knowledge_link_ids": ["db-keys-joins"],
+      "task_ids": ["orders-er-core", "orders-sql-core"],
+      "purpose": "用具体连接选择帮助学生把 ER 中的外键关系迁移到 SQL 条件。",
+      "interaction": {
+        "type": "choice",
+        "prompt": "customers 与 orders 的连接条件最应依据哪一组字段？",
+        "options": [
+          {"label": "customers.customer_id = orders.customer_id", "feedback": "正确：两列都表达客户键，连接有业务语义。", "correct": true},
+          {"label": "customers.customer_name = orders.customer_name", "feedback": "显示名称可能重复或变化，不能稳定识别客户。", "correct": false},
+          {"label": "customers.created_at = orders.created_at", "feedback": "时间相同不代表同一客户订单关系。", "correct": false}
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "center-aggregation",
+      "title": "预测分组结果",
+      "knowledge_link_ids": ["db-aggregation"],
+      "task_ids": ["orders-sql-core", "orders-plan-challenge"],
+      "purpose": "先预测一行结果代表谁，再回到 WHERE、GROUP BY 和聚合函数核对查询。",
+      "interaction": {
+        "type": "match",
+        "prompt": "哪一句最准确地描述 GROUP BY customer_id 的作用？",
+        "options": [
+          {"label": "让每个客户形成一个结果组", "feedback": "正确：结果粒度由客户键决定，COUNT 在每组内计算。", "correct": true},
+          {"label": "把所有订单按时间重新排序", "feedback": "排序不是分组；需要排序时使用明确的排序语义。", "correct": false},
+          {"label": "自动删除没有订单的客户", "feedback": "是否保留没有匹配记录的客户还取决于连接类型和筛选位置。", "correct": false}
+        ],
+        "answer_index": 0
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "guide-er-to-query",
+      "title": "从 ER 图走到查询的四步",
+      "knowledge_link_ids": ["db-er-facts", "db-keys-joins"],
+      "body": "先说清业务问题的结果对象，再沿 ER 图找实体路径，接着把关系两端的键写成连接条件，最后检查每个输出字段来自哪张表。图上没有的关系不要在查询里凭空拼接。",
+      "checkpoints": ["结果每行代表谁？", "经过了哪些实体和关系？", "连接字段为什么表示同一业务事实？", "输出字段和模型是否一致？"]
+    },
+    {
+      "id": "guide-sql-debug",
+      "title": "SQL 结果不对时的排查顺序",
+      "knowledge_link_ids": ["db-keys-joins", "db-aggregation"],
+      "body": "先单独查看连接后的记录，再加入 WHERE 确认筛选范围，最后加入 GROUP BY 和聚合。每一步都保留行数和一个样例，避免一次性堆叠所有子句后只盯最终数字。",
+      "checkpoints": ["连接后是否出现重复或丢失？", "日期边界是否明确？", "一行结果的粒度是什么？", "手算记录能否复现一行结果？"]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "kit-er-checks",
+      "title": "ER 建模检查表",
+      "kind": "建模工具",
+      "content": "每个实体只表示一种稳定业务事实；每个实体有稳定主键；外键指向真实目标；多重性和必填规则能用业务句子解释。",
+      "steps": ["先写实体含义和主键。", "再画关系并标多重性。", "最后沿业务问题走一遍路径。"]
+    },
+    {
+      "id": "kit-sql-runbook",
+      "title": "客户端查询操作顺序",
+      "kind": "数据库工具操作",
+      "content": "先打开课堂提供的连接和样例数据，再分段运行查询；每次只增加一个子句，并记录结果行数和一条核对记录。",
+      "steps": ["确认当前连接和目标数据库。", "先运行连接部分，检查字段含义。", "加入筛选和分组，最后做手算核对。"]
+    },
+    {
+      "id": "kit-result-language",
+      "title": "结果解释句式",
+      "kind": "分析支架",
+      "content": "用‘这一行代表……，它统计了……范围内的……，连接依据是……’解释结果，能把工具输出重新连回业务问题。",
+      "steps": ["先说一行代表谁。", "再说纳入了哪些记录。", "最后说筛选、连接和聚合依据。"]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "让学生把订单业务事实、ER 结构、数据库工具操作和统计查询连成一条可验证链路；课堂结束时每组交出 ER 草图、可运行查询和一条手算核对记录。",
+    "theory_bridge": "以 db-01 的实体关系为图纸，以 db-02 的主外键连接为桥，以 db-03 的筛选—分组—聚合为查询验收顺序；每个 core 步骤都回指一个理论判断。",
+    "timing": [
+      {"minutes": 8, "focus": "用 ER 路径互动预测统计对象和实体链。"},
+      {"minutes": 30, "focus": "完成订单 ER 草图，检查键、关系和多重性。"},
+      {"minutes": 25, "focus": "完成 SQL starter，分段运行并做手算核对。"},
+      {"minutes": 17, "focus": "按进度补充约束或提出执行代价假设。"},
+      {"minutes": 10, "focus": "用结果解释句式完成小组展示和出口检查。"}
+    ],
+    "task_guidance": [
+      {"task_id": "orders-er-core", "look_for": "实体分别表达业务事实，明细承载订单与商品之间的数量关系，连接路径支持统计问题。", "ask_when_stuck": "这张记录描述什么事实？如果没有它，订单中的商品数量放在哪里？"},
+      {"task_id": "orders-sql-core", "look_for": "学生按连接—筛选—分组—核对顺序工作，能说出一行结果的粒度。", "ask_when_stuck": "先看连接后的记录是否正确；这条 WHERE 让哪些记录进入统计？"},
+      {"task_id": "orders-constraints-optional", "look_for": "约束有业务来源，并通过违反样例验证而非只勾选工具选项。", "ask_when_stuck": "如果这条规则被破坏，哪一类业务事实会失真？"},
+      {"task_id": "orders-plan-challenge", "look_for": "优化假设指向字段和子句，有可观察的验证方法。", "ask_when_stuck": "查询最先缩小哪批记录？你准备观察哪一个执行变化？"}
+    ],
+    "common_errors": [
+      {"symptom": "用客户姓名连接订单。", "intervention": "回到 db-02 的键稳定性，要求在 ER 草图上指出外键来源。"},
+      {"symptom": "把订单明细数量放在订单表中。", "intervention": "用一张订单包含多个商品的事实反推记录粒度。"},
+      {"symptom": "GROUP BY 后只看数字，不检查一行代表什么。", "intervention": "让学生用结果解释句式复述一行，并拿样例手算。"}
+    ],
+    "pace_adjustments": ["进度慢：先完成四实体 ER 图，再运行只含连接和分组的查询骨架。", "进度正常：完成两个 core 并做一条手算核对。", "进度快：补约束或比较索引假设，要求保留证据。"],
+    "closing_checks": ["每组沿 ER 路径指出客户、订单和连接键。", "每组展示一位客户的手算记录与查询结果。", "学生能分别解释 WHERE、GROUP BY、COUNT 对应的理论判断。"]
+  },
+  "starter_assets": [
+    {
+      "id": "orders-er-template",
+      "path": "orders-er-template.md",
+      "language": "markdown",
+      "task_id": "orders-er-core",
+      "content": "# 订单分析 ER 草图\\n\\n## 业务问题\\n每位客户在目标月份完成了多少订单？\\n\\n## 实体事实卡\\n| 实体 | 保存的业务事实 | 主键 | 需要补充的属性 |\\n|---|---|---|---|\\n| Customer |  |  |  |\\n| Order |  |  |  |\\n| Product |  |  |  |\\n| OrderItem |  |  |  |\\n\\n## 关系与多重性\\n| 关系 | 一端 | 另一端 | 多重性 | 外键位置 |\\n|---|---|---|---|---|\\n| 客户下达订单 |  |  |  |  |\\n| 订单包含明细 |  |  |  |  |\\n| 商品出现在明细 |  |  |  |  |\\n\\n## 查询路径\\nCustomer -> ？ -> ？\\n需要的连接键：\\n"
+    },
+    {
+      "id": "orders-query-starter",
+      "path": "orders-query.sql",
+      "language": "sql",
+      "task_id": "orders-sql-core",
+      "content": "-- 订单统计：回答每位客户在目标月份完成了多少订单\\n-- 已提供表别名和输出列，请按 TODO 顺序完成。\\n\\nSELECT c.customer_id, c.customer_name, COUNT(o.order_id) AS completed_orders\\nFROM customers AS c\\nJOIN orders AS o\\n    -- TODO 1: 用稳定键写出连接条件\\n    ON c.customer_id = NULL\\nWHERE\\n    -- TODO 2: 限定完成状态\\n    o.status = NULL\\n    AND\\n    -- TODO 3: 限定目标月份日期范围\\n    o.completed_at >= NULL\\n    AND o.completed_at < NULL\\n-- TODO 4: 让每一行代表一位客户\\nGROUP BY c.customer_id, c.customer_name\\nORDER BY completed_orders DESC;\\n"
+    }
+  ]
+}
