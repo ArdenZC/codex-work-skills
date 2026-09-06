@@ -312,10 +312,17 @@ def render_learning_center(content: dict[str, Any]) -> str:
     return shell(content, "center", "学习中心", body, role="student")
 
 
+def render_task_links(task_ids: list[str]) -> str:
+    return "、".join(
+        f'<a href="student-task.html#task-{slug(task_id)}">{esc(task_id)}</a>'
+        for task_id in task_ids
+    )
+
+
 def render_study_guide(content: dict[str, Any]) -> str:
     guides = "".join(
         f'<article class="card" id="guide-{slug(guide["id"])}"><h3>{esc(guide["title"])}</h3>'
-        f'<p class="task-meta">知识点：{esc("、".join(guide["knowledge_link_ids"]))} · 对应任务：{"、".join(f"<a href=\"student-task.html#task-{slug(task_id)}\">{esc(task_id)}</a>" for task_id in guide["task_ids"])}</p>'
+        f'<p class="task-meta">知识点：{esc("、".join(guide["knowledge_link_ids"]))} · 对应任务：{render_task_links(guide["task_ids"])}</p>'
         f'<p>{text_block(guide["body"])}</p><div class="callout"><strong>同一案例/公式/操作：</strong>{text_block(guide["worked_example"])}</div>'
         f'<h4>快速查表</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in guide["quick_reference"])}</ul>'
         f'<h4>常见卡点</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in guide["common_errors"])}</ul>'
@@ -329,7 +336,7 @@ def render_study_guide(content: dict[str, Any]) -> str:
 def render_foundation_kit(content: dict[str, Any]) -> str:
     kits = "".join(
         f'<article class="card soft" id="kit-{slug(kit["id"])}"><div class="label">{esc(kit["kind"])}</div><h3>{esc(kit["title"])}</h3>'
-        f'<p class="task-meta">服务任务：{"、".join(f"<a href=\"student-task.html#task-{slug(task_id)}\">{esc(task_id)}</a>" for task_id in kit["task_ids"])}</p>'
+        f'<p class="task-meta">服务任务：{render_task_links(kit["task_ids"])}</p>'
         f'<p>{text_block(kit["content"])}</p><div class="callout"><strong>什么时候打开：</strong>{text_block(kit["when_to_use"])}</div>'
         f'<ol>{"".join(f"<li>{text_block(item)}</li>" for item in kit["steps"])}</ol>'
         f'<h4>自检</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in kit["self_check"])}</ul></article>'
