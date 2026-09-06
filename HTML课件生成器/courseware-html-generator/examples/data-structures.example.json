@@ -1,0 +1,179 @@
+{
+  "contract_version": "1.0",
+  "course_title": "数据结构与算法",
+  "chapter_title": "查找问题的结构化思路",
+  "audience": "高职软件技术专业学生",
+  "content_reserve_minutes": 120,
+  "theme": "morandi-academy",
+  "slides": [
+    {
+      "id": "search-01",
+      "title": "从扫描到定位：先看问题的结构",
+      "kicker": "问题引入",
+      "layout": "split",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "查找不是把一组数据从头看到尾这么简单。真正要先判断的是：数据有没有顺序，能不能排除一半候选，定位结果时需要保留哪些边界。"
+        },
+        {
+          "type": "cards",
+          "items": [
+            {"title": "线性扫描", "text": "逐个比较，逻辑直接，适合数据量小或没有顺序的集合。", "tone": "blue"},
+            {"title": "结构化定位", "text": "利用顺序和范围缩小候选，比较次数随规模增长得更慢。", "tone": "sage"},
+            {"title": "课堂任务", "text": "说出一次查找中已经排除的元素，并解释为什么可以排除。", "tone": "peach"}
+          ]
+        },
+        {
+          "type": "svg",
+          "caption": "每次比较都让候选范围变窄",
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 190\" role=\"img\" aria-label=\"候选范围逐步缩小\"><defs><marker id=\"arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0 L8 4 L0 8 Z\" fill=\"#6b8f9d\"/></marker></defs><rect x=\"28\" y=\"48\" width=\"180\" height=\"72\" rx=\"12\" fill=\"#dbe8eb\" stroke=\"#6b8f9d\"/><text x=\"118\" y=\"90\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"18\">全部候选</text><path d=\"M220 84 H290\" stroke=\"#6b8f9d\" stroke-width=\"3\" marker-end=\"url(#arrow)\"/><rect x=\"310\" y=\"48\" width=\"180\" height=\"72\" rx=\"12\" fill=\"#f0f6f2\" stroke=\"#7d9d91\"/><text x=\"400\" y=\"82\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"18\">排除一部分</text><text x=\"400\" y=\"106\" text-anchor=\"middle\" fill=\"#637487\" font-size=\"14\">保留范围</text><path d=\"M502 84 H572\" stroke=\"#6b8f9d\" stroke-width=\"3\" marker-end=\"url(#arrow)\"/><rect x=\"592\" y=\"48\" width=\"100\" height=\"72\" rx=\"12\" fill=\"#fcf1e9\" stroke=\"#c89579\"/><text x=\"642\" y=\"90\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"18\">定位</text></svg>"
+        },
+        {
+          "type": "code",
+          "language": "Python",
+          "caption": "先写出最朴素的比较过程",
+          "code": "for value in data:\n    if value == target:\n        return value\nreturn None"
+        }
+      ],
+      "speaker_script": "这一页我们先不急着记住某一个算法，而是把查找问题看成一个逐步缩小范围的过程。大家可以先想象在一排没有编号的抽屉里找一张纸条，如果抽屉之间没有任何规律，我们通常只能从第一个开始检查。代码中的 for 循环就是这种朴素的线性扫描：每次拿出一个 value，和 target 比较，找到就返回，全部看完还没有结果就返回空值。它的优点是简单而且不要求数据有序，缺点是数据越多，可能需要比较的次数越多。接着请大家观察右边的图：如果我们能够利用顺序，每次比较之后都能排除一部分候选，就有机会更快地定位。这里的关键不是把代码写得更复杂，而是先问清楚数据的结构和可以利用的条件。下一页我们就把这些条件拆开。",
+      "suggested_minutes": 3,
+      "demo_hint": "先用纸条或抽屉的生活例子，再回到代码逐行指读。",
+      "classroom_followup": "请学生说出一个自己使用过的线性查找场景，并指出没有顺序时为什么不能直接跳跃。",
+      "pacing_note": "如果学生把‘有序’理解成‘一定能二分’，先保留问题，下一页再澄清。"
+    },
+    {
+      "id": "search-02",
+      "title": "二分查找真正需要的三个条件",
+      "kicker": "概念拆解",
+      "layout": "comparison",
+      "blocks": [
+        {
+          "type": "bullets",
+          "items": [
+            "候选数据能够按照同一规则比较",
+            "数据已经有序，或可以先付出排序成本",
+            "每次比较都能明确排除一侧范围"
+          ]
+        },
+        {
+          "type": "table",
+          "headers": ["检查点", "可以继续二分", "需要停下来确认"],
+          "rows": [
+            ["顺序", "从小到大或从大到小一致", "不同记录使用不同排序口径"],
+            ["边界", "区间端点定义清楚", "空区间和单元素区间未约定"],
+            ["结果", "能说明相等或排除原因", "只凭‘看起来接近’判断"]
+          ]
+        },
+        {
+          "type": "formula",
+          "formula": "mid = left + (right - left) // 2",
+          "explanation": "中点不是装饰，它把当前候选区间切成两个可以继续判断的部分。"
+        },
+        {
+          "type": "comparison",
+          "left_title": "可以利用的结构",
+          "left": ["有序成绩表", "按编号排列的记录", "已经建立索引的范围"],
+          "right_title": "不能直接套用",
+          "right": ["无序的随手清单", "比较规则不一致的对象", "边界含义还没确定的数据"]
+        }
+      ],
+      "speaker_script": "现在把刚才的‘缩小范围’说得更严格一些。二分查找并不是看到数组就可以套用，它至少需要三个条件。第一，元素必须能够按照同一规则比较；第二，当前范围必须有稳定的顺序；第三，比较中点以后，我们要能解释为什么某一侧不可能包含目标。请看表格，顺序、边界和结果分别对应三个容易被忽略的检查点。尤其是边界，很多程序并不是算法思想错了，而是 left、right 到底表示包含还是不包含没有说清楚。公式中的 mid 使用 left 加上区间长度的一半，既表达了中点，也避免直接相加时可能出现的溢出风险。左侧的例子都能提供可利用的结构，右侧的清单则提醒我们不要只因为数据‘看起来差不多’就贸然二分。请大家用这三个条件检查自己熟悉的一张表，下一页我们用 stepper 看一次完整的区间变化。",
+      "suggested_minutes": 4,
+      "demo_hint": "把三个条件写在白板上，让学生把自己的数据例子归类到左右两栏。",
+      "classroom_followup": "追问‘如果数据无序但允许预处理，应该把排序成本放在哪里说明？’",
+      "pacing_note": "边界定义是本页重点，不要用大量代码打断条件解释。"
+    },
+    {
+      "id": "search-03",
+      "title": "用区间变化看懂每一次判断",
+      "kicker": "过程演示",
+      "layout": "focus",
+      "blocks": [
+        {
+          "type": "stepper",
+          "steps": [
+            {"title": "第一步：观察中点", "text": "当前区间是 0 到 7，中点位置为 3，先比较目标和中点元素。"},
+            {"title": "第二步：保留可能的一侧", "text": "如果目标更大，左端点移动到 4；另一侧已经有明确的排除理由。"},
+            {"title": "第三步：继续缩小", "text": "新区间再次取中点，直到找到目标，或区间变为空。"}
+          ]
+        },
+        {
+          "type": "svg",
+          "caption": "区间从 [0, 7] 收缩到仍可能包含目标的范围",
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 760 230\" role=\"img\" aria-label=\"二分区间变化\"><line x1=\"72\" y1=\"92\" x2=\"688\" y2=\"92\" stroke=\"#9eb2c0\" stroke-width=\"12\" stroke-linecap=\"round\"/><line x1=\"72\" y1=\"92\" x2=\"688\" y2=\"92\" stroke=\"#6b8f9d\" stroke-width=\"12\" stroke-linecap=\"round\" stroke-dasharray=\"68 20\"/><circle cx=\"380\" cy=\"92\" r=\"18\" fill=\"#c89579\"/><text x=\"380\" y=\"50\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"18\">中点 3</text><text x=\"72\" y=\"138\" text-anchor=\"middle\" fill=\"#637487\" font-size=\"16\">0</text><text x=\"688\" y=\"138\" text-anchor=\"middle\" fill=\"#637487\" font-size=\"16\">7</text><rect x=\"210\" y=\"170\" width=\"340\" height=\"36\" rx=\"18\" fill=\"#dbe8eb\"/><text x=\"380\" y=\"194\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"16\">每轮都留下可解释的候选范围</text></svg>"
+        }
+      ],
+      "speaker_script": "这一页不要求大家马上写出完整函数，我们先把一次判断的动作看清楚。开始时区间从 0 到 7，左端点和右端点共同描述当前还可能出现目标的范围。我们取出中点 3，比较目标和这个位置的值。如果目标更大，就可以说明中点左侧以及中点本身不再可能满足条件，于是左端点移动到 4；如果目标更小，移动的则是右端点。请注意，这个移动不是凭经验挪一步，而是由有序关系给出的排除结论。右侧图把这个变化画成了一条逐渐收缩的范围，颜色表示仍然保留的候选，圆点表示本轮观察的位置。下面的三个按钮可以让我们按步骤停下来：先看中点，再保留一侧，最后进入下一轮。请一位同学预测目标位于右侧时下一次区间的端点，另一位同学解释为什么左侧可以被排除。最后提醒大家，区间为空和命中目标是两种不同的结束状态，下一页会用小题检查这两个判断。",
+      "suggested_minutes": 4,
+      "demo_hint": "先让学生口算每轮区间，再点击 stepper 对照，不要一开始播放完整过程。",
+      "classroom_followup": "请学生用自己的话描述一次‘为什么可以排除左半边’，避免只说‘因为二分’。",
+      "pacing_note": "每次只推进一步；若时间紧，保留命中和空区间两个结论。"
+    },
+    {
+      "id": "search-04",
+      "title": "课堂小题：结果对不对，理由在哪里",
+      "kicker": "即时练习",
+      "layout": "split",
+      "blocks": [
+        {
+          "type": "quiz",
+          "question": "在升序数组中，当前 left=2、right=5，目标比 mid 位置的值大，下一步最合理的动作是什么？",
+          "options": ["把 right 移到 mid-1", "把 left 移到 mid+1", "把整个数组重新打乱", "不需要比较直接返回"],
+          "answer_index": 1,
+          "explanation": "目标更大时，mid 及其左侧已经不可能命中，保留右侧候选范围。"
+        },
+        {
+          "type": "summary",
+          "items": [
+            "先确认顺序和比较规则，再选择算法。",
+            "每次移动边界都要能说出排除理由。",
+            "命中目标与区间为空要分别处理。"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "做完选择后，不要只看答案颜色；请把‘哪一段已经不可能’说完整，算法才真正属于你。"
+        }
+      ],
+      "speaker_script": "现在我们用一个小题把刚才的过程落到边界动作上。题目给出一个升序数组，当前区间由 left=2 和 right=5 表示，目标值又比 mid 位置的值大。请大家先独立选择，不要急着看答案。选择之后，请把理由说成一句完整的话：因为数组是升序的，而且目标比中点大，所以中点及其左边都不可能是目标，下一轮只能保留右边。这个完整句子比记住一个箭头更重要，它能帮助我们把边界更新和数据结构联系起来。右侧的归纳列出三个检查动作：顺序、排除理由、结束状态。点击显示答案只用于核对，不代替解释；如果你选择了其他选项，请指出它违反了哪一条条件。最后请大家把‘命中’和‘没找到’区分开来：命中是比较相等，没找到则是区间已经为空。带着这两个状态，下一页我们把逻辑整理成可以复用的代码骨架。",
+      "suggested_minutes": 3,
+      "demo_hint": "先给十秒独立作答，再请两位学生分别解释正确和错误选项。",
+      "classroom_followup": "要求回答中同时出现‘有序’、‘排除’和‘下一轮范围’三个意思。",
+      "pacing_note": "答案按钮只做核对，先让学生说理由再展开解释。"
+    },
+    {
+      "id": "search-05",
+      "title": "把思路收束成可检查的代码",
+      "kicker": "方法迁移",
+      "layout": "default",
+      "blocks": [
+        {
+          "type": "code",
+          "language": "Python",
+          "caption": "边界、比较和返回状态各自有位置",
+          "code": "left, right = 0, len(data) - 1\nwhile left <= right:\n    mid = left + (right - left) // 2\n    if data[mid] == target:\n        return mid\n    if data[mid] < target:\n        left = mid + 1\n    else:\n        right = mid - 1\nreturn -1"
+        },
+        {
+          "type": "table",
+          "headers": ["代码位置", "要检查的问题"],
+          "rows": [
+            ["while 条件", "当前区间是否仍然有效"],
+            ["相等分支", "返回的是元素还是下标"],
+            ["边界更新", "是否排除了已经比较过的 mid"],
+            ["最后返回", "没找到时调用方如何识别"]
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "算法的可靠性来自可解释的边界，而不是来自代码看起来像标准答案。调试时逐轮记录 left、mid、right，通常比盯着最终结果更快找到问题。"
+        }
+      ],
+      "speaker_script": "最后把前面的判断收束成代码。第一行明确给出闭区间的两个端点，所以 while 条件使用 left 小于等于 right；如果改成半开区间，条件和更新方式就要一起改变，不能只改一个符号。进入循环后先计算中点，再按相等、目标更大、目标更小三个分支处理。目标更大时，mid 已经比较过，因此新的 left 必须是 mid+1；目标更小时，right 必须是 mid-1，这正是排除理由在代码中的位置。表格建议大家逐项检查：返回的是下标还是元素，没找到时用什么值表示，调用方能不能区分结果。调试时可以把每一轮的 left、mid、right 打印出来，观察区间是否真正变小。如果区间没有缩小，通常说明边界更新少了一个单位，或者 while 条件与区间定义不一致。请把这套检查方法迁移到另一个有序数据问题中：先写清区间含义，再决定循环条件，最后用一个命中和一个未命中的例子验证。",
+      "suggested_minutes": 4,
+      "demo_hint": "逐行高亮边界更新，再用一个命中和一个未命中输入走一遍。",
+      "classroom_followup": "让学生把闭区间写成自己的话，并指出如果采用半开区间需要同步修改哪些地方。",
+      "pacing_note": "代码只服务于边界检查；不要在本页引入递归版本。"
+    }
+  ]
+}

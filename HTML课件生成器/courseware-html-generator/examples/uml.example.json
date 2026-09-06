@@ -1,0 +1,64 @@
+{
+  "contract_version": "1.0",
+  "course_title": "软件建模与设计",
+  "chapter_title": "用例到领域对象的桥接",
+  "audience": "高职软件技术专业学生",
+  "content_reserve_minutes": 60,
+  "theme": "morandi-academy",
+  "slides": [
+    {
+      "id": "uml-01",
+      "title": "先描述目标，再寻找稳定对象",
+      "kicker": "UML 建模",
+      "layout": "split",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "用例回答系统为谁完成什么目标，领域对象回答这个目标需要哪些稳定的业务概念。两者之间需要一条能被解释的桥。"
+        },
+        {
+          "type": "comparison",
+          "left_title": "用例视角",
+          "left": ["参与者", "目标", "主要成功场景"],
+          "right_title": "领域视角",
+          "right": ["业务对象", "责任", "对象之间的协作"]
+        },
+        {
+          "type": "svg",
+          "caption": "从用户目标走向对象协作",
+          "svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 720 180\" role=\"img\" aria-label=\"用例到对象\"><defs><marker id=\"uml-arrow\" markerWidth=\"8\" markerHeight=\"8\" refX=\"7\" refY=\"4\" orient=\"auto\"><path d=\"M0 0 L8 4 L0 8 Z\" fill=\"#6b8f9d\"/></marker></defs><rect x=\"30\" y=\"45\" width=\"180\" height=\"76\" rx=\"38\" fill=\"#dbe8eb\" stroke=\"#6b8f9d\"/><text x=\"120\" y=\"90\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"18\">用户目标</text><path d=\"M225 83 H305\" stroke=\"#6b8f9d\" stroke-width=\"3\" marker-end=\"url(#uml-arrow)\"/><rect x=\"325\" y=\"45\" width=\"180\" height=\"76\" rx=\"10\" fill=\"#f0f6f2\" stroke=\"#7d9d91\"/><text x=\"415\" y=\"90\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"18\">业务概念</text><path d=\"M520 83 H600\" stroke=\"#6b8f9d\" stroke-width=\"3\" marker-end=\"url(#uml-arrow)\"/><circle cx=\"650\" cy=\"83\" r=\"38\" fill=\"#fcf1e9\" stroke=\"#c89579\"/><text x=\"650\" y=\"89\" text-anchor=\"middle\" fill=\"#26384a\" font-size=\"15\">协作</text></svg>"
+        }
+      ],
+      "speaker_script": "这一页讨论一个建模时经常出现的断点：我们已经写出了用户想完成的目标，却不知道怎样从用例继续走到对象设计。可以把用例看成从用户角度描述一次有价值的结果，参与者提出目标，系统完成主要成功场景；领域对象则要回答，为了让这个目标成立，哪些业务概念需要保存信息、承担责任并彼此协作。图中从左到右不是简单改名，而是逐步增加解释力度。我们先问用户要什么，再从场景中的名词和动作里寻找稳定概念，最后检查这些概念之间是否能完成协作。右侧对比表提醒大家，不要把参与者直接当成类，也不要把页面按钮直接当成领域对象。请先拿一个熟悉的借阅或预约场景，写出一个用户目标，再圈出两个需要长期保留的业务概念。下一页我们继续看一条时序消息怎样帮助我们验证责任分配。",
+      "suggested_minutes": 3,
+      "demo_hint": "用一个预约场景在白板上先写用户目标，再圈名词。",
+      "classroom_followup": "让学生解释一个页面按钮为什么不一定是领域对象。",
+      "pacing_note": "先保持概念边界，暂不进入数据库表设计。"
+    },
+    {
+      "id": "uml-02",
+      "title": "用时序消息检查责任是否落得下去",
+      "kicker": "模型校验",
+      "layout": "focus",
+      "blocks": [
+        {
+          "type": "stepper",
+          "steps": [
+            {"title": "提出请求", "text": "参与者发起一个明确目标，系统先接住这次请求。"},
+            {"title": "分派责任", "text": "协调对象把请求交给真正掌握业务规则的对象。"},
+            {"title": "形成结果", "text": "对象协作后返回可观察结果，并能解释状态变化。"}
+          ]
+        },
+        {
+          "type": "summary",
+          "items": ["消息要有发送者和接收者", "责任要靠业务规则支撑", "结果要能回到原始目标"]
+        }
+      ],
+      "speaker_script": "有了候选对象之后，我们还要验证责任是否真的落得下去。时序消息提供了一条很实用的检查路径：先由参与者提出一个明确请求，再由协调对象把请求交给真正掌握业务规则的对象，最后通过对象之间的协作形成可以观察的结果。这里的协调不是把所有逻辑都塞进一个控制类，而是帮助我们找到规则应该放在哪里。每推进一步，都请问两个问题：谁发送了消息，谁最了解这条规则？如果一个对象只是转发消息，却没有任何业务判断，就要继续寻找更合适的责任归属。页下的归纳可以作为模型评审清单，尤其要检查结果能否回到原始用户目标。接下来可以把经过验证的责任映射到类图或接口设计，但那属于下一阶段的细化工作。",
+      "suggested_minutes": 3,
+      "demo_hint": "逐步点击消息流程，每一步只追问一个责任问题。",
+      "classroom_followup": "请学生指出一个‘万能控制类’可能带来的维护问题。",
+      "pacing_note": "如果学生直接跳到代码，先让他补齐发送者、接收者和规则。"
+    }
+  ]
+}

@@ -5,6 +5,7 @@
 - **教案生成器 2.2.1**：批量生成、整理和校验项目化中文职业教育教案 DOCX；Lesson DOCX 只承载理论，实践工单按明确选择交付；
 - **平时成绩记分册生成器**：根据课程成绩单生成并校验平时成绩记分册 XLS。
 - **实践任务工单生成器 2.1.0**：由 Agent 将 Lesson Practice Task Contract 创作成 WorkOrder Content，再写入真实 Word 学习工单模板（Phase 2.1 Hardening）。
+- **HTML 课件生成器 1.0.0**：由 Agent 创作结构化 Courseware Content Contract，再确定性生成离线学生展示版与教师逐字稿版 HTML。
 
 AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本负责确定性模板写入、格式保护、事务提交和结果 QA。
 
@@ -19,6 +20,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 | [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.1** | **Lesson Content Contract 2.2**（兼容 2.1/2.0） | `lesson-plan v1.1.2` | 稳定 |
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
 | [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 2.1 / 2.1.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 联动候选 |
+| [HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.0.0** | **Courseware Content Contract 1.0** | `student.html` + `teacher.html` | 稳定 |
 
 **Skill 版本、内容合同版本和模板版本是三个不同概念。** 教案生成器已经进入 **2.2**，但默认 Word 模板仍是经过保护和兼容验证的 `lesson-plan v1.1.2`；升级 Skill 不代表必须把模板版本同步改成 2.2。
 
@@ -55,13 +57,26 @@ WorkOrder 以仓库 `schemas/shared/practice-task-contract.schema.json` 定义�
 
 它使用现有 `practice-work-order v1.0.0` 模板，不新增模板版本，不生成教师答案，不做成绩册回写，也不进入完整 64 学时 Phase 3 验收。
 
-## 三个 Skill 能做什么
+## HTML 课件生成器 1.0.0
+
+HTML 课件生成器把教材、PPT、讲义、教案或课程资料转成两份完全离线的单文件 HTML：学生课堂展示版和教师逐页备课版。Agent 负责理解资料和创作 `Courseware Content Contract 1.0`；内置 Python renderer 负责固定视觉系统、页面布局、SVG/代码/表格/quiz/stepper、点击/滚轮/键盘翻页、投影增强、输出 QA 和原子提交。
+
+- 学生版是 16:9 投影优先的明亮莫兰迪学院风，保持高课堂信息密度，不显示教师备注、制作/来源措辞或内部时长；
+- 教师版左侧与学生页逐页对应，右侧提供可直接朗读的自然中文连续逐字稿和最多三个辅助提示框；
+- 两份 HTML 均无服务器、CDN、外部字体、网络图片和 npm runtime，Chrome / Edge 可直接通过 `file://` 打开；
+- renderer 内置全局非交互点击翻页、稳定滚轮翻页和键盘备用；练习按钮、stepper 与投影增强不会误触发翻页；
+- 生成后执行合同、学生禁用词、SVG、安全外链、页数/id 对应和单文件 QA，并用真实浏览器验证 click、wheel 和本地离线加载。
+
+详细规则、Content Contract 和调用示例见 [HTML课件生成器/简介.md](HTML课件生成器/简介.md) 与 [HTML课件生成器/courseware-html-generator/README.md](HTML课件生成器/courseware-html-generator/README.md)。
+
+## 四个 Skill 能做什么
 
 | Skill | 主要输入 | 输出 |
 | --- | --- | --- |
 | 教案生成器 | 课程名称、专业、授课对象、总课时，以及能力图谱、章节任务拆解、课程标准、教材目录、旧教案或其他课程资料 | 项目化 `.docx` 教案 + QA 报告 |
 | 平时成绩记分册生成器 | `课程成绩单.xls` 或包含该文件的班级目录 | 平时成绩记分册 `.xls` + QA 报告 |
 | 实践任务工单生成器 2.1 | Agent-authored Practice Work Order Content V1，或用于 authoring 的 Lesson Practice Task Contract V1 handoff | 学习工单 `.docx` + Content/Cross-Artifact/Output QA |
+| HTML 课件生成器 1.0 | 教材、PPT、讲义、教案或 Agent-authored Courseware Content Contract 1.0 | `student.html` + `teacher.html` + QA 报告 |
 
 教案资料不完整时可以继续：Agent 会先读取会话和附件，再一次性确认课程基础（单课默认 2 学时；教材建议确认但不阻断）；理论/实践结构和工单偏好未提供时保持“待确认”，确认后按已确认选择完成规划和生成，不再询问模板、输出目录或是否开始生成 DOCX。Lesson DOCX 不替代实践工单；成绩册不能凭空生成成绩，必须提供真实课程成绩单。实践工单不能代写答案，学生任务结果栏保持空白。
 
@@ -111,6 +126,16 @@ https://github.com/ArdenZC/codex-work-skills
 完成环境检查、安装和安装验证，不要修改源码或模板。
 ```
 
+安装 HTML 课件生成器：
+
+```text
+请安装当前仓库中的「HTML 课件生成器 1.0.0」：
+https://github.com/ArdenZC/codex-work-skills
+
+请先阅读 README、根目录 AGENTS.md、HTML课件生成器/简介.md，以及 courseware-html-generator 下的 AGENTS.md、通用提示词.md 和 SKILL.md。
+使用 scripts/install.py 完成安装验证；不要修改源码。生成课件时必须使用 Courseware Content Contract 1.0，运行合同/输出 QA，并用真实浏览器验证 file:// 下的点击和滚轮翻页。
+```
+
 纯网页聊天工具如果没有本机文件和命令权限，不能直接完成本地安装。
 
 ### Codex 手动安装
@@ -126,6 +151,7 @@ Windows PowerShell：
 python "教案生成器/lesson-plan-docx-generator/scripts/install.py"
 python "平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
 python "实践任务工单生成器/practice-task-workorder-generator/scripts/install.py"
+python "HTML课件生成器/courseware-html-generator/scripts/install.py"
 ```
 
 macOS Terminal：
@@ -134,6 +160,7 @@ macOS Terminal：
 python3 "教案生成器/lesson-plan-docx-generator/scripts/install.py"
 python3 "平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
 python3 "实践任务工单生成器/practice-task-workorder-generator/scripts/install.py"
+python3 "HTML课件生成器/courseware-html-generator/scripts/install.py"
 ```
 
 默认安装到：
@@ -142,7 +169,8 @@ python3 "实践任务工单生成器/practice-task-workorder-generator/scripts/i
 ~/.codex/skills/
 ├── lesson-plan-docx-generator/
 ├── course-gradebook-generator/
-└── practice-task-workorder-generator/
+├── practice-task-workorder-generator/
+└── courseware-html-generator/
 ```
 
 可用参数：
@@ -156,7 +184,7 @@ Python 依赖见各 Skill 的 `requirements.txt`。教案生成器安装后可�
 
 ## 其他 Agent / 项目级规则
 
-三个 Skill 都提供 Agent adapter。默认 adapter 安装只复制规则 / instructions；需要在目标项目中直接运行完整 engine 时，应显式使用对应的 `--copy-engine`。
+四个 Skill 都提供 Agent adapter。默认 adapter 安装只复制规则 / instructions；需要在目标项目中直接运行完整 engine 时，应显式使用对应的 `--copy-engine`。
 
 示例：
 
@@ -192,6 +220,14 @@ macOS 使用 `python3`。共享 `AGENTS.md`、Claude、Gemini、Copilot 和 Aide
 
 ```text
 使用实践任务工单生成器 2.1，根据这份 Practice Task Contract V1 handoff 创作完整 WorkOrder Content V1 并生成学习工单；结果栏留空，不生成答案。
+```
+
+生成 HTML 课件：
+
+```text
+使用 HTML课件生成器，根据我上传的教材第6章内容生成课堂课件。
+默认面向大专学生，按约120分钟内容储备准备，但不要在学生课件显示任何时长或制作信息。
+同时生成学生展示版和教师备课版。
 ```
 
 普通用户通常不需要直接运行 `generate_*.py` / `generate_*.ps1`，由 Agent 调用 Skill 即可。
