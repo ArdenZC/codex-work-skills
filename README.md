@@ -78,7 +78,7 @@ flowchart LR
 - 教学评价分数限定在 **85–96**，支持 `0.5` 步长；
 - 使用受保护的 `lesson-plan v1.1.2` Word 模板生成 `.docx`。
 
-内容合同：**Lesson Content Contract 2.2**。  
+内容合同：**Lesson Content Contract 2.2**。
 默认模板：**lesson-plan v1.1.2**。
 
 [查看教案生成器](教案生成器/lesson-plan-docx-generator) · [Lesson Acceptance](docs/lesson-acceptance.md)
