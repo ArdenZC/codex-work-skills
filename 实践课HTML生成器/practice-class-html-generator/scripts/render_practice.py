@@ -118,7 +118,7 @@ def shell(content: dict[str, Any], active: str, title: str, body: str, *, role: 
     .interaction {{ margin-top:12px; padding:14px; background:#f7f8f6; border-radius:13px; border:1px solid var(--line); }}
     .interaction button,.interaction select,.interaction input {{ border:1px solid #adc3c6; background:#fff; color:var(--ink); border-radius:9px; padding:8px 11px; margin:5px 5px 5px 0; cursor:pointer; font:inherit; }} .interaction button:hover,.interaction button:focus,.interaction select:focus,.interaction input:focus {{ background:var(--sky); outline:2px solid #9dbdc1; outline-offset:1px; }}
     .feedback {{ min-height:1.7em; color:#3e6759; font-weight:600; }} .feedback.wrong {{ color:#8a5b45; }} .step {{ display:none; padding:12px; background:#fff; border-radius:10px; }} .step.show {{ display:block; }}
-    .classify-item,.reorder-item,.simulator-row {{ padding:7px 0; }} .classify-item label,.reorder-item label {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }} .sim-array {{ padding:8px 10px; background:#fff; border-radius:9px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }}
+    .classify-item,.reorder-item,.simulator-row,.multi-question {{ padding:7px 0; }} .classify-item label,.reorder-item label {{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }} .sim-array {{ padding:8px 10px; background:#fff; border-radius:9px; font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }}
     .reference-answer {{ white-space:pre-wrap; }}
     .footer {{ margin-top:42px; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:.9rem; }}
     @media (max-width:700px) {{ .page {{ padding:16px 14px 42px; }} .masthead {{ display:block; }} .nav {{ gap:4px; }} .nav-link {{ padding:6px 8px; font-size:.9rem; }} }}
@@ -136,12 +136,20 @@ def shell(content: dict[str, Any], active: str, title: str, body: str, *, role: 
   </main>
   <script>
   (() => {{
-    document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => {{
-      const box = button.closest('[data-interaction]');
-      const feedback = box && box.querySelector('.feedback');
-      if (feedback) {{ feedback.textContent = button.dataset.feedback || ''; feedback.classList.toggle('wrong', button.dataset.correct !== 'true'); }}
-      if (box) box.querySelectorAll('[data-choice]').forEach((item) => item.setAttribute('aria-pressed', item === button ? 'true' : 'false'));
-    }}));
+     document.querySelectorAll('[data-choice]').forEach((button) => button.addEventListener('click', () => {{
+       const box = button.closest('[data-question], [data-interaction]');
+       const feedback = box && box.querySelector('.feedback');
+       if (feedback) {{ feedback.textContent = button.dataset.feedback || ''; feedback.classList.toggle('wrong', button.dataset.correct !== 'true'); }}
+       if (box) box.querySelectorAll('[data-choice]').forEach((item) => item.setAttribute('aria-pressed', item === button ? 'true' : 'false'));
+       const root = button.closest('[data-multi-root]');
+       if (root) {{
+         const questions = [...root.querySelectorAll('[data-question]')];
+         const answered = questions.filter((item) => item.querySelector('[data-choice][aria-pressed="true"]')).length;
+         const correct = questions.filter((item) => item.querySelector('[data-choice][aria-pressed="true"]')?.dataset.correct === 'true').length;
+         const score = root.querySelector('[data-multi-score]');
+         if (score) score.textContent = `已完成 ${{answered}} / ${{questions.length}} 题；当前正确 ${{correct}} 题`;
+       }}
+     }}));
     document.querySelectorAll('[data-stepper]').forEach((box) => {{
       const steps = [...box.querySelectorAll('.step')]; let current = 0;
       const show = (index) => {{ current = Math.max(0, Math.min(index, steps.length - 1)); steps.forEach((step, i) => step.classList.toggle('show', i === current)); const status = box.querySelector('.step-status'); if (status) status.textContent = `第 ${{current + 1}} / ${{steps.length}} 步`; }};
@@ -284,9 +292,9 @@ def render_interaction(center: dict[str, Any]) -> str:
             for option_index, option in enumerate(question["options"]):
                 correct = "true" if option.get("correct", option_index == question.get("answer_index")) else "false"
                 option_parts.append(f'<button type="button" data-choice data-correct="{correct}" data-feedback="{esc(option["feedback"])}" aria-pressed="false">{esc(option["label"])}</button>')
-            question_parts.append(f'<div class="multi-question"><p><strong>{index + 1}. {esc(question["prompt"])}</strong></p><div>{"".join(option_parts)}</div></div>')
+            question_parts.append(f'<div class="multi-question" data-question><p><strong>{index + 1}. {esc(question["prompt"])}</strong></p><div>{"".join(option_parts)}</div><div class="feedback" aria-live="polite">请选择并读反馈。</div></div>')
         questions = "".join(question_parts)
-        return f'<div class="interaction" data-interaction="{interaction_id}" data-interaction-type="multi-question"><strong>{esc(interaction["prompt"])}</strong>{questions}<div class="feedback" aria-live="polite">每题作答后复述对应的成功或失败条件。</div></div>'
+        return f'<div class="interaction" data-interaction="{interaction_id}" data-multi-root data-interaction-type="multi-question"><strong>{esc(interaction["prompt"])}</strong>{questions}<div class="feedback" data-multi-score aria-live="polite">已完成 0 / {len(interaction["questions"])} 题；当前正确 0 题</div></div>'
     return f'<div class="interaction" data-interaction="{interaction_id}"><strong>{esc(interaction["prompt"])}</strong><div class="feedback">此互动暂未配置。</div></div>'
 
 
@@ -295,7 +303,7 @@ def render_center(content: dict[str, Any], center: dict[str, Any]) -> str:
     refs = [knowledge[item] for item in center["knowledge_link_ids"] if item in knowledge]
     source = "、".join(ref for item in refs for ref in item.get("source_slide_ids", [])) or "独立练习"
     tasks = "、".join(center["task_ids"])
-    return f'<article class="card" id="center-{slug(center["id"])}"><div class="task-top"><span class="label">知识点互动</span><span class="task-meta">理论页 {esc(source)}</span></div><h3>{esc(center["title"])}</h3><p>{text_block(center["purpose"])}</p><p class="task-meta">服务任务：{esc(tasks)}</p>{render_interaction(center)}</article>'
+    return f'<article class="card" id="center-{slug(center["id"])}"><div class="task-top"><span class="label">知识点互动 · {esc(center["interaction"]["type"])}</span><span class="task-meta">理论页 {esc(source)}</span></div><h3>{esc(center["title"])}</h3><p>{text_block(center["purpose"])}</p><p class="task-meta">服务任务：{esc(tasks)}</p>{render_interaction(center)}</article>'
 
 
 def render_learning_center(content: dict[str, Any]) -> str:
@@ -305,13 +313,28 @@ def render_learning_center(content: dict[str, Any]) -> str:
 
 
 def render_study_guide(content: dict[str, Any]) -> str:
-    guides = "".join(f'<article class="card" id="guide-{slug(guide["id"])}"><h3>{esc(guide["title"])}</h3><p class="task-meta">知识点：{esc("、".join(guide["knowledge_link_ids"]))}</p><p>{text_block(guide["body"])}</p><h4>检查自己</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in guide["checkpoints"])}</ul></article>' for guide in content["study_guide"])
+    guides = "".join(
+        f'<article class="card" id="guide-{slug(guide["id"])}"><h3>{esc(guide["title"])}</h3>'
+        f'<p class="task-meta">知识点：{esc("、".join(guide["knowledge_link_ids"]))} · 对应任务：{"、".join(f"<a href=\"student-task.html#task-{slug(task_id)}\">{esc(task_id)}</a>" for task_id in guide["task_ids"])}</p>'
+        f'<p>{text_block(guide["body"])}</p><div class="callout"><strong>同一案例/公式/操作：</strong>{text_block(guide["worked_example"])}</div>'
+        f'<h4>快速查表</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in guide["quick_reference"])}</ul>'
+        f'<h4>常见卡点</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in guide["common_errors"])}</ul>'
+        f'<h4>检查自己</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in guide["checkpoints"])}</ul></article>'
+        for guide in content["study_guide"]
+    )
     body = f'<section class="hero"><div class="eyebrow">卡住时回到可观察的判断</div><h2>学习指南</h2><p>这里不是答案库，而是一组帮助你继续完成任务的复盘卡片。先指出自己卡在概念、步骤还是验收，再打开对应条目。</p></section><section class="section"><div class="card-grid">{guides}</div></section>'
     return shell(content, "guide", "学习指南", body, role="student")
 
 
 def render_foundation_kit(content: dict[str, Any]) -> str:
-    kits = "".join(f'<article class="card soft" id="kit-{slug(kit["id"])}"><div class="label">{esc(kit["kind"])}</div><h3>{esc(kit["title"])}</h3><p>{text_block(kit["content"])}</p><ol>{"".join(f"<li>{text_block(item)}</li>" for item in kit["steps"])}</ol></article>' for kit in content["foundation_kit"])
+    kits = "".join(
+        f'<article class="card soft" id="kit-{slug(kit["id"])}"><div class="label">{esc(kit["kind"])}</div><h3>{esc(kit["title"])}</h3>'
+        f'<p class="task-meta">服务任务：{"、".join(f"<a href=\"student-task.html#task-{slug(task_id)}\">{esc(task_id)}</a>" for task_id in kit["task_ids"])}</p>'
+        f'<p>{text_block(kit["content"])}</p><div class="callout"><strong>什么时候打开：</strong>{text_block(kit["when_to_use"])}</div>'
+        f'<ol>{"".join(f"<li>{text_block(item)}</li>" for item in kit["steps"])}</ol>'
+        f'<h4>自检</h4><ul>{"".join(f"<li>{text_block(item)}</li>" for item in kit["self_check"])}</ul></article>'
+        for kit in content["foundation_kit"]
+    )
     body = f'<section class="hero"><div class="eyebrow">按课程动态生成的起步工具</div><h2>基础工具包</h2><p>工具包只包含完成本次实践所需的最小支撑：术语、操作顺序、检查表或 starter 入口。课程上下文来自上游理论课合同。</p><div class="meta">{context_chips(content)}</div></section><section class="section"><div class="card-grid">{kits}</div></section>'
     return shell(content, "kit", "基础工具包", body, role="student")
 
@@ -338,7 +361,7 @@ def render_teacher_guide(content: dict[str, Any]) -> str:
     <section class="section"><h2>任务观察点与理论链接</h2><div class="card-grid">{guidance}</div></section>
     <section class="section"><h2>常见错误与干预</h2><div class="card warm"><ul>{errors}</ul></div></section>
     <section class="section"><h2>弱基础与快进度学生</h2><div class="card-grid">{pace_adjustments}</div></section>
-    <section class="section"><h2>完成标准与随机出口抽查</h2><div class="card blue"><p>完成标准：学生提交核心必做任务的可观察成果，能够指出理论页、解释关键判断，并用验收条件复核结果。</p><ul>{closing_checks}</ul></div></section>'''
+    <section class="section"><h2>完成标准与随机出口抽查</h2><div class="card blue"><p>完成标准：学生现场完成核心必做任务的可观察成果，能够指出理论页、解释关键判断，并用验收条件复核结果；不把统一提交物作为默认门槛。</p><ul>{closing_checks}</ul></div></section>'''
     return shell(content, "teacher", "教师指南", body, role="teacher")
 
 

@@ -2,7 +2,7 @@
 name: practice-class-html-generator
 description: 根据已讲理论或 Courseware Content Contract 1.0 生成通用高职实践课 HTML 材料，包含分层任务、理论关联、互动学习中心、动态基础补给站和教师课堂指导；不用于 DOCX WorkOrder 或单一课程专用生成。
 metadata:
-  short-description: 生成理论关联、分层任务和互动学习中心 HTML
+  short-description: 生成达到 Gold 内容密度的理论关联、分层任务和互动学习中心 HTML
 ---
 
 # 实践课 HTML 生成器
@@ -16,10 +16,12 @@ metadata:
 ## 工作流
 
 1. 先读取用户资料；有 Courseware Contract 1.0 时优先使用 `--courseware-json`，把已讲 `slide.id` 作为理论范围。
-2. 创作 Practice Class Contract 1.0：知识链接和每个任务都写 `source_slide_ids`，任务写 `core / optional / challenge`、步骤、验收、帮助和预计时间，互动写明服务的知识点/任务。
-3. 编程 core 提供完整框架和 2—8 个关键 TODO；建模/数据库/工具 core 提供明确场景、起点、操作脚手架和结果验收。
-4. 运行 `scripts/render_practice.py`，生成物理隔离的 `student/` 与 `teacher/` 两棵 HTML 目录、合同副本、QA 报告和位于 `student/starter/` 的可选 starter。
-5. 运行 `scripts/validate_practice.py`，再用真实浏览器检查 `file://`、内部链接和至少一个内容相关互动。
+2. 先按 [内容质量 Gold Benchmark](references/content-quality-gold-benchmark.md) 做教学设计审查，再创作 Practice Class Contract 1.0。不要把 Gold Sample 中的课程知识或历史提交要求照搬到新课程。
+3. 知识链接和每个任务都写 `source_slide_ids`，任务写 `core / optional / challenge`、至少 3 个具体步骤、验收、帮助和预计时间，互动写明服务的知识点/任务。90 分钟实践通常拆成 7—12 个小任务，至少 5 个 core、1 个 optional、1 个 challenge。
+4. 编程 core 提供完整框架和 2—8 个真实需要学生修改的关键空位；TODO 不能只是解释正确代码。SQL、建模和工具 core 提供等价的可编辑起点、操作脚手架和结果验收。
+5. 学习中心设计 5—8 个实验区，至少 4 种互动形式，并包含动态过程、诊断/Debug、连续多题或场景挑战。学习指南设计 6—10 个任务关联小节，foundation kit 设计 5—10 个课程动态微专题。
+6. 运行 `scripts/render_practice.py`，生成物理隔离的 `student/` 与 `teacher/` 两棵 HTML 目录、合同副本、QA 报告和位于 `student/starter/` 的可选 starter。
+7. 运行 `scripts/validate_practice.py`，再用真实浏览器检查 `file://`、内部链接和至少一个内容相关互动。
 
 ## 输入模式
 
@@ -46,7 +48,7 @@ metadata:
 
 ## QA
 
-脚本检查合同结构、source slide 存在性、core 关联、任务时长、上下文继承、编程脚手架、非编程起点、互动关联、逐任务教师参考、学生/教师输出隔离、HTML 完整性和内部链接。它不会把通过脚本当成内容验收；最终仍要审阅三个优先级最高的事实：学生能否完成、理论是否真的支撑任务、互动是否有教学价值。
+脚本检查合同结构、Gold 密度底线、source slide 存在性、core 关联、任务时长、上下文继承、真实 starter 空位、非编程起点、互动关联、逐任务教师参考、学生/教师输出隔离、HTML 完整性和内部链接。它不会把通过脚本当成内容验收；最终仍要把三套真实 HTML 与 Gold Sample 并排审阅，确认学生能否连续完成、理论是否真的支撑任务、互动是否有教学价值、资料能否自助和教师能否直接授课。
 
 ## 命令
 

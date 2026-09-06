@@ -45,6 +45,13 @@ class PracticeClassPackageTests(unittest.TestCase):
             self.assertTrue(all(task["knowledge_link_ids"] for task in content["tasks"] if task["level"] == "core"))
             self.assertTrue(all(task["source_slide_ids"] for task in content["tasks"]))
             self.assertTrue(all(set(task["source_slide_ids"]) <= slide_ids for task in content["tasks"]))
+            self.assertGreaterEqual(report["metrics"]["tasks"], 7)
+            self.assertGreaterEqual(report["metrics"]["core_tasks"], 5)
+            self.assertGreaterEqual(report["metrics"]["interaction_zones"], 5)
+            self.assertGreaterEqual(report["metrics"]["interaction_type_count"], 4)
+            self.assertGreaterEqual(report["metrics"]["guide_sections"], 6)
+            self.assertGreaterEqual(report["metrics"]["foundation_microtopics"], 5)
+            self.assertEqual(report["metrics"]["core_help_coverage"], report["metrics"]["core_tasks"])
 
     def test_fixtures_have_distinct_learning_modalities_and_rich_interactions(self) -> None:
         data = self.fixture("data-structures.practice.json")
@@ -57,7 +64,9 @@ class PracticeClassPackageTests(unittest.TestCase):
         self.assertEqual(data["course_context"]["tools"], ["Dev-C++", "Code::Blocks"])
         self.assertEqual(data["learning_center"][1]["interaction"]["type"], "state-simulator")
         self.assertIn("classify", {center["interaction"]["type"] for center in uml["learning_center"]})
-        self.assertIn("predict-next", {center["interaction"]["type"] for center in database["learning_center"]})
+        self.assertIn("stepper", {center["interaction"]["type"] for center in database["learning_center"]})
+        self.assertNotEqual(data["course_title"], uml["course_title"])
+        self.assertNotEqual(uml["course_title"], database["course_title"])
 
     def test_uml_fixture_has_editable_drawio_and_no_programming_pollution(self) -> None:
         content = self.fixture("uml.practice.json")
@@ -67,12 +76,21 @@ class PracticeClassPackageTests(unittest.TestCase):
         self.assertIn("<mxfile", drawio["content"])
         self.assertIn("Student", drawio["content"])
         self.assertIn("Reservation", drawio["content"])
+        self.assertIn("shape=umlClass", drawio["content"])
+        self.assertNotIn("umlActor", drawio["content"])
+
+    def test_non_c_fixtures_have_no_c_or_dev_cpp_pollution(self) -> None:
+        for name in ("uml.practice.json", "database.practice.json"):
+            raw = json.dumps(self.fixture(name), ensure_ascii=False)
+            self.assertIsNone(re.search(r"C语言|C 语言|C/C\+\+|Dev-C\+\+|Code::Blocks|#include\s*<|binary_search", raw, re.IGNORECASE), name)
 
     def test_sql_starter_is_executable_shaped_and_keeps_mysql_context(self) -> None:
         content = self.fixture("database.practice.json")
         sql = next(asset["content"] for asset in content["starter_assets"] if asset["path"].endswith(".sql"))
         self.assertNotRegex(sql, r"=\s*NULL")
-        self.assertIn("'completed'", sql)
+        self.assertIn("'pending'", sql)
+        reference = next(item for item in content["teacher_reference"]["task_references"] if item["task_id"] == "db-sql-core")
+        self.assertIn("'completed'", reference["reference_answer"])
         self.assertEqual(content["course_context"]["database_dialect"], "MySQL")
 
     def test_invalid_source_slide_and_teacher_reference_fail(self) -> None:
@@ -110,13 +128,14 @@ class PracticeClassPackageTests(unittest.TestCase):
             qa = validate(practice, output, self.courseware_for("data-structures.practice.json"))
             self.assertEqual(qa["status"], "pass", qa)
             student = (output / "student" / "student-task.html").read_text(encoding="utf-8")
-            self.assertIn('data-task-id="binary-search-core"', student)
+            self.assertIn('data-task-id="ds-fill-core"', student)
             self.assertIn("search-02", student)
             self.assertIn("核心必做", student)
             self.assertNotIn("teacher-guide", student)
             self.assertNotIn("教师参考", student)
             self.assertIn("教师参考", (output / "teacher" / "teacher-reference.html").read_text(encoding="utf-8"))
-            self.assertTrue((output / "student" / "starter" / "binary_search.c").is_file())
+            self.assertTrue((output / "student" / "starter" / "binary-search.c").is_file())
+            self.assertIn("TODO 1", (output / "student" / "starter" / "binary-search.c").read_text(encoding="utf-8"))
 
     def test_installer_and_namespaced_adapter_are_minimal_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory(prefix="practice-class-install-") as temp:

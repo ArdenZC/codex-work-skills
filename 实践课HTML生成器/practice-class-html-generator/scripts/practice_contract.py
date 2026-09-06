@@ -43,6 +43,19 @@ OPTION_INTERACTIONS = {
     "scenario-decision",
 }
 CODING_MODALITIES = {"coding", "sql", "programming", "mixed"}
+MIN_TASKS = 7
+MIN_CORE_TASKS = 5
+MIN_OPTIONAL_TASKS = 1
+MIN_CHALLENGE_TASKS = 1
+MIN_CENTER_ZONES = 5
+MAX_CENTER_ZONES = 8
+MIN_INTERACTION_TYPES = 4
+MIN_GUIDE_SECTIONS = 6
+MAX_GUIDE_SECTIONS = 10
+MIN_KIT_TOPICS = 5
+MAX_KIT_TOPICS = 10
+MIN_TASK_STEPS = 3
+PROCESS_INTERACTIONS = {"stepper", "trace", "state-simulator"}
 CONTEXT_STRING_FIELDS = {
     "course_name",
     "audience",
@@ -363,6 +376,43 @@ def _validate_teacher_reference(
         errors.append(f"{location}.task_references is missing tasks: {', '.join(missing)}")
 
 
+def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[str]) -> int:
+    """Require every declared starter gap to be a real, locatable edit point.
+
+    A gap is intentionally small and generic: the contract does not prescribe a
+    programming language.  The marker and replacement must occur on the same
+    source line so a TODO cannot merely describe an already-complete answer.
+    """
+
+    gaps = asset.get("editable_gaps", [])
+    if gaps is None:
+        return 0
+    if not isinstance(gaps, list):
+        errors.append(f"{location}.editable_gaps must be a list")
+        return 0
+    content = _text(asset.get("content"))
+    seen: set[str] = set()
+    for index, gap in enumerate(gaps):
+        gap_location = f"{location}.editable_gaps[{index}]"
+        if not isinstance(gap, dict):
+            errors.append(f"{gap_location} must be an object")
+            continue
+        _required_strings(gap, ("marker", "replacement", "instruction", "kind"), gap_location, errors)
+        marker = gap.get("marker")
+        replacement = gap.get("replacement")
+        if not isinstance(marker, str) or not marker.strip():
+            continue
+        if marker in seen:
+            errors.append(f"{gap_location}.marker is duplicated")
+        seen.add(marker)
+        lines = [line for line in content.splitlines() if marker in line]
+        if not lines:
+            errors.append(f"{gap_location}.marker is not present in starter content")
+        elif isinstance(replacement, str) and replacement not in lines[0]:
+            errors.append(f"{gap_location}.replacement must occur on the marker's source line")
+    return len(gaps)
+
+
 def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return a JSON-serialisable structural and relationship QA report."""
 
@@ -380,8 +430,17 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "interaction_types": [],
         "starter_assets": 0,
         "todo_count": 0,
+        "editable_gaps": 0,
         "teacher_references": 0,
         "context_preserved": False,
+        "interaction_zones": 0,
+        "interaction_type_count": 0,
+        "dynamic_interactions": 0,
+        "diagnose_interactions": 0,
+        "continuous_interactions": 0,
+        "guide_sections": 0,
+        "foundation_microtopics": 0,
+        "core_help_coverage": 0,
     }
     if not isinstance(content, dict):
         return {"status": "fail", "errors": ["practice content root must be an object"], "warnings": [], "metrics": metrics, "source_slide_refs": []}
@@ -468,8 +527,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     metrics["knowledge_links"] = len(knowledge_ids)
 
     tasks = _list(content.get("tasks"))
-    if len(tasks) < 3:
-        errors.append("tasks must contain at least three items")
+    if len(tasks) < MIN_TASKS:
+        errors.append(f"tasks must contain at least {MIN_TASKS} small activities")
     task_ids: set[str] = set()
     task_by_id: dict[str, dict[str, Any]] = {}
     for index, task in enumerate(tasks):
@@ -514,8 +573,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         if level == "core" and source.get("mode") == "courseware" and not direct_source_set:
             errors.append(f"{location} core task has no source_slide_ids")
         steps = task.get("steps")
-        if not isinstance(steps, list) or len(steps) < 2:
-            errors.append(f"{location}.steps must contain at least two items")
+        if not isinstance(steps, list) or len(steps) < MIN_TASK_STEPS:
+            errors.append(f"{location}.steps must contain at least {MIN_TASK_STEPS} concrete items")
         else:
             for step_index, step in enumerate(steps):
                 _required_strings(step, ("title", "instruction"), f"{location}.steps[{step_index}]", errors)
@@ -547,8 +606,12 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     metrics["core_tasks"] = sum(1 for task in task_by_id.values() if task.get("level") == "core")
     metrics["optional_tasks"] = sum(1 for task in task_by_id.values() if task.get("level") == "optional")
     metrics["challenge_tasks"] = sum(1 for task in task_by_id.values() if task.get("level") == "challenge")
-    if not all(metrics[key] > 0 for key in ("core_tasks", "optional_tasks", "challenge_tasks")):
-        errors.append("tasks must include at least one core, optional, and challenge task")
+    if metrics["core_tasks"] < MIN_CORE_TASKS:
+        errors.append(f"tasks must include at least {MIN_CORE_TASKS} core activities")
+    if metrics["optional_tasks"] < MIN_OPTIONAL_TASKS:
+        errors.append(f"tasks must include at least {MIN_OPTIONAL_TASKS} optional activity")
+    if metrics["challenge_tasks"] < MIN_CHALLENGE_TASKS:
+        errors.append(f"tasks must include at least {MIN_CHALLENGE_TASKS} challenge activity")
 
     assets = _list(content.get("starter_assets"))
     asset_ids: set[str] = set()
@@ -573,6 +636,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
                 ET.fromstring(_text(asset.get("content")))
             except ET.ParseError as exc:
                 errors.append(f"{location}.content must be well-formed draw.io XML: {exc}")
+        metrics["editable_gaps"] += _validate_editable_gaps(asset, location, errors)
         metrics["todo_count"] += len(re.findall(r"\bTODO\s+\d+\b", _text(asset.get("content"))))
     metrics["starter_assets"] = len(asset_ids)
     for task in task_by_id.values():
@@ -583,6 +647,9 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             actual_todo = sum(len(re.findall(r"\bTODO\s+\d+\b", _text(asset.get("content")))) for asset in assets if isinstance(asset, dict) and asset.get("id") in starter_refs)
             if actual_todo != task.get("todo_count"):
                 errors.append(f"task {task.get('id')} todo_count does not match starter content ({actual_todo})")
+            actual_gaps = sum(len(asset.get("editable_gaps", [])) for asset in assets if isinstance(asset, dict) and asset.get("id") in starter_refs and isinstance(asset.get("editable_gaps", []), list))
+            if actual_gaps != task.get("todo_count"):
+                errors.append(f"task {task.get('id')} todo_count does not match declared real starter gaps ({actual_gaps})")
 
     centers = _list(content.get("learning_center"))
     center_ids: set[str] = set()
@@ -605,8 +672,31 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             interaction_types.add(interaction["type"])
         metrics["interactions"] += 1
     metrics["interaction_types"] = sorted(interaction_types)
-    if not centers:
-        errors.append("learning_center must contain at least one item")
+    metrics["interaction_zones"] = len(center_ids)
+    metrics["interaction_type_count"] = len(interaction_types)
+    metrics["dynamic_interactions"] = sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") in PROCESS_INTERACTIONS)
+    metrics["diagnose_interactions"] = sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") == "diagnose")
+    metrics["continuous_interactions"] = sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") in {"multi-question", "scenario-decision"})
+    if len(centers) < MIN_CENTER_ZONES or len(centers) > MAX_CENTER_ZONES:
+        errors.append(f"learning_center must contain {MIN_CENTER_ZONES} to {MAX_CENTER_ZONES} distinct experiment zones")
+    if len(interaction_types) < MIN_INTERACTION_TYPES:
+        errors.append(f"learning_center must use at least {MIN_INTERACTION_TYPES} interaction types")
+    if metrics["dynamic_interactions"] < 1:
+        errors.append("learning_center needs at least one dynamic process/state interaction")
+    if metrics["diagnose_interactions"] < 1:
+        errors.append("learning_center needs at least one diagnose/Debug interaction")
+    if metrics["continuous_interactions"] < 1:
+        errors.append("learning_center needs at least one continuous question or scenario challenge")
+    core_task_ids = {task_id for task_id, task in task_by_id.items() if task.get("level") == "core"}
+    covered_core_task_ids = {task_id for center in centers if isinstance(center, dict) for task_id in _list(center.get("task_ids"))}
+    missing_core_centers = sorted(core_task_ids - covered_core_task_ids)
+    if missing_core_centers:
+        errors.append("learning_center must cover every core task: " + ", ".join(missing_core_centers))
+    for knowledge_id in knowledge_ids:
+        knowledge_types = {center.get("interaction", {}).get("type") for center in centers if isinstance(center, dict) and knowledge_id in _list(center.get("knowledge_link_ids"))}
+        knowledge_types.discard(None)
+        if len(knowledge_types) < 2:
+            errors.append(f"knowledge link {knowledge_id} must be practiced in at least two interaction forms")
 
     guides = _list(content.get("study_guide"))
     guide_ids: set[str] = set()
@@ -622,8 +712,17 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
                 errors.append(f"duplicate study guide id: {guide_id}")
             guide_ids.add(guide_id)
         _check_id_refs(guide.get("knowledge_link_ids"), knowledge_ids, f"{location}.knowledge_link_ids", errors)
+        _check_id_refs(guide.get("task_ids"), task_ids, f"{location}.task_ids", errors)
+        _required_strings(guide, ("worked_example",), location, errors)
+        for field in ("quick_reference", "common_errors", "checkpoints"):
+            values = guide.get(field)
+            if not isinstance(values, list) or not values or any(not _non_empty(item) for item in values):
+                errors.append(f"{location}.{field} must be a non-empty string list")
         if not isinstance(guide.get("checkpoints"), list) or not guide["checkpoints"]:
             errors.append(f"{location}.checkpoints must be a non-empty list")
+    metrics["guide_sections"] = len(guide_ids)
+    if len(guides) < MIN_GUIDE_SECTIONS or len(guides) > MAX_GUIDE_SECTIONS:
+        errors.append(f"study_guide must contain {MIN_GUIDE_SECTIONS} to {MAX_GUIDE_SECTIONS} task-linked sections")
 
     kits = _list(content.get("foundation_kit"))
     kit_ids: set[str] = set()
@@ -638,14 +737,29 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             if kit_id in kit_ids:
                 errors.append(f"duplicate foundation kit id: {kit_id}")
             kit_ids.add(kit_id)
+        _check_id_refs(kit.get("task_ids"), task_ids, f"{location}.task_ids", errors)
+        _required_strings(kit, ("when_to_use",), location, errors)
         if not isinstance(kit.get("steps"), list) or not kit["steps"]:
             errors.append(f"{location}.steps must be a non-empty list")
+        if not isinstance(kit.get("self_check"), list) or not kit["self_check"] or any(not _non_empty(item) for item in kit.get("self_check", [])):
+            errors.append(f"{location}.self_check must be a non-empty string list")
+    metrics["foundation_microtopics"] = len(kit_ids)
+    if len(kits) < MIN_KIT_TOPICS or len(kits) > MAX_KIT_TOPICS:
+        errors.append(f"foundation_kit must contain {MIN_KIT_TOPICS} to {MAX_KIT_TOPICS} course-specific microtopics")
 
     _validate_teacher_guide(content.get("teacher_guide"), task_ids, "teacher_guide", errors)
     _validate_teacher_reference(content.get("teacher_reference"), task_by_id, knowledge_by_id, actual_slide_ids, "teacher_reference", errors)
     if isinstance(content.get("teacher_reference"), dict):
         references = content["teacher_reference"].get("task_references", [])
         metrics["teacher_references"] = len(references) if isinstance(references, list) else 0
+
+    teacher_guide_value = content.get("teacher_guide")
+    teacher_guidance = teacher_guide_value.get("task_guidance") if isinstance(teacher_guide_value, dict) else []
+    guidance_ids = {item.get("task_id") for item in _list(teacher_guidance) if isinstance(item, dict)}
+    metrics["core_help_coverage"] = len(core_task_ids & guidance_ids)
+    missing_core_guidance = sorted(core_task_ids - guidance_ids)
+    if missing_core_guidance:
+        errors.append("teacher_guide.task_guidance must cover every core task: " + ", ".join(missing_core_guidance))
 
     all_help_refs = [ref for task in task_by_id.values() for ref in _list(task.get("help_refs"))]
     valid_help = guide_ids | kit_ids
@@ -657,13 +771,18 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     if source.get("mode") == "courseware" and not source_slide_refs:
         errors.append("courseware mode requires at least one source slide reference")
 
-    # A modeling/tooling fixture must not accidentally inherit a programming
-    # scaffold.  This stays generic: it is based on declared modalities, not
-    # on a hard-coded course title.
-    if task_by_id and all(task.get("modality") not in CODING_MODALITIES for task in task_by_id.values()):
+    raw_content = json.dumps(content, ensure_ascii=False)
+    if re.search(r"统一提交|提交截图|收走|每组至少交出", raw_content):
+        errors.append("default classroom content must not require uniform submission, screenshots, or collection of artifacts")
+
+    # A modeling/tooling or non-C fixture must not accidentally inherit a
+    # C/programming scaffold.  This stays generic: it is based on the
+    # declared course language, not on a hard-coded course title.
+    declared_language = practice_context.get("language") if isinstance(practice_context, dict) else None
+    if task_by_id and declared_language != "C":
         raw = json.dumps(content, ensure_ascii=False)
-        if re.search(r"C\s*语言|C/C\+\+|#include\s*<|\bTODO\s+\d+\b|binary_search\.py", raw, re.IGNORECASE):
-            errors.append("non-programming practice content contains C/code-template pollution")
+        if re.search(r"C\s*语言|C/C\+\+|#include\s*<|代码模板|binary_search\.py", raw, re.IGNORECASE):
+            errors.append("non-C practice content contains C/code-template pollution")
 
     return {
         "status": "pass" if not errors else "fail",

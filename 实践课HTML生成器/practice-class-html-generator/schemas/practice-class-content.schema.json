@@ -14,10 +14,10 @@
     "course_context": {"$ref": "#/$defs/courseContext"},
     "source_courseware": {"$ref": "#/$defs/source"},
     "knowledge_links": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/knowledge"}},
-    "tasks": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/task"}},
-    "learning_center": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/center"}},
-    "study_guide": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/guide"}},
-    "foundation_kit": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/kit"}},
+    "tasks": {"type": "array", "minItems": 7, "items": {"$ref": "#/$defs/task"}},
+    "learning_center": {"type": "array", "minItems": 5, "maxItems": 8, "items": {"$ref": "#/$defs/center"}},
+    "study_guide": {"type": "array", "minItems": 6, "maxItems": 10, "items": {"$ref": "#/$defs/guide"}},
+    "foundation_kit": {"type": "array", "minItems": 5, "maxItems": 10, "items": {"$ref": "#/$defs/kit"}},
     "teacher_guide": {"$ref": "#/$defs/teacher"},
     "teacher_reference": {"$ref": "#/$defs/teacherReference"},
     "starter_assets": {"type": "array", "items": {"$ref": "#/$defs/starter"}}
@@ -72,7 +72,7 @@
         "id": {"$ref": "#/$defs/nonEmpty"}, "level": {"enum": ["core", "optional", "challenge"]},
         "title": {"$ref": "#/$defs/nonEmpty"}, "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
         "modality": {"$ref": "#/$defs/nonEmpty"}, "overview": {"$ref": "#/$defs/nonEmpty"},
-        "scaffold": {"$ref": "#/$defs/nonEmpty"}, "steps": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/step"}},
+        "scaffold": {"$ref": "#/$defs/nonEmpty"}, "steps": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/step"}},
         "acceptance": {"$ref": "#/$defs/strings"}, "help_refs": {"$ref": "#/$defs/strings"},
         "estimated_minutes": {"type": "integer", "minimum": 5}, "starter_asset_ids": {"$ref": "#/$defs/strings"}, "todo_count": {"type": "integer", "minimum": 0}
       }
@@ -135,13 +135,23 @@
     },
     "guide": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "knowledge_link_ids", "body", "checkpoints"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "body": {"$ref": "#/$defs/nonEmpty"}, "checkpoints": {"$ref": "#/$defs/strings"}}
+      "required": ["id", "title", "knowledge_link_ids", "task_ids", "body", "worked_example", "quick_reference", "common_errors", "checkpoints"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
+        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"},
+        "body": {"$ref": "#/$defs/nonEmpty"}, "worked_example": {"$ref": "#/$defs/nonEmpty"},
+        "quick_reference": {"$ref": "#/$defs/strings"}, "common_errors": {"$ref": "#/$defs/strings"},
+        "checkpoints": {"$ref": "#/$defs/strings"}
+      }
     },
     "kit": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "kind", "content", "steps"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"}, "content": {"$ref": "#/$defs/nonEmpty"}, "steps": {"$ref": "#/$defs/strings"}}
+      "required": ["id", "title", "kind", "content", "task_ids", "when_to_use", "steps", "self_check"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"},
+        "content": {"$ref": "#/$defs/nonEmpty"}, "task_ids": {"$ref": "#/$defs/strings"},
+        "when_to_use": {"$ref": "#/$defs/nonEmpty"}, "steps": {"$ref": "#/$defs/strings"}, "self_check": {"$ref": "#/$defs/strings"}
+      }
     },
     "teacher": {
       "type": "object", "additionalProperties": false,
@@ -171,7 +181,19 @@
     "starter": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "path", "language", "task_id", "content"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "path": {"$ref": "#/$defs/nonEmpty"}, "language": {"$ref": "#/$defs/nonEmpty"}, "task_id": {"$ref": "#/$defs/nonEmpty"}, "content": {"type": "string"}}
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmpty"}, "path": {"$ref": "#/$defs/nonEmpty"}, "language": {"$ref": "#/$defs/nonEmpty"},
+        "task_id": {"$ref": "#/$defs/nonEmpty"}, "content": {"type": "string"},
+        "editable_gaps": {"type": "array", "items": {"$ref": "#/$defs/editableGap"}}
+      }
+    },
+    "editableGap": {
+      "type": "object", "additionalProperties": false,
+      "required": ["marker", "replacement", "instruction", "kind"],
+      "properties": {
+        "marker": {"$ref": "#/$defs/nonEmpty"}, "replacement": {"$ref": "#/$defs/nonEmpty"},
+        "instruction": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"}
+      }
     }
   }
 }

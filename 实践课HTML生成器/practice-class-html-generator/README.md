@@ -77,7 +77,7 @@ python scripts/validate_practice.py `
   --output-dir .\out\data-structures --json
 ```
 
-验证会检查知识点与任务自身的 `source_slide_ids`、core 关联、任务层级、上下文继承、学习中心关联、HTML 内部链接、学生/教师目录隔离、draw.io starter 和逐任务教师参考，但不会替代教师对教学内容的审阅。
+验证会检查 Gold 内容密度底线、知识点与任务自身的 `source_slide_ids`、core 关联、任务层级、上下文继承、真实 starter 空位、学习中心关联、HTML 内部链接、学生/教师目录隔离、draw.io starter 和逐任务教师参考，但不会替代教师对教学内容的审阅。参考抽象规则见 [references/content-quality-gold-benchmark.md](references/content-quality-gold-benchmark.md)。
 
 ## 三套内容形态
 
