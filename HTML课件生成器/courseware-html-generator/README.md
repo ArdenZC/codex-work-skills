@@ -38,7 +38,7 @@ courseware-html-generator/
   → atomic commit
 ```
 
-Python 只负责稳定输出，不调用模型、在线 API 或网络资源。输入 JSON 中不能提供任意脚本；代码 block 按文本转义，SVG 仅允许通过安全检查的自包含图形。
+Python 只负责稳定输出，不调用模型、在线 API 或网络资源。输入 JSON 中不能提供任意脚本；代码 block 按文本转义，SVG 仅允许通过安全检查的自包含图形。课程级 `course_context` 可声明语言、工具、平台、软件、数据库方言、框架和其他约束，供下游 Practice Class Skill 继承；Courseware 不反向依赖实践课。
 
 ## 生成
 

@@ -36,6 +36,17 @@ SLIDE_FIELDS = {
     "classroom_followup",
     "pacing_note",
 }
+COURSE_CONTEXT_STRING_FIELDS = {
+    "course_name",
+    "audience",
+    "language",
+    "platform",
+    "software",
+    "database_dialect",
+    "framework",
+}
+COURSE_CONTEXT_LIST_FIELDS = {"tools", "other_constraints"}
+COURSE_CONTEXT_FIELDS = COURSE_CONTEXT_STRING_FIELDS | COURSE_CONTEXT_LIST_FIELDS
 STUDENT_FORBIDDEN = (
     "120分钟",
     "备课版",
@@ -209,6 +220,18 @@ def _validate_block(block: Any, location: str, errors: list[str], metrics: dict[
             _validate_text_or_list(block.get(field), f"{location}.{field}", errors)
 
 
+def _validate_course_context(value: Any, location: str, errors: list[str]) -> None:
+    if not isinstance(value, dict) or not value:
+        errors.append(f"{location} must be a non-empty object")
+        return
+    extra = sorted(set(value) - COURSE_CONTEXT_FIELDS)
+    errors.extend(f"{location} has unsupported field: {field}" for field in extra)
+    for field in COURSE_CONTEXT_STRING_FIELDS & set(value):
+        _add(errors, _non_empty(value[field]), f"{location}.{field} must be a non-empty string")
+    for field in COURSE_CONTEXT_LIST_FIELDS & set(value):
+        _validate_string_list(value[field], f"{location}.{field}", errors)
+
+
 def _block_visible_text(block: dict[str, Any]) -> list[str]:
     block_type = block.get("type")
     values: list[str] = []
@@ -273,7 +296,7 @@ def validate_content(content: Any) -> dict[str, Any]:
     }
     if not isinstance(content, dict):
         return {"status": "fail", "errors": ["content root must be an object"], "warnings": [], "metrics": metrics}
-    allowed_root = {"contract_version", "course_title", "chapter_title", "audience", "content_reserve_minutes", "theme", "slides"}
+    allowed_root = {"contract_version", "course_title", "chapter_title", "audience", "content_reserve_minutes", "theme", "course_context", "slides"}
     extra = sorted(set(content) - allowed_root)
     errors.extend(f"content has unsupported field: {field}" for field in extra)
     _add(errors, content.get("contract_version") == CONTRACT_VERSION, f"contract_version must be {CONTRACT_VERSION}")
@@ -283,6 +306,8 @@ def validate_content(content: Any) -> dict[str, Any]:
     _add(errors, isinstance(reserve, int) and not isinstance(reserve, bool) and reserve > 0, "content_reserve_minutes must be a positive integer")
     if "theme" in content:
         _add(errors, _non_empty(content.get("theme")), "theme must be a non-empty string when present")
+    if "course_context" in content:
+        _validate_course_context(content.get("course_context"), "course_context", errors)
     slides = content.get("slides")
     _add(errors, isinstance(slides, list) and len(slides) >= 2, "slides must contain at least two pages")
     if not isinstance(slides, list):

@@ -5,6 +5,16 @@
   "audience": "高职软件技术专业学生，已学习关系模型、基本 SELECT 和常见数据库工具",
   "content_reserve_minutes": 15,
   "theme": "morandi-academy",
+  "course_context": {
+    "course_name": "数据库原理与应用",
+    "audience": "高职软件技术专业学生，已学习关系模型、基本 SELECT 和常见数据库工具",
+    "language": "SQL",
+    "tools": ["MySQL Workbench", "draw.io"],
+    "platform": "Windows 实训室",
+    "software": "MySQL 8.0 / MySQL Workbench",
+    "database_dialect": "MySQL",
+    "other_constraints": ["实践查询按 MySQL 8.0 语法验证", "先分段运行再核对结果粒度"]
+  },
   "slides": [
     {
       "id": "db-01",

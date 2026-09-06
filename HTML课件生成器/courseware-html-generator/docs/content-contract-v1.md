@@ -12,7 +12,10 @@
 | `audience` | string | 必填；默认高职/大专对象，但不自动出现在学生页 |
 | `content_reserve_minutes` | integer | 必填、正数；内部储备量，不渲染到学生页 |
 | `theme` | string | 可选，默认 `morandi-academy` |
+| `course_context` | object | 可选；课程语言、工具、平台、软件、数据库方言、框架和其他约束，下游实践课必须保留已声明值 |
 | `slides` | array | 必填，至少 2 页 |
+
+`course_context` 的字段均为可选，但出现时必须使用合同声明的字段名：`course_name`、`audience`、`language`、`tools`、`platform`、`software`、`database_dialect`、`framework`、`other_constraints`。它是单向的 Courseware → Practice 上游上下文，不会让课件 Skill 依赖实践课 Skill。
 
 ## 页面级字段
 

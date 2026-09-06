@@ -29,6 +29,14 @@ class CoursewarePackageTests(unittest.TestCase):
             self.assertEqual(report["status"], "pass", report)
             self.assertGreaterEqual(report["metrics"]["slides"], 2)
 
+    def test_course_context_is_valid_and_keeps_stable_slide_ids(self) -> None:
+        data = self.load_example("data-structures.example.json")
+        uml = self.load_example("uml.example.json")
+        self.assertEqual(data["course_context"]["language"], "C")
+        self.assertEqual(data["course_context"]["tools"], ["Dev-C++", "Code::Blocks"])
+        self.assertEqual(uml["course_context"]["tools"], ["draw.io", "StarUML"])
+        self.assertEqual([slide["id"] for slide in data["slides"]], ["search-01", "search-02", "search-03", "search-04", "search-05"])
+
     def test_render_produces_two_offline_single_files_and_qa(self) -> None:
         content_path = ROOT / "examples" / "data-structures.example.json"
         with tempfile.TemporaryDirectory(prefix="courseware-package-") as temp:

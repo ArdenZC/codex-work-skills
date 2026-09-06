@@ -5,6 +5,16 @@
   "audience": "高职软件技术专业学生",
   "content_reserve_minutes": 60,
   "theme": "morandi-academy",
+  "course_context": {
+    "course_name": "软件建模与设计",
+    "audience": "高职软件技术专业学生",
+    "language": "UML 建模",
+    "tools": ["draw.io", "StarUML"],
+    "platform": "Windows 实训室",
+    "software": "draw.io / StarUML",
+    "framework": "UML 2.x",
+    "other_constraints": ["优先使用可编辑模型，不以截图替代模型", "先确认责任再细化实现"]
+  },
   "slides": [
     {
       "id": "uml-01",

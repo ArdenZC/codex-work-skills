@@ -1,23 +1,59 @@
 """Validation helpers for Practice Class Content Contract 1.0.
 
-The practice skill deliberately keeps this validator small.  It checks the
-relationships that make a practice class teachable (theory links, task
-levels, scaffolds, and interaction purpose) without importing the old
-practice-workorder hardening stack.
+This validator intentionally stays focused on teaching relationships: upstream
+slide references, task levels, modality-appropriate scaffolds, content-linked
+interactions, and the split student/teacher reference contract.  It does not
+import the former practice-workorder hardening stack.
 """
 
 from __future__ import annotations
 
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 
 CONTRACT_VERSION = "1.0"
 LEVELS = ("core", "optional", "challenge")
-INTERACTION_TYPES = {"choice", "match", "stepper"}
+LEVEL_LABELS = {"core": "核心必做", "optional": "有余力", "challenge": "提高挑战"}
+INTERACTION_TYPES = {
+    "choice",
+    "match",
+    "stepper",
+    "trace",
+    "classify",
+    "reorder",
+    "diagnose",
+    "predict-next",
+    "build-relation",
+    "state-simulator",
+    "compare-strategies",
+    "multi-question",
+    "scenario-decision",
+}
+OPTION_INTERACTIONS = {
+    "choice",
+    "match",
+    "diagnose",
+    "predict-next",
+    "build-relation",
+    "compare-strategies",
+    "scenario-decision",
+}
 CODING_MODALITIES = {"coding", "sql", "programming", "mixed"}
+CONTEXT_STRING_FIELDS = {
+    "course_name",
+    "audience",
+    "language",
+    "platform",
+    "software",
+    "database_dialect",
+    "framework",
+}
+CONTEXT_LIST_FIELDS = {"tools", "other_constraints"}
+CONTEXT_FIELDS = CONTEXT_STRING_FIELDS | CONTEXT_LIST_FIELDS
 
 
 def _text(value: Any) -> str:
@@ -40,9 +76,9 @@ def _unique_strings(values: Any, location: str, errors: list[str]) -> set[str]:
     for index, value in enumerate(values):
         if not _non_empty(value):
             errors.append(f"{location}[{index}] must be a non-empty string")
+        elif value in result:
+            errors.append(f"{location} contains duplicate id: {value}")
         else:
-            if value in result:
-                errors.append(f"{location} contains duplicate id: {value}")
             result.add(value)
     return result
 
@@ -76,6 +112,43 @@ def _check_id_refs(
     return refs
 
 
+def _check_slide_refs(values: Any, valid: set[str], location: str, errors: list[str]) -> set[str]:
+    """Validate slide reference shape; only reject unknown IDs when an upstream set exists."""
+
+    if not isinstance(values, list) or not values:
+        errors.append(f"{location} must be a non-empty list")
+        return set()
+    refs = {value for value in values if isinstance(value, str)}
+    for value in values:
+        if not isinstance(value, str) or not value.strip():
+            errors.append(f"{location} contains an empty/non-string reference")
+        elif valid and value not in valid:
+            errors.append(f"{location} references unknown id: {value}")
+    return refs
+
+
+def _validate_course_context(value: Any, location: str, errors: list[str]) -> dict[str, Any] | None:
+    """Validate the small, intentionally generic course/toolchain context."""
+
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        errors.append(f"{location} must be an object")
+        return None
+    extra = sorted(set(value) - CONTEXT_FIELDS)
+    errors.extend(f"{location} has unsupported field: {field}" for field in extra)
+    for field in sorted(CONTEXT_STRING_FIELDS & set(value)):
+        if not _non_empty(value[field]):
+            errors.append(f"{location}.{field} must be a non-empty string")
+    for field in sorted(CONTEXT_LIST_FIELDS & set(value)):
+        values = value[field]
+        if not isinstance(values, list) or not values or any(not _non_empty(item) for item in values):
+            errors.append(f"{location}.{field} must be a non-empty string list")
+    if not value:
+        errors.append(f"{location} must contain at least one context field")
+    return value
+
+
 def _courseware_ids(courseware: dict[str, Any] | None, errors: list[str]) -> set[str]:
     if courseware is None:
         return set()
@@ -84,6 +157,7 @@ def _courseware_ids(courseware: dict[str, Any] | None, errors: list[str]) -> set
         return set()
     if courseware.get("contract_version") != CONTRACT_VERSION:
         errors.append("courseware contract_version must be 1.0")
+    _validate_course_context(courseware.get("course_context"), "courseware.course_context", errors)
     slides = courseware.get("slides")
     if not isinstance(slides, list) or len(slides) < 2:
         errors.append("courseware slides must contain at least two pages")
@@ -119,6 +193,26 @@ def load_courseware(path: Path) -> dict[str, Any]:
     return content
 
 
+def _validate_options(interaction: dict[str, Any], location: str, errors: list[str]) -> list[dict[str, Any]]:
+    options = interaction.get("options")
+    if not isinstance(options, list) or len(options) < 2:
+        errors.append(f"{location}.options must contain at least two options")
+        return []
+    for index, option in enumerate(options):
+        if not isinstance(option, dict) or not _non_empty(option.get("label")) or not _non_empty(option.get("feedback")):
+            errors.append(f"{location}.options[{index}] needs label and feedback")
+    answer = interaction.get("answer_index")
+    correct_flags = [option.get("correct") is True for option in options if isinstance(option, dict)]
+    if answer is None and not any(correct_flags):
+        errors.append(f"{location} needs answer_index or one option with correct=true")
+    if answer is not None:
+        if not isinstance(answer, int) or isinstance(answer, bool):
+            errors.append(f"{location}.answer_index must be an integer")
+        elif not 0 <= answer < len(options):
+            errors.append(f"{location}.answer_index is out of range")
+    return options
+
+
 def _validate_interaction(interaction: Any, location: str, errors: list[str]) -> dict[str, Any]:
     if not isinstance(interaction, dict):
         errors.append(f"{location} must be an object")
@@ -128,20 +222,10 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
         errors.append(f"{location}.type must be one of {sorted(INTERACTION_TYPES)}")
     if not _non_empty(interaction.get("prompt")):
         errors.append(f"{location}.prompt must be a non-empty string")
-    if kind in {"choice", "match"}:
-        options = interaction.get("options")
-        if not isinstance(options, list) or len(options) < 2:
-            errors.append(f"{location}.options must contain at least two options")
-        else:
-            for index, option in enumerate(options):
-                if not isinstance(option, dict) or not _non_empty(option.get("label")) or not _non_empty(option.get("feedback")):
-                    errors.append(f"{location}.options[{index}] needs label and feedback")
-        answer = interaction.get("answer_index")
-        if not isinstance(answer, int) or isinstance(answer, bool):
-            errors.append(f"{location}.answer_index must be an integer")
-        elif isinstance(options, list) and not 0 <= answer < len(options):
-            errors.append(f"{location}.answer_index is out of range")
-    if kind == "stepper":
+
+    if kind in OPTION_INTERACTIONS:
+        _validate_options(interaction, location, errors)
+    elif kind in {"stepper", "trace"}:
         steps = interaction.get("steps")
         if not isinstance(steps, list) or len(steps) < 2:
             errors.append(f"{location}.steps must contain at least two steps")
@@ -149,7 +233,134 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
             for index, step in enumerate(steps):
                 if not isinstance(step, dict) or not _non_empty(step.get("title")) or not _non_empty(step.get("text")):
                     errors.append(f"{location}.steps[{index}] needs title and text")
+    elif kind == "classify":
+        categories = interaction.get("categories")
+        if not isinstance(categories, list) or len(categories) < 2 or any(not _non_empty(item) for item in categories):
+            errors.append(f"{location}.categories must contain at least two non-empty strings")
+        items = interaction.get("items")
+        if not isinstance(items, list) or len(items) < 2:
+            errors.append(f"{location}.items must contain at least two classification items")
+        else:
+            for index, item in enumerate(items):
+                if not isinstance(item, dict) or not _non_empty(item.get("id")) or not _non_empty(item.get("label")) or not _non_empty(item.get("answer")) or not _non_empty(item.get("feedback")):
+                    errors.append(f"{location}.items[{index}] needs id, label, answer and feedback")
+                elif isinstance(categories, list) and item["answer"] not in categories:
+                    errors.append(f"{location}.items[{index}].answer is not in categories")
+    elif kind == "reorder":
+        items = interaction.get("items")
+        order = interaction.get("correct_order")
+        item_ids = [item.get("id") for item in items] if isinstance(items, list) and all(isinstance(item, dict) for item in items) else []
+        if not isinstance(items, list) or len(items) < 2 or any(not isinstance(item, dict) or not _non_empty(item.get("id")) or not _non_empty(item.get("label")) for item in items):
+            errors.append(f"{location}.items must contain at least two items with id and label")
+        if not isinstance(order, list) or order != item_ids or len(set(order)) != len(order):
+            errors.append(f"{location}.correct_order must list every item id exactly once")
+    elif kind == "state-simulator":
+        state = interaction.get("state")
+        if not isinstance(state, dict) or not isinstance(state.get("values"), list) or len(state.get("values", [])) < 2 or "target" not in state:
+            errors.append(f"{location}.state needs values, target and a non-empty array")
+        rounds = interaction.get("rounds")
+        required_round_fields = ("left", "right", "mid", "next_left", "next_right", "feedback")
+        if not isinstance(rounds, list) or len(rounds) < 2:
+            errors.append(f"{location}.rounds must contain at least two rounds")
+        else:
+            for index, item in enumerate(rounds):
+                if not isinstance(item, dict) or any(field not in item for field in required_round_fields) or not _non_empty(item.get("feedback")):
+                    errors.append(f"{location}.rounds[{index}] needs interval values and feedback")
+                elif any(not isinstance(item[field], int) or isinstance(item[field], bool) for field in required_round_fields[:-1]):
+                    errors.append(f"{location}.rounds[{index}] interval values must be integers")
+    elif kind == "multi-question":
+        questions = interaction.get("questions")
+        if not isinstance(questions, list) or len(questions) < 2:
+            errors.append(f"{location}.questions must contain at least two questions")
+        else:
+            for index, question in enumerate(questions):
+                q_location = f"{location}.questions[{index}]"
+                if not isinstance(question, dict) or not _non_empty(question.get("prompt")):
+                    errors.append(f"{q_location}.prompt must be a non-empty string")
+                    continue
+                _validate_options(question, q_location, errors)
     return interaction
+
+
+def _validate_teacher_guide(teacher: Any, task_ids: set[str], location: str, errors: list[str]) -> None:
+    if not isinstance(teacher, dict):
+        errors.append(f"{location} must be an object")
+        return
+    _required_strings(teacher, ("purpose", "theory_bridge"), location, errors)
+    timing = teacher.get("timing")
+    if not isinstance(timing, list) or not timing:
+        errors.append(f"{location}.timing must be a non-empty list")
+    else:
+        for index, item in enumerate(timing):
+            item_location = f"{location}.timing[{index}]"
+            if not isinstance(item, dict) or not isinstance(item.get("minutes"), int) or isinstance(item.get("minutes"), bool) or item["minutes"] <= 0 or not _non_empty(item.get("focus")):
+                errors.append(f"{item_location} needs a positive integer minutes and non-empty focus")
+    guidance = teacher.get("task_guidance")
+    if not isinstance(guidance, list) or not guidance:
+        errors.append(f"{location}.task_guidance must be a non-empty list")
+    else:
+        for index, item in enumerate(guidance):
+            item_location = f"{location}.task_guidance[{index}]"
+            if not isinstance(item, dict) or item.get("task_id") not in task_ids:
+                errors.append(f"{item_location}.task_id references an unknown task")
+            elif not _non_empty(item.get("look_for")) or not _non_empty(item.get("ask_when_stuck")):
+                errors.append(f"{item_location} needs look_for and ask_when_stuck")
+    common_errors = teacher.get("common_errors")
+    if not isinstance(common_errors, list) or not common_errors:
+        errors.append(f"{location}.common_errors must be a non-empty list")
+    else:
+        for index, item in enumerate(common_errors):
+            if not isinstance(item, dict) or not _non_empty(item.get("symptom")) or not _non_empty(item.get("intervention")):
+                errors.append(f"{location}.common_errors[{index}] needs symptom and intervention")
+    for field in ("pace_adjustments", "closing_checks"):
+        values = teacher.get(field)
+        if not isinstance(values, list) or not values or any(not _non_empty(item) for item in values):
+            errors.append(f"{location}.{field} must be a non-empty string list")
+
+
+def _validate_teacher_reference(
+    value: Any,
+    task_by_id: dict[str, dict[str, Any]],
+    knowledge_by_id: dict[str, dict[str, Any]],
+    actual_slide_ids: set[str],
+    location: str,
+    errors: list[str],
+) -> None:
+    if not isinstance(value, dict):
+        errors.append(f"{location} must be an object")
+        return
+    references = value.get("task_references")
+    if not isinstance(references, list) or not references:
+        errors.append(f"{location}.task_references must be a non-empty list")
+        return
+    seen: set[str] = set()
+    for index, item in enumerate(references):
+        item_location = f"{location}.task_references[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{item_location} must be an object")
+            continue
+        _required_strings(item, ("task_id", "title", "reference_answer"), item_location, errors)
+        task_id = item.get("task_id")
+        if task_id not in task_by_id:
+            errors.append(f"{item_location}.task_id references an unknown task")
+        elif task_id in seen:
+            errors.append(f"{item_location}.task_id is duplicated")
+        else:
+            seen.add(task_id)
+        refs = _check_slide_refs(item.get("source_slide_ids"), actual_slide_ids, f"{item_location}.source_slide_ids", errors)
+        if task_id in task_by_id:
+            task_refs = set(task_by_id[task_id].get("source_slide_ids", []))
+            if refs != task_refs:
+                errors.append(f"{item_location}.source_slide_ids must match the task's source_slide_ids")
+        for field in ("key_steps", "acceptable_variants", "common_errors", "acceptance_basis"):
+            values = item.get(field)
+            if not isinstance(values, list) or not values or any(not _non_empty(entry) for entry in values):
+                errors.append(f"{item_location}.{field} must be a non-empty string list")
+        if "reference_result" in item and not _non_empty(item.get("reference_result")):
+            errors.append(f"{item_location}.reference_result must be a non-empty string when present")
+    missing = sorted(set(task_by_id) - seen)
+    if missing:
+        errors.append(f"{location}.task_references is missing tasks: {', '.join(missing)}")
 
 
 def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -166,21 +377,25 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "task_minutes": 0,
         "core_minutes": 0,
         "interactions": 0,
+        "interaction_types": [],
         "starter_assets": 0,
         "todo_count": 0,
+        "teacher_references": 0,
+        "context_preserved": False,
     }
     if not isinstance(content, dict):
         return {"status": "fail", "errors": ["practice content root must be an object"], "warnings": [], "metrics": metrics, "source_slide_refs": []}
 
     allowed = {
-        "contract_version", "course_title", "practice_title", "audience", "duration_minutes",
-        "source_courseware", "knowledge_links", "tasks", "learning_center", "study_guide",
-        "foundation_kit", "teacher_guide", "starter_assets",
+        "contract_version", "course_title", "practice_title", "audience", "duration_minutes", "course_context",
+        "source_courseware", "knowledge_links", "tasks", "learning_center", "study_guide", "foundation_kit",
+        "teacher_guide", "teacher_reference", "starter_assets",
     }
     errors.extend(f"content has unsupported field: {field}" for field in sorted(set(content) - allowed))
     if content.get("contract_version") != CONTRACT_VERSION:
         errors.append("contract_version must be 1.0")
     _required_strings(content, ("course_title", "practice_title", "audience"), "content", errors)
+    _validate_course_context(content.get("course_context"), "course_context", errors)
     duration = content.get("duration_minutes")
     if not isinstance(duration, int) or isinstance(duration, bool) or duration < 30:
         errors.append("duration_minutes must be an integer of at least 30")
@@ -204,11 +419,24 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         missing_taught = sorted(taught_ids - actual_slide_ids)
         if missing_taught:
             errors.append("taught_slide_ids are absent from courseware: " + ", ".join(missing_taught))
+    upstream_context = courseware.get("course_context") if isinstance(courseware, dict) else None
+    practice_context = content.get("course_context")
+    if upstream_context is not None:
+        if practice_context is None:
+            errors.append("course_context is required when the upstream Courseware Contract declares it")
+        elif isinstance(practice_context, dict):
+            context_ok = True
+            for field, expected in upstream_context.items():
+                if practice_context.get(field) != expected:
+                    errors.append(f"course_context.{field} must preserve the upstream Courseware value")
+                    context_ok = False
+            metrics["context_preserved"] = context_ok
 
     knowledge = _list(content.get("knowledge_links"))
     if not knowledge:
         errors.append("knowledge_links must contain at least one item")
     knowledge_ids: set[str] = set()
+    knowledge_by_id: dict[str, dict[str, Any]] = {}
     source_slide_refs: set[str] = set()
     for index, item in enumerate(knowledge):
         location = f"knowledge_links[{index}]"
@@ -221,6 +449,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             if item_id in knowledge_ids:
                 errors.append(f"duplicate knowledge link id: {item_id}")
             knowledge_ids.add(item_id)
+            knowledge_by_id[item_id] = item
         refs = item.get("source_slide_ids")
         if not isinstance(refs, list):
             errors.append(f"{location}.source_slide_ids must be a list")
@@ -259,7 +488,6 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             task_ids.add(task_id)
             task_by_id[task_id] = task
         refs = _check_id_refs(task.get("knowledge_link_ids"), knowledge_ids, f"{location}.knowledge_link_ids", errors)
-        task["_validated_knowledge_ids"] = sorted(refs)
         task_source_refs = {
             source_ref
             for item in knowledge
@@ -267,11 +495,27 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             for source_ref in item.get("source_slide_ids", [])
             if isinstance(source_ref, str)
         }
-        if level == "core" and source.get("mode") == "courseware" and not task_source_refs:
-            errors.append(f"{location} core task has no source_slide_ids through its knowledge links")
+        direct_source_refs = task.get("source_slide_ids")
+        if not isinstance(direct_source_refs, list) or not direct_source_refs:
+            errors.append(f"{location}.source_slide_ids must be a non-empty list")
+            direct_source_refs = []
+        direct_source_set: set[str] = set()
+        for source_ref in direct_source_refs:
+            if not isinstance(source_ref, str) or not source_ref.strip():
+                errors.append(f"{location}.source_slide_ids contains an empty reference")
+                continue
+            direct_source_set.add(source_ref)
+            if taught_ids and source_ref not in taught_ids:
+                errors.append(f"{location}.source_slide_ids references an untaught slide: {source_ref}")
+            if actual_slide_ids and source_ref not in actual_slide_ids:
+                errors.append(f"{location}.source_slide_ids references missing slide.id: {source_ref}")
+        if direct_source_set != task_source_refs:
+            errors.append(f"{location}.source_slide_ids must match the task's knowledge source refs")
+        if level == "core" and source.get("mode") == "courseware" and not direct_source_set:
+            errors.append(f"{location} core task has no source_slide_ids")
         steps = task.get("steps")
         if not isinstance(steps, list) or len(steps) < 2:
-            errors.append(f"{location}.steps must contain at least two steps")
+            errors.append(f"{location}.steps must contain at least two items")
         else:
             for step_index, step in enumerate(steps):
                 _required_strings(step, ("title", "instruction"), f"{location}.steps[{step_index}]", errors)
@@ -281,10 +525,10 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         minutes = task.get("estimated_minutes")
         if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 5:
             errors.append(f"{location}.estimated_minutes must be an integer of at least 5")
-        else:
+        elif level == "core":
+            metrics["core_minutes"] += minutes
+        if isinstance(minutes, int) and not isinstance(minutes, bool):
             metrics["task_minutes"] += minutes
-            if level == "core":
-                metrics["core_minutes"] += minutes
         modality = task.get("modality")
         if not _non_empty(modality):
             errors.append(f"{location}.modality must be a non-empty string")
@@ -324,6 +568,11 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         path = asset.get("path")
         if isinstance(path, str) and (Path(path).is_absolute() or ".." in Path(path).parts):
             errors.append(f"{location}.path must stay inside starter/: {path}")
+        if isinstance(path, str) and path.lower().endswith(".drawio"):
+            try:
+                ET.fromstring(_text(asset.get("content")))
+            except ET.ParseError as exc:
+                errors.append(f"{location}.content must be well-formed draw.io XML: {exc}")
         metrics["todo_count"] += len(re.findall(r"\bTODO\s+\d+\b", _text(asset.get("content"))))
     metrics["starter_assets"] = len(asset_ids)
     for task in task_by_id.values():
@@ -337,6 +586,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
 
     centers = _list(content.get("learning_center"))
     center_ids: set[str] = set()
+    interaction_types: set[str] = set()
     for index, center in enumerate(centers):
         location = f"learning_center[{index}]"
         if not isinstance(center, dict):
@@ -350,8 +600,13 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             center_ids.add(center_id)
         _check_id_refs(center.get("knowledge_link_ids"), knowledge_ids, f"{location}.knowledge_link_ids", errors)
         _check_id_refs(center.get("task_ids"), task_ids, f"{location}.task_ids", errors)
-        _validate_interaction(center.get("interaction"), f"{location}.interaction", errors)
+        interaction = _validate_interaction(center.get("interaction"), f"{location}.interaction", errors)
+        if isinstance(interaction.get("type"), str):
+            interaction_types.add(interaction["type"])
         metrics["interactions"] += 1
+    metrics["interaction_types"] = sorted(interaction_types)
+    if not centers:
+        errors.append("learning_center must contain at least one item")
 
     guides = _list(content.get("study_guide"))
     guide_ids: set[str] = set()
@@ -386,17 +641,11 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         if not isinstance(kit.get("steps"), list) or not kit["steps"]:
             errors.append(f"{location}.steps must be a non-empty list")
 
-    teacher = content.get("teacher_guide")
-    if not isinstance(teacher, dict):
-        errors.append("teacher_guide must be an object")
-    else:
-        _required_strings(teacher, ("purpose", "theory_bridge"), "teacher_guide", errors)
-        for field in ("timing", "task_guidance", "common_errors", "pace_adjustments", "closing_checks"):
-            if not isinstance(teacher.get(field), list) or not teacher[field]:
-                errors.append(f"teacher_guide.{field} must be a non-empty list")
-        for index, item in enumerate(_list(teacher.get("task_guidance"))):
-            if not isinstance(item, dict) or item.get("task_id") not in task_ids:
-                errors.append(f"teacher_guide.task_guidance[{index}].task_id references an unknown task")
+    _validate_teacher_guide(content.get("teacher_guide"), task_ids, "teacher_guide", errors)
+    _validate_teacher_reference(content.get("teacher_reference"), task_by_id, knowledge_by_id, actual_slide_ids, "teacher_reference", errors)
+    if isinstance(content.get("teacher_reference"), dict):
+        references = content["teacher_reference"].get("task_references", [])
+        metrics["teacher_references"] = len(references) if isinstance(references, list) else 0
 
     all_help_refs = [ref for task in task_by_id.values() for ref in _list(task.get("help_refs"))]
     valid_help = guide_ids | kit_ids
@@ -408,8 +657,14 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     if source.get("mode") == "courseware" and not source_slide_refs:
         errors.append("courseware mode requires at least one source slide reference")
 
-    for task in task_by_id.values():
-        task.pop("_validated_knowledge_ids", None)
+    # A modeling/tooling fixture must not accidentally inherit a programming
+    # scaffold.  This stays generic: it is based on declared modalities, not
+    # on a hard-coded course title.
+    if task_by_id and all(task.get("modality") not in CODING_MODALITIES for task in task_by_id.values()):
+        raw = json.dumps(content, ensure_ascii=False)
+        if re.search(r"C\s*语言|C/C\+\+|#include\s*<|\bTODO\s+\d+\b|binary_search\.py", raw, re.IGNORECASE):
+            errors.append("non-programming practice content contains C/code-template pollution")
+
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,

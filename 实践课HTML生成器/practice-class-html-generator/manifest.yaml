@@ -10,11 +10,12 @@ generator:
   runtime: deterministic-inline-html
 schema: schemas/practice-class-content.schema.json
 outputs:
-  - student-task.html
-  - learning-center.html
-  - study-guide.html
-  - foundation-kit.html
-  - teacher-guide.html
+  - student/student-task.html
+  - student/learning-center.html
+  - student/study-guide.html
+  - student/foundation-kit.html
+  - teacher/teacher-guide.html
+  - teacher/teacher-reference.html
   - practice-content.json
   - qa-report.json
 offline:

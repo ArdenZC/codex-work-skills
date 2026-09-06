@@ -22,7 +22,7 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
 | [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 2.1 / 2.1.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 联动候选 |
 | [HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.0.0** | **Courseware Content Contract 1.0** | `student.html` + `teacher.html` | 稳定 |
-| [实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.0.0** | **Practice Class Content Contract 1.0**（首选上游 Courseware 1.0） | 五份课堂 HTML + JSON/Starter | 联动候选 |
+| [实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.0.0** | **Practice Class Content Contract 1.0**（首选上游 Courseware 1.0） | student/ 与 teacher/ 隔离 HTML + JSON/Starter | 联动候选 |
 
 **Skill 版本、内容合同版本和模板版本是三个不同概念。** 教案生成器已经进入 **2.2**，但默认 Word 模板仍是经过保护和兼容验证的 `lesson-plan v1.1.2`；升级 Skill 不代表必须把模板版本同步改成 2.2。
 
@@ -75,7 +75,7 @@ HTML 课件生成器把教材、PPT、讲义、教案或课程资料转成两份
 
 实践课 HTML 生成器消费 `Practice Class Content Contract 1.0`，首选直接读取 Courseware Content Contract 1.0，并以真实 `source_slide_ids` 把知识点、core 任务和互动连接到已讲理论。它保持课程泛化：数据结构可以生成代码 starter，UML 生成建模/工具脚手架，数据库生成 ER/SQL/客户端操作脚手架；foundation-kit 从合同动态生成，不复用旧实践工单的 Phase 或 Hardening 架构。
 
-输出包括 `student-task.html`、`learning-center.html`、`study-guide.html`、`foundation-kit.html`、`teacher-guide.html`、`practice-content.json` 和 `qa-report.json`，并按需生成 `starter/`。详细合同和调用示例见 [实践课HTML生成器/简介.md](实践课HTML生成器/简介.md) 与 [practice-class-html-generator/README.md](实践课HTML生成器/practice-class-html-generator/README.md)。
+输出包括 `student/` 下四份学生 HTML、`teacher/` 下教师指南和逐任务教师参考、`practice-content.json`、`qa-report.json`，并按需生成 `student/starter/`。详细合同和调用示例见 [实践课HTML生成器/简介.md](实践课HTML生成器/简介.md) 与 [practice-class-html-generator/README.md](实践课HTML生成器/practice-class-html-generator/README.md)。
 
 ## 五个 Skill 能做什么
 
@@ -85,7 +85,7 @@ HTML 课件生成器把教材、PPT、讲义、教案或课程资料转成两份
 | 平时成绩记分册生成器 | `课程成绩单.xls` 或包含该文件的班级目录 | 平时成绩记分册 `.xls` + QA 报告 |
 | 实践任务工单生成器 2.1 | Agent-authored Practice Work Order Content V1，或用于 authoring 的 Lesson Practice Task Contract V1 handoff | 学习工单 `.docx` + Content/Cross-Artifact/Output QA |
 | HTML 课件生成器 1.0 | 教材、PPT、讲义、教案或 Agent-authored Courseware Content Contract 1.0 | `student.html` + `teacher.html` + QA 报告 |
-| 实践课 HTML 生成器 1.0 | Courseware Content Contract 1.0 或 Practice Class Content Contract 1.0 | 五份实践课 HTML + `practice-content.json` + `qa-report.json` + `starter/` |
+| 实践课 HTML 生成器 1.0 | Courseware Content Contract 1.0 或 Practice Class Content Contract 1.0 | `student/` + `teacher/` 实践课 HTML + `practice-content.json` + `qa-report.json` + `student/starter/` |
 
 教案资料不完整时可以继续：Agent 会先读取会话和附件，再一次性确认课程基础（单课默认 2 学时；教材建议确认但不阻断）；理论/实践结构和工单偏好未提供时保持“待确认”，确认后按已确认选择完成规划和生成，不再询问模板、输出目录或是否开始生成 DOCX。Lesson DOCX 不替代实践工单；成绩册不能凭空生成成绩，必须提供真实课程成绩单。实践工单不能代写答案，学生任务结果栏保持空白。
 

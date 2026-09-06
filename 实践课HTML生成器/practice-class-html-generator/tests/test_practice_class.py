@@ -31,7 +31,7 @@ class PracticeClassPackageTests(unittest.TestCase):
             return REPO / "HTML课件生成器" / "courseware-html-generator" / "examples" / "uml.example.json"
         return REPO / "HTML课件生成器" / "courseware-html-generator" / "examples" / "data-structures.example.json"
 
-    def test_all_fixtures_consume_real_courseware_slide_ids(self) -> None:
+    def test_all_fixtures_consume_real_courseware_slide_ids_and_context(self) -> None:
         for name in ("data-structures.practice.json", "uml.practice.json", "database.practice.json"):
             content = self.fixture(name)
             courseware = load_courseware(self.courseware_for(name))
@@ -39,43 +39,84 @@ class PracticeClassPackageTests(unittest.TestCase):
             self.assertEqual(report["status"], "pass", report)
             slide_ids = {slide["id"] for slide in courseware["slides"]}
             refs = {ref for item in content["knowledge_links"] for ref in item["source_slide_ids"]}
-            self.assertTrue(refs)
             self.assertTrue(refs <= slide_ids)
+            self.assertTrue(report["metrics"]["context_preserved"])
+            self.assertEqual(content["course_context"], courseware["course_context"])
             self.assertTrue(all(task["knowledge_link_ids"] for task in content["tasks"] if task["level"] == "core"))
+            self.assertTrue(all(task["source_slide_ids"] for task in content["tasks"]))
+            self.assertTrue(all(set(task["source_slide_ids"]) <= slide_ids for task in content["tasks"]))
 
-    def test_fixtures_have_distinct_learning_modalities(self) -> None:
+    def test_fixtures_have_distinct_learning_modalities_and_rich_interactions(self) -> None:
         data = self.fixture("data-structures.practice.json")
         uml = self.fixture("uml.practice.json")
         database = self.fixture("database.practice.json")
         self.assertIn("coding", {task["modality"] for task in data["tasks"]})
         self.assertIn("modeling", {task["modality"] for task in uml["tasks"]})
         self.assertIn("sql", {task["modality"] for task in database["tasks"]})
-        data_core = next(task for task in data["tasks"] if task["id"] == "binary-search-core")
-        self.assertEqual(data_core["todo_count"], 5)
-        self.assertEqual(sum(1 for item in data["starter_assets"][0]["content"].splitlines() if "TODO " in item), 5)
+        self.assertEqual(data["course_context"]["language"], "C")
+        self.assertEqual(data["course_context"]["tools"], ["Dev-C++", "Code::Blocks"])
+        self.assertEqual(data["learning_center"][1]["interaction"]["type"], "state-simulator")
+        self.assertIn("classify", {center["interaction"]["type"] for center in uml["learning_center"]})
+        self.assertIn("predict-next", {center["interaction"]["type"] for center in database["learning_center"]})
 
-    def test_uml_fixture_has_no_programming_template_pollution(self) -> None:
-        raw = json.dumps(self.fixture("uml.practice.json"), ensure_ascii=False)
-        self.assertIsNone(re.search(r"C语言|C 语言|C/C\+\+|代码模板|\bTODO\b|\bdef\s", raw, re.IGNORECASE))
+    def test_uml_fixture_has_editable_drawio_and_no_programming_pollution(self) -> None:
+        content = self.fixture("uml.practice.json")
+        raw = json.dumps(content, ensure_ascii=False)
+        self.assertIsNone(re.search(r"C语言|C 语言|C/C\+\+|代码模板|#include|\bTODO\s+\d+\b|binary_search\.py", raw, re.IGNORECASE))
+        drawio = next(asset for asset in content["starter_assets"] if asset["path"].endswith(".drawio"))
+        self.assertIn("<mxfile", drawio["content"])
+        self.assertIn("Student", drawio["content"])
+        self.assertIn("Reservation", drawio["content"])
 
-    def test_invalid_source_slide_fails(self) -> None:
+    def test_sql_starter_is_executable_shaped_and_keeps_mysql_context(self) -> None:
+        content = self.fixture("database.practice.json")
+        sql = next(asset["content"] for asset in content["starter_assets"] if asset["path"].endswith(".sql"))
+        self.assertNotRegex(sql, r"=\s*NULL")
+        self.assertIn("'completed'", sql)
+        self.assertEqual(content["course_context"]["database_dialect"], "MySQL")
+
+    def test_invalid_source_slide_and_teacher_reference_fail(self) -> None:
         content = self.fixture("uml.practice.json")
         content["knowledge_links"][0]["source_slide_ids"] = ["uml-missing"]
         report = validate_content(content, load_courseware(self.courseware_for("uml.practice.json")))
         self.assertEqual(report["status"], "fail")
         self.assertTrue(any("missing slide.id" in error for error in report["errors"]))
+        content = self.fixture("database.practice.json")
+        content["teacher_reference"]["task_references"] = content["teacher_reference"]["task_references"][:-1]
+        report = validate_content(content, load_courseware(self.courseware_for("database.practice.json")))
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("missing tasks" in error for error in report["errors"]))
+        content = self.fixture("data-structures.practice.json")
+        content["tasks"][0]["source_slide_ids"] = ["search-missing"]
+        report = validate_content(content, load_courseware(self.courseware_for("data-structures.practice.json")))
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("tasks[0].source_slide_ids" in error for error in report["errors"]))
 
-    def test_generation_emits_required_files_and_output_qa(self) -> None:
+    def test_independent_mode_accepts_explicit_local_slide_refs(self) -> None:
+        content = self.fixture("uml.practice.json")
+        content["source_courseware"]["mode"] = "independent"
+        report = validate_content(content)
+        self.assertEqual(report["status"], "pass", report)
+
+    def test_generation_emits_physically_split_outputs_and_output_qa(self) -> None:
         with tempfile.TemporaryDirectory(prefix="practice-class-package-") as temp:
             output = Path(temp) / "data-structures"
-            report = generate(ROOT / "examples" / "data-structures.practice.json", output, self.courseware_for("data-structures.practice.json"))
+            practice = ROOT / "examples" / "data-structures.practice.json"
+            report = generate(practice, output, self.courseware_for("data-structures.practice.json"))
             self.assertEqual(report["status"], "pass", report)
-            self.assertEqual(set(path.name for path in output.iterdir()), {"student-task.html", "learning-center.html", "study-guide.html", "foundation-kit.html", "teacher-guide.html", "practice-content.json", "qa-report.json", "starter"})
-            qa = validate(ROOT / "examples" / "data-structures.practice.json", output, self.courseware_for("data-structures.practice.json"))
+            self.assertEqual({path.name for path in output.iterdir()}, {"student", "teacher", "practice-content.json", "qa-report.json"})
+            self.assertEqual({path.name for path in (output / "student").iterdir() if path.is_file()}, {"student-task.html", "learning-center.html", "study-guide.html", "foundation-kit.html"})
+            self.assertEqual({path.name for path in (output / "teacher").iterdir()}, {"teacher-guide.html", "teacher-reference.html"})
+            qa = validate(practice, output, self.courseware_for("data-structures.practice.json"))
             self.assertEqual(qa["status"], "pass", qa)
-            self.assertIn('data-task-id="binary-search-core"', (output / "student-task.html").read_text(encoding="utf-8"))
-            self.assertIn("search-02", (output / "student-task.html").read_text(encoding="utf-8"))
-            self.assertIn("data-choice", (output / "learning-center.html").read_text(encoding="utf-8"))
+            student = (output / "student" / "student-task.html").read_text(encoding="utf-8")
+            self.assertIn('data-task-id="binary-search-core"', student)
+            self.assertIn("search-02", student)
+            self.assertIn("核心必做", student)
+            self.assertNotIn("teacher-guide", student)
+            self.assertNotIn("教师参考", student)
+            self.assertIn("教师参考", (output / "teacher" / "teacher-reference.html").read_text(encoding="utf-8"))
+            self.assertTrue((output / "student" / "starter" / "binary_search.c").is_file())
 
     def test_installer_and_namespaced_adapter_are_minimal_and_repeatable(self) -> None:
         with tempfile.TemporaryDirectory(prefix="practice-class-install-") as temp:

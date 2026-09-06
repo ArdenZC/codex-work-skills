@@ -201,9 +201,9 @@ def classify(
             continue
 
         if _under(path, COURSEWARE_ROOT):
-            _mark(result, "run_courseware", "run_package_contracts")
-            labels.add("courseware")
-            reasons.append("HTML courseware package")
+            _mark(result, "run_courseware", "run_practice_class", "run_package_contracts")
+            labels.update({"courseware", "practice_class"})
+            reasons.append("HTML courseware package and downstream Practice Class contract")
             continue
 
         if _under(path, PRACTICE_CLASS_ROOT):

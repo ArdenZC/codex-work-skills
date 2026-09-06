@@ -17,7 +17,7 @@ metadata:
 
 1. 阅读当前会话、附件和本 Skill 的 `通用提示词.md`。从资料提取课程事实；未知事实不得伪造。
 2. 先规划整章的页面顺序，再逐页创作学生内容和可以直接在讲台上朗读的 `speaker_script`。每页保留一个稳定的 `id`。
-3. 将内容写成 `schemas/courseware-content.schema.json` 描述的 JSON。至少提供课程标题、章节标题、授课对象、内部内容储备字段、主题和 `slides`。
+3. 将内容写成 `schemas/courseware-content.schema.json` 描述的 JSON。至少提供课程标题、章节标题、授课对象、内部内容储备字段、主题和 `slides`；若课程有明确语言、工具、平台、软件、方言或框架，写入 `course_context`，供下游实践课准确继承。
 4. 每页提供标题、布局、blocks、逐字稿和建议分钟数。block 只能使用合同声明的 paragraph、bullets、cards、table、code、formula、svg、quiz、stepper、comparison、summary 类型。
 5. 用 `scripts/render_courseware.py` 生成 `student.html`、`teacher.html` 和 QA 报告；生成器会先在 candidate 目录中完成合同、内容、离线和输出 QA，再原子替换正式目录。
 6. 运行 `scripts/validate_courseware.py` 或包内测试。交付前必须真实打开生成的 HTML，验证任意非交互区域点击翻页、滚轮上下翻页和交互按钮不误翻页。

@@ -12,6 +12,7 @@
     "audience": {"type": "string", "minLength": 1},
     "content_reserve_minutes": {"type": "integer", "minimum": 1},
     "theme": {"type": "string", "minLength": 1},
+    "course_context": {"$ref": "#/$defs/courseContext"},
     "slides": {
       "type": "array",
       "minItems": 2,
@@ -21,6 +22,22 @@
   "$defs": {
     "nonEmpty": {"type": "string", "minLength": 1},
     "stringList": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+    "courseContext": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "course_name": {"$ref": "#/$defs/nonEmpty"},
+        "audience": {"$ref": "#/$defs/nonEmpty"},
+        "language": {"$ref": "#/$defs/nonEmpty"},
+        "tools": {"$ref": "#/$defs/stringList"},
+        "platform": {"$ref": "#/$defs/nonEmpty"},
+        "software": {"$ref": "#/$defs/nonEmpty"},
+        "database_dialect": {"$ref": "#/$defs/nonEmpty"},
+        "framework": {"$ref": "#/$defs/nonEmpty"},
+        "other_constraints": {"$ref": "#/$defs/stringList"}
+      }
+    },
     "slide": {
       "type": "object",
       "additionalProperties": false,

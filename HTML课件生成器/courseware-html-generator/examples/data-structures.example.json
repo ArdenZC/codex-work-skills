@@ -5,6 +5,16 @@
   "audience": "高职软件技术专业学生",
   "content_reserve_minutes": 120,
   "theme": "morandi-academy",
+  "course_context": {
+    "course_name": "数据结构与算法",
+    "audience": "高职软件技术专业学生",
+    "language": "C",
+    "tools": ["Dev-C++", "Code::Blocks"],
+    "platform": "Windows 实训室",
+    "software": "Dev-C++ / Code::Blocks",
+    "framework": "C 标准库",
+    "other_constraints": ["实践 starter 保持可编译骨架", "优先使用数组、下标和循环解释边界"]
+  },
   "slides": [
     {
       "id": "search-01",
@@ -31,9 +41,9 @@
         },
         {
           "type": "code",
-          "language": "Python",
+          "language": "C",
           "caption": "先写出最朴素的比较过程",
-          "code": "for value in data:\n    if value == target:\n        return value\nreturn None"
+          "code": "int linear_search(const int data[], int length, int target) {\n    for (int i = 0; i < length; ++i) {\n        if (data[i] == target) {\n            return i;\n        }\n    }\n    return -1;\n}"
         }
       ],
       "speaker_script": "这一页我们先不急着记住某一个算法，而是把查找问题看成一个逐步缩小范围的过程。大家可以先想象在一排没有编号的抽屉里找一张纸条，如果抽屉之间没有任何规律，我们通常只能从第一个开始检查。代码中的 for 循环就是这种朴素的线性扫描：每次拿出一个 value，和 target 比较，找到就返回，全部看完还没有结果就返回空值。它的优点是简单而且不要求数据有序，缺点是数据越多，可能需要比较的次数越多。接着请大家观察右边的图：如果我们能够利用顺序，每次比较之后都能排除一部分候选，就有机会更快地定位。这里的关键不是把代码写得更复杂，而是先问清楚数据的结构和可以利用的条件。下一页我们就把这些条件拆开。",
@@ -150,9 +160,9 @@
       "blocks": [
         {
           "type": "code",
-          "language": "Python",
+          "language": "C",
           "caption": "边界、比较和返回状态各自有位置",
-          "code": "left, right = 0, len(data) - 1\nwhile left <= right:\n    mid = left + (right - left) // 2\n    if data[mid] == target:\n        return mid\n    if data[mid] < target:\n        left = mid + 1\n    else:\n        right = mid - 1\nreturn -1"
+          "code": "int binary_search(const int data[], int length, int target) {\n    int left = 0;\n    int right = length - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (data[mid] == target) return mid;\n        if (data[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return -1;\n}"
         },
         {
           "type": "table",

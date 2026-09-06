@@ -10,11 +10,11 @@
 
 ## 内容门禁
 
-- 每个 core task 必须至少关联一个 `knowledge_link`，并在联动模式下追溯到已存在的 `source_slide_ids`。
+- 每个 task 必须显式写出 `source_slide_ids`，并与其 `knowledge_link_ids` 推导出的理论页集合一致；core task 在联动模式下必须追溯到已存在的 `slide.id`。
 - 编程 core 通常提供完整框架和 2—8 个关键 TODO；建模、数据库和工具任务提供明确起点、示例、操作路径和可检查的完成条件。
 - 互动必须解释一个知识点或帮助完成一个任务；没有教学目的的动画不合格。
 - 非编程课程的 foundation kit 不得自动出现 C 语言、代码模板或编程脚手架污染。
 
 ## 交付
 
-至少生成 `student-task.html`、`learning-center.html`、`study-guide.html`、`foundation-kit.html`、`teacher-guide.html`、`practice-content.json` 和 `qa-report.json`。如果合同提供 starter，则生成 `starter/`。交付前运行自身测试、内容/链接 QA 和真实浏览器 smoke。
+至少生成 `student/student-task.html`、`student/learning-center.html`、`student/study-guide.html`、`student/foundation-kit.html`、`teacher/teacher-guide.html`、`teacher/teacher-reference.html`、`practice-content.json` 和 `qa-report.json`。如果合同提供 starter，则生成 `student/starter/`。交付前运行自身测试、内容/链接 QA 和真实浏览器 smoke；学生页面不得链接或泄露教师参考。
