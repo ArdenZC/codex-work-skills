@@ -179,7 +179,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
         self.assertEqual(
-            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.1"),
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.2"),
             1,
         )
 
