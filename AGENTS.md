@@ -15,7 +15,7 @@
 
 HTML 课件生成器额外保持 Agent / renderer 边界：Agent 只创作 Courseware Content Contract 1.0，Python 负责确定性页面布局、内联 CSS/JavaScript、交互和 QA。学生展示版与教师逐字稿版必须是单文件离线 HTML；学生页不得泄露教师备注、来源式措辞或控时/制作信息。任意非交互位置点击、滚轮和键盘翻页属于 runtime 行为，必须用真实浏览器测试，不得只用字符串断言代替。
 
-实践课 HTML 生成器首选消费 Courseware Content Contract 1.0，通过稳定 `slide.id` 建立理论—实践关联；它是独立的下游 Skill，不能把旧实践任务工单的 Phase/Hardening 体系套进来，也不能让课件 Skill 反向依赖它。三套示例内容必须保持课程模态差异，并分别经过实际生成、输出 QA 和浏览器 smoke。
+实践课 HTML 生成器首选消费 Courseware Content Contract 1.0，通过稳定 `slide.id` 建立理论—实践关联；它是独立的下游 Skill，不能把旧实践任务工单的 Phase/Hardening 体系套进来，也不能让课件 Skill 反向依赖它。输出固定为四个学生模块和两个教师模块，模块内用 pane 承载课程数组；三套示例内容必须保持课程模态差异，并分别经过实际生成、输出 QA 和浏览器 smoke。
 
 模板包的每次完整 validator 执行，包括 canonical、external、archive 解压包、scaffold、snapshot、stage、最终 target 和动态仓库校验，均必须复制到系统临时的正常 Skill 树后再启动，不得从真实 canonical 或用户工作目录直接执行 owner validator。临时树只包含 Git-tracked 的普通源文件、模板、manifest、schema、helper 和声明依赖；真实仓库中的 `__pycache__`、`.pyc`、`.pyo` 不得被读取或修改。validator 子进程使用受控环境，移除外部 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等 Python 注入变量，禁用 user site，并把 `PYTHONPYCACHEPREFIX` 重定向到临时树内的 `python-cache`；命令使用 `python -B`，验证结束后必须检查并清理整个临时树，清理失败只能报告失败。身份检查不会执行 validator，也不会被包装成完整通过。
 

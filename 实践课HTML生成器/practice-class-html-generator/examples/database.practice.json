@@ -474,6 +474,7 @@
       "purpose": "点击业务概念，练习实体边界和一对多关系，再回到 ER starter 核对。",
       "interaction": {
         "type": "choice",
+        "estimated_minutes": 5,
         "prompt": "“一个客户可以有多个订单”最直接表达什么？",
         "options": [
           {
@@ -507,6 +508,7 @@
       "purpose": "逐步从 ER 关系走到 ON 条件，再观察连接后结果的行粒度。",
       "interaction": {
         "type": "stepper",
+        "estimated_minutes": 6,
         "prompt": "从 Customer 到 Order 逐步建立查询路径。",
         "steps": [
           {
@@ -543,6 +545,7 @@
       "purpose": "在执行查询前预测行数、列含义和分组粒度，减少盲目试错。",
       "interaction": {
         "type": "multi-question",
+        "estimated_minutes": 7,
         "prompt": "每题先预测，再用 Workbench 分段结果核对。",
         "questions": [
           {
@@ -605,6 +608,7 @@
       "purpose": "把结果异常与 JOIN、WHERE、GROUP BY、COUNT 的具体位置关联起来。",
       "interaction": {
         "type": "diagnose",
+        "estimated_minutes": 5,
         "prompt": "查询结果把同一客户拆成多行，优先检查哪一处？",
         "options": [
           {
@@ -638,15 +642,16 @@
       "purpose": "把业务问题拆成可执行的查询阶段，并决定在 Workbench 中先核对哪一段。",
       "interaction": {
         "type": "reorder",
+        "estimated_minutes": 7,
         "prompt": "按本题从关系到结果的工作顺序排列。",
         "items": [
           {
-            "id": "join",
-            "label": "先用 PK/FK 建立 Customer—Order 连接"
-          },
-          {
             "id": "filter",
             "label": "再按 status 和月份限制订单事实"
+          },
+          {
+            "id": "join",
+            "label": "先用 PK/FK 建立 Customer—Order 连接"
           },
           {
             "id": "group",
@@ -679,6 +684,7 @@
       "purpose": "用分类互动区分连接片段、筛选片段、聚合片段和最终结果检查。",
       "interaction": {
         "type": "classify",
+        "estimated_minutes": 6,
         "prompt": "把核对动作放到最合适的阶段。",
         "categories": [
           "连接阶段",
@@ -729,6 +735,7 @@
       "purpose": "把同一套实体、关系、粒度和聚合原则迁移到新业务问题。",
       "interaction": {
         "type": "scenario-decision",
+        "estimated_minutes": 5,
         "prompt": "如果要统计每位客户最近一笔已完成订单，第一步仍然要先确认什么？",
         "options": [
           {

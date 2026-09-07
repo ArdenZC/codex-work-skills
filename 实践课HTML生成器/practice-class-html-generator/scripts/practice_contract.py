@@ -43,18 +43,14 @@ OPTION_INTERACTIONS = {
     "scenario-decision",
 }
 CODING_MODALITIES = {"coding", "sql", "programming", "mixed"}
-MIN_TASKS = 7
-MIN_CORE_TASKS = 5
-MIN_OPTIONAL_TASKS = 1
-MIN_CHALLENGE_TASKS = 1
-MIN_CENTER_ZONES = 5
-MAX_CENTER_ZONES = 8
-MIN_INTERACTION_TYPES = 4
-MIN_GUIDE_SECTIONS = 6
-MAX_GUIDE_SECTIONS = 10
-MIN_KIT_TOPICS = 5
-MAX_KIT_TOPICS = 10
-MIN_TASK_STEPS = 3
+# These are legal-contract minima, not Gold content targets.  Quality targets
+# are emitted as recommendations below so short workshops and unusual course
+# modalities are not rejected merely for having a different shape.
+MIN_TASKS = 1
+MIN_CENTER_ZONES = 1
+MIN_GUIDE_SECTIONS = 1
+MIN_KIT_TOPICS = 0
+MIN_TASK_STEPS = 1
 PROCESS_INTERACTIONS = {"stepper", "trace", "state-simulator"}
 RENDERER_FAMILIES = {
     "choice": "choice-family",
@@ -254,6 +250,10 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
         if field in interaction and not _non_empty(interaction.get(field)):
             errors.append(f"{location}.{field} must be a non-empty string when present")
 
+    estimated = interaction.get("estimated_minutes")
+    if estimated is not None and (not isinstance(estimated, int) or isinstance(estimated, bool) or estimated < 1):
+        errors.append(f"{location}.estimated_minutes must be a positive integer when present")
+
     if kind in OPTION_INTERACTIONS:
         _validate_options(interaction, location, errors)
     elif kind in {"stepper", "trace"}:
@@ -283,38 +283,60 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
         item_ids = [item.get("id") for item in items] if isinstance(items, list) and all(isinstance(item, dict) for item in items) else []
         if not isinstance(items, list) or len(items) < 2 or any(not isinstance(item, dict) or not _non_empty(item.get("id")) or not _non_empty(item.get("label")) for item in items):
             errors.append(f"{location}.items must contain at least two items with id and label")
-        if not isinstance(order, list) or order != item_ids or len(set(order)) != len(order):
+        if not isinstance(order, list) or len(order) != len(item_ids) or set(order) != set(item_ids) or len(set(order)) != len(order):
             errors.append(f"{location}.correct_order must list every item id exactly once")
+        elif order == item_ids:
+            errors.append(f"{location}.items must start in an intentionally incorrect order")
     elif kind == "state-simulator":
+        fields = interaction.get("state_fields")
+        field_ids: list[str] = []
+        if not isinstance(fields, list) or not fields:
+            errors.append(f"{location}.state_fields must contain at least one field")
+        else:
+            for index, field in enumerate(fields):
+                field_location = f"{location}.state_fields[{index}]"
+                if not isinstance(field, dict) or not _non_empty(field.get("id")) or not _non_empty(field.get("label")):
+                    errors.append(f"{field_location} needs id and label")
+                    continue
+                if field["id"] in field_ids:
+                    errors.append(f"{field_location}.id is duplicated")
+                field_ids.append(field["id"])
         state = interaction.get("state")
-        if not isinstance(state, dict) or not isinstance(state.get("values"), list) or len(state.get("values", [])) < 2 or "target" not in state:
-            errors.append(f"{location}.state needs values, target and a non-empty array")
+        if state is not None and not isinstance(state, dict):
+            errors.append(f"{location}.state must be an object when present")
         rounds = interaction.get("rounds")
-        required_round_fields = ("left", "right", "mid", "status", "feedback")
-        if not isinstance(rounds, list) or len(rounds) < 2:
-            errors.append(f"{location}.rounds must contain at least two rounds")
+        if not isinstance(rounds, list) or not rounds:
+            errors.append(f"{location}.rounds must contain at least one round")
         else:
             for index, item in enumerate(rounds):
                 round_location = f"{location}.rounds[{index}]"
-                if not isinstance(item, dict) or any(field not in item for field in required_round_fields) or not _non_empty(item.get("feedback")):
-                    errors.append(f"{round_location} needs state values, status and feedback")
+                if not isinstance(item, dict) or not isinstance(item.get("given"), dict) or not isinstance(item.get("expected"), dict) or not _non_empty(item.get("feedback")):
+                    errors.append(f"{round_location} needs given, expected and feedback")
                     continue
                 if item.get("status") not in {"continue", "found", "not-found"}:
                     errors.append(f"{round_location}.status must be continue, found or not-found")
-                if any(not isinstance(item[field], int) or isinstance(item[field], bool) for field in ("left", "right", "mid")):
-                    errors.append(f"{location}.rounds[{index}] interval values must be integers")
+                for field_name in ("given", "expected"):
+                    value = item.get(field_name, {})
+                    if not value:
+                        errors.append(f"{round_location}.{field_name} must contain at least one field")
+                    unknown = sorted(set(value) - set(field_ids))
+                    if unknown:
+                        errors.append(f"{round_location}.{field_name} references unknown state fields: {', '.join(unknown)}")
                 if item.get("status") == "continue":
-                    if any(not isinstance(item.get(field), int) or isinstance(item.get(field), bool) for field in ("next_left", "next_right")):
-                        errors.append(f"{round_location} with status=continue needs integer next state values")
-                elif "next_left" in item or "next_right" in item:
-                    errors.append(f"{round_location} terminal state must not declare a next state")
+                    next_expected = item.get("next_expected")
+                    if not isinstance(next_expected, dict) or not next_expected:
+                        errors.append(f"{round_location} with status=continue needs next_expected")
+                    elif set(next_expected) - set(field_ids):
+                        errors.append(f"{round_location}.next_expected references unknown state fields")
+                elif "next_expected" in item:
+                    errors.append(f"{round_location} terminal state must not declare next_expected")
                 if item.get("status") != "continue" and index != len(rounds) - 1:
                     errors.append(f"{round_location} is terminal but later rounds still exist")
                 if index < len(rounds) - 1 and item.get("status") == "continue":
                     following = rounds[index + 1]
-                    if isinstance(following, dict) and isinstance(item.get("next_left"), int) and isinstance(item.get("next_right"), int):
-                        if following.get("left") != item["next_left"] or following.get("right") != item["next_right"]:
-                            errors.append(f"{round_location} next state does not match the following round")
+                    if isinstance(following, dict) and isinstance(item.get("next_expected"), dict):
+                        if following.get("given") != item["next_expected"]:
+                            errors.append(f"{round_location}.next_expected does not match the following round's given state")
             if isinstance(rounds[-1], dict) and rounds[-1].get("status") == "continue":
                 errors.append(f"{location}.rounds must end with a terminal status")
     elif kind == "multi-question":
@@ -480,6 +502,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "guide_sections": 0,
         "foundation_microtopics": 0,
         "core_help_coverage": 0,
+        "interaction_estimated_minutes": 0,
+        "quality_recommendations": [],
     }
     if not isinstance(content, dict):
         return {"status": "fail", "errors": ["practice content root must be an object"], "warnings": [], "metrics": metrics, "source_slide_refs": []}
@@ -645,12 +669,9 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     metrics["core_tasks"] = sum(1 for task in task_by_id.values() if task.get("level") == "core")
     metrics["optional_tasks"] = sum(1 for task in task_by_id.values() if task.get("level") == "optional")
     metrics["challenge_tasks"] = sum(1 for task in task_by_id.values() if task.get("level") == "challenge")
-    if metrics["core_tasks"] < MIN_CORE_TASKS:
-        errors.append(f"tasks must include at least {MIN_CORE_TASKS} core activities")
-    if metrics["optional_tasks"] < MIN_OPTIONAL_TASKS:
-        errors.append(f"tasks must include at least {MIN_OPTIONAL_TASKS} optional activity")
-    if metrics["challenge_tasks"] < MIN_CHALLENGE_TASKS:
-        errors.append(f"tasks must include at least {MIN_CHALLENGE_TASKS} challenge activity")
+    # The three levels remain part of the content vocabulary, but none is a
+    # contract-count requirement.  A quality recommendation can point out a
+    # thin route without making a short or specialised class invalid.
 
     assets = _list(content.get("starter_assets"))
     asset_ids: set[str] = set()
@@ -691,6 +712,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
                 errors.append(f"task {task.get('id')} todo_count does not match declared real starter gaps ({actual_gaps})")
 
     centers = _list(content.get("learning_center"))
+    if len(centers) < MIN_CENTER_ZONES:
+        errors.append(f"learning_center must contain at least {MIN_CENTER_ZONES} item")
     center_ids: set[str] = set()
     interaction_types: set[str] = set()
     renderer_families: set[str] = set()
@@ -712,6 +735,11 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             interaction_types.add(interaction["type"])
             if interaction["type"] in RENDERER_FAMILIES:
                 renderer_families.add(RENDERER_FAMILIES[interaction["type"]])
+        estimated = interaction.get("estimated_minutes")
+        if isinstance(estimated, int) and not isinstance(estimated, bool):
+            metrics["interaction_estimated_minutes"] += estimated
+        else:
+            warnings.append(f"{location}.interaction.estimated_minutes is omitted; the renderer will not invent a duration")
         metrics["interactions"] += 1
     metrics["interaction_types"] = sorted(interaction_types)
     metrics["interaction_zones"] = len(center_ids)
@@ -731,19 +759,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         and isinstance(center["interaction"]["rounds"][-1], dict)
         and center["interaction"]["rounds"][-1].get("status") in {"found", "not-found"}
     )
-    if len(centers) < MIN_CENTER_ZONES or len(centers) > MAX_CENTER_ZONES:
-        errors.append(f"learning_center must contain {MIN_CENTER_ZONES} to {MAX_CENTER_ZONES} distinct experiment zones")
-    if len(interaction_types) < MIN_INTERACTION_TYPES:
-        errors.append(f"learning_center must use at least {MIN_INTERACTION_TYPES} interaction types")
-    if len(renderer_families) < MIN_INTERACTION_TYPES:
-        errors.append(f"learning_center must use at least {MIN_INTERACTION_TYPES} real renderer families")
-    if metrics["dynamic_interactions"] < 1:
-        errors.append("learning_center needs at least one dynamic process/state interaction")
-    if metrics["diagnose_interactions"] < 1:
-        errors.append("learning_center needs at least one diagnose/Debug interaction")
-    if metrics["continuous_interactions"] < 1:
-        errors.append("learning_center needs at least one continuous question or scenario challenge")
-    if any(isinstance(center, dict) and center.get("interaction", {}).get("type") == "state-simulator" for center in centers) and metrics["terminal_simulators"] < 1:
+    if metrics["terminal_simulators"] < sum(1 for center in centers if isinstance(center, dict) and center.get("interaction", {}).get("type") == "state-simulator"):
         errors.append("state-simulator interactions must include a terminal round")
     core_task_ids = {task_id for task_id, task in task_by_id.items() if task.get("level") == "core"}
     covered_core_task_ids = {task_id for center in centers if isinstance(center, dict) for task_id in _list(center.get("task_ids"))}
@@ -754,9 +770,11 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         knowledge_forms = {RENDERER_FAMILIES.get(center.get("interaction", {}).get("type")) for center in centers if isinstance(center, dict) and knowledge_id in _list(center.get("knowledge_link_ids"))}
         knowledge_forms.discard(None)
         if len(knowledge_forms) < 2:
-            errors.append(f"knowledge link {knowledge_id} must be practiced in at least two interaction forms")
+            warnings.append(f"knowledge link {knowledge_id} is practiced in only one renderer family")
 
     guides = _list(content.get("study_guide"))
+    if len(guides) < MIN_GUIDE_SECTIONS:
+        errors.append(f"study_guide must contain at least {MIN_GUIDE_SECTIONS} item")
     guide_ids: set[str] = set()
     for index, guide in enumerate(guides):
         location = f"study_guide[{index}]"
@@ -779,10 +797,10 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         if not isinstance(guide.get("checkpoints"), list) or not guide["checkpoints"]:
             errors.append(f"{location}.checkpoints must be a non-empty list")
     metrics["guide_sections"] = len(guide_ids)
-    if len(guides) < MIN_GUIDE_SECTIONS or len(guides) > MAX_GUIDE_SECTIONS:
-        errors.append(f"study_guide must contain {MIN_GUIDE_SECTIONS} to {MAX_GUIDE_SECTIONS} task-linked sections")
 
     kits = _list(content.get("foundation_kit"))
+    if len(kits) < MIN_KIT_TOPICS:
+        errors.append(f"foundation_kit must be a list")
     kit_ids: set[str] = set()
     for index, kit in enumerate(kits):
         location = f"foundation_kit[{index}]"
@@ -802,8 +820,6 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         if not isinstance(kit.get("self_check"), list) or not kit["self_check"] or any(not _non_empty(item) for item in kit.get("self_check", [])):
             errors.append(f"{location}.self_check must be a non-empty string list")
     metrics["foundation_microtopics"] = len(kit_ids)
-    if len(kits) < MIN_KIT_TOPICS or len(kits) > MAX_KIT_TOPICS:
-        errors.append(f"foundation_kit must contain {MIN_KIT_TOPICS} to {MAX_KIT_TOPICS} course-specific microtopics")
 
     _validate_teacher_guide(content.get("teacher_guide"), task_ids, "teacher_guide", errors)
     _validate_teacher_reference(content.get("teacher_reference"), task_by_id, knowledge_by_id, actual_slide_ids, "teacher_reference", errors)
@@ -833,6 +849,32 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         warnings.append(f"task minutes total {metrics['task_minutes']} differs from class duration {duration}")
     if source.get("mode") == "courseware" and not source_slide_refs:
         errors.append("courseware mode requires at least one source slide reference")
+
+    recommendations: list[str] = []
+    if isinstance(duration, int) and duration >= 75:
+        targets = (
+            (metrics["tasks"] < 6, "90-minute class usually benefits from 6-10 observable activities"),
+            (metrics["core_tasks"] < 4, "90-minute class usually benefits from 4-7 core tasks"),
+            (metrics["interaction_zones"] < 4, "90-minute class usually benefits from 4-8 effective experiments"),
+            (metrics["guide_sections"] < 4, "90-minute class usually benefits from at least 4 self-help guide modules"),
+            (metrics["foundation_microtopics"] < 3, "90-minute class usually benefits from at least 3 just-in-time foundation modules"),
+            (metrics["renderer_family_count"] < 4, "use several interaction families only where they serve distinct knowledge checks"),
+        )
+    else:
+        targets = (
+            (metrics["tasks"] < 3, "short classes usually benefit from at least 3 observable activities"),
+            (metrics["core_tasks"] < 2, "short classes usually benefit from at least 2 core tasks"),
+            (metrics["interaction_zones"] < 2, "short classes usually benefit from at least 2 effective experiments"),
+        )
+    recommendations.extend(message for triggered, message in targets if triggered)
+    if metrics["optional_tasks"] == 0:
+        recommendations.append("add an optional route when the class has room for differentiated practice")
+    if metrics["challenge_tasks"] == 0:
+        recommendations.append("add a challenge route when transfer beyond the core task is meaningful")
+    if metrics["interaction_estimated_minutes"] == 0 and metrics["interactions"]:
+        recommendations.append("provide interaction-level estimated_minutes when reliable timings are known")
+    metrics["quality_recommendations"] = recommendations
+    warnings.extend(f"quality recommendation: {item}" for item in recommendations)
 
     raw_content = json.dumps(content, ensure_ascii=False)
     if re.search(r"统一提交|提交截图|收走|每组至少交出", raw_content):

@@ -452,6 +452,7 @@
       "purpose": "把课程理论页中的有序条件和候选区间映射到今天的第一步判断。",
       "interaction": {
         "type": "choice",
+        "estimated_minutes": 4,
         "prompt": "下列哪一个条件不满足时，不能直接使用二分查找？",
         "options": [
           {
@@ -484,34 +485,32 @@
       "purpose": "逐轮填写当前区间和下一轮区间，观察排除 mid 后状态如何收缩。",
       "interaction": {
         "type": "state-simulator",
-        "prompt": "数组 [3, 8, 14, 21, 29, 37, 45, 58] 查找 37：填写每轮 left/right/mid 与下一轮边界。",
+        "estimated_minutes": 8,
+        "prompt": "数组 [3, 8, 14, 21, 29, 37, 45, 58] 查找 37：先读给定状态，再填写本轮未知字段并推导下一状态。",
+        "state_fields": [
+          {"id": "left", "label": "左边界", "input_type": "number"},
+          {"id": "right", "label": "右边界", "input_type": "number"},
+          {"id": "mid", "label": "中点位置", "input_type": "number"}
+        ],
         "state": {
-          "values": [
-            3,
-            8,
-            14,
-            21,
-            29,
-            37,
-            45,
-            58
-          ],
+          "context_label": "有序数据",
+          "context": "[3, 8, 14, 21, 29, 37, 45, 58]",
+          "target_label": "查找目标",
           "target": 37
         },
         "rounds": [
           {
-            "left": 0,
-            "right": 7,
-            "mid": 3,
+            "given": {"left": 0, "right": 7},
+            "expected": {"mid": 3},
+            "observation": "values[3] = 21 < 37",
+            "next_expected": {"left": 4, "right": 7},
             "status": "continue",
-            "next_left": 4,
-            "next_right": 7,
             "feedback": "mid=21 小于目标，下一轮只保留右半边 [4,7]。"
           },
           {
-            "left": 4,
-            "right": 7,
-            "mid": 5,
+            "given": {"left": 4, "right": 7},
+            "expected": {"mid": 5},
+            "observation": "values[5] = 37 = 37",
             "status": "found",
             "feedback": "mid=37 命中，状态立即终止；不会再进入第三轮。"
           }
@@ -533,6 +532,7 @@
       "purpose": "把互动状态与 C starter 的 4 个真实编辑点逐一对应，避免只背表达式。",
       "interaction": {
         "type": "stepper",
+        "estimated_minutes": 6,
         "prompt": "按顺序把状态规则翻译成代码判断。",
         "steps": [
           {
@@ -568,6 +568,7 @@
       "purpose": "用一组连续问题覆盖首尾、单元素、缺失和空区间，练习从结果反推边界。",
       "interaction": {
         "type": "multi-question",
+        "estimated_minutes": 6,
         "prompt": "每题先选答案，再把原因说给同伴。",
         "questions": [
           {
@@ -629,6 +630,7 @@
       "purpose": "把错误现象分类为中点越界、区间不收缩或失败返回错误，再定位对应行。",
       "interaction": {
         "type": "diagnose",
+        "estimated_minutes": 5,
         "prompt": "看到“查找缺失目标时程序卡住”，最先检查哪一处？",
         "options": [
           {
@@ -661,6 +663,7 @@
       "purpose": "把“更快”放回真实场景，比较有序条件、更新成本和查询次数。",
       "interaction": {
         "type": "compare-strategies",
+        "estimated_minutes": 5,
         "prompt": "一批数据几乎不再更新，但每天要查询很多次，哪种策略更合适？",
         "options": [
           {
@@ -694,6 +697,7 @@
       "purpose": "用新场景检验学生是否掌握前提、状态和验收，而不是记住某个数组。",
       "interaction": {
         "type": "scenario-decision",
+        "estimated_minutes": 6,
         "prompt": "设备清单按版本号升序排列，但编号字段无序；要按哪个字段做二分？",
         "options": [
           {

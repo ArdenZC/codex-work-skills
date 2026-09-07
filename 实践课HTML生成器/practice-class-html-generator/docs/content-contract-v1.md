@@ -43,15 +43,15 @@ Practice Contract 是 Agent 与 renderer 之间的内容边界。它描述一节
 
 ## 知识链接与任务
 
-知识链接至少包含 `id`、`title`、`summary`、`source_slide_ids`、`student_can_do`。任务至少包含 `id`、`level`、`title`、`knowledge_link_ids`、`source_slide_ids`、`modality`、`overview`、`steps`、`acceptance`、`help_refs`、`estimated_minutes`。质量门禁要求一套常规实践至少 7 个任务、5 个 core、1 个 optional、1 个 challenge，每个任务至少 3 个具体步骤。
+知识链接至少包含 `id`、`title`、`summary`、`source_slide_ids`、`student_can_do`。任务至少包含 `id`、`level`、`title`、`knowledge_link_ids`、`source_slide_ids`、`modality`、`overview`、`steps`、`acceptance`、`help_refs`、`estimated_minutes`；合同结构最低允许 1 个任务、1 个步骤，内容质量建议再根据时长给出。90 分钟左右的 Gold 目标通常是 7—12 个任务、约 5 个 core、1 个 optional、1 个 challenge、每个任务至少 3 个具体步骤，但这些数量由 validator 作为 quality recommendation/warning 检查，不能写死成跨课程 schema 门槛。
 
-`level` 只能是 `core`、`optional`、`challenge`，学生页面显示为“核心必做 / 有余力 / 提高挑战”。`modality` 可以是 `interactive`、`coding`、`modeling`、`database`、`tooling`、`analysis`、`mixed`。编程 core 通过 `starter_asset_ids` 绑定完整、可运行框架，并在 starter 中保留 2—8 个关键 TODO；非编程 core 通过 `scaffold` 写出明确起点和操作路径。若上游提供 `course_context`，Practice 必须逐字段保留其语言、工具、平台、软件、方言和约束，不得静默替换。
+`level` 只能是 `core`、`optional`、`challenge`，学生页面显示为“核心必做 / 有余力 / 提高挑战”。`modality` 可以是 `interactive`、`coding`、`modeling`、`database`、`tooling`、`analysis`、`mixed`。编程 core 通常通过 `starter_asset_ids` 绑定完整、可运行框架，并在 starter 中保留 2—8 个关键 TODO；非编程 core 通过 `scaffold` 写出明确起点和操作路径。若上游提供 `course_context`，Practice 必须逐字段保留其语言、工具、平台、软件、方言和约束，不得静默替换。
 
 ## 互动与学习资料
 
-`learning_center` 中每项都要写 `knowledge_link_ids`、`task_ids`、`purpose` 和 `interaction`。常规实践应有 5—8 个实验区、至少 4 种互动类型，并包含动态过程、诊断/Debug、连续多题或场景挑战。合同里的 `interaction.type` 是教学语义，不等于某个 CSS 组件；renderer 必须把它映射为真实可操作的 renderer family，例如 choice、step、classify、reorder、state-simulator、multi-question 等。每个互动必须有反馈、重试或推进，并服务具体知识点和任务。可以提供 `success_feedback`、`retry_feedback`、`completion_feedback` 作为课程内容反馈；未提供时 renderer 使用中性反馈，不得在 renderer 中硬编码 UML、SQL、C 或某个领域的正确答案。
+`learning_center` 中每项都要写 `knowledge_link_ids`、`task_ids`、`purpose` 和 `interaction`。90 分钟左右的 Gold 目标通常为 5—8 个实验区、至少 4 种互动类型，并包含动态过程、诊断/Debug、连续多题或场景挑战；短课可以按主题缩放。合同里的 `interaction.type` 是教学语义，不等于某个 CSS 组件；renderer 必须把它映射为真实可操作的 renderer family，例如 choice、step、classify、reorder、state-simulator、multi-question 等。每个互动必须有反馈、重试或推进，并服务具体知识点和任务。可以提供 `success_feedback`、`retry_feedback`、`completion_feedback` 作为课程内容反馈；未提供时 renderer 使用中性反馈，不得在 renderer 中硬编码 UML、SQL、C 或某个领域的正确答案。
 
-状态模拟器的每个 `round` 必须写 `left`、`right`、`mid`、`status` 和 `feedback`。`status` 只能是 `continue`、`found` 或 `not-found`：继续时提供下一状态，终止时不得提供下一状态，且终止轮必须是最后一轮。多题互动应能逐题推进，排序互动应提供真实的移动操作，不能用一个“选择顺序”的下拉框冒充排序。`study_guide` 应有 6—10 个 task 关联小节，`foundation_kit` 应有 5—10 个按课程动态列出的基础微专题，不使用固定的 C 语言补给站字段。
+状态模拟器使用通用的 `state_fields`、`state` 和 `rounds`：每个 round 至少提供 `given`、`expected`、`status` 和 `feedback`，可选 `observation` 与 `next_expected`；`status=continue` 时必须有下一状态，终止时不得提供下一状态且终止轮必须是最后一轮。字段可以是边界、对象、消息、记录、工具状态或课程定义的其他过程变量，不能把 `left/right/mid` 写成跨课程合同。多题互动应能逐题推进，排序互动应提供真实的移动操作，不能用一个“选择顺序”的下拉框冒充排序。`study_guide` 与 `foundation_kit` 的数量由时长/课程主题决定，通常分别以 6—10 个任务关联小节和 5—10 个动态微专题为 Gold 参考，不使用固定的 C 语言补给站字段。
 
 ## 教师指导
 
@@ -61,9 +61,9 @@ Practice Contract 是 Agent 与 renderer 之间的内容边界。它描述一节
 
 ## 输出信息架构与学生可见边界
 
-renderer 固定生成四个学生入口索引：`student-task.html`、`learning-center.html`、`study-guide.html` 和 `foundation-kit.html`。入口只呈现摘要卡；任务、互动、学习小节和补给微专题分别生成到 `student/tasks/`、`student/learning/`、`student/guides/` 和 `student/kit/` 的详情页。教师参考同样使用 `teacher-reference.html` 索引加 `teacher/references/<task-id>.html` 详情页。详情页只承载一个焦点，正文应保持约 720—920px 的单列阅读宽度，并提供返回索引、上一项、下一项、标题、预计时间和帮助入口。
+renderer 固定生成四个学生模块页：`student-task.html`、`learning-center.html`、`study-guide.html` 和 `foundation-kit.html`；任务、互动、学习小节和补给微专题在各自模块页内渲染成 pane，由导航和 hash 切换，任一时刻只显示一个 pane。教师侧固定生成 `teacher-guide.html` 与 `teacher-reference.html` 两个模块页，教师观察点和逐任务参考成果同样在 pane 内切换，不再生成按 task 拆分的详情 HTML。每个 pane 只承载一个焦点，正文应保持可读的单列阅读宽度，并提供返回目录、上一项、下一项、标题、预计时间和帮助入口。
 
-学生可见文字不得出现 `contract_version`、原始 task/guide/kit/slide ID、`interaction.type` 或 renderer family；这些值可以保留在机器可读属性中供 QA 使用。学生页的链接必须留在 `student/`，不得链接教师页。离线输出是一个可导航的站点包，不承诺所有内容在一个文件内展开。
+学生可见文字不得出现 `contract_version`、原始 task/guide/kit/slide ID、`interaction.type` 或 renderer family；这些值可以保留在机器可读属性中供 QA 使用。学生页的链接必须留在 `student/`，不得链接教师页。离线输出是六个可导航的模块页加 JSON/starter 资源；不承诺所有内容在一个文件内展开，但也不把一个教学对象拆成额外的动态 HTML 文件。
 
 ## 输出隔离
 

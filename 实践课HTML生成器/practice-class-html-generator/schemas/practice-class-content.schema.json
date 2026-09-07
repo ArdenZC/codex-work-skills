@@ -14,10 +14,10 @@
     "course_context": {"$ref": "#/$defs/courseContext"},
     "source_courseware": {"$ref": "#/$defs/source"},
     "knowledge_links": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/knowledge"}},
-    "tasks": {"type": "array", "minItems": 7, "items": {"$ref": "#/$defs/task"}},
-    "learning_center": {"type": "array", "minItems": 5, "maxItems": 8, "items": {"$ref": "#/$defs/center"}},
-    "study_guide": {"type": "array", "minItems": 6, "maxItems": 10, "items": {"$ref": "#/$defs/guide"}},
-    "foundation_kit": {"type": "array", "minItems": 5, "maxItems": 10, "items": {"$ref": "#/$defs/kit"}},
+    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}},
+    "learning_center": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/center"}},
+    "study_guide": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/guide"}},
+    "foundation_kit": {"type": "array", "minItems": 0, "items": {"$ref": "#/$defs/kit"}},
     "teacher_guide": {"$ref": "#/$defs/teacher"},
     "teacher_reference": {"$ref": "#/$defs/teacherReference"},
     "starter_assets": {"type": "array", "items": {"$ref": "#/$defs/starter"}}
@@ -72,7 +72,7 @@
         "id": {"$ref": "#/$defs/nonEmpty"}, "level": {"enum": ["core", "optional", "challenge"]},
         "title": {"$ref": "#/$defs/nonEmpty"}, "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
         "modality": {"$ref": "#/$defs/nonEmpty"}, "overview": {"$ref": "#/$defs/nonEmpty"},
-        "scaffold": {"$ref": "#/$defs/nonEmpty"}, "steps": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/step"}},
+        "scaffold": {"$ref": "#/$defs/nonEmpty"}, "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}},
         "acceptance": {"$ref": "#/$defs/strings"}, "help_refs": {"$ref": "#/$defs/strings"},
         "estimated_minutes": {"type": "integer", "minimum": 5}, "starter_asset_ids": {"$ref": "#/$defs/strings"}, "todo_count": {"type": "integer", "minimum": 0}
       }
@@ -93,6 +93,7 @@
       "properties": {
         "type": {"enum": ["choice", "match", "stepper", "trace", "classify", "reorder", "diagnose", "predict-next", "build-relation", "state-simulator", "compare-strategies", "multi-question", "scenario-decision"]},
         "prompt": {"$ref": "#/$defs/nonEmpty"},
+        "estimated_minutes": {"type": "integer", "minimum": 1},
         "success_feedback": {"$ref": "#/$defs/nonEmpty"},
         "retry_feedback": {"$ref": "#/$defs/nonEmpty"},
         "completion_feedback": {"$ref": "#/$defs/nonEmpty"},
@@ -102,28 +103,38 @@
         "categories": {"$ref": "#/$defs/strings"},
         "items": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/interactionItem"}},
         "correct_order": {"$ref": "#/$defs/strings"},
+        "state_fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateField"}},
         "state": {"$ref": "#/$defs/state"},
-        "rounds": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/round"}},
+        "rounds": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/round"}},
         "questions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/question"}}
       }
     },
     "interactionItem": {
       "type": "object", "additionalProperties": false,
       "required": ["id", "label"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "answer": {"$ref": "#/$defs/nonEmpty"}, "feedback": {"$ref": "#/$defs/nonEmpty"}}
+      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "answer": {"$ref": "#/$defs/nonEmpty"}, "feedback": {"$ref": "#/$defs/nonEmpty"}, "hint": {"$ref": "#/$defs/nonEmpty"}}
+    },
+    "stateField": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "input_type": {"enum": ["text", "number"]}}
     },
     "state": {
       "type": "object", "additionalProperties": false,
-      "required": ["values", "target"],
-      "properties": {"values": {"type": "array", "minItems": 2}, "target": {"type": ["string", "number"]}}
+      "properties": {
+        "context_label": {"$ref": "#/$defs/nonEmpty"},
+        "context": {"$ref": "#/$defs/nonEmpty"},
+        "target_label": {"$ref": "#/$defs/nonEmpty"},
+        "target": {"type": ["string", "number", "boolean"]}
+      }
     },
     "round": {
       "type": "object", "additionalProperties": false,
-      "required": ["left", "right", "mid", "status", "feedback"],
-      "properties": {"left": {"type": "integer"}, "right": {"type": "integer"}, "mid": {"type": "integer"}, "status": {"enum": ["continue", "found", "not-found"]}, "next_left": {"type": "integer"}, "next_right": {"type": "integer"}, "feedback": {"$ref": "#/$defs/nonEmpty"}},
+      "required": ["given", "expected", "status", "feedback"],
+      "properties": {"given": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]}}, "expected": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "number", "boolean"]}}, "observation": {"$ref": "#/$defs/nonEmpty"}, "next_expected": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "number", "boolean"]}}, "status": {"enum": ["continue", "found", "not-found"]}, "feedback": {"$ref": "#/$defs/nonEmpty"}},
       "allOf": [
-        {"if": {"properties": {"status": {"const": "continue"}}}, "then": {"required": ["next_left", "next_right"]}},
-        {"if": {"properties": {"status": {"enum": ["found", "not-found"]}}}, "then": {"not": {"anyOf": [{"required": ["next_left"]}, {"required": ["next_right"]}]}}}
+        {"if": {"properties": {"status": {"const": "continue"}}}, "then": {"required": ["next_expected"]}},
+        {"if": {"properties": {"status": {"enum": ["found", "not-found"]}}}, "then": {"not": {"required": ["next_expected"]}}}
       ]
     },
     "question": {

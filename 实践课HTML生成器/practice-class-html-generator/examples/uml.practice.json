@@ -476,6 +476,7 @@
       "purpose": "把业务目标、稳定对象和交互顺序分到合适的 UML 视图。",
       "interaction": {
         "type": "choice",
+        "estimated_minutes": 4,
         "prompt": "预约场景中，哪个结果最适合先放进领域类图？",
         "options": [
           {
@@ -509,6 +510,7 @@
       "purpose": "用分类互动练习 Entity、Boundary、Control/Service 和用例参与者的差异。",
       "interaction": {
         "type": "classify",
+        "estimated_minutes": 7,
         "prompt": "为对象选择最合适的当前建模角色。",
         "categories": [
           "Entity",
@@ -564,6 +566,7 @@
       "purpose": "在真实可编辑 starter 上补关系，再用场景句子解释方向和数量约束。",
       "interaction": {
         "type": "diagnose",
+        "estimated_minutes": 5,
         "prompt": "Reservation 与 TimeSlot 的关系没有多重性，最先补什么证据？",
         "options": [
           {
@@ -596,15 +599,16 @@
       "purpose": "先排序再建图，避免把返回直接画到无关对象。",
       "interaction": {
         "type": "reorder",
+        "estimated_minutes": 7,
         "prompt": "把预约成功/冲突消息排成时间顺序。",
         "items": [
           {
-            "id": "request",
-            "label": "ReservationPage -> ReservationService：requestReservation()"
-          },
-          {
             "id": "check",
             "label": "ReservationService -> TimeSlot：checkAvailability()"
+          },
+          {
+            "id": "request",
+            "label": "ReservationPage -> ReservationService：requestReservation()"
           },
           {
             "id": "return",
@@ -642,6 +646,7 @@
       "purpose": "按时间推进一条成功链，再指出冲突分支在哪里停止。",
       "interaction": {
         "type": "stepper",
+        "estimated_minutes": 6,
         "prompt": "沿着服务协调的消息链检查对象责任。",
         "steps": [
           {
@@ -677,6 +682,7 @@
       "purpose": "用错误模型练习发现错位，而不是只检查线是否相交。",
       "interaction": {
         "type": "diagnose",
+        "estimated_minutes": 5,
         "prompt": "错误模型中 TimeSlot 直接创建 Reservation，最需要修正什么？",
         "options": [
           {
@@ -710,6 +716,7 @@
       "purpose": "用多题连续核对模型是否回答场景，而不是只看图面完整。",
       "interaction": {
         "type": "multi-question",
+        "estimated_minutes": 8,
         "prompt": "每题先选判断，再回到 starter 找证据。",
         "questions": [
           {
@@ -772,6 +779,7 @@
       "purpose": "把同一套责任原则迁移到取消预约，不要求增加无关系统模块。",
       "interaction": {
         "type": "scenario-decision",
+        "estimated_minutes": 6,
         "prompt": "取消预约时，谁最适合协调状态变更并通知页面结果？",
         "options": [
           {
