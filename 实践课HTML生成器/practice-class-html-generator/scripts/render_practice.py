@@ -9,8 +9,16 @@ import re
 import shutil
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from practice_contract import LEVEL_LABELS, RENDERER_FAMILIES, load_courseware, load_json, validate_content
+
+
+TEXT_ASSET_EXTENSIONS = {
+    ".c", ".cpp", ".h", ".hpp", ".py", ".java", ".js", ".ts", ".html", ".htm", ".css",
+    ".sql", ".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".csv",
+}
+NON_TEXT_ASSET_EXTENSIONS = {".drawio", ".xlsx", ".xls", ".docx", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".zip"}
 
 
 def esc(value: Any) -> str:
@@ -86,7 +94,24 @@ def _humanize(content: dict[str, Any], value: Any) -> str:
             replacements[str(item["id"])] = f"起点材料 {item.get('path', '')}".strip()
     for raw, human in sorted(replacements.items(), key=lambda pair: len(pair[0]), reverse=True):
         text = text.replace(raw, human)
+    for raw, human in {
+        "source_slide_ids": "已讲理论页",
+        "interaction type": "互动类型",
+        "renderer family": "呈现方式",
+    }.items():
+        text = text.replace(raw, human)
     return text
+
+
+def _unique_text(values: list[str]) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        key = re.sub(r"\s+", " ", value).strip()
+        if key and key not in seen:
+            seen.add(key)
+            result.append(value)
+    return result
 
 
 def _nav_links(role: str, prefix: str) -> str:
@@ -99,14 +124,45 @@ def _nav_links(role: str, prefix: str) -> str:
 
 def _context_tools(content: dict[str, Any]) -> str:
     context = content.get("course_context") if isinstance(content.get("course_context"), dict) else {}
-    values: list[str] = []
-    for key in ("language", "database_dialect", "platform", "software", "framework"):
-        if context.get(key):
-            values.append(str(context[key]))
-    for item in _list(context.get("tools")):
-        if str(item) not in values:
-            values.append(str(item))
-    return " · ".join(esc(item) for item in values) or "按课程资料选择工具"
+    def normalize(value: str) -> str:
+        return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", value.casefold())
+
+    def split_names(value: Any) -> list[str]:
+        return [part.strip() for part in re.split(r"\s*[/|、·,，]\s*", str(value or "")) if part.strip()]
+
+    def unique(values: list[str]) -> list[str]:
+        result: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            key = normalize(value)
+            if key and key not in seen:
+                seen.add(key)
+                result.append(value)
+        return result
+
+    tools = unique([str(item) for item in _list(context.get("tools")) if str(item).strip()])
+    software = unique(split_names(context.get("software")))
+    language = str(context.get("language") or "").strip()
+    dialect = str(context.get("database_dialect") or "").strip()
+    if dialect:
+        label = "本次环境"
+        software_keys = {normalize(name) for name in software}
+        values = unique(software + [item for item in tools if normalize(item) not in software_keys])
+    elif language and re.search(r"\b(C|C\+\+|Java|Python|JavaScript|TypeScript)\b", language, re.IGNORECASE):
+        label = "本次环境"
+        if software and len(software) == len(tools) and {normalize(item) for item in software} == {normalize(item) for item in tools}:
+            values = [language, " / ".join(software)]
+        else:
+            values = unique([language] + software + tools)
+    else:
+        label = "本次工具"
+        if software and len(software) == len(tools) and {normalize(item) for item in software} == {normalize(item) for item in tools}:
+            values = [" / ".join(software)]
+        elif len(tools) > 1:
+            values = [" / ".join(tools)]
+        else:
+            values = unique(tools or software)
+    return f"{label}：" + (" · ".join(esc(item) for item in values) or "按课程资料选择工具")
 
 
 def _modality_label(value: Any) -> str:
@@ -194,7 +250,7 @@ def shell(content: dict[str, Any], role: str, module: str, title: str, subtitle:
     role_label = "学生实践空间" if role == "student" else "教师课堂空间"
     return f'''<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{esc(content.get("course_title"))} · {esc(title)}</title><style>{_shell_css()}</style></head><body>
 <header class="site-header"><div class="site-brand"><div class="eyebrow">{esc(role_label)}</div><h1>{esc(content.get("course_title"))}</h1><p>{esc(content.get("practice_title"))}</p></div><nav class="nav" aria-label="模块导航">{_nav_links(role, prefix)}</nav></header>
-<main class="page" data-role="{esc(role)}" data-page-module="{esc(module)}" data-pane-module><section class="module-header" id="module-top"><div><div class="module-kicker">{esc(role_label)} · {esc(title)}</div><h2>{esc(title)}</h2><p>{text_block(subtitle)}</p></div><div class="compact-meta">可用工具：{_context_tools(content)}</div></section>{body}</main>
+<main class="page" data-role="{esc(role)}" data-page-module="{esc(module)}" data-pane-module><section class="module-header" id="module-top"><div><div class="module-kicker">{esc(role_label)} · {esc(title)}</div><h2>{esc(title)}</h2><p>{text_block(subtitle)}</p></div><div class="compact-meta">{_context_tools(content)}</div></section>{body}</main>
 <footer class="footer">内容来自已讲理论与实践合同；本页的互动服务具体学习目标，完成后请回到任务路线继续。</footer><script>{_shell_script()}</script></body></html>'''
 
 
@@ -214,12 +270,36 @@ def _pane_footer(items: list[dict[str, Any]], index: int, pane_prefix: str, *, r
     return f'<div class="pane-footer"><div class="footer-links"><a href="#module-top">{esc(route_label)}</a>{previous_html}{following_html}</div></div>'
 
 
+def _asset_is_text(asset: dict[str, Any]) -> bool:
+    path = str(asset.get("path", ""))
+    suffix = Path(path).suffix.casefold()
+    return suffix in TEXT_ASSET_EXTENSIONS and suffix not in NON_TEXT_ASSET_EXTENSIONS
+
+
+def _asset_description(asset: dict[str, Any]) -> str:
+    path = str(asset.get("path", ""))
+    suffix = Path(path).suffix.casefold()
+    language = str(asset.get("language", "")).strip()
+    if suffix == ".drawio":
+        return "可在 draw.io 中继续编辑的建模起点；网页只提供文件入口和任务说明。"
+    if suffix in {".xlsx", ".xls", ".docx", ".pptx", ".pdf"}:
+        return f"{language or '课堂文件'}起点，下载后在对应工具中打开。"
+    return f"{language or '文本'}起点，可打开后按任务步骤编辑。"
+
+
 def _starter_html(assets: dict[str, dict[str, Any]], ids: list[str]) -> str:
     blocks = []
     for asset_id in ids:
         asset = assets.get(asset_id)
-        if asset:
-            blocks.append(f'<details class="starter-box"><summary>打开起点材料：{esc(asset.get("path"))}</summary><pre class="starter-code">{esc(asset.get("content"))}</pre></details>')
+        if not asset:
+            continue
+        relative = str(asset.get("path", "")).replace("\\", "/")
+        href = "starter/" + quote(relative, safe="/@:+,;=-._~")
+        link = f'<a class="starter-link" data-starter-path="{esc(relative)}" href="{esc(href)}" download>打开起点文件</a>'
+        preview = ""
+        if _asset_is_text(asset):
+            preview = f'<details class="starter-preview"><summary>查看内容预览</summary><pre class="starter-code" data-starter-preview-path="{esc(relative)}">{esc(asset.get("content"))}</pre></details>'
+        blocks.append(f'<article class="starter-box" data-starter-asset="{esc(asset.get("id"))}"><div class="starter-head"><strong>{esc(relative)}</strong><span class="chip">{esc(asset.get("language"))}</span></div><p class="starter-description">{esc(_asset_description(asset))}</p><div class="starter-actions">{link}</div>{preview}</article>')
     return "".join(blocks)
 
 
@@ -250,7 +330,7 @@ def _task_pane(content: dict[str, Any], task: dict[str, Any], assets: dict[str, 
     acceptance = "".join(f"<li>{text_block(item)}</li>" for item in _list(task.get("acceptance")))
     starter = _starter_html(assets, _list(task.get("starter_asset_ids")))
     minutes = f'<span class="chip">约 {esc(task.get("estimated_minutes"))} 分钟</span>' if task.get("estimated_minutes") else ""
-    return f'''<article class="pane{' is-active' if index == 0 else ''}" id="task-{esc(slug(task.get("id")))}" data-pane data-task-id="{esc(task.get("id"))}" data-source-slide-ids="{esc(source_refs)}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title"))}</h3><p class="pane-lead">{text_block(task.get("overview"))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level")))}</span></div><div class="chip-row"><span class="chip">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</span>{minutes}<span class="chip">{esc(_modality_label(task.get("modality")))}</span></div><div class="section-label">本次要留下的结果</div><div class="scaffold">{text_block(task.get("scaffold"))}</div><div class="section-label">完成步骤</div><ol class="task-steps">{steps}</ol><div class="section-label">验收清单</div><div class="acceptance"><ul class="clean-list">{acceptance}</ul></div>{f'<div class="section-label">起点材料</div>{starter}' if starter else ''}<div class="section-label">卡住时的自助路径</div><p class="small">先打开一个相关实验或资料，完成一小步，再回到本任务。</p><div class="related-links">{_task_links(content, task)}</div>{_pane_footer(tasks, index, "task-")}</section></article>'''
+    return f'''<article class="pane{' is-active' if index == 0 else ''}" id="task-{esc(slug(task.get("id")))}" data-pane data-task-id="{esc(task.get("id"))}" data-source-slide-ids="{esc(source_refs)}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title"))}</h3><p class="pane-lead">{text_block(task.get("overview"))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level")))}</span></div><div class="chip-row"><span class="chip">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</span>{minutes}<span class="chip">{esc(_modality_label(task.get("modality")))}</span></div><div class="section-label">本次要留下的结果</div><div class="scaffold">{text_block(task.get("scaffold"))}</div><div class="section-label">完成步骤</div><ol class="task-steps">{steps}</ol>{f'<div class="section-label">起点文件</div>{starter}' if starter else ''}<div class="section-label">卡住时帮助</div><p class="small">先打开一个相关实验或资料，完成一小步，再回到本任务。</p><div class="related-links">{_task_links(content, task)}</div><div class="section-label">课堂验收</div><div class="acceptance"><ul class="clean-list">{acceptance}</ul></div>{_pane_footer(tasks, index, "task-")}</section></article>'''
 
 
 def render_student_task(content: dict[str, Any]) -> str:
@@ -350,16 +430,80 @@ def render_foundation_kit(content: dict[str, Any]) -> str:
 
 def render_teacher_guide(content: dict[str, Any]) -> str:
     teacher = content.get("teacher_guide", {}) if isinstance(content.get("teacher_guide"), dict) else {}; tasks, knowledge = _task_map(content), _knowledge_map(content); guidance = [item for item in _list(teacher.get("task_guidance")) if isinstance(item, dict)]
-    timing = "".join(f'<div class="timing-item"><strong>{esc(item.get("minutes"))} 分钟</strong>{text_block(_humanize(content, item.get("focus")))}</div>' for item in _list(teacher.get("timing")) if isinstance(item, dict)); nav_items = [{"id": item.get("task_id"), "title": _task_title(tasks, item.get("task_id", "")), "purpose": "抽查与追问"} for item in guidance]
+    timing_blocks: list[str] = []
+    timing_seen: set[str] = set()
+    for item in _list(teacher.get("timing")):
+        if not isinstance(item, dict):
+            continue
+        focus = _humanize(content, item.get("focus"))
+        if focus in timing_seen:
+            continue
+        timing_seen.add(focus)
+        timing_blocks.append(f'<div class="timing-item"><strong>{esc(item.get("minutes"))} 分钟</strong>{text_block(focus)}</div>')
+    timing = "".join(timing_blocks)
+    nav_items = [{"id": item.get("task_id"), "title": _task_title(tasks, item.get("task_id", "")), "purpose": "抽查与追问"} for item in guidance]
     panes = []
     for item in guidance:
         task = tasks.get(item.get("task_id"), {})
         active = " is-active" if len(panes) == 0 else ""
         panes.append(f'<article class="pane{active}" id="teacher-task-{esc(slug(item.get("task_id")))}" data-pane data-task-id="{esc(item.get("task_id"))}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title", item.get("task_id")))}</h3><p class="pane-lead">理论桥接：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level", "实践")))}</span></div><div class="section-label">教师观察点</div><div class="scaffold">{text_block(_humanize(content, item.get("look_for")))}</div><div class="section-label">学生卡住时</div><div class="teacher-note">{text_block(_humanize(content, item.get("ask_when_stuck")))}</div></section></article>')
-    common = "".join(f'<li><strong>{text_block(_humanize(content, item.get("symptom")))}</strong>：{text_block(_humanize(content, item.get("intervention")))}</li>' for item in _list(teacher.get("common_errors")) if isinstance(item, dict)); pace = "".join(f"<li>{text_block(_humanize(content, item))}</li>" for item in _list(teacher.get("pace_adjustments"))); closing = "".join(f"<li>{text_block(_humanize(content, item))}</li>" for item in _list(teacher.get("closing_checks")))
+    common_items = _unique_text([f'{_humanize(content, item.get("symptom"))}：{_humanize(content, item.get("intervention"))}' for item in _list(teacher.get("common_errors")) if isinstance(item, dict)])
+    common = "".join(f"<li>{text_block(item)}</li>" for item in common_items)
+    pace = "".join(f"<li>{text_block(item)}</li>" for item in _unique_text([_humanize(content, item) for item in _list(teacher.get("pace_adjustments"))]))
+    closing = "".join(f"<li>{text_block(item)}</li>" for item in _unique_text([_humanize(content, item) for item in _list(teacher.get("closing_checks"))]))
     overview = f'<section class="teacher-note"><strong>课堂目的：</strong>{text_block(_humanize(content, teacher.get("purpose")))}<br><strong>理论桥接：</strong>{text_block(_humanize(content, teacher.get("theory_bridge")))}<div class="timing-list">{timing}</div></section><div class="summary-grid"><div class="summary-card"><strong>常见错误</strong><ul class="clean-list">{common}</ul></div><div class="summary-card"><strong>节奏调节</strong><ul class="clean-list">{pace}</ul></div><div class="summary-card"><strong>收束检查</strong><ul class="clean-list">{closing}</ul></div></div>'
     body = f'{overview}<div class="module-layout"><aside class="pane-nav" aria-label="教师任务指导"><strong>按任务抽查</strong>{_module_nav(nav_items, "teacher-task-")}</aside><section class="pane-main">{"".join(panes)}</section></div>'
     return shell(content, "teacher", "teacher-guide", "课堂指导", "按任务打开抽查与追问建议；答案集中在教师参考模块，课堂指导保持可观察、可调节。", body)
+
+
+def _reference_visual_html(reference: dict[str, Any]) -> str:
+    visual = reference.get("model_visual")
+    if not isinstance(visual, dict):
+        return ""
+    title = str(visual.get("title") or "参考模型")
+    nodes = [item for item in _list(visual.get("nodes")) if isinstance(item, dict)]
+    box_width = 230
+    gap = 45
+    left = 25
+    top = 48
+    heights = [max(72, 42 + 21 * len(_list(item.get("fields")))) for item in nodes]
+    view_width = max(760, left * 2 + len(nodes) * box_width + max(0, len(nodes) - 1) * gap)
+    view_height = max(185, top + (max(heights) if heights else 72) + 62)
+    svg_parts = [f'<svg class="uml-svg" viewBox="0 0 {view_width} {view_height}" role="img" aria-label="{esc(title)}"><defs><marker id="uml-arrow-{slug(reference.get("task_id"))}" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#397078"></path></marker></defs>']
+    positions: dict[str, tuple[float, float, float, float]] = {}
+    for index, node in enumerate(nodes):
+        x = left + index * (box_width + gap)
+        y = top
+        height = heights[index]
+        node_id = str(node.get("id"))
+        positions[node_id] = (x, y, box_width, height)
+    for relation in _list(visual.get("relations")):
+        if not isinstance(relation, dict):
+            continue
+        start = positions.get(str(relation.get("from")))
+        end = positions.get(str(relation.get("to")))
+        if not start or not end:
+            continue
+        x1, y1, w1, h1 = start
+        x2, y2, w2, h2 = end
+        forward = x1 <= x2
+        sx = x1 + w1 if forward else x1
+        ex = x2 if forward else x2 + w2
+        sy = y1 + h1 / 2
+        ey = y2 + h2 / 2
+        label_x = (sx + ex) / 2
+        label_y = (sy + ey) / 2 - 7
+        svg_parts.append(f'<line class="uml-line" x1="{sx:g}" y1="{sy:g}" x2="{ex:g}" y2="{ey:g}" marker-end="url(#uml-arrow-{slug(reference.get("task_id"))})"></line><text class="uml-label" x="{label_x:g}" y="{label_y:g}" text-anchor="middle">{esc(relation.get("label"))}</text>')
+    for node in nodes:
+        node_id = str(node.get("id"))
+        x, y, width, height = positions[node_id]
+        svg_parts.append(f'<rect class="uml-node" x="{x:g}" y="{y:g}" width="{width:g}" height="{height:g}" rx="8"></rect><text x="{x + 12:g}" y="{y + 23:g}" font-weight="700">{esc(node.get("title"))}</text>')
+        for line_index, field in enumerate(_list(node.get("fields"))):
+            svg_parts.append(f'<text class="uml-field" x="{x + 12:g}" y="{y + 45 + line_index * 18:g}">{esc(field)}</text>')
+    svg_parts.append("</svg>")
+    messages = "".join(f"<li><strong>{esc(item.get('from'))} → {esc(item.get('to'))}</strong>：{text_block(item.get('label'))}</li>" for item in _list(visual.get("messages")) if isinstance(item, dict))
+    message_html = f'<ol class="message-chain">{messages}</ol>' if messages else ""
+    return f'<section class="reference-visual" data-reference-visual="{esc(visual.get("kind", "model"))}"><h4>{esc(title)}</h4>{"".join(svg_parts) if nodes else ""}{message_html}</section>'
 
 
 def render_teacher_reference(content: dict[str, Any]) -> str:
@@ -367,7 +511,8 @@ def render_teacher_reference(content: dict[str, Any]) -> str:
     for index, reference in enumerate(references):
         task = tasks.get(reference.get("task_id"), {}); key_steps = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("key_steps"))); variants = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("acceptable_variants"))); errors = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("common_errors"))); basis = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("acceptance_basis"))); result = f'<div class="section-label">参考结果</div><div class="callout">{text_block(reference.get("reference_result"))}</div>' if reference.get("reference_result") else ""
         active = " is-active" if index == 0 else ""
-        panes.append(f'<article class="pane reference-pane{active}" id="reference-{esc(slug(reference.get("task_id")))}" data-pane data-task-id="{esc(reference.get("task_id"))}" data-source-slide-ids="{esc(" ".join(reference.get("source_slide_ids", [])))}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(reference.get("title"))}</h3><p class="pane-lead">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</p></div><a href="../student/student-task.html#task-{esc(slug(reference.get("task_id")))}">打开学生任务</a></div><div class="section-label">参考答案 / 参考成果</div><pre class="reference-answer">{text_block(_humanize(content, reference.get("reference_answer")))}</pre>{result}<div class="section-label">关键步骤</div><ul class="clean-list">{key_steps}</ul><div class="section-label">可接受变体</div><ul class="clean-list">{variants}</ul><div class="section-label">常见错误</div><ul class="clean-list">{errors}</ul><div class="section-label">验收依据</div><ul class="clean-list">{basis}</ul>{_pane_footer(references, index, "reference-", route_label="返回参考目录")}</section></article>')
+        visual = _reference_visual_html(reference)
+        panes.append(f'<article class="pane reference-pane{active}" id="reference-{esc(slug(reference.get("task_id")))}" data-pane data-task-id="{esc(reference.get("task_id"))}" data-source-slide-ids="{esc(" ".join(reference.get("source_slide_ids", [])))}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(reference.get("title"))}</h3><p class="pane-lead">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</p></div><a href="../student/student-task.html#task-{esc(slug(reference.get("task_id")))}">打开学生任务</a></div><div class="section-label">参考答案 / 参考成果</div><pre class="reference-answer">{text_block(_humanize(content, reference.get("reference_answer")))}</pre>{visual}{result}<div class="section-label">关键步骤</div><ul class="clean-list">{key_steps}</ul><div class="section-label">可接受变体</div><ul class="clean-list">{variants}</ul><div class="section-label">常见错误</div><ul class="clean-list">{errors}</ul><div class="section-label">验收依据</div><ul class="clean-list">{basis}</ul>{_pane_footer(references, index, "reference-", route_label="返回参考目录")}</section></article>')
     body = f'<div class="module-layout"><aside class="pane-nav" aria-label="教师参考导航"><strong>选择参考成果</strong>{_module_nav(nav_items, "reference-")}</aside><section class="pane-main">{"".join(panes)}</section></div>'
     return shell(content, "teacher", "teacher-reference", "教师参考", "按任务切换参考答案和可接受变体，答案区保持宽版，便于课堂核对。", body, prefix="")
 

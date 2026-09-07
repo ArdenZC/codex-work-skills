@@ -189,12 +189,22 @@
         "task_id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
         "reference_answer": {"$ref": "#/$defs/nonEmpty"}, "reference_result": {"$ref": "#/$defs/nonEmpty"},
         "key_steps": {"$ref": "#/$defs/strings"}, "acceptable_variants": {"$ref": "#/$defs/strings"},
-        "common_errors": {"$ref": "#/$defs/strings"}, "acceptance_basis": {"$ref": "#/$defs/strings"}
+        "common_errors": {"$ref": "#/$defs/strings"}, "acceptance_basis": {"$ref": "#/$defs/strings"},
+        "model_visual": {"$ref": "#/$defs/modelVisual"}
       }
     },
     "teacherReference": {
       "type": "object", "additionalProperties": false, "required": ["task_references"],
       "properties": {"task_references": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/teacherTaskReference"}}}
+    },
+    "modelVisual": {
+      "type": "object", "additionalProperties": false, "required": ["title"],
+      "properties": {
+        "kind": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
+        "nodes": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "title"], "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "fields": {"$ref": "#/$defs/strings"}}}},
+        "relations": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "label"], "properties": {"from": {"$ref": "#/$defs/nonEmpty"}, "to": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}}}},
+        "messages": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "label"], "properties": {"from": {"$ref": "#/$defs/nonEmpty"}, "to": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}}}}
+      }
     },
     "starter": {
       "type": "object", "additionalProperties": false,

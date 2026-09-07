@@ -1119,7 +1119,7 @@
   ],
   "teacher_guide": {
     "purpose": "用一个预约场景贯穿视图选择、领域对象、关系多重性、消息责任和可编辑工具操作；弱基础学生完成核心模型即可达标。",
-    "theory_bridge": "uml-01 提供场景、稳定对象和关系语义，uml-02 提供消息顺序与责任落点。课堂每个核心任务都通过 source_slide_ids 回指这两个已讲页。",
+    "theory_bridge": "本次实践依次衔接理论课中的五个主题：从用例目标识别稳定建模对象；明确对象责任与协作；使用关联与多重性表达业务关系；区分 Entity、Boundary 与 Control；通过时序消息检查责任分配和结果返回。实践中的领域模型、多重性、对象职责和消息链，均对应以上已讲内容。",
     "timing": [
       {
         "minutes": 8,
@@ -1264,6 +1264,39 @@
         ],
         "reference_answer": "Student（领域类图）= Entity/class；Student（用例参与者）= Actor-in-use-case-context；ReservationService=Control/Service；Reservation=Entity；ReservationPage=Boundary。",
         "reference_result": "Student 在 draw.io 领域模型中使用 class/domain object，而非 umlActor。",
+        "model_visual": {
+          "kind": "domain-model",
+          "title": "预约领域参考模型",
+          "nodes": [
+            {
+              "id": "student",
+              "title": "Student",
+              "fields": ["studentId", "name"]
+            },
+            {
+              "id": "reservation",
+              "title": "Reservation",
+              "fields": ["reservationId", "status", "date"]
+            },
+            {
+              "id": "timeslot",
+              "title": "TimeSlot",
+              "fields": ["start", "end", "capacity"]
+            }
+          ],
+          "relations": [
+            {
+              "from": "student",
+              "to": "reservation",
+              "label": "1 → 0..*"
+            },
+            {
+              "from": "reservation",
+              "to": "timeslot",
+              "label": "1 → 0..*（按题设确认）"
+            }
+          ]
+        },
         "key_steps": [
           "完成分类",
           "检查 Student 形状",
@@ -1315,6 +1348,76 @@
         ],
         "reference_answer": "ReservationPage -> ReservationService: requestReservation()；ReservationService -> TimeSlot: checkAvailability()；TimeSlot --> ReservationService: available/conflict；available 时 ReservationService -> Reservation: create/confirm(...)；ReservationService --> ReservationPage: result。",
         "reference_result": "成功路径创建/确认 Reservation，冲突路径不创建，并最终返回页面。",
+        "model_visual": {
+          "kind": "interaction-model",
+          "title": "预约交互责任参考模型",
+          "nodes": [
+            {
+              "id": "page",
+              "title": "ReservationPage",
+              "fields": ["selectSlot()", "showResult()"]
+            },
+            {
+              "id": "service",
+              "title": "ReservationService",
+              "fields": ["requestReservation()", "confirmReservation()", "cancelReservation()"]
+            },
+            {
+              "id": "slot",
+              "title": "TimeSlot",
+              "fields": ["checkAvailability()"]
+            },
+            {
+              "id": "reservation",
+              "title": "Reservation",
+              "fields": ["create()", "confirm()", "status"]
+            }
+          ],
+          "relations": [
+            {
+              "from": "page",
+              "to": "service",
+              "label": "requestReservation()"
+            },
+            {
+              "from": "service",
+              "to": "slot",
+              "label": "checkAvailability()"
+            },
+            {
+              "from": "service",
+              "to": "reservation",
+              "label": "create / confirm"
+            }
+          ],
+          "messages": [
+            {
+              "from": "ReservationPage",
+              "to": "ReservationService",
+              "label": "requestReservation()"
+            },
+            {
+              "from": "ReservationService",
+              "to": "TimeSlot",
+              "label": "checkAvailability()"
+            },
+            {
+              "from": "TimeSlot",
+              "to": "ReservationService",
+              "label": "available / conflict"
+            },
+            {
+              "from": "ReservationService",
+              "to": "Reservation",
+              "label": "available 时 create / confirm()"
+            },
+            {
+              "from": "ReservationService",
+              "to": "ReservationPage",
+              "label": "result"
+            }
+          ]
+        },
         "key_steps": [
           "先排序",
           "补两个消息槽",
@@ -1368,7 +1471,7 @@
           "uml-04",
           "uml-05"
         ],
-        "reference_answer": "修正为 TimeSlot 返回可用性给 ReservationService；服务根据结果创建/确认 Reservation 或返回冲突。",
+        "reference_answer": "消息责任应为 TimeSlot → ReservationService：available / conflict；ReservationService → Reservation：available 时 create/confirm()；ReservationService → ReservationPage：result。TimeSlot 不直接创建 Reservation，页面也不越过服务调用实体。",
         "reference_result": "责任从状态对象与协调服务分离，消息链可执行。",
         "key_steps": [
           "指出责任错位",
@@ -1393,7 +1496,7 @@
           "uml-03",
           "uml-04"
         ],
-        "reference_answer": "用例视图中的 Student 可作为参与者；领域类图中的 Student 是 class/domain object。两者是语境不同，不是概念矛盾。",
+        "reference_answer": "用例视图中的 Student → 预约用例，表示参与者；领域类图中的 Student 是 class/domain object。两个视图的语境不同，但 ReservationPage → ReservationService 的责任关系仍要保持一致，不能把参与者图形直接当成领域类。",
         "reference_result": "两种视图各自回答自己的问题，模型没有把角色混为一谈。",
         "key_steps": [
           "写视图问题",

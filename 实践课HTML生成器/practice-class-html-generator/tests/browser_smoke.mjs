@@ -24,7 +24,7 @@ function forbiddenValues(data) {
   for (const item of data.tasks || []) for (const ref of item.source_slide_ids || []) values.add(ref);
   for (const item of data.knowledge_links || []) for (const ref of item.source_slide_ids || []) values.add(ref);
   for (const value of [...Object.keys(data.source_courseware || {})]) if (value.includes("slide")) values.add(value);
-  for (const value of ["choice-family", "step-family", "classify-family", "reorder-family", "state-simulator-family", "multi-question-family", "state-simulator", "multi-question", "scenario-decision"]) values.add(value);
+  for (const value of ["choice-family", "step-family", "classify-family", "reorder-family", "state-simulator-family", "multi-question-family", "state-simulator", "multi-question", "scenario-decision", "task_id", "slide_id", "source_slide_ids", "interaction_type", "renderer_family"]) values.add(value);
   return [...values].filter(Boolean);
 }
 
@@ -159,6 +159,23 @@ async function smokeTeacherReference(page, file, data) {
   const refs = data.teacher_reference?.task_references || [];
   await activateAndCheckPanes(page, file, refs.length);
   for (const ref of refs) { await page.goto(pageUrl(file, `reference-${ref.task_id}`), { waitUntil: "load" }); if (!(await page.locator("[data-pane].is-active .reference-answer").innerText()).trim()) throw new Error(`reference answer missing for ${ref.task_id}`); }
+  const expectedVisuals = refs.filter((ref) => ref.model_visual).length;
+  if (await page.locator("[data-reference-visual]").count() !== expectedVisuals) throw new Error(`reference model visual count mismatch in ${file}`);
+}
+
+async function smokeStarters(page, file, data) {
+  const assets = new Map((data.starter_assets || []).map((asset) => [asset.path.replaceAll("\\", "/"), asset]));
+  const links = page.locator("a[data-starter-path]");
+  if (await links.count() < assets.size) throw new Error(`starter links missing in ${file}`);
+  const hrefs = await links.evaluateAll((nodes) => nodes.map((node) => ({ path: node.dataset.starterPath, href: node.getAttribute("href") })));
+  for (const item of hrefs) {
+    if (!item.href?.startsWith("starter/")) throw new Error(`starter link is not relative in ${file}: ${item.href}`);
+    if (!assets.has(item.path)) throw new Error(`unknown starter link in ${file}: ${item.path}`);
+  }
+  const drawioPaths = [...assets.keys()].filter((value) => value.toLowerCase().endsWith(".drawio"));
+  const previews = await page.locator("[data-starter-preview-path]").evaluateAll((nodes) => nodes.map((node) => node.dataset.starterPreviewPath));
+  for (const drawio of drawioPaths) if (previews.includes(drawio)) throw new Error(`draw.io raw preview exposed in ${file}: ${drawio}`);
+  if ((await page.locator("body").innerText()).includes("mxGraphModel")) throw new Error(`draw.io XML exposed in ${file}`);
 }
 
 const dirs = fixtureDirs(root);
@@ -172,7 +189,7 @@ try {
       for (const relative of [...studentNames, ...teacherNames]) {
         const file = path.join(dir, ...relative.split("/")); const page = await browser.newPage({ viewport }); const requests = []; page.on("request", (request) => { if (/^https?:/i.test(request.url())) requests.push(request.url()); }); await page.goto(pathToFileURL(file).href, { waitUntil: "load" });
         const role = relative.startsWith("student/") ? "student" : "teacher"; await checkShell(page, file, role, dir, data);
-        if (relative === "student/learning-center.html") await smokeLearning(page, file, data, firstScreen); else if (relative === "teacher/teacher-reference.html") await smokeTeacherReference(page, file, data); else { const expected = relative === "student/student-task.html" ? data.tasks.length : relative === "student/study-guide.html" ? data.study_guide.length : relative === "student/foundation-kit.html" ? data.foundation_kit.length : relative === "teacher/teacher-guide.html" ? (data.teacher_guide?.task_guidance || []).length : 0; if (expected) await activateAndCheckPanes(page, file, expected); }
+        if (relative === "student/student-task.html") await smokeStarters(page, file, data); if (relative === "student/learning-center.html") await smokeLearning(page, file, data, firstScreen); else if (relative === "teacher/teacher-reference.html") await smokeTeacherReference(page, file, data); else { const expected = relative === "student/student-task.html" ? data.tasks.length : relative === "student/study-guide.html" ? data.study_guide.length : relative === "student/foundation-kit.html" ? data.foundation_kit.length : relative === "teacher/teacher-guide.html" ? (data.teacher_guide?.task_guidance || []).length : 0; if (expected) await activateAndCheckPanes(page, file, expected); }
         if (requests.length) throw new Error(`external request in ${file}: ${requests.join(", ")}`); paneCounts[relative] = await page.locator("[data-pane]").count(); results.push({ fixture: path.basename(dir), page: relative, viewport: `${viewport.width}x${viewport.height}` }); await page.close();
       }
     }

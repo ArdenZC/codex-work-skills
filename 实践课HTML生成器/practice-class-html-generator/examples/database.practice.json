@@ -100,8 +100,8 @@
         "db-01"
       ],
       "modality": "modeling",
-      "overview": "把“客户下过订单”拆成实体、属性和关系，先在 ER starter 中核对一对多语义。",
-      "scaffold": "draw.io 文件已给出 Customer、Order、主键字段和可编辑的待补关系线；学生要在图上连线并把 Order.customer_id 标成外键，不从空白建模。打开同一套 setup SQL 可获得本节样例数据。",
+      "overview": "把“客户下过订单”拆成实体、属性和关系，先在 ER starter 中修改占位关联并核对一对多语义。",
+      "scaffold": "draw.io 文件已给出 Customer、Order、主键字段和一条可编辑的虚线占位关系；学生要把占位线改为正式关联，补上 1 / 0..* 多重性，并把 Order.customer_id 标成外键，不从空白建模，也不要新建第二条关系线。打开同一套 setup SQL 可获得本节样例数据。",
       "steps": [
         {
           "title": "圈实体",
@@ -114,15 +114,15 @@
           "check": "能说出两端数量。"
         },
         {
-          "title": "核 starter",
-          "instruction": "打开 orders-er.drawio，补出 Customer—Order 关系线和一端多重性，再把 Order.customer_id 的 FK 标识补进字段标签。",
-          "check": "关系线、基数和字段角色都是真实可编辑结果，文件可继续编辑。"
+          "title": "修改占位关联",
+          "instruction": "打开 orders-er.drawio，找到 Customer 与 Order 之间的虚线占位关系，把它改为正式关联线；再在 Customer 端标注 1、Order 端标注 0..*，并把 Order.customer_id 的 FK 标识补进字段标签。",
+          "check": "只有一条 Customer—Order 关系，正式关联、基数和字段角色都是真实可编辑结果，文件可继续编辑。"
         }
       ],
       "acceptance": [
         "Customer/Order 边界正确。",
         "一对多关系能用业务句解释。",
-        "PK/FK 位置不混淆。"
+        "PK/FK 位置不混淆，且没有重复创建第二条关系线。"
       ],
       "help_refs": [
         "db-entity",
@@ -1129,7 +1129,7 @@
   ],
   "teacher_guide": {
     "purpose": "让学生从业务事实、ER 关系和主外键路径走到客户级聚合查询，并在 Workbench 中用粒度和结果诊断 SQL。",
-    "theory_bridge": "db-01 支撑实体/关系和基数，db-02 支撑主键外键与连接路径，db-03 支撑结果粒度、筛选和聚合；实践问题统一为“2025-02 月有已完成订单的客户及其订单数”。",
+    "theory_bridge": "本次实践对应：实体、主键与外键；表关系与 JOIN；COUNT 与 GROUP BY；WHERE 条件与日期区间；Workbench 分段执行与结果核对。所有任务围绕“2025-02 月有已完成订单的客户及其订单数”展开。",
     "timing": [
       {
         "minutes": 10,
@@ -1248,8 +1248,8 @@
         "source_slide_ids": [
           "db-01"
         ],
-        "reference_answer": "Customer、Order 为实体；Customer.customer_id 为 PK，Order.customer_id 为待补 FK；Order.amount 是本节挑战所需的订单金额；Customer 1 对 Order 0..*。学生应在图上补 Customer—Order 关系线并标注基数。",
-        "reference_result": "ER starter 中关系线和 FK 字段标签都经过学生实际编辑，实体、字段和关系语义一致。",
+        "reference_answer": "Customer、Order 为实体；Customer.customer_id 为 PK，Order.customer_id 为待补 FK；Order.amount 是本节挑战所需的订单金额；Customer 1 对 Order 0..*。学生应在图上找到已有的 Customer—Order 虚线占位关系，把它改为正式关联并标注基数，不应新建第二条关系线。",
+        "reference_result": "ER starter 中只有一条 Customer—Order 正式关系线，FK 字段标签和 1 / 0..* 基数都经过学生实际编辑，实体、字段和关系语义一致。",
         "key_steps": [
           "识别实体",
           "标注 PK/FK",
@@ -1272,8 +1272,8 @@
         "source_slide_ids": [
           "db-02"
         ],
-        "reference_answer": "ON c.customer_id = o.customer_id。Customer.customer_id 是 PK，Order.customer_id 是引用该 PK 的 FK。",
-        "reference_result": "连接后每一行代表一笔订单关联的客户信息。",
+        "reference_answer": "完整核对 SQL：SELECT c.customer_name, o.order_id FROM customers AS c JOIN orders AS o ON c.customer_id = o.customer_id; 其中 ON c.customer_id = o.customer_id 把 Customer 主键和 Order 外键相连；Customer.customer_id 是 PK，Order.customer_id 是引用该 PK 的 FK。等价写法可使用表别名更短的 c.customer_id = o.customer_id，但不能只按 customer_name 连接。常见错误是连接条件漏写或把状态筛选写进 ON 后却没有解释结果口径。",
+        "reference_result": "连接后每一行代表一笔订单关联的客户信息；同一客户有多笔订单时会出现多行，这是进入客户级 GROUP BY 之前的订单粒度。",
         "key_steps": [
           "找 PK",
           "找 FK",
@@ -1320,8 +1320,8 @@
           "db-02",
           "db-03"
         ],
-        "reference_answer": "SELECT c.customer_name, COUNT(o.order_id) AS completed_orders FROM customers AS c JOIN orders AS o ON c.customer_id = o.customer_id WHERE o.status = 'completed' AND o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01' GROUP BY c.customer_id, c.customer_name ORDER BY completed_orders DESC, c.customer_name;",
-        "reference_result": "正确样例返回客户 A=2、客户 B=1，各客户一行；客户 C 只有 pending 订单，因此不出现，按订单数降序再按姓名排序。",
+        "reference_answer": "正确 SQL：SELECT c.customer_name, COUNT(o.order_id) AS completed_orders FROM customers AS c JOIN orders AS o ON c.customer_id = o.customer_id WHERE o.status = 'completed' AND o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01' GROUP BY c.customer_id, c.customer_name ORDER BY completed_orders DESC, c.customer_name;\n\n解释：JOIN 先把客户和订单按 PK/FK 对齐，WHERE 保留 2025-02 月且已完成的订单，GROUP BY 把订单粒度收束到客户，COUNT(o.order_id) 统计完成订单数，ORDER BY 先按数量降序再按姓名排序。等价写法可以用 < '2025-03-01' 的半开区间替代 BETWEEN，避免日期时间边界遗漏。常见错误是漏写 GROUP BY、把 COUNT(*) 解释成客户数，或把日期上界写成 2025-02-28 而漏掉当天带时间的记录。",
+        "reference_result": "执行结果（按查询输出）：客户 A=2（客户 A | 2）；客户 B=1（客户 B | 1）；客户 C | 不出现（该月没有 completed 订单）。每位客户一行，客户 C 只有 pending 订单，因此被 WHERE 排除；最终按订单数降序、姓名升序排列。",
         "key_steps": [
           "修正 COUNT 对象",
           "修正状态",
@@ -1347,8 +1347,8 @@
         "source_slide_ids": [
           "db-03"
         ],
-        "reference_answer": "重复客户行优先检查结果粒度与 GROUP BY；空结果优先检查 status、日期和连接；错配优先检查 PK/FK JOIN。",
-        "reference_result": "学生能为三个症状各给出首个检查位置和一个最小修复。",
+        "reference_answer": "可执行基准 SQL：SELECT c.customer_name, COUNT(o.order_id) AS completed_orders FROM customers AS c JOIN orders AS o ON c.customer_id = o.customer_id WHERE o.status = 'completed' AND o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01' GROUP BY c.customer_id, c.customer_name ORDER BY completed_orders DESC, c.customer_name;\n\n诊断顺序：重复客户行优先检查是否漏写 GROUP BY 或按订单字段分组；空结果优先检查 status、日期半开区间和 PK/FK JOIN；客户与订单错配优先检查 ON c.customer_id = o.customer_id。最小修复是一次只改一个条件，再核对行数、粒度和客户 C 不出现的原因。等价写法可以把 WHERE 条件分段执行，但必须保持同一连接和客户级分组。",
+        "reference_result": "学生能用基准 SQL 对三个症状各指出首个检查位置、一个最小修复和修复后的预期粒度，而不是只描述“查询有问题”。",
         "key_steps": [
           "描述症状",
           "定位阶段",
@@ -1372,8 +1372,8 @@
           "db-02",
           "db-03"
         ],
-        "reference_answer": "分段：先 SELECT c.customer_name,o.order_id FROM ... JOIN ...；再加 WHERE completed/month；最后 COUNT/GROUP BY/ORDER BY。",
-        "reference_result": "每段都能说出列、行数和粒度变化。",
+        "reference_answer": "完整基准 SQL：SELECT c.customer_name, COUNT(o.order_id) AS completed_orders FROM customers AS c JOIN orders AS o ON c.customer_id = o.customer_id WHERE o.status = 'completed' AND o.order_date >= '2025-02-01' AND o.order_date < '2025-03-01' GROUP BY c.customer_id, c.customer_name ORDER BY completed_orders DESC, c.customer_name; 在 Workbench 中分三段执行：第一段只保留 SELECT c.customer_name, o.order_id 与 JOIN，观察订单粒度；第二段加入 completed 和 2025-02 日期条件，观察行数；第三段加入 COUNT、GROUP BY、ORDER BY，核对客户级结果。",
+        "reference_result": "每一段都能说出列、行数和粒度变化；最终输出客户 A=2、客户 B=1，客户 C 因没有该月已完成订单而不出现。",
         "key_steps": [
           "运行连接",
           "运行筛选",
@@ -1397,7 +1397,7 @@
           "db-02",
           "db-03"
         ],
-          "reference_answer": "关键约束：Customer.customer_id 唯一且非空，Order.customer_id 引用 Customer，status 使用 completed/pending 统一值，order_date 可按月筛选，amount 可用于金额聚合。",
+          "reference_answer": "关键约束：Customer.customer_id 唯一且非空，Order.customer_id（FK）→ Customer.customer_id（PK），因此 Customer 1 → Order 0..*；status 使用 completed/pending 统一值，order_date 可按月筛选，amount 可用于金额聚合。",
         "reference_result": "学生指出一个约束缺失会导致错配、重复或空结果的具体风险。",
         "key_steps": [
           "逐字段核对",
@@ -1447,12 +1447,12 @@
       "path": "orders-er.drawio",
       "language": "ER / draw.io",
       "task_id": "db-map-core",
-      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"orders-er\" name=\"Orders ER starter\">\n    <mxGraphModel dx=\"1100\" dy=\"720\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"title\" value=\"订单 ER：请在图上完成两个编辑点\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"70\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer\" value=\"Customer&#xa;---&#xa;customer_id PK&#xa;customer_name\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"70\" y=\"100\" width=\"240\" height=\"115\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"order\" value=\"Order&#xa;---&#xa;order_id PK&#xa;customer_id [待标注 FK]&#xa;status&#xa;order_date&#xa;amount\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"520\" y=\"100\" width=\"270\" height=\"150\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer-order-gap\" value=\"待补关系 A：拖出 Customer—Order 连接并标注 1 / 0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;html=1;endArrow=none;strokeColor=#bd8b47;\" edge=\"1\" parent=\"1\" source=\"customer\" target=\"order\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"field-guidance\" value=\"操作提示：编辑 Order.customer_id 字段文字，确认它引用 Customer.customer_id\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"80\" y=\"330\" width=\"330\" height=\"75\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
+      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"orders-er\" name=\"Orders ER starter\">\n    <mxGraphModel dx=\"1100\" dy=\"720\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"title\" value=\"订单 ER：请在图上完成两个编辑点\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"70\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer\" value=\"Customer&#xa;---&#xa;customer_id PK&#xa;customer_name\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"70\" y=\"100\" width=\"240\" height=\"115\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"order\" value=\"Order&#xa;---&#xa;order_id PK&#xa;customer_id [待标注 FK]&#xa;status&#xa;order_date&#xa;amount\" style=\"shape=table;html=1;whiteSpace=wrap;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"520\" y=\"100\" width=\"270\" height=\"150\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"customer-order-gap\" value=\"占位关系 A：改为正式关联并标注 1 / 0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;dashed=1;html=1;endArrow=none;strokeColor=#bd8b47;\" edge=\"1\" parent=\"1\" source=\"customer\" target=\"order\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"field-guidance\" value=\"操作提示：编辑 Order.customer_id 字段文字，确认它引用 Customer.customer_id\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"80\" y=\"330\" width=\"330\" height=\"75\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
       "editable_gaps": [
         {
-          "marker": "待补关系 A",
-          "replacement": "待补关系 A",
-          "instruction": "在 draw.io 中编辑待补关系线，保留 Customer—Order 连接并补上 1 / 0..* 基数。",
+          "marker": "占位关系 A",
+          "replacement": "占位关系 A",
+          "instruction": "在 draw.io 中编辑现有占位关系线，将它改为正式 Customer—Order 关联并补上 1 / 0..* 基数。",
           "kind": "editable-relationship"
         },
         {

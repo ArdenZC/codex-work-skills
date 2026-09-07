@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import html.parser
 import json
 import re
@@ -19,8 +20,10 @@ TEACHER_PAGES = (Path("teacher") / "teacher-guide.html", Path("teacher") / "teac
 REQUIRED_TOP_LEVEL = {"student", "teacher", "practice-content.json", "qa-report.json"}
 EXTERNAL_PATTERN = re.compile(r"(?i)(?:https?:|//|data:|javascript:|file:)")
 FORBIDDEN_LAYOUT = re.compile(r"(?i)border-left\s*:\s*4px\s+solid")
-FORBIDDEN_MARKERS = ("Contract 1.0", "Practice Class")
+FORBIDDEN_MARKERS = ("Contract 1.0", "Practice Class", "source_slide_ids", "interaction type", "renderer family", "task_id", "slide_id", "interaction_type", "renderer_family")
 FAMILIES = set(RENDERER_FAMILIES.values())
+TEXT_ASSET_EXTENSIONS = {".c", ".cpp", ".h", ".hpp", ".py", ".java", ".js", ".ts", ".html", ".htm", ".css", ".sql", ".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".csv"}
+NON_TEXT_ASSET_EXTENSIONS = {".drawio", ".xlsx", ".xls", ".docx", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".zip"}
 
 
 class _HTMLProbe(html.parser.HTMLParser):
@@ -195,6 +198,28 @@ def _elements_with(probe: _HTMLProbe, attr: str, value: str) -> list[dict[str, A
     return [item for item in probe.elements if item.get(attr) == value]
 
 
+def _asset_is_text(path: str) -> bool:
+    suffix = Path(path).suffix.casefold()
+    return suffix in TEXT_ASSET_EXTENSIONS and suffix not in NON_TEXT_ASSET_EXTENSIONS
+
+
+def _validate_reference_completeness(content: dict[str, Any], errors: list[str]) -> None:
+    tasks = {str(item.get("id")): item for item in content.get("tasks", []) if isinstance(item, dict) and item.get("id")}
+    for reference in content.get("teacher_reference", {}).get("task_references", []):
+        if not isinstance(reference, dict):
+            continue
+        task_id = str(reference.get("task_id"))
+        task = tasks.get(task_id, {})
+        modality = str(task.get("modality", "")).casefold()
+        answer = str(reference.get("reference_answer", ""))
+        if modality in {"coding", "programming"} and (len(answer) < 160 or "return" not in answer or "{" not in answer):
+            errors.append(f"teacher reference for coding task is too short to be a complete code result: {task_id}")
+        if "sql" in modality and (not re.search(r"\bselect\b", answer, re.IGNORECASE) or not re.search(r"\bfrom\b", answer, re.IGNORECASE)):
+            errors.append(f"teacher reference for SQL task needs a complete SQL expression: {task_id}")
+        if modality in {"modeling", "modeling-tool", "model-critique"} and not reference.get("model_visual") and not re.search(r"(?:→|->|—|1\s*[-—]\s*0\.\.\*|关系|消息)", answer):
+            errors.append(f"teacher reference for modeling task needs relation/message structure or model_visual: {task_id}")
+
+
 def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -255,6 +280,9 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
     task_page = output_dir / "student" / "student-task.html"
     task_probe = _probe(task_page) if task_page.is_file() else None
     if task_probe:
+        assets_by_id = {str(asset.get("id")): asset for asset in content.get("starter_assets", []) if isinstance(asset, dict) and asset.get("id")}
+        starter_links = {str(item.get("data-starter-path")): item for item in task_probe.elements if item.get("_tag") == "a" and item.get("data-starter-path")}
+        starter_previews = {str(item.get("data-starter-preview-path")) for item in task_probe.elements if item.get("data-starter-preview-path")}
         for task in content.get("tasks", []):
             if not isinstance(task, dict):
                 continue
@@ -266,6 +294,28 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
             refs = set(str(item) for item in task.get("source_slide_ids", []))
             if refs - declared:
                 errors.append(f"student task pane lacks source slide references: {task.get('id')}")
+            for asset_id in task.get("starter_asset_ids", []):
+                asset = assets_by_id.get(str(asset_id))
+                if not asset:
+                    continue
+                asset_path = str(asset.get("path", "")).replace("\\", "/")
+                if asset_path not in starter_links:
+                    errors.append(f"task {task.get('id')} starter has no clickable href: {asset_path}")
+                target = output_dir / "student" / "starter" / asset_path
+                if not target.is_file():
+                    continue
+                if _asset_is_text(asset_path):
+                    if asset_path not in starter_previews:
+                        errors.append(f"text starter has no content preview marker: {asset_path}")
+                    else:
+                        escaped_content = html.escape(target.read_text(encoding="utf-8"), quote=True)
+                        if escaped_content and escaped_content not in task_page.read_text(encoding="utf-8"):
+                            errors.append(f"starter preview does not match file content: {asset_path}")
+                elif asset_path.casefold().endswith(".drawio"):
+                    if asset_path in starter_previews:
+                        errors.append(f"draw.io starter must not expose a raw preview: {asset_path}")
+                    if "mxGraphModel" in task_probe.visible_text or "mxCell" in task_probe.visible_text:
+                        errors.append(f"draw.io starter XML is visible in student page: {asset_path}")
 
     learning_page = output_dir / "student" / "learning-center.html"
     learning_probe = _probe(learning_page) if learning_page.is_file() else None
@@ -294,12 +344,12 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
                     errors.append(f"state simulator must expose generic state_fields and rounds: {center_id}")
 
     files = sorted(str(path.relative_to(output_dir)).replace("\\", "/") for path in output_dir.rglob("*") if path.is_file())
-    metrics = {"main_html_count": len(actual_html), "page_panes": page_metrics}
+    metrics = {"main_html_count": len(actual_html), "page_panes": page_metrics, "starter_links": len(starter_links) if task_probe else 0, "starter_previews": len(starter_previews) if task_probe else 0}
     return {"status": "pass" if not errors else "fail", "errors": errors, "warnings": warnings, "files": files, "metrics": metrics}
 
 
 def validate(practice_path: Path, output_dir: Path, courseware_path: Path | None = None) -> dict[str, Any]:
-    content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None; contract = validate_content(content, courseware); output = validate_output_files(content, output_dir); errors = [*contract["errors"], *output["errors"]]; warnings = [*contract["warnings"], *output["warnings"]]
+    content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None; contract = validate_content(content, courseware); output = validate_output_files(content, output_dir); completeness_errors: list[str] = []; _validate_reference_completeness(content, completeness_errors); errors = [*contract["errors"], *output["errors"], *completeness_errors]; warnings = [*contract["warnings"], *output["warnings"]]
     return {"status": "pass" if not errors else "fail", "errors": errors, "warnings": warnings, "contract": contract, "outputs": output}
 
 

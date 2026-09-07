@@ -1047,7 +1047,7 @@
   ],
   "teacher_guide": {
     "purpose": "把有序条件、区间不变量和边界验证串成一节 90 分钟的 C 实践；基础学生以核心任务的大部分完成为达标。",
-    "theory_bridge": "从 search-01 的有序前提进入 search-02/03 的状态规则，再由 search-04/05 落到函数补空、边界测试和 Debug；每个核心任务都能回指已讲理论页。",
+    "theory_bridge": "本次实践依次衔接理论课中的五个主题：二分查找使用条件、闭区间状态变化、C 函数实现、边界测试、Debug 与失败返回。学生先从前提和状态推演入手，再把规则落到函数补空、边界验证和故障修复。",
     "timing": [
       {
         "minutes": 8,
@@ -1216,7 +1216,7 @@
           "search-02",
           "search-05"
         ],
-        "reference_answer": "int mid = (left + right) / 2;\nleft = mid + 1;\nright = mid - 1;\nreturn -1;",
+        "reference_answer": "完整参考实现：\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n\n        if (values[mid] == target) {\n            return mid;\n        }\n\n        if (values[mid] < target) {\n            left = mid + 1;\n        } else {\n            right = mid - 1;\n        }\n    }\n\n    return -1;\n}\n\n学生4处 TODO 答案：\nTODO 1：left + (right - left) / 2；\nTODO 2：left = mid + 1；\nTODO 3：right = mid - 1；\nTODO 4：return -1。",
         "reference_result": "targets 21、3、58 返回对应下标，20 返回 -1。",
         "key_steps": [
           "完成四处实际编辑",
@@ -1267,7 +1267,7 @@
           "search-04",
           "search-05"
         ],
-        "reference_answer": "死循环优先检查 mid±1；错误下标检查闭区间和 n-1；失败误判检查返回值约定。",
+        "reference_answer": "三个 Debug starter 的逐文件参考：\n\nbug-loop.c\n错误：left = mid;\n修复：left = mid + 1;\n原因：mid 已经比较过；若仍保留 mid，区间可能无法缩小，导致重复比较甚至死循环。\n\nbug-boundary.c\n错误：right = mid;\n修复：right = mid - 1;\n原因：这是闭区间，mid 已经比较过，左侧搜索必须排除 mid。\n\nbug-return.c\n错误：未命中时 return 0;\n修复：return -1;\n原因：0 是合法数组下标，不能同时表示查找失败。\n\n回归验证：分别用命中、首元素、末元素和缺失目标运行三个文件，确认每次只修对应故障。",
         "reference_result": "每种故障都能通过一个最小输入复现并修复。",
         "key_steps": [
           "记录现象",

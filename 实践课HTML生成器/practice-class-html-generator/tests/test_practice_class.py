@@ -139,6 +139,39 @@ class PracticeClassPackageTests(unittest.TestCase):
             self.assertNotIn("search-01", re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", teacher, flags=re.S))
             self.assertTrue((output / "student" / "starter" / "binary-search.c").is_file())
 
+    def test_starters_and_teacher_references_are_directly_usable(self) -> None:
+        for name in ("data-structures.practice.json", "uml.practice.json", "database.practice.json"):
+            with self.subTest(fixture=name), tempfile.TemporaryDirectory(prefix="practice-class-r6-") as temp:
+                output = Path(temp) / "fixture"
+                practice = ROOT / "examples" / name
+                report = generate(practice, output, self.courseware_for(name))
+                self.assertEqual(report["status"], "pass", report)
+                student = (output / "student" / "student-task.html").read_text(encoding="utf-8")
+                teacher = (output / "teacher" / "teacher-reference.html").read_text(encoding="utf-8")
+                visible_student = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", student, flags=re.S)
+                visible_teacher = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", teacher, flags=re.S)
+                self.assertNotRegex(visible_teacher, r"source_slide_ids|task_id|slide_id|renderer_family|interaction_type")
+                for asset in self.fixture(name)["starter_assets"]:
+                    path = asset["path"].replace("\\", "/")
+                    self.assertIn(f'data-starter-path="{path}"', student)
+                    self.assertIn(f'href="starter/{path}"', student)
+                    if path.casefold().endswith(".drawio"):
+                        self.assertNotIn(f'data-starter-preview-path="{path}"', student)
+                        self.assertNotIn("mxGraphModel", visible_student)
+                    else:
+                        self.assertIn(f'data-starter-preview-path="{path}"', student)
+                if name == "data-structures.practice.json":
+                    self.assertIn("int binary_search", teacher)
+                    self.assertIn("TODO 1", teacher)
+                    self.assertIn("本次环境：C · Dev-C++ / Code::Blocks", visible_student)
+                elif name == "uml.practice.json":
+                    self.assertGreaterEqual(teacher.count('data-reference-visual='), 2)
+                    self.assertIn("本次工具：draw.io / StarUML", visible_student)
+                else:
+                    self.assertIn("SELECT c.customer_name", teacher)
+                    self.assertIn("客户 A | 2", teacher)
+                    self.assertIn("本次环境：MySQL 8.0 · MySQL Workbench · draw.io", visible_student)
+
     def test_database_setup_and_query_semantics_are_non_trivial(self) -> None:
         content = self.fixture("database.practice.json")
         setup = next(asset["content"] for asset in content["starter_assets"] if asset["path"].endswith("setup.sql"))
