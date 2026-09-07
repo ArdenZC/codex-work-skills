@@ -95,4 +95,4 @@ $env:PRACTICE_BROWSER_EXECUTABLE = "C:\Program Files\Google\Chrome\Application\c
 node tests/browser_smoke.mjs .\out\data-structures
 ```
 
-smoke 会从 `file://` 打开每套输出的四个学生模块和两个教师模块，在 1366×768、1440×900、1920×1080 检查无横向溢出和无外部请求，逐 pane 切换，并实际点击选择、步骤、分类、排序、状态模拟和多题互动；内部链接由 `validate_practice.py` 同时检查。Chrome/Edge 可通过 `PRACTICE_BROWSER_EXECUTABLE` 指定已有可执行文件。这里的自动化 PASS 只说明结构与交互可运行，不替代 Gold Sample 并排内容验收。
+smoke 会从 `file://` 打开每套输出的四个学生模块和两个教师模块，在 1366×768、1440×900、1920×1080 检查无横向溢出和无外部请求，逐 pane 切换，并实际点击选择、步骤、分类、排序、状态模拟、连续诊断、多参数比较和多题互动；教师参考页还会检查模型 SVG 的计算样式与可见尺寸，内部链接由 `validate_practice.py` 同时检查。Chrome/Edge 可通过 `PRACTICE_BROWSER_EXECUTABLE` 指定已有可执行文件。这里的自动化 PASS 只说明结构与交互可运行，不替代 Gold Sample 并排内容验收。

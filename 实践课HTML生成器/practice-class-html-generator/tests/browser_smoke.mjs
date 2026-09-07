@@ -24,7 +24,7 @@ function forbiddenValues(data) {
   for (const item of data.tasks || []) for (const ref of item.source_slide_ids || []) values.add(ref);
   for (const item of data.knowledge_links || []) for (const ref of item.source_slide_ids || []) values.add(ref);
   for (const value of [...Object.keys(data.source_courseware || {})]) if (value.includes("slide")) values.add(value);
-  for (const value of ["choice-family", "step-family", "classify-family", "reorder-family", "state-simulator-family", "multi-question-family", "state-simulator", "multi-question", "scenario-decision", "task_id", "slide_id", "source_slide_ids", "interaction_type", "renderer_family"]) values.add(value);
+  for (const value of ["choice-family", "step-family", "classify-family", "reorder-family", "state-simulator-family", "multi-question-family", "state-simulator", "multi-question", "scenario-decision", "task_id", "slide_id", "source_slide_ids", "interaction_type", "renderer_family", "pane", "renderer", "contract", "schema"]) values.add(value);
   return [...values].filter(Boolean);
 }
 
@@ -115,7 +115,15 @@ async function smokeState(box) {
   const rounds = JSON.parse(await box.getAttribute("data-rounds"));
   const fields = JSON.parse(await box.getAttribute("data-state-fields"));
   if (!fields.length || !rounds.length) throw new Error("generic state contract missing");
+  const visual = box.locator("[data-visual-items]");
+  let previousCandidate = "";
   for (let index = 0; index < rounds.length; index += 1) {
+    if (await visual.count()) {
+      const candidate = await visual.locator(".state-cell.is-candidate").evaluateAll((nodes) => nodes.map((node) => node.dataset.stateIndex).join(","));
+      if (!candidate) throw new Error("state visual has no candidate cells");
+      if (index > 0 && candidate === previousCandidate) throw new Error("state visual did not change with the next round");
+      previousCandidate = candidate;
+    }
     const expectedInputs = box.locator("[data-state-expected] input");
     for (let i = 0; i < await expectedInputs.count(); i += 1) if (await expectedInputs.nth(i).inputValue()) throw new Error("state expected field was auto-filled");
     const nextInputs = box.locator("[data-state-next] input");
@@ -124,6 +132,11 @@ async function smokeState(box) {
     for (const input of await nextInputs.all()) if (await input.isVisible()) await input.fill(JSON.parse(await input.getAttribute("data-expected-value"))?.toString?.() ?? "");
     await box.locator("[data-check]").click();
     if (!(await box.locator(".feedback").innerText()).trim()) throw new Error("state feedback missing");
+    if (await visual.count()) {
+      const note = await box.locator("[data-state-visual-note]").innerText();
+      if (rounds[index].observation && !note.includes(rounds[index].observation)) throw new Error("state visual did not reveal the checked observation");
+      if (await visual.locator(".state-cell.is-focus").count() !== 1) throw new Error("state visual did not highlight the checked focus");
+    }
     if (rounds[index].status === "continue") await box.locator("[data-next-round]").click();
     else {
       if (await box.locator("[data-next-round]").isVisible()) throw new Error("terminal state exposes next round");
@@ -133,6 +146,36 @@ async function smokeState(box) {
   }
   await box.locator("[data-reset]").click();
   if (!(await box.locator("[data-sim-status]").innerText()).includes("1")) throw new Error("state reset did not return to first round");
+}
+
+async function smokeDiagnostic(box) {
+  const cases = box.locator("[data-diagnostic-case]");
+  if (await cases.count() < 2) throw new Error("diagnostic interaction has fewer than two cases");
+  for (let index = 0; index < await cases.count(); index += 1) {
+    const current = box.locator("[data-diagnostic-case]:visible");
+    if (await current.count() !== 1 || await current.locator("[data-diagnostic-group]").count() !== 2) throw new Error("diagnostic case is not a two-part decision");
+    const errorAnswer = Number(await current.getAttribute("data-error-answer"));
+    const fixAnswer = Number(await current.getAttribute("data-fix-answer"));
+    await current.locator('[data-diagnostic-group="error"] [data-diagnostic-choice]').nth(errorAnswer).click();
+    await current.locator('[data-diagnostic-group="fix"] [data-diagnostic-choice]').nth(fixAnswer).click();
+    await box.locator("[data-diagnostic-check]").click();
+    if (!(await current.locator("[data-diagnostic-feedback]").innerText()).trim()) throw new Error("diagnostic feedback missing");
+    if (index + 1 < await cases.count()) await box.locator("[data-diagnostic-next]").click();
+  }
+  const status = await box.locator("[data-diagnostic-status]").innerText();
+  if (!status.includes(`${await cases.count()} / ${await cases.count()}`)) throw new Error("diagnostic completion status missing");
+  if (!(await box.locator("[data-diagnostic-completion]").isVisible())) throw new Error("diagnostic completion note missing");
+}
+
+async function smokeComparison(box) {
+  const parameters = box.locator("[data-compare-parameter]");
+  if (await parameters.count() < 3) throw new Error("comparison has fewer than three parameter choices");
+  const before = await box.locator("[data-comparison-explanation]").innerText();
+  await parameters.last().click();
+  const after = await box.locator("[data-comparison-explanation]").innerText();
+  if (!after.trim() || after === before) throw new Error("comparison parameter did not update explanation");
+  const widths = await box.locator("[data-comparison-bar]").evaluateAll((nodes) => nodes.map((node) => node.style.width));
+  if (!widths.some((value) => value && value !== "0%")) throw new Error("comparison bars did not render");
 }
 
 async function smokeMulti(box) {
@@ -151,16 +194,35 @@ async function smokeLearning(page, file, data, firstScreen) {
     const family = await interaction.getAttribute("data-renderer-family"); families.add(family);
     const box = interaction;
     const y = await box.boundingBox(); if (y) firstScreen.push(y.y);
-    if (family === "choice-family") await smokeChoice(box); else if (family === "step-family") await smokeStep(box); else if (family === "classify-family") await smokeClassify(box); else if (family === "reorder-family") await smokeReorder(box); else if (family === "state-simulator-family") await smokeState(box); else if (family === "multi-question-family") await smokeMulti(box); else throw new Error(`unknown renderer family ${family}`);
+    if (await box.getAttribute("data-diagnostic-root") !== null) await smokeDiagnostic(box); else if (family === "choice-family") await smokeChoice(box); else if (family === "step-family") await smokeStep(box); else if (family === "classify-family") await smokeClassify(box); else if (family === "reorder-family") await smokeReorder(box); else if (family === "state-simulator-family") await smokeState(box); else if (family === "multi-question-family") await smokeMulti(box); else throw new Error(`unknown renderer family ${family}`);
+    if (await box.getAttribute("data-compare-root") !== null) await smokeComparison(box);
   }
 }
 
 async function smokeTeacherReference(page, file, data) {
   const refs = data.teacher_reference?.task_references || [];
   await activateAndCheckPanes(page, file, refs.length);
-  for (const ref of refs) { await page.goto(pageUrl(file, `reference-${ref.task_id}`), { waitUntil: "load" }); if (!(await page.locator("[data-pane].is-active .reference-answer").innerText()).trim()) throw new Error(`reference answer missing for ${ref.task_id}`); }
+  let visualChecks = 0;
+  for (const ref of refs) {
+    await page.goto(pageUrl(file, `reference-${ref.task_id}`), { waitUntil: "load" });
+    const active = page.locator("[data-pane].is-active");
+    if (!(await active.locator(".reference-answer").innerText()).trim()) throw new Error(`reference answer missing for ${ref.task_id}`);
+    if (ref.model_visual) {
+      const svg = active.locator("[data-reference-visual] .uml-svg");
+      if (await svg.count() !== 1) throw new Error(`reference visual missing for ${ref.task_id}`);
+      const visual = await svg.evaluate((node) => {
+        const rect = node.querySelector(".uml-node"); const line = node.querySelector(".uml-line"); const title = node.querySelector(".uml-title"); const field = node.querySelector(".uml-field"); const label = node.querySelector(".uml-label");
+        const style = (item) => item ? getComputedStyle(item) : null; const rectStyle = style(rect); const lineStyle = style(line); const titleStyle = style(title); const fieldStyle = style(field); const labelStyle = style(label); const box = node.getBoundingClientRect();
+        return { width: box.width, height: box.height, rectFill: rectStyle?.fill, rectStroke: rectStyle?.stroke, lineStroke: lineStyle?.stroke, titleFill: titleStyle?.fill, fieldFill: fieldStyle?.fill, labelFill: labelStyle?.fill, nodes: node.querySelectorAll(".uml-node").length, texts: node.querySelectorAll("text").length };
+      });
+      for (const value of [visual.rectFill, visual.rectStroke, visual.lineStroke, visual.titleFill, visual.fieldFill, visual.labelFill]) if (!value || /^rgb\(0,\s*0,\s*0\)/i.test(value)) throw new Error(`reference visual has black or missing computed style for ${ref.task_id}: ${JSON.stringify(visual)}`);
+      if (visual.width <= 0 || visual.height <= 0 || visual.nodes < 1 || visual.texts < 2) throw new Error(`reference visual is not readable/rendered for ${ref.task_id}: ${JSON.stringify(visual)}`);
+      visualChecks += 1;
+    }
+  }
   const expectedVisuals = refs.filter((ref) => ref.model_visual).length;
   if (await page.locator("[data-reference-visual]").count() !== expectedVisuals) throw new Error(`reference model visual count mismatch in ${file}`);
+  if (visualChecks !== expectedVisuals) throw new Error(`reference visual smoke count mismatch in ${file}`);
 }
 
 async function smokeStarters(page, file, data) {

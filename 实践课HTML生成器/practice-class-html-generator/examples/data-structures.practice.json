@@ -492,13 +492,33 @@
           {"id": "right", "label": "右边界", "input_type": "number"},
           {"id": "mid", "label": "中点位置", "input_type": "number"}
         ],
-        "state": {
-          "context_label": "有序数据",
-          "context": "[3, 8, 14, 21, 29, 37, 45, 58]",
-          "target_label": "查找目标",
-          "target": 37
-        },
-        "rounds": [
+      "state": {
+        "context_label": "有序数据",
+        "context": "[3, 8, 14, 21, 29, 37, 45, 58]",
+        "target_label": "查找目标",
+        "target": 37
+      },
+      "state_visual": {
+        "items": [
+          {"label": "0", "value": 3},
+          {"label": "1", "value": 8},
+          {"label": "2", "value": 14},
+          {"label": "3", "value": 21},
+          {"label": "4", "value": 29},
+          {"label": "5", "value": 37},
+          {"label": "6", "value": 45},
+          {"label": "7", "value": 58}
+        ],
+        "start_field": "left",
+        "end_field": "right",
+        "focus_field": "mid",
+        "index_label": "下标",
+        "value_label": "值",
+        "candidate_label": "当前候选区间",
+        "focus_label": "已核对本轮中点",
+        "terminal_label": "已找到目标：下标 5"
+      },
+      "rounds": [
           {
             "given": {"left": 0, "right": 7},
             "expected": {"mid": 3},
@@ -628,25 +648,70 @@
         "ds-fill-core"
       ],
       "purpose": "把错误现象分类为中点越界、区间不收缩或失败返回错误，再定位对应行。",
-      "interaction": {
-        "type": "diagnose",
-        "estimated_minutes": 5,
-        "prompt": "看到“查找缺失目标时程序卡住”，最先检查哪一处？",
-        "options": [
-          {
-            "label": "比较后是否使用 mid±1 收缩区间",
-            "feedback": "正确：保留 mid 会让边界可能原地不动。"
-          },
-          {
-            "label": "数组是否必须改成浮点数",
-            "feedback": "数据类型不是这个死循环现象的第一原因。"
-          },
-          {
-            "label": "把所有 if 改成 switch",
-            "feedback": "控制结构替换不能解释边界没有移动。"
-          }
-        ],
-        "answer_index": 0
+    "interaction": {
+      "type": "diagnose",
+      "estimated_minutes": 5,
+      "prompt": "连续完成三个小案例：先指出错误现象对应的规则，再选择只改一处的修复动作；每题检查后才进入下一个文件。",
+      "completion_feedback": "3 / 3 Debug 诊断完成：现在打开三个 starter 文件，分别做最小修改并回归验证。",
+      "diagnostic_cases": [
+        {
+          "id": "bug-loop",
+          "title": "bug-loop.c · 缺失目标时卡住",
+          "context": "现象：查找 20 时某一轮的 left 与 mid 不再变化。",
+          "error_prompt": "先判断错误原因",
+          "error_options": [
+            {"label": "较大目标分支保留了 mid，区间没有严格变小", "feedback": "对：mid 已经比较过，继续保留它可能让边界原地不动。"},
+            {"label": "数组元素需要改成浮点数", "feedback": "数据类型不是这个循环边界不变化现象的原因。"},
+            {"label": "必须把 while 换成 for", "feedback": "换循环形式不能修复区间更新规则。"}
+          ],
+          "error_answer_index": 0,
+          "fix_prompt": "再选择最小修复",
+          "fix_options": [
+            {"label": "把 left = mid 改为 left = mid + 1", "feedback": "对：排除已经检查过的 mid，候选区间才会缩小。"},
+            {"label": "把 left = mid 改为 left = left + 1，无需比较目标", "feedback": "这会丢失二分的比较依据。"},
+            {"label": "删除缺失目标测试", "feedback": "删掉测试不能修复函数行为。"}
+          ],
+          "fix_answer_index": 0
+        },
+        {
+          "id": "bug-boundary",
+          "title": "bug-boundary.c · 左侧区间重复判断",
+          "context": "现象：目标小于当前中点时，某些输入会重复访问同一个中点。",
+          "error_prompt": "先判断错误原因",
+          "error_options": [
+            {"label": "闭区间的左侧分支没有排除已经比较过的 mid", "feedback": "对：目标更小时应在 mid 左侧继续搜索，并排除 mid。"},
+            {"label": "right 初值应该是 n 而不是 n-1", "feedback": "这会改变区间定义，不能解释 mid 重复。"},
+            {"label": "命中分支必须继续循环", "feedback": "命中后继续循环反而会破坏终止语义。"}
+          ],
+          "error_answer_index": 0,
+          "fix_prompt": "再选择最小修复",
+          "fix_options": [
+            {"label": "把 right = mid 改为 right = mid - 1", "feedback": "对：闭区间左侧搜索必须排除 mid。"},
+            {"label": "把 right = mid 改为 right = mid + 1", "feedback": "这会把搜索移向错误的一侧。"},
+            {"label": "把所有边界初始化为 1", "feedback": "初始化不能替代当前分支的排除规则。"}
+          ],
+          "fix_answer_index": 0
+        },
+        {
+          "id": "bug-return",
+          "title": "bug-return.c · 缺失结果被误报命中",
+          "context": "现象：查找不存在的目标时返回 0，调用方误以为找到了首元素。",
+          "error_prompt": "先判断错误原因",
+          "error_options": [
+            {"label": "失败返回值与合法下标 0 冲突", "feedback": "对：失败结果必须和所有合法下标区分开。"},
+            {"label": "数组排序会自动修复返回值", "feedback": "有序只支持比较方向，不会替函数定义失败标记。"},
+            {"label": "mid 不能使用整数除法", "feedback": "本案例的症状发生在未找到后的返回约定。"}
+          ],
+          "error_answer_index": 0,
+          "fix_prompt": "再选择最小修复",
+          "fix_options": [
+            {"label": "未找到时 return -1，并在调用处识别失败", "feedback": "对：负值与合法下标区分，调用方可以明确处理失败。"},
+            {"label": "未找到时仍 return 0，但打印提示", "feedback": "打印提示不能消除返回值歧义。"},
+            {"label": "命中时改成 return 1", "feedback": "这会破坏真实下标，且没有解决失败标记。"}
+          ],
+          "fix_answer_index": 0
+        }
+      ]
       }
     },
     {
@@ -661,11 +726,24 @@
         "ds-transfer-challenge"
       ],
       "purpose": "把“更快”放回真实场景，比较有序条件、更新成本和查询次数。",
-      "interaction": {
-        "type": "compare-strategies",
-        "estimated_minutes": 5,
-        "prompt": "一批数据几乎不再更新，但每天要查询很多次，哪种策略更合适？",
-        "options": [
+    "interaction": {
+      "type": "compare-strategies",
+      "estimated_minutes": 5,
+      "prompt": "一批数据几乎不再更新，但每天要查询很多次，哪种策略更合适？",
+      "comparison": {
+        "parameter_label": "选择数据量 n，观察一次查询的比较次数",
+        "chart_label": "线性扫描与二分查找的比较次数示意",
+        "parameters": [
+          {"id": "n-8", "label": "n = 8", "explanation": "n=8 时两种方法差距尚小；先确认是否值得为有序维护付出成本。"},
+          {"id": "n-32", "label": "n = 32", "explanation": "n=32 时二分把比较次数压到约 5 次，批量查询的收益开始明显。"},
+          {"id": "n-128", "label": "n = 128", "explanation": "n=128 时线性扫描可能要看 128 个位置，而二分约 7 次；维护成本可由高频查询摊薄。"}
+        ],
+        "series": [
+          {"id": "linear", "label": "线性扫描（最坏）", "counts": [8, 32, 128], "unit": "次"},
+          {"id": "binary", "label": "二分查找（约）", "counts": [3, 5, 7], "unit": "次"}
+        ]
+      },
+      "options": [
           {
             "label": "维护有序后使用二分查找",
             "feedback": "正确：前置维护成本可以由大量查询摊薄。"

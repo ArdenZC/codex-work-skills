@@ -100,6 +100,26 @@ class PracticeClassPackageTests(unittest.TestCase):
                     self.assertNotEqual([item["id"] for item in interaction["items"]], interaction["correct_order"])
                     self.assertEqual(set(item["id"] for item in interaction["items"]), set(interaction["correct_order"]))
 
+    def test_r7_state_debug_comparison_and_uml_multiplicity_are_explicit(self) -> None:
+        data = self.fixture("data-structures.practice.json")
+        centers = {item["id"]: item["interaction"] for item in data["learning_center"]}
+        visual = centers["ds-interval-lab"]["state_visual"]
+        self.assertEqual([item["value"] for item in visual["items"]], [3, 8, 14, 21, 29, 37, 45, 58])
+        self.assertEqual(visual["focus_field"], "mid")
+        self.assertEqual([case["id"] for case in centers["ds-debug-detective"]["diagnostic_cases"]], ["bug-loop", "bug-boundary", "bug-return"])
+        comparison = centers["ds-strategy-compare"]["comparison"]
+        self.assertEqual([item["label"] for item in comparison["parameters"]], ["n = 8", "n = 32", "n = 128"])
+        self.assertEqual(comparison["series"][1]["counts"], [3, 5, 7])
+
+        uml = self.fixture("uml.practice.json")
+        relation = next(task for task in uml["tasks"] if task["id"] == "uml-relation-core")
+        reference = next(item for item in uml["teacher_reference"]["task_references"] if item["task_id"] == "uml-relation-core")
+        self.assertIn("Reservation 端标 0..*", reference["reference_answer"])
+        self.assertIn("TimeSlot 端标 1", reference["reference_answer"])
+        role_reference = next(item for item in uml["teacher_reference"]["task_references"] if item["task_id"] == "uml-role-core")
+        labels = " ".join(item["label"] for item in role_reference["model_visual"]["relations"])
+        self.assertIn("Reservation 端 0..* —— TimeSlot 端 1", labels)
+
     def test_renderer_source_is_course_neutral(self) -> None:
         source = (SCRIPTS / "render_practice.py").read_text(encoding="utf-8")
         self.assertIsNone(re.search(r"\bBoundary\b|\bControl\b|\bActor\b|消息接收者|SQL JOIN|\bpivot\b", source, re.IGNORECASE))

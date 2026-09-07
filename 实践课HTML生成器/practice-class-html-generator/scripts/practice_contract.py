@@ -254,7 +254,26 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
     if estimated is not None and (not isinstance(estimated, int) or isinstance(estimated, bool) or estimated < 1):
         errors.append(f"{location}.estimated_minutes must be a positive integer when present")
 
-    if kind in OPTION_INTERACTIONS:
+    comparison = interaction.get("comparison")
+    if comparison is not None:
+        if not isinstance(comparison, dict):
+            errors.append(f"{location}.comparison must be an object when present")
+        else:
+            parameters = comparison.get("parameters")
+            series = comparison.get("series")
+            if not isinstance(parameters, list) or len(parameters) < 2 or any(not isinstance(item, dict) or not _non_empty(item.get("id")) or not _non_empty(item.get("label")) or not _non_empty(item.get("explanation")) for item in parameters):
+                errors.append(f"{location}.comparison.parameters must contain labelled explanations")
+            if not isinstance(series, list) or len(series) < 2:
+                errors.append(f"{location}.comparison.series must contain at least two series")
+            else:
+                expected_count = len(parameters) if isinstance(parameters, list) else 0
+                for index, item in enumerate(series):
+                    if not isinstance(item, dict) or not _non_empty(item.get("id")) or not _non_empty(item.get("label")) or not isinstance(item.get("counts"), list) or len(item["counts"]) != expected_count:
+                        errors.append(f"{location}.comparison.series[{index}] needs one numeric count per parameter")
+                    elif any(not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0 for value in item["counts"]):
+                        errors.append(f"{location}.comparison.series[{index}].counts must be non-negative numbers")
+
+    if kind in OPTION_INTERACTIONS and not (kind == "diagnose" and "diagnostic_cases" in interaction):
         _validate_options(interaction, location, errors)
     elif kind in {"stepper", "trace"}:
         steps = interaction.get("steps")
@@ -339,6 +358,45 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
                             errors.append(f"{round_location}.next_expected does not match the following round's given state")
             if isinstance(rounds[-1], dict) and rounds[-1].get("status") == "continue":
                 errors.append(f"{location}.rounds must end with a terminal status")
+        visual = interaction.get("state_visual")
+        if visual is not None:
+            if not isinstance(visual, dict):
+                errors.append(f"{location}.state_visual must be an object when present")
+            else:
+                items = visual.get("items")
+                if not isinstance(items, list) or not items:
+                    errors.append(f"{location}.state_visual.items must contain at least one item")
+                else:
+                    for index, item in enumerate(items):
+                        if not isinstance(item, dict) or not _non_empty(item.get("label")) or "value" not in item:
+                            errors.append(f"{location}.state_visual.items[{index}] needs label and value")
+                for field_name in ("start_field", "end_field", "focus_field"):
+                    if not _non_empty(visual.get(field_name)) or visual.get(field_name) not in field_ids:
+                        errors.append(f"{location}.state_visual.{field_name} must name a state field")
+    elif kind == "diagnose":
+        cases = interaction.get("diagnostic_cases")
+        if cases is not None:
+            if not isinstance(cases, list) or len(cases) < 2:
+                errors.append(f"{location}.diagnostic_cases must contain at least two cases")
+            else:
+                for index, case in enumerate(cases):
+                    case_location = f"{location}.diagnostic_cases[{index}]"
+                    if not isinstance(case, dict) or not _non_empty(case.get("id")) or not _non_empty(case.get("title")):
+                        errors.append(f"{case_location} needs id and title")
+                        continue
+                    for option_name in ("error_options", "fix_options"):
+                        options = case.get(option_name)
+                        if not isinstance(options, list) or len(options) < 2:
+                            errors.append(f"{case_location}.{option_name} must contain at least two options")
+                        else:
+                            _validate_options({"options": options, "answer_index": case.get("error_answer_index" if option_name == "error_options" else "fix_answer_index")}, f"{case_location}.{option_name}", errors)
+                    for answer_name in ("error_answer_index", "fix_answer_index"):
+                        if not isinstance(case.get(answer_name), int):
+                            errors.append(f"{case_location}.{answer_name} must be an integer")
+        else:
+            options = interaction.get("options")
+            if not isinstance(options, list) or len(options) < 2:
+                errors.append(f"{location}.options must contain at least two diagnostic options")
     elif kind == "multi-question":
         questions = interaction.get("questions")
         if not isinstance(questions, list) or len(questions) < 2:

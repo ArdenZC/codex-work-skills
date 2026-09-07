@@ -105,8 +105,11 @@
         "correct_order": {"$ref": "#/$defs/strings"},
         "state_fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateField"}},
         "state": {"$ref": "#/$defs/state"},
+        "state_visual": {"$ref": "#/$defs/stateVisual"},
         "rounds": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/round"}},
-        "questions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/question"}}
+        "questions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/question"}},
+        "diagnostic_cases": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/diagnosticCase"}},
+        "comparison": {"$ref": "#/$defs/comparison"}
       }
     },
     "interactionItem": {
@@ -128,6 +131,20 @@
         "target": {"type": ["string", "number", "boolean"]}
       }
     },
+    "stateVisualItem": {
+      "type": "object", "additionalProperties": false, "required": ["label", "value"],
+      "properties": {"label": {"$ref": "#/$defs/nonEmpty"}, "value": {"type": ["string", "number", "boolean"]}}
+    },
+    "stateVisual": {
+      "type": "object", "additionalProperties": false, "required": ["items", "start_field", "end_field", "focus_field"],
+      "properties": {
+        "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateVisualItem"}},
+        "start_field": {"$ref": "#/$defs/nonEmpty"}, "end_field": {"$ref": "#/$defs/nonEmpty"}, "focus_field": {"$ref": "#/$defs/nonEmpty"},
+        "index_label": {"$ref": "#/$defs/nonEmpty"}, "value_label": {"$ref": "#/$defs/nonEmpty"},
+        "candidate_label": {"$ref": "#/$defs/nonEmpty"}, "focus_label": {"$ref": "#/$defs/nonEmpty"},
+        "terminal_label": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
     "round": {
       "type": "object", "additionalProperties": false,
       "required": ["given", "expected", "status", "feedback"],
@@ -141,6 +158,28 @@
       "type": "object", "additionalProperties": false,
       "required": ["prompt", "options", "answer_index"],
       "properties": {"prompt": {"$ref": "#/$defs/nonEmpty"}, "options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}}, "answer_index": {"type": "integer", "minimum": 0}}
+    },
+    "diagnosticCase": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "title", "error_prompt", "error_options", "error_answer_index", "fix_prompt", "fix_options", "fix_answer_index"],
+      "properties": {
+        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
+        "context": {"$ref": "#/$defs/nonEmpty"}, "error_prompt": {"$ref": "#/$defs/nonEmpty"},
+        "error_options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}}, "error_answer_index": {"type": "integer", "minimum": 0},
+        "fix_prompt": {"$ref": "#/$defs/nonEmpty"}, "fix_options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}}, "fix_answer_index": {"type": "integer", "minimum": 0}
+      }
+    },
+    "comparisonParameter": {
+      "type": "object", "additionalProperties": false, "required": ["id", "label", "explanation"],
+      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "explanation": {"$ref": "#/$defs/nonEmpty"}}
+    },
+    "comparisonSeries": {
+      "type": "object", "additionalProperties": false, "required": ["id", "label", "counts"],
+      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "counts": {"type": "array", "minItems": 1, "items": {"type": "number"}}, "unit": {"$ref": "#/$defs/nonEmpty"}}
+    },
+    "comparison": {
+      "type": "object", "additionalProperties": false, "required": ["parameter_label", "parameters", "series"],
+      "properties": {"parameter_label": {"$ref": "#/$defs/nonEmpty"}, "parameters": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/comparisonParameter"}}, "series": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/comparisonSeries"}}, "chart_label": {"$ref": "#/$defs/nonEmpty"}}
     },
     "center": {
       "type": "object", "additionalProperties": false,

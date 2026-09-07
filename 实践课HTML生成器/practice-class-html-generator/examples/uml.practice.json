@@ -183,8 +183,8 @@
         "uml-04"
       ],
       "modality": "modeling",
-      "overview": "在可编辑 draw.io starter 中补齐预约、时段和学生之间的关系，使用场景数量约束解释每个多重性。",
-      "scaffold": "已有 Student、Reservation、TimeSlot 三个领域类和两个待补关系槽；交互/责任视图另有页面与服务分区，学生补关系，不需从空白画布开始。",
+      "overview": "在可编辑 draw.io starter 中补齐预约、时段和学生之间的关系；直接使用题面业务规则解释每个多重性，不再自行猜测容量规则。",
+      "scaffold": "已有 Student、Reservation、TimeSlot 三个领域类和两个待补关系槽；题面已给出：一次预约只选择一个时段，同一个时段可以被多个学生预约，具体容量控制属于后续业务规则。",
       "steps": [
         {
           "title": "读对象",
@@ -193,8 +193,8 @@
         },
         {
           "title": "补关系",
-          "instruction": "在 Reservation 与 TimeSlot 之间建立关联，并填方向/多重性。",
-          "check": "关系能回到预约规则。"
+          "instruction": "在 Reservation 与 TimeSlot 之间建立关联，并按端点语义标注 Reservation 端 0..*、TimeSlot 端 1。",
+          "check": "能说清一次预约只选一个时段，而一个时段可被 0..* 个预约使用。"
         },
         {
           "title": "口头验证",
@@ -205,7 +205,7 @@
       "acceptance": [
         "Student—Reservation 关系保留。",
         "Reservation—TimeSlot 关系可解释。",
-        "至少两条多重性有场景依据。"
+        "Reservation 端标 0..*、TimeSlot 端标 1，且能用题面业务规则解释端点。"
       ],
       "help_refs": [
         "uml-association",
@@ -1288,12 +1288,12 @@
             {
               "from": "student",
               "to": "reservation",
-              "label": "1 → 0..*"
+              "label": "Student 端 1 —— Reservation 端 0..*"
             },
             {
               "from": "reservation",
               "to": "timeslot",
-              "label": "1 → 0..*（按题设确认）"
+              "label": "Reservation 端 0..* —— TimeSlot 端 1"
             }
           ]
         },
@@ -1321,8 +1321,8 @@
           "uml-03",
           "uml-04"
         ],
-        "reference_answer": "保留 Student 1—Reservation 0..* 示例；补 Reservation—TimeSlot 关系，并以题设数量规则决定多重性。",
-        "reference_result": "关系线和标注可编辑，学生能解释至少两处数量约束。",
+      "reference_answer": "保留 Student 端 1—Reservation 端 0..*；补 Reservation—TimeSlot 关系，并遵循明确业务规则：一次预约只选择一个时段，同一个时段可以被多个学生预约，具体容量控制属于后续业务规则。因此 Reservation 端标 0..*，TimeSlot 端标 1。端点读法是：一个 Reservation 对应 1 个 TimeSlot；一个 TimeSlot 可对应 0..* 个 Reservation。",
+      "reference_result": "关系线和标注可编辑，学生能从题面规则读出 Reservation 端 0..* / TimeSlot 端 1，并解释两个端点各自代表什么。",
         "key_steps": [
           "对照场景",
           "补连接和标签",
@@ -1548,7 +1548,7 @@
       "path": "reservation-domain.drawio",
       "language": "UML 2.x / draw.io",
       "task_id": "uml-role-core",
-      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"reservation-domain\" name=\"Reservation domain view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"domain-title\" value=\"领域类图：稳定业务对象\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"25\" width=\"300\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student\" value=\"Student&#xa;---&#xa;studentId&#xa;name\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"90\" width=\"190\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"reservation\" value=\"Reservation&#xa;---&#xa;reservationId&#xa;status&#xa;date\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"350\" y=\"90\" width=\"210\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"timeslot\" value=\"TimeSlot&#xa;---&#xa;start&#xa;end&#xa;capacity\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"680\" y=\"90\" width=\"190\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student-reservation\" value=\"1        0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;\" edge=\"1\" parent=\"1\" source=\"student\" target=\"reservation\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-a\" value=\"待补关系 A：Reservation 与 TimeSlot 的业务关联/多重性\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"640\" y=\"290\" width=\"280\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-b\" value=\"待补多重性 B：一次预约是否只能对应一个时段？\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"310\" width=\"300\" height=\"70\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n  <diagram id=\"reservation-interaction\" name=\"Reservation interaction view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"2\"/><mxCell id=\"3\" parent=\"2\"/>\n        <mxCell id=\"interaction-title\" value=\"交互/责任视图：页面与服务编排\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"page\" value=\"ReservationPage&#xa;---&#xa;selectSlot()&#xa;showResult()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f7ece7;strokeColor=#a56a52;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"50\" y=\"100\" width=\"210\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"service\" value=\"ReservationService&#xa;---&#xa;requestReservation()&#xa;confirmReservation()&#xa;cancelReservation()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f2eafa;strokeColor=#7e67a3;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"340\" y=\"100\" width=\"260\" height=\"145\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-timeslot\" value=\"TimeSlot&#xa;---&#xa;checkAvailability()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"680\" y=\"100\" width=\"220\" height=\"100\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-reservation\" value=\"Reservation&#xa;---&#xa;create() / confirm()&#xa;status\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"360\" y=\"350\" width=\"220\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-1\" value=\"ReservationPage → ReservationService : requestReservation()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"520\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-2\" value=\"ReservationService → TimeSlot : checkAvailability()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"580\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-3\" value=\"TimeSlot → ReservationService : available / conflict\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#f8eade;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"640\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-4\" value=\"available → ReservationService → Reservation : create/confirm()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"520\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-5\" value=\"ReservationService → ReservationPage : result\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"580\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
+      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"reservation-domain\" name=\"Reservation domain view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"domain-title\" value=\"领域类图：稳定业务对象\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"25\" width=\"300\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student\" value=\"Student&#xa;---&#xa;studentId&#xa;name\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"90\" width=\"190\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"reservation\" value=\"Reservation&#xa;---&#xa;reservationId&#xa;status&#xa;date\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"350\" y=\"90\" width=\"210\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"timeslot\" value=\"TimeSlot&#xa;---&#xa;start&#xa;end&#xa;capacity\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"680\" y=\"90\" width=\"190\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student-reservation\" value=\"1        0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;\" edge=\"1\" parent=\"1\" source=\"student\" target=\"reservation\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-a\" value=\"待补关系 A：Reservation 与 TimeSlot 的业务关联/多重性\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"640\" y=\"290\" width=\"280\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-b\" value=\"待补多重性 B：按规则补 Reservation 端 0..* / TimeSlot 端 1\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"310\" width=\"300\" height=\"70\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n  <diagram id=\"reservation-interaction\" name=\"Reservation interaction view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"2\"/><mxCell id=\"3\" parent=\"2\"/>\n        <mxCell id=\"interaction-title\" value=\"交互/责任视图：页面与服务编排\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"page\" value=\"ReservationPage&#xa;---&#xa;selectSlot()&#xa;showResult()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f7ece7;strokeColor=#a56a52;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"50\" y=\"100\" width=\"210\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"service\" value=\"ReservationService&#xa;---&#xa;requestReservation()&#xa;confirmReservation()&#xa;cancelReservation()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f2eafa;strokeColor=#7e67a3;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"340\" y=\"100\" width=\"260\" height=\"145\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-timeslot\" value=\"TimeSlot&#xa;---&#xa;checkAvailability()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"680\" y=\"100\" width=\"220\" height=\"100\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-reservation\" value=\"Reservation&#xa;---&#xa;create() / confirm()&#xa;status\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"360\" y=\"350\" width=\"220\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-1\" value=\"ReservationPage → ReservationService : requestReservation()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"520\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-2\" value=\"ReservationService → TimeSlot : checkAvailability()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"580\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-3\" value=\"TimeSlot → ReservationService : available / conflict\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#f8eade;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"640\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-4\" value=\"available → ReservationService → Reservation : create/confirm()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"520\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-5\" value=\"ReservationService → ReservationPage : result\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"580\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
       "editable_gaps": [
         {
           "marker": "待补关系 A",
@@ -1559,7 +1559,7 @@
         {
           "marker": "待补多重性 B",
           "replacement": "待补多重性 B",
-          "instruction": "根据场景确认一次预约与时段的数量约束。",
+          "instruction": "根据题面已给规则，在 Reservation 端标注 0..*，在 TimeSlot 端标注 1；不要把端点语义读反。",
           "kind": "multiplicity-slot"
         }
       ]
