@@ -1,9 +1,9 @@
 skill:
   id: courseware-html-generator
   name: HTML 课件生成器
-  version: 1.0.0
+  version: 1.1.0
   phase: stable
-  content_contract: "1.0"
+  content_contract: "1.1"
 generator:
   entrypoint: scripts/render_courseware.py
   validator: scripts/validate_courseware.py

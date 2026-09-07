@@ -11,9 +11,12 @@ SKILL_NAME = "practice-class-html-generator"
 REQUIRED = (
     "简介.md", "AGENTS.md", "通用提示词.md", "SKILL.md", "CLAUDE.md", "GEMINI.md",
     "CONVENTIONS.md", "requirements.txt", "README.md", "manifest.yaml", "agents/openai.yaml",
-    "docs/content-contract-v1.md", "schemas/practice-class-content.schema.json",
+    "docs/content-contract-v1.1.md", "docs/content-contract-v1.md",
+    "references/content-quality-gold-benchmark.md", "schemas/practice-class-content.schema.json",
     "scripts/practice_contract.py", "scripts/render_practice.py", "scripts/validate_practice.py",
-    "scripts/install.py", "scripts/install_adapters.py", "tests/test_practice_class.py", "tests/browser_smoke.mjs",
+    "scripts/practice_pedagogical_review.py", "scripts/apply_reference_gaps.py", "scripts/holdout_audit.py",
+    "holdouts/build_holdouts.py", "scripts/install.py", "scripts/install_adapters.py",
+    "tests/test_practice_class.py", "tests/test_generalization.py", "tests/browser_smoke.mjs",
 )
 
 

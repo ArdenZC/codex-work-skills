@@ -50,7 +50,7 @@ ADAPTER_PATHS = {
 ADAPTER_PAYLOAD = """HTML 课件生成器规则：
 
 - 先阅读 `.courseware-html-generator/简介.md`、`通用提示词.md` 和 `SKILL.md`（若目标项目只安装规则，则读取源 Skill 的对应文件）。
-- Agent 负责理解教材、PPT、讲义或教案，创作 Courseware Content Contract 1.0；Python renderer 负责确定性 HTML/CSS/JS、离线输出和 QA。
+- Agent 负责理解教材、PPT、讲义或教案，创作 Courseware Content Contract 1.1；Python renderer 负责确定性 HTML/CSS/JS、离线输出和 QA。旧 1.0 仅通过迁移兼容。
 - 同时生成学生展示版和教师逐页备课版。学生页不得出现教师备注、来源措辞、制作信息或任何分钟/控时信息；教师逐字稿必须是自然中文连续讲解。
 - 学生页必须支持任意非交互区域点击下一页、稳定 wheel 上下翻页、键盘备用和投影增强；交互按钮不得误翻页。
 - 输出必须是无服务器、无 CDN、无外部字体/图片的单文件 HTML；交付前运行合同/输出 QA，并在真实浏览器中验证 click、wheel、file:// 和交互控件。

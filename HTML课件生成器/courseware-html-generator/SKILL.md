@@ -9,16 +9,16 @@ metadata:
 
 ## 目标与边界
 
-使用本 Skill 时，Agent 负责读取用户资料、理解课程主题、规划页面和创作完整的 `Courseware Content Contract 1.0` JSON。内置 Python 脚本负责确定性校验、布局、CSS/JavaScript、单文件输出和 QA；不要让模型直接拼接最终 HTML，也不要在输入中提交任意 JavaScript。
+使用本 Skill 时，Agent 负责读取用户资料、理解课程主题、规划页面和创作完整的 `Courseware Content Contract 1.1` JSON。内置 Python 脚本负责确定性校验、布局、CSS/JavaScript、单文件输出和 QA；不要让模型直接拼接最终 HTML，也不要在输入中提交任意 JavaScript。旧 1.0 输入只作为一次性迁移入口。
 
-本 Skill 仍独立于教案 DOCX 和旧实践任务工单 Skill：不要解析或修改它们的输出，也不依赖 `practice-class-html-generator`。新的实践课 Skill 可以直接消费本 Skill 产出的 Courseware Content Contract 1.0；因此必须保持 `slide.id` 稳定，并且 Courseware 不反向依赖实践课 Skill，也不绑定到某个课程主题。
+本 Skill 仍独立于教案 DOCX 和旧实践任务工单 Skill：不要解析或修改它们的输出，也不依赖 `practice-class-html-generator`。新的实践课 Skill 可以直接消费本 Skill 产出的 Courseware Content Contract 1.1；因此必须保持 `slide.id`、`learning_units` 和 `canonical_facts` 稳定，并且 Courseware 不反向依赖实践课 Skill，也不绑定到某个课程主题。
 
 ## 使用流程
 
 1. 阅读当前会话、附件和本 Skill 的 `通用提示词.md`。从资料提取课程事实；未知事实不得伪造。
 2. 先规划整章的页面顺序，再逐页创作学生内容和可以直接在讲台上朗读的 `speaker_script`。每页保留一个稳定的 `id`。
-3. 将内容写成 `schemas/courseware-content.schema.json` 描述的 JSON。至少提供课程标题、章节标题、授课对象、内部内容储备字段、主题和 `slides`；若课程有明确语言、工具、平台、软件、方言或框架，写入 `course_context`，供下游实践课准确继承。
-4. 每页提供标题、布局、blocks、逐字稿和建议分钟数。block 只能使用合同声明的 paragraph、bullets、cards、table、code、formula、svg、quiz、stepper、comparison、summary 类型。
+3. 将内容写成 `schemas/courseware-content.schema.json` 描述的 1.1 JSON。至少提供课程标题、章节标题、授课对象、四个显式时长字段、主题、`learning_units`、`canonical_facts` 和 `slides`；若课程有明确语言、工具、平台、软件、方言或框架，写入 `course_context`，供下游实践课准确继承。
+4. 每页提供稳定 `id`、标题、布局、`lecture_minutes`、`activity_minutes`、`suggested_minutes`、`teaching_intent`、`learning_unit_ids`、blocks 和逐字稿。block 只能使用合同声明的 paragraph、bullets、cards、table、code、formula、svg、image、quiz、stepper、comparison、summary 类型。
 5. 用 `scripts/render_courseware.py` 生成 `student.html`、`teacher.html` 和 QA 报告；生成器会先在 candidate 目录中完成合同、内容、离线和输出 QA，再原子替换正式目录。
 6. 运行 `scripts/validate_courseware.py` 或包内测试。交付前必须真实打开生成的 HTML，验证任意非交互区域点击翻页、滚轮上下翻页和交互按钮不误翻页。
 
@@ -26,10 +26,10 @@ metadata:
 
 - 默认面向高职/大专学生；保持课程需要的理论深度，不自动写成考研教材。
 - 学生页要像成熟课堂 PPT：明亮冷白/浅灰蓝底色、深色正文、高信息密度、完整细边框卡片、双栏/表格/对比/图示合理组合。禁止深色背景和 `border-left: 4px solid ...` 粗色强调条。
-- 学生页不得出现制作信息、教师备注、来源式措辞或内部控时信息，包括“120分钟”“备课版”“学生版”“教师版”“最大可用”“本页建议”“教师提示”“原PPT”“上传资料”“高职学生”等；`content_reserve_minutes` 和 `suggested_minutes` 只用于内部 QA 和教师版。
+- 学生页不得出现制作信息、教师备注、来源式措辞或内部控时信息，包括“120分钟”“备课版”“学生版”“教师版”“最大可用”“本页建议”“教师提示”“原PPT”“上传资料”“高职学生”等；根级/页级时长、讲稿和教学意图只用于内部 QA 和教师版。
 - SVG 必须是自包含教学图，承担树、图、UML、流程、架构、状态、数据变化或对比等教学信息；不得依赖外部字体、图片、网络资源或跨 SVG 的 id。renderer 会给合法 id 加稳定命名空间。
 - 教师版必须与学生版逐页对应。逐字稿是连续自然中文口语，必须包含进入本页、讲解、例子、对图/代码/表格的说明、自然提问、可能回答后的接话、易错点和到下一页的过渡；不能用“讲一下定义”“追问学生”“控时7分钟”这类提纲代替正文。
-- `suggested_minutes` 只是教师版页首和逐字稿长度 QA 的内部字段，绝不渲染到学生页。逐字稿需要达到页时长的合理最低容量，不能用底部提示框凑时长。
+- `lecture_minutes` 与 `activity_minutes` 分别表示讲解和课堂活动；`suggested_minutes` 必须等于二者之和，只用于教师版和 QA，绝不渲染到学生页。逐字稿需要达到页时长的合理最低容量，不能用底部提示框凑时长。
 - 练习支持判断、单选、看图回答、小计算和代码预测；答案默认隐藏，按钮必须阻止全局翻页。stepper/过程动画要可重置、能上一步/下一步、停在最终状态，静态显示时也能理解。
 
 ## 运行时要求

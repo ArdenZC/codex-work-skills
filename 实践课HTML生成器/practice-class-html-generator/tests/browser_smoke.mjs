@@ -19,7 +19,7 @@ function contract(dir) { return JSON.parse(fs.readFileSync(path.join(dir, "pract
 function pageUrl(file, hash = "") { return `${pathToFileURL(file).href}${hash ? `#${encodeURIComponent(hash)}` : ""}`; }
 
 function forbiddenValues(data) {
-  const values = new Set(["Contract 1.0", "Practice Class"]);
+  const values = new Set(["Contract 1.0", "Contract 1.1", "Practice Class"]);
   for (const group of ["tasks", "learning_center", "study_guide", "foundation_kit"]) for (const item of data[group] || []) if (item?.id) values.add(item.id);
   for (const item of data.tasks || []) for (const ref of item.source_slide_ids || []) values.add(ref);
   for (const item of data.knowledge_links || []) for (const ref of item.source_slide_ids || []) values.add(ref);
@@ -116,9 +116,11 @@ async function smokeState(box) {
   const fields = JSON.parse(await box.getAttribute("data-state-fields"));
   if (!fields.length || !rounds.length) throw new Error("generic state contract missing");
   const visual = box.locator("[data-visual-items]");
+  const visualAttribute = await box.getAttribute("data-state-visual");
+  const visualConfig = visualAttribute ? JSON.parse(visualAttribute) : null;
   let previousCandidate = "";
   for (let index = 0; index < rounds.length; index += 1) {
-    if (await visual.count()) {
+    if (await visual.count() && visualConfig?.kind === "sequence-range") {
       const candidate = await visual.locator(".state-cell.is-candidate").evaluateAll((nodes) => nodes.map((node) => node.dataset.stateIndex).join(","));
       if (!candidate) throw new Error("state visual has no candidate cells");
       if (index > 0 && candidate === previousCandidate) throw new Error("state visual did not change with the next round");
@@ -132,10 +134,12 @@ async function smokeState(box) {
     for (const input of await nextInputs.all()) if (await input.isVisible()) await input.fill(JSON.parse(await input.getAttribute("data-expected-value"))?.toString?.() ?? "");
     await box.locator("[data-check]").click();
     if (!(await box.locator(".feedback").innerText()).trim()) throw new Error("state feedback missing");
-    if (await visual.count()) {
+    if (await visual.count() && visualConfig?.kind === "sequence-range") {
       const note = await box.locator("[data-state-visual-note]").innerText();
       if (rounds[index].observation && !note.includes(rounds[index].observation)) throw new Error("state visual did not reveal the checked observation");
       if (await visual.locator(".state-cell.is-focus").count() !== 1) throw new Error("state visual did not highlight the checked focus");
+    } else if (await visual.count() && await visual.locator(".state-cell").count() < 1) {
+      throw new Error("generic state visual rendered no state items");
     }
     if (rounds[index].status === "continue") await box.locator("[data-next-round]").click();
     else {
@@ -207,20 +211,25 @@ async function smokeTeacherReference(page, file, data) {
     await page.goto(pageUrl(file, `reference-${ref.task_id}`), { waitUntil: "load" });
     const active = page.locator("[data-pane].is-active");
     if (!(await active.locator(".reference-answer").innerText()).trim()) throw new Error(`reference answer missing for ${ref.task_id}`);
-    if (ref.model_visual) {
-      const svg = active.locator("[data-reference-visual] .uml-svg");
-      if (await svg.count() !== 1) throw new Error(`reference visual missing for ${ref.task_id}`);
-      const visual = await svg.evaluate((node) => {
-        const rect = node.querySelector(".uml-node"); const line = node.querySelector(".uml-line"); const title = node.querySelector(".uml-title"); const field = node.querySelector(".uml-field"); const label = node.querySelector(".uml-label");
-        const style = (item) => item ? getComputedStyle(item) : null; const rectStyle = style(rect); const lineStyle = style(line); const titleStyle = style(title); const fieldStyle = style(field); const labelStyle = style(label); const box = node.getBoundingClientRect();
-        return { width: box.width, height: box.height, rectFill: rectStyle?.fill, rectStroke: rectStyle?.stroke, lineStroke: lineStyle?.stroke, titleFill: titleStyle?.fill, fieldFill: fieldStyle?.fill, labelFill: labelStyle?.fill, nodes: node.querySelectorAll(".uml-node").length, texts: node.querySelectorAll("text").length };
-      });
-      for (const value of [visual.rectFill, visual.rectStroke, visual.lineStroke, visual.titleFill, visual.fieldFill, visual.labelFill]) if (!value || /^rgb\(0,\s*0,\s*0\)/i.test(value)) throw new Error(`reference visual has black or missing computed style for ${ref.task_id}: ${JSON.stringify(visual)}`);
-      if (visual.width <= 0 || visual.height <= 0 || visual.nodes < 1 || visual.texts < 2) throw new Error(`reference visual is not readable/rendered for ${ref.task_id}: ${JSON.stringify(visual)}`);
+    if (ref.reference_visual || ref.model_visual) {
+      const visualData = ref.reference_visual || ref.model_visual;
+      if (["uml-class", "uml-sequence"].includes(visualData.kind)) {
+        const svg = active.locator("[data-reference-visual] .uml-svg");
+        if (await svg.count() !== 1) throw new Error(`reference visual missing for ${ref.task_id}`);
+        const visual = await svg.evaluate((node) => {
+          const rect = node.querySelector(".uml-node"); const line = node.querySelector(".uml-line"); const title = node.querySelector(".uml-title"); const field = node.querySelector(".uml-field"); const label = node.querySelector(".uml-label");
+          const style = (item) => item ? getComputedStyle(item) : null; const rectStyle = style(rect); const lineStyle = style(line); const titleStyle = style(title); const fieldStyle = style(field); const labelStyle = style(label); const box = node.getBoundingClientRect();
+          return { width: box.width, height: box.height, rectFill: rectStyle?.fill, rectStroke: rectStyle?.stroke, lineStroke: lineStyle?.stroke, titleFill: titleStyle?.fill, fieldFill: fieldStyle?.fill, labelFill: labelStyle?.fill, nodes: node.querySelectorAll(".uml-node").length, texts: node.querySelectorAll("text").length };
+        });
+        for (const value of [visual.rectFill, visual.rectStroke, visual.lineStroke, visual.titleFill, visual.fieldFill, visual.labelFill]) if (!value || /^rgb\(0,\s*0,\s*0\)/i.test(value)) throw new Error(`reference visual has black or missing computed style for ${ref.task_id}: ${JSON.stringify(visual)}`);
+        if (visual.width <= 0 || visual.height <= 0 || visual.nodes < 1 || visual.texts < 2) throw new Error(`reference visual is not readable/rendered for ${ref.task_id}: ${JSON.stringify(visual)}`);
+      } else if (await active.locator("[data-reference-visual] table, [data-reference-visual] .reference-fallback-table").count() !== 1) {
+        throw new Error(`generic reference visual missing for ${ref.task_id}`);
+      }
       visualChecks += 1;
     }
   }
-  const expectedVisuals = refs.filter((ref) => ref.model_visual).length;
+  const expectedVisuals = refs.filter((ref) => ref.reference_visual || ref.model_visual).length;
   if (await page.locator("[data-reference-visual]").count() !== expectedVisuals) throw new Error(`reference model visual count mismatch in ${file}`);
   if (visualChecks !== expectedVisuals) throw new Error(`reference visual smoke count mismatch in ${file}`);
 }

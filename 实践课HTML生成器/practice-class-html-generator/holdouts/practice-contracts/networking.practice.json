@@ -1,0 +1,1729 @@
+{
+  "contract_version": "1.1",
+  "course_title": "计算机网络基础",
+  "practice_title": "实践：用抓包证据定位网络问题",
+  "audience": "高职网络技术专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "计算机网络基础",
+    "audience": "高职网络技术专业学生",
+    "language": "IPv4",
+    "tools": [
+      "Wireshark",
+      "Cisco Packet Tracer"
+    ],
+    "platform": "Windows",
+    "software": "Wireshark 4",
+    "other_constraints": [
+      "先观察抓包证据，再改网络配置"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.1",
+    "chapter_title": "IPv4 路径观察与故障诊断",
+    "taught_slide_ids": [
+      "networking-s1",
+      "networking-s2",
+      "networking-s3",
+      "networking-s4",
+      "networking-s5"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "networking-k1",
+      "title": "地址与子网",
+      "summary": "IPv4 地址、掩码和网络边界共同决定主机是否同网段",
+      "source_slide_ids": [
+        "networking-s1"
+      ],
+      "student_can_do": "能根据地址和掩码判断网络边界",
+      "learning_unit_ids": [
+        "networking-u1"
+      ],
+      "canonical_fact_ids": [
+        "networking-f1"
+      ]
+    },
+    {
+      "id": "networking-k2",
+      "title": "链路与 ARP",
+      "summary": "同网段发送前需要通过 ARP 找到下一跳的链路地址",
+      "source_slide_ids": [
+        "networking-s2"
+      ],
+      "student_can_do": "能从抓包顺序解释 ARP 请求与应答",
+      "learning_unit_ids": [
+        "networking-u2"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2"
+      ]
+    },
+    {
+      "id": "networking-k3",
+      "title": "路由与 TTL",
+      "summary": "路由器按下一跳转发并让 TTL 逐跳减少",
+      "source_slide_ids": [
+        "networking-s3"
+      ],
+      "student_can_do": "能沿路径写出每跳的观察结果",
+      "learning_unit_ids": [
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f3"
+      ]
+    },
+    {
+      "id": "networking-k4",
+      "title": "故障定位",
+      "summary": "网络诊断要区分地址、链路、路由和服务层症状",
+      "source_slide_ids": [
+        "networking-s4"
+      ],
+      "student_can_do": "能根据现象选择最小检查",
+      "learning_unit_ids": [
+        "networking-u4"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4"
+      ]
+    },
+    {
+      "id": "networking-k5",
+      "title": "证据闭环",
+      "summary": "一次诊断需要把现象、抓包证据和修复后的回归结果连起来",
+      "source_slide_ids": [
+        "networking-s5"
+      ],
+      "student_can_do": "能写出一条可复核诊断记录",
+      "learning_unit_ids": [
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f5"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "networking-address",
+      "level": "core",
+      "title": "判断两个主机是否同网段",
+      "knowledge_link_ids": [
+        "networking-k1"
+      ],
+      "source_slide_ids": [
+        "networking-s1"
+      ],
+      "learning_unit_ids": [
+        "networking-u1"
+      ],
+      "canonical_fact_ids": [
+        "networking-f1"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "result",
+      "capabilities": [
+        "state_tracking",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "用地址和掩码卡判断两台主机的网络边界。",
+      "scaffold": "提供四组地址/掩码和网络号槽位。",
+      "steps": [
+        {
+          "title": "抄地址",
+          "instruction": "把地址与掩码分列。",
+          "check": "不混用主机号。"
+        },
+        {
+          "title": "算边界",
+          "instruction": "写出网络号并比较。",
+          "check": "每组结论有依据。"
+        },
+        {
+          "title": "说例外",
+          "instruction": "找一组最容易看错的边界。",
+          "check": "能说明掩码作用。"
+        }
+      ],
+      "acceptance": [
+        "完成四组同网段判断",
+        "解释掩码改变边界的方式"
+      ],
+      "help_refs": [
+        "networking-g1",
+        "networking-kit1"
+      ],
+      "estimated_minutes": 8,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-arp",
+      "level": "core",
+      "title": "按抓包顺序解释 ARP",
+      "knowledge_link_ids": [
+        "networking-k2"
+      ],
+      "source_slide_ids": [
+        "networking-s2"
+      ],
+      "learning_unit_ids": [
+        "networking-u2"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2"
+      ],
+      "task_kind": "observation",
+      "artifact_kind": "result",
+      "capabilities": [
+        "state_tracking",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "从一个抓包片段中排列 ARP 请求、应答和后续数据。",
+      "scaffold": "给出四条带方向和地址的帧记录。",
+      "steps": [
+        {
+          "title": "认广播",
+          "instruction": "找出询问目标链路地址的帧。",
+          "check": "能解释广播范围。"
+        },
+        {
+          "title": "找应答",
+          "instruction": "配对请求和应答。",
+          "check": "请求方与应答方对应。"
+        },
+        {
+          "title": "接数据",
+          "instruction": "说明为什么后续才能发送数据。",
+          "check": "链路证据完整。"
+        }
+      ],
+      "acceptance": [
+        "正确解释 ARP 顺序",
+        "指出一次缓存命中或未命中"
+      ],
+      "help_refs": [
+        "networking-g2",
+        "networking-kit2"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-ttl",
+      "level": "core",
+      "title": "追踪 TTL 的逐跳变化",
+      "knowledge_link_ids": [
+        "networking-k3"
+      ],
+      "source_slide_ids": [
+        "networking-s3"
+      ],
+      "learning_unit_ids": [
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f3"
+      ],
+      "task_kind": "experiment",
+      "artifact_kind": "result",
+      "capabilities": [
+        "state_tracking",
+        "visualization",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "沿三跳路径填写每跳 TTL 与下一跳。",
+      "scaffold": "提供初始 TTL、路径节点和状态表。",
+      "steps": [
+        {
+          "title": "填首跳",
+          "instruction": "记录客户端发出的 TTL。",
+          "check": "初值明确。"
+        },
+        {
+          "title": "逐跳减",
+          "instruction": "按路由器顺序填写变化。",
+          "check": "每一跳只减少一次。"
+        },
+        {
+          "title": "核对终点",
+          "instruction": "比较服务端收到的值和路径。",
+          "check": "能排除一跳遗漏。"
+        }
+      ],
+      "acceptance": [
+        "完成三跳状态表",
+        "解释 TTL 对路径定位的帮助"
+      ],
+      "help_refs": [
+        "networking-g3",
+        "networking-kit3"
+      ],
+      "estimated_minutes": 14,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-layer-debug",
+      "level": "core",
+      "title": "按分层证据定位故障",
+      "knowledge_link_ids": [
+        "networking-k4"
+      ],
+      "source_slide_ids": [
+        "networking-s4"
+      ],
+      "learning_unit_ids": [
+        "networking-u4"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4"
+      ],
+      "task_kind": "debugging",
+      "artifact_kind": "result",
+      "capabilities": [
+        "diagnosis",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "根据网关、端口和服务现象选择最小检查。",
+      "scaffold": "提供三种现象和四层检查卡。",
+      "steps": [
+        {
+          "title": "分层",
+          "instruction": "把现象放到地址、链路、路由或服务层。",
+          "check": "一层一结论。"
+        },
+        {
+          "title": "选检查",
+          "instruction": "选择能排除最大范围的最小命令/观察。",
+          "check": "检查与现象匹配。"
+        },
+        {
+          "title": "写原因",
+          "instruction": "将结果连接到一条理论事实。",
+          "check": "原因不是猜测。"
+        }
+      ],
+      "acceptance": [
+        "三种现象均有分层判断",
+        "每种判断有一个最小检查"
+      ],
+      "help_refs": [
+        "networking-g4",
+        "networking-kit4"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-evidence",
+      "level": "core",
+      "title": "形成网络诊断证据链",
+      "knowledge_link_ids": [
+        "networking-k5"
+      ],
+      "source_slide_ids": [
+        "networking-s5"
+      ],
+      "learning_unit_ids": [
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f5"
+      ],
+      "task_kind": "tooling",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "把抓包、配置和回归结果整理成一条诊断记录。",
+      "scaffold": "提供现象—证据—动作—回归四列表格。",
+      "steps": [
+        {
+          "title": "记现象",
+          "instruction": "写出用户可感知的失败。",
+          "check": "现象可复现。"
+        },
+        {
+          "title": "挂证据",
+          "instruction": "贴一条抓包或路径观察。",
+          "check": "证据能定位层次。"
+        },
+        {
+          "title": "做回归",
+          "instruction": "修复后重复同一观察。",
+          "check": "前后结果可比较。"
+        }
+      ],
+      "acceptance": [
+        "四列记录完整",
+        "回归观察与原证据对应"
+      ],
+      "help_refs": [
+        "networking-g5",
+        "networking-kit5"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-filters",
+      "level": "optional",
+      "title": "设计 Wireshark 过滤器练习",
+      "knowledge_link_ids": [
+        "networking-k2",
+        "networking-k3"
+      ],
+      "source_slide_ids": [
+        "networking-s2",
+        "networking-s3"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f3"
+      ],
+      "task_kind": "tooling",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "comparison"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为 ARP、ICMP 和 TCP 三种观察目的选择过滤条件。",
+      "scaffold": "提供三种问题和候选过滤卡。",
+      "steps": [
+        {
+          "title": "对问题",
+          "instruction": "把问题和协议字段配对。",
+          "check": "每个问题有一个筛选方向。"
+        },
+        {
+          "title": "试过滤",
+          "instruction": "在样例包中观察剩余帧。",
+          "check": "过滤后仍保留目标证据。"
+        },
+        {
+          "title": "写解释",
+          "instruction": "说明为何其他过滤会漏掉证据。",
+          "check": "解释可复核。"
+        }
+      ],
+      "acceptance": [
+        "三个问题都有过滤方案",
+        "能解释一个漏证据的方案"
+      ],
+      "help_refs": [
+        "networking-g2",
+        "networking-kit2"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-latency",
+      "level": "optional",
+      "title": "比较延迟与丢包现象",
+      "knowledge_link_ids": [
+        "networking-k3",
+        "networking-k4"
+      ],
+      "source_slide_ids": [
+        "networking-s3",
+        "networking-s4"
+      ],
+      "learning_unit_ids": [
+        "networking-u3",
+        "networking-u4"
+      ],
+      "canonical_fact_ids": [
+        "networking-f3",
+        "networking-f4"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "result",
+      "capabilities": [
+        "comparison",
+        "scenario_reasoning"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "比较同一路径的高延迟和丢包记录，区分症状。",
+      "scaffold": "提供两段时间序列和路径摘要。",
+      "steps": [
+        {
+          "title": "读序列",
+          "instruction": "标出延迟尖峰和缺失回应。",
+          "check": "证据标记清楚。"
+        },
+        {
+          "title": "连路径",
+          "instruction": "比较两段记录经过的节点。",
+          "check": "不把两个层次混为一谈。"
+        },
+        {
+          "title": "提动作",
+          "instruction": "为每种现象给一个小检查。",
+          "check": "动作与现象相邻。"
+        }
+      ],
+      "acceptance": [
+        "正确区分两类现象",
+        "每类都有后续检查"
+      ],
+      "help_refs": [
+        "networking-g3",
+        "networking-kit3"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "networking-incident",
+      "level": "challenge",
+      "title": "模拟一次服务恢复演练",
+      "knowledge_link_ids": [
+        "networking-k4",
+        "networking-k5"
+      ],
+      "source_slide_ids": [
+        "networking-s4",
+        "networking-s5"
+      ],
+      "learning_unit_ids": [
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4",
+        "networking-f5"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "scenario",
+      "capabilities": [
+        "scenario_reasoning",
+        "diagnosis",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "从用户报障开始完成分层定位、最小修复和回归。",
+      "scaffold": "提供报障卡、三条观察结果和回归表。",
+      "steps": [
+        {
+          "title": "定层",
+          "instruction": "根据第一条证据缩小范围。",
+          "check": "不跳层。"
+        },
+        {
+          "title": "选修复",
+          "instruction": "只改变一个路由或服务条件。",
+          "check": "修复可回退。"
+        },
+        {
+          "title": "回归讲解",
+          "instruction": "重复原观察并向同伴解释。",
+          "check": "恢复有证据。"
+        }
+      ],
+      "acceptance": [
+        "形成一条完整证据链",
+        "能说明为何没有盲目重启全部设备"
+      ],
+      "help_refs": [
+        "networking-g4",
+        "networking-kit4"
+      ],
+      "estimated_minutes": 14,
+      "verification": "按验收条件复核输入、动作和结果。"
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "networking-lab1",
+      "title": "地址边界判断",
+      "knowledge_link_ids": [
+        "networking-k1"
+      ],
+      "task_ids": [
+        "networking-address"
+      ],
+      "learning_unit_ids": [
+        "networking-u1"
+      ],
+      "canonical_fact_ids": [
+        "networking-f1"
+      ],
+      "purpose": "用地址边界判断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 6,
+        "prompt": "围绕地址边界判断，先做一个判断，再把反馈带回任务。",
+        "options": [
+          {
+            "label": "证据支持地址边界判断的关键条件",
+            "feedback": "正确。请把这条证据写入任务验收。"
+          },
+          {
+            "label": "只凭结果表面相似就直接通过",
+            "feedback": "还不够，需要回到条件或过程证据。"
+          },
+          {
+            "label": "跳过检查直接改变工具设置",
+            "feedback": "先保留可解释的检查步骤，再改变设置。"
+          }
+        ],
+        "answer_index": 0,
+        "success_feedback": "判断完成，请回到对应任务执行。",
+        "retry_feedback": "请从理论页的条件和当前证据重新核对。"
+      }
+    },
+    {
+      "id": "networking-lab2",
+      "title": "链路状态推演",
+      "knowledge_link_ids": [
+        "networking-k2",
+        "networking-k3"
+      ],
+      "task_ids": [
+        "networking-arp",
+        "networking-ttl"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f3"
+      ],
+      "purpose": "用链路状态推演把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "state-simulator",
+        "estimated_minutes": 6,
+        "prompt": "根据链路状态推演的过程状态，填写下一步字段；输入框不会预填答案。",
+        "state_fields": [
+          {
+            "id": "phase",
+            "label": "当前阶段",
+            "input_type": "text"
+          },
+          {
+            "id": "action",
+            "label": "下一动作",
+            "input_type": "text"
+          }
+        ],
+        "state": {
+          "context_label": "当前场景",
+          "context": "链路状态推演的过程被拆成两个可观察状态。"
+        },
+        "visualization": {
+          "kind": "state-machine",
+          "title": "链路状态推演状态图",
+          "items": [
+            {
+              "label": "观察",
+              "value": "先收集证据"
+            },
+            {
+              "label": "检查",
+              "value": "按标准核对"
+            },
+            {
+              "label": "处理",
+              "value": "做一个最小动作"
+            }
+          ]
+        },
+        "rounds": [
+          {
+            "given": {
+              "phase": "观察",
+              "action": "等待"
+            },
+            "expected": {
+              "action": "检查"
+            },
+            "next_expected": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "status": "continue",
+            "observation": "已经从描述转向证据检查。",
+            "feedback": "下一动作应当能产生可观察证据。"
+          },
+          {
+            "given": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "expected": {
+              "action": "处理"
+            },
+            "status": "found",
+            "observation": "已完成一次最小、可解释的处理。",
+            "feedback": "过程到达终止状态，可以回到任务验收。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "networking-lab3",
+      "title": "TTL 路径逐步追踪",
+      "knowledge_link_ids": [
+        "networking-k3"
+      ],
+      "task_ids": [
+        "networking-ttl"
+      ],
+      "learning_unit_ids": [
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f3"
+      ],
+      "purpose": "用TTL 路径逐步追踪把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "围绕TTL 路径逐步追踪，先做一个判断，再把反馈带回任务。",
+        "steps": [
+          {
+            "title": "定位输入",
+            "text": "列出TTL 路径逐步追踪的输入、观察对象和当前已知条件。"
+          },
+          {
+            "title": "执行一步",
+            "text": "只改变一个与TTL 路径逐步追踪相关的操作，记录状态变化。"
+          },
+          {
+            "title": "核对结果",
+            "text": "用理论中的判断标准解释结果，并决定是否进入下一步。"
+          },
+          {
+            "title": "回到任务",
+            "text": "把观察到的规律写成任务中的一个小验收条件。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "networking-lab4",
+      "title": "分层故障诊断",
+      "knowledge_link_ids": [
+        "networking-k4"
+      ],
+      "task_ids": [
+        "networking-layer-debug"
+      ],
+      "learning_unit_ids": [
+        "networking-u4"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4"
+      ],
+      "purpose": "用分层故障诊断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 6,
+        "prompt": "连续处理分层故障诊断中的两个诊断案例，先说现象，再选最小修复。",
+        "diagnostic_cases": [
+          {
+            "id": "networking-case-1",
+            "title": "结果为空或没有变化",
+            "context": "在分层故障诊断操作中出现：结果为空或没有变化。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          },
+          {
+            "id": "networking-case-2",
+            "title": "结果与理论条件不一致",
+            "context": "在分层故障诊断操作中出现：结果与理论条件不一致。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          }
+        ],
+        "completion_feedback": "两个诊断案例都完成；请把最小修复带回实践任务。"
+      }
+    },
+    {
+      "id": "networking-lab5",
+      "title": "连续证据题组",
+      "knowledge_link_ids": [
+        "networking-k4",
+        "networking-k5"
+      ],
+      "task_ids": [
+        "networking-layer-debug",
+        "networking-evidence"
+      ],
+      "learning_unit_ids": [
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4",
+        "networking-f5"
+      ],
+      "purpose": "用连续证据题组把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 6,
+        "prompt": "逐题完成连续证据题组的三个检查点，每题反馈后再进入下一题。",
+        "questions": [
+          {
+            "prompt": "连续证据题组：第一步应保留什么证据？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续证据题组：哪个动作最能验证理论？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续证据题组：什么时候需要打开补给资料？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "networking-lab6",
+      "title": "动作角色分类",
+      "knowledge_link_ids": [
+        "networking-k2",
+        "networking-k5"
+      ],
+      "task_ids": [
+        "networking-arp",
+        "networking-evidence"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f5"
+      ],
+      "purpose": "用动作角色分类把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "classify",
+        "estimated_minutes": 6,
+        "prompt": "把动作角色分类中的动作分到正确的工作角色。",
+        "categories": [
+          "证据",
+          "动作",
+          "验收"
+        ],
+        "items": [
+          {
+            "id": "evidence",
+            "label": "读取现象、条件和原始记录",
+            "answer": "证据",
+            "feedback": "先形成可复核证据。"
+          },
+          {
+            "id": "action",
+            "label": "只修改一个关键设置或字段",
+            "answer": "动作",
+            "feedback": "动作要小且能回退。"
+          },
+          {
+            "id": "accept",
+            "label": "按标准解释结果并决定下一步",
+            "answer": "验收",
+            "feedback": "验收连接理论与实践。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "networking-lab7",
+      "title": "恢复演练排序",
+      "knowledge_link_ids": [
+        "networking-k4",
+        "networking-k5"
+      ],
+      "task_ids": [
+        "networking-evidence",
+        "networking-incident"
+      ],
+      "learning_unit_ids": [
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4",
+        "networking-f5"
+      ],
+      "purpose": "用恢复演练排序把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "reorder",
+        "estimated_minutes": 6,
+        "prompt": "排列恢复演练排序的实际工作顺序，先恢复证据链，再做判断。",
+        "items": [
+          {
+            "id": "observe",
+            "label": "执行最小操作并观察结果"
+          },
+          {
+            "id": "check",
+            "label": "核对输入和前置条件"
+          },
+          {
+            "id": "explain",
+            "label": "用理论解释结果"
+          },
+          {
+            "id": "verify",
+            "label": "按验收清单回归"
+          }
+        ],
+        "correct_order": [
+          "check",
+          "observe",
+          "explain",
+          "verify"
+        ],
+        "success_feedback": "顺序正确，已经形成可复核的实践闭环。",
+        "retry_feedback": "先把证据和前置条件放在最前面。"
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "networking-g1",
+      "title": "1. 地址与子网怎么用",
+      "knowledge_link_ids": [
+        "networking-k1"
+      ],
+      "task_ids": [
+        "networking-address"
+      ],
+      "learning_unit_ids": [
+        "networking-u1"
+      ],
+      "canonical_fact_ids": [
+        "networking-f1"
+      ],
+      "body": "IPv4 地址、掩码和网络边界共同决定主机是否同网段 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以192.168.10.23/24 的网络号为例：先读条件，再执行一个最小动作，最后用“能根据地址和掩码判断网络边界”解释观察到的结果。",
+      "quick_reference": [
+        "IPv4 地址、掩码和网络边界共同决定主机是否同网段",
+        "能根据地址和掩码判断网络边界",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "只看地址前两段就能判断同网段",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "networking-g2",
+      "title": "2. 链路与 ARP怎么用",
+      "knowledge_link_ids": [
+        "networking-k2"
+      ],
+      "task_ids": [
+        "networking-arp",
+        "networking-filters"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f3"
+      ],
+      "body": "同网段发送前需要通过 ARP 找到下一跳的链路地址 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以先广播询问再单播发送为例：先读条件，再执行一个最小动作，最后用“能从抓包顺序解释 ARP 请求与应答”解释观察到的结果。",
+      "quick_reference": [
+        "同网段发送前需要通过 ARP 找到下一跳的链路地址",
+        "能从抓包顺序解释 ARP 请求与应答",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "看到 IP 就等于知道链路地址",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "networking-g3",
+      "title": "3. 路由与 TTL怎么用",
+      "knowledge_link_ids": [
+        "networking-k3"
+      ],
+      "task_ids": [
+        "networking-ttl",
+        "networking-filters",
+        "networking-latency"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u3",
+        "networking-u4"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f3",
+        "networking-f4"
+      ],
+      "body": "路由器按下一跳转发并让 TTL 逐跳减少 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以客户端到服务端经过两台路由器为例：先读条件，再执行一个最小动作，最后用“能沿路径写出每跳的观察结果”解释观察到的结果。",
+      "quick_reference": [
+        "路由器按下一跳转发并让 TTL 逐跳减少",
+        "能沿路径写出每跳的观察结果",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "TTL 由终端在每一跳重新设回初值",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "networking-g4",
+      "title": "4. 故障定位怎么用",
+      "knowledge_link_ids": [
+        "networking-k4"
+      ],
+      "task_ids": [
+        "networking-layer-debug",
+        "networking-latency",
+        "networking-incident"
+      ],
+      "learning_unit_ids": [
+        "networking-u3",
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f3",
+        "networking-f4",
+        "networking-f5"
+      ],
+      "body": "网络诊断要区分地址、链路、路由和服务层症状 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以能 ping 网关但不能访问服务为例：先读条件，再执行一个最小动作，最后用“能根据现象选择最小检查”解释观察到的结果。",
+      "quick_reference": [
+        "网络诊断要区分地址、链路、路由和服务层症状",
+        "能根据现象选择最小检查",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "任何失败都先重启所有设备",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "networking-g5",
+      "title": "5. 证据闭环怎么用",
+      "knowledge_link_ids": [
+        "networking-k5"
+      ],
+      "task_ids": [
+        "networking-evidence",
+        "networking-incident"
+      ],
+      "learning_unit_ids": [
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4",
+        "networking-f5"
+      ],
+      "body": "一次诊断需要把现象、抓包证据和修复后的回归结果连起来 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以修复路由后再次观察 SYN/ACK为例：先读条件，再执行一个最小动作，最后用“能写出一条可复核诊断记录”解释观察到的结果。",
+      "quick_reference": [
+        "一次诊断需要把现象、抓包证据和修复后的回归结果连起来",
+        "能写出一条可复核诊断记录",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "配置保存成功就等于业务恢复",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "networking-g6",
+      "title": "6. 从证据到解释的自助路径",
+      "knowledge_link_ids": [
+        "networking-k1",
+        "networking-k2",
+        "networking-k3",
+        "networking-k4",
+        "networking-k5"
+      ],
+      "task_ids": [
+        "networking-address",
+        "networking-arp",
+        "networking-ttl",
+        "networking-layer-debug",
+        "networking-evidence",
+        "networking-filters",
+        "networking-latency",
+        "networking-incident"
+      ],
+      "learning_unit_ids": [
+        "networking-u1",
+        "networking-u2",
+        "networking-u3",
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f1",
+        "networking-f2",
+        "networking-f3",
+        "networking-f4",
+        "networking-f5"
+      ],
+      "body": "当结果不符合预期时，沿着条件—动作—证据—解释四步回查；每一步都能指向一个具体学习资料或基础补给。",
+      "worked_example": "先复述当前输入和预期，再只做一个最小修复，重新观察并把变化解释给同伴。",
+      "quick_reference": [
+        "先找最早出现差异的步骤。",
+        "优先回到对应理论页和基础补给。",
+        "能解释为什么修复有效才算完成。"
+      ],
+      "common_errors": [
+        "同时改动多个变量，无法归因。",
+        "把教师参考答案当成第一步，而不先观察。"
+      ],
+      "checkpoints": [
+        "我知道每个 core task 卡住时的入口。",
+        "我能把一次操作连接到一个理论事实。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "networking-kit1",
+      "title": "地址与子网基础补给",
+      "kind": "地址换算",
+      "content": "这是开始地址与子网任务前的最小工具卡：IPv4 地址、掩码和网络边界共同决定主机是否同网段",
+      "task_ids": [
+        "networking-address"
+      ],
+      "learning_unit_ids": [
+        "networking-u1"
+      ],
+      "canonical_fact_ids": [
+        "networking-f1"
+      ],
+      "when_to_use": "看到地址与子网相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是地址与子网。",
+        "按卡片中的一个动作检查/24 与 /26。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释地址与子网。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "networking-kit2",
+      "title": "链路与 ARP基础补给",
+      "kind": "抓包筛选",
+      "content": "这是开始链路与 ARP任务前的最小工具卡：同网段发送前需要通过 ARP 找到下一跳的链路地址",
+      "task_ids": [
+        "networking-arp",
+        "networking-filters"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u3"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f3"
+      ],
+      "when_to_use": "看到链路与 ARP相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是链路与 ARP。",
+        "按卡片中的一个动作检查缓存命中与未命中。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释链路与 ARP。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "networking-kit3",
+      "title": "路由与 TTL基础补给",
+      "kind": "路径跟踪",
+      "content": "这是开始路由与 TTL任务前的最小工具卡：路由器按下一跳转发并让 TTL 逐跳减少",
+      "task_ids": [
+        "networking-ttl",
+        "networking-filters",
+        "networking-latency"
+      ],
+      "learning_unit_ids": [
+        "networking-u2",
+        "networking-u3",
+        "networking-u4"
+      ],
+      "canonical_fact_ids": [
+        "networking-f2",
+        "networking-f3",
+        "networking-f4"
+      ],
+      "when_to_use": "看到路由与 TTL相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是路由与 TTL。",
+        "按卡片中的一个动作检查到达与超时。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释路由与 TTL。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "networking-kit4",
+      "title": "故障定位基础补给",
+      "kind": "分层诊断",
+      "content": "这是开始故障定位任务前的最小工具卡：网络诊断要区分地址、链路、路由和服务层症状",
+      "task_ids": [
+        "networking-layer-debug",
+        "networking-latency",
+        "networking-incident"
+      ],
+      "learning_unit_ids": [
+        "networking-u3",
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f3",
+        "networking-f4",
+        "networking-f5"
+      ],
+      "when_to_use": "看到故障定位相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是故障定位。",
+        "按卡片中的一个动作检查网关可达与端口不可达。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释故障定位。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "networking-kit5",
+      "title": "证据闭环基础补给",
+      "kind": "诊断记录",
+      "content": "这是开始证据闭环任务前的最小工具卡：一次诊断需要把现象、抓包证据和修复后的回归结果连起来",
+      "task_ids": [
+        "networking-evidence",
+        "networking-incident"
+      ],
+      "learning_unit_ids": [
+        "networking-u4",
+        "networking-u5"
+      ],
+      "canonical_fact_ids": [
+        "networking-f4",
+        "networking-f5"
+      ],
+      "when_to_use": "看到证据闭环相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是证据闭环。",
+        "按卡片中的一个动作检查配置状态与实际流量。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释证据闭环。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "带领学生用计算机网络基础的理论完成一条可观察实践闭环。",
+    "theory_bridge": "每次巡视先让学生指出 source 理论事实，再看操作证据；不要用教师答案替代学生判断。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "理论回看与第一个可观察判断"
+      },
+      {
+        "minutes": 30,
+        "focus": "core 前半段：小步操作和即时核对"
+      },
+      {
+        "minutes": 24,
+        "focus": "core 后半段：完成、运行或诊断"
+      },
+      {
+        "minutes": 20,
+        "focus": "差异化路径和连续互动"
+      },
+      {
+        "minutes": 8,
+        "focus": "解释性收束与个别抽查"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "networking-address",
+        "look_for": "检查学生是否真的完成“判断两个主机是否同网段”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述用地址和掩码卡判断两台主机的网络边界。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-arp",
+        "look_for": "检查学生是否真的完成“按抓包顺序解释 ARP”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述从一个抓包片段中排列 ARP 请求、应答和后续数据。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-ttl",
+        "look_for": "检查学生是否真的完成“追踪 TTL 的逐跳变化”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述沿三跳路径填写每跳 TTL 与下一跳。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-layer-debug",
+        "look_for": "检查学生是否真的完成“按分层证据定位故障”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述根据网关、端口和服务现象选择最小检查。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-evidence",
+        "look_for": "检查学生是否真的完成“形成网络诊断证据链”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述把抓包、配置和回归结果整理成一条诊断记录。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-filters",
+        "look_for": "检查学生是否真的完成“设计 Wireshark 过滤器练习”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为 ARP、ICMP 和 TCP 三种观察目的选择过滤条件。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-latency",
+        "look_for": "检查学生是否真的完成“比较延迟与丢包现象”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述比较同一路径的高延迟和丢包记录，区分症状。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "networking-incident",
+        "look_for": "检查学生是否真的完成“模拟一次服务恢复演练”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述从用户报障开始完成分层定位、最小修复和回归。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "学生直接改结果而不记录条件",
+        "intervention": "让学生回到理论页，写出输入、动作和预期后再做一次最小变化。"
+      },
+      {
+        "symptom": "学生把一次偶然成功当成规则",
+        "intervention": "要求换一个边界或反例，说明规则是否仍成立。"
+      },
+      {
+        "symptom": "学生卡在工具操作而非本课知识",
+        "intervention": "先打开对应 foundation-kit，完成自检后再回到 core task。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱时只要求完成所有 core 的第一验收点，并把 optional 改为教师示范。",
+      "进度较快时要求比较两个条件或处理 challenge，但不打断基础学生路径。",
+      "课堂时间不足时保留理论关联、一个可观察结果和一次解释性抽查。"
+    ],
+    "closing_checks": [
+      "随机请学生解释一个结果背后的理论事实。",
+      "检查每个 core 是否至少留下一个可复核结果。",
+      "确认学生知道下次卡住时打开哪份资料。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "networking-address",
+        "title": "判断两个主机是否同网段",
+        "source_slide_ids": [
+          "networking-s1"
+        ],
+        "learning_unit_ids": [
+          "networking-u1"
+        ],
+        "canonical_fact_ids": [
+          "networking-f1"
+        ],
+        "reference_answer": "完成判断两个主机是否同网段：完成四组同网段判断；解释掩码改变边界的方式。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "把地址与掩码分列。",
+          "写出网络号并比较。",
+          "找一组最容易看错的边界。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成四组同网段判断",
+          "解释掩码改变边界的方式"
+        ]
+      },
+      {
+        "task_id": "networking-arp",
+        "title": "按抓包顺序解释 ARP",
+        "source_slide_ids": [
+          "networking-s2"
+        ],
+        "learning_unit_ids": [
+          "networking-u2"
+        ],
+        "canonical_fact_ids": [
+          "networking-f2"
+        ],
+        "reference_answer": "完成按抓包顺序解释 ARP：正确解释 ARP 顺序；指出一次缓存命中或未命中。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "找出询问目标链路地址的帧。",
+          "配对请求和应答。",
+          "说明为什么后续才能发送数据。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "正确解释 ARP 顺序",
+          "指出一次缓存命中或未命中"
+        ]
+      },
+      {
+        "task_id": "networking-ttl",
+        "title": "追踪 TTL 的逐跳变化",
+        "source_slide_ids": [
+          "networking-s3"
+        ],
+        "learning_unit_ids": [
+          "networking-u3"
+        ],
+        "canonical_fact_ids": [
+          "networking-f3"
+        ],
+        "reference_answer": "完成追踪 TTL 的逐跳变化：完成三跳状态表；解释 TTL 对路径定位的帮助。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "记录客户端发出的 TTL。",
+          "按路由器顺序填写变化。",
+          "比较服务端收到的值和路径。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成三跳状态表",
+          "解释 TTL 对路径定位的帮助"
+        ]
+      },
+      {
+        "task_id": "networking-layer-debug",
+        "title": "按分层证据定位故障",
+        "source_slide_ids": [
+          "networking-s4"
+        ],
+        "learning_unit_ids": [
+          "networking-u4"
+        ],
+        "canonical_fact_ids": [
+          "networking-f4"
+        ],
+        "reference_answer": "完成按分层证据定位故障：三种现象均有分层判断；每种判断有一个最小检查。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "把现象放到地址、链路、路由或服务层。",
+          "选择能排除最大范围的最小命令/观察。",
+          "将结果连接到一条理论事实。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三种现象均有分层判断",
+          "每种判断有一个最小检查"
+        ]
+      },
+      {
+        "task_id": "networking-evidence",
+        "title": "形成网络诊断证据链",
+        "source_slide_ids": [
+          "networking-s5"
+        ],
+        "learning_unit_ids": [
+          "networking-u5"
+        ],
+        "canonical_fact_ids": [
+          "networking-f5"
+        ],
+        "reference_answer": "完成形成网络诊断证据链：四列记录完整；回归观察与原证据对应。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "写出用户可感知的失败。",
+          "贴一条抓包或路径观察。",
+          "修复后重复同一观察。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "四列记录完整",
+          "回归观察与原证据对应"
+        ]
+      },
+      {
+        "task_id": "networking-filters",
+        "title": "设计 Wireshark 过滤器练习",
+        "source_slide_ids": [
+          "networking-s2",
+          "networking-s3"
+        ],
+        "learning_unit_ids": [
+          "networking-u2",
+          "networking-u3"
+        ],
+        "canonical_fact_ids": [
+          "networking-f2",
+          "networking-f3"
+        ],
+        "reference_answer": "完成设计 Wireshark 过滤器练习：三个问题都有过滤方案；能解释一个漏证据的方案。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "把问题和协议字段配对。",
+          "在样例包中观察剩余帧。",
+          "说明为何其他过滤会漏掉证据。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三个问题都有过滤方案",
+          "能解释一个漏证据的方案"
+        ]
+      },
+      {
+        "task_id": "networking-latency",
+        "title": "比较延迟与丢包现象",
+        "source_slide_ids": [
+          "networking-s3",
+          "networking-s4"
+        ],
+        "learning_unit_ids": [
+          "networking-u3",
+          "networking-u4"
+        ],
+        "canonical_fact_ids": [
+          "networking-f3",
+          "networking-f4"
+        ],
+        "reference_answer": "完成比较延迟与丢包现象：正确区分两类现象；每类都有后续检查。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "标出延迟尖峰和缺失回应。",
+          "比较两段记录经过的节点。",
+          "为每种现象给一个小检查。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "正确区分两类现象",
+          "每类都有后续检查"
+        ]
+      },
+      {
+        "task_id": "networking-incident",
+        "title": "模拟一次服务恢复演练",
+        "source_slide_ids": [
+          "networking-s4",
+          "networking-s5"
+        ],
+        "learning_unit_ids": [
+          "networking-u4",
+          "networking-u5"
+        ],
+        "canonical_fact_ids": [
+          "networking-f4",
+          "networking-f5"
+        ],
+        "reference_answer": "完成模拟一次服务恢复演练：形成一条完整证据链；能说明为何没有盲目重启全部设备。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "根据第一条证据缩小范围。",
+          "只改变一个路由或服务条件。",
+          "重复原观察并向同伴解释。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "形成一条完整证据链",
+          "能说明为何没有盲目重启全部设备"
+        ]
+      }
+    ]
+  },
+  "starter_assets": []
+}

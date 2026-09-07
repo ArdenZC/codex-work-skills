@@ -1,10 +1,12 @@
-"""Render Courseware Content Contract 1.0 into two offline single-file HTML documents."""
+"""Render Courseware Content Contract 1.1 into two offline single-file HTML documents."""
 
 from __future__ import annotations
 
 import argparse
+import base64
 import html
 import json
+import mimetypes
 import os
 import re
 import shutil
@@ -14,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from content_contract import CoursewareContractError, load_content
+from pedagogical_review import review_content
 from validate_courseware import validate_html_outputs
 
 
@@ -46,12 +49,12 @@ button { font: inherit; }
 .projection-toggle, .answer-button, .stepper-controls button { border: 1px solid var(--line-strong); border-radius: 999px; background: var(--paper); color: var(--ink); padding: 7px 12px; cursor: pointer; transition: background .18s ease, color .18s ease, border-color .18s ease; }
 .projection-toggle:hover, .answer-button:hover, .stepper-controls button:hover { border-color: var(--accent); background: var(--accent-soft); }
 .deck { flex: 1; display: grid; place-items: center; padding: 20px 24px 24px; min-height: 0; }
-.slide-page { display: none; width: min(94vw, calc((100vh - 142px) * 1.7778)); aspect-ratio: 16 / 9; max-height: calc(100vh - 142px); overflow: auto; padding: clamp(22px, 3vw, 46px); border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: var(--shadow); }
+.slide-page { display: none; width: min(94vw, calc((100vh - 142px) * 1.7778)); aspect-ratio: 16 / 9; max-height: calc(100vh - 142px); overflow: hidden; padding: clamp(22px, 3vw, 46px); border: 1px solid var(--line); border-radius: 22px; background: var(--paper); box-shadow: var(--shadow); }
 .slide-page.is-active { display: flex; flex-direction: column; }
 .slide-kicker { color: var(--accent); font-size: clamp(11px, 1.05vw, 15px); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .slide-title { margin: 7px 0 0; font-size: clamp(25px, 3.2vw, 52px); line-height: 1.12; letter-spacing: -.025em; }
 .slide-rule { width: 100%; height: 1px; margin: 16px 0 18px; background: linear-gradient(90deg, var(--accent), var(--line), transparent); }
-.slide-layout { flex: 1; min-height: 0; display: grid; grid-auto-rows: minmax(min-content, 1fr); gap: clamp(12px, 1.5vw, 22px); align-content: stretch; overflow: auto; }
+.slide-layout { flex: 1; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: clamp(12px, 1.5vw, 22px); align-content: stretch; overflow: hidden; }
 .slide-layout > * { min-width: 0; }
 .layout-hero, .layout-focus { grid-template-columns: minmax(0, 1fr); }
 .layout-split, .layout-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -82,8 +85,11 @@ button { font: inherit; }
 .formula { font-family: "Cambria Math", "Times New Roman", serif; font-size: clamp(20px, 2vw, 32px); color: #385b68; }
 .formula-block p { margin: 8px 0 0; color: var(--muted); font-size: clamp(13px, 1.06vw, 18px); }
 .svg-block { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
-.svg-block svg { display: block; width: 100%; height: auto; max-height: 31vh; }
+.svg-block svg { display: block; width: 100%; height: auto; max-height: min(31vh, calc(100% - 30px)); }
 .svg-block figcaption { margin: 5px 4px 0; color: var(--muted); font-size: 12px; }
+.image-block { margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); }
+.image-block img { display: block; width: 100%; max-height: min(31vh, calc(100% - 30px)); object-fit: contain; }
+.image-block figcaption { margin: 5px 4px 0; color: var(--muted); font-size: 12px; }
 .quiz-block, .stepper-block { min-height: 0; overflow: auto; padding: 15px 17px; border: 1px solid var(--line-strong); border-radius: 16px; background: #f5f8f7; }
 .quiz-question { margin: 0 0 10px; font-weight: 700; font-size: clamp(15px, 1.25vw, 21px); }
 .quiz-options { display: grid; gap: 7px; }
@@ -295,7 +301,7 @@ def _scope_svg(raw: str, scope: str) -> str:
     return scoped
 
 
-def _render_block(block: dict[str, Any], slide_index: int, block_index: int) -> str:
+def _render_block(block: dict[str, Any], slide_index: int, block_index: int, assets: dict[str, str] | None = None) -> str:
     block_type = block["type"]
     if block_type == "paragraph":
         return f'<p class="block-paragraph">{_escape(block["text"])}</p>'
@@ -323,6 +329,13 @@ def _render_block(block: dict[str, Any], slide_index: int, block_index: int) -> 
         svg = _scope_svg(block["svg"], f"cw-{slide_index}-{block_index}")
         caption = f'<figcaption>{_escape(block["caption"])}</figcaption>' if block.get("caption") else ""
         return f'<figure class="svg-block" data-svg-block>{svg}{caption}</figure>'
+    if block_type == "image":
+        asset_data = (assets or {}).get(str(block.get("asset_id")))
+        if not asset_data:
+            raise CoursewareContractError(f"image asset is not available: {block.get('asset_id')}")
+        caption = f'<figcaption>{_escape(block["caption"])}</figcaption>' if block.get("caption") else ""
+        alt = _escape(block.get("caption") or "课程图示")
+        return f'<figure class="image-block" data-image-block><img src="{_escape(asset_data)}" alt="{alt}">{caption}</figure>'
     if block_type == "quiz":
         options = "".join(
             f'<button class="quiz-option" data-action="quiz-choice" data-choice="{index}" data-interactive="true">{_escape(option)}</button>'
@@ -347,10 +360,10 @@ def _render_block(block: dict[str, Any], slide_index: int, block_index: int) -> 
     raise CoursewareContractError(f"unsupported block type at render: {block_type}")
 
 
-def _render_slide_body(slide: dict[str, Any], slide_index: int, *, include_page_attrs: bool = True) -> str:
+def _render_slide_body(slide: dict[str, Any], slide_index: int, *, include_page_attrs: bool = True, assets: dict[str, str] | None = None) -> str:
     attrs = f' data-page-index="{slide_index}" data-page-id="{_escape(slide["id"])}"' if include_page_attrs else ""
     kicker = f'<div class="slide-kicker">{_escape(slide.get("kicker", ""))}</div>' if slide.get("kicker") else ""
-    blocks = "".join(_render_block(block, slide_index, block_index) for block_index, block in enumerate(slide["blocks"]))
+    blocks = "".join(_render_block(block, slide_index, block_index, assets) for block_index, block in enumerate(slide["blocks"]))
     active = " is-active" if slide_index == 0 else ""
     return f'<section class="slide-page{active}"{attrs} aria-hidden="{"false" if slide_index == 0 else "true"}">{kicker}<h1 class="slide-title">{_escape(slide["title"])}</h1><div class="slide-rule"></div><div class="slide-layout layout-{_escape(slide["layout"])}">{blocks}</div></section>'
 
@@ -359,9 +372,9 @@ def _document_header(title: str, body_class: str) -> str:
     return f'<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{_escape(title)}</title><style data-courseware-style>{RUNTIME_CSS}</style></head><body class="{body_class}" data-courseware-runtime="1">'
 
 
-def render_student(content: dict[str, Any]) -> str:
+def render_student(content: dict[str, Any], assets: dict[str, str] | None = None) -> str:
     title = f'{content["course_title"]} · {content["chapter_title"]}'
-    pages = "".join(_render_slide_body(slide, index) for index, slide in enumerate(content["slides"]))
+    pages = "".join(_render_slide_body(slide, index, assets=assets) for index, slide in enumerate(content["slides"]))
     return (
         _document_header(title, "student-mode")
         + '<div class="app"><header class="topbar"><div class="topbar-title"><strong>'
@@ -381,7 +394,7 @@ def _script_paragraphs(script: str) -> str:
     return "".join(f"<p>{_escape(paragraph)}</p>" for paragraph in paragraphs)
 
 
-def render_teacher(content: dict[str, Any]) -> str:
+def render_teacher(content: dict[str, Any], assets: dict[str, str] | None = None) -> str:
     title = f'{content["course_title"]} · {content["chapter_title"]} · 教师备课'
     pages: list[str] = []
     for index, slide in enumerate(content["slides"]):
@@ -392,7 +405,7 @@ def render_teacher(content: dict[str, Any]) -> str:
         active = " is-active" if index == 0 else ""
         pages.append(
             f'<section class="teacher-page{active}" data-page-index="{index}" data-page-id="{_escape(slide["id"])}" aria-hidden="{"false" if index == 0 else "true"}">'
-            f'<div class="teacher-left">{_render_slide_body(slide, index, include_page_attrs=False)}</div>'
+            f'<div class="teacher-left">{_render_slide_body(slide, index, include_page_attrs=False, assets=assets)}</div>'
             f'<aside class="teacher-notes"><div class="notes-heading">第{index + 1}页 | {_escape(slide["title"])} | 建议 {slide["suggested_minutes"]} 分钟</div><div class="speaker-script">{_script_paragraphs(slide["speaker_script"])}</div><div class="teacher-note-grid">{"".join(notes)}</div></aside></section>'
         )
     return (
@@ -418,6 +431,21 @@ def _remove(path: Path | None) -> None:
         path.unlink()
 
 
+def _asset_data_uris(content: dict[str, Any], base_dir: Path) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for asset in content.get("assets", []):
+        if not isinstance(asset, dict):
+            continue
+        asset_id = asset.get("id")
+        path_value = asset.get("path")
+        if not isinstance(asset_id, str) or not isinstance(path_value, str):
+            continue
+        path = (base_dir / path_value).resolve()
+        mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        result[asset_id] = f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+    return result
+
+
 def generate(content_path: Path, output_dir: Path, *, replace: bool = False) -> dict[str, Any]:
     content_path = content_path.expanduser().resolve()
     output_dir = output_dir.expanduser().resolve()
@@ -429,19 +457,24 @@ def generate(content_path: Path, output_dir: Path, *, replace: bool = False) -> 
     stage = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.courseware-stage-", dir=str(parent)))
     backup: Path | None = None
     try:
-        student = render_student(content)
-        teacher = render_teacher(content)
+        assets = _asset_data_uris(content, content_path.parent)
+        student = render_student(content, assets)
+        teacher = render_teacher(content, assets)
         qa = validate_html_outputs(content, student, teacher)
         if qa["status"] != "pass":
             raise CoursewareContractError("generated HTML QA failed: " + "; ".join(qa["errors"]))
+        pedagogical = review_content(content)
+        if pedagogical["status"] == "FAIL":
+            raise CoursewareContractError("pedagogical review failed: " + "; ".join(pedagogical["errors"]))
         (stage / "student.html").write_text(student, encoding="utf-8", newline="\n")
         (stage / "teacher.html").write_text(teacher, encoding="utf-8", newline="\n")
         report = {
             "status": "pass",
-            "contract": "Courseware Content Contract 1.0",
+            "contract": "Courseware Content Contract 1.1",
             "source": str(content_path),
             "outputs": ["student.html", "teacher.html"],
             "qa": qa,
+            "pedagogical": pedagogical,
         }
         (stage / "qa-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
         if output_dir.exists():

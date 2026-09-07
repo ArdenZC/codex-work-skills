@@ -1,6 +1,6 @@
 ---
 name: practice-class-html-generator
-description: 根据已讲理论或 Courseware Content Contract 1.0 生成通用高职实践课 HTML 材料，包含分层任务、理论关联、互动学习中心、动态基础补给站和教师课堂指导；四个学生模块与两个教师模块在模块内使用 pane 导航；不用于 DOCX WorkOrder 或单一课程专用生成。
+description: 根据已讲理论或 Courseware Content Contract 1.1 生成通用高职实践课 HTML 材料，包含分层任务、理论关联、互动学习中心、动态基础补给站和教师课堂指导；四个学生模块与两个教师模块在模块内使用 pane 导航；不用于 DOCX WorkOrder 或单一课程专用生成。
 metadata:
   short-description: 生成达到 Gold 内容密度的理论关联、分层任务和互动学习中心 HTML
 ---
@@ -9,14 +9,14 @@ metadata:
 
 ## 目标与边界
 
-用 Agent 创作 `Practice Class Content Contract 1.0`，再由内置 Python renderer 稳定生成一套可在机房/实训课堂使用的 HTML。它适用于编程、数据库、软件建模、人工智能、工具操作、设计分析等课程；不要把 C 语言、数据结构或某一种工具写死在产品概念里。
+用 Agent 创作 `Practice Class Content Contract 1.1`，再由内置 Python renderer 稳定生成一套可在机房/实训课堂使用的 HTML。它适用于编程、数据库、软件建模、人工智能、工具操作、设计分析等课程；不要把 C 语言、数据结构或某一种工具写死在产品概念里。旧 1.0 只作为迁移输入，不作为生成目标。
 
 本 Skill 不生成 DOCX，不调用或改写旧 `practice-task-workorder-generator`，不复制其 Phase、Hardening、模板指纹、symlink 防御或复杂事务体系。它只保留合同、理论关联、任务脚手架、HTML 完整性、内部链接和真实互动 QA。
 
 ## 工作流
 
-1. 先读取用户资料；有 Courseware Contract 1.0 时优先使用 `--courseware-json`，把已讲 `slide.id` 作为理论范围。
-2. 先按 [内容质量 Gold Benchmark](references/content-quality-gold-benchmark.md) 做教学设计审查，再创作 Practice Class Contract 1.0。不要把 Gold Sample 中的课程知识或历史提交要求照搬到新课程。
+1. 先读取用户资料；有 Courseware Contract 1.1 时优先使用 `--courseware-json`，把已讲 `slide.id`、`learning_units` 和 `canonical_facts` 作为理论范围。旧 1.0 由上游迁移后再消费。
+2. 先按 [内容质量 Gold Benchmark](references/content-quality-gold-benchmark.md) 做教学设计审查，再创作 Practice Class Contract 1.1。不要把 Gold Sample 中的课程知识或历史提交要求照搬到新课程。
 3. 知识链接和每个任务都写 `source_slide_ids`，任务写 `core / optional / challenge`、具体步骤、验收、帮助和预计时间，互动写明服务的知识点/任务。结构校验只要求合法的非空最小集合；90 分钟实践的 Gold 目标通常是 7—12 个小任务、约 5 个 core、1 个 optional 和 1 个 challenge，具体数量按课程时长和内容颗粒度判断，质量校验以 warning 给出建议而不是把数量写死。
 4. 编程 core 提供完整框架和 2—8 个真实需要学生修改的关键空位；TODO 不能只是解释正确代码。SQL、建模和工具 core 提供等价的可编辑起点、操作脚手架和结果验收。
 5. 学习中心按课程需要设计互动 pane，90 分钟 Gold 目标通常为 5—8 个实验区、至少 4 种有教学目的的互动形式，并包含动态过程、诊断/Debug、连续多题或场景挑战。互动数量本身不是质量证明：至少两处应有状态变化或多步推进，至少一处应连续处理多个诊断案例；参数变化、状态变化和检查动作都要立即反馈，并且反馈要能把学生带回具体任务。学习指南通常有 6—10 个任务关联小节，foundation kit 通常有 5—10 个课程动态微专题；短课或窄主题可以更少，但必须保留自助路径。
@@ -25,7 +25,7 @@ metadata:
 
 ## 输入模式
 
-- Courseware 联动（首选）：Practice JSON + Courseware Content Contract 1.0；知识点和任务的所有 `source_slide_ids` 必须真实存在且集合一致，core task 必须能追溯到已讲知识点。
+- Courseware 联动（首选）：Practice JSON + Courseware Content Contract 1.1；知识点和任务的所有 `source_slide_ids` 必须真实存在且集合一致，`learning_unit_ids`/`canonical_fact_ids` 必须覆盖对应理论语义，core task 必须能追溯到已讲知识点。
 - 课件/原始资料：以课件合同为理论边界，教材或讲义只补充操作说明，不扩大 core 范围。
 - 独立资料：没有课件时先在 Practice Contract 的 `source_courseware.mode` 标为 `independent`，明确本次理论范围后再设计任务。
 

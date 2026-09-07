@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
-from practice_contract import RENDERER_FAMILIES, load_courseware, load_json, validate_content
+from practice_contract import RENDERER_FAMILIES, load_courseware, load_json, normalize_content, validate_content
 
 
 STUDENT_PAGES = (Path("student") / "student-task.html", Path("student") / "learning-center.html", Path("student") / "study-guide.html", Path("student") / "foundation-kit.html")
@@ -20,7 +20,7 @@ TEACHER_PAGES = (Path("teacher") / "teacher-guide.html", Path("teacher") / "teac
 REQUIRED_TOP_LEVEL = {"student", "teacher", "practice-content.json", "qa-report.json"}
 EXTERNAL_PATTERN = re.compile(r"(?i)(?:https?:|//|data:|javascript:|file:)")
 FORBIDDEN_LAYOUT = re.compile(r"(?i)border-left\s*:\s*4px\s+solid")
-FORBIDDEN_MARKERS = ("Contract 1.0", "Practice Class", "source_slide_ids", "interaction type", "renderer family", "task_id", "slide_id", "interaction_type", "renderer_family")
+FORBIDDEN_MARKERS = ("Contract 1.0", "Contract 1.1", "Practice Class", "source_slide_ids", "interaction type", "renderer family", "task_id", "slide_id", "interaction_type", "renderer_family")
 FAMILIES = set(RENDERER_FAMILIES.values())
 TEXT_ASSET_EXTENSIONS = {".c", ".cpp", ".h", ".hpp", ".py", ".java", ".js", ".ts", ".html", ".htm", ".css", ".sql", ".md", ".txt", ".json", ".yaml", ".yml", ".xml", ".csv"}
 NON_TEXT_ASSET_EXTENSIONS = {".drawio", ".xlsx", ".xls", ".docx", ".pptx", ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".zip"}
@@ -128,8 +128,10 @@ def _machine_values(content: dict[str, Any]) -> set[str]:
         values.update(str(item.get("id")) for item in content.get(field, []) if isinstance(item, dict))
     values.update(str(ref) for item in content.get("knowledge_links", []) if isinstance(item, dict) for ref in item.get("source_slide_ids", []))
     values.update(str(ref) for ref in content.get("source_courseware", {}).get("taught_slide_ids", []))
+    # Renderer keys such as ``trace`` can be legitimate course/tool words
+    # (for example, Cisco Packet Tracer).  Keep the user-visible guard on
+    # stable machine markers and renderer-family labels, not short type keys.
     values.update(FAMILIES)
-    values.update(RENDERER_FAMILIES)
     return {value for value in values if value}
 
 
@@ -211,13 +213,46 @@ def _validate_reference_completeness(content: dict[str, Any], errors: list[str])
         task_id = str(reference.get("task_id"))
         task = tasks.get(task_id, {})
         modality = str(task.get("modality", "")).casefold()
+        capabilities = set(task.get("capabilities", [])) if isinstance(task.get("capabilities"), list) else set()
         answer = str(reference.get("reference_answer", ""))
-        if modality in {"coding", "programming"} and (len(answer) < 160 or "return" not in answer or "{" not in answer):
+        if ("code_editing" in capabilities or modality in {"coding", "programming"}) and (len(answer) < 160 or "return" not in answer or "{" not in answer):
             errors.append(f"teacher reference for coding task is too short to be a complete code result: {task_id}")
-        if "sql" in modality and (not re.search(r"\bselect\b", answer, re.IGNORECASE) or not re.search(r"\bfrom\b", answer, re.IGNORECASE)):
+        if ("query_execution" in capabilities or "sql" in modality) and (not re.search(r"\bselect\b", answer, re.IGNORECASE) or not re.search(r"\bfrom\b", answer, re.IGNORECASE)):
             errors.append(f"teacher reference for SQL task needs a complete SQL expression: {task_id}")
-        if modality in {"modeling", "modeling-tool", "model-critique"} and not reference.get("model_visual") and not re.search(r"(?:→|->|—|1\s*[-—]\s*0\.\.\*|关系|消息)", answer):
-            errors.append(f"teacher reference for modeling task needs relation/message structure or model_visual: {task_id}")
+        if ("model_editing" in capabilities or modality in {"modeling", "modeling-tool", "model-critique"}) and not reference.get("reference_visual") and not reference.get("model_visual") and not re.search(r"(?:→|->|—|1\s*[-—]\s*0\.\.\*|关系|消息)", answer):
+            errors.append(f"teacher reference for modeling task needs relation/message structure or reference_visual: {task_id}")
+
+
+def _validate_safe_student_package(output_dir: Path, errors: list[str]) -> None:
+    student_root = output_dir / "student-package"
+    manifest_path = student_root / "student-manifest.json"
+    safe_content_path = student_root / "practice-content.json"
+    teacher_root = output_dir / "teacher-package"
+    for path in (student_root / "student", manifest_path, safe_content_path, teacher_root / "teacher", teacher_root / "full-practice-content.json"):
+        if not path.exists():
+            errors.append(f"safe package output is missing: {path.relative_to(output_dir)}")
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for field in ("teacher_answers_included", "replacement_metadata_included", "canonical_answers_included"):
+                if manifest.get(field) is not False:
+                    errors.append(f"student manifest must set {field}=false")
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"student manifest is not valid JSON: {exc}")
+    if safe_content_path.is_file():
+        try:
+            safe = json.loads(safe_content_path.read_text(encoding="utf-8"))
+            for forbidden in ("teacher_guide", "teacher_reference", "canonical_facts"):
+                if forbidden in safe:
+                    errors.append(f"student package leaks teacher-only field: {forbidden}")
+            for asset in safe.get("starter_assets", []):
+                if not isinstance(asset, dict):
+                    continue
+                for forbidden in ("editable_gaps", "replacement", "target"):
+                    if forbidden in asset:
+                        errors.append(f"student package starter leaks teacher-only field: {forbidden}")
+        except (OSError, json.JSONDecodeError) as exc:
+            errors.append(f"student package content is not valid JSON: {exc}")
 
 
 def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str, Any]:
@@ -229,12 +264,17 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
     for required in REQUIRED_TOP_LEVEL:
         if required not in names:
             errors.append(f"missing required output: {required}")
+    _validate_safe_student_package(output_dir, errors)
     expected = _expected_html_paths()
     for relative in expected:
         result = validate_html_file(output_dir / relative, output_dir, content=content)
         errors.extend(result["errors"])
         warnings.extend(result["warnings"])
-    actual_html = {path.relative_to(output_dir) for path in output_dir.rglob("*.html")}
+    actual_html = {
+        path.relative_to(output_dir)
+        for path in output_dir.rglob("*.html")
+        if len(path.relative_to(output_dir).parts) == 2 and path.relative_to(output_dir).parts[0] in {"student", "teacher"}
+    }
     unexpected = sorted(actual_html - set(expected))
     if unexpected:
         errors.extend(f"unexpected HTML output: {path.as_posix()}" for path in unexpected)
@@ -349,7 +389,7 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
 
 
 def validate(practice_path: Path, output_dir: Path, courseware_path: Path | None = None) -> dict[str, Any]:
-    content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None; contract = validate_content(content, courseware); output = validate_output_files(content, output_dir); completeness_errors: list[str] = []; _validate_reference_completeness(content, completeness_errors); errors = [*contract["errors"], *output["errors"], *completeness_errors]; warnings = [*contract["warnings"], *output["warnings"]]
+    raw_content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None; content, _ = normalize_content(raw_content, courseware); contract = validate_content(content, courseware); output = validate_output_files(content, output_dir); completeness_errors: list[str] = []; _validate_reference_completeness(content, completeness_errors); errors = [*contract["errors"], *output["errors"], *completeness_errors]; warnings = [*contract["warnings"], *output["warnings"]]
     return {"status": "pass" if not errors else "fail", "errors": errors, "warnings": warnings, "contract": contract, "outputs": output}
 
 

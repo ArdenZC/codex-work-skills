@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import base64
 import json
 import sys
 import tempfile
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
-from content_contract import CoursewareContractError, load_content, validate_content  # noqa: E402
+from content_contract import CoursewareContractError, load_content, normalize_content, validate_content  # noqa: E402
 from install_adapters import install as install_adapters  # noqa: E402
 from install import install as install_skill  # noqa: E402
 from render_courseware import generate  # noqa: E402
@@ -76,6 +77,51 @@ class CoursewarePackageTests(unittest.TestCase):
             with self.assertRaises(CoursewareContractError):
                 load_content(source)
             self.assertEqual(list(Path(temp).glob("*.html")), [])
+
+    def test_explicit_1_1_time_budget_cannot_hide_a_120_to_18_mismatch(self) -> None:
+        content, _ = normalize_content(self.load_example("data-structures.example.json"))
+        content["session_minutes"] = 120
+        content["prepared_minutes"] = 120
+        content["core_minutes"] = 100
+        content["extension_minutes"] = 20
+        self.assertEqual(validate_content(content)["status"], "fail")
+        self.assertTrue(any("prepared_minutes" in error or "planned minutes" in error for error in validate_content(content)["errors"]))
+
+    def test_speaker_script_uses_lecture_time_and_teaching_intent(self) -> None:
+        content, _ = normalize_content(self.load_example("data-structures.example.json"))
+        content["slides"][0]["lecture_minutes"] = 4
+        content["slides"][0]["suggested_minutes"] = 4
+        content["slides"][0]["speaker_script"] = "太短"
+        report = validate_content(content)
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("speaker_script" in error for error in report["errors"]))
+
+    def test_context_learning_unit_and_slide_references_are_checked(self) -> None:
+        content, _ = normalize_content(self.load_example("data-structures.example.json"))
+        content["course_context"]["course_name"] = "另一门课"
+        self.assertEqual(validate_content(content)["status"], "fail")
+        content, _ = normalize_content(self.load_example("data-structures.example.json"))
+        content["slides"][0]["learning_unit_ids"] = ["missing-unit"]
+        report = validate_content(content)
+        self.assertEqual(report["status"], "fail")
+        self.assertTrue(any("unknown unit" in error for error in report["errors"]))
+
+    def test_local_image_asset_is_validated_and_inlined(self) -> None:
+        content = self.load_example("data-structures.example.json")
+        content["assets"] = [{"id": "tiny-diagram", "kind": "image", "path": "tiny.png"}]
+        content["slides"][0]["blocks"].append({"type": "image", "asset_id": "tiny-diagram", "caption": "局部示意"})
+        with tempfile.TemporaryDirectory(prefix="courseware-image-") as temp:
+            root = Path(temp)
+            (root / "tiny.png").write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="))
+            source = root / "content.json"
+            source.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual(validate_content(content, base_dir=root)["status"], "pass")
+            output = root / "out"
+            report = generate(source, output)
+            self.assertEqual(report["status"], "pass", report)
+            student = (output / "student.html").read_text(encoding="utf-8")
+            self.assertIn("data:image/png;base64,", student)
+            self.assertNotIn('src="tiny.png"', student)
 
     def test_failed_replacement_preserves_existing_output(self) -> None:
         content_path = ROOT / "examples" / "data-structures.example.json"

@@ -1,4 +1,4 @@
-"""Validation helpers for Practice Class Content Contract 1.0.
+"""Validation helpers for Practice Class Content Contract 1.1.
 
 This validator intentionally stays focused on teaching relationships: upstream
 slide references, task levels, modality-appropriate scaffolds, content-linked
@@ -8,14 +8,17 @@ import the former practice-workorder hardening stack.
 
 from __future__ import annotations
 
+import copy
 import json
 import re
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 
-CONTRACT_VERSION = "1.0"
+CONTRACT_VERSION = "1.1"
+LEGACY_CONTRACT_VERSION = "1.0"
 LEVELS = ("core", "optional", "challenge")
 LEVEL_LABELS = {"core": "核心必做", "optional": "有余力", "challenge": "提高挑战"}
 INTERACTION_TYPES = {
@@ -42,7 +45,41 @@ OPTION_INTERACTIONS = {
     "compare-strategies",
     "scenario-decision",
 }
-CODING_MODALITIES = {"coding", "sql", "programming", "mixed"}
+TASK_KINDS = {"observation", "analysis", "implementation", "debugging", "modeling", "tooling", "experiment", "scenario", "mixed"}
+CAPABILITIES = {
+    "code_editing",
+    "file_editing",
+    "model_editing",
+    "execution",
+    "query_execution",
+    "diagnosis",
+    "state_tracking",
+    "visualization",
+    "explanation",
+    "comparison",
+    "scenario_reasoning",
+}
+ARTIFACT_KINDS = {"source-code", "query", "model", "document", "workbook", "diagram", "scenario", "result", "mixed"}
+VISUALIZATION_KINDS = {
+    "sequence-range",
+    "timeline",
+    "table-state",
+    "state-machine",
+    "queue",
+    "graph-path",
+    "comparison",
+    "table",
+}
+REFERENCE_VISUAL_KINDS = {
+    "uml-class",
+    "uml-sequence",
+    "graph",
+    "table",
+    "timeline",
+    "state-machine",
+    "comparison",
+    "result-preview",
+}
 # These are legal-contract minima, not Gold content targets.  Quality targets
 # are emitted as recommendations below so short workshops and unusual course
 # modalities are not rejected merely for having a different shape.
@@ -78,6 +115,131 @@ CONTEXT_STRING_FIELDS = {
 }
 CONTEXT_LIST_FIELDS = {"tools", "other_constraints"}
 CONTEXT_FIELDS = CONTEXT_STRING_FIELDS | CONTEXT_LIST_FIELDS
+
+TOOLCHAIN_FAMILY_PATTERNS = {
+    "c-cpp": re.compile(r"(?i)(?:#\s*include\s*[<\"]|\bgcc\b|\bg\+\+\b|\bclang\b|\bdev-c\+\+\b|\bcode::blocks\b|\bcmake\b|\.(?:c|cpp|h|hpp)\b)"),
+    "java": re.compile(r"(?i)(?:\bjava\b|\bjavac\b|\bintellij\b|\bmaven\b|\bgradle\b|\.(?:java|jar)\b)"),
+    "python": re.compile(r"(?i)(?:\bpython(?:3)?\b|\bpip\b|\bpytest\b|\bflask\b|\bdjango\b|\.(?:py|ipynb)\b)"),
+    "sql": re.compile(r"(?i)(?:\bsql\b|\bmysql\b|\bpostgres(?:ql)?\b|\bsqlite\b|\bselect\b.+\bfrom\b)"),
+    "uml": re.compile(r"(?i)(?:\bdraw\.io\b|\bstaruml\b|\bplantuml\b|\bmermaid\b|\buml\b|\.drawio\b)"),
+}
+
+
+_COURSEWARE_SCRIPTS = Path(__file__).resolve().parents[3] / "HTML课件生成器" / "courseware-html-generator" / "scripts"
+if str(_COURSEWARE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_COURSEWARE_SCRIPTS))
+from content_contract import normalize_content as normalize_courseware_content  # noqa: E402
+
+
+def _legacy_capabilities(task: dict[str, Any]) -> tuple[str, str, list[str], str]:
+    modality = str(task.get("modality", "")).casefold()
+    if modality in {"coding", "programming"}:
+        return "implementation", "source-code", ["code_editing", "execution", "explanation"], "C"
+    if modality.startswith("sql"):
+        return "implementation", "query", ["file_editing", "query_execution", "explanation"], "B"
+    if "debug" in modality or task.get("id", "").casefold().find("debug") >= 0:
+        return "debugging", "mixed", ["diagnosis", "explanation"], "B"
+    if "model" in modality or "uml" in modality:
+        return "modeling", "model", ["model_editing", "visualization", "explanation"], "B"
+    if "tool" in modality:
+        return "tooling", "document", ["file_editing", "explanation"], "B"
+    return "mixed", "mixed", ["explanation"], "B"
+
+
+def _courseware_semantics(courseware: dict[str, Any] | None) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, dict[str, Any]]]:
+    slide_units: dict[str, set[str]] = {}
+    fact_by_id: dict[str, set[str]] = {}
+    units_by_id: dict[str, dict[str, Any]] = {}
+    if not isinstance(courseware, dict):
+        return slide_units, fact_by_id, units_by_id
+    for unit in courseware.get("learning_units", []):
+        if isinstance(unit, dict) and _non_empty(unit.get("id")):
+            units_by_id[str(unit["id"])] = unit
+    for slide in courseware.get("slides", []):
+        if isinstance(slide, dict) and _non_empty(slide.get("id")):
+            slide_units[str(slide["id"])] = set(str(ref) for ref in slide.get("learning_unit_ids", []) if isinstance(ref, str))
+    for fact in courseware.get("canonical_facts", []):
+        if isinstance(fact, dict) and _non_empty(fact.get("id")):
+            fact_by_id[str(fact["id"])] = set(str(ref) for ref in fact.get("source_slide_ids", []) if isinstance(ref, str))
+    return slide_units, fact_by_id, units_by_id
+
+
+def _refs_for_slides(slide_refs: Any, slide_units: dict[str, set[str]], fact_by_id: dict[str, set[str]], courseware: dict[str, Any] | None) -> tuple[list[str], list[str]]:
+    refs = [str(ref) for ref in slide_refs if isinstance(ref, str)] if isinstance(slide_refs, list) else []
+    units = sorted({unit for ref in refs for unit in slide_units.get(ref, set())})
+    fact_ids: list[str] = []
+    for fact_id, fact_refs in fact_by_id.items():
+        if set(refs) & fact_refs:
+            fact_ids.append(fact_id)
+    return units, sorted(fact_ids)
+
+
+def _normalize_item_links(item: dict[str, Any], slide_units: dict[str, set[str]], fact_by_id: dict[str, set[str]]) -> None:
+    units, facts = _refs_for_slides(item.get("source_slide_ids", []), slide_units, fact_by_id, None)
+    item.setdefault("learning_unit_ids", units)
+    item.setdefault("canonical_fact_ids", facts)
+
+
+def normalize_content(content: Any, courseware: dict[str, Any] | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Normalize legacy 1.0 practice JSON to the 1.1 semantic shape."""
+
+    if not isinstance(content, dict):
+        return content, {"migrated": False, "from": None, "to": CONTRACT_VERSION}
+    normalized = copy.deepcopy(content)
+    version = normalized.get("contract_version")
+    migration = {"migrated": False, "from": version, "to": CONTRACT_VERSION}
+    slide_units, fact_by_id, _ = _courseware_semantics(courseware)
+    if version == LEGACY_CONTRACT_VERSION:
+        normalized["contract_version"] = CONTRACT_VERSION
+        source = normalized.get("source_courseware")
+        if isinstance(source, dict):
+            source["contract_version"] = CONTRACT_VERSION
+        for item in normalized.get("knowledge_links", []):
+            if isinstance(item, dict):
+                _normalize_item_links(item, slide_units, fact_by_id)
+        for task in normalized.get("tasks", []):
+            if not isinstance(task, dict):
+                continue
+            kind, artifact, capabilities, scaffold_level = _legacy_capabilities(task)
+            task.setdefault("task_kind", kind)
+            task.setdefault("artifact_kind", artifact)
+            task.setdefault("capabilities", capabilities)
+            task.setdefault("scaffold_level", scaffold_level)
+            _normalize_item_links(task, slide_units, fact_by_id)
+        for collection_name in ("learning_center", "study_guide", "foundation_kit"):
+            for item in normalized.get(collection_name, []):
+                if isinstance(item, dict):
+                    if "source_slide_ids" in item:
+                        _normalize_item_links(item, slide_units, fact_by_id)
+                    else:
+                        task_ids = set(item.get("task_ids", []))
+                        task_by_id = {str(task.get("id")): task for task in normalized.get("tasks", []) if isinstance(task, dict)}
+                        slide_refs = [ref for task_id in task_ids for ref in task_by_id.get(task_id, {}).get("source_slide_ids", [])]
+                        item.setdefault("learning_unit_ids", sorted({unit for ref in slide_refs for unit in slide_units.get(ref, set())}))
+                        item.setdefault("canonical_fact_ids", sorted({fact for fact, refs in fact_by_id.items() if set(slide_refs) & refs}))
+                    interaction = item.get("interaction")
+                    if isinstance(interaction, dict) and isinstance(interaction.get("state_visual"), dict):
+                        visual = copy.deepcopy(interaction["state_visual"])
+                        visual.setdefault("kind", "sequence-range")
+                        interaction.setdefault("visualization", visual)
+        for asset in normalized.get("starter_assets", []):
+            if isinstance(asset, dict) and "student_instruction" not in asset and "instruction" in asset:
+                asset["student_instruction"] = asset["instruction"]
+        references = normalized.get("teacher_reference", {}).get("task_references", []) if isinstance(normalized.get("teacher_reference"), dict) else []
+        task_by_id = {str(task.get("id")): task for task in normalized.get("tasks", []) if isinstance(task, dict)}
+        for reference in references:
+            if not isinstance(reference, dict):
+                continue
+            task = task_by_id.get(str(reference.get("task_id")), {})
+            ref_obj = reference.get("model_visual")
+            if isinstance(ref_obj, dict):
+                converted = copy.deepcopy(ref_obj)
+                converted["kind"] = "uml-sequence" if converted.get("messages") else "uml-class"
+                reference.setdefault("reference_visual", converted)
+            reference.setdefault("learning_unit_ids", task.get("learning_unit_ids", []))
+            reference.setdefault("canonical_fact_ids", task.get("canonical_fact_ids", []))
+        migration["migrated"] = True
+    return normalized, migration
 
 
 def _text(value: Any) -> str:
@@ -151,6 +313,36 @@ def _check_slide_refs(values: Any, valid: set[str], location: str, errors: list[
     return refs
 
 
+def _validate_semantic_links(
+    item: dict[str, Any],
+    location: str,
+    task_by_id: dict[str, dict[str, Any]],
+    unit_ids: set[str],
+    fact_ids: set[str],
+    errors: list[str],
+    *,
+    task_field: str = "task_ids",
+) -> tuple[set[str], set[str]]:
+    """Check that a teaching surface carries the same semantic trail as its tasks."""
+
+    linked_units = _check_id_refs(item.get("learning_unit_ids"), unit_ids, f"{location}.learning_unit_ids", errors)
+    linked_facts = _check_id_refs(item.get("canonical_fact_ids", []), fact_ids, f"{location}.canonical_fact_ids", errors, allow_empty=True)
+    expected_units: set[str] = set()
+    expected_facts: set[str] = set()
+    for task_id in _list(item.get(task_field)):
+        task = task_by_id.get(str(task_id))
+        if isinstance(task, dict):
+            expected_units.update(ref for ref in task.get("learning_unit_ids", []) if isinstance(ref, str))
+            expected_facts.update(ref for ref in task.get("canonical_fact_ids", []) if isinstance(ref, str))
+    missing_units = expected_units - linked_units
+    missing_facts = expected_facts - linked_facts
+    if missing_units:
+        errors.append(f"{location}.learning_unit_ids must cover linked tasks: {', '.join(sorted(missing_units))}")
+    if missing_facts:
+        errors.append(f"{location}.canonical_fact_ids must cover linked tasks: {', '.join(sorted(missing_facts))}")
+    return linked_units, linked_facts
+
+
 def _validate_course_context(value: Any, location: str, errors: list[str]) -> dict[str, Any] | None:
     """Validate the small, intentionally generic course/toolchain context."""
 
@@ -173,14 +365,55 @@ def _validate_course_context(value: Any, location: str, errors: list[str]) -> di
     return value
 
 
+def _declared_toolchain_families(context: dict[str, Any] | None) -> set[str]:
+    if not isinstance(context, dict):
+        return set()
+    raw = json.dumps(context, ensure_ascii=False).casefold()
+    declared: set[str] = set()
+    language = str(context.get("language", "")).casefold()
+    if "java" in language:
+        declared.add("java")
+    if "python" in language:
+        declared.add("python")
+    if "sql" in language or "mysql" in raw or "postgres" in raw or "sqlite" in raw:
+        declared.add("sql")
+    if "uml" in language or "model" in language or any(token in raw for token in ("draw.io", "staruml", "plantuml", "mermaid")):
+        declared.add("uml")
+    if re.search(r"c\+\+|c/c\+\+|cpp|g\+\+", raw):
+        declared.add("c-cpp")
+    elif re.search(r"(?i)\blanguage\"\s*:\s*\"c\"|\bdev-c\+\+\b|\bgcc\b|\bclang\b", raw):
+        declared.add("c-cpp")
+    return declared
+
+
+def _toolchain_compatibility_errors(content: dict[str, Any], context: dict[str, Any] | None) -> list[str]:
+    """Detect incompatible toolchain fragments without a course-specific ban list."""
+
+    if not isinstance(context, dict):
+        return []
+    raw = json.dumps(content, ensure_ascii=False)
+    declared = _declared_toolchain_families(context)
+    if not declared:
+        return []
+    errors: list[str] = []
+    context_raw = json.dumps(context, ensure_ascii=False)
+    language = str(context.get("language", "")).casefold()
+    if "java" in language and re.search(r"(?i)(?:gcc|g\+\+|clang|dev-c\+\+|code::blocks)", context_raw):
+        errors.append("Java course context cannot declare a GCC/Dev-C++/C++ toolchain")
+    for family, pattern in TOOLCHAIN_FAMILY_PATTERNS.items():
+        if pattern.search(raw) and family not in declared:
+            errors.append(f"practice content contains {family} toolchain material incompatible with declared course context")
+    return errors
+
+
 def _courseware_ids(courseware: dict[str, Any] | None, errors: list[str]) -> set[str]:
     if courseware is None:
         return set()
     if not isinstance(courseware, dict):
         errors.append("courseware content must be an object")
         return set()
-    if courseware.get("contract_version") != CONTRACT_VERSION:
-        errors.append("courseware contract_version must be 1.0")
+    if courseware.get("contract_version") != "1.1":
+        errors.append("courseware contract_version must be 1.1 after migration")
     _validate_course_context(courseware.get("course_context"), "courseware.course_context", errors)
     slides = courseware.get("slides")
     if not isinstance(slides, list) or len(slides) < 2:
@@ -209,7 +442,8 @@ def load_json(path: Path) -> dict[str, Any]:
 def load_courseware(path: Path) -> dict[str, Any]:
     """Load the upstream Courseware Content Contract and expose its stable IDs."""
 
-    content = load_json(path)
+    raw = load_json(path)
+    content, _ = normalize_courseware_content(raw)
     probe_errors: list[str] = []
     _courseware_ids(content, probe_errors)
     if probe_errors:
@@ -358,21 +592,27 @@ def _validate_interaction(interaction: Any, location: str, errors: list[str]) ->
                             errors.append(f"{round_location}.next_expected does not match the following round's given state")
             if isinstance(rounds[-1], dict) and rounds[-1].get("status") == "continue":
                 errors.append(f"{location}.rounds must end with a terminal status")
-        visual = interaction.get("state_visual")
+        visual = interaction.get("visualization")
+        if visual is None:
+            visual = interaction.get("state_visual")
         if visual is not None:
             if not isinstance(visual, dict):
-                errors.append(f"{location}.state_visual must be an object when present")
+                errors.append(f"{location}.visualization must be an object when present")
             else:
+                visual_kind = visual.get("kind", "table")
+                if visual_kind not in VISUALIZATION_KINDS:
+                    errors.append(f"{location}.visualization.kind must be one of {sorted(VISUALIZATION_KINDS)}")
                 items = visual.get("items")
                 if not isinstance(items, list) or not items:
-                    errors.append(f"{location}.state_visual.items must contain at least one item")
+                    errors.append(f"{location}.visualization.items must contain at least one item")
                 else:
                     for index, item in enumerate(items):
                         if not isinstance(item, dict) or not _non_empty(item.get("label")) or "value" not in item:
-                            errors.append(f"{location}.state_visual.items[{index}] needs label and value")
-                for field_name in ("start_field", "end_field", "focus_field"):
-                    if not _non_empty(visual.get(field_name)) or visual.get(field_name) not in field_ids:
-                        errors.append(f"{location}.state_visual.{field_name} must name a state field")
+                            errors.append(f"{location}.visualization.items[{index}] needs label and value")
+                if visual_kind == "sequence-range":
+                    for field_name in ("start_field", "end_field", "focus_field"):
+                        if not _non_empty(visual.get(field_name)) or visual.get(field_name) not in field_ids:
+                            errors.append(f"{location}.visualization.{field_name} must name a state field")
     elif kind == "diagnose":
         cases = interaction.get("diagnostic_cases")
         if cases is not None:
@@ -452,6 +692,8 @@ def _validate_teacher_reference(
     task_by_id: dict[str, dict[str, Any]],
     knowledge_by_id: dict[str, dict[str, Any]],
     actual_slide_ids: set[str],
+    courseware_unit_ids: set[str],
+    courseware_fact_ids: set[str],
     location: str,
     errors: list[str],
 ) -> None:
@@ -481,6 +723,28 @@ def _validate_teacher_reference(
             task_refs = set(task_by_id[task_id].get("source_slide_ids", []))
             if refs != task_refs:
                 errors.append(f"{item_location}.source_slide_ids must match the task's source_slide_ids")
+            expected_units = set(task_by_id[task_id].get("learning_unit_ids", []))
+            expected_facts = set(task_by_id[task_id].get("canonical_fact_ids", []))
+            if courseware_unit_ids:
+                linked_units = _check_id_refs(item.get("learning_unit_ids"), courseware_unit_ids, f"{item_location}.learning_unit_ids", errors)
+                if expected_units - linked_units:
+                    errors.append(f"{item_location}.learning_unit_ids must cover the task's learning units: {', '.join(sorted(expected_units - linked_units))}")
+            if courseware_fact_ids:
+                linked_facts = _check_id_refs(item.get("canonical_fact_ids", []), courseware_fact_ids, f"{item_location}.canonical_fact_ids", errors, allow_empty=True)
+                if expected_facts - linked_facts:
+                    errors.append(f"{item_location}.canonical_fact_ids must cover the task's canonical facts: {', '.join(sorted(expected_facts - linked_facts))}")
+        visual = item.get("reference_visual")
+        if visual is None:
+            visual = item.get("model_visual")
+        if visual is not None:
+            if not isinstance(visual, dict):
+                errors.append(f"{item_location}.reference_visual must be an object when present")
+            else:
+                kind = visual.get("kind", "table")
+                if kind not in REFERENCE_VISUAL_KINDS:
+                    errors.append(f"{item_location}.reference_visual.kind must be one of {sorted(REFERENCE_VISUAL_KINDS)}")
+                if not _non_empty(visual.get("title")):
+                    errors.append(f"{item_location}.reference_visual.title is required")
         for field in ("key_steps", "acceptable_variants", "common_errors", "acceptance_basis"):
             values = item.get(field)
             if not isinstance(values, list) or not values or any(not _non_empty(entry) for entry in values):
@@ -493,12 +757,7 @@ def _validate_teacher_reference(
 
 
 def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[str]) -> int:
-    """Require every declared starter gap to be a real, locatable edit point.
-
-    A gap is intentionally small and generic: the contract does not prescribe a
-    programming language.  The marker and replacement must occur on the same
-    source line so a TODO cannot merely describe an already-complete answer.
-    """
+    """Require a real student marker without leaking the teacher replacement."""
 
     gaps = asset.get("editable_gaps", [])
     if gaps is None:
@@ -513,7 +772,7 @@ def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[s
         if not isinstance(gap, dict):
             errors.append(f"{gap_location} must be an object")
             continue
-        _required_strings(gap, ("marker", "replacement", "instruction", "kind"), gap_location, errors)
+        _required_strings(gap, ("marker", "replacement", "student_instruction", "kind"), gap_location, errors)
         marker = gap.get("marker")
         replacement = gap.get("replacement")
         if not isinstance(marker, str) or not marker.strip():
@@ -521,16 +780,37 @@ def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[s
         if marker in seen:
             errors.append(f"{gap_location}.marker is duplicated")
         seen.add(marker)
-        lines = [line for line in content.splitlines() if marker in line]
-        if not lines:
+        positions = [index for index, line in enumerate(content.splitlines()) if marker in line]
+        if not positions:
             errors.append(f"{gap_location}.marker is not present in starter content")
-        elif isinstance(replacement, str) and replacement not in lines[0]:
-            errors.append(f"{gap_location}.replacement must occur on the marker's source line")
+            continue
+        if not isinstance(replacement, str) or not replacement.strip():
+            continue
+        lines = content.splitlines()
+        # The marker line is the actionable student surface.  Inspect that
+        # line (including an inline comment) rather than adjacent source
+        # lines: adjacent SQL bounds may legitimately contain each other's
+        # target literal while still keeping the teacher replacement hidden.
+        marker_line = lines[positions[0]]
+        if replacement.casefold() in marker_line.casefold():
+            errors.append(f"{gap_location}.replacement leaks into the student marker line")
+        target = gap.get("target")
+        if target is not None and (not isinstance(target, str) or not target):
+            errors.append(f"{gap_location}.target must be a non-empty string when present")
+        if isinstance(target, str) and target not in content:
+            errors.append(f"{gap_location}.target is not present in starter content")
+        instruction = gap.get("student_instruction")
+        if isinstance(instruction, str) and replacement.casefold() in instruction.casefold():
+            errors.append(f"{gap_location}.student_instruction leaks the complete replacement")
     return len(gaps)
 
 
 def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> dict[str, Any]:
     """Return a JSON-serialisable structural and relationship QA report."""
+
+    if isinstance(courseware, dict):
+        courseware, _ = normalize_courseware_content(courseware)
+    content, migration = normalize_content(content, courseware)
 
     errors: list[str] = []
     warnings: list[str] = []
@@ -562,9 +842,14 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "core_help_coverage": 0,
         "interaction_estimated_minutes": 0,
         "quality_recommendations": [],
+        "learning_units": 0,
+        "canonical_facts": 0,
+        "support_path_coverage": 0,
+        "capability_errors": 0,
+        "starter_leakage_errors": 0,
     }
     if not isinstance(content, dict):
-        return {"status": "fail", "errors": ["practice content root must be an object"], "warnings": [], "metrics": metrics, "source_slide_refs": []}
+        return {"status": "fail", "errors": ["practice content root must be an object"], "warnings": [], "metrics": metrics, "source_slide_refs": [], "migration": migration}
 
     allowed = {
         "contract_version", "course_title", "practice_title", "audience", "duration_minutes", "course_context",
@@ -573,7 +858,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     }
     errors.extend(f"content has unsupported field: {field}" for field in sorted(set(content) - allowed))
     if content.get("contract_version") != CONTRACT_VERSION:
-        errors.append("contract_version must be 1.0")
+        errors.append(f"contract_version must be {CONTRACT_VERSION}")
     _required_strings(content, ("course_title", "practice_title", "audience"), "content", errors)
     _validate_course_context(content.get("course_context"), "course_context", errors)
     duration = content.get("duration_minutes")
@@ -586,13 +871,18 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         source = {}
     if source.get("mode") not in {"courseware", "independent"}:
         errors.append("source_courseware.mode must be courseware or independent")
-    if source.get("contract_version") != CONTRACT_VERSION:
-        errors.append("source_courseware.contract_version must be 1.0")
+    if source.get("contract_version") != "1.1":
+        errors.append("source_courseware.contract_version must be 1.1 after migration")
     _required_strings(source, ("chapter_title",), "source_courseware", errors)
     taught_ids = _unique_strings(source.get("taught_slide_ids"), "source_courseware.taught_slide_ids", errors) if source.get("taught_slide_ids") else set()
     if source.get("mode") == "courseware" and not taught_ids:
         errors.append("courseware mode requires taught_slide_ids")
     actual_slide_ids = _courseware_ids(courseware, errors)
+    slide_units, fact_by_slide, courseware_units = _courseware_semantics(courseware)
+    courseware_unit_ids = set(courseware_units)
+    courseware_fact_ids = set(fact_by_slide)
+    metrics["learning_units"] = len(courseware_unit_ids)
+    metrics["canonical_facts"] = len(courseware_fact_ids)
     if source.get("mode") == "courseware" and courseware is None:
         errors.append("courseware mode requires the upstream Courseware Content Contract (--courseware-json)")
     if actual_slide_ids:
@@ -645,6 +935,15 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
                     errors.append(f"{location}.source_slide_ids references an untaught slide: {ref}")
                 if actual_slide_ids and ref not in actual_slide_ids:
                     errors.append(f"{location}.source_slide_ids references missing slide.id: {ref}")
+        linked_units = _check_id_refs(item.get("learning_unit_ids"), courseware_unit_ids, f"{location}.learning_unit_ids", errors) if source.get("mode") == "courseware" else set()
+        linked_facts = _check_id_refs(item.get("canonical_fact_ids", []), courseware_fact_ids, f"{location}.canonical_fact_ids", errors, allow_empty=True) if courseware is not None else set()
+        if source.get("mode") == "courseware":
+            expected_units = {unit for ref in refs for unit in slide_units.get(ref, set())}
+            if expected_units - linked_units:
+                errors.append(f"{location}.learning_unit_ids must cover the units behind source_slide_ids: {', '.join(sorted(expected_units - linked_units))}")
+            expected_facts = {fact_id for fact_id, fact_refs in fact_by_slide.items() if set(refs) & fact_refs}
+            if expected_facts - linked_facts:
+                errors.append(f"{location}.canonical_fact_ids must cover the facts behind source_slide_ids: {', '.join(sorted(expected_facts - linked_facts))}")
     metrics["knowledge_links"] = len(knowledge_ids)
 
     tasks = _list(content.get("tasks"))
@@ -668,6 +967,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             task_ids.add(task_id)
             task_by_id[task_id] = task
         refs = _check_id_refs(task.get("knowledge_link_ids"), knowledge_ids, f"{location}.knowledge_link_ids", errors)
+        task_units = _check_id_refs(task.get("learning_unit_ids"), courseware_unit_ids, f"{location}.learning_unit_ids", errors) if source.get("mode") == "courseware" else set()
+        task_facts = _check_id_refs(task.get("canonical_fact_ids", []), courseware_fact_ids, f"{location}.canonical_fact_ids", errors, allow_empty=True) if courseware is not None else set()
         task_source_refs = {
             source_ref
             for item in knowledge
@@ -693,15 +994,26 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             errors.append(f"{location}.source_slide_ids must match the task's knowledge source refs")
         if level == "core" and source.get("mode") == "courseware" and not direct_source_set:
             errors.append(f"{location} core task has no source_slide_ids")
+        if source.get("mode") == "courseware":
+            expected_units = {unit for ref in direct_source_set for unit in slide_units.get(ref, set())}
+            if expected_units - task_units:
+                errors.append(f"{location}.learning_unit_ids must cover the units behind source_slide_ids: {', '.join(sorted(expected_units - task_units))}")
+            expected_facts = {fact_id for fact_id, fact_refs in fact_by_slide.items() if direct_source_set & fact_refs}
+            if expected_facts - task_facts:
+                errors.append(f"{location}.canonical_fact_ids must cover the facts behind source_slide_ids: {', '.join(sorted(expected_facts - task_facts))}")
+            not_yet_taught = " ".join(str(courseware_units.get(unit, {}).get("not_yet_taught", [])) for unit in task_units)
+            if level == "core" and not_yet_taught and any(term and term.casefold() in json.dumps(task, ensure_ascii=False).casefold() for unit in task_units for term in courseware_units.get(unit, {}).get("not_yet_taught", [])):
+                errors.append(f"{location} core task uses a not_yet_taught boundary")
         steps = task.get("steps")
         if not isinstance(steps, list) or len(steps) < MIN_TASK_STEPS:
             errors.append(f"{location}.steps must contain at least {MIN_TASK_STEPS} concrete items")
         else:
             for step_index, step in enumerate(steps):
                 _required_strings(step, ("title", "instruction"), f"{location}.steps[{step_index}]", errors)
-        for field in ("acceptance", "help_refs"):
-            if not isinstance(task.get(field), list) or not task[field]:
-                errors.append(f"{location}.{field} must be a non-empty list")
+        if not isinstance(task.get("acceptance"), list) or not task["acceptance"]:
+            errors.append(f"{location}.acceptance must be a non-empty list")
+        if not isinstance(task.get("help_refs"), list):
+            errors.append(f"{location}.help_refs must be a list when present")
         minutes = task.get("estimated_minutes")
         if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 5:
             errors.append(f"{location}.estimated_minutes must be an integer of at least 5")
@@ -710,11 +1022,33 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         if isinstance(minutes, int) and not isinstance(minutes, bool):
             metrics["task_minutes"] += minutes
         modality = task.get("modality")
-        if not _non_empty(modality):
-            errors.append(f"{location}.modality must be a non-empty string")
+        if modality is not None and not _non_empty(modality):
+            errors.append(f"{location}.modality must be a non-empty string when present")
+        task_kind = task.get("task_kind")
+        artifact_kind = task.get("artifact_kind")
+        capabilities = task.get("capabilities")
+        if task_kind not in TASK_KINDS:
+            errors.append(f"{location}.task_kind must be one of {sorted(TASK_KINDS)}")
+        if artifact_kind not in ARTIFACT_KINDS:
+            errors.append(f"{location}.artifact_kind must be one of {sorted(ARTIFACT_KINDS)}")
+        if not isinstance(capabilities, list) or not capabilities:
+            errors.append(f"{location}.capabilities must be a non-empty list")
+            capabilities = []
+        else:
+            unknown_capabilities = sorted(set(capabilities) - CAPABILITIES)
+            errors.extend(f"{location}.capabilities contains unknown capability: {item}" for item in unknown_capabilities)
+        if level == "core" and "code_editing" in capabilities and not task.get("starter_asset_ids"):
+            errors.append(f"{location} core code_editing task must provide a starter")
+        if "model_editing" in capabilities and not task.get("starter_asset_ids"):
+            errors.append(f"{location} model_editing task must provide an editable starter or scaffold")
+        if "execution" in capabilities or "query_execution" in capabilities:
+            if not _non_empty(task.get("verification", "")) and not task.get("acceptance"):
+                errors.append(f"{location} execution capability needs verification guidance")
+        if "diagnosis" in capabilities and not _non_empty(task.get("scaffold")):
+            errors.append(f"{location} diagnosis capability needs a concrete symptom scaffold")
         if level == "core" and source.get("mode") == "courseware" and not refs:
             errors.append(f"{location} core task must link to taught knowledge")
-        if level == "core" and modality in CODING_MODALITIES:
+        if level == "core" and "code_editing" in capabilities:
             starter_values = task.get("starter_asset_ids")
             if not isinstance(starter_values, list) or not starter_values:
                 errors.append(f"{location}.starter_asset_ids must be a non-empty list")
@@ -761,7 +1095,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         starter_refs = task.get("starter_asset_ids", [])
         if starter_refs:
             _check_id_refs(starter_refs, asset_ids, f"tasks[{task.get('id')}].starter_asset_ids", errors)
-        if task.get("level") == "core" and task.get("modality") in CODING_MODALITIES:
+        if task.get("level") == "core" and "code_editing" in task.get("capabilities", []):
             actual_todo = sum(len(re.findall(r"\bTODO\s+\d+\b", _text(asset.get("content")))) for asset in assets if isinstance(asset, dict) and asset.get("id") in starter_refs)
             if actual_todo != task.get("todo_count"):
                 errors.append(f"task {task.get('id')} todo_count does not match starter content ({actual_todo})")
@@ -788,6 +1122,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             center_ids.add(center_id)
         _check_id_refs(center.get("knowledge_link_ids"), knowledge_ids, f"{location}.knowledge_link_ids", errors)
         _check_id_refs(center.get("task_ids"), task_ids, f"{location}.task_ids", errors)
+        if source.get("mode") == "courseware":
+            _validate_semantic_links(center, location, task_by_id, courseware_unit_ids, courseware_fact_ids, errors)
         interaction = _validate_interaction(center.get("interaction"), f"{location}.interaction", errors)
         if isinstance(interaction.get("type"), str):
             interaction_types.add(interaction["type"])
@@ -821,9 +1157,6 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         errors.append("state-simulator interactions must include a terminal round")
     core_task_ids = {task_id for task_id, task in task_by_id.items() if task.get("level") == "core"}
     covered_core_task_ids = {task_id for center in centers if isinstance(center, dict) for task_id in _list(center.get("task_ids"))}
-    missing_core_centers = sorted(core_task_ids - covered_core_task_ids)
-    if missing_core_centers:
-        errors.append("learning_center must cover every core task: " + ", ".join(missing_core_centers))
     for knowledge_id in knowledge_ids:
         knowledge_forms = {RENDERER_FAMILIES.get(center.get("interaction", {}).get("type")) for center in centers if isinstance(center, dict) and knowledge_id in _list(center.get("knowledge_link_ids"))}
         knowledge_forms.discard(None)
@@ -847,6 +1180,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             guide_ids.add(guide_id)
         _check_id_refs(guide.get("knowledge_link_ids"), knowledge_ids, f"{location}.knowledge_link_ids", errors)
         _check_id_refs(guide.get("task_ids"), task_ids, f"{location}.task_ids", errors)
+        if source.get("mode") == "courseware":
+            _validate_semantic_links(guide, location, task_by_id, courseware_unit_ids, courseware_fact_ids, errors)
         _required_strings(guide, ("worked_example",), location, errors)
         for field in ("quick_reference", "common_errors", "checkpoints"):
             values = guide.get(field)
@@ -872,6 +1207,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
                 errors.append(f"duplicate foundation kit id: {kit_id}")
             kit_ids.add(kit_id)
         _check_id_refs(kit.get("task_ids"), task_ids, f"{location}.task_ids", errors)
+        if source.get("mode") == "courseware":
+            _validate_semantic_links(kit, location, task_by_id, courseware_unit_ids, courseware_fact_ids, errors)
         _required_strings(kit, ("when_to_use",), location, errors)
         if not isinstance(kit.get("steps"), list) or not kit["steps"]:
             errors.append(f"{location}.steps must be a non-empty list")
@@ -880,7 +1217,16 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     metrics["foundation_microtopics"] = len(kit_ids)
 
     _validate_teacher_guide(content.get("teacher_guide"), task_ids, "teacher_guide", errors)
-    _validate_teacher_reference(content.get("teacher_reference"), task_by_id, knowledge_by_id, actual_slide_ids, "teacher_reference", errors)
+    _validate_teacher_reference(
+        content.get("teacher_reference"),
+        task_by_id,
+        knowledge_by_id,
+        actual_slide_ids,
+        courseware_unit_ids,
+        courseware_fact_ids,
+        "teacher_reference",
+        errors,
+    )
     if isinstance(content.get("teacher_reference"), dict):
         references = content["teacher_reference"].get("task_references", [])
         metrics["teacher_references"] = len(references) if isinstance(references, list) else 0
@@ -891,13 +1237,29 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     metrics["core_help_coverage"] = len(core_task_ids & guidance_ids)
     missing_core_guidance = sorted(core_task_ids - guidance_ids)
     if missing_core_guidance:
-        errors.append("teacher_guide.task_guidance must cover every core task: " + ", ".join(missing_core_guidance))
+        warnings.append("teacher_guide.task_guidance does not cover every core task: " + ", ".join(missing_core_guidance))
 
     all_help_refs = [ref for task in task_by_id.values() for ref in _list(task.get("help_refs"))]
     valid_help = guide_ids | kit_ids
     for ref in all_help_refs:
         if ref not in valid_help:
             warnings.append(f"help_refs item is not a study guide or foundation kit id: {ref}")
+    support_covered = 0
+    for task_id in core_task_ids:
+        task = task_by_id[task_id]
+        refs = set(task.get("help_refs", []))
+        has_support = bool(refs & valid_help) or bool(task.get("starter_asset_ids")) or _non_empty(task.get("scaffold"))
+        if has_support:
+            support_covered += 1
+    metrics["support_path_coverage"] = support_covered
+    metrics["core_help_coverage"] = support_covered
+    missing_support = sorted(task_id for task_id in core_task_ids if not (
+        set(task_by_id[task_id].get("help_refs", [])) & valid_help
+        or task_by_id[task_id].get("starter_asset_ids")
+        or _non_empty(task_by_id[task_id].get("scaffold"))
+    ))
+    if missing_support:
+        errors.append("core tasks need at least one effective support path: " + ", ".join(missing_support))
     timing = content.get("teacher_guide", {}).get("timing", []) if isinstance(content.get("teacher_guide"), dict) else []
     timing_minutes = sum(item.get("minutes", 0) for item in timing if isinstance(item, dict) and isinstance(item.get("minutes"), int))
     metrics["teacher_timing_minutes"] = timing_minutes
@@ -938,14 +1300,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     if re.search(r"统一提交|提交截图|收走|每组至少交出", raw_content):
         errors.append("default classroom content must not require uniform submission, screenshots, or collection of artifacts")
 
-    # A modeling/tooling or non-C fixture must not accidentally inherit a
-    # C/programming scaffold.  This stays generic: it is based on the
-    # declared course language, not on a hard-coded course title.
-    declared_language = practice_context.get("language") if isinstance(practice_context, dict) else None
-    if task_by_id and declared_language != "C":
-        raw = json.dumps(content, ensure_ascii=False)
-        if re.search(r"C\s*语言|C/C\+\+|#include\s*<|代码模板|binary_search\.py", raw, re.IGNORECASE):
-            errors.append("non-C practice content contains C/code-template pollution")
+    errors.extend(_toolchain_compatibility_errors(content, practice_context))
 
     return {
         "status": "pass" if not errors else "fail",
@@ -953,6 +1308,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "warnings": warnings,
         "metrics": metrics,
         "source_slide_refs": sorted(source_slide_refs),
+        "migration": migration,
     }
 
 

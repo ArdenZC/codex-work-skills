@@ -1,6 +1,6 @@
 # Practice Class Content Quality Gold Benchmark
 
-这份参考只抽象内容质量标准，不复制任何一门课程的知识点、案例、代码或历史提交要求。它用于判断生成结果是否已经接近“教师下一次课就敢拿进机房使用”的实践课，而不是替代 Courseware Content Contract 1.0。
+这份参考只抽象内容质量标准，不复制任何一门课程的知识点、案例、代码或历史提交要求。它用于判断生成结果是否已经接近“教师下一次课就敢拿进机房使用”的实践课，而不是替代 Courseware Content Contract 1.1。
 
 ## 质量目标
 

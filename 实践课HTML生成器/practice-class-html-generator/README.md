@@ -7,7 +7,8 @@
 ```text
 practice-class-html-generator/
 ├── agents/openai.yaml
-├── docs/content-contract-v1.md
+├── docs/content-contract-v1.1.md
+├── docs/content-contract-v1.md       # 1.0 历史兼容说明
 ├── examples/
 │   ├── data-structures.practice.json
 │   ├── uml.practice.json
@@ -18,9 +19,13 @@ practice-class-html-generator/
 │   ├── practice_contract.py
 │   ├── render_practice.py
 │   ├── validate_practice.py
+│   ├── practice_pedagogical_review.py
+│   ├── apply_reference_gaps.py
+│   ├── holdout_audit.py
 │   ├── install.py
 │   └── install_adapters.py
 ├── tests/test_practice_class.py
+├── tests/test_generalization.py
 ├── tests/browser_smoke.mjs
 └── SKILL.md
 ```
@@ -28,11 +33,11 @@ practice-class-html-generator/
 ## 数据流
 
 ```text
-Courseware Content Contract 1.0 / 课程资料
-  → Agent 创作 Practice Class Content Contract 1.0
+Courseware Content Contract 1.1 / 课程资料
+  → Agent 创作 Practice Class Content Contract 1.1
   → 理论关联与学生可完成性 QA
   → deterministic HTML renderer（四个学生模块 + 两个教师模块，模块内 pane）
-  → student/ 学生材料 + teacher/ 教师指导/逐任务参考
+  → student/ 学生材料 + teacher/ 教师指导/逐任务参考 + student-package/teacher-package
   → file:// 浏览器 smoke
 ```
 
@@ -61,14 +66,16 @@ practice-output/
 │  ├─ teacher-guide.html       # 课堂指导模块，观察点在 pane 内切换
 │  └─ teacher-reference.html   # 教师参考模块，逐任务成果在 pane 内切换
 ├─ practice-content.json
-└─ qa-report.json
+├─ qa-report.json
+├─ student-package/             # 可单独分发的无答案学生包
+└─ teacher-package/             # 可单独分发的教师包与自动参考成果
 ```
 
 四个学生模块和两个教师模块都是完整主页面；合同数组映射成各页的 pane，左侧（窄屏时顶部）导航只切换当前 pane，hash 可直接定位一个任务、实验或参考成果。每个 pane 聚焦一个教学对象，正文保持可读的单列宽度，并提供返回目录、上一项、下一项、标题和时间/帮助导航。学生页只在 `student/` 内导航，学生可见文本隐藏合同版本、原始 ID、interaction type 和教师路径；教师页可以反向链接学生页。`course_context` 从上游 Courseware Contract 继承语言、工具、平台、软件、数据库方言等强约束。离线输出是可导航的站点包，不是把内容拆成大量详情 HTML，也不是单一 HTML 文件。
 
 ## 合同与验证
 
-合同说明见 [docs/content-contract-v1.md](docs/content-contract-v1.md)，机器结构见 [schemas/practice-class-content.schema.json](schemas/practice-class-content.schema.json)。
+合同说明见 [docs/content-contract-v1.1.md](docs/content-contract-v1.1.md)，历史兼容入口见 [docs/content-contract-v1.md](docs/content-contract-v1.md)，机器结构见 [schemas/practice-class-content.schema.json](schemas/practice-class-content.schema.json)。
 
 ```powershell
 python scripts/validate_practice.py `
@@ -96,3 +103,21 @@ node tests/browser_smoke.mjs .\out\data-structures
 ```
 
 smoke 会从 `file://` 打开每套输出的四个学生模块和两个教师模块，在 1366×768、1440×900、1920×1080 检查无横向溢出和无外部请求，逐 pane 切换，并实际点击选择、步骤、分类、排序、状态模拟、连续诊断、多参数比较和多题互动；教师参考页还会检查模型 SVG 的计算样式与可见尺寸，内部链接由 `validate_practice.py` 同时检查。Chrome/Edge 可通过 `PRACTICE_BROWSER_EXECUTABLE` 指定已有可执行文件。这里的自动化 PASS 只说明结构与交互可运行，不替代 Gold Sample 并排内容验收。
+
+## 五门泛化 holdout
+
+`holdouts/` 是独立于 Data Structures/UML/Database regression fixture 的冻结 source pack。它覆盖 Python Web、Excel/Power Query、计算机网络、AI 分类评价和软件测试；首次生成前运行：
+
+```powershell
+python holdouts\build_holdouts.py --freeze-manifest
+python scripts\holdout_audit.py `
+  --output-root F:\work\practice-class-generalization-audit-<date> `
+  --pass-name first-pass --browser-smoke
+python scripts\holdout_audit.py `
+  --output-root F:\work\practice-class-generalization-audit-<date> `
+  --pass-name second-pass --browser-smoke
+python scripts\holdout_audit.py `
+  --output-root F:\work\practice-class-generalization-audit-<date> --compare
+```
+
+审计分开报告 Contract、Reference/Leakage、Browser 和 Pedagogical 结果；`content_acceptance` 必须等人工把生成包与 Gold Sample 并排审阅后才改变。三个已知 fixture 只能作为 regression，不能替代泛化验收。

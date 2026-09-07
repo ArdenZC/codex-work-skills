@@ -1,8 +1,9 @@
-"""Render Practice Class Content Contract 1.0 as a compact offline HTML package."""
+"""Render Practice Class Content Contract 1.1 as a compact offline HTML package."""
 
 from __future__ import annotations
 
 import argparse
+import copy
 import html
 import json
 import re
@@ -11,7 +12,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from practice_contract import LEVEL_LABELS, RENDERER_FAMILIES, load_courseware, load_json, validate_content
+from apply_reference_gaps import build_reference_report
+from practice_pedagogical_review import review_content
+from practice_contract import LEVEL_LABELS, RENDERER_FAMILIES, load_courseware, load_json, normalize_content, validate_content
 
 
 TEXT_ASSET_EXTENSIONS = {
@@ -239,7 +242,7 @@ document.querySelectorAll("[data-state-root]").forEach((box) => {
   const rounds = JSON.parse(box.dataset.rounds || "[]"); const fields = JSON.parse(box.dataset.stateFields || "[]"); const visualConfig = box.dataset.stateVisual ? JSON.parse(box.dataset.stateVisual) : null; let current = 0; const fieldMap = new Map(fields.map((field) => [field.id, field])); const labelFor = (id) => fieldMap.get(id)?.label || "过程字段"; const valueText = (value) => typeof value === "object" ? JSON.stringify(value) : String(value);
   const makeGiven = (container, values) => { container.innerHTML = ""; Object.entries(values || {}).forEach(([id, value]) => { const span = document.createElement("span"); span.className = "state-value"; span.innerHTML = `<b>${labelFor(id)}</b> ${valueText(value)}`; container.appendChild(span); }); };
   const makeInputs = (container, values, prefix) => { container.innerHTML = ""; Object.entries(values || {}).forEach(([id, value]) => { const label = document.createElement("label"); label.textContent = `${labelFor(id)} `; const input = document.createElement("input"); input.type = fieldMap.get(id)?.input_type || (typeof value === "number" ? "number" : "text"); input.value = ""; input.dataset.stateInput = prefix; input.dataset.field = id; input.dataset.expectedValue = JSON.stringify(value); label.appendChild(input); container.appendChild(label); }); };
-  const renderVisual = (round, checked = false) => { if (!visualConfig) return; const cells = box.querySelector("[data-visual-items]"); const start = Number(round.given?.[visualConfig.start_field]); const end = Number(round.given?.[visualConfig.end_field]); const focus = checked ? Number(round.expected?.[visualConfig.focus_field]) : null; if (!cells || !Number.isFinite(start) || !Number.isFinite(end)) return; cells.innerHTML = ""; (visualConfig.items || []).forEach((item, index) => { const cell = document.createElement("div"); const candidate = index >= start && index <= end; cell.className = `state-cell ${candidate ? "is-candidate" : "is-outside"}${focus === index ? " is-focus" : ""}`; cell.dataset.stateIndex = String(index); cell.innerHTML = `<span class="state-index">${visualConfig.index_label || "位置"} ${item.label}</span><span class="state-value-text">${valueText(item.value)}</span>`; cells.appendChild(cell); }); const status = box.querySelector("[data-state-visual-status]"); if (status) status.textContent = checked ? (visualConfig.focus_label || "已核对本轮中点") : `${visualConfig.candidate_label || "候选区间"}：${start}—${end}`; const note = box.querySelector("[data-state-visual-note]"); if (note) note.textContent = checked ? (round.status === "found" ? `${round.observation || ""}；${visualConfig.terminal_label || `已找到目标：下标 ${focus}`}` : (round.observation || "已显示本轮比较结果。")) : "先填写本轮未知字段，再检查中点和下一状态。"; };
+  const renderVisual = (round, checked = false) => { if (!visualConfig) return; const cells = box.querySelector("[data-visual-items]"); if (!cells) return; const visualKind = visualConfig.kind || "table"; if (visualKind === "sequence-range") { const start = Number(round.given?.[visualConfig.start_field]); const end = Number(round.given?.[visualConfig.end_field]); const focus = checked ? Number(round.expected?.[visualConfig.focus_field]) : null; if (!Number.isFinite(start) || !Number.isFinite(end)) return; cells.innerHTML = ""; (visualConfig.items || []).forEach((item, index) => { const cell = document.createElement("div"); const candidate = index >= start && index <= end; cell.className = `state-cell ${candidate ? "is-candidate" : "is-outside"}${focus === index ? " is-focus" : ""}`; cell.dataset.stateIndex = String(index); const indexNode = document.createElement("span"); indexNode.className = "state-index"; indexNode.textContent = `${visualConfig.index_label || "位置"} ${item.label}`; const valueNode = document.createElement("span"); valueNode.className = "state-value-text"; valueNode.textContent = valueText(item.value); cell.append(indexNode, valueNode); cells.appendChild(cell); }); const status = box.querySelector("[data-state-visual-status]"); if (status) status.textContent = checked ? (visualConfig.focus_label || "已核对当前焦点") : `${visualConfig.candidate_label || "当前范围"}：${start}—${end}`; const note = box.querySelector("[data-state-visual-note]"); if (note) note.textContent = checked ? (round.status === "found" ? `${round.observation || ""}；${visualConfig.terminal_label || `已到达终止状态：${focus}`}` : (round.observation || "已显示本轮比较结果。")) : (visualConfig.instruction || "先填写本轮未知字段，再检查下一状态。"); return; } const visualState = round.visual_state || round.visual_values || {}; cells.innerHTML = ""; (visualConfig.items || []).forEach((item, index) => { const cell = document.createElement("div"); const key = item.id || item.label; const value = Object.prototype.hasOwnProperty.call(visualState, key) ? visualState[key] : item.value; const focused = checked && (round.focus_item_id === item.id || round.focus_label === item.label); cell.className = `state-cell${focused ? " is-focus" : ""}`; cell.dataset.stateIndex = String(index); const indexNode = document.createElement("span"); indexNode.className = "state-index"; indexNode.textContent = item.label; const valueNode = document.createElement("span"); valueNode.className = "state-value-text"; valueNode.textContent = valueText(value); cell.append(indexNode, valueNode); cells.appendChild(cell); }); const status = box.querySelector("[data-state-visual-status]"); if (status) status.textContent = checked ? (visualConfig.checked_label || "已核对当前状态") : (visualConfig.status_label || "当前状态"); const note = box.querySelector("[data-state-visual-note]"); if (note) note.textContent = checked ? (round.observation || "已显示本轮状态结果。") : (visualConfig.instruction || "先观察给定状态，再填写需要推导的字段。"); };
   const render = () => { const round = rounds[current]; makeGiven(box.querySelector("[data-state-given]"), round.given); makeInputs(box.querySelector("[data-state-expected]"), round.expected, "current"); const next = box.querySelector("[data-state-next]"); const continuing = round.status === "continue"; if (next) { next.hidden = !continuing; if (continuing) makeInputs(next.querySelector("[data-state-next-inputs]"), round.next_expected, "next"); } const terminal = box.querySelector("[data-terminal-note]"); if (terminal) terminal.hidden = true; const feedback = box.querySelector(".feedback"); if (feedback) { feedback.textContent = ""; feedback.classList.remove("wrong"); } const observation = box.querySelector("[data-state-observation]"); if (observation) { observation.hidden = true; observation.textContent = round.observation || ""; } const nextButton = box.querySelector("[data-next-round]"); if (nextButton) { nextButton.hidden = !continuing; nextButton.disabled = true; } const status = box.querySelector("[data-sim-status]"); if (status) status.textContent = `第 ${current + 1} / ${rounds.length} 轮`; renderVisual(round, false); };
   const same = (input) => { if (!input || input.value.trim() === "") return false; const expected = JSON.parse(input.dataset.expectedValue); if (typeof expected === "number") return Number(input.value) === expected; return input.value.trim() === String(expected); };
   box.querySelector("[data-check]")?.addEventListener("click", () => { const round = rounds[current]; const inputs = [...box.querySelectorAll("[data-state-input]")]; const correct = inputs.length > 0 && inputs.every(same); const feedback = box.querySelector(".feedback"); if (feedback) { feedback.textContent = correct ? (round.feedback || neutralSuccess) : (box.dataset.retryFeedback || neutralRetry); feedback.classList.toggle("wrong", !correct); } const observation = box.querySelector("[data-state-observation]"); if (observation && correct) observation.hidden = false; const nextButton = box.querySelector("[data-next-round]"); if (nextButton && correct) nextButton.disabled = false; const terminal = box.querySelector("[data-terminal-note]"); if (terminal && correct && round.status !== "continue") { terminal.hidden = false; terminal.textContent = round.terminal_label || "已到达终止状态，当前过程结束。"; } if (correct) renderVisual(round, true); });
@@ -415,7 +418,9 @@ def _render_state(interaction: dict[str, Any], base: str, interaction_id: str) -
     state = interaction.get("state") if isinstance(interaction.get("state"), dict) else {}
     target = f'；{esc(state.get("target_label"))}：{esc(state.get("target"))}' if state.get("target") is not None else ""
     context = f'<div class="state-context"><b>{esc(state.get("context_label", "背景状态"))}</b>：{text_block(state.get("context", "请阅读题面给出的状态。"))}{target}</div>'
-    visual = interaction.get("state_visual") if isinstance(interaction.get("state_visual"), dict) else None
+    visual = interaction.get("visualization") if isinstance(interaction.get("visualization"), dict) else None
+    if visual is None and isinstance(interaction.get("state_visual"), dict):
+        visual = interaction.get("state_visual")
     visual_html = ""
     visual_attr = ""
     if visual:
@@ -504,7 +509,9 @@ def render_teacher_guide(content: dict[str, Any]) -> str:
 
 
 def _reference_visual_html(reference: dict[str, Any]) -> str:
-    visual = reference.get("model_visual")
+    visual = reference.get("reference_visual")
+    if not isinstance(visual, dict):
+        visual = reference.get("model_visual")
     if not isinstance(visual, dict):
         return ""
     title = str(visual.get("title") or "参考模型")
@@ -552,6 +559,21 @@ def _reference_visual_html(reference: dict[str, Any]) -> str:
             svg_parts.append(f'<text class="uml-field" x="{x + 12:g}" y="{y + 45 + line_index * 18:g}">{esc(field)}</text>')
     svg_parts.append("</svg>")
     messages = "".join(f"<li><strong>{esc(item.get('from'))} → {esc(item.get('to'))}</strong>：{text_block(item.get('label'))}</li>" for item in _list(visual.get("messages")) if isinstance(item, dict))
+    if not nodes and not messages:
+        rows = visual.get("rows") if isinstance(visual.get("rows"), list) else visual.get("items")
+        if isinstance(rows, list) and rows:
+            rendered_rows = []
+            for row in rows:
+                if isinstance(row, dict):
+                    rendered_rows.append("<tr>" + "".join(f"<td>{text_block(value)}</td>" for value in row.values()) + "</tr>")
+                elif isinstance(row, list):
+                    rendered_rows.append("<tr>" + "".join(f"<td>{text_block(value)}</td>" for value in row) + "</tr>")
+                else:
+                    rendered_rows.append(f"<tr><td>{text_block(row)}</td></tr>")
+            table_html = f'<table class="reference-fallback-table"><tbody>{"".join(rendered_rows)}</tbody></table>'
+        else:
+            table_html = '<div class="reference-fallback-table">教师参考视觉暂用表格化说明。</div>'
+        return f'<section class="reference-visual" data-reference-visual="{esc(visual.get("kind", "table"))}"><h4>{esc(title)}</h4>{table_html}</section>'
     message_html = f'<ol class="message-chain">{messages}</ol>' if messages else ""
     return f'<section class="reference-visual" data-reference-visual="{esc(visual.get("kind", "model"))}"><h4>{esc(title)}</h4>{"".join(svg_parts) if nodes else ""}{message_html}</section>'
 
@@ -578,9 +600,41 @@ def _safe_asset_path(relative: str) -> Path:
     return candidate
 
 
+def _sanitize_student_content(content: dict[str, Any]) -> dict[str, Any]:
+    """Remove teacher answers and replacement metadata from the distributable copy."""
+
+    safe = copy.deepcopy(content)
+    safe.pop("teacher_guide", None)
+    safe.pop("teacher_reference", None)
+    safe.pop("canonical_facts", None)
+    for collection in ("knowledge_links", "tasks", "learning_center", "study_guide", "foundation_kit"):
+        for item in _list(safe.get(collection)):
+            if not isinstance(item, dict):
+                continue
+            item.pop("canonical_fact_ids", None)
+    for asset in _list(safe.get("starter_assets")):
+        if not isinstance(asset, dict):
+            continue
+        asset.pop("editable_gaps", None)
+        for field in ("replacement", "target", "reference_answer", "reference_result", "acceptable_variants", "common_errors", "acceptance_basis"):
+            asset.pop(field, None)
+    return safe
+
+
+def _copy_tree(source: Path, target: Path) -> None:
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(source, target)
+
+
 def generate(practice_path: Path, output_dir: Path, courseware_path: Path | None = None, *, replace: bool = False) -> dict[str, Any]:
-    content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None; contract = validate_content(content, courseware)
+    raw_content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None
+    content, migration = normalize_content(raw_content, courseware)
+    contract = validate_content(content, courseware)
+    contract["migration"] = migration
     if contract["status"] != "pass": raise ValueError("invalid Practice Class Content Contract: " + "; ".join(contract["errors"]))
+    pedagogical = review_content(content, contract)
+    if pedagogical["status"] == "FAIL": raise ValueError("Practice Pedagogical Integrity Review failed: " + "; ".join(pedagogical["errors"]))
     if output_dir.exists():
         if not replace: raise FileExistsError(f"output exists; use --replace: {output_dir}")
         if not output_dir.is_dir(): raise ValueError(f"output target must be a directory: {output_dir}")
@@ -591,14 +645,31 @@ def generate(practice_path: Path, output_dir: Path, courseware_path: Path | None
         if not isinstance(asset, dict): continue
         target = student_dir / "starter" / _safe_asset_path(str(asset.get("path", ""))); target.parent.mkdir(parents=True, exist_ok=True); target.write_text(str(asset.get("content", "")), encoding="utf-8", newline="\n")
     (output_dir / "practice-content.json").write_text(json.dumps(content, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    reference_report = build_reference_report(content, output_dir=output_dir / "teacher-package")
+    student_package = output_dir / "student-package"
+    _copy_tree(student_dir, student_package / "student")
+    safe_content = _sanitize_student_content(content)
+    (student_package / "practice-content.json").write_text(json.dumps(safe_content, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (student_package / "student-manifest.json").write_text(json.dumps({
+        "package_kind": "student",
+        "contract_version": content.get("contract_version"),
+        "pages": ["student/student-task.html", "student/learning-center.html", "student/study-guide.html", "student/foundation-kit.html"],
+        "starter_directory": "student/starter",
+        "teacher_answers_included": False,
+        "replacement_metadata_included": False,
+        "canonical_answers_included": False,
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    _copy_tree(teacher_dir, output_dir / "teacher-package" / "teacher")
+    (output_dir / "teacher-package" / "full-practice-content.json").write_text(json.dumps(content, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     (output_dir / "qa-report.json").write_text("{}\n", encoding="utf-8", newline="\n")
     try:
         from validate_practice import validate_output_files
         outputs = validate_output_files(content, output_dir)
     except Exception as exc:  # pragma: no cover
         outputs = {"status": "fail", "errors": [f"output QA unavailable: {exc}"], "warnings": [], "files": []}
-    qa = {"status": "pass" if contract["status"] == "pass" and outputs["status"] == "pass" else "fail", "contract": contract, "outputs": outputs}
+    qa = {"status": "pass" if contract["status"] == "pass" and pedagogical["status"] != "FAIL" and outputs["status"] == "pass" and reference_report["status"] == "pass" else "fail", "contract": contract, "pedagogical": pedagogical, "outputs": outputs, "reference_generation": reference_report}
     (output_dir / "qa-report.json").write_text(json.dumps(qa, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (output_dir / "teacher-package" / "qa-report.json").write_text(json.dumps(qa, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return qa
 
 

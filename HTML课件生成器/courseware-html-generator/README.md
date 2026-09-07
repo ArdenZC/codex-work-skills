@@ -2,14 +2,16 @@
 
 可复用的离线 HTML 课件生成 Skill。它把 Agent 创作的结构化内容渲染为学生课堂展示版和教师逐页备课版，不绑定数据结构或某一门课程。
 
-下游实践课联动：`实践课HTML生成器/practice-class-html-generator` 以本 Skill 的 Courseware Content Contract 1.0 为首选上游输入，并通过稳定的 `slide.id` 关联理论页。课件 Skill 不依赖或反向修改实践课 Skill。
+下游实践课联动：`实践课HTML生成器/practice-class-html-generator` 以本 Skill 的 Courseware Content Contract 1.1 为首选上游输入，并通过稳定的 `slide.id`、`learning_units` 和 `canonical_facts` 关联理论页。课件 Skill 不依赖或反向修改实践课 Skill。
 
 ## 目录
 
 ```text
 courseware-html-generator/
 ├── agents/openai.yaml
-├── docs/content-contract-v1.md
+├── docs/content-contract-v1.1.md
+├── docs/content-contract-v1.md       # 1.0 历史兼容说明
+├── references/courseware-content-gold-benchmark.md
 ├── examples/
 │   ├── data-structures.example.json
 │   └── uml.example.json
@@ -18,6 +20,7 @@ courseware-html-generator/
 │   ├── content_contract.py
 │   ├── render_courseware.py
 │   ├── validate_courseware.py
+│   ├── pedagogical_review.py
 │   ├── install.py
 │   └── install_adapters.py
 ├── tests/
@@ -30,7 +33,7 @@ courseware-html-generator/
 
 ```text
 教材 / PPT / 讲义 / 教案
-  → Agent 规划与创作 Courseware Content Contract 1.0
+  → Agent 规划与创作 Courseware Content Contract 1.1
   → Contract QA
   → deterministic renderer
   → student.html + teacher.html
@@ -59,7 +62,7 @@ python scripts/render_courseware.py `
 
 ## 合同与 QA
 
-合同字段见 [docs/content-contract-v1.md](docs/content-contract-v1.md)，机器结构见 [schemas/courseware-content.schema.json](schemas/courseware-content.schema.json)。输出 QA 检查页数/id 对应、逐字稿长度、学生禁用词、SVG、安全外链、粗色 `border-left`、单文件离线条件和固定 runtime 标记。
+合同字段见 [docs/content-contract-v1.1.md](docs/content-contract-v1.1.md)，旧 1.0 迁移说明见 [docs/content-contract-v1.md](docs/content-contract-v1.md)，机器结构见 [schemas/courseware-content.schema.json](schemas/courseware-content.schema.json)。输出 QA 检查页数/id 对应、页级时间、教学意图、学生禁用词、SVG/图片、安全外链、粗色 `border-left`、单文件离线条件和固定 runtime 标记。
 
 ```powershell
 python scripts/validate_courseware.py `
@@ -81,6 +84,19 @@ node tests/browser_smoke.mjs <output>\student.html
 ```
 
 也可以设置 `COURSEWARE_BROWSER_EXECUTABLE` 指向本机已有 Chrome/Edge，避免下载 Playwright 浏览器。没有 Node.js/Playwright 时，测试应明确失败；这不影响交付 HTML 的零依赖要求。
+
+## 泛化审计
+
+实践课 Skill 的五门 holdout 审计从 Courseware 1.1 合同开始，并与三个已知案例分开作为 regression set。审计会冻结 source packs、分别保存 first-pass/second-pass、运行结构/语义/浏览器 QA，并把 Gold 内容验收保留为人工结论：
+
+```powershell
+python ..\..\实践课HTML生成器\practice-class-html-generator\holdouts\build_holdouts.py --freeze-manifest
+python ..\..\实践课HTML生成器\practice-class-html-generator\scripts\holdout_audit.py `
+  --output-root F:\work\practice-class-generalization-audit-<date> `
+  --pass-name first-pass --browser-smoke
+```
+
+`Courseware Contract PASS`、`Browser PASS` 和 `Pedagogical Review PASS` 分开记录；它们不等于最终内容授课验收。
 
 ## 安装与适配器
 

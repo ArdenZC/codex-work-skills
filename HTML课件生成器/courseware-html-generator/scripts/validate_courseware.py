@@ -21,8 +21,12 @@ def _resource_errors(document: str) -> list[str]:
     errors: list[str] = []
     if re.search(r"(?is)<link\b|<iframe\b|<object\b|<embed\b", document):
         errors.append("generated document contains an external-capable HTML resource element")
-    if re.search(r"(?is)<script\b[^>]*\bsrc\s*=|<img\b[^>]*\bsrc\s*=", document):
-        errors.append("generated document contains an external script or image source")
+    if re.search(r"(?is)<script\b[^>]*\bsrc\s*=", document):
+        errors.append("generated document contains an external script source")
+    for raw_img in re.findall(r"(?is)<img\b[^>]*>", document):
+        src = re.search(r'''(?i)\bsrc\s*=\s*["']([^"']+)["']''', raw_img)
+        if not src or not re.match(r"(?i)^data:image/(?:png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$", src.group(1)):
+            errors.append("generated document contains an image without a safe local data URI")
     if re.search(r"(?i)@import|url\(\s*['\"]?https?://|(?:src|href)\s*=\s*['\"]https?://", document):
         errors.append("generated document contains an external URL or stylesheet reference")
     if re.search(r"(?i)fonts\.googleapis|fonts\.gstatic|@font-face", document):

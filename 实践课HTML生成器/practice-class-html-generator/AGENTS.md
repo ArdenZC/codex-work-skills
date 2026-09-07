@@ -4,8 +4,8 @@
 
 ## Agent / renderer 边界
 
-- Agent 负责读取理论资料、判断学生起点、设计可完成的任务和创作 Practice Class Content Contract 1.0。
-- Python 只负责合同校验、理论页关联 QA、HTML 布局、互动行为、starter 写入和精简输出 QA。
+- Agent 负责读取理论资料、判断学生起点、设计可完成的任务和创作 Practice Class Content Contract 1.1；旧 1.0 只能通过迁移读取。
+- Python 只负责合同校验、理论页关联 QA、HTML 布局、互动行为、starter 写入和精简输出 QA；内容质量评分与结构 QA 分离。
 - 不要让模型直接拼接最终 HTML、CSS 或 JavaScript；不要把旧 WorkOrder 的 DOCX、评分册、模板指纹或复杂事务机制带入本 Skill。
 
 ## 内容门禁

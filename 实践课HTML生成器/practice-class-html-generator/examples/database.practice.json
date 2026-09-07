@@ -1451,14 +1451,16 @@
       "editable_gaps": [
         {
           "marker": "占位关系 A",
-          "replacement": "占位关系 A",
-          "instruction": "在 draw.io 中编辑现有占位关系线，将它改为正式 Customer—Order 关联并补上 1 / 0..* 基数。",
+          "target": "占位关系 A",
+          "replacement": "Customer — Order：Customer 1；Order 0..*",
+          "student_instruction": "在 draw.io 中编辑现有关联线，补出两端对象、业务关系和基数。",
           "kind": "editable-relationship"
         },
         {
           "marker": "待标注 FK",
-          "replacement": "待标注 FK",
-          "instruction": "编辑 Order.customer_id 字段标签，明确它引用 Customer.customer_id。",
+          "target": "待标注 FK",
+          "replacement": "Order.customer_id → Customer.customer_id（FK）",
+          "student_instruction": "编辑 Order.customer_id 字段标签，明确外键指向和字段角色。",
           "kind": "field-role"
         }
       ]
@@ -1476,30 +1478,34 @@
       "path": "orders-query.sql",
       "language": "SQL / MySQL 8.0",
       "task_id": "db-sql-core",
-      "content": "-- MySQL 8.0 starter：统计 2025-02 月有已完成订单的客户及其订单数\nSELECT\n    c.customer_name,\n    COUNT(DISTINCT o.customer_id) AS completed_orders /* TODO 1: replace with COUNT(o.order_id) */\nFROM customers AS c\nJOIN orders AS o ON c.customer_id = o.customer_id\nWHERE o.status = 'pending' /* TODO 2: replace with 'completed' */\n  AND o.order_date >= '2025-03-01' /* TODO 3: replace with '2025-02-01' */\n  AND o.order_date < '2025-02-01' /* TODO 4: replace with '2025-03-01' */\nGROUP BY c.customer_id, c.customer_name\nORDER BY completed_orders DESC, c.customer_name;",
+      "content": "-- MySQL 8.0 starter：统计二月已完成订单的客户及其订单数\nSELECT\n    c.customer_name,\n    COUNT(DISTINCT o.customer_id) AS completed_orders /* TODO 1 */\nFROM customers AS c\nJOIN orders AS o ON c.customer_id = o.customer_id\nWHERE o.status = 'pending' /* TODO 2 */\n  AND o.order_date >= '2025-03-01' /* TODO 3 */\n  AND o.order_date < '2025-02-01' /* TODO 4 */\nGROUP BY c.customer_id, c.customer_name\nORDER BY completed_orders DESC, c.customer_name;",
       "editable_gaps": [
         {
           "marker": "TODO 1",
-          "replacement": "DISTINCT o.customer_id",
-          "instruction": "把按客户去重的计数改成每一行订单的稳定标识，观察客户 A 的数量变化。",
+          "target": "COUNT(DISTINCT o.customer_id)",
+          "replacement": "COUNT(o.order_id)",
+          "student_instruction": "把按客户去重的计数改成按订单行计数，观察结果为何改变。",
           "kind": "aggregate-expression"
         },
         {
           "marker": "TODO 2",
-          "replacement": "'pending'",
-          "instruction": "把状态条件改为题目要求的 completed。",
+          "target": "o.status = 'pending'",
+          "replacement": "o.status = 'completed'",
+          "student_instruction": "把状态条件改为题目要求的已完成状态。",
           "kind": "where-value"
         },
         {
           "marker": "TODO 3",
-          "replacement": "'2025-03-01'",
-          "instruction": "把错误的全年起点改为 2025-02-01，观察 1 月 31 日记录是否被排除。",
+          "target": "o.order_date >= '2025-03-01'",
+          "replacement": "o.order_date >= '2025-02-01'",
+          "student_instruction": "把错误的日期下界改为课程指定的二月起点，并检查边界前一天。",
           "kind": "date-lower-bound"
         },
         {
           "marker": "TODO 4",
-          "replacement": "'2025-02-01'",
-          "instruction": "把过早的上界改为 2025-03-01，保留 2 月 1 日和 2 月 28 日。",
+          "target": "o.order_date < '2025-02-01'",
+          "replacement": "o.order_date < '2025-03-01'",
+          "student_instruction": "把过早的日期上界改为下一个月起点，并检查二月首尾记录。",
           "kind": "date-upper-bound"
         }
       ]

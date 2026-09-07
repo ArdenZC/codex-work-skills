@@ -25,7 +25,7 @@ ADAPTER_PATHS = {
 PAYLOAD = """实践课 HTML 生成器规则：
 
 - 先阅读 `practice-class-html-generator/简介.md`、`通用提示词.md` 和 `SKILL.md`。
-- 首选消费上游 Courseware Content Contract 1.0；实践知识点和 core 任务必须保留真实 `source_slide_ids`。
+- 首选消费上游 Courseware Content Contract 1.1；实践知识点和 core 任务必须保留真实 `source_slide_ids`、学习单元和事实关联。
 - 根据课程动态生成 foundation-kit；任务按 core / optional / challenge 分层，互动必须服务知识点和任务。
 - 生成后运行合同、HTML 内链和浏览器 smoke QA；内容是否适合学生仍需人工验收。
 """

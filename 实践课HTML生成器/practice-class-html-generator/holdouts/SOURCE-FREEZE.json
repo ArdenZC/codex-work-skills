@@ -1,0 +1,40 @@
+{
+  "status": "frozen-before-first-generation",
+  "holdouts": [
+    {
+      "id": "web-api",
+      "courseware": "web-api.courseware.json",
+      "practice": "web-api.practice.json",
+      "courseware_sha256": "137693c5a3550a71b2206588efeb38cccf28a64ef8dd28dbd4abba48b6b406a6",
+      "practice_sha256": "1b7584cadab82dde71da1d038b1464d2107e3513b1fa22593c98a0e31e8fa0a8"
+    },
+    {
+      "id": "spreadsheet",
+      "courseware": "spreadsheet.courseware.json",
+      "practice": "spreadsheet.practice.json",
+      "courseware_sha256": "18882dd49f18ccc1580699e54222152aeb9669f2afb49cc4e5c8a2d89c1c449a",
+      "practice_sha256": "9c906798fcace66a6737071693eb00ec5bbb0fe91fd1a8ab4304f3ccbd488706"
+    },
+    {
+      "id": "networking",
+      "courseware": "networking.courseware.json",
+      "practice": "networking.practice.json",
+      "courseware_sha256": "d4772cd33c92009bc956b68d204f6f9d68ded9618671a012583687d437d64618",
+      "practice_sha256": "1ca4d5eb141f187cb3feadf31e46e64085a9ec57e6cee450ec99ca42cc4b0804"
+    },
+    {
+      "id": "ai-evaluation",
+      "courseware": "ai-evaluation.courseware.json",
+      "practice": "ai-evaluation.practice.json",
+      "courseware_sha256": "ec458d7aa469719493cc3bda2a7e2a5959d0cdfc04951bb559d730a05c99f4fb",
+      "practice_sha256": "55f7131c9b4d25a5302dd01f1815b91ada3d7472c9e610bdb01deec356db79d5"
+    },
+    {
+      "id": "software-testing",
+      "courseware": "software-testing.courseware.json",
+      "practice": "software-testing.practice.json",
+      "courseware_sha256": "4cddd77e09f5a2be69502bca561b75d51bd27152ade382cd5f328dd2a6dc226b",
+      "practice_sha256": "a9aae8fcbde75b7a6bf35f73153f5b12d3ebb74aae9a78e2626dcf345c12fee1"
+    }
+  ]
+}

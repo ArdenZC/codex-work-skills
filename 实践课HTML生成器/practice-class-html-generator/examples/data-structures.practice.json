@@ -1468,30 +1468,34 @@
       "path": "binary-search.c",
       "language": "C",
       "task_id": "ds-fill-core",
-      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = 0; /* TODO 1: replace 0 with the midpoint of the current closed interval */\n        if (values[mid] == target) {\n            return mid;\n        }\n        if (values[mid] < target) {\n            left = mid; /* TODO 2: exclude the midpoint before searching the right half */\n        } else {\n            right = mid; /* TODO 3: exclude the midpoint before searching the left half */\n        }\n    }\n    return 0; /* TODO 4: use the course's not-found return value */\n}\n\nint main(void) {\n    int values[] = {3, 8, 14, 21, 29, 37, 45, 58};\n    int n = (int)(sizeof(values) / sizeof(values[0]));\n    int targets[] = {21, 3, 58, 20};\n    for (int i = 0; i < 4; i++) {\n        printf(\"target=%d index=%d\\n\", targets[i], binary_search(values, n, targets[i]));\n    }\n    return 0;\n}\n",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = 0; /* TODO 1 */\n        if (values[mid] == target) {\n            return mid;\n        }\n        if (values[mid] < target) {\n            left = mid; /* TODO 2 */\n        } else {\n            right = mid; /* TODO 3 */\n        }\n    }\n    return 0; /* TODO 4 */\n}\n\nint main(void) {\n    int values[] = {3, 8, 14, 21, 29, 37, 45, 58};\n    int n = (int)(sizeof(values) / sizeof(values[0]));\n    int targets[] = {21, 3, 58, 20};\n    for (int i = 0; i < 4; i++) {\n        printf(\"target=%d index=%d\\n\", targets[i], binary_search(values, n, targets[i]));\n    }\n    return 0;\n}\n",
       "editable_gaps": [
         {
           "marker": "TODO 1",
-          "replacement": "0",
-          "instruction": "把当前闭区间的中点表达式填入。",
+          "target": "int mid = 0",
+          "replacement": "int mid = left + (right - left) / 2",
+          "student_instruction": "把当前闭区间的中点表达式填入，并保持整数下标。",
           "kind": "expression"
         },
         {
           "marker": "TODO 2",
-          "replacement": "mid",
-          "instruction": "目标更大时排除 mid，移动左边界。",
+          "target": "left = mid",
+          "replacement": "left = mid + 1",
+          "student_instruction": "目标更大时排除已经比较过的中点，再移动左边界。",
           "kind": "boundary-update"
         },
         {
           "marker": "TODO 3",
-          "replacement": "mid",
-          "instruction": "目标更小时排除 mid，移动右边界。",
+          "target": "right = mid",
+          "replacement": "right = mid - 1",
+          "student_instruction": "目标更小时排除已经比较过的中点，再移动右边界。",
           "kind": "boundary-update"
         },
         {
           "marker": "TODO 4",
-          "replacement": "0",
-          "instruction": "填入课程约定的未找到返回值。",
+          "target": "return 0; /* TODO 4 */",
+          "replacement": "return -1; /* TODO 4 */",
+          "student_instruction": "填入课程约定的未找到返回值。",
           "kind": "return-value"
         }
       ]

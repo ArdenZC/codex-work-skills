@@ -1,12 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ArdenZC/codex-work-skills/practice-class-html-generator/practice-class-content.schema.json",
-  "title": "Practice Class Content Contract 1.0",
+  "title": "Practice Class Content Contract 1.1",
+  "description": "Practice contract 1.1 consumes Courseware Content Contract 1.1. Legacy 1.0 is migrated by scripts/practice_contract.py.",
   "type": "object",
   "additionalProperties": false,
   "required": ["contract_version", "course_title", "practice_title", "audience", "duration_minutes", "source_courseware", "knowledge_links", "tasks", "learning_center", "study_guide", "foundation_kit", "teacher_guide", "teacher_reference", "starter_assets"],
   "properties": {
-    "contract_version": {"const": "1.0"},
+    "contract_version": {"const": "1.1"},
     "course_title": {"type": "string", "minLength": 1},
     "practice_title": {"type": "string", "minLength": 1},
     "audience": {"type": "string", "minLength": 1},
@@ -25,6 +26,7 @@
   "$defs": {
     "nonEmpty": {"type": "string", "minLength": 1},
     "strings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+    "strings0": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
     "courseContext": {
       "type": "object",
       "minProperties": 1,
@@ -46,18 +48,18 @@
       "required": ["mode", "contract_version", "chapter_title", "taught_slide_ids"],
       "properties": {
         "mode": {"enum": ["courseware", "independent"]},
-        "contract_version": {"const": "1.0"},
+        "contract_version": {"const": "1.1"},
         "chapter_title": {"$ref": "#/$defs/nonEmpty"},
         "taught_slide_ids": {"$ref": "#/$defs/strings"}
       }
     },
     "knowledge": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "summary", "source_slide_ids", "student_can_do"],
+      "required": ["id", "title", "summary", "source_slide_ids", "student_can_do", "learning_unit_ids", "canonical_fact_ids"],
       "properties": {
         "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
         "summary": {"$ref": "#/$defs/nonEmpty"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
-        "student_can_do": {"$ref": "#/$defs/nonEmpty"}
+        "student_can_do": {"$ref": "#/$defs/nonEmpty"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"}
       }
     },
     "step": {
@@ -67,11 +69,15 @@
     },
     "task": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "level", "title", "knowledge_link_ids", "source_slide_ids", "modality", "overview", "steps", "acceptance", "help_refs", "estimated_minutes", "scaffold"],
+      "required": ["id", "level", "title", "knowledge_link_ids", "source_slide_ids", "learning_unit_ids", "canonical_fact_ids", "task_kind", "artifact_kind", "capabilities", "scaffold_level", "overview", "steps", "acceptance", "help_refs", "estimated_minutes", "scaffold"],
       "properties": {
         "id": {"$ref": "#/$defs/nonEmpty"}, "level": {"enum": ["core", "optional", "challenge"]},
         "title": {"$ref": "#/$defs/nonEmpty"}, "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
-        "modality": {"$ref": "#/$defs/nonEmpty"}, "overview": {"$ref": "#/$defs/nonEmpty"},
+        "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
+        "task_kind": {"enum": ["observation", "analysis", "implementation", "debugging", "modeling", "tooling", "experiment", "scenario", "mixed"]},
+        "artifact_kind": {"enum": ["source-code", "query", "model", "document", "workbook", "diagram", "scenario", "result", "mixed"]},
+        "capabilities": {"type": "array", "minItems": 1, "items": {"enum": ["code_editing", "file_editing", "model_editing", "execution", "query_execution", "diagnosis", "state_tracking", "visualization", "explanation", "comparison", "scenario_reasoning"]}},
+        "scaffold_level": {"$ref": "#/$defs/nonEmpty"}, "modality": {"$ref": "#/$defs/nonEmpty"}, "overview": {"$ref": "#/$defs/nonEmpty"},
         "scaffold": {"$ref": "#/$defs/nonEmpty"}, "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}},
         "acceptance": {"$ref": "#/$defs/strings"}, "help_refs": {"$ref": "#/$defs/strings"},
         "estimated_minutes": {"type": "integer", "minimum": 5}, "starter_asset_ids": {"$ref": "#/$defs/strings"}, "todo_count": {"type": "integer", "minimum": 0}
@@ -105,7 +111,7 @@
         "correct_order": {"$ref": "#/$defs/strings"},
         "state_fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateField"}},
         "state": {"$ref": "#/$defs/state"},
-        "state_visual": {"$ref": "#/$defs/stateVisual"},
+        "visualization": {"$ref": "#/$defs/visualization"}, "state_visual": {"$ref": "#/$defs/stateVisual"},
         "rounds": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/round"}},
         "questions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/question"}},
         "diagnostic_cases": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/diagnosticCase"}},
@@ -143,6 +149,14 @@
         "index_label": {"$ref": "#/$defs/nonEmpty"}, "value_label": {"$ref": "#/$defs/nonEmpty"},
         "candidate_label": {"$ref": "#/$defs/nonEmpty"}, "focus_label": {"$ref": "#/$defs/nonEmpty"},
         "terminal_label": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "visualization": {
+      "type": "object", "additionalProperties": false, "required": ["kind", "items"],
+      "properties": {
+        "kind": {"enum": ["sequence-range", "timeline", "table-state", "state-machine", "queue", "graph-path", "comparison", "table"]},
+        "title": {"$ref": "#/$defs/nonEmpty"}, "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateVisualItem"}},
+        "start_field": {"$ref": "#/$defs/nonEmpty"}, "end_field": {"$ref": "#/$defs/nonEmpty"}, "focus_field": {"$ref": "#/$defs/nonEmpty"}
       }
     },
     "round": {
@@ -183,19 +197,19 @@
     },
     "center": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "knowledge_link_ids", "task_ids", "purpose", "interaction"],
+      "required": ["id", "title", "knowledge_link_ids", "task_ids", "learning_unit_ids", "canonical_fact_ids", "purpose", "interaction"],
       "properties": {
         "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"},
+        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
         "purpose": {"$ref": "#/$defs/nonEmpty"}, "interaction": {"$ref": "#/$defs/interaction"}
       }
     },
     "guide": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "knowledge_link_ids", "task_ids", "body", "worked_example", "quick_reference", "common_errors", "checkpoints"],
+      "required": ["id", "title", "knowledge_link_ids", "task_ids", "learning_unit_ids", "canonical_fact_ids", "body", "worked_example", "quick_reference", "common_errors", "checkpoints"],
       "properties": {
         "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"},
+        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
         "body": {"$ref": "#/$defs/nonEmpty"}, "worked_example": {"$ref": "#/$defs/nonEmpty"},
         "quick_reference": {"$ref": "#/$defs/strings"}, "common_errors": {"$ref": "#/$defs/strings"},
         "checkpoints": {"$ref": "#/$defs/strings"}
@@ -203,10 +217,10 @@
     },
     "kit": {
       "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "kind", "content", "task_ids", "when_to_use", "steps", "self_check"],
+      "required": ["id", "title", "kind", "content", "task_ids", "learning_unit_ids", "canonical_fact_ids", "when_to_use", "steps", "self_check"],
       "properties": {
         "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"},
-        "content": {"$ref": "#/$defs/nonEmpty"}, "task_ids": {"$ref": "#/$defs/strings"},
+        "content": {"$ref": "#/$defs/nonEmpty"}, "task_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
         "when_to_use": {"$ref": "#/$defs/nonEmpty"}, "steps": {"$ref": "#/$defs/strings"}, "self_check": {"$ref": "#/$defs/strings"}
       }
     },
@@ -223,13 +237,13 @@
     },
     "teacherTaskReference": {
       "type": "object", "additionalProperties": false,
-      "required": ["task_id", "title", "source_slide_ids", "reference_answer", "key_steps", "acceptable_variants", "common_errors", "acceptance_basis"],
+      "required": ["task_id", "title", "source_slide_ids", "learning_unit_ids", "canonical_fact_ids", "reference_answer", "key_steps", "acceptable_variants", "common_errors", "acceptance_basis"],
       "properties": {
-        "task_id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
+        "task_id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "source_slide_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
         "reference_answer": {"$ref": "#/$defs/nonEmpty"}, "reference_result": {"$ref": "#/$defs/nonEmpty"},
         "key_steps": {"$ref": "#/$defs/strings"}, "acceptable_variants": {"$ref": "#/$defs/strings"},
         "common_errors": {"$ref": "#/$defs/strings"}, "acceptance_basis": {"$ref": "#/$defs/strings"},
-        "model_visual": {"$ref": "#/$defs/modelVisual"}
+        "reference_visual": {"$ref": "#/$defs/modelVisual"}, "model_visual": {"$ref": "#/$defs/modelVisual"}
       }
     },
     "teacherReference": {
@@ -239,7 +253,7 @@
     "modelVisual": {
       "type": "object", "additionalProperties": false, "required": ["title"],
       "properties": {
-        "kind": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
+        "kind": {"enum": ["uml-class", "uml-sequence", "graph", "table", "timeline", "state-machine", "comparison", "result-preview"]}, "title": {"$ref": "#/$defs/nonEmpty"},
         "nodes": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "title"], "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "fields": {"$ref": "#/$defs/strings"}}}},
         "relations": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "label"], "properties": {"from": {"$ref": "#/$defs/nonEmpty"}, "to": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}}}},
         "messages": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "label"], "properties": {"from": {"$ref": "#/$defs/nonEmpty"}, "to": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}}}}
@@ -256,10 +270,10 @@
     },
     "editableGap": {
       "type": "object", "additionalProperties": false,
-      "required": ["marker", "replacement", "instruction", "kind"],
+      "required": ["marker", "replacement", "student_instruction", "kind"],
       "properties": {
-        "marker": {"$ref": "#/$defs/nonEmpty"}, "replacement": {"$ref": "#/$defs/nonEmpty"},
-        "instruction": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"}
+        "marker": {"$ref": "#/$defs/nonEmpty"}, "target": {"$ref": "#/$defs/nonEmpty"}, "replacement": {"$ref": "#/$defs/nonEmpty"},
+        "student_instruction": {"$ref": "#/$defs/nonEmpty"}, "instruction": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"}
       }
     }
   }

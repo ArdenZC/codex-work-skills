@@ -1552,14 +1552,16 @@
       "editable_gaps": [
         {
           "marker": "待补关系 A",
-          "replacement": "待补关系 A",
-          "instruction": "在图中补出 Reservation 与 TimeSlot 的关系和多重性。",
+          "target": "待补关系 A",
+          "replacement": "Reservation — TimeSlot：Reservation 0..*；TimeSlot 1",
+          "student_instruction": "在图中补出 Reservation 与 TimeSlot 的业务关系，并让两端含义可读。",
           "kind": "association-slot"
         },
         {
           "marker": "待补多重性 B",
-          "replacement": "待补多重性 B",
-          "instruction": "根据题面已给规则，在 Reservation 端标注 0..*，在 TimeSlot 端标注 1；不要把端点语义读反。",
+          "target": "待补多重性 B",
+          "replacement": "Reservation 端 0..*；TimeSlot 端 1",
+          "student_instruction": "按题面规则在关系两端补基数，并用一句话说明端点语义。",
           "kind": "multiplicity-slot"
         }
       ]
@@ -1573,14 +1575,16 @@
       "editable_gaps": [
         {
           "marker": "待补消息 A",
-          "replacement": "待补消息 A",
-          "instruction": "补出页面请求到协调服务的消息。",
+          "target": "待补消息 A",
+          "replacement": "ReservationPage → ReservationService：requestReservation()",
+          "student_instruction": "补出页面发起预约时发送给协调服务的消息。",
           "kind": "message-slot"
         },
         {
           "marker": "待补消息 B",
-          "replacement": "待补消息 B",
-          "instruction": "补出 available 分支创建或确认 Reservation 的消息。",
+          "target": "待补消息 B",
+          "replacement": "ReservationService → Reservation：available 时 create / confirm()",
+          "student_instruction": "补出 available 分支创建或确认 Reservation 的消息。",
           "kind": "message-slot"
         }
       ]
