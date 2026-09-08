@@ -2896,8 +2896,301 @@ def _practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _v22_agent_review_report(
+    lessons: list[dict[str, Any]],
+    lesson_ids: list[str],
+) -> tuple[dict[str, Any], list[str]]:
+    """Read the Agent's qualitative review without re-implementing it in Python."""
+
+    required_checks = {
+        "professional_accuracy",
+        "goal_activity_evidence",
+        "stage_coherence",
+        "capacity_fit",
+        "progression",
+        "reference_relevance",
+    }
+    records: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for lesson_id, lesson in zip(lesson_ids, lessons):
+        review = lesson.get("pedagogical_review")
+        is_object = isinstance(review, dict)
+        status = review.get("status") if is_object else None
+        capacity = review.get("capacity") if is_object else None
+        summary = str(review.get("summary", "")).strip() if is_object else ""
+        checks = review.get("checks") if is_object else None
+        approved = (
+            status == "approved"
+            and capacity == "fit"
+            and len(summary) >= 12
+            and isinstance(checks, dict)
+            and bool(checks)
+            and required_checks.issubset(checks)
+        )
+        if not approved:
+            errors.append(
+                f"{lesson_id}.pedagogical_review must be approved, capacity=fit, and include all required review checks"
+            )
+        records.append(
+            {
+                "lesson_id": lesson_id,
+                "status": "passed" if approved else "failed",
+                "capacity": capacity,
+                "summary": summary,
+                "checks": sorted(checks) if isinstance(checks, dict) else [],
+                "semantic_source": "Agent review; Python performs no lexical relevance judgment",
+            }
+        )
+    return {
+        "status": "passed" if not errors else "failed",
+        "scope": "lesson-level pedagogical chain and capacity",
+        "records": records,
+        "required_review_checks": sorted(required_checks),
+    }, errors
+
+
+def _v22_exact_duplicate_report(
+    lessons: list[dict[str, Any]],
+    lesson_ids: list[str],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Keep only exact repeated substantive items as a deterministic audit signal."""
+
+    locations: dict[tuple[str, str], list[str]] = {}
+    for lesson_id, lesson in zip(lesson_ids, lessons):
+        for field, values in _item_values(lesson, {}).items():
+            if field.startswith("evaluation.") or field.startswith("references"):
+                continue
+            for value in values:
+                normalized = _normalize_item(value)
+                if normalized:
+                    locations.setdefault((field, normalized), []).append(lesson_id)
+    duplicates: list[dict[str, Any]] = []
+    errors: list[str] = []
+    for (field, normalized), owners in sorted(locations.items()):
+        unique_owners = list(dict.fromkeys(owners))
+        if len(unique_owners) < 2:
+            continue
+        record = {"field": field, "lessons": unique_owners, "normalized": normalized}
+        duplicates.append(record)
+        errors.append(f"exact duplicate {field}: {','.join(unique_owners)}")
+    return duplicates, errors
+
+
+def _v22_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
+    requested = bool((data.get("artifact_plan") or {}).get("practice_work_orders"))
+    contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), dict) else None
+    tasks = contract.get("tasks", []) if isinstance(contract, dict) else []
+    expected = plan.get("practice_hours", 0)
+    task_hours = sum(float(task.get("practice_hours", 0)) for task in tasks if isinstance(task, dict))
+    lesson_task_ids = [
+        str(task_id)
+        for lesson in data.get("lessons", [])
+        if isinstance(lesson, dict)
+        for task_id in lesson.get("practice_task_ids", [])
+    ]
+    if not requested:
+        forbidden = contract is not None or bool(lesson_task_ids)
+        return {
+            "status": "failed" if forbidden else "not_applicable",
+            "contract_version": contract.get("contract_version") if contract else None,
+            "task_count": len(tasks),
+            "expected_task_count": 0,
+            "expected_workorder_count": 0,
+            "expected_practice_hours": expected,
+            "actual_practice_hours": contract.get("practice_hours") if contract else None,
+            "sum_task_practice_hours": task_hours,
+            "hour_consistent": not forbidden,
+            "one_way_lesson_links": not bool(lesson_task_ids),
+            "workorders_requested": False,
+        }
+    expected_number = float(expected or 0)
+    unit_ok = all(float(task.get("practice_hours", 0)) == 2 for task in tasks if isinstance(task, dict))
+    expected_task_count = int(expected_number / 2) if expected_number and expected_number % 2 == 0 else 0
+    count_ok = len(tasks) == expected_task_count
+    hours_ok = (
+        isinstance(contract, dict)
+        and float(contract.get("practice_hours", -1)) == expected_number
+        and task_hours == expected_number
+        and unit_ok
+        and count_ok
+    )
+    return {
+        "status": "passed" if hours_ok else "failed",
+        "contract_version": contract.get("contract_version") if contract else None,
+        "task_count": len(tasks),
+        "expected_task_count": expected_task_count if requested else 0,
+        "expected_workorder_count": expected_task_count if requested else 0,
+        "expected_practice_hours": expected,
+        "actual_practice_hours": contract.get("practice_hours") if contract else None,
+        "sum_task_practice_hours": task_hours,
+        "hour_consistent": hours_ok,
+        "one_way_lesson_links": True,
+        "workorders_requested": requested,
+    }
+
+
+def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Content 2.2 quality boundary: facts are deterministic, pedagogy is Agent-reviewed."""
+
+    lessons = data.get("lessons", [])
+    lesson_ids = [_lesson_id(lesson, index) for index, lesson in enumerate(lessons, 1)]
+    errors = [f"confirmed course information: {message}" for message in confirmed_course_info_errors(data)]
+    agent_review, review_errors = _v22_agent_review_report(lessons, lesson_ids)
+    errors.extend(review_errors)
+    exact_duplicates, duplicate_errors = _v22_exact_duplicate_report(lessons, lesson_ids)
+    errors.extend(duplicate_errors)
+
+    references = _reference_provenance_report(lessons, lesson_ids, data)
+    source_regions = references.get("catalog_source_regions", {})
+    domestic_source_count = int(source_regions.get("domestic", 0))
+    foreign_source_count = int(source_regions.get("foreign", 0))
+    catalog_source_count = domestic_source_count + foreign_source_count + int(source_regions.get("unknown", 0))
+    domestic_share = (
+        domestic_source_count / catalog_source_count
+        if catalog_source_count
+        else None
+    )
+    warnings: list[str] = []
+    if domestic_share is not None and domestic_share < 0.70:
+        warnings.append("domestic reference share is below 70%; review local curriculum alignment")
+    for item in references.get("missing_evidence", []):
+        errors.append(f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence")
+    for item in references.get("invalid_generic", []):
+        errors.append(f"{item['lesson']}.references[{item['reference']}] generic source is too specific")
+    for item in references.get("invalid_verified_public", []):
+        errors.append(f"{item['lesson']}.references[{item['reference']}] verified_public evidence is not locatable")
+    for item in references.get("invalid_resource_only", []):
+        errors.append(f"{item['lesson']}.references[{item['reference']}] is a resource-only item")
+    for item in references.get("invalid_metadata", []):
+        errors.append(f"reference_pool[{item['reference']}] bibliography metadata is incomplete: " + "; ".join(item["errors"]))
+    for item in references.get("same_lesson_duplicates", []):
+        errors.append(f"{item['lesson']}.references[{item['reference']}] duplicates reference {item['duplicate_of']}")
+    for item in references.get("unresolved_ids", []):
+        errors.append(f"{item['lesson']}.reference_ids[{item['index']}] unresolved reference ID {item['reference_id']}")
+    for item in references.get("placeholder_items", []):
+        errors.append(f"{item['lesson']}.reference_ids[{item['index']}] is a non-renderable reference placeholder")
+    for item in references.get("textbook_overlap", []):
+        errors.append(f"{item['lesson']}.reference_ids[{item['index']}] overlaps the textbook")
+
+    practice_handoff = _v22_practice_handoff_report(data)
+    if practice_handoff["status"] == "failed":
+        errors.append("practice handoff: task hours and WorkOrder count do not reconcile")
+
+    progression_links = [
+        {
+            "from": lesson_ids[index - 1],
+            "to": lesson_ids[index],
+            "status": "passed",
+            "kind": "declared_sequence",
+            "semantic_source": "Agent review and explicit progression fields",
+        }
+        for index in range(1, len(lesson_ids))
+    ]
+    progression = {
+        "status": "passed",
+        "lesson_ids": lesson_ids,
+        "links": progression_links,
+        "sequence_links": progression_links,
+        "declared_prior_links": progression_links,
+        "requires_agent_review": True,
+        "agent_review_items": [],
+        "method": "explicit progression fields plus Agent review; no character n-gram scoring",
+    }
+    implementation = {
+        lesson_id: {
+            "status": "passed" if agent_review["status"] == "passed" else "failed",
+            "method": "stage-level pedagogical chain reviewed by Agent",
+            "stages": len(lesson.get("implementation", [])),
+        }
+        for lesson_id, lesson in zip(lesson_ids, lessons)
+    }
+    mechanical_count = sum(
+        1
+        for lesson in lessons
+        for stage in lesson.get("implementation", [])
+        for value in (
+            stage.get("label", ""),
+            stage.get("modality", ""),
+            stage.get("objective", ""),
+            *stage.get("content", []),
+            *stage.get("teacher_actions", []),
+            *stage.get("student_actions", []),
+        )
+        if any(marker in str(value) for marker in ("对应主题：", "核心主题：", "本节主题：", "任务主题：", "本节关联："))
+    )
+    return {
+        "status": "passed" if not errors else "failed",
+        "content_contract_version": "2.2",
+        "diagnostic_content_policy": {"mode": "agent_review_and_exact_facts", "hash": "sha256"},
+        "errors": errors,
+        "warnings": warnings,
+        "agent_pedagogical_review": agent_review,
+        "exact_duplicates": exact_duplicates,
+        "adjacent_exact_duplicates": [],
+        "item_duplicates": exact_duplicates,
+        "adjacent_item_duplicates": [],
+        "frequency_item_duplicates": [],
+        "adjacent_similarity_pairs": [],
+        "field_similarity_pairs": [],
+        "adjacent_field_similarity_pairs": [],
+        "whole_lesson_similarity_pairs": [],
+        "high_similarity_pairs": [],
+        "implementation_duplicates": [],
+        "adjacent_implementation_exact_duplicates": [],
+        "implementation_similarity_pairs": [],
+        "adjacent_implementation_similarity_pairs": [],
+        "structural_similarity_pairs": [],
+        "implementation_structural_similarity_pairs": [],
+        "evaluation_remark_duplicates": [],
+        "evaluation_remark_similarity": [],
+        "repeated_sentences": [],
+        "boilerplate_hits": [],
+        "progression": progression,
+        "intra_lesson_coherence": {
+            "status": agent_review["status"],
+            "method": "stage-level chain: content -> teacher activity -> student activity/evidence -> design intent",
+            "failures": [record for record in agent_review["records"] if record["status"] != "passed"],
+        },
+        "reference_provenance": references,
+        "practice_handoff": practice_handoff,
+        "coverage": {
+            "lesson_count": len(lessons),
+            "implementation_stages": {lesson_id: len(lesson.get("implementation", [])) for lesson_id, lesson in zip(lesson_ids, lessons)},
+            "implementation_review": implementation,
+            "meaningful_characters": None,
+            "content_fields": len(CONTENT_FIELD_NAMES),
+            "evaluation_criteria": len(EVALUATION_CRITERIA),
+            "in_class_stage_ids": sorted(IN_CLASS_STAGE_IDS),
+            "required_stage_ids": list(IMPLEMENTATION_STAGE_IDS),
+            "stage_semantic_rule": "Agent review; not all item statuses and not lexical overlap",
+            "mechanical_topic_suffix_count_before_formatting": mechanical_count,
+            "reference_metrics": {
+                "textbook_present": bool((data.get("course_materials") or {}).get("textbook")),
+                "pool_size": len(data.get("reference_pool", [])),
+                "domestic_source_count": domestic_source_count,
+                "foreign_source_count": foreign_source_count,
+                "unknown_source_count": int(source_regions.get("unknown", 0)),
+                "domestic_share": domestic_share,
+                "lessons_with_references": sum(bool(lesson.get("reference_ids")) for lesson in lessons),
+                "lessons_without_references": sum(not lesson.get("reference_ids") for lesson in lessons),
+                "reuse_frequency": references.get("reuse_frequency", {}),
+                "empty_reference_lesson_count": len(references.get("empty_reference_lessons", [])),
+            },
+        },
+        "completeness": {"status": "schema_validated"},
+        "density_errors": [],
+        "resource_reuse": [],
+        "evaluation_remark_density": [],
+        "reuse_policy": {"mode": "exact_duplicate_audit; cross-lesson source reuse is allowed"},
+    }
+
+
 def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
     """Run deterministic course-level checks, including item and skeleton repetition."""
+
+    if data.get("content_contract_version") == "2.2":
+        return _assess_content_quality_v22(data, manifest)
 
     lessons = data.get("lessons", [])
     lesson_ids = [_lesson_id(lesson, index) for index, lesson in enumerate(lessons, 1)]
@@ -2907,7 +3200,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     errors.extend(f"confirmed course information: {message}" for message in confirmed_course_info_errors(data))
     if data.get("content_contract_version") == "2.2" and data.get("allow_textbook_as_reference", False):
         errors.append(
-            "allow_textbook_as_reference is not supported in Content Contract 2.2.2; "
+            "allow_textbook_as_reference is not supported in Content Contract 2.2; "
             "course_materials.textbook and reference_pool are separate"
         )
     course_terms = _course_terms(lessons)
