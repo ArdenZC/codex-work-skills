@@ -54,4 +54,4 @@ JSON、QA 报告、文件名和内部日志可以保留 `task_id`、`project_id`
 独立调试：--content-json … --mode standalone --skip-render
 ```
 
-安装器只复制完整 Skill 和 canonical shared schema，不自动安装 Python 依赖；成功替换默认清理临时 backup，只有显式 `--keep-backup` 才保留。安装后可用源树的 `scripts/install.py --doctor --json --skills-dir <目录>` 比对 `source_fingerprint`、`installed_fingerprint` 和 `status=current`。适配器只能读取本文件和通用 Agent 方法提示，不得另写一套业务规则。
+默认使用模板路径 `assets/templates/practice-work-order/v1.0.0/template.docx`。安装器只复制完整 Skill 和 canonical shared schema，不自动安装 Python 依赖；成功替换默认清理临时 backup，只有显式 `--keep-backup` 才保留。安装后可用源树的 `scripts/install.py --doctor --json --skills-dir <目录>` 比对 `source_fingerprint`、`installed_fingerprint` 和 `status=current`。适配器只能读取本文件和通用 Agent 方法提示，不得另写一套业务规则。

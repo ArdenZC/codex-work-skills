@@ -83,7 +83,7 @@ Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账�
 → 如需工单则调用 WorkOrder Skill Agent → 统一交付与人工验收
 ```
 
-默认模板为 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。`--render` 的结果只代表 smoke；缺少渲染后端时报告 `RENDER UNVERIFIED` 或 fail-closed，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
+默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。`--render` 的结果只代表 smoke；缺少渲染后端时报告 `RENDER UNVERIFIED` 或 fail-closed，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
 
 生产命令：
 
