@@ -163,14 +163,26 @@ def _clean(value: Any) -> str:
     return str(value).strip()
 
 
+MECHANICAL_TOPIC_MARKERS = (
+    "聚焦",
+    "聚焦于",
+    "围绕",
+    "针对",
+    "对应主题",
+    "核心主题",
+    "本节主题",
+    "任务主题",
+    "本节关联",
+)
+_MECHANICAL_TOPIC_MARKER_PATTERN = r"(?:聚焦(?:于)?|围绕|针对|对应主题|核心主题|本节主题|任务主题|本节关联)"
 MECHANICAL_TOPIC_PAREN_SUFFIX_PATTERN = re.compile(
-    r"\s*[（(]\s*(?:聚焦(?:于)?|围绕|针对)\s*(?:[:：])?\s*[^（）()]*[）)]\s*$"
+    rf"\s*[（(]\s*{_MECHANICAL_TOPIC_MARKER_PATTERN}\s*(?:[:：])?\s*[^（）()]*[）)]\s*$"
 )
 MECHANICAL_TOPIC_TAIL_SUFFIX_PATTERN = re.compile(
-    r"(?:[。！？；;]\s*|\s+)(?:聚焦(?:于)?|围绕|针对)\s*[:：]\s*[^。！？；;\n]+$"
+    rf"(?:[。！？；;,，]\s*|\s+){_MECHANICAL_TOPIC_MARKER_PATTERN}\s*[:：]\s*[^。！？；;,，\n]+$"
 )
 MECHANICAL_TOPIC_ONLY_PATTERN = re.compile(
-    r"^(?:聚焦(?:于)?|围绕|针对)\s*[:：]\s*.+$"
+    rf"^{_MECHANICAL_TOPIC_MARKER_PATTERN}\s*[:：]\s*.+$"
 )
 
 
@@ -277,10 +289,29 @@ def format_numbered_list(items: Iterable[Any]) -> str:
     return "\n".join(f"{index}. {value}" for index, value in enumerate(values, 1))
 
 
+_EDITION_PAREN_PATTERN = re.compile(
+    r"[（(]\s*第\s*[一二三四五六七八九十百千万零〇0-9]+\s*版\s*[）)]$",
+    re.IGNORECASE,
+)
+_EDITION_SUFFIX_PATTERN = re.compile(
+    r"(?:[》>】\]）)]\s*)?(?:[·,，;；:/\s]*)第\s*[一二三四五六七八九十百千万零〇0-9]+\s*版$",
+    re.IGNORECASE,
+)
+
+
 def _normalize_reference_title(value: Any) -> str:
-    title = _clean(value)
-    title = re.sub(r"^[《<【\[]|[》>】\]]$", "", title)
-    return re.sub(r"\s+", "", title).casefold()
+    """Normalize identity without collapsing distinct subject titles."""
+
+    title = unicodedata.normalize("NFKC", _clean(value))
+    title = re.sub(r"\s+", "", title)
+    previous = None
+    while title and title != previous:
+        previous = title
+        title = re.sub(r"^[《<【\[]", "", title)
+        title = re.sub(r"[》>】\]]$", "", title)
+        title = _EDITION_PAREN_PATTERN.sub("", title)
+        title = _EDITION_SUFFIX_PATTERN.sub("", title)
+    return title.casefold()
 
 
 def reference_identity(reference: dict[str, Any]) -> str:
@@ -374,8 +405,6 @@ def reference_metadata_errors(reference: dict[str, Any], prefix: str = "referenc
             errors.append(f"{prefix}.authors must preserve the real book author or editor")
         if not publisher:
             errors.append(f"{prefix}.publisher is required for a book")
-        if not year:
-            errors.append(f"{prefix}.year is required for a book")
     elif reference_type == "formal_course_document":
         if not author_values:
             errors.append(f"{prefix}.authors must preserve the course responsible teacher or team")

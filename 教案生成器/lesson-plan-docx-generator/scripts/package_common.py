@@ -80,7 +80,7 @@ REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
 )
 REPOSITORY_ROOT = SKILL_DIR.parents[1]
 PRACTICE_CONTRACT_SCHEMA = REPOSITORY_ROOT / "schemas" / "shared" / "practice-task-contract.schema.json"
-PRACTICE_CONTRACT_SCHEMA_ID = "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"
+PRACTICE_CONTRACT_SCHEMA_ID = "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.1.json"
 
 
 def require_meaningful_text(value: Any, field_name: str, minimum: int = 1) -> str:
@@ -788,6 +788,16 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
         _validate_locator_evidence(textbook, "course_materials.textbook", allow_generic=False)
 
     pool = data.get("reference_pool", [])
+    research = data.get("reference_research") or {}
+    research_status = research.get("status") if isinstance(research, dict) else None
+    if research_status not in {"verified_external_source", "no_verified_external_source"}:
+        raise ValueError(
+            "reference_research.status must record whether a verified external source was available"
+        )
+    if research_status == "no_verified_external_source" and pool:
+        raise ValueError(
+            "reference_pool must be empty when reference_research.status=no_verified_external_source"
+        )
     reference_by_id: dict[str, dict[str, Any]] = {}
     for index, reference in enumerate(pool, 1):
         prefix = f"reference_pool[{index}]"
@@ -807,7 +817,7 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
     textbook_identity = reference_identity(textbook) if textbook is not None else ""
     if data.get("allow_textbook_as_reference", False):
         raise ValueError(
-            "allow_textbook_as_reference is not supported in Content Contract 2.2.2; "
+            "allow_textbook_as_reference is not supported in Content Contract 2.2; "
             "course_materials.textbook and reference_pool are separate"
         )
     if textbook_identity:
@@ -822,8 +832,10 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
         if lesson["lesson_type"] != "theory":
             raise ValueError(f"{prefix}.lesson_type must be theory; practice belongs to Practice Task/WorkOrder artifacts")
         ids = [str(value) for value in lesson.get("reference_ids", [])]
-        if not ids:
-            raise ValueError(f"{prefix}.reference_ids must contain at least one citable reference")
+        if not ids and research_status != "no_verified_external_source":
+            raise ValueError(
+                f"{prefix}.reference_ids may be empty only when reference_research.status=no_verified_external_source"
+            )
         if len(ids) != len(set(ids)):
             raise ValueError(f"{prefix}.reference_ids must not contain duplicate IDs within one lesson")
         missing = [value for value in ids if value not in reference_by_id]
@@ -840,9 +852,15 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
                 )
             if normalized_text:
                 seen_reference_content[normalized_text] = reference_id
+        if lesson.get("practice_task_ids") != []:
+            raise ValueError(f"{prefix}.practice_task_ids must remain [] in Content Contract 2.2")
 
 
-def _validate_implementation_stage_invariants(lessons: list[dict[str, Any]]) -> None:
+def _validate_implementation_stage_invariants(
+    lessons: list[dict[str, Any]],
+    *,
+    exact_out_of_class: bool = False,
+) -> None:
     """Validate the canonical nine-stage schedule shared by every V2 contract."""
 
     expected_stage_ids = list(IMPLEMENTATION_STAGE_IDS)
@@ -896,21 +914,34 @@ def _validate_implementation_stage_invariants(lessons: list[dict[str, Any]]) -> 
                 f"expected {int(expected_minutes)}, got {int(classroom_minutes)}"
             )
 
-        out_of_class_limit = max(60, int(expected_minutes))
-        for stage_id, minutes in out_of_class_minutes:
-            if minutes < 0 or minutes > out_of_class_limit:
+        if exact_out_of_class:
+            expected_out_of_class = {
+                "before_class_preparation": 10,
+                "after_class_improvement": 15,
+            }
+            for stage_id, minutes in out_of_class_minutes:
+                expected_value = expected_out_of_class[stage_id]
+                if minutes != expected_value:
+                    raise ValueError(
+                        "out-of-class minutes must be fixed: "
+                        f"lesson_id={lesson_id} stage={stage_id} actual={minutes} expected={expected_value}"
+                    )
+        else:
+            out_of_class_limit = max(60, int(expected_minutes))
+            for stage_id, minutes in out_of_class_minutes:
+                if minutes < 0 or minutes > out_of_class_limit:
+                    raise ValueError(
+                        "out-of-class minutes sanity failed: "
+                        f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
+                    )
+            out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
+            total_limit = 2 * int(expected_minutes)
+            if out_of_class_total > total_limit:
                 raise ValueError(
                     "out-of-class minutes sanity failed: "
-                    f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
+                    f"lesson_id={lesson_id} stage=out_of_class_total "
+                    f"actual={out_of_class_total} limit={total_limit}"
                 )
-        out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
-        total_limit = 2 * int(expected_minutes)
-        if out_of_class_total > total_limit:
-            raise ValueError(
-                "out-of-class minutes sanity failed: "
-                f"lesson_id={lesson_id} stage=out_of_class_total "
-                f"actual={out_of_class_total} limit={total_limit}"
-            )
 
 
 def _validate_practice_contract_v21(data: dict[str, Any]) -> None:
@@ -1086,9 +1117,8 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
         if lesson_theory != hours or lesson_practice != 0:
             raise ValueError(f"{prefix} theory Lesson must have theory_hours=hours and practice_hours=0")
         actual_theory += hours
-        for task_id in lesson.get("practice_task_ids", []):
-            if not isinstance(task_id, str) or not task_id.strip():
-                raise ValueError(f"{prefix}.practice_task_ids contains an empty task ID")
+        if lesson.get("practice_task_ids") != []:
+            raise ValueError(f"{prefix}.practice_task_ids must remain [] in Content Contract 2.2")
 
     if actual_theory != theory:
         raise ValueError(
@@ -1130,23 +1160,14 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
             if item.get(field_name) != expected:
                 raise ValueError(f"outline[{index}].{field_name} must match lessons[{index}]")
 
-    _validate_implementation_stage_invariants(data["lessons"])
+    _validate_implementation_stage_invariants(data["lessons"], exact_out_of_class=True)
 
     workorders_requested = bool(artifact_plan.get("practice_work_orders"))
     practice_contract = data.get("practice_task_contract")
-    lesson_task_ids = [
-        str(task_id)
-        for lesson in lessons
-        for task_id in lesson.get("practice_task_ids", [])
-    ]
     if not workorders_requested:
         if practice_contract is not None:
             raise ValueError(
                 "practice_task_contract is forbidden when artifact_plan.practice_work_orders=false"
-            )
-        if lesson_task_ids:
-            raise ValueError(
-                "lessons.practice_task_ids are forbidden when artifact_plan.practice_work_orders=false"
             )
         return
 
@@ -1163,8 +1184,45 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
         raise ValueError(
             "practice_task_contract is required when artifact_plan.practice_work_orders=true"
         )
-    if practice_contract["course_name"] != data["course_name"]:
-        raise ValueError("practice_task_contract.course_name must equal course_name")
+    if practice_contract.get("contract_version") != "1.1":
+        raise ValueError(
+            "practice_task_contract.contract_version must be 1.1 for the Practice Task handoff"
+        )
+    expected_profile = {
+        "course_name": data["course_name"],
+        "major": data["major"],
+        "audience": data["audience"],
+        "total_hours": data["total_hours"],
+        "theory_hours": plan["theory_hours"],
+        "practice_hours": plan["practice_hours"],
+        "delivery_mode": plan["mode"],
+        "default_lesson_hours": data["default_hours"],
+    }
+    actual_profile = practice_contract.get("course_profile")
+    if not isinstance(actual_profile, dict) or set(actual_profile) != set(expected_profile):
+        raise ValueError(
+            "practice_task_contract.course_profile must contain exactly the confirmed course profile fields"
+        )
+    for field_name, expected in expected_profile.items():
+        if field_name in {"total_hours", "theory_hours", "practice_hours", "default_lesson_hours"}:
+            actual = _decimal_hours(
+                actual_profile[field_name],
+                f"practice_task_contract.course_profile.{field_name}",
+                allow_zero=field_name in {"theory_hours", "practice_hours"},
+            )
+            expected_value = _decimal_hours(
+                expected,
+                f"course_profile.{field_name}",
+                allow_zero=field_name in {"theory_hours", "practice_hours"},
+            )
+            if actual != expected_value:
+                raise ValueError(
+                    f"practice_task_contract.course_profile.{field_name} must equal confirmed course information"
+                )
+        elif actual_profile.get(field_name) != expected:
+            raise ValueError(
+                f"practice_task_contract.course_profile.{field_name} must equal confirmed course information"
+            )
     if practice_contract.get("granularity") != "per_task":
         raise ValueError(
             "practice_task_contract.granularity must be per_task when practice_work_orders=true"
@@ -1213,16 +1271,8 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
             "practice task hours must equal delivery_plan.practice_hours: "
             f"expected {practice}, got {task_hours}"
         )
-    unresolved_task_ids = sorted(
-        {
-            str(task_id)
-            for lesson in lessons
-            for task_id in lesson.get("practice_task_ids", [])
-            if str(task_id) not in task_by_id
-        }
-    )
-    if unresolved_task_ids:
-        raise ValueError("lessons.practice_task_ids contains unresolved task IDs: " + ", ".join(unresolved_task_ids))
+    # PracticeTask -> Lesson is intentionally one-way.  Lesson records never
+    # carry reverse task IDs, so there is no reverse-link reconciliation here.
 
 
 def _validate_meaningful_contract(data: dict[str, Any]) -> None:

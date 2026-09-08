@@ -1,108 +1,115 @@
-"""Deterministic QA for the Lesson Practice Task -> WorkOrder handoff.
+"""Deterministic Lesson Practice Task -> WorkOrder contract checks.
 
-The Practice Task Contract is the upstream fact source.  This module checks
-that a downstream Work Order still represents that task; it never rewrites
-either artifact and deliberately avoids embeddings or external NLP services.
+The upstream Practice Task is the source of linked facts. A linked WorkOrder
+must carry the canonical course profile and an exact source-task snapshot;
+student-facing task items may then organise or expand that material. Semantic
+quality and workload judgement belong to the Agent pedagogical review.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import json
-import re
-import unicodedata
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
-from content_contract import WorkOrderContractError, load_work_order_content, normalise_text
-
-
-_IT_TERMS = ("sql", "mysql", "java", "ide", "api", "数据库", "索引")
-_NURSING_TERMS = ("护理", "患者", "血压", "体温", "无菌", "生命体征", "护理模拟")
-_GENERIC_ANCHORS = {
-    "完成",
-    "进行",
-    "任务",
-    "实践",
-    "操作",
-    "项目",
-    "设计",
-    "整理",
-    "记录",
-    "数据",
-    "信息",
-    "内容",
-    "结果",
-    "检查",
-    "系统",
-    "要求",
-    "材料",
-    "工作",
-    "说明",
-}
+from content_contract import (
+    COURSE_PROFILE_FIELDS,
+    WorkOrderContractError,
+    canonical_task_snapshot,
+    canonicalise_content,
+    course_profile_from_contract,
+    load_work_order_content,
+    normalise_text,
+)
 
 
-def _compact(value: Any) -> str:
-    text = unicodedata.normalize("NFKC", normalise_text(value)).casefold()
-    return re.sub(r"[\s\W_]+", "", text, flags=re.UNICODE)
-
-
-def _text_values(values: Iterable[Any]) -> list[str]:
-    return [normalise_text(value) for value in values if normalise_text(value)]
-
-
-def _artifact_text(content: dict[str, Any]) -> str:
-    values: list[Any] = [
-        content.get("course_name", ""),
-        content.get("major", ""),
-        content.get("class_or_audience", ""),
-        content.get("practice_task_id", ""),
-        content.get("task_title", ""),
-        content.get("project_id", ""),
-        content.get("project_name", ""),
-        *content.get("safety_or_compliance", []),
-    ]
-    for item in content.get("task_items", []):
-        values.extend([item.get("title", ""), item.get("description", "")])
-        for key in ("tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
-            values.extend(item.get(key, []))
-    return " ".join(_text_values(values))
-
-
-def _practice_task(value: dict[str, Any], task_id: str) -> dict[str, Any]:
+def _unwrap_contract(value: dict[str, Any]) -> dict[str, Any]:
     if isinstance(value.get("practice_task_contract"), dict):
-        value = value["practice_task_contract"]
-    tasks = value.get("tasks")
-    if isinstance(tasks, list):
-        matches = [task for task in tasks if isinstance(task, dict) and task.get("task_id") == task_id]
-        if len(matches) != 1:
-            raise WorkOrderContractError(
-                f"Practice Task Contract must contain exactly one task for {task_id}; found {len(matches)}"
-            )
-        return matches[0]
-    if value.get("task_id") == task_id:
-        return value
-    raise WorkOrderContractError(f"Practice Task {task_id} was not found")
-
-
-def _work_order(value: dict[str, Any] | list[dict[str, Any]], task_id: str) -> dict[str, Any]:
-    if isinstance(value, list):
-        if not value:
-            raise WorkOrderContractError("Work Order content must contain one item")
-        matches = [item for item in value if isinstance(item, dict) and item.get("practice_task_id") == task_id]
-        if len(matches) != 1:
-            raise WorkOrderContractError(
-                f"Work Order content must contain exactly one item for {task_id}; found {len(matches)}"
-            )
-        return matches[0]
-    if value.get("practice_task_id") != task_id:
-        raise WorkOrderContractError(
-            f"Work Order practice_task_id={value.get('practice_task_id')!r} does not match {task_id}"
-        )
+        return value["practice_task_contract"]
     return value
 
 
-def _number(value: Any, field: str) -> int:
+def _legacy_contract(value: dict[str, Any]) -> dict[str, Any]:
+    """Convert the old handoff shape for explicit compatibility callers."""
+
+    tasks = value.get("tasks")
+    if not isinstance(tasks, list):
+        raise WorkOrderContractError("Practice Task Contract requires a tasks array")
+    practice_hours = value.get("practice_hours", 0)
+    try:
+        hours = int(float(practice_hours))
+    except (TypeError, ValueError) as exc:
+        raise WorkOrderContractError("Practice Task practice_hours must be a whole number") from exc
+    profile = {
+        "course_name": normalise_text(value.get("course_name")) or "待确认课程",
+        "major": normalise_text(value.get("major")) or "待确认专业",
+        "audience": normalise_text(value.get("class_or_audience", value.get("audience"))) or "待确认对象",
+        "total_hours": hours,
+        "theory_hours": 0,
+        "practice_hours": hours,
+        "delivery_mode": "practice_only",
+        "default_lesson_hours": 2,
+    }
+    return {
+        "contract_version": "1.1",
+        "course_profile": profile,
+        "practice_hours": hours,
+        "granularity": "per_task",
+        "tasks": copy.deepcopy(tasks),
+    }
+
+
+def _canonical_contract(
+    value: dict[str, Any],
+    *,
+    require_collection_shape: bool = True,
+    allow_legacy: bool = False,
+) -> dict[str, Any]:
+    contract = copy.deepcopy(_unwrap_contract(value))
+    if not isinstance(contract, dict):
+        raise WorkOrderContractError("Practice Task Contract must be an object")
+    if contract.get("contract_version") == "1.0":
+        if not allow_legacy:
+            raise WorkOrderContractError("Practice Task Contract 1.0 is legacy; rerun with --legacy or regenerate as 1.1")
+        contract = _legacy_contract(contract)
+    if contract.get("contract_version") != "1.1":
+        raise WorkOrderContractError("linked WorkOrder requires Practice Task Contract 1.1")
+    profile = course_profile_from_contract(contract)
+    if not isinstance(contract.get("tasks"), list) or not contract["tasks"]:
+        raise WorkOrderContractError("Practice Task Contract must contain at least one task")
+    total_hours = _hours(contract.get("practice_hours"), "Practice Task practice_hours")
+    profile_hours = _hours(profile.get("practice_hours"), "course_profile.practice_hours")
+    if total_hours != profile_hours:
+        raise WorkOrderContractError("Practice Task practice_hours must equal course_profile.practice_hours")
+    if require_collection_shape and (total_hours <= 0 or total_hours % 2 or len(contract["tasks"]) != total_hours // 2):
+        raise WorkOrderContractError("Practice Task Contract must contain exactly practice_hours / 2 two-hour tasks")
+    for task in contract["tasks"]:
+        if not isinstance(task, dict) or _hours(task.get("practice_hours"), "Practice Task item practice_hours") != 2:
+            raise WorkOrderContractError("every Practice Task in a linked handoff must be exactly 2 hours")
+    return contract
+
+
+def _canonical_content(value: dict[str, Any], *, allow_legacy: bool = False) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise WorkOrderContractError("WorkOrder Content must be an object")
+    compatibility = value.get("content_contract_version") == "1.0"
+    if compatibility and not allow_legacy:
+        raise WorkOrderContractError("WorkOrder Content 1.0 is legacy; rerun with --legacy or regenerate as 1.1")
+    content = canonicalise_content(value, compatibility=compatibility)
+    if content.get("content_contract_version") != "1.1":
+        raise WorkOrderContractError("linked WorkOrder requires WorkOrder Content 1.1")
+    return content
+
+
+def _check(name: str, passed: bool, detail: str, *, errors: list[str], checks: dict[str, Any]) -> None:
+    checks[name] = {"status": "pass" if passed else "fail", "detail": detail}
+    if not passed:
+        errors.append(f"{name}: {detail}")
+
+
+def _hours(value: Any, field: str) -> int:
     try:
         number = float(value)
     except (TypeError, ValueError) as exc:
@@ -112,94 +119,87 @@ def _number(value: Any, field: str) -> int:
     return int(number)
 
 
-def _anchors(value: Any) -> set[str]:
-    normalized = unicodedata.normalize("NFKC", normalise_text(value)).casefold()
-    text = _compact(normalized)
-    if not text:
-        return set()
-    anchors: set[str] = set()
-    if len(text) >= 4:
-        anchors.add(text)
-    anchors.update(
-        token
-        for token in re.findall(r"[a-z0-9]+", normalized)
-        if len(token) >= 3 and token not in _GENERIC_ANCHORS
-    )
-    for run in re.findall(r"[\u4e00-\u9fff]+", normalized):
-        compact_run = _compact(run)
-        for width in (2, 3, 4):
-            anchors.update(
-                compact_run[index : index + width]
-                for index in range(len(compact_run) - width + 1)
-                if compact_run[index : index + width] not in _GENERIC_ANCHORS
-            )
-    return {anchor for anchor in anchors if len(anchor) >= 2}
-
-
-def _covered(source: Any, targets: Iterable[Any]) -> bool:
-    source_text = _compact(source)
-    if not source_text:
-        return False
-    for target in targets:
-        target_text = _compact(target)
-        if source_text == target_text or (len(source_text) >= 4 and source_text in target_text):
-            return True
-        source_anchors = _anchors(source)
-        overlap = source_anchors & _anchors(target)
-        if len(overlap) >= (2 if len(source_text) >= 4 else 1):
-            return True
-    return False
-
-
-def _preserved(source: Any, targets: Iterable[Any]) -> bool:
-    """Match required tools/materials by normalized identity, not broad text."""
-
-    source_text = _compact(source)
-    if not source_text:
-        return False
-    for target in targets:
-        target_text = _compact(target)
-        if source_text == target_text or (len(source_text) >= 3 and source_text in target_text):
-            return True
-    return False
-
-
-def _strongly_covered(source: Any, targets: Iterable[Any]) -> bool:
-    source_text = _compact(source)
-    return bool(source_text) and any(
-        source_text in _compact(target) or _compact(target) in source_text
-        for target in targets
-        if _compact(target)
+def _profile_key(profile: dict[str, Any]) -> tuple[Any, ...]:
+    return tuple(
+        _hours(profile[field], f"course_profile.{field}")
+        if field in {"total_hours", "theory_hours", "practice_hours", "default_lesson_hours"}
+        else normalise_text(profile[field])
+        for field in COURSE_PROFILE_FIELDS
     )
 
 
-def _check(name: str, passed: bool, detail: str, *, errors: list[str], checks: dict[str, Any]) -> None:
-    checks[name] = {"status": "pass" if passed else "fail", "detail": detail}
-    if not passed:
-        errors.append(f"{name}: {detail}")
+def _text(value: Any) -> str:
+    if isinstance(value, dict):
+        return normalise_text(value.get("text", ""))
+    return normalise_text(value)
+
+
+def _task_for_id(contract: dict[str, Any], task_id: str) -> dict[str, Any]:
+    matches = [
+        task for task in contract.get("tasks", [])
+        if isinstance(task, dict) and normalise_text(task.get("task_id")) == task_id
+    ]
+    if len(matches) != 1:
+        raise WorkOrderContractError(
+            f"Practice Task Contract must contain exactly one task for {task_id}; found {len(matches)}"
+        )
+    return matches[0]
+
+
+def _target_for_id(
+    value: dict[str, Any] | list[dict[str, Any]],
+    task_id: str,
+    *,
+    allow_legacy: bool = False,
+) -> dict[str, Any]:
+    values = value if isinstance(value, list) else [value]
+    matches = [
+        item for item in values
+        if isinstance(item, dict)
+        and normalise_text(item.get("task_id", item.get("practice_task_id"))) == task_id
+    ]
+    if len(matches) != 1:
+        raise WorkOrderContractError(
+            f"WorkOrder Content must contain exactly one item for {task_id}; found {len(matches)}"
+        )
+    return _canonical_content(matches[0], allow_legacy=allow_legacy)
+
+
+def _snapshot_equal(source: dict[str, Any], target: dict[str, Any]) -> bool:
+    try:
+        expected = canonical_task_snapshot(source)
+    except (KeyError, WorkOrderContractError):
+        return False
+    actual = target.get("source_task_snapshot")
+    return isinstance(actual, dict) and actual == expected
+
+
+def _downstream_values(content: dict[str, Any], field: str) -> list[Any]:
+    return [
+        value
+        for item in content.get("task_items", [])
+        if isinstance(item, dict)
+        for value in item.get(field, [])
+    ]
 
 
 def validate_cross_artifact_collection(
     practice_task_contract: dict[str, Any],
     work_order_content: list[dict[str, Any]],
+    *,
+    allow_legacy: bool = False,
 ) -> dict[str, Any]:
-    """Validate the complete Lesson-task to WorkOrder one-to-one mapping."""
+    """Validate one WorkOrder for every upstream Practice Task."""
 
     errors: list[str] = []
     checks: dict[str, Any] = {}
-    contract = (
-        practice_task_contract.get("practice_task_contract")
-        if isinstance(practice_task_contract.get("practice_task_contract"), dict)
-        else practice_task_contract
-    )
-    source_tasks = contract.get("tasks") if isinstance(contract, dict) else None
-    source_ids = [
-        normalise_text(task.get("task_id"))
-        for task in source_tasks or []
-        if isinstance(task, dict)
-    ]
+    try:
+        contract = _canonical_contract(practice_task_contract, allow_legacy=allow_legacy)
+    except WorkOrderContractError as exc:
+        return {"status": "fail", "errors": [str(exc)], "warnings": [], "checks": {}, "reports": [], "metrics": {}}
+    source_ids = [normalise_text(task.get("task_id")) for task in contract["tasks"] if isinstance(task, dict)]
     target_ids = [
-        normalise_text(item.get("practice_task_id"))
+        normalise_text(item.get("task_id", item.get("practice_task_id")))
         for item in work_order_content
         if isinstance(item, dict)
     ]
@@ -207,7 +207,7 @@ def validate_cross_artifact_collection(
     target_unique = len(target_ids) == len(set(target_ids))
     mapping_ok = (
         bool(source_ids)
-        and bool(work_order_content)
+        and bool(target_ids)
         and source_unique
         and target_unique
         and len(source_ids) == len(target_ids)
@@ -227,13 +227,16 @@ def validate_cross_artifact_collection(
         if not isinstance(item, dict):
             errors.append(f"work_order[{index}] must be an object")
             continue
-        report = validate_cross_artifact(practice_task_contract, item)
+        item_id = normalise_text(item.get("task_id", item.get("practice_task_id")))
+        try:
+            single_contract = copy.deepcopy(contract)
+            single_contract["tasks"] = [_task_for_id(contract, item_id)]
+            report = validate_cross_artifact(single_contract, item, _single=True, allow_legacy=allow_legacy)
+        except WorkOrderContractError as exc:
+            report = {"status": "fail", "errors": [str(exc)]}
         reports.append(report)
         if report.get("status") != "pass":
-            errors.extend(
-                f"work_order[{index}] {message}"
-                for message in report.get("errors", [])
-            )
+            errors.extend(f"work_order[{index}] {message}" for message in report.get("errors", []))
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,
@@ -251,59 +254,62 @@ def validate_cross_artifact_collection(
 def validate_cross_artifact(
     practice_task_contract: dict[str, Any],
     work_order_content: dict[str, Any] | list[dict[str, Any]],
+    *,
+    _single: bool = False,
+    allow_legacy: bool = False,
 ) -> dict[str, Any]:
-    """Return a cross-artifact report without mutating either input."""
+    """Return a fail-closed cross-artifact report without mutating inputs."""
 
-    if isinstance(work_order_content, list):
-        contract = (
-            practice_task_contract.get("practice_task_contract")
-            if isinstance(practice_task_contract.get("practice_task_contract"), dict)
-            else practice_task_contract
+    try:
+        contract = _canonical_contract(
+            practice_task_contract,
+            require_collection_shape=not _single,
+            allow_legacy=allow_legacy,
         )
-        source_tasks = contract.get("tasks") if isinstance(contract, dict) else []
-        if len(work_order_content) != 1 or len(source_tasks) != 1:
-            return validate_cross_artifact_collection(practice_task_contract, work_order_content)
-        work_order_content = work_order_content[0]
+        values = work_order_content if isinstance(work_order_content, list) else [work_order_content]
+        if not _single and (len(values) != 1 or len(contract.get("tasks", [])) != 1):
+            return validate_cross_artifact_collection(contract, values, allow_legacy=allow_legacy)
+        raw_id = normalise_text(values[0].get("task_id", values[0].get("practice_task_id")))
+        source = _task_for_id(contract, raw_id)
+        downstream = _target_for_id(values, raw_id, allow_legacy=allow_legacy)
+    except (WorkOrderContractError, AttributeError, TypeError) as exc:
+        return {"status": "fail", "errors": [str(exc)], "warnings": [], "checks": {}, "metrics": {}}
 
     errors: list[str] = []
     warnings: list[str] = []
     checks: dict[str, Any] = {}
-    try:
-        if isinstance(work_order_content, list):
-            work_order_id = work_order_content[0].get("practice_task_id", "") if work_order_content else ""
-        elif isinstance(work_order_content, dict):
-            work_order_id = work_order_content.get("practice_task_id", "")
-        else:
-            raise WorkOrderContractError("Work Order content must be an object or a non-empty array")
-        source = _practice_task(practice_task_contract, normalise_text(work_order_id))
-        downstream = _work_order(work_order_content, normalise_text(work_order_id))
-    except WorkOrderContractError as exc:
-        return {
-            "status": "fail",
-            "errors": [str(exc)],
-            "warnings": [],
-            "checks": {},
-            "metrics": {},
-        }
-
     source_id = normalise_text(source.get("task_id"))
-    target_id = normalise_text(downstream.get("practice_task_id"))
+    target_id = normalise_text(downstream.get("task_id"))
     _check("identity", source_id == target_id, f"source={source_id}, work_order={target_id}", errors=errors, checks=checks)
-
-    source_lessons = _text_values(source.get("lesson_ids", []))
-    target_lessons = _text_values(downstream.get("lesson_ids", []))
     _check(
-        "lesson_ids",
-        set(source_lessons) == set(target_lessons),
-        f"source={source_lessons}, work_order={target_lessons}",
+        "mode",
+        downstream.get("mode") == "linked",
+        f"linked cross-artifact QA requires WorkOrder mode=linked, got {downstream.get('mode')!r}",
         errors=errors,
         checks=checks,
     )
-    if source_lessons != target_lessons and set(source_lessons) == set(target_lessons):
-        warnings.append("lesson_ids order differs but the contract-defined set is preserved")
 
-    source_hours = _number(source.get("practice_hours"), "Practice Task practice_hours")
-    target_hours = _number(downstream.get("practice_hours"), "Work Order practice_hours")
+    source_profile = course_profile_from_contract(contract)
+    target_profile = downstream.get("course_profile")
+    profile_ok = isinstance(target_profile, dict) and _profile_key(source_profile) == _profile_key(target_profile)
+    _check(
+        "course_profile",
+        profile_ok,
+        f"source={source_profile}, work_order={target_profile}",
+        errors=errors,
+        checks=checks,
+    )
+
+    source_project = normalise_text(source.get("project_id"))
+    target_project = normalise_text(downstream.get("project_id"))
+    _check("project_id", source_project == target_project, f"source={source_project}, work_order={target_project}", errors=errors, checks=checks)
+
+    source_lessons = [normalise_text(value) for value in source.get("lesson_ids", [])]
+    target_lessons = [normalise_text(value) for value in downstream.get("lesson_ids", [])]
+    _check("lesson_ids", source_lessons == target_lessons, f"source={source_lessons}, work_order={target_lessons}", errors=errors, checks=checks)
+
+    source_hours = _hours(source.get("practice_hours"), "Practice Task practice_hours")
+    target_hours = _hours(downstream.get("practice_hours"), "WorkOrder practice_hours")
     _check("practice_hours", source_hours == target_hours, f"source={source_hours}, work_order={target_hours}", errors=errors, checks=checks)
     _check(
         "practice_hours_unit",
@@ -312,81 +318,74 @@ def validate_cross_artifact(
         errors=errors,
         checks=checks,
     )
-    if target_hours > max(1, len(downstream.get("task_items", [])) * 4):
-        warnings.append("workload review required: task breadth may exceed the declared practice hours")
 
     source_title = normalise_text(source.get("title"))
-    target_title = normalise_text(downstream.get("task_title") or downstream.get("project_name"))
-    title_pass = _covered(source_title, [target_title])
-    _check("task_title_intent", title_pass, f"source={source_title!r}, work_order={target_title!r}", errors=errors, checks=checks)
+    target_title = normalise_text(downstream.get("task_title"))
+    _check(
+        "task_title_intent",
+        source_title == target_title,
+        f"source={source_title!r}, work_order={target_title!r}; linked titles must be identical",
+        errors=errors,
+        checks=checks,
+    )
+    _check(
+        "source_task_snapshot",
+        _snapshot_equal(source, downstream),
+        "linked WorkOrder must preserve the exact canonical Practice Task snapshot",
+        errors=errors,
+        checks=checks,
+    )
 
-    task_items = downstream.get("task_items", [])
-    downstream_deliverables = [value for item in task_items for value in item.get("deliverables", [])]
-    downstream_criteria = [value for item in task_items for value in item.get("acceptance_criteria", [])]
-    source_deliverables = _text_values(source.get("deliverables", []))
-    source_criteria = _text_values(source.get("acceptance_criteria", []))
-    uncovered_deliverables = [value for value in source_deliverables if not _covered(value, downstream_deliverables)]
+    task_items = [item for item in downstream.get("task_items", []) if isinstance(item, dict)]
+    downstream_deliverables = _downstream_values(downstream, "deliverables")
+    downstream_criteria = _downstream_values(downstream, "acceptance_criteria")
+    source_deliverables = [normalise_text(value) for value in source.get("deliverables", [])]
+    source_criteria = [normalise_text(value) for value in source.get("acceptance_criteria", [])]
+    missing_deliverables = [
+        value for value in source_deliverables
+        if not any(value == _text(item) or value in _text(item) for item in downstream_deliverables)
+    ]
     _check(
         "deliverables",
-        not uncovered_deliverables,
-        "uncovered=" + ", ".join(uncovered_deliverables) if uncovered_deliverables else "all source deliverables are represented",
+        not missing_deliverables,
+        "uncovered=" + ", ".join(missing_deliverables) if missing_deliverables else "all source deliverables are represented",
         errors=errors,
         checks=checks,
     )
-    uncovered_criteria = [value for value in source_criteria if not _covered(value, downstream_criteria)]
+    missing_criteria = [
+        value for value in source_criteria
+        if not any(value == _text(item) or value in _text(item) for item in downstream_criteria)
+    ]
     _check(
         "acceptance_criteria",
-        not uncovered_criteria,
-        "uncovered=" + ", ".join(uncovered_criteria) if uncovered_criteria else "all source criteria are represented",
+        not missing_criteria,
+        "uncovered=" + ", ".join(missing_criteria) if missing_criteria else "all source acceptance criteria are represented",
         errors=errors,
         checks=checks,
     )
 
-    source_tools = _text_values(source.get("tools_or_materials", []))
-    downstream_tools = [
-        value
-        for item in task_items
-        for value in item.get("tools_or_materials", [])
-    ]
+    source_tools = [normalise_text(value) for value in source.get("tools_or_materials", [])]
+    downstream_tools = _downstream_values(downstream, "tools_or_materials")
     missing_tools = [
-        value for value in source_tools if not _preserved(value, downstream_tools)
+        value for value in source_tools
+        if not any(value == _text(item) or value in _text(item) for item in downstream_tools)
     ]
+    tools_ok = not missing_tools
     _check(
         "tools_materials_preservation",
-        not missing_tools,
-        "missing upstream tool/material: " + ", ".join(missing_tools)
-        if missing_tools
-        else "all upstream tools/materials are preserved",
+        tools_ok,
+        "missing upstream tool/material: " + ", ".join(missing_tools) if missing_tools else "all upstream tools/materials are preserved",
         errors=errors,
         checks=checks,
     )
+    # Compatibility names remain, but they are now the same exact-field check;
+    # no domain vocabulary or lexical similarity is used.
+    checks["tools_materials"] = checks["tools_materials_preservation"]
+    checks["tools_materials_domain"] = checks["tools_materials_preservation"]
 
-    source_text = " ".join(
-        _text_values(
-            [source.get("title"), source.get("scenario"), *source.get("tools_or_materials", []), *source.get("objectives", [])]
-        )
-    ).casefold()
-    target_text = _artifact_text(downstream).casefold()
-    source_it = any(term in source_text for term in _IT_TERMS)
-    source_nursing = any(term in source_text for term in _NURSING_TERMS)
-    target_it = any(term in target_text for term in _IT_TERMS)
-    target_nursing = any(term in target_text for term in _NURSING_TERMS)
-    conflict = (source_nursing and target_it and not source_it) or (source_it and target_nursing and not source_nursing)
-    _check(
-        "tools_materials",
-        not conflict,
-        "downstream terminology conflicts with the upstream domain" if conflict else "no bounded domain/tool conflict detected",
-        errors=errors,
-        checks=checks,
-    )
-    # Keep the pre-Phase-2.1 check name as the compatibility surface while
-    # exposing the more precise semantic label to newer callers.
-    checks["tools_materials_domain"] = checks["tools_materials"]
-
-    source_safety = _text_values(source.get("safety_or_compliance", []))
-    target_safety = _text_values(downstream.get("safety_or_compliance", []))
-    target_full_text = _artifact_text(downstream)
-    missing_safety = [value for value in source_safety if not _strongly_covered(value, target_safety + [target_full_text])]
+    source_safety = [normalise_text(value) for value in source.get("safety_or_compliance", [])]
+    target_safety = [normalise_text(value) for value in downstream.get("safety_or_compliance", [])]
+    missing_safety = [value for value in source_safety if value not in target_safety]
     _check(
         "safety_or_compliance",
         not missing_safety,
@@ -401,6 +400,7 @@ def validate_cross_artifact(
         "warnings": warnings,
         "checks": checks,
         "metrics": {
+            "task_id": source_id,
             "practice_task_id": source_id,
             "lesson_ids": source_lessons,
             "practice_hours": source_hours,
@@ -408,6 +408,7 @@ def validate_cross_artifact(
             "acceptance_criteria_count": len(source_criteria),
             "tool_material_count": len(source_tools),
             "work_order_task_item_count": len(task_items),
+            "semantic_quality_source": "Agent pedagogical review",
         },
     }
 
@@ -421,11 +422,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--practice-task-json", required=True, type=Path)
     parser.add_argument("--work-order-json", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Explicitly enable the non-production 1.0 compatibility adapter",
+    )
     args = parser.parse_args(argv)
     try:
         practice = _read_json(args.practice_task_json)
-        work_order = load_work_order_content(args.work_order_json)
-        report = validate_cross_artifact(practice, work_order)
+        work_order = load_work_order_content(args.work_order_json, allow_legacy=args.legacy)
+        report = validate_cross_artifact(practice, work_order, allow_legacy=args.legacy)
     except Exception as exc:
         report = {"status": "fail", "errors": [str(exc)], "warnings": [], "checks": {}, "metrics": {}}
     args.output.parent.mkdir(parents=True, exist_ok=True)

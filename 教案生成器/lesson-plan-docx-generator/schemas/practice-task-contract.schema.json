@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-work-skills.local/schemas/lesson-plan/practice-task-contract-v1.json",
-  "title": "Practice Task Contract V1 compatibility entrypoint",
-  "$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"
+  "$id": "https://codex-work-skills.local/schemas/lesson-plan/practice-task-contract-v1.1.json",
+  "title": "Practice Task Contract 1.1 entrypoint",
+  "$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.1.json"
 }
