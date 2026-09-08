@@ -9,9 +9,9 @@ template:
   format: docx
   file: assets/templates/practice-work-order/v1.0.0/template.docx
 generator:
-  version: 2.1.0
-  content_contract: Practice Work Order Content V1
-  lesson_handoff: Practice Task Contract V1
+  version: 2.2.0
+  content_contract: Practice WorkOrder Content 1.1
+  lesson_handoff: Practice Task Contract 1.1
 schema: schemas/work-order-content.schema.json
 fingerprint:
   algorithm: sha256
@@ -20,4 +20,4 @@ fingerprint:
 validation:
   require_docx_open: true
   top_level_tables: 3
-  require_render_check: false
+  require_render_check: true

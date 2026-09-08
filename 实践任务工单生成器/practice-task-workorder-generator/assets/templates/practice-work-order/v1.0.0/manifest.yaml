@@ -5,10 +5,10 @@ template:
   format: docx
   file: template.docx
 generator:
-  version: 1.0.0
+  version: 2.2.0
   supported_major: 1
-  content_contract: Practice Work Order Content V1
-  lesson_handoff: Practice Task Contract V1
+  content_contract: Practice WorkOrder Content 1.1
+  lesson_handoff: Practice Task Contract 1.1
 schema: schemas/work-order-content.schema.json
 structure:
   top_level_tables: 3
@@ -35,7 +35,7 @@ protected:
 validation:
   require_docx_open: true
   top_level_tables: 3
-  require_render_check: false
+  require_render_check: true
 fingerprint:
   algorithm: sha256
   sha256: F20308238D07C7BFB9B1F9D2A25591D6EE09F13EC5855B7C57FA914CEE9457BD

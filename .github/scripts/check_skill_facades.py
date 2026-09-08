@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 WORKORDER_RELATIVE = Path("实践任务工单生成器") / "practice-task-workorder-generator"
-SKILL_VERSION = "2.1.0"
+SKILL_VERSION = "2.2.0"
 TEMPLATE_VERSION = "1.0.0"
 TEMPLATE_REF = "practice-work-order v1.0.0"
 
@@ -89,7 +89,7 @@ def check(root: Path) -> list[str]:
         if TEMPLATE_REF not in text:
             errors.append(f"{label} is missing {TEMPLATE_REF}")
     if f"{SKILL_VERSION}" not in readme or f"{SKILL_VERSION}" not in intro_text:
-        errors.append("README and WorkOrder 简介 must expose WorkOrder Skill version 2.1.0")
+        errors.append("README and WorkOrder 简介 must expose WorkOrder Skill version 2.2.0")
     if "practice-task-workorder-generator" not in readme:
         errors.append("README is missing the WorkOrder Skill reference")
     if "SKILL_NAME = \"practice-task-workorder-generator\"" not in install_text:
