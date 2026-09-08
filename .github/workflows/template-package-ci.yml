@@ -630,10 +630,10 @@ jobs:
           mkdir -p "$workorder_dir"
           python "实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py" \
             --content-json "实践任务工单生成器/practice-task-workorder-generator/examples/software.example.json" \
-            --output-dir "$workorder_dir/software" --replace --render --json > "$workorder_dir/software-report.json"
+            --output-dir "$workorder_dir/software" --replace --mode standalone --render --json > "$workorder_dir/software-report.json"
           python "实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py" \
             --content-json "实践任务工单生成器/practice-task-workorder-generator/examples/nursing.example.json" \
-            --output-dir "$workorder_dir/nursing" --replace --render --json > "$workorder_dir/nursing-report.json"
+            --output-dir "$workorder_dir/nursing" --replace --mode standalone --render --json > "$workorder_dir/nursing-report.json"
           python - "$workorder_dir/software-report.json" "$workorder_dir/nursing-report.json" <<'PY'
           import json
           import sys

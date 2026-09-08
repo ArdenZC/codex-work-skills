@@ -456,6 +456,11 @@ def main() -> None:
     parser.add_argument("--skip-output-validation", action="store_true")
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
     parser.add_argument("--qa-report", default="")
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Explicitly enable the non-production 2.0/2.1 compatibility path",
+    )
     args = parser.parse_args()
     if (args.skip_template_validation or args.skip_output_validation) and os.environ.get(UNSAFE_VALIDATION_SKIP_ENV) != "1":
         raise RuntimeError("Unsafe validation bypass is disabled.")
@@ -472,6 +477,11 @@ def main() -> None:
     schema_path = Path(args.schema).expanduser().resolve()
     with source_path.open("r", encoding="utf-8") as f:
         meta = json.load(f)
+    if meta.get("content_contract_version") != "2.2" and not args.legacy:
+        raise ValueError(
+            "Lesson Content Contract 2.2 is required for production generation; "
+            "legacy 2.0/2.1 input requires the explicit --legacy flag."
+        )
     validate_content_v2_input(meta, schema_path)
     lessons = meta["lessons"]
 

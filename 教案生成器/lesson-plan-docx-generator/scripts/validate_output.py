@@ -45,6 +45,9 @@ from render_qa import render_docx_directory
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
+MECHANICAL_TOPIC_SUFFIX_RE = re.compile(
+    r"(?:聚焦(?:于)?|围绕|针对|对应主题|核心主题|本节主题|任务主题|本节关联)\s*[:：]"
+)
 
 
 def _same_lexical_path(left: Path | str, right: Path | str) -> bool:
@@ -1130,12 +1133,17 @@ def validate_output_dir(
             item_errors.append(f"evaluation table validation failed: {exc}")
 
         all_text = _document_text(document, table)
-        contamination = detect_non_it_contamination(course_metadata, item, all_text)
+        contamination = [] if is_v22 else detect_non_it_contamination(course_metadata, item, all_text)
         if contamination:
             contamination_terms.update(contamination)
             item_errors.extend(
                 f"non-IT content contamination: {term}"
                 for term in contamination
+            )
+        suffix_count = len(MECHANICAL_TOPIC_SUFFIX_RE.findall(all_text))
+        if suffix_count:
+            item_errors.append(
+                f"mechanical topic suffixes remain in rendered DOCX: {suffix_count}"
             )
         for forbidden in manifest.get("validation", {}).get("forbidden_template_text", []):
             if forbidden in {course_expected, expected_course, str(item["unit"]), str(item["task"])}:
@@ -1225,8 +1233,11 @@ def validate_output_dir(
         else:
             render_report = render_docx_directory(out_dir)
         report["render"] = render_report
-        if render_report["status"] == "failed":
-            errors.extend(f"render QA: {message}" for message in render_report["errors"])
+        if render_report["status"] != "passed":
+            render_errors = render_report.get("errors") or [
+                f"render status={render_report.get('status')}: {render_report.get('reason', 'render was not verified')}"
+            ]
+            errors.extend(f"render QA: {message}" for message in render_errors)
     if not errors:
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
@@ -1249,6 +1260,11 @@ def main() -> int:
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Explicitly enable the non-production 2.0/2.1 compatibility path",
+    )
     args = parser.parse_args()
     try:
         source_path = Path(args.input_json).expanduser().resolve()
@@ -1273,6 +1289,11 @@ def main() -> int:
         assert_output_path_safe(Path(args.output_dir), protected_paths)
         if args.qa_report and not _same_lexical_path(args.qa_report, Path(args.output_dir) / "qa-report.json"):
             assert_external_qa_path_safe(args.qa_report, args.output_dir, protected_paths)
+        if data.get("content_contract_version") != "2.2" and not args.legacy:
+            raise ValueError(
+                "Lesson Content Contract 2.2 is required for production output validation; "
+                "legacy 2.0/2.1 input requires the explicit --legacy flag."
+            )
         validate_content_v2_input(data, schema_path)
         custom_template = args.custom_template if args.custom_template else None
         if args.skip_validation:
