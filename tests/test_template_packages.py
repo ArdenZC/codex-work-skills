@@ -181,6 +181,22 @@ def run_script(
     *args: str,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    command_args = list(args)
+    if script.name in {"generate_lesson_plans.py", "validate_output.py"} and "--legacy" not in command_args:
+        source_flag = "--tasks-json" if script.name == "generate_lesson_plans.py" else "--input-json"
+        if source_flag in command_args:
+            source_index = command_args.index(source_flag) + 1
+            if source_index < len(command_args):
+                try:
+                    source_version = json.loads(Path(command_args[source_index]).read_text(encoding="utf-8-sig")).get(
+                        "content_contract_version"
+                    )
+                except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+                    source_version = "2.2"
+                if source_version != "2.2":
+                    # The legacy test fixtures opt into the compatibility adapter explicitly.
+                    command_args.append("--legacy")
+
     if env is None:
         env = os.environ.copy()
         if (
@@ -191,7 +207,7 @@ def run_script(
             # production callers still need to opt in through the environment.
             env.setdefault("LESSON_ALLOW_UNSAFE_VALIDATION_SKIP", "1")
     return subprocess.run(
-        [str(PYTHON), str(script), *args],
+        [str(PYTHON), str(script), *command_args],
         cwd=ROOT,
         env=env,
         text=True,

@@ -4,6 +4,14 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## Lesson 2.2.3 / WorkOrder 2.2.0 Structural Closeout — 2026-09-08
+
+- Lesson 继续使用 Content Contract 2.2，固定每课课前 10 分钟、课后 15 分钟；课中仍按 `hours × 45` 分配，课外时间不计入课程课时。
+- 课程级教材、教学资源和参考文献继续分离；书籍作者/编辑、书名、出版社必填，年份可选；无可验证外部来源时允许空 reference pool 并记录检索状态。
+- Lesson 的实践任务反向字段保持空数组；Practice Task Contract 1.1 从已确认课程基本盘单向连接理论 Lesson。
+- WorkOrder Content 1.1 增加显式 linked/standalone 模式、课程基本盘、完整来源任务快照和 Agent pedagogical review；每项 2 学时，固定 10+90=100 分，交付物—验收使用 ID 映射。
+- 关联 WorkOrder 默认执行 Cross-Artifact QA、Output QA 和真实 Render Smoke；standalone/debug 显式跳过渲染时不报告 Production PASS。模板 binary、`lesson-plan v1.1.2` 和 `practice-work-order v1.0.0` 均不变。
+
 ## Lesson / WorkOrder Contract Fix 2.2.1 — 2026-09-05
 
 - Intake 未明确的理论/实践学时、组织方式和实践工单偏好保持“待确认”，不再隐含 50/50、综合组织或 false；确认前不规划课次、任务或生成文件。

@@ -1,13 +1,22 @@
 [
   {
-    "content_contract_version": "1.0",
-    "course_name": "基础护理技术",
-    "major": "护理",
-    "class_or_audience": "高职护理一年级",
-    "practice_task_id": "NU-WO-01",
+    "content_contract_version": "1.1",
+    "mode": "standalone",
+    "course_profile": {
+      "course_name": "基础护理技术",
+      "major": "护理",
+      "audience": "高职护理一年级",
+      "total_hours": 40,
+      "theory_hours": 20,
+      "practice_hours": 20,
+      "delivery_mode": "split_lessons",
+      "default_lesson_hours": 2
+    },
+    "task_id": "NU-WO-01",
+    "project_id": "NU-P-01",
+    "task_title": "完成生命体征测量记录",
     "lesson_ids": ["L02", "L03"],
     "granularity": "per_task",
-    "project_name": "完成生命体征测量记录",
     "practice_hours": 2,
     "group": {
       "name": "第____组",
@@ -21,8 +30,10 @@
         "score": 30,
         "tools_or_materials": ["生命体征测量用品", "操作核对表"],
         "steps": ["核对对象信息", "检查用品状态和环境要求"],
-        "deliverables": ["操作前核对记录"],
-        "acceptance_criteria": ["核对项目完整", "记录能够说明异常处理方式"]
+        "deliverables": [{"deliverable_id": "D1", "text": "操作前核对记录"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C1", "text": "核对项目完整且记录能够说明异常处理方式", "covers": ["D1"]}
+        ]
       },
       {
         "title": "实施测量操作",
@@ -30,8 +41,10 @@
         "score": 35,
         "tools_or_materials": ["血压计", "体温计", "计时工具"],
         "steps": ["按流程实施测量", "观察并记录关键操作节点"],
-        "deliverables": ["测量过程记录单"],
-        "acceptance_criteria": ["步骤顺序符合要求", "记录内容与观察过程一致"]
+        "deliverables": [{"deliverable_id": "D2", "text": "测量过程记录单"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C2", "text": "步骤顺序符合要求且记录内容与观察过程一致", "covers": ["D2"]}
+        ]
       },
       {
         "title": "整理结果与交接",
@@ -39,20 +52,47 @@
         "score": 25,
         "tools_or_materials": ["护理记录单", "交接记录表"],
         "steps": ["核对记录项目", "完成交接说明并签名确认"],
-        "deliverables": ["护理记录单", "交接说明"],
-        "acceptance_criteria": ["记录项目齐全", "交接说明可追溯到记录"]
+        "deliverables": [
+          {"deliverable_id": "D3", "text": "护理记录单"},
+          {"deliverable_id": "D4", "text": "交接说明"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C3", "text": "记录项目齐全", "covers": ["D3"]},
+          {"criterion_id": "C4", "text": "交接说明可追溯到记录", "covers": ["D4"]}
+        ]
       }
-    ]
+    ],
+    "safety_or_compliance": ["遵守操作安全和隐私要求"],
+    "pedagogical_review": {
+      "status": "approved",
+      "capacity": "fit",
+      "summary": "准备核对、规范操作和交接记录形成完整证据链，用品配置明确，普通学生可在九十分钟内完成核心演练。",
+      "checks": {
+        "professional_accuracy": true,
+        "ordinary_student_90_minutes": true,
+        "deliverable_acceptance_mapping": true,
+        "no_teacher_answer": true
+      }
+    }
   },
   {
-    "content_contract_version": "1.0",
-    "course_name": "基础护理技术",
-    "major": "护理",
-    "class_or_audience": "高职护理一年级",
-    "practice_task_id": "NU-WO-02",
+    "content_contract_version": "1.1",
+    "mode": "standalone",
+    "course_profile": {
+      "course_name": "基础护理技术",
+      "major": "护理",
+      "audience": "高职护理一年级",
+      "total_hours": 40,
+      "theory_hours": 20,
+      "practice_hours": 20,
+      "delivery_mode": "split_lessons",
+      "default_lesson_hours": 2
+    },
+    "task_id": "NU-WO-02",
+    "project_id": "NU-P-02",
+    "task_title": "整理无菌操作检查记录",
     "lesson_ids": ["L06", "L07"],
     "granularity": "per_task",
-    "project_name": "整理无菌操作检查记录",
     "practice_hours": 2,
     "group": {
       "name": "第____组",
@@ -66,8 +106,10 @@
         "score": 30,
         "tools_or_materials": ["无菌操作用品", "环境检查表"],
         "steps": ["检查环境条件", "核对用品和人员准备"],
-        "deliverables": ["环境与准备检查表"],
-        "acceptance_criteria": ["检查项目齐全", "整改项目有具体位置说明"]
+        "deliverables": [{"deliverable_id": "D1", "text": "环境与准备检查表"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C1", "text": "检查项目齐全且整改项目有具体位置说明", "covers": ["D1"]}
+        ]
       },
       {
         "title": "实施规范操作",
@@ -75,8 +117,10 @@
         "score": 35,
         "tools_or_materials": ["无菌包", "操作模型", "操作记录表"],
         "steps": ["按流程实施演练", "记录关键控制点和观察情况"],
-        "deliverables": ["操作过程记录表"],
-        "acceptance_criteria": ["操作顺序符合规范", "关键控制点均有记录"]
+        "deliverables": [{"deliverable_id": "D2", "text": "操作过程记录表"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C2", "text": "操作顺序符合规范且关键控制点均有记录", "covers": ["D2"]}
+        ]
       },
       {
         "title": "完成同伴复核",
@@ -84,20 +128,47 @@
         "score": 25,
         "tools_or_materials": ["同伴复核表", "改进记录表"],
         "steps": ["逐项复核操作记录", "记录问题和改进措施"],
-        "deliverables": ["同伴复核表", "改进记录"],
-        "acceptance_criteria": ["复核意见具体", "改进措施与问题逐项对应"]
+        "deliverables": [
+          {"deliverable_id": "D3", "text": "同伴复核表"},
+          {"deliverable_id": "D4", "text": "改进记录"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C3", "text": "复核意见具体", "covers": ["D3"]},
+          {"criterion_id": "C4", "text": "改进措施与问题逐项对应", "covers": ["D4"]}
+        ]
       }
-    ]
+    ],
+    "safety_or_compliance": ["遵守无菌操作规范和个人防护要求"],
+    "pedagogical_review": {
+      "status": "approved",
+      "capacity": "fit",
+      "summary": "环境检查、操作记录与同伴复核依次留下过程和改进证据，任务材料和时长适合九十分钟内完成。",
+      "checks": {
+        "professional_accuracy": true,
+        "ordinary_student_90_minutes": true,
+        "deliverable_acceptance_mapping": true,
+        "no_teacher_answer": true
+      }
+    }
   },
   {
-    "content_contract_version": "1.0",
-    "course_name": "基础护理技术",
-    "major": "护理",
-    "class_or_audience": "高职护理一年级",
-    "practice_task_id": "NU-WO-03",
+    "content_contract_version": "1.1",
+    "mode": "standalone",
+    "course_profile": {
+      "course_name": "基础护理技术",
+      "major": "护理",
+      "audience": "高职护理一年级",
+      "total_hours": 40,
+      "theory_hours": 20,
+      "practice_hours": 20,
+      "delivery_mode": "split_lessons",
+      "default_lesson_hours": 2
+    },
+    "task_id": "NU-WO-03",
+    "project_id": "NU-P-03",
+    "task_title": "完成患者护理观察记录",
     "lesson_ids": ["L10", "L11"],
     "granularity": "per_task",
-    "project_name": "完成患者护理观察记录",
     "practice_hours": 2,
     "group": {
       "name": "第____组",
@@ -111,8 +182,10 @@
         "score": 30,
         "tools_or_materials": ["观察任务单", "护理观察记录表"],
         "steps": ["阅读观察任务", "收集并分类观察信息"],
-        "deliverables": ["观察信息分类表"],
-        "acceptance_criteria": ["信息分类清晰", "每条信息都有记录时间"]
+        "deliverables": [{"deliverable_id": "D1", "text": "观察信息分类表"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C1", "text": "信息分类清晰且每条信息都有记录时间", "covers": ["D1"]}
+        ]
       },
       {
         "title": "记录观察过程",
@@ -120,8 +193,14 @@
         "score": 35,
         "tools_or_materials": ["护理观察记录表", "沟通记录表"],
         "steps": ["按时间记录观察过程", "核对沟通要点和记录对象"],
-        "deliverables": ["护理观察记录", "沟通要点记录"],
-        "acceptance_criteria": ["记录按时间可追溯", "描述客观且没有遗漏关键项目"]
+        "deliverables": [
+          {"deliverable_id": "D2", "text": "护理观察记录"},
+          {"deliverable_id": "D3", "text": "沟通要点记录"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C2", "text": "记录按时间可追溯", "covers": ["D2"]},
+          {"criterion_id": "C3", "text": "描述客观且没有遗漏关键项目", "covers": ["D3"]}
+        ]
       },
       {
         "title": "整理交接材料",
@@ -129,9 +208,27 @@
         "score": 25,
         "tools_or_materials": ["交接清单", "小组记录表"],
         "steps": ["核对观察记录", "整理材料并完成交接说明"],
-        "deliverables": ["观察材料包", "交接说明"],
-        "acceptance_criteria": ["材料与记录一致", "交接说明能指向具体观察记录"]
+        "deliverables": [
+          {"deliverable_id": "D4", "text": "观察材料包"},
+          {"deliverable_id": "D5", "text": "交接说明"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C4", "text": "材料与记录一致", "covers": ["D4"]},
+          {"criterion_id": "C5", "text": "交接说明能指向具体观察记录", "covers": ["D5"]}
+        ]
       }
-    ]
+    ],
+    "safety_or_compliance": ["遵守隐私保护和护理记录规范"],
+    "pedagogical_review": {
+      "status": "approved",
+      "capacity": "fit",
+      "summary": "观察信息、过程记录和交接材料形成连续工作流，隐私与记录规范明确，九十分钟内可完成核心产出。",
+      "checks": {
+        "professional_accuracy": true,
+        "ordinary_student_90_minutes": true,
+        "deliverable_acceptance_mapping": true,
+        "no_teacher_answer": true
+      }
+    }
   }
 ]

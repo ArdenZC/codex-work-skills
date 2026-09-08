@@ -27,8 +27,8 @@
 
 | Skill | 当前版本 | 主要用途 | 输出 |
 | --- | --- | --- | --- |
-| [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.2** | 课程规划、真实参考资料检索、项目化理论教案生成 | `.docx` |
-| [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.1.0 / Phase 2.1** | 根据实践教学单元生成学生任务工单 | `.docx` |
+| [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.3** | 课程规划、真实参考资料检索、项目化理论教案生成 | `.docx` |
+| [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.2.0 / Phase 2.2** | 根据实践教学单元生成学生任务工单 | `.docx` |
 | [📊 平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | **当前稳定版** | 根据真实课程成绩单生成平时成绩记分册 | `.xls` |
 
 > Skill 版本、内容合同版本和 Word / Excel 模板版本彼此独立。升级 Skill 不代表必须同步修改模板。
@@ -60,7 +60,7 @@ flowchart LR
 
 ---
 
-## 📝 教案生成器 2.2.2
+## 📝 教案生成器 2.2.3
 
 教案生成器面向高职、高校等中文教学场景，使用真实 Word 模板生成课程教学单元设计。
 
@@ -71,21 +71,21 @@ flowchart LR
 - Lesson DOCX 只覆盖理论课时，默认 **2 学时 / 份**；
 - 用户确认的课程元数据贯穿内容合同和最终 DOCX，避免专业、授课对象等字段漂移；
 - 教材、教学资源、参考文献严格分离，课程教材和 PPT / 课件不作为参考文献；
-- 在具备联网能力时优先检索国内出版社、高校公开课程、国家/行业标准和权威公开资料，并保留真实责任者信息；
+- 在具备联网能力时优先检索可核验的出版社、高校公开课程、国家/行业标准和权威公开资料，并保留真实责任者信息；
 - 参考文献允许跨课合理复用，不为了“去重”强行制造不真实来源；
 - 删除机械的“聚焦：xxx”等主题尾缀，正文以自然教学语言体现课次主题；
-- 支持 IT、护理、会计等不同专业方向，避免固定 IT 场景污染；
+- 支持不同专业方向，避免固定领域场景污染；
 - 教学评价分数限定在 **85–96**，支持 `0.5` 步长；
 - 使用受保护的 `lesson-plan v1.1.2` Word 模板生成 `.docx`。
 
-内容合同：**Lesson Content Contract 2.2**。
+内容合同：**Lesson Content Contract 2.2**；实践侧上游合同：**Practice Task Contract 1.1**。
 默认模板：**lesson-plan v1.1.2**。
 
 [查看教案生成器](教案生成器/lesson-plan-docx-generator) · [Lesson Acceptance](docs/lesson-acceptance.md)
 
 ---
 
-## 📋 实践任务工单生成器 2.1.0
+## 📋 实践任务工单生成器 2.2.0
 
 实践任务工单用于承接课程中的实践教学单元。
 
@@ -94,9 +94,10 @@ flowchart LR
 - **1 个实践教学单元 = 2 学时 = 1 份任务工单**；
 - Lesson 只有在用户明确要求生成工单时才建立 Practice Task Contract；
 - Practice Task 与 WorkOrder 一一对应；
+- 关联工单使用 Practice Task Contract 1.1 和 WorkOrder Content 1.1 的完整来源任务快照；独立模式必须明确选择；
 - 课堂考勤固定 **10 分**，其余任务评价合计 **90 分**，总分 100 分；
 - 学生任务结果区保持空白，不生成教师答案；
-- 使用真实 `practice-work-order v1.0.0` Word 模板。
+- 使用真实 `practice-work-order v1.0.0` Word 模板；关联模式默认真实渲染通过后才交付。
 
 [查看实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator)
 
@@ -170,7 +171,8 @@ Codex 默认安装位置：
 - `--dry-run`：只查看安装计划；
 - `--skills-dir <目录>`：指定 Skill 目录；
 - `--replace`：替换已有安装；
-- `--keep-backup`：替换成功后保留上一份安装备份。
+- `--keep-backup`：替换成功后保留上一份安装备份（支持该参数的 installer）；
+- `--doctor --json`：由源树只读比对已安装副本的 fingerprint，并要求 `status=current`。
 
 ---
 

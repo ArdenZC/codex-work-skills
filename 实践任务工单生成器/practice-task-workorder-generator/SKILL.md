@@ -1,57 +1,57 @@
-# 实践任务工单生成器 Skill 2.1.0（Phase 2.1 Hardening）
+# 实践任务工单生成器 Skill 2.2.0
 
-你是一个独立的实践任务学习工单生成器。当前版本消费 Lesson 的 Practice Task Contract V1 和 Agent 已创作的 WorkOrder Content V1，并在写入真实模板前完成确定性合同、跨工件和输出检查。当前仍是 Phase 2.1 Hardening，不是 Phase 3 的 64 学时稳定版。
+这是 Lesson 的实践任务下游 Skill，当前收口范围为 Phase 2.2。它把 Agent 创作的 WorkOrder Content 1.1 写入受保护的 `practice-work-order v1.0.0` 模板；模板二进制、版式和模板版本不变。本 Skill 不进入 Phase 3，不生成教师答案，不联动成绩册。
 
-## 正式流程
+本文件是工单行为的唯一人类合同。机器字段约束以 `schemas/work-order-content.schema.json` 和仓库根目录的 `schemas/shared/practice-task-contract.schema.json` 为准；Python 只实现这些确定性约束、模板映射、输出检查、渲染门禁和事务，不复制或替代本文件的教学判断。
 
-读取当前会话、已有附件和上游 handoff → 识别输入模式 → 校验 canonical Practice Task Contract V1 和 Agent-authored WorkOrder Content V1 → WorkOrder Content QA → Cross-Artifact QA → 使用默认模板 `practice-work-order v1.0.0` 生成全部 candidate DOCX → 全部 Output QA → 请求时全部 Render Smoke → 批量原子发布 → 报告路径和 QA。
+## 输入与模式
 
-调用本 Skill 即表示需要正式 DOCX，不再次询问模板、输出目录或是否开始生成。只有用户主动改变要求、输入存在无法合理解决的直接冲突，或正式文件覆盖存在安全冲突时才暂停。
+Practice Task Contract 1.1 是关联模式的唯一上游事实源。它必须包含已确认的课程基本盘：课程名称、专业、授课对象、总课时、理论课时、实践课时、组织方式和默认单课学时；每个 Practice Task 固定 2 学时，任务数等于实践学时除以 2。
 
-## 合同与事实源
+WorkOrder Content 1.1 必须由 Agent 独立创作，至少包含：
 
-Practice Task Contract V1 的唯一 canonical schema 位于仓库 `schemas/shared/practice-task-contract.schema.json`。Lesson Skill 和本 Skill 共同消费这一份 schema；Lesson 目录中的兼容入口只用于兼容旧路径，不得再复制、独立演化第二份合同。
+- `content_contract_version=1.1`、`mode`、课程基本盘、`task_id`、`project_id`、`task_title`、`lesson_ids`、`practice_hours=2`、小组占位信息和任务项；
+- 每个任务项的标题、描述、工具/材料、步骤、交付物、验收标准和 Agent `pedagogical_review`；
+- 关联模式的 `source_task_snapshot`。它必须逐字段保存上游任务的 ID、项目、标题、课次、学时、场景、目标、输入、步骤、交付物、验收标准、工具/材料和安全/合规要求。
 
-`--practice-task-json` 是 handoff-only 入口，正式数据流是：
+模式边界必须保持清楚：
+
+- `mode=linked`：同时提供 Practice Task Contract 1.1 和完整 WorkOrder Content 1.1；生成前必须通过课程基本盘相等、任务身份、课次、2 学时和 exact snapshot 的 Cross-Artifact QA。只有 handoff 时只能输出 Agent 创作骨架，不能生成正式 Content 或 DOCX。
+- `mode=standalone`：只允许在命令行明确传入 `--mode standalone`，且不能声称已完成上游 handoff；`source_task_snapshot` 不得出现。`--skip-render` 只能用于明确的 standalone/debug 输出，报告中的 `render.status=skipped`，不构成 Production PASS。
+- `mode=linked` 默认执行真实 DOCX 渲染。必须得到 `render.status=pass` 才能报告生产成功；没有 LibreOffice 时 fail-closed，并明确渲染未验证。`--skip-render` 不得绕过关联模式的生产门禁。
+
+旧的 Practice Task/WorkOrder V1 只可通过显式 `--legacy` 或迁移适配器读取。默认路径只接受 1.1，不得把兼容字段当作新的合同。
+
+## Agent 创作与质量判断
+
+Agent 在写入前必须先完成整份工单的 pedagogical review；发现问题先重写 Content，再交给 Python。Review 至少说明：专业准确性、普通学生九十分钟内完成的可行性、上游目标到活动和证据的连贯性、工具准备与先决知识、交付物专业性、每个交付物到验收标准的映射、没有教师答案泄露，以及安全/合规边界。`status=approved` 且 `capacity=fit` 才能生成。
+
+一个 Practice Task 只生成一个 WorkOrder。任务项可以按教学流程组织或扩展，但不得改写来源任务的目标、场景、输入、步骤和约束。WorkOrder 应让普通学生在约 90 分钟内完成核心产出；若负荷过大，应由 Agent 合并、缩小、调整顺序或标记可选扩展，而不是由 Python 估算或追加说明。
+
+每个 WorkOrder 的评分固定为课堂考勤 10 分、任务项合计 90 分、总分 100 分。具体任务项分值由 Agent 按工作量和产出重要性决定，不机械均分；Python 只校验总和。每个实质性交付物使用 `D1` 等内部 ID，每条验收标准使用 `C1` 等内部 ID，并在 `covers` 中明确覆盖至少一个交付物。学生文档不显示这些内部 ID。
+
+学生的“任务结果”栏必须保持空白。不要把标准答案、完整代码、最终模型、临床结论、会计结论或其他教师答案写入正文或结果栏。固定学生/教师评价表沿用模板，不创建第二套评分体系，也不参与跨工单重复判断。
+
+Python 不用字符 n-gram、模糊相似度、动作词库、专业词库或 IT/护理标记来判断自然度、相关性、案例质量、教学价值或九十分钟负荷。Python 只做 schema、ID/小时/分值/空值、精确重复、交付物 ID 映射、来源快照、课程信息和模板/输出/渲染等硬门禁；语义问题由 Agent review 负责。
+
+## 资料与标题
+
+WorkOrder 不维护第二套参考文献系统。课程资料、Practice Task 的输入和工具来自上游或 Agent 已确认内容；不能为了降低重复率虚构任务、工具、教材、作者、出版社、ISBN、标准编号或公开文献。关联标题必须使用上游 `title` 原样写入 `task_title`，Word 主标题也只使用 `task_title`；`project_name` 只属于显式 legacy 迁移输入，不是 WorkOrder Content 1.1 字段，也不能替代任务标题。
+
+JSON、QA 报告、文件名和内部日志可以保留 `task_id`、`project_id`、`lesson_ids` 作为追溯信息；学生可见的 metadata、标题、正文和 Office core properties 默认隐藏这些内部 ID。模板中只有明确的业务编号占位才可显示。
+
+## 生成、验证与交付
+
+正式顺序是：读取 canonical 合同 → Agent 完成 Content 1.1 和 review → Content QA →（关联模式）Cross-Artifact QA → candidate DOCX → Output QA →（关联模式默认）真实 Render Smoke → 全部通过后批量原子发布。任一 candidate、QA 或渲染失败，都不得发布部分工单；不得修改上游 Lesson 或模板 binary。
+
+输出 QA 至少确认三张顶层表、固定表头、考勤 10 分、任务项 90 分、总分 100 分、动态任务行、学生结果空白、固定评价表、任务标题和课程信息。Render Smoke 只证明文件能被分页渲染，不等于人工视觉检查；人工检查仍需由调用 Agent 另行记录。
+
+标准入口：
 
 ```text
-Practice Task Contract V1 → schema / semantic validation → Agent authoring skeleton
-→ Agent authors complete Work Order Content V1 → QA → DOCX
+实践任务 handoff：--practice-task-json … --authoring-skeleton-output …
+关联生成：--content-json … --practice-task-json … --mode linked --render
+独立调试：--content-json … --mode standalone --skip-render
 ```
 
-Python 只做 schema validation、确定性一致性检查、有限字段格式化、模板映射、事务和 QA，不重新创作任务正文，不生成答案，不决定 task item 标题、描述、步骤、交付物表述、验收表述或评分语义。`--practice-task-json` 可以读取合同并输出 authoring skeleton，但不会生成 Content V1 或 DOCX；生产 DOCX 必须使用 Agent 完整创作的 `--content-json`，并可同时提供 `--practice-task-json` 执行 Cross-Artifact QA。Practice Task 是事实源；发生冲突时 WorkOrder Content 失败并要求重新生成，不能修改 Lesson 或上游合同来迁就错误工单。
-
-WorkOrder Content V1 保留 `content_contract_version=1.0`，并承载 `practice_task_id`、`task_title`、`project_id`、`lesson_ids`、`practice_hours`、任务项、工具/材料、安全/合规和教师评价占位。当前 Lesson 2.2.1 集成中，每个 WorkOrder 的 `practice_hours` 必须为 2，且一个上游 Practice Task 只能映射一个 WorkOrder；批量 Cross-Artifact QA 必须同时检查任务数、WorkOrder 数和任务 ID 集合完全一致。上游任务 ID、课次集合和实践学时必须原样贯穿，不能随机生成替代 ID 或偷偷改变课次/学时。
-
-## 固定产品合同
-
-- 评分固定为课堂考勤 10 分 + task_items 90 分 = 100 分；每个 task item 分值为 Agent 按工作量、难度和交付物权重决定的正整数，支持 1–5 项，不要求平均分配；Python 只校验 task_items 合计为 90。
-- 学生 `任务结果` 区必须为空白，不能代填结果、标准 SQL、最终模型、护理操作结论或其他答案；本阶段不开发教师答案版。
-- 学生评价表和教师评价表沿用 canonical 模板固定内容，不纳入工单正文反重复检查，也不新建评分体系。
-- 每项必须说明做什么、需要什么、怎么开始、步骤、交付物和可观察验收标准。每个 substantive deliverable 都必须至少被一条可观察 acceptance criterion 覆盖；一条 criterion 可以覆盖多个相关交付物。泛化短语不能独立构成任务、交付物、验收标准或主要操作步骤；主要步骤至少包含动作和对象/产物/目标。
-- 任务项应由 Agent 依据上游任务展开，但仍属于同一个 Practice Task；禁止为了降低重复率编造新任务、标准、工具、教材或技术结果。重复的合法上游事实不是正文反重复问题，禁止为了降重复率虚构不同教材、作者、ISBN、出版社、标准编号或公开文献。
-- 每个 Practice Task 固定为 2 学时；WorkOrder 数量严格等于上游 Practice Task 数量，不能按项目或 Agent 偏好合并、拆分或重新规划。
-
-## Cross-Artifact QA
-
-`scripts/cross_artifact_quality.py` 生成 `cross-artifact-report.json`，只使用 ID equality、lesson set equality、小时一致性、有限词锚覆盖和明显领域冲突规则，禁止 embedding、在线模型和外部 NLP 服务。传入批量 Content V1 时，它还必须检查 Practice Task / WorkOrder 数量相等、ID 集合相等且每个 ID 恰好出现一次。它检查：
-
-- `practice_task_id`、`lesson_ids` 集合、`practice_hours`（每份固定 2 学时）；
-- task title / intent；
-- 上游 deliverables 是否在工单任务项和验收中得到承载；
-- 上游 acceptance criteria 是否仍可定位；
-- 上游 `tools_or_materials` 是否逐项保留在下游工单（允许空白、标点和明确 alias 的确定性归一）；
-- 工具/材料是否出现明显跨专业冲突；
-- `safety_or_compliance` 是否被静默丢失。
-
-上游缺失或下游冲突都 hard-fail；脚本不会自动改写任何输入。
-
-## 安装、适配器和运行时
-
-`scripts/install.py` 使用 source integrity、staging、canonical shared schema 拷贝、完整性验证和原子替换/回滚；不自动 pip 安装。成功替换默认删除临时 backup，只有显式 `--keep-backup` 才保留上一份；失败时临时 backup 用于恢复且不能删除旧安装。`scripts/check_dependencies.py` 是只读依赖 doctor，缺包时提示 `pip install -r requirements.txt`。
-
-`scripts/install_adapters.py` 独立写入 WorkOrder namespace，正式支持 Codex/AGENTS、Claude、Gemini、Copilot、Aider；可选 `--copy-engine` 安装项目本地完整运行时，并识别 `minimal`、`full-current`、`full-stale`、`inconsistent`，不无提示降级或覆盖不一致运行时。适配器只追加/替换自己的 marker，遇到复杂 Aider 配置或损坏 marker 时 fail-closed。
-
-## 文件安全与范围
-
-生成器先把整批模板复制为 staging candidates，完成整批 Content/Cross-Artifact/Output QA，并在请求 render 时完成整批真实 render；全部通过后才发布 DOCX 和 render 产物。任一失败都回滚整批并清理 staging，不留下部分新文件。canonical WorkOrder binary、manifest fingerprint、Lesson canonical Word templates 和上游文档不会被修改。本阶段不新增 WorkOrder 模板版本、不发布模板、不反向解析 Lesson DOCX、不联动成绩册，也不进入 Phase 3 的完整 64 学时验收。
+安装器只复制完整 Skill 和 canonical shared schema，不自动安装 Python 依赖；成功替换默认清理临时 backup，只有显式 `--keep-backup` 才保留。安装后可用源树的 `scripts/install.py --doctor --json --skills-dir <目录>` 比对 `source_fingerprint`、`installed_fingerprint` 和 `status=current`。适配器只能读取本文件和通用 Agent 方法提示，不得另写一套业务规则。

@@ -17,6 +17,7 @@ from tests.test_lesson_content_v2 import (
     bookmark_text,
     field_bookmark,
     lesson_generator,
+    lesson_content_contract,
     load_manifest,
     run_script,
 )
@@ -228,8 +229,25 @@ def make_v22_payload(
         lesson["hours"] = lesson_hours[index - 1]
         lesson["theory_hours"] = lesson_hours[index - 1]
         lesson["practice_hours"] = 0
-        lesson["reference_ids"] = [str(item["reference_id"]) for item in (references or _pool())[:2]]
+        reference_source = _pool() if references is None else references
+        lesson["reference_ids"] = [str(item["reference_id"]) for item in reference_source[:2]]
         lesson["practice_task_ids"] = []
+        lesson["pedagogical_review"] = {
+            "status": "approved",
+            "capacity": "fit",
+            "summary": "已按课程目标、前置基础、课堂容量、阶段闭环、递进关系和参考资料相关性完成教学审阅。",
+            "checks": {
+                "professional_accuracy": True,
+                "goal_activity_evidence": True,
+                "stage_coherence": True,
+                "capacity_fit": True,
+                "progression": True,
+                "reference_relevance": True,
+            },
+        }
+        lesson["teaching_methods"] = [
+            f"{method}（{focus}）" for method in lesson["teaching_methods"]
+        ]
         lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"L{index - 1:02d}"
         for progression_field in ("prior_learning", "deliverable", "next_bridge"):
             value = str(lesson["progression"][progression_field])
@@ -239,7 +257,7 @@ def make_v22_payload(
         if lesson_hours[index - 1] == 1:
             for stage, minutes in zip(
                 lesson["implementation"],
-                (5, 5, 10, 12, 5, 5, 3, 5, 5),
+                (10, 5, 10, 12, 5, 5, 3, 5, 15),
             ):
                 stage["minutes"] = minutes
         lessons.append(lesson)
@@ -254,10 +272,8 @@ def make_v22_payload(
         related_lessons = [lesson["lesson_id"] for lesson in lessons[: min(2, len(lessons))]]
         for index, hours in enumerate(task_hours, 1):
             tasks.append(_task(f"PT-{index:02d}", hours, course, related_lessons if theory_hours else []))
-        if lessons:
-            lessons[0]["practice_task_ids"] = [task["task_id"] for task in tasks]
 
-    pool = copy.deepcopy(references or _pool())
+    pool = copy.deepcopy(_pool() if references is None else references)
     lesson_ids = [lesson["lesson_id"] for lesson in lessons]
     outline = [
         {
@@ -291,6 +307,10 @@ def make_v22_payload(
         },
         "course_materials": {"textbook": copy.deepcopy(textbook)},
         "reference_pool": pool,
+        "reference_research": {
+            "status": "verified_external_source" if pool else "no_verified_external_source",
+            "note": "测试夹具使用可核实来源" if pool else "测试夹具没有可核实外部来源",
+        },
         "allow_textbook_as_reference": allow_textbook,
         "artifact_plan": {
             "lesson_plans": theory_hours > 0,
@@ -301,8 +321,17 @@ def make_v22_payload(
     }
     if practice_work_orders:
         payload["practice_task_contract"] = {
-            "contract_version": "1.0",
-            "course_name": course,
+            "contract_version": "1.1",
+            "course_profile": {
+                "course_name": course,
+                "major": major,
+                "audience": audience,
+                "total_hours": total_hours,
+                "theory_hours": theory_hours,
+                "practice_hours": practice_hours,
+                "delivery_mode": payload["delivery_plan"]["mode"],
+                "default_lesson_hours": default_hours,
+            },
             "practice_hours": practice_hours,
             "granularity": "per_task",
             "tasks": tasks,
@@ -497,7 +526,18 @@ class LessonContentV22Tests(unittest.TestCase):
 
         empty = make_v22_payload(references=_pool())
         empty["lessons"][0]["reference_ids"] = []
-        self.assert_rejected(empty, r"(?:at least one citable reference|should be non-empty)")
+        self.assert_rejected(empty, "may be empty only when reference_research.status=no_verified_external_source")
+
+    def test_book_year_is_optional_and_edition_identity_is_normalized(self) -> None:
+        first = {"title": "《数据结构（第二版）》"}
+        second = {"title": "《数据结构》第2版"}
+        self.assertEqual(
+            lesson_content_contract.reference_identity(first),
+            lesson_content_contract.reference_identity(second),
+        )
+        references = _pool()
+        references[0].pop("year")
+        self.assert_valid_and_qa(make_v22_payload(references=references))
 
     def test_real_manual_and_domestic_majority_are_quality_passes(self) -> None:
         manual = [

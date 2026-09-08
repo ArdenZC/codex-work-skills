@@ -106,7 +106,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("Lesson DOCX", canonical)
         self.assertIn("Practice Task", canonical)
         self.assertIn("source_region", canonical)
-        self.assertIn("reference_reusable", canonical)
+        self.assertIn("reference_pool", canonical)
         self.assertIn("references", canonical)
         self.assertIn("resources", canonical)
 
@@ -179,7 +179,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
         self.assertEqual(
-            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.2"),
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.3"),
             1,
         )
 
@@ -865,7 +865,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             agents_text = agents.read_text(encoding="utf-8")
             self.assertIn("project-owned notes", agents_text)
             self.assertIn(install_adapters.MARKER_START, agents_text)
-            self.assertIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents_text)
+            self.assertNotIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents_text)
             self.assertNotIn("the full Lesson runtime (install with --copy-engine)", agents_text)
 
             legacy = folder / "legacy-full"
@@ -932,7 +932,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertEqual(agents.count(install_adapters.MARKER_START), 1)
             self.assertIn(".lesson-plan-docx-generator/SKILL.md", agents)
             self.assertNotIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", agents)
-            self.assertIn("--copy-engine", agents)
+            self.assertNotIn("--copy-engine", agents)
             self.assertTrue((target / ".lesson-plan-docx-generator" / "SKILL.md").is_file())
             self.assertTrue((target / ".lesson-plan-docx-generator" / "CONVENTIONS.md").is_file())
             for minimal_name in ("SKILL.md", "通用提示词.md", "AGENTS.md", "CONVENTIONS.md"):
@@ -944,7 +944,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             full_target = Path(temp_name) / "full-project"
             install_adapters.install(LESSON, full_target, adapters=["all"], copy_engine=True)
             full_agents = (full_target / "AGENTS.md").read_text(encoding="utf-8")
-            self.assertIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", full_agents)
+            self.assertNotIn(".lesson-plan-docx-generator/scripts/generate_lesson_plans.py", full_agents)
             stale = full_target / ".lesson-plan-docx-generator" / "obsolete-helper.py"
             stale.write_text("stale", encoding="utf-8")
             install_adapters.install(LESSON, full_target, adapters=["all"], copy_engine=True, replace=True)
@@ -1075,6 +1075,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             output = folder / "output"
             argv = [
                 "generate_lesson_plans.py",
+                "--legacy",
                 "--tasks-json",
                 str(source),
                 "--output-dir",

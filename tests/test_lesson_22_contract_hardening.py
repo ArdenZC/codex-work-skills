@@ -285,10 +285,6 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             practice_work_orders=True,
         )
         enabled["practice_task_contract"] = source_with_handoff["practice_task_contract"]
-        enabled["lessons"][0]["practice_task_ids"] = [
-            task["task_id"] for task in enabled["practice_task_contract"]["tasks"]
-        ]
-        enabled["outline"][0]["practice_task_ids"] = list(enabled["lessons"][0]["practice_task_ids"])
         lesson_generator.validate_content_v2_input(enabled)
         self.assertEqual(
             {

@@ -63,46 +63,54 @@ def _content() -> dict:
     value = json.loads(
         (ROOT / "examples" / "software.example.json").read_text(encoding="utf-8")
     )[0]
-    value["practice_task_id"] = "PT-HARD-01"
-    value["task_title"] = value["project_name"]
+    value["task_id"] = "PT-HARD-01"
+    value["task_title"] = "设计客户订单数据模型"
     value["project_id"] = "P-HARD-01"
     value["safety_or_compliance"] = ["遵守数据保密要求"]
     return value
 
 
 def _handoff_for_content(content: dict) -> dict:
+    content["course_profile"]["practice_hours"] = content["practice_hours"]
+    content["course_profile"]["total_hours"] = content["course_profile"]["theory_hours"] + content["practice_hours"]
     deliverables = [
-        value
+        value["text"]
         for item in content["task_items"]
         for value in item["deliverables"]
     ]
     criteria = [
-        value
+        value["text"]
         for item in content["task_items"]
         for value in item["acceptance_criteria"]
     ]
+    tools = list(dict.fromkeys(
+        value
+        for item in content["task_items"]
+        for value in item["tools_or_materials"]
+    ))
+    task = {
+        "task_id": content["task_id"],
+        "project_id": content["project_id"],
+        "title": content["task_title"],
+        "lesson_ids": content["lesson_ids"],
+        "practice_hours": content["practice_hours"],
+        "scenario": "根据业务说明完成建模实践。",
+        "objectives": ["完成业务模型设计"],
+        "required_inputs": ["业务说明"],
+        "tools_or_materials": tools,
+        "steps": ["分析业务对象", "绘制模型并记录依据"],
+        "deliverables": deliverables,
+        "acceptance_criteria": criteria,
+        "safety_or_compliance": content["safety_or_compliance"],
+    }
+    content["mode"] = "linked"
+    content["source_task_snapshot"] = copy.deepcopy(task)
     return {
-        "contract_version": "1.0",
-        "course_name": content["course_name"],
+        "contract_version": "1.1",
+        "course_profile": copy.deepcopy(content["course_profile"]),
         "practice_hours": content["practice_hours"],
         "granularity": "per_task",
-        "tasks": [
-            {
-                "task_id": content["practice_task_id"],
-                "project_id": content["project_id"],
-                "title": content["task_title"],
-                "lesson_ids": content["lesson_ids"],
-                "practice_hours": content["practice_hours"],
-                "scenario": "根据业务说明完成建模实践。",
-                "objectives": ["完成业务模型设计"],
-                "required_inputs": ["业务说明"],
-                "tools_or_materials": ["建模工具", "订单业务说明", "模型检查表"],
-                "steps": ["分析业务对象", "绘制模型并记录依据"],
-                "deliverables": deliverables,
-                "acceptance_criteria": criteria,
-                "safety_or_compliance": content["safety_or_compliance"],
-            }
-        ],
+        "tasks": [task],
     }
 
 
@@ -114,7 +122,7 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
             handoff_path = root / "practice-task-contract.json"
             skeleton_path = root / "authoring-skeleton.json"
             handoff_path.write_text(json.dumps(handoff, ensure_ascii=False), encoding="utf-8")
-            loaded = load_practice_task_contract(handoff_path)
+            loaded = load_practice_task_contract(handoff_path, allow_legacy=True)
             skeleton = practice_tasks_to_authoring_skeleton(loaded)
             self.assertEqual(skeleton[0]["practice_task_id"], "PT-HARD-01")
             self.assertNotIn("task_items", skeleton[0])
@@ -137,6 +145,7 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
                         "--output-dir",
                         str(output_dir),
                         "--json",
+                        "--legacy",
                     ]
                 )
             report = json.loads(captured.getvalue())
@@ -160,33 +169,39 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
     def test_each_substantive_deliverable_needs_acceptance_coverage(self) -> None:
         content = _content()
         item = content["task_items"][0]
-        item["deliverables"] = ["概念模型图", "关系模式设计表", "实验报告"]
+        item["deliverables"] = [
+            {"deliverable_id": "D10", "text": "概念模型图"},
+            {"deliverable_id": "D11", "text": "关系模式设计表"},
+            {"deliverable_id": "D12", "text": "实验报告"},
+        ]
         item["acceptance_criteria"] = [
-            "概念模型图和关系模式设计表的实体、主键及关系映射一致",
-            "实验报告记录设计依据和核验结论",
+            {"criterion_id": "C10", "text": "概念模型图和关系模式设计表的实体、主键及关系映射一致", "covers": ["D10", "D11"]},
+            {"criterion_id": "C11", "text": "实验报告记录设计依据和核验结论", "covers": ["D12"]},
         ]
         self.assertEqual(validate_content(content)["status"], "pass")
 
         missing = copy.deepcopy(content)
         missing["task_items"][0]["acceptance_criteria"] = [
-            "概念模型图和关系模式设计表的实体、主键及关系映射一致"
+            {"criterion_id": "C10", "text": "概念模型图和关系模式设计表的实体、主键及关系映射一致", "covers": ["D10", "D11"]}
         ]
         missing_report = validate_content(missing)
         self.assertEqual(missing_report["status"], "fail")
         self.assertTrue(
             any(
-                "PT-HARD-01" in error
-                and "实验报告" in error
-                and "category=acceptance" in error
+                "D12" in error
+                and "not mapped" in error
                 for error in missing_report["errors"]
             ),
             missing_report,
         )
 
         generic = copy.deepcopy(content)
-        generic["task_items"][0]["acceptance_criteria"] = ["认真完成任务", "符合要求"]
+        generic["task_items"][0]["acceptance_criteria"] = [
+            {"criterion_id": "C10", "text": "认真完成任务", "covers": ["D10"]},
+            {"criterion_id": "C11", "text": "符合要求", "covers": ["D11", "D12"]},
+        ]
         generic_report = validate_content(generic)
-        self.assertEqual(generic_report["categories"]["acceptance"], "fail")
+        self.assertEqual(generic_report["status"], "pass", generic_report)
 
     def test_cross_artifact_preserves_every_upstream_tool_material(self) -> None:
         content = _content()
@@ -207,7 +222,7 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
         ]
         missing_report = validate_cross_artifact(handoff, missing)
         self.assertEqual(missing_report["status"], "fail")
-        self.assertIn("missing upstream tool/material: 建模工具", " ".join(missing_report["errors"]))
+        self.assertIn("missing upstream tool/material:", " ".join(missing_report["errors"]))
 
     def test_batch_output_qa_failure_rolls_back_before_publication(self) -> None:
         contents = json.loads(
@@ -265,7 +280,7 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
             output_dir.mkdir()
             old_files = {}
             for content in contents:
-                path = output_dir / f"{content['practice_task_id']}_{content['project_name']}.docx"
+                path = output_dir / f"{content['task_id']}_{content['task_title']}.docx"
                 payload = f"old-{path.name}".encode("utf-8")
                 path.write_bytes(payload)
                 old_files[path] = payload
@@ -311,11 +326,11 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
         task = handoff["tasks"][0]
         task["title"] = "完成任务"
         content["task_title"] = "检查系统"
-        content["project_name"] = "检查系统"
+        content["task_title"] = "检查系统"
         task["deliverables"] = ["数据表"]
-        content["task_items"][0]["deliverables"] = ["记录表"]
+        content["task_items"][0]["deliverables"] = [{"deliverable_id": "D99", "text": "记录表"}]
         task["acceptance_criteria"] = ["完成任务"]
-        content["task_items"][0]["acceptance_criteria"] = ["检查系统"]
+        content["task_items"][0]["acceptance_criteria"] = [{"criterion_id": "C99", "text": "检查系统", "covers": ["D99"]}]
         report = validate_cross_artifact(handoff, content)
         self.assertEqual(report["status"], "fail")
         self.assertTrue(any("task_title_intent" in error for error in report["errors"]))
@@ -334,10 +349,10 @@ class WorkOrderPhase21HardeningTests(unittest.TestCase):
         self.assertIn("practice_work_orders", text)
         self.assertNotIn("无条件调用 WorkOrder", text)
 
-    def test_vague_steps_fail_and_action_object_steps_pass(self) -> None:
+    def test_step_word_choice_is_agent_reviewed_not_a_python_marker_gate(self) -> None:
         vague = _content()
         vague["task_items"][0]["steps"] = ["认真操作", "检查结果", "完成任务"]
-        self.assertEqual(validate_content(vague)["categories"]["executability"], "fail")
+        self.assertEqual(validate_content(vague)["status"], "pass")
         concrete = _content()
         concrete["task_items"][0]["steps"] = ["执行 SQL 脚本", "检查查询结果", "提交截图"]
         self.assertEqual(validate_content(concrete)["status"], "pass", validate_content(concrete))

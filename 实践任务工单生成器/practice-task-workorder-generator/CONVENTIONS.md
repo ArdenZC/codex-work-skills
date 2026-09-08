@@ -1,11 +1,8 @@
-# Practice Task WorkOrder conventions
+# 实践任务工单约定
 
-- Treat the canonical Practice Task Contract V1 as authoritative.
-- Keep `practice_task_id`, `lesson_ids`, and `practice_hours` unchanged.
-- Do not silently rewrite the upstream Lesson artifact.
-- Keep attendance at 10, task items at 90, and total score at 100.
-- Keep the student task-result area blank; do not produce a teacher answer or standard result.
-- Use `practice-work-order v1.0.0` and run Content, Cross-Artifact, and Output QA.
-- `--practice-task-json` is only a validated handoff/authoring-skeleton path; never use it to generate production Content or DOCX. Agent-authored Content V1 is required.
-- Publish a batch only after every candidate, Output QA result, and requested render has passed; `skipped` is not a render pass.
-- Successful installer replacement deletes temporary backups by default; use `--keep-backup` when an explicit previous copy is needed.
+- 以 `SKILL.md` 为唯一人类合同；机器约束由 Content 1.1、Practice Task Contract 1.1 schema 实现。
+- 关联 Content 必须保留 exact source-task snapshot；一项 Practice Task 对应一份 2 学时 WorkOrder。
+- 任务项分值由 Agent 按工作量决定，合计 90；固定考勤 10、总分 100；学生任务结果栏留空。
+- 每个交付物用内部 ID 映射到至少一条验收标准；学生可见文档隐藏任务、项目和课次 ID。
+- 关联模式执行 Content/Cross-Artifact/Output QA 和真实 render；standalone/debug 显式 `--skip-render` 不构成生产通过。
+- 旧 V1 只允许显式 `--legacy` 或迁移适配器；安装替换默认清理临时 backup，需保留时显式 `--keep-backup`。
