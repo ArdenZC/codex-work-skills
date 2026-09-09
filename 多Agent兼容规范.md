@@ -14,6 +14,7 @@
 - OpenCode：AGENTS.md。
 - GitHub Copilot CLI/Cloud Agent：AGENTS.md 和 .github/copilot-instructions.md。
 - Aider：CONVENTIONS.md 和 .aider.conf.yml。
+- HTML 课件生成器另外提供 Cursor、Cline、Continue、Windsurf 和 OpenCode 的 namespaced 规则文件；完整列表以该 Skill 的 `scripts/install_adapters.py` 为准。
 
 ## 模型支持
 
@@ -32,3 +33,5 @@ python3 path/to/skill/scripts/install_adapters.py --target-dir path/to/project
 默认不覆盖目标项目中的现有文件。只安装指定工具时可重复传入 --adapter，例如 --adapter claude --adapter cursor；明确传入 --replace 才会备份并替换已有文件。若需要把整个 skill 包也复制到目标项目，可增加 --copy-engine；它会写入目标项目的 .lesson-plan-docx-generator 目录。
 
 工具规则文件会随工具版本变化；如果某个工具暂时不识别专用目录，直接加载对应 skill 的 通用提示词.md 并执行内置脚本即可。
+
+HTML 课件生成器的适配器只安装规则时不复制完整 engine；只有显式 `--copy-engine` 才会复制 `courseware-html-generator` runtime。它要求 Agent 生成 `Courseware Content Contract 1.1`，再由 deterministic renderer 输出两个离线 HTML，并保留真实浏览器 click/wheel QA、source truth、time evidence、learning unit 和 canonical fact 兼容性。

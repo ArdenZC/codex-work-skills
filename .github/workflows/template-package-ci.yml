@@ -31,6 +31,7 @@ jobs:
       run_lesson: ${{ steps.classify.outputs.run_lesson }}
       run_gradebook: ${{ steps.classify.outputs.run_gradebook }}
       run_workorder: ${{ steps.classify.outputs.run_workorder }}
+      run_courseware: ${{ steps.classify.outputs.run_courseware }}
       run_tooling: ${{ steps.classify.outputs.run_tooling }}
       run_release: ${{ steps.classify.outputs.run_release }}
       run_package_contracts: ${{ steps.classify.outputs.run_package_contracts }}
@@ -122,6 +123,7 @@ jobs:
               root / "多Agent兼容规范.md",
               root / "教案生成器" / "简介.md",
               root / "平时成绩记分册生成器" / "简介.md",
+              root / "HTML课件生成器" / "简介.md",
           ]
           sources.extend(sorted((root / "docs").rglob("*.md")))
           link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
@@ -159,6 +161,7 @@ jobs:
           install_paths = [
               root / "教案生成器" / "lesson-plan-docx-generator" / "scripts" / "install.py",
               root / "平时成绩记分册生成器" / "course-gradebook-generator" / "scripts" / "install.py",
+              root / "HTML课件生成器" / "courseware-html-generator" / "scripts" / "install.py",
           ]
           missing = [str(path.relative_to(root)) for path in install_paths if not path.is_file()]
           if missing:
@@ -185,21 +188,34 @@ jobs:
           )
           lesson_version = version_from_manifest(lesson_manifest)
           gradebook_version = version_from_manifest(gradebook_manifest)
+          courseware_manifest = root / "HTML课件生成器" / "courseware-html-generator" / "manifest.yaml"
+          courseware_text = courseware_manifest.read_text(encoding="utf-8")
+          courseware_match = re.search(r"^  version:\s*([^\s#]+)", courseware_text, re.MULTILINE)
+          if not courseware_match:
+              raise SystemExit(f"Courseware Skill version not found: {courseware_manifest}")
+          courseware_version = courseware_match.group(1)
           documents = {
-              root / "README.md": (lesson_version, gradebook_version),
+              root / "README.md": (lesson_version, gradebook_version, courseware_version),
               root / "教案生成器" / "简介.md": (lesson_version,),
               root / "平时成绩记分册生成器" / "简介.md": (gradebook_version,),
+              root / "HTML课件生成器" / "简介.md": (courseware_version,),
           }
           for document, versions in documents.items():
               text = document.read_text(encoding="utf-8")
               for version in versions:
                   if f"v{version}" not in text:
                       raise SystemExit(f"template version v{version} missing from {document.relative_to(root)}")
-          print(f"versions: lesson-plan v{lesson_version}; course-gradebook v{gradebook_version}")
+          print(f"versions: lesson-plan v{lesson_version}; course-gradebook v{gradebook_version}; courseware {courseware_version}")
           PY
 
       - name: Check WorkOrder Skill facade
         run: python .github/scripts/check_skill_facades.py
+
+      - name: Run HTML Courseware contract tests
+        run: >-
+          python -m unittest discover
+          -s HTML课件生成器/courseware-html-generator/tests
+          -p "test_*.py" -v
 
   package-contracts:
     name: Package contracts / static Ubuntu
@@ -662,6 +678,76 @@ jobs:
           $status = git status --porcelain
           if ($status) { $status; throw "Tests left changes in the worktree." }
 
+  template-courseware:
+    name: HTML courseware / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_courseware == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+          - os: macos-14
+            python-version: "3.11"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Compile and run Courseware unit tests
+        run: |
+          python -m compileall -q HTML课件生成器/courseware-html-generator
+          python -m unittest discover -s HTML课件生成器/courseware-html-generator/tests -p "test_*.py" -v
+
+      - name: Install Playwright browser for real interaction smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/courseware-node" --no-save playwright
+          "$RUNNER_TEMP/courseware-node/node_modules/.bin/playwright" install chromium
+
+      - name: Generate and validate offline courseware
+        shell: bash
+        run: |
+          set -euo pipefail
+          # browser_smoke.mjs opens the output through file:// and asserts offline loading.
+          output_dir="$RUNNER_TEMP/courseware-output"
+          mkdir -p "$output_dir"
+          python HTML课件生成器/courseware-html-generator/scripts/render_courseware.py \
+            --content-json HTML课件生成器/courseware-html-generator/examples/data-structures.example.json \
+            --output-dir "$output_dir" --replace --json > "$RUNNER_TEMP/courseware-generation.json"
+          python HTML课件生成器/courseware-html-generator/scripts/validate_courseware.py \
+            --content-json HTML课件生成器/courseware-html-generator/examples/data-structures.example.json \
+            --student-html "$output_dir/student.html" \
+            --teacher-html "$output_dir/teacher.html" --json
+          COURSEWARE_PLAYWRIGHT_ROOT="$RUNNER_TEMP/courseware-node/node_modules/playwright" node \
+            HTML课件生成器/courseware-html-generator/tests/browser_smoke.mjs \
+            "$output_dir/student.html"
+
+      - name: Verify Courseware worktree is clean
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
   template-release:
     name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs:
@@ -766,6 +852,7 @@ jobs:
       - template-lesson
       - template-gradebook
       - template-workorder
+      - template-courseware
       - template-release
     runs-on: ubuntu-latest
     steps:
@@ -778,6 +865,7 @@ jobs:
           LESSON_RESULT: ${{ needs.template-lesson.result }}
           GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
+          COURSEWARE_RESULT: ${{ needs.template-courseware.result }}
           RELEASE_RESULT: ${{ needs.template-release.result }}
           RUN_DOCS: ${{ needs.classify-changes.outputs.run_docs }}
           RUN_PACKAGE: ${{ needs.classify-changes.outputs.run_package_contracts }}
@@ -785,6 +873,7 @@ jobs:
           RUN_LESSON: ${{ needs.classify-changes.outputs.run_lesson }}
           RUN_GRADEBOOK: ${{ needs.classify-changes.outputs.run_gradebook }}
           RUN_WORKORDER: ${{ needs.classify-changes.outputs.run_workorder }}
+          RUN_COURSEWARE: ${{ needs.classify-changes.outputs.run_courseware }}
           RUN_RELEASE: ${{ needs.classify-changes.outputs.run_release }}
           FORCE_FULL: ${{ needs.classify-changes.outputs.force_full }}
           CLASSIFICATION: ${{ needs.classify-changes.outputs.classification }}
@@ -820,6 +909,7 @@ jobs:
           check_job template-lesson "$RUN_LESSON" "$LESSON_RESULT"
           check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"
+          check_job template-courseware "$RUN_COURSEWARE" "$COURSEWARE_RESULT"
           check_job template-release "$RUN_RELEASE" "$RELEASE_RESULT"
 
           {

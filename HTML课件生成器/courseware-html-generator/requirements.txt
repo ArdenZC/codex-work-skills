@@ -1,0 +1,2 @@
+# The renderer and validator use only the Python standard library.
+# Browser smoke tests use Node.js and Playwright separately; delivery HTML has no runtime dependency.

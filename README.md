@@ -4,7 +4,7 @@
 
 **面向真实教学工作的可复用 AI Skills**
 
-教案 · 实践任务工单 · 平时成绩记分册
+教案 · 实践任务工单 · 平时成绩记分册 · 理论课 HTML 课件
 
 ![Python](https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-supported-0078D6?logo=windows&logoColor=white)
@@ -30,6 +30,7 @@
 | [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.2** | 课程规划、真实参考资料检索、项目化理论教案生成 | `.docx` |
 | [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.1.0 / Phase 2.1** | 根据实践教学单元生成学生任务工单 | `.docx` |
 | [📊 平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | **当前稳定版** | 根据真实课程成绩单生成平时成绩记分册 | `.xls` |
+| [📺 理论课 HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** | 将课程资料转为理论课学生展示版与教师备课版离线 HTML | `student.html` + `teacher.html` |
 
 > Skill 版本、内容合同版本和 Word / Excel 模板版本彼此独立。升级 Skill 不代表必须同步修改模板。
 
@@ -46,6 +47,8 @@ flowchart LR
     G[真实课程成绩单] --> H[平时成绩记分册生成器]
     H --> I[平时成绩记分册 XLS]
 ```
+
+理论课 HTML 课件与实践任务工单是两个职责不同的产物：Courseware 负责理论课讲授与教师备课，Practice 负责在已讲理论边界内组织可执行实践。当前发布链为 Raw materials → Courseware → Practice；人工教学审核仍是内容质量的最终边界。
 
 ### 理论课与实践课的产物边界
 
@@ -112,6 +115,17 @@ flowchart LR
 
 [查看平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator)
 
+## 理论课 HTML 课件生成器 1.2.1
+
+Courseware 将教材、PPT、讲义、教案或其他课程资料转为两份完全离线的单文件 HTML：学生课堂展示版和教师逐页备课版。Agent 负责理解资料并创作 Courseware Content Contract 1.1；确定性 renderer 负责页面布局、交互、输出 QA 和原子交付。
+
+- 明确区分理论讲授与实践活动，使用 explicit time model、learning units、canonical facts、source truth 和 time evidence。
+- 学生版与教师版严格隔离；教师版提供可直接朗读的 Gold speaker scripts，学生版不暴露教师答案、制作信息或内部证据。
+- 支持本地资源内联、click / wheel / keyboard navigation、dynamic browser smoke、production pipeline E2E 和 offline/no-external-resource 验证。
+- Skill 1.2.1 / Courseware Content Contract 1.1 已完成 Blind Generalization 人工 PASS；自动化通过不替代课堂人工教学审核。
+
+[查看理论课 HTML 课件生成器](HTML课件生成器/courseware-html-generator)
+
 ---
 
 ## 快速安装
@@ -146,6 +160,7 @@ Windows PowerShell：
 python "教案生成器/lesson-plan-docx-generator/scripts/install.py"
 python "实践任务工单生成器/practice-task-workorder-generator/scripts/install.py"
 python "平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
+python "HTML课件生成器/courseware-html-generator/scripts/install.py"
 ```
 
 macOS Terminal：
@@ -154,6 +169,7 @@ macOS Terminal：
 python3 "教案生成器/lesson-plan-docx-generator/scripts/install.py"
 python3 "实践任务工单生成器/practice-task-workorder-generator/scripts/install.py"
 python3 "平时成绩记分册生成器/course-gradebook-generator/scripts/install.py"
+python3 "HTML课件生成器/courseware-html-generator/scripts/install.py"
 ```
 
 Codex 默认安装位置：
@@ -162,7 +178,8 @@ Codex 默认安装位置：
 ~/.codex/skills/
 ├── lesson-plan-docx-generator/
 ├── practice-task-workorder-generator/
-└── course-gradebook-generator/
+├── course-gradebook-generator/
+└── courseware-html-generator/
 ```
 
 常用安装参数：
@@ -200,6 +217,10 @@ Codex 默认安装位置：
 每份工单对应 2 个实践学时。
 ```
 
+### 生成理论课 HTML 课件
+
+使用 HTML 课件生成器，根据已提供的教材、PPT 或讲义生成理论课学生展示版和教师备课版；要求离线单文件、Courseware Content Contract 1.1、教师逐字稿、真实浏览器 smoke 和输出 QA。
+
 ### 生成平时成绩记分册
 
 ```text
@@ -225,6 +246,7 @@ Codex 默认安装位置：
 - [教案生成器 SKILL.md](教案生成器/lesson-plan-docx-generator/SKILL.md)
 - [实践任务工单生成器 SKILL.md](实践任务工单生成器/practice-task-workorder-generator/SKILL.md)
 - [平时成绩记分册生成器 SKILL.md](平时成绩记分册生成器/course-gradebook-generator/SKILL.md)
+- [理论课 HTML 课件生成器 SKILL.md](HTML课件生成器/courseware-html-generator/SKILL.md)
 
 ---
 

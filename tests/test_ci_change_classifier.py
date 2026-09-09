@@ -20,7 +20,7 @@ class ChangeClassifierTests(unittest.TestCase):
 
     def test_documentation_allowlist_is_docs_only(self) -> None:
         result = classify(
-            ["README.md", "docs/ci.md", "教案生成器/简介.md", "平时成绩记分册生成器/简介.md", "多Agent兼容规范.md"],
+            ["README.md", "docs/ci.md", "教案生成器/简介.md", "平时成绩记分册生成器/简介.md", "HTML课件生成器/简介.md", "多Agent兼容规范.md"],
             event_name="pull_request",
         )
         self.assert_flags(result, docs_only=True, run_docs=True, force_full=False)
@@ -73,6 +73,24 @@ class ChangeClassifierTests(unittest.TestCase):
             force_full=False,
         )
         self.assertEqual(result["classification"], "workorder")
+
+    def test_courseware_changes_run_only_courseware_and_contracts(self) -> None:
+        result = classify(
+            ["HTML课件生成器/courseware-html-generator/scripts/render_courseware.py"],
+            event_name="pull_request",
+        )
+        self.assert_flags(
+            result,
+            run_package_contracts=True,
+            run_courseware=True,
+            run_tooling=False,
+            run_release=False,
+            run_lesson=False,
+            run_gradebook=False,
+            run_workorder=False,
+            force_full=False,
+        )
+        self.assertEqual(result["classification"], "courseware")
 
     def test_tooling_and_release_paths_do_not_run_both_core_skills(self) -> None:
         tooling = classify(["tools/template_tooling/archive.py"], event_name="pull_request")
