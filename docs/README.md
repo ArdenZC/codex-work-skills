@@ -7,6 +7,12 @@
 - [Lesson Acceptance](lesson-acceptance.md) — 教案生成结果的本地验收、报告和人工复核协议。
 - [Lesson Acceptance Report Schema](lesson-acceptance-report.schema.json) — 验收报告结构定义。
 - [Test Execution](test-execution.md) — 仓库测试执行方式和分层说明。
+- [Generalization QA Report](acceptance/GENERALIZATION-QA-REPORT.md) — Courseware / Practice 的历史 generalization QA 证据。
+- [Holdout Evaluation Boundary](acceptance/HOLDOUT-EVALUATION.md) — holdout 与 blind generalization 的历史验收边界。
+
+## 架构记录
+
+- [Generalization Architecture Report](architecture/GENERALIZATION-ARCHITECTURE-REPORT.md) — Courseware / Practice 双 Skill 架构与 generalization audit 记录。
 
 ## 模板包
 
@@ -32,15 +38,17 @@
 - [CONTRIBUTING.md](../CONTRIBUTING.md) — 设计边界、模板修改、测试与 PR 约定。
 - [CHANGELOG.md](../CHANGELOG.md) — 面向使用者的重要版本变化。
 
-## 工程验收与阶段性证据
+## 历史发布证据
 
-根目录保留以下阶段性文档，主要用于追踪 generalization、holdout 和 release 过程，不是普通用户的必读材料：
+- [Dual Teaching Skills Generalization 1.0 Release Notes](releases/DUAL-TEACHING-SKILLS-RELEASE-NOTES.md)
+- [Dual Teaching Skills Generalization 1.0 Release Manifest](releases/DUAL-TEACHING-SKILLS-RELEASE-MANIFEST.json)
 
-- [GENERALIZATION-ARCHITECTURE-REPORT.md](../GENERALIZATION-ARCHITECTURE-REPORT.md)
-- [GENERALIZATION-QA-REPORT.md](../GENERALIZATION-QA-REPORT.md)
-- [HOLDOUT-EVALUATION.md](../HOLDOUT-EVALUATION.md)
-- [DUAL-TEACHING-SKILLS-RELEASE-NOTES.md](../DUAL-TEACHING-SKILLS-RELEASE-NOTES.md)
-- [DUAL-TEACHING-SKILLS-RELEASE-MANIFEST.json](../DUAL-TEACHING-SKILLS-RELEASE-MANIFEST.json)
+## Archive
+
+`archive/` 保存已经完成使命、但仍需保留 provenance 的一次性操作说明。它们不是当前生产入口：
+
+- [Blind First-pass Generation Instructions](archive/BLIND-GENERATION-INSTRUCTIONS.md)
+- [Blind Second-pass Instructions](archive/BLIND-SECOND-PASS-INSTRUCTIONS.md)
 
 ## 版本阅读原则
 
