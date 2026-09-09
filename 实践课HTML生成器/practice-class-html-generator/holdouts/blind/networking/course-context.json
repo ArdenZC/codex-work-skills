@@ -1,0 +1,21 @@
+{
+  "course_id": "H3-networking",
+  "course_title": "计算机网络基础",
+  "chapter_title": "IPv4、局域网观察与路径诊断",
+  "audience": "高职/大专，已接触基本网络设备和命令行，但网络基础不稳定",
+  "theory_requirements": {
+    "session_minutes": 120,
+    "prepared_minutes": 120,
+    "description": "本次理论课按 120 分钟准备；课程安排为 2 课时。"
+  },
+  "practice_requirements": {
+    "session_minutes": 120,
+    "description": "本次实践课为 2 课时，在机房观察网络并完成基础诊断。"
+  },
+  "environment": {
+    "os": "Windows",
+    "tools": "ping、tracert、Wireshark、Cisco Packet Tracer",
+    "network": "课堂提供可观察的局域网或模拟拓扑；真实外网路径可能不同"
+  },
+  "source_role": "教师提供的本次章节原始资料与课堂背景"
+}

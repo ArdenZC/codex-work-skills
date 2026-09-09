@@ -82,7 +82,7 @@ def _student_text_errors(document: str) -> list[str]:
         match = pattern.search(document)
         if match:
             errors.append(f"student.html contains forbidden timing/source pattern: {match.group(0)}")
-    for internal_field in ("content_reserve_minutes", "suggested_minutes", "speaker_script", "demo_hint", "classroom_followup", "pacing_note"):
+    for internal_field in ("content_reserve_minutes", "suggested_minutes", "speaker_script", "demo_hint", "classroom_followup", "pacing_note", "activity_plan", "teacher_prompt", "check_method", "expected_artifact_or_response"):
         if internal_field in document:
             errors.append(f"student.html leaks internal field name: {internal_field}")
     return errors

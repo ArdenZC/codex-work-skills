@@ -42,9 +42,11 @@ from content_contract import (
     EVALUATION_SCORE_STEP,
     IMPLEMENTATION_STAGE_IDS,
     IN_CLASS_STAGE_IDS,
+    confirmed_course_info_errors,
     format_reference,
     lesson_references,
     reference_identity,
+    reference_metadata_errors,
     reference_looks_like_placeholder,
     reference_looks_like_resource_only,
 )
@@ -798,14 +800,21 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
         if reference.get("source_region") not in {"domestic", "foreign", "unknown"}:
             raise ValueError(f"{prefix}.source_region must be domestic, foreign, or unknown")
         _validate_locator_evidence(reference, prefix, allow_generic=True)
+        metadata_errors = reference_metadata_errors(reference, prefix)
+        if metadata_errors:
+            raise ValueError("; ".join(metadata_errors))
 
     textbook_identity = reference_identity(textbook) if textbook is not None else ""
-    if textbook_identity and not data.get("allow_textbook_as_reference", False):
+    if data.get("allow_textbook_as_reference", False):
+        raise ValueError(
+            "allow_textbook_as_reference is not supported in Content Contract 2.2.2; "
+            "course_materials.textbook and reference_pool are separate"
+        )
+    if textbook_identity:
         for reference in pool:
             if reference_identity(reference) == textbook_identity:
                 raise ValueError(
-                    "reference_pool contains the course textbook; set allow_textbook_as_reference=true "
-                    "only when the textbook should also be rendered as a lesson reference"
+                    "reference_pool contains the course textbook; textbook cannot be rendered as a reference"
                 )
 
     for index, lesson in enumerate(data["lessons"]):
@@ -1321,6 +1330,9 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
     if version == "2.2":
         _schema_errors(data, schema_path)
         _validate_meaningful_contract(data)
+        confirmed_errors = confirmed_course_info_errors(data)
+        if confirmed_errors:
+            raise ValueError("confirmed course information mismatch: " + "; ".join(confirmed_errors))
         _validate_materials_v22(data)
         _validate_practice_contract_v22(data)
         return

@@ -8,13 +8,23 @@ import html
 import json
 import re
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 from apply_reference_gaps import build_reference_report
+from classroom_integrity import closure, materialize_bundles, prepare_assets, reference_gate, write_asset, STUDENT_ROLES, package_links
+from repair_practice import repair_content
 from practice_pedagogical_review import review_content
 from practice_contract import LEVEL_LABELS, RENDERER_FAMILIES, load_courseware, load_json, normalize_content, validate_content
+from practice_time_reviewer import review_practice_time
+from source_truth_validator import validate_source_truth
+
+COURSEWARE_SCRIPTS = Path(__file__).resolve().parents[3] / "HTML课件生成器" / "courseware-html-generator" / "scripts"
+if str(COURSEWARE_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(COURSEWARE_SCRIPTS))
+from activity_time_reviewer import review_courseware_time  # noqa: E402
 
 
 TEXT_ASSET_EXTENSIONS = {
@@ -117,6 +127,98 @@ def _unique_text(values: list[str]) -> list[str]:
     return result
 
 
+def _public_evidence_value(value: Any) -> Any:
+    """Keep teacher evidence useful without exposing contract metadata."""
+
+    hidden_keys = {
+        "id",
+        "task_id",
+        "source_slide_ids",
+        "slide_id",
+        "renderer_family",
+        "interaction_type",
+    }
+    if isinstance(value, dict):
+        return {
+            key: _public_evidence_value(item)
+            for key, item in value.items()
+            if key not in hidden_keys
+        }
+    if isinstance(value, list):
+        return [_public_evidence_value(item) for item in value]
+    return value
+
+
+def _teacher_behavior_evidence(content: dict[str, Any], evidence: Any) -> str:
+    """Render executable evidence as human-readable classroom observations."""
+
+    checks = evidence.get("checks", []) if isinstance(evidence, dict) else evidence
+    if not isinstance(checks, list):
+        checks = []
+    kind_labels = {
+        "syntax": "语法检查",
+        "function-call": "函数行为检查",
+        "web-request": "网页请求检查",
+        "query-result": "查询结果检查",
+        "structured-data": "结构化数据检查",
+        "browser": "浏览器观察",
+        "manual-evidence": "课堂观察",
+    }
+    status_labels = {
+        "MANUAL_EVIDENCE_DEFINED": "待课堂人工核对",
+        "AUTOMATED_UNAVAILABLE": "自动化不可用 · 已定义人工验收标准",
+        "MANUAL_PASS": "课堂人工核对通过",
+        "FAIL": "未通过",
+        "PASS": "通过",
+    }
+    rows: list[str] = []
+    for check in checks:
+        if not isinstance(check, dict):
+            continue
+        raw_status = str(check.get("status", "")).upper()
+        automation_status = str(check.get("automation", "")).upper()
+        if raw_status in status_labels:
+            status = status_labels[raw_status]
+        elif automation_status in status_labels:
+            status = status_labels[automation_status]
+        elif check.get("passed") is True or raw_status in {"PASSED"}:
+            status = status_labels["PASS"]
+        else:
+            status = status_labels["FAIL"]
+        kind = kind_labels.get(str(check.get("verification_type", "")), "行为检查")
+        details: list[str] = []
+        if check.get("status_code") is not None:
+            details.append(f"状态码 {check['status_code']}")
+        payload = check.get("json") if check.get("json") is not None else check.get("body")
+        if payload not in (None, ""):
+            safe_payload = _public_evidence_value(payload)
+            rendered = json.dumps(safe_payload, ensure_ascii=False) if isinstance(safe_payload, (dict, list)) else str(safe_payload)
+            details.append(_humanize(content, rendered))
+        rows.append(f"<li><strong>{esc(kind)}</strong>：{esc(status)}" + (f"（{esc('；'.join(details))}）" if details else "") + "</li>")
+    return "".join(rows) or "<li>已定义课堂行为检查，详情见教师参考材料。</li>"
+
+
+def _teacher_formula_evidence(content: dict[str, Any], fact: dict[str, Any]) -> str:
+    """Render formula truth facts without exposing machine-only field names."""
+
+    bindings = fact.get("bindings", {}) if isinstance(fact.get("bindings"), dict) else {}
+    input_fields = [bindings.get("input_field"), *(_list(bindings.get("input_fields")))]
+    input_fields = [str(item) for item in input_fields if item not in (None, "")]
+    lines: list[str] = []
+    if fact.get("formula"):
+        lines.append(f"<li><strong>公式</strong>：<code>{esc(fact['formula'])}</code></li>")
+    if input_fields:
+        lines.append(f"<li><strong>输入字段</strong>：{esc('、'.join(input_fields))}</li>")
+    if bindings.get("output_field"):
+        lines.append(f"<li><strong>结果字段</strong>：{esc(bindings['output_field'])}</li>")
+    if fact.get("operation_location"):
+        lines.append(f"<li><strong>填写位置</strong>：{esc(fact['operation_location'])}</li>")
+    if fact.get("expected_result") is not None:
+        result = _humanize(content, json.dumps(fact["expected_result"], ensure_ascii=False) if isinstance(fact["expected_result"], (dict, list)) else str(fact["expected_result"]))
+        lines.append(f"<li><strong>当前数据期望结果</strong>：{esc(result)}</li>")
+    return "".join(lines) or "<li>已定义当前数据公式核验，详情见教师参考材料。</li>"
+
+
 def _nav_links(role: str, prefix: str) -> str:
     if role == "student":
         links = (("student-task.html", "任务路线"), ("learning-center.html", "学习中心"), ("study-guide.html", "学习指南"), ("foundation-kit.html", "基础补给"))
@@ -178,6 +280,14 @@ def _modality_label(value: Any) -> str:
         "mixed": "混合实践",
     }
     return labels.get(str(value), "实践操作")
+
+
+def _task_time_breakdown(task: dict[str, Any]) -> str:
+    steps = [item for item in _list(task.get("time_breakdown")) if isinstance(item, dict)]
+    if not steps:
+        return ""
+    items = "".join(f'<li>{text_block(item.get("step"))} · {esc(item.get("minutes"))} 分钟</li>' for item in steps)
+    return f'<div class="section-label">任务时间依据</div><ul class="clean-list">{items}</ul>'
 
 
 def _shell_css() -> str:
@@ -342,13 +452,13 @@ def _task_pane(content: dict[str, Any], task: dict[str, Any], assets: dict[str, 
     source_refs = " ".join(str(item) for item in task.get("source_slide_ids", []))
     step_html = []
     for step in _list(task.get("steps")):
-        check = f'<span class="small"><br>检查：{text_block(step.get("check"))}</span>' if step.get("check") else ""
-        step_html.append(f'<li><strong>{esc(step.get("title"))}</strong>：{text_block(step.get("instruction"))}{check}</li>')
+        check = f'<span class="small"><br>检查：{text_block(_humanize(content, step.get("check")))}</span>' if step.get("check") else ""
+        step_html.append(f'<li><strong>{esc(_humanize(content, step.get("title")))}</strong>：{text_block(_humanize(content, step.get("instruction")))}{check}</li>')
     steps = "".join(step_html)
-    acceptance = "".join(f"<li>{text_block(item)}</li>" for item in _list(task.get("acceptance")))
+    acceptance = "".join(f"<li>{text_block(_humanize(content, item))}</li>" for item in _list(task.get("acceptance")))
     starter = _starter_html(assets, _list(task.get("starter_asset_ids")))
     minutes = f'<span class="chip">约 {esc(task.get("estimated_minutes"))} 分钟</span>' if task.get("estimated_minutes") else ""
-    return f'''<article class="pane{' is-active' if index == 0 else ''}" id="task-{esc(slug(task.get("id")))}" data-pane data-task-id="{esc(task.get("id"))}" data-source-slide-ids="{esc(source_refs)}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title"))}</h3><p class="pane-lead">{text_block(task.get("overview"))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level")))}</span></div><div class="chip-row"><span class="chip">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</span>{minutes}<span class="chip">{esc(_modality_label(task.get("modality")))}</span></div><div class="section-label">本次要留下的结果</div><div class="scaffold">{text_block(task.get("scaffold"))}</div><div class="section-label">完成步骤</div><ol class="task-steps">{steps}</ol>{f'<div class="section-label">起点文件</div>{starter}' if starter else ''}<div class="section-label">卡住时帮助</div><p class="small">先打开一个相关实验或资料，完成一小步，再回到本任务。</p><div class="related-links">{_task_links(content, task)}</div><div class="section-label">课堂验收</div><div class="acceptance"><ul class="clean-list">{acceptance}</ul></div>{_pane_footer(tasks, index, "task-")}</section></article>'''
+    return f'''<article class="pane{' is-active' if index == 0 else ''}" id="task-{esc(slug(task.get("id")))}" data-pane data-task-id="{esc(task.get("id"))}" data-source-slide-ids="{esc(source_refs)}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title"))}</h3><p class="pane-lead">{text_block(_humanize(content, task.get("overview")))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level")))}</span></div><div class="chip-row"><span class="chip">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</span>{minutes}<span class="chip">{esc(_modality_label(task.get("modality")))}</span></div><div class="section-label">本次要留下的结果</div><div class="scaffold">{text_block(_humanize(content, task.get("scaffold")))}</div><div class="section-label">完成步骤</div><ol class="task-steps">{steps}</ol>{f'<div class="section-label">起点文件</div>{starter}' if starter else ''}<div class="section-label">卡住时帮助</div><p class="small">先打开一个相关实验或资料，完成一小步，再回到本任务。</p><div class="related-links">{_task_links(content, task)}</div><div class="section-label">课堂验收</div><div class="acceptance"><ul class="clean-list">{acceptance}</ul></div>{_pane_footer(tasks, index, "task-")}</section></article>'''
 
 
 def render_student_task(content: dict[str, Any]) -> str:
@@ -498,7 +608,7 @@ def render_teacher_guide(content: dict[str, Any]) -> str:
     for item in guidance:
         task = tasks.get(item.get("task_id"), {})
         active = " is-active" if len(panes) == 0 else ""
-        panes.append(f'<article class="pane{active}" id="teacher-task-{esc(slug(item.get("task_id")))}" data-pane data-task-id="{esc(item.get("task_id"))}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title", item.get("task_id")))}</h3><p class="pane-lead">理论桥接：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level", "实践")))}</span></div><div class="section-label">教师观察点</div><div class="scaffold">{text_block(_humanize(content, item.get("look_for")))}</div><div class="section-label">学生卡住时</div><div class="teacher-note">{text_block(_humanize(content, item.get("ask_when_stuck")))}</div></section></article>')
+        panes.append(f'<article class="pane{active}" id="teacher-task-{esc(slug(item.get("task_id")))}" data-pane data-task-id="{esc(item.get("task_id"))}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(task.get("title", item.get("task_id")))}</h3><p class="pane-lead">理论桥接：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</p></div><span class="level {esc(task.get("level"))}">{esc(LEVEL_LABELS.get(task.get("level"), task.get("level", "实践")))}</span></div><div class="section-label">教师观察点</div><div class="scaffold">{text_block(_humanize(content, item.get("look_for")))}</div><div class="section-label">学生卡住时</div><div class="teacher-note">{text_block(_humanize(content, item.get("ask_when_stuck")))}</div>{_task_time_breakdown(task)}</section></article>')
     common_items = _unique_text([f'{_humanize(content, item.get("symptom"))}：{_humanize(content, item.get("intervention"))}' for item in _list(teacher.get("common_errors")) if isinstance(item, dict)])
     common = "".join(f"<li>{text_block(item)}</li>" for item in common_items)
     pace = "".join(f"<li>{text_block(item)}</li>" for item in _unique_text([_humanize(content, item) for item in _list(teacher.get("pace_adjustments"))]))
@@ -584,6 +694,14 @@ def render_teacher_reference(content: dict[str, Any]) -> str:
         task = tasks.get(reference.get("task_id"), {}); key_steps = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("key_steps"))); variants = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("acceptable_variants"))); errors = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("common_errors"))); basis = "".join(f"<li>{text_block(item)}</li>" for item in _list(reference.get("acceptance_basis"))); result = f'<div class="section-label">参考结果</div><div class="callout">{text_block(reference.get("reference_result"))}</div>' if reference.get("reference_result") else ""
         active = " is-active" if index == 0 else ""
         visual = _reference_visual_html(reference)
+        for artifact in reference.get('verified_reference', []):
+            visual += '<div class="section-label">已验证参考实现：' + esc(artifact['path']) + '</div><pre class="starter-code reference-artifact">' + esc(artifact['content']) + '</pre>'
+        if reference.get('behavior_evidence'):
+            visual += '<div class="section-label">行为验证证据</div><ul class="clean-list">' + _teacher_behavior_evidence(content, reference['behavior_evidence']) + '</ul>'
+        for fact in content.get('formula_facts', []):
+            if fact.get('task_id') == reference.get('task_id'):
+                from formula_truth import verify_formula
+                visual += '<div class="section-label">当前数据公式</div><ul class="clean-list">' + _teacher_formula_evidence(content, fact) + '</ul>'
         panes.append(f'<article class="pane reference-pane{active}" id="reference-{esc(slug(reference.get("task_id")))}" data-pane data-task-id="{esc(reference.get("task_id"))}" data-source-slide-ids="{esc(" ".join(reference.get("source_slide_ids", [])))}"><section class="pane-card"><div class="pane-title-row"><div><h3>{esc(reference.get("title"))}</h3><p class="pane-lead">理论：{esc(_knowledge_titles(knowledge, _list(task.get("knowledge_link_ids"))))}</p></div><a href="../student/student-task.html#task-{esc(slug(reference.get("task_id")))}">打开学生任务</a></div><div class="section-label">参考答案 / 参考成果</div><pre class="reference-answer">{text_block(_humanize(content, reference.get("reference_answer")))}</pre>{visual}{result}<div class="section-label">关键步骤</div><ul class="clean-list">{key_steps}</ul><div class="section-label">可接受变体</div><ul class="clean-list">{variants}</ul><div class="section-label">常见错误</div><ul class="clean-list">{errors}</ul><div class="section-label">验收依据</div><ul class="clean-list">{basis}</ul>{_pane_footer(references, index, "reference-", route_label="返回参考目录")}</section></article>')
     body = f'<div class="module-layout"><aside class="pane-nav" aria-label="教师参考导航"><strong>选择参考成果</strong>{_module_nav(nav_items, "reference-")}</aside><section class="pane-main">{"".join(panes)}</section></div>'
     return shell(content, "teacher", "teacher-reference", "教师参考", "按任务切换参考答案和可接受变体，答案区保持宽版，便于课堂核对。", body, prefix="")
@@ -595,7 +713,16 @@ def _write_page(path: Path, value: str) -> None:
 
 
 def _safe_asset_path(relative: str) -> Path:
-    candidate = Path(relative)
+    # Contracts describe paths relative to the student starter root, while
+    # classroom bundle examples may spell that root explicitly as
+    # ``starter/foo``. Normalize the latter so it is not materialized as
+    # ``starter/starter/foo``.
+    normalized = str(relative).replace("\\", "/").lstrip("/")
+    if normalized == "starter":
+        normalized = ""
+    elif normalized.startswith("starter/"):
+        normalized = normalized[len("starter/"):]
+    candidate = Path(normalized)
     if candidate.is_absolute() or ".." in candidate.parts: raise ValueError(f"starter path must stay inside starter/: {relative}")
     return candidate
 
@@ -604,6 +731,11 @@ def _sanitize_student_content(content: dict[str, Any]) -> dict[str, Any]:
     """Remove teacher answers and replacement metadata from the distributable copy."""
 
     safe = copy.deepcopy(content)
+    for field in ('starter_bundles', 'classroom_assets', 'formula_facts', 'runtime_dependencies', 'integrity_version'):
+        safe.pop(field, None)
+    safe['starter_assets'] = [a for a in safe.get('starter_assets', []) if a.get('role', 'student-edit') in STUDENT_ROLES]
+    for task in safe.get('tasks', []):
+        task.pop('reference_verification', None)
     safe.pop("teacher_guide", None)
     safe.pop("teacher_reference", None)
     safe.pop("canonical_facts", None)
@@ -612,10 +744,13 @@ def _sanitize_student_content(content: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(item, dict):
                 continue
             item.pop("canonical_fact_ids", None)
+            item.pop("time_breakdown", None)
     for asset in _list(safe.get("starter_assets")):
         if not isinstance(asset, dict):
             continue
         asset.pop("editable_gaps", None)
+        for key in ('source_path','source_sha256','reference_verification'):
+            asset.pop(key, None)
         for field in ("replacement", "target", "reference_answer", "reference_result", "acceptable_variants", "common_errors", "acceptance_basis"):
             asset.pop(field, None)
     return safe
@@ -627,25 +762,110 @@ def _copy_tree(source: Path, target: Path) -> None:
     shutil.copytree(source, target)
 
 
-def generate(practice_path: Path, output_dir: Path, courseware_path: Path | None = None, *, replace: bool = False) -> dict[str, Any]:
+def _generate_candidate(
+    practice_path: Path,
+    output_dir: Path,
+    courseware_path: Path | None = None,
+    *,
+    replace: bool = False,
+    auto_repair: bool = False,
+    repair_rounds: int = 2,
+    source_root: Path | None = None,
+    evidence_mode: str = "migration-trust",
+) -> dict[str, Any]:
     raw_content = load_json(practice_path); courseware = load_courseware(courseware_path) if courseware_path else None
-    content, migration = normalize_content(raw_content, courseware)
+    repair_report: dict[str, Any] = {"status": "not-run", "round_limit": min(max(0, repair_rounds), 2)}
+    if auto_repair:
+        repaired = repair_content(raw_content, courseware, max_rounds=repair_rounds)
+        repair_report = {key: value for key, value in repaired.items() if key not in {"content", "validation"}}
+        repair_report["validation"] = repaired.get("validation", {})
+        if repaired.get("status") != "pass":
+            raise ValueError("automatic contract repair failed: " + "; ".join(repaired.get("errors", [])))
+        content = repaired["content"]
+        migration = repaired.get("migration", {})
+    else:
+        content, migration = normalize_content(raw_content, courseware)
+    g3 = evidence_mode == "strict" or content.get("integrity_version") == "1.0"
+    lineage = []
+    if g3:
+        if courseware:
+            environment = courseware.get('course_context', {}).get('delivery_environment')
+            if environment:
+                content.setdefault('course_context', {})['delivery_environment'] = environment
+        content, lineage = prepare_assets(content, source_root)
+    source_truth: dict[str, Any] = {"status": "not-run", "mode": evidence_mode, "errors": [], "warnings": []}
+    time_evidence: dict[str, Any] = {"status": "not-run", "mode": evidence_mode, "errors": [], "warnings": []}
+    courseware_time: dict[str, Any] = {"status": "not-run", "mode": evidence_mode, "errors": [], "warnings": []}
+    if evidence_mode not in {"strict", "migration-trust"}:
+        raise ValueError(f"unsupported evidence mode: {evidence_mode}")
+    if evidence_mode == "strict":
+        if source_root is None:
+            raise ValueError("strict Practice generation requires --source-root")
+        if courseware is None:
+            raise ValueError("strict Practice generation requires --courseware-json")
+        courseware_time = review_courseware_time(courseware, mode="strict")
+        if courseware_time["status"] == "FAIL":
+            raise ValueError("Courseware TIME_EVIDENCE_FAIL; Practice NOT_RUN: " + "; ".join(courseware_time.get("errors", [])))
+        source_truth = validate_source_truth(courseware, source_root, content, mode="strict")
+        if source_truth["status"] != "pass":
+            raise ValueError("source truth verification failed: " + "; ".join(source_truth.get("errors", [])))
+        time_evidence = review_practice_time(content, mode="strict")
+        if time_evidence["status"] == "FAIL":
+            raise ValueError("Practice time evidence failed: " + "; ".join(time_evidence.get("errors", [])))
+    else:
+        time_evidence = review_practice_time(content, mode=evidence_mode)
+    formula_truth: dict[str, Any] = {"status": "not-run", "formulas": [], "errors": []}
+    if g3:
+        from formula_truth import verify_formulas
+        formula_truth = verify_formulas(content, source_root)
+        if formula_truth["status"] != "PASS":
+            raise ValueError("FORMULA_SEMANTIC_FAIL: " + "; ".join(formula_truth.get("errors", [])))
+        for fact, report in zip(content.get('formula_facts', []), formula_truth['formulas']):
+            if report['status'] == 'PASS':
+                fact['expected_result'] = report['expected_result']
     contract = validate_content(content, courseware)
     contract["migration"] = migration
     if contract["status"] != "pass": raise ValueError("invalid Practice Class Content Contract: " + "; ".join(contract["errors"]))
-    pedagogical = review_content(content, contract)
+    pedagogical = review_content(content, contract, time_mode=evidence_mode)
     if pedagogical["status"] == "FAIL": raise ValueError("Practice Pedagogical Integrity Review failed: " + "; ".join(pedagogical["errors"]))
+    integrity = reference_gate(content, source_root) if g3 else {"status": "NOT_RUN"}
+    if integrity['status'] == 'FAIL':
+        raise ValueError('REFERENCE_BEHAVIOR_FAIL / CLASSROOM_PACKAGE_INTEGRITY: ' + '; '.join(integrity['errors']))
     if output_dir.exists():
         if not replace: raise FileExistsError(f"output exists; use --replace: {output_dir}")
         if not output_dir.is_dir(): raise ValueError(f"output target must be a directory: {output_dir}")
         shutil.rmtree(output_dir)
+    from generation_provenance import provenance
+    origin = provenance(__file__, source_root, repair_report.get('status', 'not-run'))
+    if g3 and evidence_mode == 'strict' and not origin['valid']:
+        raise ValueError('PROVENANCE_INVALID: strict generation requires a committed clean worktree')
     student_dir, teacher_dir = output_dir / "student", output_dir / "teacher"; student_dir.mkdir(parents=True, exist_ok=True); teacher_dir.mkdir(parents=True, exist_ok=True)
+    if content.get('spreadsheet_workflow'):
+        for task in content.get('tasks', []):
+            if task.get('artifact_kind') == 'workbook':
+                task['overview'] = str(task.get('overview', '')) + '\n' + content['spreadsheet_workflow']
     _write_page(student_dir / "student-task.html", render_student_task(content)); _write_page(student_dir / "learning-center.html", render_learning_center(content)); _write_page(student_dir / "study-guide.html", render_study_guide(content)); _write_page(student_dir / "foundation-kit.html", render_foundation_kit(content)); _write_page(teacher_dir / "teacher-guide.html", render_teacher_guide(content)); _write_page(teacher_dir / "teacher-reference.html", render_teacher_reference(content))
     for asset in _list(content.get("starter_assets")):
         if not isinstance(asset, dict): continue
-        target = student_dir / "starter" / _safe_asset_path(str(asset.get("path", ""))); target.parent.mkdir(parents=True, exist_ok=True); target.write_text(str(asset.get("content", "")), encoding="utf-8", newline="\n")
+        if asset.get('role', 'student-edit') not in STUDENT_ROLES: continue
+        target = student_dir / "starter" / _safe_asset_path(str(asset.get("path", "")))
+        write_asset(asset, target, source_root)
+    if g3:
+        bundle_materialization = materialize_bundles(content, student_dir / "starter", source_root, include_private=False)
+        if bundle_materialization["status"] != "PASS":
+            raise ValueError("CLASSROOM_PACKAGE_INTEGRITY: " + "; ".join(bundle_materialization["errors"]))
+        final_closure = closure(content, student_dir / "starter")
+        if final_closure["status"] != "PASS":
+            raise ValueError("CLASSROOM_PACKAGE_INTEGRITY: " + "; ".join(final_closure["errors"]))
+    if g3: (output_dir / 'generation-provenance.json').write_text(json.dumps(origin, ensure_ascii=False, indent=2), encoding='utf-8')
+    if g3:
+        integrity = reference_gate(content, source_root, output_dir / 'teacher-package')
+        reference_report = {'status': 'pass' if integrity['status'] == 'PASS' else 'fail', **{k:v for k,v in integrity.items() if k != 'status'}}
+        (output_dir / 'asset-lineage.json').write_text(json.dumps(lineage, ensure_ascii=False, indent=2), encoding='utf-8')
+        (output_dir / 'behavior-verification.json').write_text(json.dumps(integrity, ensure_ascii=False, indent=2), encoding='utf-8')
+    else:
+        reference_report = build_reference_report(content, output_dir=output_dir / "teacher-package")
     (output_dir / "practice-content.json").write_text(json.dumps(content, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-    reference_report = build_reference_report(content, output_dir=output_dir / "teacher-package")
     student_package = output_dir / "student-package"
     _copy_tree(student_dir, student_package / "student")
     safe_content = _sanitize_student_content(content)
@@ -667,14 +887,49 @@ def generate(practice_path: Path, output_dir: Path, courseware_path: Path | None
         outputs = validate_output_files(content, output_dir)
     except Exception as exc:  # pragma: no cover
         outputs = {"status": "fail", "errors": [f"output QA unavailable: {exc}"], "warnings": [], "files": []}
-    qa = {"status": "pass" if contract["status"] == "pass" and pedagogical["status"] != "FAIL" and outputs["status"] == "pass" and reference_report["status"] == "pass" else "fail", "contract": contract, "pedagogical": pedagogical, "outputs": outputs, "reference_generation": reference_report}
+    if g3:
+        link_report = package_links(student_package)
+        outputs['errors'].extend(link_report['errors'])
+        if link_report['status'] == 'FAIL': outputs['status'] = 'fail'
+        package_closure = closure(content, student_package / "student" / "starter")
+        outputs['classroom_package_integrity'] = package_closure
+        outputs['formula_truth'] = formula_truth
+        outputs['errors'].extend(package_closure['errors'])
+        if package_closure['status'] == 'FAIL': outputs['status'] = 'fail'
+    qa = {"status": "pass" if contract["status"] == "pass" and pedagogical["status"] != "FAIL" and outputs["status"] == "pass" and reference_report["status"] == "pass" else "fail", "contract": contract, "pedagogical": pedagogical, "outputs": outputs, "reference_generation": reference_report, "classroom_integrity": integrity, "asset_lineage": lineage, "formula_truth": formula_truth, "contract_repair": repair_report, "source_truth": source_truth, "courseware_time_evidence": courseware_time, "time_evidence": time_evidence}
     (output_dir / "qa-report.json").write_text(json.dumps(qa, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     (output_dir / "teacher-package" / "qa-report.json").write_text(json.dumps(qa, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return qa
 
 
+def generate(practice_path, output_dir, courseware_path=None, *, replace=False, **kwargs):
+    """Only publish a fully verified candidate; retain existing outputs on failure."""
+    import tempfile
+    import uuid
+    output_dir = Path(output_dir).resolve()
+    if output_dir.exists() and not replace:
+        raise FileExistsError(f"output exists; use --replace: {output_dir}")
+    output_dir.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.practice-candidate-', dir=output_dir.parent) as temp:
+        candidate = Path(temp) / 'output'
+        report = _generate_candidate(practice_path, candidate, courseware_path, **kwargs)
+        if report['status'] != 'pass':
+            raise ValueError('Practice candidate QA failed: ' + json.dumps(report, ensure_ascii=False))
+        backup = output_dir.with_name(output_dir.name + '.backup-' + uuid.uuid4().hex)
+        moved = False
+        try:
+            if output_dir.exists():
+                output_dir.rename(backup); moved = True
+            candidate.rename(output_dir)
+        except Exception:
+            if moved and not output_dir.exists(): backup.rename(output_dir)
+            raise
+        if moved: shutil.rmtree(backup)
+        return report
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--practice-json", required=True, type=Path); parser.add_argument("--courseware-json", type=Path); parser.add_argument("--output-dir", required=True, type=Path); parser.add_argument("--replace", action="store_true"); parser.add_argument("--json", action="store_true", dest="as_json"); args = parser.parse_args(); report = generate(args.practice_json, args.output_dir, args.courseware_json, replace=args.replace); print(json.dumps(report, ensure_ascii=False, indent=2) if args.as_json else f"status={report['status']} errors={len(report['outputs']['errors'])}"); raise SystemExit(0 if report["status"] == "pass" else 1)
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--practice-json", required=True, type=Path); parser.add_argument("--courseware-json", type=Path); parser.add_argument("--source-root", type=Path); parser.add_argument("--evidence-mode", choices=("strict", "migration-trust"), default="migration-trust"); parser.add_argument("--output-dir", required=True, type=Path); parser.add_argument("--replace", action="store_true"); parser.add_argument("--auto-repair", action="store_true", help="repair derivable contract omissions for at most two rounds before rendering"); parser.add_argument("--repair-rounds", type=int, default=2); parser.add_argument("--json", action="store_true", dest="as_json"); args = parser.parse_args(); report = generate(args.practice_json, args.output_dir, args.courseware_json, replace=args.replace, auto_repair=args.auto_repair, repair_rounds=args.repair_rounds, source_root=args.source_root, evidence_mode=args.evidence_mode); print(json.dumps(report, ensure_ascii=False, indent=2) if args.as_json else f"status={report['status']} errors={len(report['outputs']['errors'])}"); raise SystemExit(0 if report["status"] == "pass" else 1)
 
 
 if __name__ == "__main__":

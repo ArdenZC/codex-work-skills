@@ -16,7 +16,10 @@ from pathlib import Path
 from typing import Any
 
 from content_contract import CoursewareContractError, load_content
+from activity_time_reviewer import ACTIVITY_ROLE_LABELS
 from pedagogical_review import review_content
+from repair_courseware import repair_content
+from source_truth_validator import validate_source_truth
 from validate_courseware import validate_html_outputs
 
 
@@ -55,7 +58,7 @@ button { font: inherit; }
 .slide-title { margin: 7px 0 0; font-size: clamp(25px, 3.2vw, 52px); line-height: 1.12; letter-spacing: -.025em; }
 .slide-rule { width: 100%; height: 1px; margin: 16px 0 18px; background: linear-gradient(90deg, var(--accent), var(--line), transparent); }
 .slide-layout { flex: 1; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: clamp(12px, 1.5vw, 22px); align-content: stretch; overflow: hidden; }
-.slide-layout > * { min-width: 0; }
+.slide-layout > * { min-width: 0; min-height: 0; }
 .layout-hero, .layout-focus { grid-template-columns: minmax(0, 1fr); }
 .layout-split, .layout-comparison { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .layout-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -63,10 +66,10 @@ button { font: inherit; }
 .layout-default { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .block-paragraph { margin: 0; font-size: clamp(16px, 1.35vw, 23px); color: var(--ink); }
 .block-paragraph + .block-paragraph { margin-top: 7px; }
-.bullet-block, .summary-block { padding: 14px 17px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper-blue); }
+.bullet-block, .summary-block { overflow: auto; padding: 14px 17px; border: 1px solid var(--line); border-radius: 15px; background: var(--paper-blue); }
 .bullet-block ul, .summary-block ul { margin: 0; padding-left: 1.35em; font-size: clamp(15px, 1.23vw, 21px); }
 .bullet-block li + li, .summary-block li + li { margin-top: 7px; }
-.cards-block { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.cards-block { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; overflow: auto; }
 .info-card { padding: 15px 16px; min-height: 100%; border: 1px solid var(--line); border-radius: 16px; background: var(--paper-warm); }
 .info-card.tone-sage { background: #f0f6f2; }
 .info-card.tone-peach { background: #fcf1e9; }
@@ -141,6 +144,11 @@ body.projection-mode .slide-page { box-shadow: 0 16px 36px rgba(31, 54, 69, .17)
 .teacher-note { padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper-blue); }
 .teacher-note strong { display: block; color: #557786; font-size: 12px; margin-bottom: 3px; }
 .teacher-note span { color: var(--muted); font-size: 13px; }
+.activity-plan-note { background: #f4f0e5; }
+.activity-plan-note ol { margin: 6px 0 0; padding-left: 1.25em; color: var(--muted); font-size: 13px; }
+.teacher-reserve { margin: 10px 18px 0; padding: 10px 14px; border: 1px solid #d9c4a0; border-radius: 12px; background: #fff8e9; color: #725b39; }
+.teacher-reserve strong { margin-right: 8px; }
+.teacher-reserve span { color: #856d49; font-size: 13px; }
 @media (max-width: 900px) {
   .teacher-page { grid-template-columns: 1fr; overflow: auto; }
   .teacher-left .slide-page { min-height: 55vh; }
@@ -394,11 +402,43 @@ def _script_paragraphs(script: str) -> str:
     return "".join(f"<p>{_escape(paragraph)}</p>" for paragraph in paragraphs)
 
 
+def _activity_plan_note(slide: dict[str, Any]) -> str:
+    minutes = slide.get("activity_minutes")
+    plan = slide.get("activity_plan")
+    if not isinstance(minutes, int) or minutes <= 0 or not isinstance(plan, dict):
+        return ""
+    segments = "".join(
+        f'<li>{_escape(item.get("label"))} {_escape(item.get("minutes"))}分钟</li>'
+        for item in plan.get("segments", [])
+        if isinstance(item, dict)
+    )
+    summary = _escape(plan.get("student_action"))
+    check = _escape(plan.get("check_method"))
+    role_label = ACTIVITY_ROLE_LABELS.get(plan.get("activity_role"))
+    title = f'课堂活动 · {role_label} · {_escape(minutes)}分钟' if role_label else f'课堂活动 · {_escape(minutes)}分钟'
+    return f'<div class="teacher-note activity-plan-note"><strong>{title}</strong><span>{summary}；检查：{check}</span><ol>{segments}</ol></div>'
+
+
+def _teacher_reserve(content: dict[str, Any]) -> str:
+    extensions = [item for item in content.get("extensions", []) if isinstance(item, dict)]
+    if not extensions:
+        return ""
+    total = sum(int(item.get("minutes", 0) or 0) for item in extensions if isinstance(item.get("minutes"), int))
+    items = "".join(
+        f'<li><strong>{_escape(item.get("title"))}</strong> · {_escape(item.get("minutes"))}分钟：{_escape(item.get("content"))}（使用条件：{_escape(item.get("use_when"))}；活动：{_escape(item.get("activity"))}）</li>'
+        for item in extensions
+    )
+    return f'<section class="teacher-reserve"><strong>备用内容 / 讲得快时使用 · 累计 {total} 分钟</strong><span>这些内容不默认进入学生主线。</span><ul>{items}</ul></section>'
+
+
 def render_teacher(content: dict[str, Any], assets: dict[str, str] | None = None) -> str:
     title = f'{content["course_title"]} · {content["chapter_title"]} · 教师备课'
     pages: list[str] = []
     for index, slide in enumerate(content["slides"]):
         notes: list[str] = []
+        activity_note = _activity_plan_note(slide)
+        if activity_note:
+            notes.append(activity_note)
         for label, field in (("演示建议", "demo_hint"), ("课堂接话方式", "classroom_followup"), ("授课节奏 / 易错提醒", "pacing_note")):
             if slide.get(field):
                 notes.append(f'<div class="teacher-note"><strong>{label}</strong><span>{_escape(slide[field])}</span></div>')
@@ -414,7 +454,9 @@ def render_teacher(content: dict[str, Any], assets: dict[str, str] | None = None
         + _escape(content["course_title"])
         + '</strong><span>'
         + _escape(content["chapter_title"])
-        + ' · 逐页备课</span><span class="page-counter" data-page-counter></span></header><main class="teacher-deck" id="deck">'
+        + ' · 逐页备课</span><span class="page-counter" data-page-counter></span></header>'
+        + _teacher_reserve(content)
+        + '<main class="teacher-deck" id="deck">'
         + "".join(pages)
         + '</main><footer class="deck-footer"><span>键盘 / 滚轮翻页</span><span class="progress-track"><span class="progress-value" data-progress-value></span></span></footer></div><script data-courseware-runtime-script>'
         + RUNTIME_JS
@@ -446,10 +488,43 @@ def _asset_data_uris(content: dict[str, Any], base_dir: Path) -> dict[str, str]:
     return result
 
 
-def generate(content_path: Path, output_dir: Path, *, replace: bool = False) -> dict[str, Any]:
+def generate(
+    content_path: Path,
+    output_dir: Path,
+    *,
+    replace: bool = False,
+    auto_repair: bool = False,
+    repair_rounds: int = 2,
+    source_root: Path | None = None,
+    evidence_mode: str = "migration-trust",
+    separate_practice_available: bool = False,
+) -> dict[str, Any]:
     content_path = content_path.expanduser().resolve()
     output_dir = output_dir.expanduser().resolve()
-    content = load_content(content_path)
+    repair_report: dict[str, Any] = {"status": "not-run", "round_limit": min(max(0, repair_rounds), 2)}
+    if auto_repair:
+        raw = json.loads(content_path.read_text(encoding="utf-8"))
+        repaired = repair_content(raw, base_dir=content_path.parent, max_rounds=repair_rounds)
+        repair_report = {key: value for key, value in repaired.items() if key not in {"content", "validation"}}
+        repair_report["validation"] = repaired.get("validation", {})
+        if repaired.get("status") != "pass":
+            raise CoursewareContractError("automatic contract repair failed: " + "; ".join(repaired.get("errors", [])))
+        content = repaired["content"]
+    else:
+        content = load_content(content_path)
+    source_truth: dict[str, Any] = {"status": "not-run", "mode": evidence_mode, "errors": [], "warnings": []}
+    from generation_provenance import provenance
+    origin = provenance(__file__, source_root)
+    if evidence_mode == "strict" and not origin['valid']:
+        raise CoursewareContractError('PROVENANCE_INVALID: strict generation requires a committed clean worktree')
+    if evidence_mode == "strict":
+        if source_root is None:
+            raise CoursewareContractError("strict evidence mode requires --source-root")
+        source_truth = validate_source_truth(content, source_root, mode=evidence_mode)
+        if source_truth["status"] != "pass":
+            raise CoursewareContractError("source truth verification failed: " + "; ".join(source_truth.get("errors", [])))
+    elif evidence_mode != "migration-trust":
+        raise CoursewareContractError(f"unsupported evidence mode: {evidence_mode}")
     if output_dir.exists() and not replace:
         raise FileExistsError(f"output exists: {output_dir}; use --replace")
     parent = output_dir.parent
@@ -463,7 +538,16 @@ def generate(content_path: Path, output_dir: Path, *, replace: bool = False) -> 
         qa = validate_html_outputs(content, student, teacher)
         if qa["status"] != "pass":
             raise CoursewareContractError("generated HTML QA failed: " + "; ".join(qa["errors"]))
-        pedagogical = review_content(content)
+        pedagogical = review_content(
+            content,
+            time_mode=evidence_mode,
+            separate_practice_available=separate_practice_available,
+        )
+        pedagogical.setdefault("metrics", {})["source_truth"] = {
+            "status": source_truth.get("status"),
+            "fact_count": len(source_truth.get("facts", [])),
+            "cross_material_status": source_truth.get("cross_material", {}).get("status") if isinstance(source_truth.get("cross_material"), dict) else "not-run",
+        }
         if pedagogical["status"] == "FAIL":
             raise CoursewareContractError("pedagogical review failed: " + "; ".join(pedagogical["errors"]))
         (stage / "student.html").write_text(student, encoding="utf-8", newline="\n")
@@ -475,7 +559,12 @@ def generate(content_path: Path, output_dir: Path, *, replace: bool = False) -> 
             "outputs": ["student.html", "teacher.html"],
             "qa": qa,
             "pedagogical": pedagogical,
+            "source_truth": source_truth,
+            "contract_repair": repair_report,
         }
+        if evidence_mode == 'strict':
+            origin['repair_status'] = repair_report.get('status', 'not-run')
+            (stage / 'generation-provenance.json').write_text(json.dumps(origin, ensure_ascii=False, indent=2), encoding='utf-8')
         (stage / "qa-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
         if output_dir.exists():
             backup = parent / f".{output_dir.name}.courseware-backup-{uuid.uuid4().hex}"
@@ -501,11 +590,25 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--content-json", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--replace", action="store_true")
+    parser.add_argument("--auto-repair", action="store_true", help="repair derivable contract omissions for at most two rounds before rendering")
+    parser.add_argument("--repair-rounds", type=int, default=2)
+    parser.add_argument("--source-root", type=Path, help="raw source root for strict fact verification")
+    parser.add_argument("--evidence-mode", choices=("strict", "migration-trust"), default="migration-trust")
+    parser.add_argument("--separate-practice-available", action="store_true", help="apply the theory/practice boundary heuristic for a companion Practice asset")
     parser.add_argument("--render", action="store_true", help="accepted for workflow symmetry; HTML is always rendered")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
-        report = generate(args.content_json, args.output_dir, replace=args.replace)
+        report = generate(
+            args.content_json,
+            args.output_dir,
+            replace=args.replace,
+            auto_repair=args.auto_repair,
+            repair_rounds=args.repair_rounds,
+            source_root=args.source_root,
+            evidence_mode=args.evidence_mode,
+            separate_practice_available=args.separate_practice_available,
+        )
     except Exception as exc:  # noqa: BLE001 - CLI must expose a useful failure
         report = {"status": "fail", "errors": [str(exc)]}
     if args.json:

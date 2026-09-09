@@ -9,14 +9,19 @@ from pathlib import Path
 
 SKILL_NAME = "practice-class-html-generator"
 REQUIRED = (
+    'scripts/classroom_integrity.py',
+    'scripts/reference_behavior.py',
+    'docs/integrity-contract-v1.md',
+    'tests/test_g3_integrity.py',
+
     "简介.md", "AGENTS.md", "通用提示词.md", "SKILL.md", "CLAUDE.md", "GEMINI.md",
     "CONVENTIONS.md", "requirements.txt", "README.md", "manifest.yaml", "agents/openai.yaml",
     "docs/content-contract-v1.1.md", "docs/content-contract-v1.md",
     "references/content-quality-gold-benchmark.md", "schemas/practice-class-content.schema.json",
     "scripts/practice_contract.py", "scripts/render_practice.py", "scripts/validate_practice.py",
-    "scripts/practice_pedagogical_review.py", "scripts/apply_reference_gaps.py", "scripts/holdout_audit.py",
+    "scripts/practice_pedagogical_review.py", "scripts/practice_time_reviewer.py", "scripts/source_truth_validator.py", "scripts/teaching_blueprint.py", "scripts/repair_practice.py", "scripts/apply_reference_gaps.py", "scripts/holdout_audit.py",
     "holdouts/build_holdouts.py", "scripts/install.py", "scripts/install_adapters.py",
-    "tests/test_practice_class.py", "tests/test_generalization.py", "tests/browser_smoke.mjs",
+    "tests/test_practice_class.py", "tests/test_generalization.py", "tests/test_g1_adaptive_planning.py", "tests/test_g2_practice_time.py", "tests/browser_smoke.mjs",
 )
 
 

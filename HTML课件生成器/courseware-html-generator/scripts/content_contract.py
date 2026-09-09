@@ -18,6 +18,7 @@ from typing import Any
 
 CONTRACT_VERSION = "1.1"
 LEGACY_CONTRACT_VERSION = "1.0"
+SESSION_DELIVERY_MODES = {"theory-led", "mixed", "practice-led"}
 SUPPORTED_LAYOUTS = {"hero", "split", "grid", "focus", "comparison", "timeline", "default"}
 SUPPORTED_BLOCKS = {
     "paragraph",
@@ -33,6 +34,7 @@ SUPPORTED_BLOCKS = {
     "comparison",
     "summary",
 }
+DELIVERY_TRACKS = {"core", "extension"}
 TEACHING_INTENT_FIELDS = (
     "opening",
     "core_explanation",
@@ -53,9 +55,14 @@ SLIDE_FIELDS = {
     "suggested_minutes",
     "teaching_intent",
     "learning_unit_ids",
+    "canonical_fact_ids",
+    "activity_plan",
     "demo_hint",
     "classroom_followup",
     "pacing_note",
+    "delivery_track",
+    "script_coverage",
+    "planning_rationale",
 }
 COURSE_CONTEXT_STRING_FIELDS = {
     "course_name",
@@ -65,6 +72,7 @@ COURSE_CONTEXT_STRING_FIELDS = {
     "software",
     "database_dialect",
     "framework",
+    "delivery_environment",
 }
 COURSE_CONTEXT_LIST_FIELDS = {"tools", "other_constraints"}
 COURSE_CONTEXT_FIELDS = COURSE_CONTEXT_STRING_FIELDS | COURSE_CONTEXT_LIST_FIELDS
@@ -441,6 +449,37 @@ def _validate_course_context(value: Any, location: str, errors: list[str]) -> No
         _validate_string_list(value[field], f"{location}.{field}", errors)
 
 
+def _validate_formula_fact_shapes(value: Any, location: str, errors: list[str]) -> None:
+    if value is None:
+        return
+    if not isinstance(value, list):
+        errors.append(f"{location} must be a list")
+        return
+    seen: set[str] = set()
+    for index, fact in enumerate(value):
+        item_location = f"{location}[{index}]"
+        if not isinstance(fact, dict):
+            errors.append(f"{item_location} must be an object")
+            continue
+        for field in ("id", "formula", "example_scope"):
+            _add(errors, _non_empty(fact.get(field)), f"{item_location}.{field} is required")
+        fact_id = fact.get("id")
+        if isinstance(fact_id, str):
+            if fact_id in seen:
+                errors.append(f"{item_location}.id is duplicated")
+            seen.add(fact_id)
+        if fact.get("example_scope") not in {"abstract", "current-dataset"}:
+            errors.append(f"{item_location}.example_scope must be abstract or current-dataset")
+        if not _text(fact.get("formula")).strip().startswith("="):
+            errors.append(f"{item_location}.formula must start with =")
+        if fact.get("example_scope") == "current-dataset":
+            for field in ("source_id", "semantic_intent", "operation_location"):
+                _add(errors, _non_empty(fact.get(field)), f"{item_location}.{field} is required for current-dataset facts")
+            bindings = fact.get("bindings")
+            if not isinstance(bindings, dict) or not (bindings.get("input_field") or bindings.get("input_fields")):
+                errors.append(f"{item_location}.bindings must declare input_field or input_fields")
+
+
 def _validate_learning_units(value: Any, facts: list[dict[str, Any]], errors: list[str]) -> tuple[set[str], dict[str, dict[str, Any]]]:
     if not isinstance(value, list) or not value:
         errors.append("learning_units must be a non-empty list")
@@ -471,6 +510,44 @@ def _validate_learning_units(value: Any, facts: list[dict[str, Any]], errors: li
     return ids, by_id
 
 
+def _validate_fact_evidence_shape(value: Any, location: str, errors: list[str]) -> None:
+    """Validate the transport shape; source agreement belongs to the truth layer."""
+
+    if value is None:
+        return
+    if not isinstance(value, list):
+        errors.append(f"{location} must be a list when present")
+        return
+    for index, evidence in enumerate(value):
+        item_location = f"{location}[{index}]"
+        if not isinstance(evidence, dict):
+            errors.append(f"{item_location} must be an object")
+            continue
+        for field in ("source_id", "evidence_type"):
+            _add(errors, _non_empty(evidence.get(field)), f"{item_location}.{field} is required")
+        if "locator" in evidence and not isinstance(evidence.get("locator"), (str, dict)):
+            errors.append(f"{item_location}.locator must be a string or object when present")
+        if "quote" in evidence:
+            _add(errors, _non_empty(evidence.get("quote")), f"{item_location}.quote must be a non-empty string when present")
+
+
+def _validate_fact_verification(value: Any, location: str, errors: list[str]) -> None:
+    if value is None:
+        return
+    if not isinstance(value, dict):
+        errors.append(f"{location} must be an object when present")
+        return
+    status = value.get("status")
+    if status is not None:
+        _add(errors, status in {"verified", "source-supported", "inferred", "unverified"}, f"{location}.status is invalid")
+    for field in ("method", "verifier", "expected_value", "expected_result", "expression", "derivation_summary", "token_family"):
+        if field in value and not isinstance(value.get(field), (str, int, float, bool, type(None))):
+            errors.append(f"{location}.{field} must be scalar when present")
+    for field in ("key_tokens", "allowed_tokens", "conflict_tokens"):
+        if field in value:
+            _validate_string_list(value.get(field), f"{location}.{field}", errors, allow_empty=True)
+
+
 def _validate_facts(value: Any, slide_ids: set[str], errors: list[str]) -> tuple[list[dict[str, Any]], set[str]]:
     if not isinstance(value, list):
         errors.append("canonical_facts must be a list")
@@ -484,6 +561,10 @@ def _validate_facts(value: Any, slide_ids: set[str], errors: list[str]) -> tuple
             continue
         for field in ("id", "kind", "statement"):
             _add(errors, _non_empty(fact.get(field)), f"{location}.{field} is required")
+        _validate_fact_evidence_shape(fact.get("evidence"), f"{location}.evidence", errors)
+        _validate_fact_verification(fact.get("verification"), f"{location}.verification", errors)
+        if "source_refs" in fact:
+            _validate_string_list(fact.get("source_refs"), f"{location}.source_refs", errors, allow_empty=True)
         fact_id = fact.get("id")
         if isinstance(fact_id, str):
             if fact_id in ids:
@@ -573,9 +654,15 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
         "core_minutes": 0,
         "extension_minutes": 0,
         "planned_slide_minutes": 0,
+        "core_slide_minutes": 0,
+        "extension_slide_minutes": 0,
         "learning_units": 0,
+        "covered_learning_units": 0,
+        "uncovered_learning_units": [],
         "canonical_facts": 0,
         "assets": 0,
+        "extensions": 0,
+        "session_delivery_mode": content.get("session_delivery_mode", "theory-led") if isinstance(content, dict) else "theory-led",
     }
     if not isinstance(content, dict):
         return {"status": "fail", "errors": ["content root must be an object"], "warnings": [], "metrics": metrics}
@@ -583,6 +670,8 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
         "contract_version", "course_title", "chapter_title", "audience", "session_minutes", "prepared_minutes",
         "core_minutes", "extension_minutes", "theme", "course_context", "learning_units", "canonical_facts",
         "assets", "slides",
+        "extensions",
+        "integrity_version", "formula_facts", "session_delivery_mode",
     }
     errors.extend(f"content has unsupported field: {field}" for field in sorted(set(content) - allowed_root))
     _add(errors, content.get("contract_version") == CONTRACT_VERSION, f"contract_version must be {CONTRACT_VERSION}")
@@ -597,11 +686,19 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
     _add(errors, duration_fields.get("session_minutes", 0) > 0, "session_minutes must be positive")
     _add(errors, duration_fields.get("prepared_minutes", 0) >= duration_fields.get("session_minutes", 0), "prepared_minutes must be >= session_minutes")
     _add(errors, duration_fields.get("core_minutes", -1) <= duration_fields.get("prepared_minutes", 0), "core_minutes must be <= prepared_minutes")
+    _add(errors, duration_fields.get("core_minutes", -1) <= duration_fields.get("session_minutes", 0), "core_minutes must be <= session_minutes")
     if duration_fields:
         _add(errors, duration_fields.get("extension_minutes") == duration_fields.get("prepared_minutes", 0) - duration_fields.get("core_minutes", 0), "extension_minutes must equal prepared_minutes - core_minutes")
     metrics.update(duration_fields)
     if "theme" in content:
         _add(errors, _non_empty(content.get("theme")), "theme must be a non-empty string when present")
+    session_delivery_mode = content.get("session_delivery_mode", "theory-led")
+    _add(
+        errors,
+        session_delivery_mode in SESSION_DELIVERY_MODES,
+        f"session_delivery_mode must be one of {sorted(SESSION_DELIVERY_MODES)} when present",
+    )
+    metrics["session_delivery_mode"] = session_delivery_mode
     context = content.get("course_context")
     if context is not None:
         _validate_course_context(context, "course_context", errors)
@@ -610,6 +707,10 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
                 errors.append("course_context.course_name must match course_title")
             if context.get("audience") and context.get("audience") != content.get("audience"):
                 errors.append("course_context.audience must match audience")
+    integrity_version = content.get("integrity_version")
+    if integrity_version is not None and integrity_version != "1.0":
+        errors.append("integrity_version must be 1.0 when present")
+    _validate_formula_fact_shapes(content.get("formula_facts"), "formula_facts", errors)
     slides = content.get("slides")
     _add(errors, isinstance(slides, list) and len(slides) >= 2, "slides must contain at least two pages")
     if not isinstance(slides, list):
@@ -632,7 +733,29 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
     metrics["canonical_facts"] = len(fact_ids)
     asset_ids, _ = _validate_assets(content.get("assets", []), base_dir, errors)
     metrics["assets"] = len(asset_ids)
+    extensions = content.get("extensions", [])
+    extension_ids: set[str] = set()
+    if not isinstance(extensions, list):
+        errors.append("extensions must be a list when present")
+        extensions = []
+    for index, extension in enumerate(extensions):
+        location = f"extensions[{index}]"
+        if not isinstance(extension, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        for field in ("id", "title", "content", "activity", "use_when"):
+            _add(errors, _non_empty(extension.get(field)), f"{location}.{field} is required")
+        extension_id = extension.get("id")
+        if isinstance(extension_id, str):
+            if extension_id in extension_ids:
+                errors.append(f"duplicate extension id: {extension_id}")
+            extension_ids.add(extension_id)
+        minutes = extension.get("minutes")
+        _add(errors, isinstance(minutes, int) and not isinstance(minutes, bool) and minutes > 0, f"{location}.minutes must be a positive integer")
+    metrics["extensions"] = len(extension_ids)
     planned = 0
+    covered_units: set[str] = set()
+    planned_by_track = {"core": 0, "extension": 0}
     for slide_index, slide in enumerate(slides, start=1):
         location = f"slides[{slide_index - 1}]"
         if not isinstance(slide, dict):
@@ -645,6 +768,8 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
         _add(errors, _non_empty(slide.get("title")), f"{location}.title must be a non-empty string")
         layout = slide.get("layout")
         _add(errors, layout in SUPPORTED_LAYOUTS, f"{location}.layout must be one of {sorted(SUPPORTED_LAYOUTS)}")
+        delivery_track = slide.get("delivery_track", "core")
+        _add(errors, delivery_track in DELIVERY_TRACKS, f"{location}.delivery_track must be core or extension when present")
         blocks = slide.get("blocks")
         _add(errors, isinstance(blocks, list) and bool(blocks), f"{location}.blocks must be a non-empty list")
         if isinstance(blocks, list):
@@ -666,6 +791,13 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
         for ref in unit_refs if isinstance(unit_refs, list) else []:
             if ref not in unit_ids:
                 errors.append(f"{location}.learning_unit_ids references unknown unit: {ref}")
+            else:
+                covered_units.add(ref)
+        fact_refs = slide.get("canonical_fact_ids", [])
+        _validate_string_list(fact_refs, f"{location}.canonical_fact_ids", errors, allow_empty=True)
+        for ref in fact_refs if isinstance(fact_refs, list) else []:
+            if ref not in fact_ids:
+                errors.append(f"{location}.canonical_fact_ids references unknown fact: {ref}")
         intent = slide.get("teaching_intent")
         if not isinstance(intent, dict):
             errors.append(f"{location}.teaching_intent must be an object")
@@ -674,21 +806,32 @@ def _validate_normalized(content: dict[str, Any], *, base_dir: Path | None = Non
                 _add(errors, _non_empty(intent.get(field)), f"{location}.teaching_intent.{field} is required")
             if _non_empty(script) and not _intent_overlap(intent, script):
                 warnings.append(f"{location}.teaching_intent should be reconciled with speaker_script")
-        if _non_empty(script) and isinstance(lecture, int) and lecture > 0:
-            minimum = max(120, lecture * 45)
-            actual = _meaningful_length(script)
-            if isinstance(intent, dict):
-                intent_chars = sum(_meaningful_length(_text(intent.get(field))) for field in TEACHING_INTENT_FIELDS)
-                minimum = max(minimum, round(intent_chars * 0.60))
-            if actual < minimum:
-                errors.append(f"{location}.speaker_script has {actual} meaningful chars; minimum for {lecture} lecture minutes is {minimum}")
+        if isinstance(suggested, int) and suggested > 0 and delivery_track in planned_by_track:
+            planned_by_track[delivery_track] += suggested
         for field in ("kicker", "demo_hint", "classroom_followup", "pacing_note"):
             if field in slide:
                 _add(errors, isinstance(slide.get(field), str), f"{location}.{field} must be a string when present")
+        if integrity_version == "1.0":
+            _add(errors, _non_empty(slide.get("planning_rationale")), f"{location}.planning_rationale is required in integrity mode")
+        coverage = slide.get("script_coverage")
+        if coverage is not None:
+            if not isinstance(coverage, dict) or any(not isinstance(key, str) or not _non_empty(value) for key, value in coverage.items()):
+                errors.append(f"{location}.script_coverage must map labels to non-empty excerpts")
     metrics["planned_slide_minutes"] = planned
+    metrics["core_slide_minutes"] = planned_by_track["core"]
+    metrics["extension_slide_minutes"] = planned_by_track["extension"]
+    metrics["covered_learning_units"] = len(covered_units)
+    metrics["uncovered_learning_units"] = sorted(unit_ids - covered_units)
+    if unit_ids - covered_units:
+        errors.append("every learning unit must be covered by at least one slide: " + ", ".join(sorted(unit_ids - covered_units)))
     tolerance = max(1, round(duration_fields.get("prepared_minutes", 0) * 0.10))
-    if abs(planned - duration_fields.get("prepared_minutes", 0)) > tolerance:
-        errors.append(f"slide planned minutes {planned} must match prepared_minutes {duration_fields.get('prepared_minutes')} within ±{tolerance}")
+    prepared_target = duration_fields.get("prepared_minutes", 0)
+    core_target = duration_fields.get("core_minutes", 0)
+    if min(abs(planned - prepared_target), abs(planned - core_target)) > tolerance:
+        errors.append(
+            f"slide planned minutes {planned} must match prepared_minutes {prepared_target} "
+            f"or core_minutes {core_target} within ±{tolerance}"
+        )
     visible = student_visible_text(content)
     for forbidden in STUDENT_FORBIDDEN:
         if forbidden in visible:

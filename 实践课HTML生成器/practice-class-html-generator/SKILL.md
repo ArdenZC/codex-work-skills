@@ -1,71 +1,85 @@
 ---
 name: practice-class-html-generator
-description: 根据已讲理论或 Courseware Content Contract 1.1 生成通用高职实践课 HTML 材料，包含分层任务、理论关联、互动学习中心、动态基础补给站和教师课堂指导；四个学生模块与两个教师模块在模块内使用 pane 导航；不用于 DOCX WorkOrder 或单一课程专用生成。
+description: 根据已讲理论或 Courseware Content Contract 1.1 生成通用高职实践课 HTML 材料，包含分层任务、理论关联、按需互动学习中心、动态基础补给站和教师课堂指导；四个学生模块与两个教师模块在模块内使用 pane 导航；不用于 DOCX WorkOrder 或单一课程专用生成。
 metadata:
-  short-description: 生成达到 Gold 内容密度的理论关联、分层任务和互动学习中心 HTML
+  short-description: 生成理论关联、可执行任务和按需互动学习中心 HTML
 ---
 
 # 实践课 HTML 生成器
 
 ## 目标与边界
 
-用 Agent 创作 `Practice Class Content Contract 1.1`，再由内置 Python renderer 稳定生成一套可在机房/实训课堂使用的 HTML。它适用于编程、数据库、软件建模、人工智能、工具操作、设计分析等课程；不要把 C 语言、数据结构或某一种工具写死在产品概念里。旧 1.0 只作为迁移输入，不作为生成目标。
+Agent 先建立 Practice Blueprint，再创作 `Practice Class Content Contract 1.1`；Python renderer 负责合同、链接、学生/教师隔离、布局、交互和输出 QA。它适用于编程、数据库、软件建模、人工智能、工作表、工具操作和设计分析等课程，不把任何一门课程或工具写成产品分支。旧 1.0 只作为迁移输入，不作为生成目标。
 
-本 Skill 不生成 DOCX，不调用或改写旧 `practice-task-workorder-generator`，不复制其 Phase、Hardening、模板指纹、symlink 防御或复杂事务体系。它只保留合同、理论关联、任务脚手架、HTML 完整性、内部链接和真实互动 QA。
+## 自适应生成流程
 
-## 工作流
+1. **Theory Boundary**：优先读取上游 Courseware Contract 1.1，确认已讲 `slide.id`、`learning_units`、`canonical_facts` 和 `not_yet_taught`；没有上游时明确 `independent` 理论范围。跨模块复用的事实沿用上游 `source_refs`、`evidence` 和 `verification`，不在 Practice 中覆盖其值。
+2. **Practice Blueprint**：先列出学习单元、可练能力、每种活动的 affordance、工具/起点、支架、反馈、覆盖矩阵和不纳入 core 的边界。
+3. **Draft Contract**：只为已确认的可观察结果选择任务、starter、学习资料和互动；任务层级、互动数量和学习中心是否存在都由课程证据决定，不能套用固定配额。
+4. **Evidence Gates**：新生成先对上游 Courseware 执行 strict Source Truth 和 Time Evidence；Courseware 时间证据失败时 Practice 为 `NOT_RUN`。Core task 可提供可选 `time_breakdown`，用步骤分钟解释 `estimated_minutes`；缺少时是轻量 warning，明显总和不匹配才失败。历史 fixture 仅在显式 `migration-trust` 下回归。
+5. **Structural Validation**：运行 `practice_contract.py`，检查理论回链、任务完整性、起点文件、编辑空位、工具环境、学生答案隔离和教师参考。
+6. **Pedagogical Review**：运行 `practice_pedagogical_review.py`，分别给课程结构、难度支架、自然形式选择、教师脚本/桥接、任务价值和自助支持提供证据与发现，并纳入时间/事实证据；数量只作描述，不得加分。
+7. **Automatic Contract Repair**：允许 `scripts/repair_practice.py` 最多两轮，从既有 Courseware/Practice 合同推导缺失的语义链接、starter 引用、操作语义和教师回链；禁止新增任务、互动或学生答案，禁止把 teacher replacement 泄露到 starter。修复后必须重新跑事实/时间/合同/教学审查。
+8. **Revalidation → Render → Browser QA**：所有 strict gates 通过后再生成四个学生模块、两个教师模块，最后在真实浏览器检查 `file://`、pane/hash、链接、反馈和多个桌面宽度。
+9. **Final Package**：保留 Agent 草稿、最终合同、repair report、QA 和公开决策摘要；学生包只包含安全 starter，不含教师答案、replacement 元数据、canonical facts 或时间规划字段。
 
-1. 先读取用户资料；有 Courseware Contract 1.1 时优先使用 `--courseware-json`，把已讲 `slide.id`、`learning_units` 和 `canonical_facts` 作为理论范围。旧 1.0 由上游迁移后再消费。
-2. 先按 [内容质量 Gold Benchmark](references/content-quality-gold-benchmark.md) 做教学设计审查，再创作 Practice Class Contract 1.1。不要把 Gold Sample 中的课程知识或历史提交要求照搬到新课程。
-3. 知识链接和每个任务都写 `source_slide_ids`，任务写 `core / optional / challenge`、具体步骤、验收、帮助和预计时间，互动写明服务的知识点/任务。结构校验只要求合法的非空最小集合；90 分钟实践的 Gold 目标通常是 7—12 个小任务、约 5 个 core、1 个 optional 和 1 个 challenge，具体数量按课程时长和内容颗粒度判断，质量校验以 warning 给出建议而不是把数量写死。
-4. 编程 core 提供完整框架和 2—8 个真实需要学生修改的关键空位；TODO 不能只是解释正确代码。SQL、建模和工具 core 提供等价的可编辑起点、操作脚手架和结果验收。
-5. 学习中心按课程需要设计互动 pane，90 分钟 Gold 目标通常为 5—8 个实验区、至少 4 种有教学目的的互动形式，并包含动态过程、诊断/Debug、连续多题或场景挑战。互动数量本身不是质量证明：至少两处应有状态变化或多步推进，至少一处应连续处理多个诊断案例；参数变化、状态变化和检查动作都要立即反馈，并且反馈要能把学生带回具体任务。学习指南通常有 6—10 个任务关联小节，foundation kit 通常有 5—10 个课程动态微专题；短课或窄主题可以更少，但必须保留自助路径。
-6. 运行 `scripts/render_practice.py`，生成四个学生模块页、两个教师模块页；每个模块页在同一 HTML 内用 pane 承载合同数组内容，只显示一个活动 pane。输出同时包含合同副本、QA 报告和位于 `student/starter/` 的可选 starter。离线包是一个可导航的小型站点，不是把内容拆成大量详情 HTML。
-7. 运行 `scripts/validate_practice.py`，再用真实浏览器在 1366、1440 和 1920 宽度检查 `file://`、六个模块页、pane hash 导航和每一类内容相关互动。
+## Practice Blueprint 最小字段
 
-## 输入模式
+```json
+{
+  "blueprint_version": "1.0",
+  "practice_goal": "学生完成后能产生的可观察结果",
+  "duration_minutes": 90,
+  "available_learning_units": [{"id": "unit-1", "title": "已讲单元"}],
+  "practiceable_abilities": ["观察", "编辑", "解释"],
+  "forbidden_not_yet_taught": ["本节不纳入 core 的边界"],
+  "activity_affordances": [{"ability": "编辑", "observable_output": "可运行或可核对结果", "feedback": "即时检查方式"}],
+  "task_plan": [{"result": "结果", "modality": "由课程选择", "starter_need": "需要/不需要及原因"}],
+  "scaffold_strategy": ["基础生起点和卡住时的下一步"],
+  "tool_workflow": ["工具起始状态、操作、预期可见结果"],
+  "support_strategy": ["study guide、starter、帮助和教师介入"],
+  "assessment_strategy": ["完成/运行/操作/解释的核对证据"],
+  "coverage_matrix": [{
+    "ability": "编辑",
+    "learning_unit": "unit-1",
+    "canonical_facts": ["fact-1"],
+    "allowed_depth": "本次允许深度",
+    "suitable_modality": "为什么选这个形式",
+    "starter_need": "起点需求",
+    "scaffold": "支架和求助路径"
+  }]
+}
+```
 
-- Courseware 联动（首选）：Practice JSON + Courseware Content Contract 1.1；知识点和任务的所有 `source_slide_ids` 必须真实存在且集合一致，`learning_unit_ids`/`canonical_fact_ids` 必须覆盖对应理论语义，core task 必须能追溯到已讲知识点。
-- 课件/原始资料：以课件合同为理论边界，教材或讲义只补充操作说明，不扩大 core 范围。
-- 独立资料：没有课件时先在 Practice Contract 的 `source_courseware.mode` 标为 `independent`，明确本次理论范围后再设计任务。
+coverage matrix 是设计约束，不是数量排行榜。`challenge` 可以为零；五个 core、两个 optional、没有 Learning Center，若 starter、study guide、参考成果和验收足够，都是合法形态。Learning Center 只在有即时反馈、状态变化、连续诊断、多步操作或场景判断等真实 affordance 时出现。
 
-## 输出
+## 任务语义完整性
 
-输出目录至少包含：
+- `implementation`/`code_editing`：提供真实 starter、可编辑空位或明确 edit target、验收和帮助；学生起点不含完整 replacement。
+- `debugging`/`diagnosis`：写明 symptom、faulty artifact、expected behavior、diagnosis target、repair target 和验收。
+- `modeling`/`model_editing`：提供可编辑模型、required edit、modeling constraints 和参考成果。
+- `tooling`/`tool_operation`：写明 tool、starting state、具体 operations 和 expected observable result。
+- `experiment`：写明 variable、control、operation、observation 和 expected reasoning。
 
-- `student/student-task.html`：任务路线模块；在同一页内用 pane 承载核心必做 / 有余力 / 提高挑战任务；
-- `student/learning-center.html`：学习中心模块；在同一页内用 pane 承载互动实验；
-- `student/study-guide.html`：学习指南模块；在同一页内用 pane 承载知识小节；
-- `student/foundation-kit.html`：基础补给模块；在同一页内用 pane 承载课程动态微专题；没有补给时保留清晰的空状态；
-- `teacher/teacher-guide.html`：教师课堂模块；在同一页内用 pane 承载理论桥接、节奏、抽查、错误和调节，不放答案倾倒；
-- `teacher/teacher-reference.html`：教师参考模块；在同一页内用 pane 承载逐任务参考答案和可接受成果；
-- `practice-content.json`、`qa-report.json`；
-- 合同有 `starter_assets` 时的 `student/starter/`。
+不同课程可以选择不同能力组合；不要因为模板熟悉而强加代码 starter、固定互动族或统一提交物。默认验收是完成、运行/操作正确、能解释关键判断，除非用户明确要求，不加截图、报告或收走产物。
 
-模块页的导航卡只承担路线选择，pane 内聚焦一个任务、知识点、互动或教师观察对象；正文保持可读的单列宽度，并提供返回目录、上一项、下一项、标题、预计时间和帮助入口。hash 导航和 `data-pane` 状态保证同一时间只有一个 pane 可见。学生页面只能在 `student/` 内导航，学生可见文字不得暴露合同版本、原始 task/slide/interaction ID 或教师路径；教师页面可以链接回学生页面。若上游 Courseware Contract 声明 `course_context`，必须保留语言、工具、平台、软件、数据库方言、框架和其他约束。
+## 输出与 QA
 
-`starter_assets` 必须成为学生可实际取得的相对路径文件入口；纯文本起点可以提供页面内预览，但 draw.io 或其他二进制/可编辑文件不能把原始 XML、压缩内容或内部序列化数据倾倒到学生页面。教师参考必须给出可直接拿来核对的完整成果：编程函数要包含关键 TODO 的逐项答案，SQL 要包含完整可运行查询、预期结果、解释、等价写法和常见错误，建模/工具任务要有可见参考模型或等价操作结果。
-
-实践课 HTML 是普通滚动网页，不套 Courseware 的全屏翻页 runtime。交互只为具体任务服务：按钮应反馈预测/匹配/步骤状态，不做装饰动画。
-
-## QA
-
-脚本检查合同结构、Gold 密度建议、source slide 存在性、core 关联、任务时长、上下文继承、真实 starter 空位、非编程起点、互动关联、renderer family、终止状态、逐任务教师参考、学生/教师输出隔离、学生可见信息、HTML 完整性、pane/hash 内部链接和六个主页面。浏览器 smoke 还要检查所有模块页在多个桌面宽度无横向溢出，状态/诊断/比较互动是否真的改变画面并给出反馈，且每个互动族都有真实可操作控件。它不会把通过脚本当成内容验收；最终仍要把三套真实 HTML 与 Gold Sample 并排审阅，确认任务颗粒度、互动深度、学习资料密度、基础补给、自助路径和课堂节奏达到 Gold。**自动化 PASS 不代表内容验收通过，等待真实 HTML 内容验收。**
-
-## 命令
+输出四个学生模块 `student/student-task.html`、`student/learning-center.html`、`student/study-guide.html`、`student/foundation-kit.html`，两个教师模块 `teacher/teacher-guide.html`、`teacher/teacher-reference.html`，以及合同、QA、学生包和教师包。Learning Center 可以为空；foundation kit 可以为空，但要给出自助路径的质量解释。
 
 ```powershell
-python scripts/render_practice.py `
-  --practice-json examples/data-structures.practice.json `
-  --courseware-json ..\..\HTML课件生成器\courseware-html-generator\examples\data-structures.example.json `
-  --output-dir .\out\data-structures --replace --json
-
-python scripts/validate_practice.py `
-  --practice-json examples/data-structures.practice.json `
-  --courseware-json ..\..\HTML课件生成器\courseware-html-generator\examples\data-structures.example.json `
-  --output-dir .\out\data-structures --json
+python scripts/teaching_blueprint.py --blueprint-json <blueprint.json> --json
+python scripts/repair_practice.py --practice-json <draft.json> --courseware-json <courseware.json> --output-json <repaired.json> --max-rounds 2
+python scripts/render_practice.py --practice-json <repaired.json> --courseware-json <courseware.json> --output-dir <out> --replace --json
+python scripts/validate_practice.py --practice-json <repaired.json> --courseware-json <courseware.json> --output-dir <out> --json
 ```
+
+学生页面不得暴露合同版本、内部 ID、教师参考、replacement 或答案。真实浏览器须检查四个学生页、两个教师页、pane/hash 导航、starter 链接、每类实际存在的互动以及按钮反馈；在 1366、1440 和 1920 宽度确认无横向溢出。自动化 PASS 不等于教师内容验收通过。
 
 ## 适配器
 
-运行 `scripts/install_adapters.py --target-dir <project>` 可写入 namespaced 的 Codex/Claude/Gemini/Copilot/Aider/Cursor/Cline/Continue/Windsurf/OpenCode 规则。默认只写规则；只有显式 `--copy-engine` 才复制 Skill 文件。
+运行 `scripts/install_adapters.py --target-dir <project>` 可写入 namespaced 的 Codex/Claude/Gemini/Copilot/Aider/Cursor/Cline/Continue/Windsurf/OpenCode 规则；只有显式 `--copy-engine` 才复制 Skill 文件。
+
+## G3 正式完整性规则（Skill 1.2.0）
+
+新生成必须先读取 `docs/integrity-contract-v1.md`，遵循 Integrity Contract 1.0；Content Contract 仍为 1.1。使用 strict evidence mode；migration-trust 仅用于历史回归。先验证草稿，再渲染最终内容，不手工修补已生成包。所有行为、资产、公式和规划证据按文档保存，自动评分不得掩盖 DEGRADED 或不可用检查。

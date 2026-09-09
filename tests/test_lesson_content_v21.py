@@ -149,7 +149,7 @@ class LessonContentV21Tests(unittest.TestCase):
         lesson_generator.validate_content_v2_input(payload)
         lesson_generator.validate_content_v2_input(load_fixture("lesson-plan-input.json"))
         report = lesson_content_contract.lesson_content_field_values(payload["lessons"][0], payload)
-        self.assertIn("《软件测试基础》", report["references"])
+        self.assertIn("《软件测试基础·第1版》", report["references"])
         self.assertIn("《软件测试课程标准》", report["references"])
         self.assertNotIn("用户上传：软件测试基础.pdf", report["references"])
 

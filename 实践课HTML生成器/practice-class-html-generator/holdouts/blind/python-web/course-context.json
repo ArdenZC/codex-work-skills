@@ -1,0 +1,23 @@
+{
+  "course_id": "H1-python-web",
+  "course_title": "Python Web 应用基础",
+  "chapter_title": "Flask 基础请求处理",
+  "audience": "高职/大专，已学习变量、if、函数和字典，Python 基础一般",
+  "theory_requirements": {
+    "session_minutes": 120,
+    "prepared_minutes": 120,
+    "description": "本次理论课按 120 分钟准备；课程安排为 2 课时。"
+  },
+  "practice_requirements": {
+    "session_minutes": 120,
+    "description": "本次实践课为 2 课时，在机房完成，使用同一章节理论范围。"
+  },
+  "environment": {
+    "os": "Windows",
+    "editor": "VS Code",
+    "language": "Python",
+    "framework": "Flask",
+    "browser": "桌面版 Chrome 或 Edge"
+  },
+  "source_role": "教师提供的本次章节原始资料与课堂背景"
+}

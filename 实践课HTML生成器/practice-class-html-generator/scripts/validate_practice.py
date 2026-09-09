@@ -13,6 +13,7 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from practice_contract import RENDERER_FAMILIES, load_courseware, load_json, normalize_content, validate_content
+from classroom_integrity import closure
 
 
 STUDENT_PAGES = (Path("student") / "student-task.html", Path("student") / "learning-center.html", Path("student") / "study-guide.html", Path("student") / "foundation-kit.html")
@@ -221,6 +222,24 @@ def _validate_reference_completeness(content: dict[str, Any], errors: list[str])
             errors.append(f"teacher reference for SQL task needs a complete SQL expression: {task_id}")
         if ("model_editing" in capabilities or modality in {"modeling", "modeling-tool", "model-critique"}) and not reference.get("reference_visual") and not reference.get("model_visual") and not re.search(r"(?:→|->|—|1\s*[-—]\s*0\.\.\*|关系|消息)", answer):
             errors.append(f"teacher reference for modeling task needs relation/message structure or reference_visual: {task_id}")
+        if content.get("integrity_version") == "1.0":
+            facts = [fact for fact in content.get("formula_facts", []) if isinstance(fact, dict) and fact.get("task_id") == task_id and fact.get("example_scope") == "current-dataset"]
+            if task.get("artifact_kind") == "workbook" and not facts:
+                errors.append(f"teacher reference for workbook task needs a current-dataset formula fact: {task_id}")
+            for fact in facts:
+                bindings = fact.get("bindings", {}) if isinstance(fact.get("bindings"), dict) else {}
+                fields = [bindings.get("input_field"), *(bindings.get("input_fields") or [])]
+                if not any(str(field) and str(field) in answer for field in fields):
+                    errors.append(f"teacher reference for workbook task must name bound fields: {task_id}")
+                if str(fact.get("formula", "")).replace(" ", "") not in answer.replace(" ", "") and not reference.get("formula_evidence"):
+                    errors.append(f"teacher reference for workbook task must show the verified formula: {task_id}")
+                if not fact.get("operation_location") or (fact.get("expected_result") is None and not reference.get("reference_result")):
+                    errors.append(f"teacher reference for workbook task needs formula location and result: {task_id}")
+            verification = task.get("reference_verification")
+            if isinstance(verification, dict) and any(item.get("verification_type") in {"manual-evidence", "browser"} for item in verification.get("checks", []) if isinstance(item, dict)):
+                for field in ("reference_reasoning", "tool_observation", "environment_boundary"):
+                    if not reference.get(field):
+                        errors.append(f"teacher reference for manual/tool task needs {field}: {task_id}")
 
 
 def _validate_safe_student_package(output_dir: Path, errors: list[str]) -> None:
@@ -265,6 +284,9 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
         if required not in names:
             errors.append(f"missing required output: {required}")
     _validate_safe_student_package(output_dir, errors)
+    package_integrity = closure(content, output_dir / "student" / "starter")
+    if content.get("integrity_version") == "1.0":
+        errors.extend(package_integrity["errors"])
     expected = _expected_html_paths()
     for relative in expected:
         result = validate_html_file(output_dir / relative, output_dir, content=content)
@@ -307,6 +329,10 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
 
     for asset in content.get("starter_assets", []):
         if not isinstance(asset, dict):
+            continue
+        if asset.get('role', 'student-edit') in {'teacher-reference', 'test-only'}:
+            if (output_dir / 'student' / 'starter' / str(asset.get('path', ''))).exists():
+                errors.append('teacher-only starter leaked')
             continue
         target = output_dir / "student" / "starter" / str(asset.get("path", ""))
         if not target.is_file():
@@ -384,7 +410,7 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
                     errors.append(f"state simulator must expose generic state_fields and rounds: {center_id}")
 
     files = sorted(str(path.relative_to(output_dir)).replace("\\", "/") for path in output_dir.rglob("*") if path.is_file())
-    metrics = {"main_html_count": len(actual_html), "page_panes": page_metrics, "starter_links": len(starter_links) if task_probe else 0, "starter_previews": len(starter_previews) if task_probe else 0}
+    metrics = {"main_html_count": len(actual_html), "page_panes": page_metrics, "starter_links": len(starter_links) if task_probe else 0, "starter_previews": len(starter_previews) if task_probe else 0, "classroom_package_integrity": package_integrity}
     return {"status": "pass" if not errors else "fail", "errors": errors, "warnings": warnings, "files": files, "metrics": metrics}
 
 

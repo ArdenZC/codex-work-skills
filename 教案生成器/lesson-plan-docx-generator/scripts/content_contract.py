@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
 
 
@@ -41,6 +41,20 @@ REFERENCE_TYPES = (
 REFERENCE_SOURCE_KINDS = ("provided", "generic", "verified_public")
 PRACTICE_TASK_GRANULARITIES = ("per_lesson", "per_task", "per_project")
 MAX_FILENAME_BYTES = 255
+ONLINE_COURSE_PLATFORM_ONLY = frozenset(
+    {
+        "国家高等教育智慧教育平台",
+        "中国大学MOOC",
+        "学堂在线",
+        "爱课程",
+    }
+)
+CONFIRMED_COURSE_INFO_TEXT_FIELDS = ("course_name", "major", "audience")
+CONFIRMED_COURSE_INFO_HOUR_FIELDS = ("total_hours", "theory_hours", "practice_hours")
+CONFIRMED_COURSE_INFO_FIELDS = CONFIRMED_COURSE_INFO_TEXT_FIELDS + (
+    *CONFIRMED_COURSE_INFO_HOUR_FIELDS,
+    "delivery_mode",
+)
 
 # This is intentionally a small, conservative boundary check.  It catches
 # standalone classroom tools without rejecting document titles that happen to
@@ -62,7 +76,26 @@ REFERENCE_RESOURCE_ONLY_EXACT = frozenset(
         "实训任务单",
         "课堂练习材料",
         "案例数据集",
+        "课程课件",
+        "教学课件",
+        "课堂课件",
+        "课程案例",
+        "教学案例",
+        "案例",
+        "教学资源",
+        "课程资源",
+        "内部教学资源",
     }
+)
+REFERENCE_RESOURCE_ONLY_PATTERN = re.compile(
+    r"^(?:"
+    r"第[一二三四五六七八九十百0-9]+章[^。！？\n]{0,80}pptx?"
+    r"|(?:课程|课堂|教学|内部)(?:教学)?(?:pptx?|课件|资源)"
+    r"|ppt课件"
+    r"|(?:课程|课堂|教学|内部)?案例(?:表|集|数据集|材料|卡片|清单|文件)?"
+    r"|(?:课堂练习材料|实训任务单)"
+    r")$",
+    re.IGNORECASE,
 )
 REFERENCE_PLACEHOLDER_PATTERN = re.compile(
     r"(?:^(?:相关|有关|本课程|课程)(?:的)?(?:公开)?(?:网络)?(?:资料|文献|文档|指南|教材|参考资料|网络资源)$)"
@@ -130,6 +163,86 @@ def _clean(value: Any) -> str:
     return str(value).strip()
 
 
+MECHANICAL_TOPIC_PAREN_SUFFIX_PATTERN = re.compile(
+    r"\s*[（(]\s*(?:聚焦(?:于)?|围绕|针对)\s*(?:[:：])?\s*[^（）()]*[）)]\s*$"
+)
+MECHANICAL_TOPIC_TAIL_SUFFIX_PATTERN = re.compile(
+    r"(?:[。！？；;]\s*|\s+)(?:聚焦(?:于)?|围绕|针对)\s*[:：]\s*[^。！？；;\n]+$"
+)
+MECHANICAL_TOPIC_ONLY_PATTERN = re.compile(
+    r"^(?:聚焦(?:于)?|围绕|针对)\s*[:：]\s*.+$"
+)
+
+
+def strip_mechanical_topic_suffix(value: Any) -> str:
+    """Remove QA-oriented topic tails without rewriting ordinary prose."""
+
+    text = _clean(value)
+    previous = None
+    while text and text != previous:
+        previous = text
+        text = MECHANICAL_TOPIC_PAREN_SUFFIX_PATTERN.sub("", text).strip()
+        text = MECHANICAL_TOPIC_TAIL_SUFFIX_PATTERN.sub("", text).strip()
+    if MECHANICAL_TOPIC_ONLY_PATTERN.fullmatch(text):
+        return ""
+    return text
+
+
+def confirmed_course_info_errors(data: dict[str, Any]) -> list[str]:
+    """Check that the optional intake snapshot and normalized contract agree."""
+
+    snapshot = data.get("confirmed_course_info")
+    if snapshot is None:
+        return []
+    if not isinstance(snapshot, dict):
+        return ["confirmed_course_info must be an object"]
+
+    errors: list[str] = []
+    for field_name in CONFIRMED_COURSE_INFO_TEXT_FIELDS:
+        if field_name not in snapshot:
+            errors.append(f"confirmed_course_info.{field_name} is required")
+        elif data.get(field_name) != snapshot[field_name]:
+            errors.append(
+                f"{field_name} must equal the user-confirmed value in confirmed_course_info"
+            )
+
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
+
+    def same_number(left: Any, right: Any) -> bool:
+        try:
+            return Decimal(str(left)) == Decimal(str(right))
+        except (InvalidOperation, TypeError, ValueError):
+            return left == right
+
+    numeric_sources = {
+        "total_hours": data.get("total_hours"),
+        "theory_hours": plan.get("theory_hours"),
+        "practice_hours": plan.get("practice_hours"),
+    }
+    for field_name in CONFIRMED_COURSE_INFO_HOUR_FIELDS:
+        if field_name not in snapshot:
+            errors.append(f"confirmed_course_info.{field_name} is required")
+        elif not same_number(numeric_sources[field_name], snapshot[field_name]):
+            errors.append(
+                f"{field_name} must equal the user-confirmed value in confirmed_course_info"
+            )
+    if "delivery_mode" not in snapshot:
+        errors.append("confirmed_course_info.delivery_mode is required")
+    elif plan.get("mode") != snapshot["delivery_mode"]:
+        errors.append("delivery_plan.mode must equal confirmed_course_info.delivery_mode")
+    return errors
+
+
+def course_info_values(data: dict[str, Any]) -> dict[str, Any]:
+    """Return frozen intake values when present, falling back to compatible inputs."""
+
+    snapshot = data.get("confirmed_course_info")
+    return {
+        field_name: snapshot[field_name] if isinstance(snapshot, dict) and field_name in snapshot else data[field_name]
+        for field_name in ("course_name", "major", "audience")
+    }
+
+
 def safe_name(text: str) -> str:
     """Make a deterministic filesystem-safe lesson filename component."""
 
@@ -159,7 +272,8 @@ def lesson_filename(seq: int, unit: str, task: str) -> str:
 def format_numbered_list(items: Iterable[Any]) -> str:
     """Number existing list items without adding or removing their meaning."""
 
-    values = [_clean(item) for item in items if _clean(item)]
+    values = [strip_mechanical_topic_suffix(item) for item in items]
+    values = [value for value in values if value]
     return "\n".join(f"{index}. {value}" for index, value in enumerate(values, 1))
 
 
@@ -184,12 +298,12 @@ def reference_identity(reference: dict[str, Any]) -> str:
 
 
 def reference_looks_like_resource_only(text: Any) -> bool:
-    """Return true only for an unmistakable standalone teaching resource."""
+    """Return true for an unmistakable standalone teaching resource."""
 
     normalized = unicodedata.normalize("NFKC", str(text))
     normalized = re.sub(r"\s+", "", normalized).strip().casefold()
-    normalized = "".join(char for char in normalized if not unicodedata.category(char).startswith("P"))
-    return normalized in REFERENCE_RESOURCE_ONLY_EXACT
+    compact = "".join(char for char in normalized if not unicodedata.category(char).startswith("P"))
+    return compact in REFERENCE_RESOURCE_ONLY_EXACT or bool(REFERENCE_RESOURCE_ONLY_PATTERN.fullmatch(compact))
 
 
 def reference_looks_like_placeholder(text: Any) -> bool:
@@ -212,16 +326,73 @@ def format_reference(reference: dict[str, Any]) -> str:
     title = _clean(reference.get("title", ""))
     title = re.sub(r"^[《<【\[]|[》>】\]]$", "", title)
     reference_type = reference.get("reference_type")
-    if reference_type in {"official_manual", "official_documentation", "paper"}:
-        title_text = title
+    institution = _clean(reference.get("institution", ""))
+    edition = _clean(reference.get("edition", ""))
+    publisher = _clean(reference.get("publisher", ""))
+    year = _clean(reference.get("year", ""))
+    if edition and edition not in title:
+        if title.endswith(("）", ")")) and ("（" in title or "(" in title):
+            title = f"{title[:-1]}·{edition}{title[-1]}"
+        else:
+            title = f"{title}·{edition}" if title else edition
+
+    course_label = False
+    if reference_type == "formal_course_document":
+        if institution and institution not in author_text:
+            author_text = f"{author_text}（{institution}）" if author_text else institution
+        course_label = bool(title and not re.search(r"课程$", title))
+
+    # For an official online/manual source, an organization entered as the
+    # publisher is the visible authority, not a technical trailing field.
+    if reference_type in {"official_manual", "official_documentation"} and not author_text and publisher:
+        author_text, publisher = publisher, ""
+    title_text = f"《{title}》" if title else ""
+    if course_label:
+        title_text = f"{title_text}课程"
+    core = f"{author_text}：{title_text}" if author_text and title_text else author_text or title_text
+    tail = [value for value in (publisher, year) if value]
+    citation = "，".join([core, *tail]) if core and tail else core or "，".join(tail)
+    return f"{citation}。" if citation else ""
+
+
+def reference_metadata_errors(reference: dict[str, Any], prefix: str = "reference") -> list[str]:
+    """Require visible bibliographic responsibility for typed 2.2 sources."""
+
+    reference_type = reference.get("reference_type")
+    authors = reference.get("authors", [])
+    if isinstance(authors, (list, tuple)):
+        author_values = [_clean(value) for value in authors if _clean(value)]
     else:
-        title_text = f"《{title}》" if title else ""
-    parts = [value for value in (author_text, title_text) if value]
-    for field_name in ("edition", "publisher"):
-        value = _clean(reference.get(field_name, ""))
-        if value:
-            parts.append(value)
-    return "，".join(parts)
+        author_values = [_clean(authors)] if _clean(authors) else []
+    publisher = _clean(reference.get("publisher", ""))
+    institution = _clean(reference.get("institution", ""))
+    year = _clean(reference.get("year", ""))
+    errors: list[str] = []
+
+    if reference_type == "book":
+        if not author_values:
+            errors.append(f"{prefix}.authors must preserve the real book author or editor")
+        if not publisher:
+            errors.append(f"{prefix}.publisher is required for a book")
+        if not year:
+            errors.append(f"{prefix}.year is required for a book")
+    elif reference_type == "formal_course_document":
+        if not author_values:
+            errors.append(f"{prefix}.authors must preserve the course responsible teacher or team")
+        elif all(value in ONLINE_COURSE_PLATFORM_ONLY for value in author_values):
+            errors.append(
+                f"{prefix}.authors must name a real course responsible teacher/team, not only the hosting platform"
+            )
+        if not institution:
+            errors.append(f"{prefix}.institution must preserve the offering university or institution")
+        if not publisher:
+            errors.append(f"{prefix}.publisher must preserve the course platform or publisher")
+    elif reference_type == "paper" and not author_values:
+        errors.append(f"{prefix}.authors must preserve the real paper author or team")
+    elif reference_type in {"standard", "official_manual", "official_documentation", "guideline"}:
+        if not author_values and not publisher:
+            errors.append(f"{prefix} must preserve a responsible organization or publisher")
+    return errors
 
 
 def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> list[dict[str, Any]]:
@@ -282,11 +453,11 @@ def format_implementation_stage(stage: dict[str, Any]) -> dict[int, str]:
     minutes = Decimal(str(stage["minutes"]))
     minutes_text = str(int(minutes)) if minutes == minutes.to_integral_value() else format(minutes, "f")
     return {
-        0: f"{_clean(stage['label'])}\n{minutes_text}min\n{_clean(stage['modality'])}",
+        0: f"{strip_mechanical_topic_suffix(stage['label'])}\n{minutes_text}min\n{strip_mechanical_topic_suffix(stage['modality'])}",
         1: format_numbered_list(stage["content"]),
         2: format_numbered_list(stage["teacher_actions"]),
         3: format_numbered_list(stage["student_actions"]),
-        4: _clean(stage["objective"]),
+        4: strip_mechanical_topic_suffix(stage["objective"]),
     }
 
 
@@ -296,9 +467,9 @@ def format_implementation(implementation: Iterable[dict[str, Any]]) -> list[dict
 
 def format_reflection(reflection: dict[str, Any]) -> list[str]:
     return [
-        _clean(reflection["summary"]),
-        _clean(reflection["innovation"]),
-        _clean(reflection["improvement"]),
+        strip_mechanical_topic_suffix(reflection["summary"]),
+        strip_mechanical_topic_suffix(reflection["innovation"]),
+        strip_mechanical_topic_suffix(reflection["improvement"]),
     ]
 
 
@@ -323,10 +494,11 @@ def lesson_content_field_values(
 
 
 def lesson_header_values(data: dict[str, Any], lesson: dict[str, Any]) -> dict[str, str]:
+    course_info = course_info_values(data)
     return {
-        "course_name": _clean(data["course_name"]),
-        "major": _clean(data["major"]),
-        "audience": _clean(data["audience"]),
+        "course_name": _clean(course_info["course_name"]),
+        "major": _clean(course_info["major"]),
+        "audience": _clean(course_info["audience"]),
         "unit": _clean(lesson["unit"]),
         "task": _clean(lesson["task"]),
         "hours": _clean(lesson["hours"]),
@@ -344,9 +516,10 @@ def format_evaluation_values(lesson: dict[str, Any], scores: Iterable[Any]) -> l
             if score_decimal == score_decimal.to_integral_value()
             else format(score_decimal, "f")
         )
-        values.append({2: score_text, 3: _clean(remarks[criterion_id])})
+        values.append({2: score_text, 3: strip_mechanical_topic_suffix(remarks[criterion_id])})
     return values
 
 
 def format_title(sequence: int, data: dict[str, Any], lesson: dict[str, Any]) -> str:
-    return f"{sequence} 《{_clean(data['course_name'])}》教学单元设计：{_clean(lesson['task'])}"
+    course_info = course_info_values(data)
+    return f"{sequence} 《{_clean(course_info['course_name'])}》教学单元设计：{_clean(lesson['task'])}"

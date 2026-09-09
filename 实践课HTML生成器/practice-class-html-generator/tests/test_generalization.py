@@ -27,7 +27,10 @@ class GeneralizationHoldoutTests(unittest.TestCase):
             courseware = load_json(courseware_path)
             practice = load_json(practice_path)
             courseware_report = content_contract.validate_content(courseware, base_dir=courseware_path.parent)
-            practice_report = validate_content(practice, courseware)
+            # These frozen architecture-pair fixtures predate the G1
+            # modality-specific fields.  Keep their structural regression
+            # check while the current generator path uses the strict default.
+            practice_report = validate_content(practice, courseware, enforce_task_semantics=False)
             self.assertEqual(courseware_report["status"], "pass", entry["id"])
             self.assertEqual(practice_report["status"], "pass", entry["id"])
             slide_ids = {slide["id"] for slide in courseware["slides"]}

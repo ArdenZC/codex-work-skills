@@ -1,0 +1,35 @@
+{
+  "status": "frozen-before-generation",
+  "frozen_at": "2026-09-07T22:45:33+08:00",
+  "source_purpose": "Blind Teaching Generalization Test raw source packs for H1 Python Web, H2 Excel/Data Processing, and H3 Computer Networking",
+  "holdouts": [
+    {
+      "id": "H1-python-web",
+      "relative_dir": "python-web",
+      "files": [
+        {"relative_path": "python-web/README.md", "sha256": "0858a5751b3b66cda4e285cf02ce96f6c287b87338ab583389e807449d717a14"},
+        {"relative_path": "python-web/course-context.json", "sha256": "96eceb9a853aa5d53e2bfec3162e9c9d21d211766dc781da73e9b2e92ecee3f8"},
+        {"relative_path": "python-web/source.md", "sha256": "c465d0af2de5d8bc0b07078115c1c08584afe33f5a67a7174e6876f49e4b585f"}
+      ]
+    },
+    {
+      "id": "H2-spreadsheet",
+      "relative_dir": "spreadsheet",
+      "files": [
+        {"relative_path": "spreadsheet/README.md", "sha256": "6a4cf1cffd0ac78c1be8ed2ad2b01ee3142279c9665695a629beeba93186249d"},
+        {"relative_path": "spreadsheet/course-context.json", "sha256": "5d23f1aa180a083be85090246815324de285575a9f1ba71608ef310313418faa"},
+        {"relative_path": "spreadsheet/source.md", "sha256": "47aca80e6e8847e397aee875634e64e11725a018f01d457469d25f913f303d85"},
+        {"relative_path": "spreadsheet/starter-data/sales-records.csv", "sha256": "cc358e982b88e13fb471e4ce21710ed563b06034e18291f0dd7c1fb87a0d7cd7"}
+      ]
+    },
+    {
+      "id": "H3-networking",
+      "relative_dir": "networking",
+      "files": [
+        {"relative_path": "networking/README.md", "sha256": "01f0f160db068c9ed7eed2d1d743c199be589e6033acb864a1e6a92bdcbad1f4"},
+        {"relative_path": "networking/course-context.json", "sha256": "c9c9d4766b9fbb5277e32a8cb5ce6e1a8fbadb21be5714d05f114dbe2c871c5e"},
+        {"relative_path": "networking/source.md", "sha256": "acc859e18b6a535fb7297c201ca53ece3c9de34e98e6b4f91fa317e361eabe43"}
+      ]
+    }
+  ]
+}

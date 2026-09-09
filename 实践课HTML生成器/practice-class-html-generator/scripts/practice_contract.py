@@ -58,8 +58,10 @@ CAPABILITIES = {
     "explanation",
     "comparison",
     "scenario_reasoning",
+    "tool_operation",
+    "experiment",
 }
-ARTIFACT_KINDS = {"source-code", "query", "model", "document", "workbook", "diagram", "scenario", "result", "mixed"}
+ARTIFACT_KINDS = {"source-code", "query", "model", "document", "workbook", "diagram", "scenario", "result", "mixed", "project"}
 VISUALIZATION_KINDS = {
     "sequence-range",
     "timeline",
@@ -84,7 +86,10 @@ REFERENCE_VISUAL_KINDS = {
 # are emitted as recommendations below so short workshops and unusual course
 # modalities are not rejected merely for having a different shape.
 MIN_TASKS = 1
-MIN_CENTER_ZONES = 1
+# A Learning Center is an optional modality.  A practice route can be fully
+# teachable with core starter assets plus the study guide; interaction zones
+# are selected by affordance, not by a quota.
+MIN_CENTER_ZONES = 0
 MIN_GUIDE_SECTIONS = 1
 MIN_KIT_TOPICS = 0
 MIN_TASK_STEPS = 1
@@ -112,6 +117,7 @@ CONTEXT_STRING_FIELDS = {
     "software",
     "database_dialect",
     "framework",
+    "delivery_environment",
 }
 CONTEXT_LIST_FIELDS = {"tools", "other_constraints"}
 CONTEXT_FIELDS = CONTEXT_STRING_FIELDS | CONTEXT_LIST_FIELDS
@@ -144,6 +150,42 @@ def _legacy_capabilities(task: dict[str, Any]) -> tuple[str, str, list[str], str
     if "tool" in modality:
         return "tooling", "document", ["file_editing", "explanation"], "B"
     return "mixed", "mixed", ["explanation"], "B"
+
+
+def _legacy_task_semantics(task: dict[str, Any], kind: str, artifact: str, capabilities: list[str]) -> None:
+    """Populate the new task-kind fields only when migrating a 1.0 contract.
+
+    These values are derived from the legacy task itself; they are not a course
+    template and are never used to author a new 1.1 task.
+    """
+
+    overview = _text(task.get("overview")) or _text(task.get("title"))
+    scaffold = _text(task.get("scaffold")) or overview
+    steps = [item.get("instruction") for item in _list(task.get("steps")) if isinstance(item, dict) and _non_empty(item.get("instruction"))]
+    acceptance = [str(item) for item in _list(task.get("acceptance")) if _non_empty(item)]
+    if kind == "implementation" or "code_editing" in capabilities:
+        task.setdefault("edit_targets", [f"按任务要求修改 starter 中的关键空位：{overview}"])
+    if kind == "debugging" or "diagnosis" in capabilities:
+        task.setdefault("symptom", f"观察现象：{overview}")
+        task.setdefault("faulty_artifact", _text(task.get("starter_asset_ids")) or "任务提供的可观察起点")
+        task.setdefault("expected_behavior", acceptance[0] if acceptance else "结果应与已讲理论规则一致。")
+        task.setdefault("diagnosis_target", "把可观察现象对应到一个可检查的理论或操作原因。")
+        task.setdefault("repair_target", "修改造成该现象的关键位置，并用验收条件复核。")
+    if kind == "modeling" or "model_editing" in capabilities:
+        task.setdefault("editable_model", scaffold)
+        task.setdefault("required_edit", overview)
+        task.setdefault("modeling_constraints", acceptance or ["只修改本任务明确的对象、关系或属性。"])
+    if kind == "tooling" or "tool_operation" in capabilities:
+        task.setdefault("tool", "课程声明的工具环境")
+        task.setdefault("starting_state", scaffold)
+        task.setdefault("operations", steps or ["按任务步骤完成一次可观察操作。"])
+        task.setdefault("expected_observable_result", acceptance[0] if acceptance else "记录一个可复核的操作结果。")
+    if kind == "experiment" or "experiment" in capabilities:
+        task.setdefault("variable", "任务要求观察的变量或条件")
+        task.setdefault("control", "保持其他条件不变")
+        task.setdefault("operation", steps or ["改变一个条件并执行观察。"])
+        task.setdefault("observation", acceptance or ["记录改变条件前后的可见差异。"])
+        task.setdefault("expected_reasoning", overview)
 
 
 def _courseware_semantics(courseware: dict[str, Any] | None) -> tuple[dict[str, set[str]], dict[str, set[str]], dict[str, dict[str, Any]]]:
@@ -205,6 +247,7 @@ def normalize_content(content: Any, courseware: dict[str, Any] | None = None) ->
             task.setdefault("artifact_kind", artifact)
             task.setdefault("capabilities", capabilities)
             task.setdefault("scaffold_level", scaffold_level)
+            _legacy_task_semantics(task, kind, artifact, capabilities)
             _normalize_item_links(task, slide_units, fact_by_id)
         for collection_name in ("learning_center", "study_guide", "foundation_kit"):
             for item in normalized.get(collection_name, []):
@@ -276,6 +319,59 @@ def _required_strings(item: Any, fields: tuple[str, ...], location: str, errors:
     for field in fields:
         if not _non_empty(item.get(field)):
             errors.append(f"{location}.{field} must be a non-empty string")
+
+
+def _required_string_list(item: Any, field: str, location: str, errors: list[str]) -> None:
+    values = item.get(field) if isinstance(item, dict) else None
+    if not isinstance(values, list) or not values or any(not _non_empty(value) for value in values):
+        errors.append(f"{location}.{field} must be a non-empty string list")
+
+
+def _validate_time_breakdown(value: Any, location: str, errors: list[str]) -> None:
+    """Validate optional, human-authored time evidence without requiring it."""
+
+    if value is None:
+        return
+    if not isinstance(value, list) or not value:
+        errors.append(f"{location} must be a non-empty list when present")
+        return
+    for index, item in enumerate(value):
+        item_location = f"{location}[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{item_location} must be an object")
+            continue
+        if not _non_empty(item.get("step")):
+            errors.append(f"{item_location}.step must be a non-empty string")
+        minutes = item.get("minutes")
+        if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes <= 0:
+            errors.append(f"{item_location}.minutes must be a positive integer")
+
+
+def _required_task_semantics(task: dict[str, Any], location: str, task_kind: Any, capabilities: list[str], errors: list[str]) -> None:
+    """Apply modality-specific completeness rules to new 1.1 tasks."""
+
+    code_task = task_kind == "implementation" or "code_editing" in capabilities
+    debug_task = task_kind == "debugging" or "diagnosis" in capabilities
+    model_task = task_kind == "modeling" or "model_editing" in capabilities
+    tool_task = task_kind == "tooling" or "tool_operation" in capabilities
+    experiment_task = task_kind == "experiment" or "experiment" in capabilities
+    if code_task:
+        values = task.get("starter_asset_ids")
+        if not isinstance(values, list) or not values:
+            errors.append(f"{location}.starter_asset_ids is required for implementation/code_editing tasks")
+        _required_string_list(task, "edit_targets", location, errors)
+    if debug_task:
+        _required_strings(task, ("symptom", "faulty_artifact", "expected_behavior", "diagnosis_target", "repair_target"), location, errors)
+    if model_task:
+        _required_strings(task, ("editable_model", "required_edit"), location, errors)
+        _required_string_list(task, "modeling_constraints", location, errors)
+    if tool_task:
+        _required_strings(task, ("tool", "starting_state", "expected_observable_result"), location, errors)
+        _required_string_list(task, "operations", location, errors)
+    if experiment_task:
+        _required_strings(task, ("variable", "control", "expected_reasoning"), location, errors)
+        _required_string_list(task, "operation", location, errors)
+        _required_string_list(task, "observation", location, errors)
 
 
 def _check_id_refs(
@@ -772,7 +868,9 @@ def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[s
         if not isinstance(gap, dict):
             errors.append(f"{gap_location} must be an object")
             continue
-        _required_strings(gap, ("marker", "replacement", "student_instruction", "kind"), gap_location, errors)
+        patch_kind = gap.get("patch_kind", "replace-expression")
+        required_gap_fields = ("replacement", "student_instruction", "kind") if patch_kind == "add-file" else ("marker", "replacement", "student_instruction", "kind")
+        _required_strings(gap, required_gap_fields, gap_location, errors)
         marker = gap.get("marker")
         replacement = gap.get("replacement")
         if not isinstance(marker, str) or not marker.strip():
@@ -781,19 +879,18 @@ def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[s
             errors.append(f"{gap_location}.marker is duplicated")
         seen.add(marker)
         positions = [index for index, line in enumerate(content.splitlines()) if marker in line]
-        if not positions:
+        if not positions and gap.get('patch_kind') != 'add-file':
             errors.append(f"{gap_location}.marker is not present in starter content")
             continue
         if not isinstance(replacement, str) or not replacement.strip():
             continue
         lines = content.splitlines()
-        # The marker line is the actionable student surface.  Inspect that
-        # line (including an inline comment) rather than adjacent source
-        # lines: adjacent SQL bounds may legitimately contain each other's
-        # target literal while still keeping the teacher replacement hidden.
-        marker_line = lines[positions[0]]
-        if replacement.casefold() in marker_line.casefold():
-            errors.append(f"{gap_location}.replacement leaks into the student marker line")
+        # The marker line is the actionable student surface, but a complete
+        # replacement must not be present anywhere in the student starter.
+        # Checking the full content closes the leak when an answer is copied to
+        # a nearby comment or a second line instead of the marker line.
+        if replacement.casefold() in content.casefold():
+            errors.append(f"{gap_location}.replacement leaks into the student starter")
         target = gap.get("target")
         if target is not None and (not isinstance(target, str) or not target):
             errors.append(f"{gap_location}.target must be a non-empty string when present")
@@ -805,7 +902,165 @@ def _validate_editable_gaps(asset: dict[str, Any], location: str, errors: list[s
     return len(gaps)
 
 
-def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> dict[str, Any]:
+REFERENCE_TYPES = {
+    "syntax",
+    "command",
+    "function-call",
+    "web-request",
+    "file-output",
+    "query-result",
+    "structured-data",
+    "browser",
+    "manual-evidence",
+}
+INTEGRITY_ROLES = {"student-edit", "student-input", "runtime-required", "generated-scaffold", "teacher-reference", "test-only"}
+PUBLIC_ASSET_ROLES = {"student-edit", "student-input", "runtime-required", "generated-scaffold"}
+INTEGRITY_CLASSIFICATIONS = {"source-only-reference", "teacher-only-material", "student-classroom-input", "generated-starter-seed"}
+
+
+def _validate_formula_fact_shapes(facts: Any, location: str, errors: list[str]) -> None:
+    if facts is None:
+        return
+    if not isinstance(facts, list):
+        errors.append(f"{location} must be a list")
+        return
+    seen: set[str] = set()
+    for index, fact in enumerate(facts):
+        item_location = f"{location}[{index}]"
+        if not isinstance(fact, dict):
+            errors.append(f"{item_location} must be an object")
+            continue
+        _required_strings(fact, ("id", "formula"), item_location, errors)
+        fact_id = fact.get("id")
+        if isinstance(fact_id, str):
+            if fact_id in seen:
+                errors.append(f"{item_location}.id is duplicated")
+            seen.add(fact_id)
+        if fact.get("example_scope") not in {"abstract", "current-dataset"}:
+            errors.append(f"{item_location}.example_scope must be abstract or current-dataset")
+        if not _text(fact.get("formula")).strip().startswith("="):
+            errors.append(f"{item_location}.formula must start with =")
+        if fact.get("example_scope") == "current-dataset":
+            _required_strings(fact, ("source_id", "semantic_intent", "operation_location"), item_location, errors)
+            bindings = fact.get("bindings")
+            if not isinstance(bindings, dict) or not (bindings.get("input_field") or bindings.get("input_fields")):
+                errors.append(f"{item_location}.bindings must declare input_field or input_fields")
+
+
+def _validate_reference_verification(task: dict[str, Any], location: str, errors: list[str], *, integrity: bool) -> None:
+    capabilities = set(task.get("required_capabilities", task.get("capabilities", [])))
+    kind = task.get("task_kind", task.get("type"))
+    required = kind in {"implementation", "debugging", "code_editing", "execution"} or bool(capabilities & {"implementation", "debugging", "code_editing", "execution"})
+    verification = task.get("reference_verification")
+    if not integrity and not verification:
+        return
+    if required and not isinstance(verification, dict):
+        errors.append(f"{location}.reference_verification is required for executable tasks")
+        return
+    if verification is None:
+        return
+    if verification.get("kind") not in {"behavioral", "manual"}:
+        errors.append(f"{location}.reference_verification.kind must be behavioral or manual")
+    checks = verification.get("checks")
+    if not isinstance(checks, list) or not checks:
+        errors.append(f"{location}.reference_verification.checks must be non-empty")
+        return
+    ids: set[str] = set()
+    types: list[str] = []
+    for index, check in enumerate(checks):
+        check_location = f"{location}.reference_verification.checks[{index}]"
+        if not isinstance(check, dict):
+            errors.append(f"{check_location} must be an object")
+            continue
+        _required_strings(check, ("id", "verification_type"), check_location, errors)
+        check_id = check.get("id")
+        if isinstance(check_id, str):
+            if check_id in ids:
+                errors.append(f"{check_location}.id is duplicated")
+            ids.add(check_id)
+        verification_type = check.get("verification_type")
+        types.append(str(verification_type))
+        if verification_type not in REFERENCE_TYPES:
+            errors.append(f"{check_location}.verification_type is unsupported")
+        if verification_type in {"browser", "manual-evidence"}:
+            for field in ("procedure", "observation", "expected_result"):
+                if not _non_empty(check.get(field)):
+                    errors.append(f"{check_location}.{field} is required for manual evidence")
+    if required and set(types) <= {"syntax"}:
+        errors.append(f"{location}.reference_verification needs behavioral evidence, not syntax alone")
+    if verification.get("required_scenarios") is not None:
+        scenarios = verification.get("required_scenarios")
+        if not isinstance(scenarios, list) or any(not _non_empty(item) for item in scenarios):
+            errors.append(f"{location}.reference_verification.required_scenarios must be a string list")
+
+
+def _validate_g3_assets(content: dict[str, Any], task_ids: set[str], errors: list[str]) -> None:
+    assets = [item for item in content.get("starter_assets", []) if isinstance(item, dict)]
+    assets_by_id = {str(item.get("id")): item for item in assets if item.get("id")}
+    for index, bundle in enumerate(content.get("starter_bundles", [])):
+        location = f"starter_bundles[{index}]"
+        if not isinstance(bundle, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        _required_strings(bundle, ("id", "root", "entrypoint"), location, errors)
+        if bundle.get("artifact_kind") != "project":
+            errors.append(f"{location}.artifact_kind must be project")
+        files = bundle.get("files")
+        if not isinstance(files, list) or not files:
+            errors.append(f"{location}.files must be non-empty")
+            continue
+        seen: set[str] = set()
+        public = set()
+        for file_index, item in enumerate(files):
+            file_location = f"{location}.files[{file_index}]"
+            if not isinstance(item, dict):
+                errors.append(f"{file_location} must be an object")
+                continue
+            _required_strings(item, ("path", "role"), file_location, errors)
+            role = item.get("role")
+            if role not in INTEGRITY_ROLES:
+                errors.append(f"{file_location}.role is unsupported")
+            path = str(item.get("path", ""))
+            if path.casefold() in seen:
+                errors.append(f"{file_location}.path is duplicated")
+            seen.add(path.casefold())
+            if role in PUBLIC_ASSET_ROLES:
+                public.add(path.casefold())
+                if item.get("asset_id") and str(item.get("asset_id")) not in {str(asset.get("id")) for asset in assets}:
+                    errors.append(f"{file_location}.asset_id references an unknown starter asset")
+                candidates = {path.replace("\\", "/"), f"{str(bundle.get('root', '')).replace('starter/', '').strip('/')}/{path}".strip('/')}
+                if not item.get("asset_id") and not any(str(asset.get("path", "")).replace("\\", "/").strip("/").casefold() in {candidate.casefold() for candidate in candidates} for asset in assets):
+                    errors.append(f"{file_location} needs a starter_assets entry or asset_id")
+        entrypoint = str(bundle.get("entrypoint", ""))
+        if entrypoint and entrypoint.casefold() not in public:
+            errors.append(f"{location}.entrypoint must refer to a student bundle file")
+    for index, asset in enumerate(assets):
+        role = asset.get("role", "student-edit")
+        if role not in INTEGRITY_ROLES:
+            errors.append(f"starter_assets[{index}].role is unsupported")
+    for index, item in enumerate(content.get("classroom_assets", [])):
+        location = f"classroom_assets[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{location} must be an object")
+            continue
+        _required_strings(item, ("id", "title", "task_id", "source_path", "sha256", "classification"), location, errors)
+        if item.get("task_id") not in task_ids:
+            errors.append(f"{location}.task_id references an unknown task")
+        if item.get("classification") not in INTEGRITY_CLASSIFICATIONS:
+            errors.append(f"{location}.classification is unsupported")
+        if item.get("classification") in {"student-classroom-input", "generated-starter-seed"} and not _non_empty(item.get("student_path")):
+            errors.append(f"{location}.student_path is required for student classroom input")
+    for index, dep in enumerate(content.get("runtime_dependencies", [])):
+        if not isinstance(dep, dict) or not _non_empty(dep.get("path")):
+            errors.append(f"runtime_dependencies[{index}].path is required")
+
+
+def validate_content(
+    content: Any,
+    courseware: dict[str, Any] | None = None,
+    *,
+    enforce_task_semantics: bool = True,
+) -> dict[str, Any]:
     """Return a JSON-serialisable structural and relationship QA report."""
 
     if isinstance(courseware, dict):
@@ -822,6 +1077,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         "challenge_tasks": 0,
         "task_minutes": 0,
         "core_minutes": 0,
+        "time_breakdown_tasks": 0,
         "interactions": 0,
         "interaction_types": [],
         "starter_assets": 0,
@@ -854,7 +1110,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     allowed = {
         "contract_version", "course_title", "practice_title", "audience", "duration_minutes", "course_context",
         "source_courseware", "knowledge_links", "tasks", "learning_center", "study_guide", "foundation_kit",
-        "teacher_guide", "teacher_reference", "starter_assets",
+        "teacher_guide", "teacher_reference", "starter_assets", "integrity_version", "formula_facts",
+        "starter_bundles", "classroom_assets", "runtime_dependencies", "paper_work_authorization", "spreadsheet_workflow",
     }
     errors.extend(f"content has unsupported field: {field}" for field in sorted(set(content) - allowed))
     if content.get("contract_version") != CONTRACT_VERSION:
@@ -1014,6 +1271,9 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             errors.append(f"{location}.acceptance must be a non-empty list")
         if not isinstance(task.get("help_refs"), list):
             errors.append(f"{location}.help_refs must be a list when present")
+        _validate_time_breakdown(task.get("time_breakdown"), f"{location}.time_breakdown", errors)
+        if task.get("time_breakdown") is not None:
+            metrics["time_breakdown_tasks"] += 1
         minutes = task.get("estimated_minutes")
         if not isinstance(minutes, int) or isinstance(minutes, bool) or minutes < 5:
             errors.append(f"{location}.estimated_minutes must be an integer of at least 5")
@@ -1037,6 +1297,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         else:
             unknown_capabilities = sorted(set(capabilities) - CAPABILITIES)
             errors.extend(f"{location}.capabilities contains unknown capability: {item}" for item in unknown_capabilities)
+        if enforce_task_semantics:
+            _required_task_semantics(task, location, task_kind, capabilities, errors)
         if level == "core" and "code_editing" in capabilities and not task.get("starter_asset_ids"):
             errors.append(f"{location} core code_editing task must provide a starter")
         if "model_editing" in capabilities and not task.get("starter_asset_ids"):
@@ -1046,6 +1308,7 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
                 errors.append(f"{location} execution capability needs verification guidance")
         if "diagnosis" in capabilities and not _non_empty(task.get("scaffold")):
             errors.append(f"{location} diagnosis capability needs a concrete symptom scaffold")
+        _validate_reference_verification(task, location, errors, integrity=content.get("integrity_version") == "1.0")
         if level == "core" and source.get("mode") == "courseware" and not refs:
             errors.append(f"{location} core task must link to taught knowledge")
         if level == "core" and "code_editing" in capabilities:
@@ -1053,8 +1316,8 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
             if not isinstance(starter_values, list) or not starter_values:
                 errors.append(f"{location}.starter_asset_ids must be a non-empty list")
             todo_count = task.get("todo_count")
-            if not isinstance(todo_count, int) or not 2 <= todo_count <= 8:
-                errors.append(f"{location}.todo_count must be between 2 and 8 for a coding core task")
+            if todo_count is not None and (not isinstance(todo_count, int) or isinstance(todo_count, bool) or todo_count < 0):
+                errors.append(f"{location}.todo_count must be a non-negative integer when present")
         elif not _non_empty(task.get("scaffold")):
             errors.append(f"{location}.scaffold is required for a non-coding task")
     metrics["tasks"] = len(task_ids)
@@ -1072,7 +1335,9 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         if not isinstance(asset, dict):
             errors.append(f"{location} must be an object")
             continue
-        _required_strings(asset, ("id", "path", "language", "task_id", "content"), location, errors)
+        _required_strings(asset, ("id", "path", "language", "task_id"), location, errors)
+        if not asset.get('source_path') and not any(g.get('patch_kind') == 'add-file' for g in asset.get('editable_gaps', [])):
+            _required_strings(asset, ('content',), location, errors)
         asset_id = asset.get("id")
         if isinstance(asset_id, str):
             if asset_id in asset_ids:
@@ -1091,16 +1356,28 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
         metrics["editable_gaps"] += _validate_editable_gaps(asset, location, errors)
         metrics["todo_count"] += len(re.findall(r"\bTODO\s+\d+\b", _text(asset.get("content"))))
     metrics["starter_assets"] = len(asset_ids)
+    integrity = content.get("integrity_version")
+    if integrity is not None and integrity != "1.0":
+        errors.append("integrity_version must be 1.0 when present")
+    if integrity == "1.0":
+        _validate_formula_fact_shapes(content.get("formula_facts", []), "formula_facts", errors)
+        _validate_g3_assets(content, task_ids, errors)
+    elif content.get("formula_facts") is not None:
+        _validate_formula_fact_shapes(content.get("formula_facts"), "formula_facts", errors)
     for task in task_by_id.values():
         starter_refs = task.get("starter_asset_ids", [])
         if starter_refs:
             _check_id_refs(starter_refs, asset_ids, f"tasks[{task.get('id')}].starter_asset_ids", errors)
+        bundle_refs = task.get("starter_bundle_ids", [])
+        if bundle_refs:
+            known_bundle_ids = {str(bundle.get("id")) for bundle in content.get("starter_bundles", []) if isinstance(bundle, dict) and bundle.get("id")}
+            _check_id_refs(bundle_refs, known_bundle_ids, f"tasks[{task.get('id')}].starter_bundle_ids", errors)
         if task.get("level") == "core" and "code_editing" in task.get("capabilities", []):
             actual_todo = sum(len(re.findall(r"\bTODO\s+\d+\b", _text(asset.get("content")))) for asset in assets if isinstance(asset, dict) and asset.get("id") in starter_refs)
-            if actual_todo != task.get("todo_count"):
+            if task.get("todo_count") is not None and actual_todo != task.get("todo_count"):
                 errors.append(f"task {task.get('id')} todo_count does not match starter content ({actual_todo})")
             actual_gaps = sum(len(asset.get("editable_gaps", [])) for asset in assets if isinstance(asset, dict) and asset.get("id") in starter_refs and isinstance(asset.get("editable_gaps", []), list))
-            if actual_gaps != task.get("todo_count"):
+            if task.get("todo_count") is not None and actual_gaps != task.get("todo_count"):
                 errors.append(f"task {task.get('id')} todo_count does not match declared real starter gaps ({actual_gaps})")
 
     centers = _list(content.get("learning_center"))
@@ -1270,27 +1547,15 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     if source.get("mode") == "courseware" and not source_slide_refs:
         errors.append("courseware mode requires at least one source slide reference")
 
+    # Counts and level distribution are descriptive metrics, never contract
+    # gates or score multipliers.  Only surface a warning when a declared
+    # affordance is absent and the author should confirm that the omission is
+    # intentional; a small or specialised class remains legal.
     recommendations: list[str] = []
-    if isinstance(duration, int) and duration >= 75:
-        targets = (
-            (metrics["tasks"] < 6, "90-minute class usually benefits from 6-10 observable activities"),
-            (metrics["core_tasks"] < 4, "90-minute class usually benefits from 4-7 core tasks"),
-            (metrics["interaction_zones"] < 4, "90-minute class usually benefits from 4-8 effective experiments"),
-            (metrics["guide_sections"] < 4, "90-minute class usually benefits from at least 4 self-help guide modules"),
-            (metrics["foundation_microtopics"] < 3, "90-minute class usually benefits from at least 3 just-in-time foundation modules"),
-            (metrics["renderer_family_count"] < 4, "use several interaction families only where they serve distinct knowledge checks"),
-        )
-    else:
-        targets = (
-            (metrics["tasks"] < 3, "short classes usually benefit from at least 3 observable activities"),
-            (metrics["core_tasks"] < 2, "short classes usually benefit from at least 2 core tasks"),
-            (metrics["interaction_zones"] < 2, "short classes usually benefit from at least 2 effective experiments"),
-        )
-    recommendations.extend(message for triggered, message in targets if triggered)
-    if metrics["optional_tasks"] == 0:
-        recommendations.append("add an optional route when the class has room for differentiated practice")
-    if metrics["challenge_tasks"] == 0:
-        recommendations.append("add a challenge route when transfer beyond the core task is meaningful")
+    if not metrics["foundation_microtopics"]:
+        recommendations.append("foundation_kit is empty; confirm that no just-in-time prerequisite support is needed")
+    if not metrics["interactions"]:
+        recommendations.append("learning_center is empty; confirm that core starter and study-guide support are sufficient")
     if metrics["interaction_estimated_minutes"] == 0 and metrics["interactions"]:
         recommendations.append("provide interaction-level estimated_minutes when reliable timings are known")
     metrics["quality_recommendations"] = recommendations
@@ -1299,6 +1564,13 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     raw_content = json.dumps(content, ensure_ascii=False)
     if re.search(r"统一提交|提交截图|收走|每组至少交出", raw_content):
         errors.append("default classroom content must not require uniform submission, screenshots, or collection of artifacts")
+
+    environment = str((practice_context or {}).get("delivery_environment", "")).casefold() if isinstance(practice_context, dict) else ""
+    paper_authorized = _non_empty(content.get("paper_work_authorization"))
+    if ("computer-lab" in environment or "机房" in environment) and not paper_authorized:
+        paper_phrases = sorted(set(re.findall(r"在纸上写|纸上填写|手写提交|纸笔记录|纸上记录", raw_content, flags=re.IGNORECASE)))
+        if paper_phrases:
+            warnings.append("COMPUTER_LAB_MODALITY_WARNING: default computer-lab work uses paper wording: " + "、".join(paper_phrases))
 
     errors.extend(_toolchain_compatibility_errors(content, practice_context))
 
@@ -1312,8 +1584,13 @@ def validate_content(content: Any, courseware: dict[str, Any] | None = None) -> 
     }
 
 
-def require_valid(content: dict[str, Any], courseware: dict[str, Any] | None = None) -> dict[str, Any]:
-    report = validate_content(content, courseware)
+def require_valid(
+    content: dict[str, Any],
+    courseware: dict[str, Any] | None = None,
+    *,
+    enforce_task_semantics: bool = True,
+) -> dict[str, Any]:
+    report = validate_content(content, courseware, enforce_task_semantics=enforce_task_semantics)
     if report["status"] != "pass":
         raise ValueError("invalid Practice Class Content Contract: " + "; ".join(report["errors"]))
     return report

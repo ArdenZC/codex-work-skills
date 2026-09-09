@@ -56,11 +56,14 @@ try {
     assert.equal(await index(), before, `${item.action} action advanced the deck`);
   }
 
-  const answerButtons = page.locator('[data-action="show-answer"]');
-  for (let i = 0; i < await answerButtons.count(); i += 1) {
-    await answerButtons.nth(i).click();
-    const answer = answerButtons.nth(i).locator("xpath=following-sibling::*[@data-answer]");
-    assert.equal(await answer.isHidden(), false, "show-answer did not reveal its answer");
+  for (let pageIndex = 0; pageIndex < count; pageIndex += 1) {
+    await page.evaluate((next) => window.__coursewareRuntime.goTo(next), pageIndex);
+    const answerButtons = page.locator(`[data-page-index="${pageIndex}"] [data-action="show-answer"]:visible`);
+    for (let i = 0; i < await answerButtons.count(); i += 1) {
+      await answerButtons.nth(i).click();
+      const answer = answerButtons.nth(i).locator("xpath=following-sibling::*[@data-answer]");
+      assert.equal(await answer.isHidden(), false, "show-answer did not reveal its answer");
+    }
   }
   const steppers = page.locator("[data-stepper]:visible");
   for (let i = 0; i < await steppers.count(); i += 1) {

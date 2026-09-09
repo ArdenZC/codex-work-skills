@@ -1,7 +1,7 @@
 skill:
   id: practice-class-html-generator
   name: 实践课 HTML 生成器
-  version: 1.1.0
+  version: 1.2.0
   phase: stable
   content_contract: "1.1"
 generator:
@@ -23,3 +23,4 @@ outputs:
 offline:
   single_file: true
   external_runtime: false
+integrity_contract: "1.0"

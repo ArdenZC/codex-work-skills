@@ -5,275 +5,1950 @@
   "description": "Practice contract 1.1 consumes Courseware Content Contract 1.1. Legacy 1.0 is migrated by scripts/practice_contract.py.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract_version", "course_title", "practice_title", "audience", "duration_minutes", "source_courseware", "knowledge_links", "tasks", "learning_center", "study_guide", "foundation_kit", "teacher_guide", "teacher_reference", "starter_assets"],
+  "required": [
+    "contract_version",
+    "course_title",
+    "practice_title",
+    "audience",
+    "duration_minutes",
+    "source_courseware",
+    "knowledge_links",
+    "tasks",
+    "learning_center",
+    "study_guide",
+    "foundation_kit",
+    "teacher_guide",
+    "teacher_reference",
+    "starter_assets"
+  ],
   "properties": {
-    "contract_version": {"const": "1.1"},
-    "course_title": {"type": "string", "minLength": 1},
-    "practice_title": {"type": "string", "minLength": 1},
-    "audience": {"type": "string", "minLength": 1},
-    "duration_minutes": {"type": "integer", "minimum": 30},
-    "course_context": {"$ref": "#/$defs/courseContext"},
-    "source_courseware": {"$ref": "#/$defs/source"},
-    "knowledge_links": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/knowledge"}},
-    "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}},
-    "learning_center": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/center"}},
-    "study_guide": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/guide"}},
-    "foundation_kit": {"type": "array", "minItems": 0, "items": {"$ref": "#/$defs/kit"}},
-    "teacher_guide": {"$ref": "#/$defs/teacher"},
-    "teacher_reference": {"$ref": "#/$defs/teacherReference"},
-    "starter_assets": {"type": "array", "items": {"$ref": "#/$defs/starter"}}
+    "contract_version": {
+      "const": "1.1"
+    },
+    "course_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "practice_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "audience": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duration_minutes": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "course_context": {
+      "$ref": "#/$defs/courseContext"
+    },
+    "source_courseware": {
+      "$ref": "#/$defs/source"
+    },
+    "knowledge_links": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/knowledge"
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "learning_center": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/$defs/center"
+      }
+    },
+    "study_guide": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/guide"
+      }
+    },
+    "foundation_kit": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "$ref": "#/$defs/kit"
+      }
+    },
+    "teacher_guide": {
+      "$ref": "#/$defs/teacher"
+    },
+    "teacher_reference": {
+      "$ref": "#/$defs/teacherReference"
+    },
+    "starter_assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/starter"
+      }
+    },
+    "integrity_version": {
+      "const": "1.0"
+    },
+    "formula_facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "formula",
+          "example_scope"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "formula": {
+            "type": "string"
+          },
+          "example_scope": {
+            "enum": [
+              "abstract",
+              "current-dataset"
+            ]
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "semantic_intent": {
+            "type": "string"
+          },
+          "bindings": {
+            "type": "object"
+          },
+          "operation_location": {
+            "type": "string"
+          },
+          "expected_result": {},
+          "task_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "starter_bundles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "artifact_kind",
+          "root",
+          "files",
+          "entrypoint"
+        ],
+        "properties": {
+          "artifact_kind": {
+            "const": "project"
+          },
+          "id": {
+            "type": "string"
+          },
+          "root": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "framework": {
+            "type": "string"
+          },
+          "template_path": {
+            "type": "string"
+          },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "role"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "role": {
+                  "enum": [
+                    "student-edit",
+                    "student-input",
+                    "runtime-required",
+                    "generated-scaffold",
+                    "teacher-reference",
+                    "test-only"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "classroom_assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "source_path",
+          "classification",
+          "sha256",
+          "title",
+          "task_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source_path": {
+            "type": "string"
+          },
+          "student_path": {
+            "type": "string"
+          },
+          "task_id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "source-only-reference",
+              "teacher-only-material",
+              "student-classroom-input",
+              "generated-starter-seed"
+            ]
+          }
+        }
+      }
+    },
+    "runtime_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path"
+        ]
+      }
+    },
+    "paper_work_authorization": {
+      "type": "string"
+    },
+    "spreadsheet_workflow": {
+      "type": "string"
+    }
   },
   "$defs": {
-    "nonEmpty": {"type": "string", "minLength": 1},
-    "strings": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
-    "strings0": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}},
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "strings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nonEmpty"
+      }
+    },
+    "strings0": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmpty"
+      }
+    },
     "courseContext": {
       "type": "object",
       "minProperties": 1,
       "additionalProperties": false,
       "properties": {
-        "course_name": {"$ref": "#/$defs/nonEmpty"},
-        "audience": {"$ref": "#/$defs/nonEmpty"},
-        "language": {"$ref": "#/$defs/nonEmpty"},
-        "tools": {"$ref": "#/$defs/strings"},
-        "platform": {"$ref": "#/$defs/nonEmpty"},
-        "software": {"$ref": "#/$defs/nonEmpty"},
-        "database_dialect": {"$ref": "#/$defs/nonEmpty"},
-        "framework": {"$ref": "#/$defs/nonEmpty"},
-        "other_constraints": {"$ref": "#/$defs/strings"}
+        "course_name": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "audience": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "language": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "tools": {
+          "$ref": "#/$defs/strings"
+        },
+        "platform": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "software": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "database_dialect": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "framework": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "other_constraints": {
+          "$ref": "#/$defs/strings"
+        },
+        "delivery_environment": {
+          "type": "string"
+        }
       }
     },
     "source": {
-      "type": "object", "additionalProperties": false,
-      "required": ["mode", "contract_version", "chapter_title", "taught_slide_ids"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode",
+        "contract_version",
+        "chapter_title",
+        "taught_slide_ids"
+      ],
       "properties": {
-        "mode": {"enum": ["courseware", "independent"]},
-        "contract_version": {"const": "1.1"},
-        "chapter_title": {"$ref": "#/$defs/nonEmpty"},
-        "taught_slide_ids": {"$ref": "#/$defs/strings"}
+        "mode": {
+          "enum": [
+            "courseware",
+            "independent"
+          ]
+        },
+        "contract_version": {
+          "const": "1.1"
+        },
+        "chapter_title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "taught_slide_ids": {
+          "$ref": "#/$defs/strings"
+        }
       }
     },
     "knowledge": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "summary", "source_slide_ids", "student_can_do", "learning_unit_ids", "canonical_fact_ids"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "source_slide_ids",
+        "student_can_do",
+        "learning_unit_ids",
+        "canonical_fact_ids"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "summary": {"$ref": "#/$defs/nonEmpty"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
-        "student_can_do": {"$ref": "#/$defs/nonEmpty"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "summary": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_slide_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "student_can_do": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/strings0"
+        }
       }
     },
     "step": {
-      "type": "object", "additionalProperties": false,
-      "required": ["title", "instruction"],
-      "properties": {"title": {"$ref": "#/$defs/nonEmpty"}, "instruction": {"$ref": "#/$defs/nonEmpty"}, "check": {"type": "string"}}
-    },
-    "task": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "level", "title", "knowledge_link_ids", "source_slide_ids", "learning_unit_ids", "canonical_fact_ids", "task_kind", "artifact_kind", "capabilities", "scaffold_level", "overview", "steps", "acceptance", "help_refs", "estimated_minutes", "scaffold"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "instruction"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "level": {"enum": ["core", "optional", "challenge"]},
-        "title": {"$ref": "#/$defs/nonEmpty"}, "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "source_slide_ids": {"$ref": "#/$defs/strings"},
-        "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
-        "task_kind": {"enum": ["observation", "analysis", "implementation", "debugging", "modeling", "tooling", "experiment", "scenario", "mixed"]},
-        "artifact_kind": {"enum": ["source-code", "query", "model", "document", "workbook", "diagram", "scenario", "result", "mixed"]},
-        "capabilities": {"type": "array", "minItems": 1, "items": {"enum": ["code_editing", "file_editing", "model_editing", "execution", "query_execution", "diagnosis", "state_tracking", "visualization", "explanation", "comparison", "scenario_reasoning"]}},
-        "scaffold_level": {"$ref": "#/$defs/nonEmpty"}, "modality": {"$ref": "#/$defs/nonEmpty"}, "overview": {"$ref": "#/$defs/nonEmpty"},
-        "scaffold": {"$ref": "#/$defs/nonEmpty"}, "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}},
-        "acceptance": {"$ref": "#/$defs/strings"}, "help_refs": {"$ref": "#/$defs/strings"},
-        "estimated_minutes": {"type": "integer", "minimum": 5}, "starter_asset_ids": {"$ref": "#/$defs/strings"}, "todo_count": {"type": "integer", "minimum": 0}
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "instruction": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "check": {
+          "type": "string"
+        }
       }
     },
+    "timeBreakdownStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step",
+        "minutes"
+      ],
+      "properties": {
+        "step": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "level",
+        "title",
+        "knowledge_link_ids",
+        "source_slide_ids",
+        "learning_unit_ids",
+        "canonical_fact_ids",
+        "task_kind",
+        "artifact_kind",
+        "capabilities",
+        "scaffold_level",
+        "overview",
+        "steps",
+        "acceptance",
+        "help_refs",
+        "estimated_minutes",
+        "scaffold"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "level": {
+          "enum": [
+            "core",
+            "optional",
+            "challenge"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "knowledge_link_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "source_slide_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/strings0"
+        },
+        "task_kind": {
+          "enum": [
+            "observation",
+            "analysis",
+            "implementation",
+            "debugging",
+            "modeling",
+            "tooling",
+            "experiment",
+            "scenario",
+            "mixed"
+          ]
+        },
+        "artifact_kind": {
+          "enum": [
+            "source-code",
+            "query",
+            "model",
+            "document",
+            "workbook",
+            "diagram",
+            "scenario",
+            "result",
+            "mixed",
+            "project"
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": [
+              "code_editing",
+              "file_editing",
+              "model_editing",
+              "execution",
+              "query_execution",
+              "diagnosis",
+              "state_tracking",
+              "visualization",
+              "explanation",
+              "comparison",
+              "scenario_reasoning",
+              "tool_operation",
+              "experiment"
+            ]
+          }
+        },
+        "scaffold_level": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "modality": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "overview": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "scaffold": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "acceptance": {
+          "$ref": "#/$defs/strings"
+        },
+        "help_refs": {
+          "$ref": "#/$defs/strings"
+        },
+        "estimated_minutes": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "time_breakdown": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/timeBreakdownStep"
+          }
+        },
+        "starter_asset_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "starter_bundle_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "todo_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "edit_targets": {
+          "$ref": "#/$defs/strings"
+        },
+        "symptom": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "faulty_artifact": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "expected_behavior": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "diagnosis_target": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "repair_target": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "editable_model": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "required_edit": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "modeling_constraints": {
+          "$ref": "#/$defs/strings"
+        },
+        "tool": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "starting_state": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "operations": {
+          "$ref": "#/$defs/strings"
+        },
+        "expected_observable_result": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "variable": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "control": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "operation": {
+          "$ref": "#/$defs/strings"
+        },
+        "observation": {
+          "$ref": "#/$defs/strings"
+        },
+        "expected_reasoning": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reference_verification": {
+          "type": "object",
+          "required": [
+            "kind",
+            "checks"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "behavioral",
+                "manual"
+              ]
+            },
+            "checks": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "verification_type"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "verification_type": {
+                    "enum": [
+                      "syntax",
+                      "command",
+                      "function-call",
+                      "web-request",
+                      "file-output",
+                      "query-result",
+                      "structured-data",
+                      "browser",
+                      "manual-evidence"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "task_kind": {
+                "const": "implementation"
+              }
+            },
+            "required": [
+              "task_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "starter_asset_ids",
+              "edit_targets"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capabilities": {
+                "contains": {
+                  "const": "code_editing"
+                }
+              }
+            },
+            "required": [
+              "capabilities"
+            ]
+          },
+          "then": {
+            "required": [
+              "starter_asset_ids",
+              "edit_targets"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_kind": {
+                "const": "debugging"
+              }
+            },
+            "required": [
+              "task_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "symptom",
+              "faulty_artifact",
+              "expected_behavior",
+              "diagnosis_target",
+              "repair_target"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capabilities": {
+                "contains": {
+                  "const": "diagnosis"
+                }
+              }
+            },
+            "required": [
+              "capabilities"
+            ]
+          },
+          "then": {
+            "required": [
+              "symptom",
+              "faulty_artifact",
+              "expected_behavior",
+              "diagnosis_target",
+              "repair_target"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_kind": {
+                "const": "modeling"
+              }
+            },
+            "required": [
+              "task_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "editable_model",
+              "required_edit",
+              "modeling_constraints"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capabilities": {
+                "contains": {
+                  "const": "model_editing"
+                }
+              }
+            },
+            "required": [
+              "capabilities"
+            ]
+          },
+          "then": {
+            "required": [
+              "editable_model",
+              "required_edit",
+              "modeling_constraints"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_kind": {
+                "const": "tooling"
+              }
+            },
+            "required": [
+              "task_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "tool",
+              "starting_state",
+              "operations",
+              "expected_observable_result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capabilities": {
+                "contains": {
+                  "const": "tool_operation"
+                }
+              }
+            },
+            "required": [
+              "capabilities"
+            ]
+          },
+          "then": {
+            "required": [
+              "tool",
+              "starting_state",
+              "operations",
+              "expected_observable_result"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "task_kind": {
+                "const": "experiment"
+              }
+            },
+            "required": [
+              "task_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "variable",
+              "control",
+              "operation",
+              "observation",
+              "expected_reasoning"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capabilities": {
+                "contains": {
+                  "const": "experiment"
+                }
+              }
+            },
+            "required": [
+              "capabilities"
+            ]
+          },
+          "then": {
+            "required": [
+              "variable",
+              "control",
+              "operation",
+              "observation",
+              "expected_reasoning"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "artifact_kind": {
+                "const": "project"
+              }
+            },
+            "required": [
+              "artifact_kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "starter_bundle_ids"
+            ]
+          }
+        }
+      ]
+    },
     "option": {
-      "type": "object", "additionalProperties": false,
-      "required": ["label", "feedback"],
-      "properties": {"label": {"$ref": "#/$defs/nonEmpty"}, "feedback": {"$ref": "#/$defs/nonEmpty"}, "correct": {"type": "boolean"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "feedback"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "feedback": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "correct": {
+          "type": "boolean"
+        }
+      }
     },
     "stepperStep": {
-      "type": "object", "additionalProperties": false,
-      "required": ["title", "text"],
-      "properties": {"title": {"$ref": "#/$defs/nonEmpty"}, "text": {"$ref": "#/$defs/nonEmpty"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "text"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "text": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
     },
     "interaction": {
-      "type": "object", "additionalProperties": false,
-      "required": ["type", "prompt"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "prompt"
+      ],
       "properties": {
-        "type": {"enum": ["choice", "match", "stepper", "trace", "classify", "reorder", "diagnose", "predict-next", "build-relation", "state-simulator", "compare-strategies", "multi-question", "scenario-decision"]},
-        "prompt": {"$ref": "#/$defs/nonEmpty"},
-        "estimated_minutes": {"type": "integer", "minimum": 1},
-        "success_feedback": {"$ref": "#/$defs/nonEmpty"},
-        "retry_feedback": {"$ref": "#/$defs/nonEmpty"},
-        "completion_feedback": {"$ref": "#/$defs/nonEmpty"},
-        "options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}},
-        "answer_index": {"type": "integer", "minimum": 0},
-        "steps": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/stepperStep"}},
-        "categories": {"$ref": "#/$defs/strings"},
-        "items": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/interactionItem"}},
-        "correct_order": {"$ref": "#/$defs/strings"},
-        "state_fields": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateField"}},
-        "state": {"$ref": "#/$defs/state"},
-        "visualization": {"$ref": "#/$defs/visualization"}, "state_visual": {"$ref": "#/$defs/stateVisual"},
-        "rounds": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/round"}},
-        "questions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/question"}},
-        "diagnostic_cases": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/diagnosticCase"}},
-        "comparison": {"$ref": "#/$defs/comparison"}
+        "type": {
+          "enum": [
+            "choice",
+            "match",
+            "stepper",
+            "trace",
+            "classify",
+            "reorder",
+            "diagnose",
+            "predict-next",
+            "build-relation",
+            "state-simulator",
+            "compare-strategies",
+            "multi-question",
+            "scenario-decision"
+          ]
+        },
+        "prompt": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "estimated_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "success_feedback": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "retry_feedback": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "completion_feedback": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "answer_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/stepperStep"
+          }
+        },
+        "categories": {
+          "$ref": "#/$defs/strings"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/interactionItem"
+          }
+        },
+        "correct_order": {
+          "$ref": "#/$defs/strings"
+        },
+        "state_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stateField"
+          }
+        },
+        "state": {
+          "$ref": "#/$defs/state"
+        },
+        "visualization": {
+          "$ref": "#/$defs/visualization"
+        },
+        "state_visual": {
+          "$ref": "#/$defs/stateVisual"
+        },
+        "rounds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/round"
+          }
+        },
+        "questions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/question"
+          }
+        },
+        "diagnostic_cases": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/diagnosticCase"
+          }
+        },
+        "comparison": {
+          "$ref": "#/$defs/comparison"
+        }
       }
     },
     "interactionItem": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "label"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "answer": {"$ref": "#/$defs/nonEmpty"}, "feedback": {"$ref": "#/$defs/nonEmpty"}, "hint": {"$ref": "#/$defs/nonEmpty"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "answer": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "feedback": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "hint": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
     },
     "stateField": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "label"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "input_type": {"enum": ["text", "number"]}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "input_type": {
+          "enum": [
+            "text",
+            "number"
+          ]
+        }
+      }
     },
     "state": {
-      "type": "object", "additionalProperties": false,
+      "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "context_label": {"$ref": "#/$defs/nonEmpty"},
-        "context": {"$ref": "#/$defs/nonEmpty"},
-        "target_label": {"$ref": "#/$defs/nonEmpty"},
-        "target": {"type": ["string", "number", "boolean"]}
+        "context_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "context": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "target_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "target": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
       }
     },
     "stateVisualItem": {
-      "type": "object", "additionalProperties": false, "required": ["label", "value"],
-      "properties": {"label": {"$ref": "#/$defs/nonEmpty"}, "value": {"type": ["string", "number", "boolean"]}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "value"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      }
     },
     "stateVisual": {
-      "type": "object", "additionalProperties": false, "required": ["items", "start_field", "end_field", "focus_field"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "start_field",
+        "end_field",
+        "focus_field"
+      ],
       "properties": {
-        "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateVisualItem"}},
-        "start_field": {"$ref": "#/$defs/nonEmpty"}, "end_field": {"$ref": "#/$defs/nonEmpty"}, "focus_field": {"$ref": "#/$defs/nonEmpty"},
-        "index_label": {"$ref": "#/$defs/nonEmpty"}, "value_label": {"$ref": "#/$defs/nonEmpty"},
-        "candidate_label": {"$ref": "#/$defs/nonEmpty"}, "focus_label": {"$ref": "#/$defs/nonEmpty"},
-        "terminal_label": {"$ref": "#/$defs/nonEmpty"}
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stateVisualItem"
+          }
+        },
+        "start_field": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "end_field": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "focus_field": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "index_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "value_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "candidate_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "focus_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "terminal_label": {
+          "$ref": "#/$defs/nonEmpty"
+        }
       }
     },
     "visualization": {
-      "type": "object", "additionalProperties": false, "required": ["kind", "items"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "items"
+      ],
       "properties": {
-        "kind": {"enum": ["sequence-range", "timeline", "table-state", "state-machine", "queue", "graph-path", "comparison", "table"]},
-        "title": {"$ref": "#/$defs/nonEmpty"}, "items": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/stateVisualItem"}},
-        "start_field": {"$ref": "#/$defs/nonEmpty"}, "end_field": {"$ref": "#/$defs/nonEmpty"}, "focus_field": {"$ref": "#/$defs/nonEmpty"}
+        "kind": {
+          "enum": [
+            "sequence-range",
+            "timeline",
+            "table-state",
+            "state-machine",
+            "queue",
+            "graph-path",
+            "comparison",
+            "table"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stateVisualItem"
+          }
+        },
+        "start_field": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "end_field": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "focus_field": {
+          "$ref": "#/$defs/nonEmpty"
+        }
       }
     },
     "round": {
-      "type": "object", "additionalProperties": false,
-      "required": ["given", "expected", "status", "feedback"],
-      "properties": {"given": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]}}, "expected": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "number", "boolean"]}}, "observation": {"$ref": "#/$defs/nonEmpty"}, "next_expected": {"type": "object", "minProperties": 1, "additionalProperties": {"type": ["string", "number", "boolean"]}}, "status": {"enum": ["continue", "found", "not-found"]}, "feedback": {"$ref": "#/$defs/nonEmpty"}},
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "given",
+        "expected",
+        "status",
+        "feedback"
+      ],
+      "properties": {
+        "given": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "expected": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "observation": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "next_expected": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "status": {
+          "enum": [
+            "continue",
+            "found",
+            "not-found"
+          ]
+        },
+        "feedback": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      },
       "allOf": [
-        {"if": {"properties": {"status": {"const": "continue"}}}, "then": {"required": ["next_expected"]}},
-        {"if": {"properties": {"status": {"enum": ["found", "not-found"]}}}, "then": {"not": {"required": ["next_expected"]}}}
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "continue"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "next_expected"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "found",
+                  "not-found"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "next_expected"
+              ]
+            }
+          }
+        }
       ]
     },
     "question": {
-      "type": "object", "additionalProperties": false,
-      "required": ["prompt", "options", "answer_index"],
-      "properties": {"prompt": {"$ref": "#/$defs/nonEmpty"}, "options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}}, "answer_index": {"type": "integer", "minimum": 0}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt",
+        "options",
+        "answer_index"
+      ],
+      "properties": {
+        "prompt": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "answer_index": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     },
     "diagnosticCase": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "error_prompt", "error_options", "error_answer_index", "fix_prompt", "fix_options", "fix_answer_index"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "error_prompt",
+        "error_options",
+        "error_answer_index",
+        "fix_prompt",
+        "fix_options",
+        "fix_answer_index"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "context": {"$ref": "#/$defs/nonEmpty"}, "error_prompt": {"$ref": "#/$defs/nonEmpty"},
-        "error_options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}}, "error_answer_index": {"type": "integer", "minimum": 0},
-        "fix_prompt": {"$ref": "#/$defs/nonEmpty"}, "fix_options": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/option"}}, "fix_answer_index": {"type": "integer", "minimum": 0}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "context": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "error_prompt": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "error_options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "error_answer_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fix_prompt": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "fix_options": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/option"
+          }
+        },
+        "fix_answer_index": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     },
     "comparisonParameter": {
-      "type": "object", "additionalProperties": false, "required": ["id", "label", "explanation"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "explanation": {"$ref": "#/$defs/nonEmpty"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "explanation"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "explanation": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
     },
     "comparisonSeries": {
-      "type": "object", "additionalProperties": false, "required": ["id", "label", "counts"],
-      "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}, "counts": {"type": "array", "minItems": 1, "items": {"type": "number"}}, "unit": {"$ref": "#/$defs/nonEmpty"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "counts"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "counts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "unit": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
     },
     "comparison": {
-      "type": "object", "additionalProperties": false, "required": ["parameter_label", "parameters", "series"],
-      "properties": {"parameter_label": {"$ref": "#/$defs/nonEmpty"}, "parameters": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/comparisonParameter"}}, "series": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/comparisonSeries"}}, "chart_label": {"$ref": "#/$defs/nonEmpty"}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter_label",
+        "parameters",
+        "series"
+      ],
+      "properties": {
+        "parameter_label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "parameters": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/comparisonParameter"
+          }
+        },
+        "series": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/comparisonSeries"
+          }
+        },
+        "chart_label": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
     },
     "center": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "knowledge_link_ids", "task_ids", "learning_unit_ids", "canonical_fact_ids", "purpose", "interaction"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "knowledge_link_ids",
+        "task_ids",
+        "learning_unit_ids",
+        "canonical_fact_ids",
+        "purpose",
+        "interaction"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
-        "purpose": {"$ref": "#/$defs/nonEmpty"}, "interaction": {"$ref": "#/$defs/interaction"}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "knowledge_link_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "task_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/strings0"
+        },
+        "purpose": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "interaction": {
+          "$ref": "#/$defs/interaction"
+        }
       }
     },
     "guide": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "knowledge_link_ids", "task_ids", "learning_unit_ids", "canonical_fact_ids", "body", "worked_example", "quick_reference", "common_errors", "checkpoints"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "knowledge_link_ids",
+        "task_ids",
+        "learning_unit_ids",
+        "canonical_fact_ids",
+        "body",
+        "worked_example",
+        "quick_reference",
+        "common_errors",
+        "checkpoints"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "knowledge_link_ids": {"$ref": "#/$defs/strings"}, "task_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
-        "body": {"$ref": "#/$defs/nonEmpty"}, "worked_example": {"$ref": "#/$defs/nonEmpty"},
-        "quick_reference": {"$ref": "#/$defs/strings"}, "common_errors": {"$ref": "#/$defs/strings"},
-        "checkpoints": {"$ref": "#/$defs/strings"}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "knowledge_link_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "task_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/strings0"
+        },
+        "body": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "worked_example": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "quick_reference": {
+          "$ref": "#/$defs/strings"
+        },
+        "common_errors": {
+          "$ref": "#/$defs/strings"
+        },
+        "checkpoints": {
+          "$ref": "#/$defs/strings"
+        }
       }
     },
     "kit": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "title", "kind", "content", "task_ids", "learning_unit_ids", "canonical_fact_ids", "when_to_use", "steps", "self_check"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "kind",
+        "content",
+        "task_ids",
+        "learning_unit_ids",
+        "canonical_fact_ids",
+        "when_to_use",
+        "steps",
+        "self_check"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"},
-        "content": {"$ref": "#/$defs/nonEmpty"}, "task_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
-        "when_to_use": {"$ref": "#/$defs/nonEmpty"}, "steps": {"$ref": "#/$defs/strings"}, "self_check": {"$ref": "#/$defs/strings"}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "kind": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "content": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "task_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/strings0"
+        },
+        "when_to_use": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "steps": {
+          "$ref": "#/$defs/strings"
+        },
+        "self_check": {
+          "$ref": "#/$defs/strings"
+        }
       }
     },
     "teacher": {
-      "type": "object", "additionalProperties": false,
-      "required": ["purpose", "theory_bridge", "timing", "task_guidance", "common_errors", "pace_adjustments", "closing_checks"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "theory_bridge",
+        "timing",
+        "task_guidance",
+        "common_errors",
+        "pace_adjustments",
+        "closing_checks"
+      ],
       "properties": {
-        "purpose": {"$ref": "#/$defs/nonEmpty"}, "theory_bridge": {"$ref": "#/$defs/nonEmpty"},
-        "timing": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["minutes", "focus"], "properties": {"minutes": {"type": "integer", "minimum": 1}, "focus": {"$ref": "#/$defs/nonEmpty"}}}},
-        "task_guidance": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["task_id", "look_for", "ask_when_stuck"], "properties": {"task_id": {"$ref": "#/$defs/nonEmpty"}, "look_for": {"$ref": "#/$defs/nonEmpty"}, "ask_when_stuck": {"$ref": "#/$defs/nonEmpty"}}}},
-        "common_errors": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["symptom", "intervention"], "properties": {"symptom": {"$ref": "#/$defs/nonEmpty"}, "intervention": {"$ref": "#/$defs/nonEmpty"}}}},
-        "pace_adjustments": {"$ref": "#/$defs/strings"}, "closing_checks": {"$ref": "#/$defs/strings"}
+        "purpose": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "theory_bridge": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "timing": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "minutes",
+              "focus"
+            ],
+            "properties": {
+              "minutes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "focus": {
+                "$ref": "#/$defs/nonEmpty"
+              }
+            }
+          }
+        },
+        "task_guidance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "task_id",
+              "look_for",
+              "ask_when_stuck"
+            ],
+            "properties": {
+              "task_id": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "look_for": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "ask_when_stuck": {
+                "$ref": "#/$defs/nonEmpty"
+              }
+            }
+          }
+        },
+        "common_errors": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "symptom",
+              "intervention"
+            ],
+            "properties": {
+              "symptom": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "intervention": {
+                "$ref": "#/$defs/nonEmpty"
+              }
+            }
+          }
+        },
+        "pace_adjustments": {
+          "$ref": "#/$defs/strings"
+        },
+        "closing_checks": {
+          "$ref": "#/$defs/strings"
+        }
       }
     },
     "teacherTaskReference": {
-      "type": "object", "additionalProperties": false,
-      "required": ["task_id", "title", "source_slide_ids", "learning_unit_ids", "canonical_fact_ids", "reference_answer", "key_steps", "acceptable_variants", "common_errors", "acceptance_basis"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "title",
+        "source_slide_ids",
+        "learning_unit_ids",
+        "canonical_fact_ids",
+        "reference_answer",
+        "key_steps",
+        "acceptable_variants",
+        "common_errors",
+        "acceptance_basis"
+      ],
       "properties": {
-        "task_id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "source_slide_ids": {"$ref": "#/$defs/strings"}, "learning_unit_ids": {"$ref": "#/$defs/strings"}, "canonical_fact_ids": {"$ref": "#/$defs/strings0"},
-        "reference_answer": {"$ref": "#/$defs/nonEmpty"}, "reference_result": {"$ref": "#/$defs/nonEmpty"},
-        "key_steps": {"$ref": "#/$defs/strings"}, "acceptable_variants": {"$ref": "#/$defs/strings"},
-        "common_errors": {"$ref": "#/$defs/strings"}, "acceptance_basis": {"$ref": "#/$defs/strings"},
-        "reference_visual": {"$ref": "#/$defs/modelVisual"}, "model_visual": {"$ref": "#/$defs/modelVisual"}
+        "task_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_slide_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/strings"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/strings0"
+        },
+        "reference_answer": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "reference_result": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "key_steps": {
+          "$ref": "#/$defs/strings"
+        },
+        "acceptable_variants": {
+          "$ref": "#/$defs/strings"
+        },
+        "common_errors": {
+          "$ref": "#/$defs/strings"
+        },
+        "acceptance_basis": {
+          "$ref": "#/$defs/strings"
+        },
+        "reference_visual": {
+          "$ref": "#/$defs/modelVisual"
+        },
+        "model_visual": {
+          "$ref": "#/$defs/modelVisual"
+        },
+        "verified_reference": {
+          "type": "array"
+        },
+        "behavior_evidence": {
+          "type": "object"
+        },
+        "formula_evidence": {
+          "type": "object"
+        },
+        "reference_reasoning": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "tool_observation": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "environment_boundary": {
+          "$ref": "#/$defs/nonEmpty"
+        }
       }
     },
     "teacherReference": {
-      "type": "object", "additionalProperties": false, "required": ["task_references"],
-      "properties": {"task_references": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/teacherTaskReference"}}}
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_references"
+      ],
+      "properties": {
+        "task_references": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/teacherTaskReference"
+          }
+        }
+      }
     },
     "modelVisual": {
-      "type": "object", "additionalProperties": false, "required": ["title"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ],
       "properties": {
-        "kind": {"enum": ["uml-class", "uml-sequence", "graph", "table", "timeline", "state-machine", "comparison", "result-preview"]}, "title": {"$ref": "#/$defs/nonEmpty"},
-        "nodes": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "title"], "properties": {"id": {"$ref": "#/$defs/nonEmpty"}, "title": {"$ref": "#/$defs/nonEmpty"}, "fields": {"$ref": "#/$defs/strings"}}}},
-        "relations": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "label"], "properties": {"from": {"$ref": "#/$defs/nonEmpty"}, "to": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}}}},
-        "messages": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "to", "label"], "properties": {"from": {"$ref": "#/$defs/nonEmpty"}, "to": {"$ref": "#/$defs/nonEmpty"}, "label": {"$ref": "#/$defs/nonEmpty"}}}}
+        "kind": {
+          "enum": [
+            "uml-class",
+            "uml-sequence",
+            "graph",
+            "table",
+            "timeline",
+            "state-machine",
+            "comparison",
+            "result-preview"
+          ]
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "title": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "fields": {
+                "$ref": "#/$defs/strings"
+              }
+            }
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "label"
+            ],
+            "properties": {
+              "from": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "to": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "label": {
+                "$ref": "#/$defs/nonEmpty"
+              }
+            }
+          }
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "from",
+              "to",
+              "label"
+            ],
+            "properties": {
+              "from": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "to": {
+                "$ref": "#/$defs/nonEmpty"
+              },
+              "label": {
+                "$ref": "#/$defs/nonEmpty"
+              }
+            }
+          }
+        }
       }
     },
     "starter": {
-      "type": "object", "additionalProperties": false,
-      "required": ["id", "path", "language", "task_id", "content"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "path",
+        "language",
+        "task_id",
+        "content"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"}, "path": {"$ref": "#/$defs/nonEmpty"}, "language": {"$ref": "#/$defs/nonEmpty"},
-        "task_id": {"$ref": "#/$defs/nonEmpty"}, "content": {"type": "string"},
-        "editable_gaps": {"type": "array", "items": {"$ref": "#/$defs/editableGap"}}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "language": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "task_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "content": {
+          "type": "string"
+        },
+        "editable_gaps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/editableGap"
+          }
+        },
+        "role": {
+          "type": "string"
+        },
+        "source_path": {
+          "type": "string"
+        },
+        "source_sha256": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "purpose": {
+          "type": "string"
+        }
       }
     },
     "editableGap": {
-      "type": "object", "additionalProperties": false,
-      "required": ["marker", "replacement", "student_instruction", "kind"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "marker",
+        "replacement",
+        "student_instruction",
+        "kind"
+      ],
       "properties": {
-        "marker": {"$ref": "#/$defs/nonEmpty"}, "target": {"$ref": "#/$defs/nonEmpty"}, "replacement": {"$ref": "#/$defs/nonEmpty"},
-        "student_instruction": {"$ref": "#/$defs/nonEmpty"}, "instruction": {"$ref": "#/$defs/nonEmpty"}, "kind": {"$ref": "#/$defs/nonEmpty"}
+        "marker": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "target": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "replacement": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "student_instruction": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "instruction": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "kind": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "patch_kind": {
+          "type": "string"
+        },
+        "end_marker": {
+          "type": "string"
+        },
+        "indent_policy": {
+          "type": "string"
+        }
       }
     }
   }

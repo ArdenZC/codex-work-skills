@@ -14,6 +14,11 @@ from pathlib import Path
 
 SKILL_NAME = "courseware-html-generator"
 REQUIRED = (
+    'scripts/formula_truth.py',
+    'scripts/planning_integrity.py',
+    'scripts/generation_provenance.py',
+    'docs/planning-integrity-v1.md',
+
     "简介.md",
     "AGENTS.md",
     "通用提示词.md",
@@ -32,12 +37,17 @@ REQUIRED = (
     "examples/data-structures.example.json",
     "examples/uml.example.json",
     "scripts/content_contract.py",
+    "scripts/teaching_blueprint.py",
+    "scripts/repair_courseware.py",
     "scripts/render_courseware.py",
     "scripts/validate_courseware.py",
     "scripts/pedagogical_review.py",
+    "scripts/source_truth_validator.py",
+    "scripts/activity_time_reviewer.py",
     "scripts/install.py",
     "scripts/install_adapters.py",
     "tests/test_courseware.py",
+    "tests/test_g2_source_truth.py",
     "tests/browser_smoke.mjs",
 )
 

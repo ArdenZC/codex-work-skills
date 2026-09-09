@@ -13,6 +13,8 @@ import json
 import shutil
 import subprocess
 import sys
+import re
+import textwrap
 import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -40,12 +42,56 @@ def apply_asset_gaps(asset: dict[str, Any]) -> tuple[str, list[str]]:
             continue
         target = gap.get("target") or gap.get("marker")
         replacement = gap.get("replacement")
+        patch_kind = gap.get('patch_kind', 'replace-expression')
+        if patch_kind == 'add-file':
+            if content:
+                errors.append(f'{location}: add-file target already has content')
+            elif isinstance(replacement, str):
+                content = replacement
+            continue
+        if patch_kind not in {'replace-expression', 'replace-line', 'replace-region', 'insert-before', 'insert-after', 'replace-block'}:
+            errors.append(f'{location}: unknown patch_kind {patch_kind}')
+            continue
+        if patch_kind in {'replace-line', 'replace-region', 'insert-before', 'insert-after', 'replace-block'}:
+            marker = gap.get('marker')
+            lines = content.splitlines(keepends=True)
+            starts = [i for i, line in enumerate(lines) if marker and marker in line]
+            if len(starts) != 1 or not isinstance(replacement, str):
+                errors.append(f'{location}: patch anchor must occur exactly once')
+                continue
+            start = starts[0]; end = start
+            if patch_kind in {'replace-region', 'replace-block'}:
+                ends = [i for i, line in enumerate(lines) if gap.get('end_marker') and gap['end_marker'] in line]
+                if len(ends) != 1 or ends[0] <= start:
+                    errors.append(f'{location}: region end must uniquely follow start')
+                    continue
+                end = ends[0]
+            policy = gap.get('indent_policy', 'inherit')
+            if policy not in {'inherit', 'explicit'}:
+                errors.append(f'{location}: unknown indent_policy'); continue
+            indent = re.match(r'[ \t]*', lines[start]).group()
+            value = textwrap.indent(textwrap.dedent(replacement), indent) if policy == 'inherit' else replacement
+            new = value.rstrip('\n') + '\n'
+            if patch_kind == 'insert-before': end = start - 1
+            if patch_kind == 'insert-after': start = end + 1
+            lines[start:end+1] = [new]
+            content = ''.join(lines)
+            continue
         if not isinstance(target, str) or not target:
             errors.append(f"{location}.target or marker must be a non-empty string")
             continue
         if not isinstance(replacement, str) or not replacement:
             errors.append(f"{location}.replacement must be a non-empty string")
             continue
+        # Some generators describe a full comment marker but provide its
+        # short prefix as ``target`` (for example ``# TODO 1`` inside
+        # ``# TODO 1: add the route``).  Replacing only that prefix would
+        # leave the prose suffix in executable code.  Prefer the complete
+        # marker when it contains the declared target; expression-level
+        # targets in established contracts remain unchanged.
+        marker = gap.get("marker")
+        if isinstance(marker, str) and marker != target and target in marker and content.count(marker) == 1:
+            target = marker
         count = content.count(target)
         if count != 1:
             errors.append(f"{location}.target occurs {count} times in the current reference source")

@@ -1,6 +1,6 @@
 # practice-class-html-generator
 
-通用实践课 HTML 生成 Skill。核心不是把任务写得漂亮，而是让学生能依据已经讲过的理论完成一个可观察结果，并在遇到卡点时知道去哪里自助。
+通用实践课 HTML 生成 Skill。核心不是把任务写得漂亮或堆数量，而是让学生能依据已经讲过的理论完成一个可观察结果，并在遇到卡点时知道去哪里自助。
 
 ## 目录
 
@@ -20,6 +20,8 @@ practice-class-html-generator/
 │   ├── render_practice.py
 │   ├── validate_practice.py
 │   ├── practice_pedagogical_review.py
+│   ├── practice_time_reviewer.py
+│   ├── source_truth_validator.py
 │   ├── apply_reference_gaps.py
 │   ├── holdout_audit.py
 │   ├── install.py
@@ -34,12 +36,18 @@ practice-class-html-generator/
 
 ```text
 Courseware Content Contract 1.1 / 课程资料
-  → Agent 创作 Practice Class Content Contract 1.1
-  → 理论关联与学生可完成性 QA
+  → Agent Practice Blueprint + coverage matrix
+  → Draft Practice Class Content Contract 1.1
+  → Structural QA → Pedagogical Review
+  → 最多两轮自动合同修复 → Revalidation
   → deterministic HTML renderer（四个学生模块 + 两个教师模块，模块内 pane）
   → student/ 学生材料 + teacher/ 教师指导/逐任务参考 + student-package/teacher-package
   → file:// 浏览器 smoke
 ```
+
+生成前必须有公开 Practice Blueprint 和 coverage matrix；`scripts/teaching_blueprint.py` 校验蓝图，`scripts/repair_practice.py` 最多执行两轮只读合同推导修复。任务和互动数量不构成门禁或质量分。
+
+新生成采用 strict evidence mode：上游 Courseware 的 Source Truth 与 Time Evidence 通过后才进入 Practice。`source_truth_validator.py` 复用 Courseware 的 CSV/text/简单计算适配器和跨材料 fact registry；Practice 不覆盖 canonical fact。Core task 可选 `time_breakdown` 解释估计时长，`practice_time_reviewer.py` 对缺失给 warning、对明显总和不匹配给 FAIL。旧 1.0/历史 fixture 只能在显式 `migration-trust` 下回归。
 
 ## 生成
 
@@ -48,6 +56,12 @@ python scripts/render_practice.py `
   --practice-json examples/data-structures.practice.json `
   --courseware-json ..\..\HTML课件生成器\courseware-html-generator\examples\data-structures.example.json `
   --output-dir .\out\data-structures --replace --json
+```
+
+严格生成可显式传入：
+
+```powershell
+python scripts/render_practice.py --practice-json <practice.json> --courseware-json <courseware.json> --source-root <frozen-source> --evidence-mode strict --output-dir <out> --replace --json
 ```
 
 不提供 `--courseware-json` 时，只能使用 `source_courseware.mode = independent` 的合同；联动合同会在缺少上游文件时失败。生成不需要 Python 第三方依赖。
@@ -84,7 +98,7 @@ python scripts/validate_practice.py `
   --output-dir .\out\data-structures --json
 ```
 
-验证会检查合同结构、按时长给出的 Gold 内容密度建议、知识点与任务自身的 `source_slide_ids`、core 关联、任务层级、上下文继承、真实 starter 空位、学习中心关联、renderer family、终止状态、学生可见文本、六个模块页的 pane/hash 内部链接、学生/教师目录隔离、draw.io starter 和逐任务教师参考；浏览器 smoke 检查全部六个主页面、多桌面宽度、真实互动及无横向溢出，但不会替代教师对教学内容的审阅。参考抽象规则见 [references/content-quality-gold-benchmark.md](references/content-quality-gold-benchmark.md)。**自动化 PASS 不代表内容验收通过，等待真实 HTML 内容验收。**
+验证会检查合同结构、coverage matrix 导出的理论边界、知识点与任务自身的 `source_slide_ids`、core 关联、任务语义完整性、上下文继承、真实 starter 空位、按需学习中心、renderer family、终止状态、学生可见文本、六个模块页的 pane/hash 内部链接、学生/教师目录隔离、draw.io starter 和逐任务教师参考；浏览器 smoke 检查全部六个主页面、多桌面宽度、真实互动及无横向溢出，但不会替代教师对教学内容的审阅。任务和互动数量只作描述，不是门禁或得分。参考抽象规则见 [references/content-quality-gold-benchmark.md](references/content-quality-gold-benchmark.md)。**自动化 PASS 不代表内容验收通过，等待真实 HTML 内容验收。**
 
 ## 三套内容形态
 

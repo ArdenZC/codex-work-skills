@@ -4,6 +4,18 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 实践课 HTML 生成器 1.2.0 — 2026-09-09
+
+- 收口 Practice Class Content Contract 1.1：优先消费 Courseware Contract 1.1，保留 `source_slide_ids`、`learning_unit_ids`、`canonical_fact_ids`、`not_yet_taught` 和 `course_context` 语义边界。
+- 完成 G3 Classroom Asset Integrity、Executable Reference、Behavioral Verification、Formula Truth、Editable Gap answer isolation、Starter Bundle 与 student/teacher package isolation；人工 Blind Generalization：PASS。
+- Fresh Flow 为 Raw materials → Courseware → Practice；Courseware 更新导致 ID 变化时，必须持久化兼容映射或重新生成 Practice。自动化 PASS 不替代真实教师教学审核。
+
+## HTML 课件生成器 1.2.1 — 2026-09-09
+
+- 收口 Courseware Content Contract 1.1：explicit time model、learning units、canonical facts、source truth、time evidence、course context、stable slide IDs 和 theory-led planning。
+- 完成 Gold Closure、dynamic browser smoke、multi-viewport overflow、production pipeline E2E、offline/no-external-resource 与 student/teacher separation；Final Human Gold review：PASS。
+- Courseware 作为理论课上游 Skill，不依赖或反向修改 Practice；自动化 QA 通过不等于教学内容天然完美。
+
 ## 实践课 HTML 生成器 1.0.0 — 2026-09-06
 
 - 新增 `practice-class-html-generator` 1.0.0：以 Courseware Content Contract 1.0 为首选上游，生成学生任务、学习中心、学习指南、动态基础工具包和教师指南，并输出合同/内链/互动 QA。

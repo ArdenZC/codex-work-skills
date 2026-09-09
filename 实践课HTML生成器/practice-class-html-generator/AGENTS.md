@@ -10,14 +10,13 @@
 
 ## 内容门禁
 
-- 先读取 `references/content-quality-gold-benchmark.md`。每套 90 分钟左右的实践包以 7—12 个小任务（约 5 core、1 optional、1 challenge）、5—8 个学习中心实验区、6—10 个学习指南小节和 5—10 个 foundation-kit 微专题作为 Gold 参考；这些是按时长给出的内容质量建议，validator 以 warning 报告，不是把某门课程的知识结构或固定数量硬编码进 Skill。
-- 每个 task 必须显式写出 `source_slide_ids`，并与其 `knowledge_link_ids` 推导出的理论页集合一致；core task 在联动模式下必须追溯到已存在的 `slide.id`。
-- 编程或 SQL core 通常提供完整框架和 2—8 个真实需要学生修改的关键空位；建模、数据库和工具任务提供可编辑起点、示例、操作路径和可检查的完成条件。
-- 同一个核心知识点至少使用两种不同互动/操作形态；学习中心必须包含动态过程、诊断/Debug、连续多题或场景挑战，不能退化为几张单选卡。
+- 先读 `references/content-quality-gold-benchmark.md`，然后从原始理论边界写 Practice Blueprint 和 coverage matrix。任务、层级、互动、Learning Center、study guide 和 foundation kit 的数量都由能力覆盖、工具 affordance、时长和学生可完成性决定；数量既不是固定门槛，也不产生分数。
+- 每个 task 必须显式写出 `source_slide_ids`，并与其 `knowledge_link_ids` 推导出的理论页集合一致；core task 在联动模式下必须追溯到已存在的 `slide.id`，且不能进入 `not_yet_taught`。
+- implementation/code_editing、debugging/diagnosis、modeling/model_editing、tooling/tool_operation 和 experiment 任务分别满足合同声明的起点、症状、模型、工具和变量字段。
+- 互动必须解释一个知识点或帮助完成一个任务；只有存在即时反馈、状态变化、连续诊断、多步操作或场景判断时才加入 Learning Center。它可以为空，starter + study guide 仍可构成合法核心路径。
 - 默认课堂验收是完成、运行/操作正确、能解释；除非用户明确要求，不写统一提交、截图、报告或收走产物。
 - Gold Sample 只提供内容质量标尺；不要复制其中的数据结构知识、案例、代码或历史提交要求。
-- Gold 标尺同时检查任务颗粒度、互动深度、资料密度、基础补给、自助路径和课堂节奏；四个学生模块和两个教师模块在模块内使用 pane，当前 pane 单列聚焦一个教学对象，自动化 PASS 不等于内容验收通过。
-- 互动必须解释一个知识点或帮助完成一个任务；没有教学目的的动画不合格。
+- Gold 标尺检查任务颗粒度、互动深度、资料密度、基础补给、自助路径和课堂节奏；四个学生模块和两个教师模块在模块内使用 pane，自动化 PASS 不等于内容验收通过。
 - 非编程课程的 foundation kit 不得自动出现 C 语言、代码模板或编程脚手架污染。
 
 ## 交付
