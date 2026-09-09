@@ -43,7 +43,7 @@ Courseware smoke 根据页面实际发现普通内容块和互动控件，不再
 
 ### DONE：Courseware Gold Benchmark
 
-新增 [courseware-content-gold-benchmark.md](HTML课件生成器/courseware-html-generator/references/courseware-content-gold-benchmark.md)，明确真实备课量、讲解结构、页面密度、来源、离线资产和 PASS/DEGRADED/FAIL 边界。
+新增 [courseware-content-gold-benchmark.md](../../HTML课件生成器/courseware-html-generator/references/courseware-content-gold-benchmark.md)，明确真实备课量、讲解结构、页面密度、来源、离线资产和 PASS/DEGRADED/FAIL 边界。
 
 ### PARTIAL：Slide Planner/Density Planner
 

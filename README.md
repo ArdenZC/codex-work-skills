@@ -212,14 +212,14 @@ codex-work-skills/
 ├─ schemas/                 # 跨 Skill 共享合同
 ├─ tools/                   # template tooling / release / blind evaluation
 ├─ tests/                   # 跨包与回归测试
-├─ docs/                    # 维护、验收、模板规范
+├─ docs/                    # 维护、验收、架构、发布与历史归档
 ├─ .github/workflows/       # Windows / macOS CI 与 template release
 ├─ AGENTS.md                # 仓库级 Agent 规则
 ├─ CHANGELOG.md
 └─ README.md
 ```
 
-根目录还保留部分 generalization / holdout / release evidence 文档，用于记录阶段性工程验收，不属于普通用户的必读入口。
+Generalization、holdout 和阶段性 release evidence 已归档到 `docs/` 对应分类目录；根目录只保留当前使用与维护入口。
 
 ## 质量与验证
 
