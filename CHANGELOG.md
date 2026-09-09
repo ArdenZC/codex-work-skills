@@ -4,12 +4,13 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
-## HTML 课件生成器 1.0.0 — 2026-09-06
+## HTML 课件生成器 1.2.1 — 2026-09-09
 
-- 新增独立的 `HTML课件生成器/courseware-html-generator` Skill，使用 `Courseware Content Contract 1.0` 将教材、PPT、讲义、教案或其他课程资料渲染为学生课堂展示版和教师逐页备课版。
+- Courseware Skill 收口到 1.2.1，使用 `Courseware Content Contract 1.1`，加入 explicit time model、learning units、canonical facts、source truth、time evidence 和 theory-led planning。
 - 内置确定性 renderer：明亮莫兰迪学院风、16:9 投影布局、内联 CSS/JavaScript、SVG/代码/表格/quiz/stepper、投影增强、点击/滚轮/键盘翻页和逐页教师逐字稿布局。
 - 学生版不输出教师备注、来源式措辞、制作信息或内部时长；学生/教师 HTML 均为无服务器、无 CDN、无外部字体/图片依赖的单文件离线文档。
 - 新增 Content/HTML/离线 QA、事务式 Codex 安装器、跨工具 adapter、数据结构与 UML fixture，以及真实 Playwright 浏览器交互 smoke，覆盖任意非交互位置点击、滚轮上下翻页、单 wheel 不多跳和交互按钮不误翻页。
+- 完成 Courseware Gold Closure、动态 browser smoke、多 viewport overflow、production pipeline E2E、offline/no-external-resource、student/teacher separation、本地图片资源与人工 Blind Generalization PASS 验收；自动化通过不替代课堂人工教学审核。
 - 本 Skill 独立于 Lesson DOCX 与 Practice WorkOrder，不修改既有模板或上游合同。
 
 ## Lesson / WorkOrder Contract Fix 2.2.1 — 2026-09-05

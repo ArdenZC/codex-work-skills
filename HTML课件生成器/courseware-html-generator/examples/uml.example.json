@@ -5,6 +5,16 @@
   "audience": "高职软件技术专业学生",
   "content_reserve_minutes": 60,
   "theme": "morandi-academy",
+  "course_context": {
+    "course_name": "软件建模与设计",
+    "audience": "高职软件技术专业学生",
+    "language": "UML 建模",
+    "tools": ["draw.io", "StarUML"],
+    "platform": "Windows 实训室",
+    "software": "draw.io / StarUML",
+    "framework": "UML 2.x",
+    "other_constraints": ["优先使用可编辑模型，不以截图替代模型", "先确认责任再细化实现"]
+  },
   "slides": [
     {
       "id": "uml-01",
@@ -59,6 +69,90 @@
       "demo_hint": "逐步点击消息流程，每一步只追问一个责任问题。",
       "classroom_followup": "请学生指出一个‘万能控制类’可能带来的维护问题。",
       "pacing_note": "如果学生直接跳到代码，先让他补齐发送者、接收者和规则。"
+    },
+    {
+      "id": "uml-03",
+      "title": "从业务规则推出关联与多重性",
+      "kicker": "关系建模",
+      "layout": "comparison",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "关联不是为了把类连起来，而是把业务事实写成可以检查的结构。多重性要从场景中的数量约束推出，不能只凭画图习惯填写。"
+        },
+        {
+          "type": "table",
+          "headers": ["业务规则", "关联端点的表达"],
+          "rows": [
+            ["一次预约只对应一个时段", "Reservation 端为 1 个 TimeSlot"],
+            ["一个时段可以被多个预约使用", "TimeSlot 端允许 0..* 个 Reservation"],
+            ["取消预约不删除时段", "两个概念仍保持独立生命周期"]
+          ]
+        },
+        {
+          "type": "summary",
+          "items": ["先写业务句，再标端点", "0..* 表示允许没有或有多个", "不确定时保留待确认并写出证据"]
+        }
+      ],
+      "speaker_script": "这一页把关联和多重性从画图符号重新放回业务规则。学生常常看到两个名词就画一条线，再凭记忆填上一个和多个；这种做法看似完成了图，实际上无法说明数字从哪里来。我们先写完整业务句：一次预约只对应一个时段，一个时段是否允许多个预约要看题设的容量规则。然后把句子两端分别对应到关联端点，最后再决定是否允许零个。这里的 0..* 不是装饰，它表达了某个对象目前可以没有关联对象，也可以随着业务发生拥有多个关联对象。如果场景没有给出容量或生命周期证据，不应让学生凭习惯猜，而要标为待确认并写下缺少的业务信息。实践中请学生先在文字卡上标注事实，再把标注迁移到可编辑类图。",
+      "suggested_minutes": 3,
+      "demo_hint": "用一次预约和一个时段的三条业务规则，现场逐步标出关联两端。",
+      "classroom_followup": "让学生指出哪条业务证据支持 0..*，以及如果题设改变应改哪里。",
+      "pacing_note": "先讲数量语义，再进入工具中的关联线操作。"
+    },
+    {
+      "id": "uml-04",
+      "title": "用 Entity、Boundary、Control 分开模型职责",
+      "kicker": "分析模型",
+      "layout": "grid",
+      "blocks": [
+        {
+          "type": "cards",
+          "items": [
+            {"title": "Entity", "text": "保存业务状态并承担稳定业务规则，例如 Student、Reservation、TimeSlot。"},
+            {"title": "Boundary", "text": "连接参与者与系统，例如 ReservationPage；它呈现输入输出，不持有核心业务状态。"},
+            {"title": "Control", "text": "协调一次业务动作，例如 ReservationService；它编排请求，但把可用性规则交给 TimeSlot。"}
+          ]
+        },
+        {
+          "type": "comparison",
+          "left_title": "领域视图",
+          "left": ["Student", "Reservation", "TimeSlot"],
+          "right_title": "交互视图",
+          "right": ["ReservationPage", "ReservationService", "消息与返回结果"]
+        }
+      ],
+      "speaker_script": "当我们已经找到稳定业务对象之后，还需要避免把不同层次的东西混成一张领域类图。Entity 关注要保存的业务状态和稳定规则，Boundary 负责与参与者交换信息，Control 负责协调一次业务动作。以预约场景为例，Student、Reservation 和 TimeSlot 可以先作为领域视图中的业务对象；ReservationPage 和 ReservationService 则应在交互或责任视图中出现。Service 不应把所有规则都据为己有，它可以接收页面请求、编排步骤，再把时段可用性判断交给 TimeSlot。这样分开不是为了背三个英文单词，而是为了让后面的消息链能够回答谁掌握状态、谁负责呈现、谁负责协调。实践时请学生先给五个候选元素贴角色标签，再决定哪些进入领域类图。",
+      "suggested_minutes": 3,
+      "demo_hint": "把五个候选元素写在卡片上，先分类再放入领域视图或交互视图。",
+      "classroom_followup": "追问 ReservationService 为什么不是一个业务状态实体，以及 TimeSlot 应掌握什么规则。",
+      "pacing_note": "允许同一现实概念在不同视图扮演不同角色，但要写清上下文。"
+    },
+    {
+      "id": "uml-05",
+      "title": "让时序消息与对象责任保持一致",
+      "kicker": "时序校验",
+      "layout": "timeline",
+      "blocks": [
+        {
+          "type": "stepper",
+          "steps": [
+            {"title": "页面提出请求", "text": "ReservationPage 把用户的预约目标交给 ReservationService。"},
+            {"title": "服务协调规则", "text": "ReservationService 请求 TimeSlot 检查可用性，不直接假设结果。"},
+            {"title": "时段返回判断", "text": "TimeSlot 把 available 或 conflict 返回给 ReservationService。"},
+            {"title": "服务形成结果", "text": "只有 available 分支才由服务创建或确认 Reservation，并把结果返回页面。"}
+          ]
+        },
+        {
+          "type": "summary",
+          "items": ["返回消息回到调用者", "规则由最了解状态的对象判断", "分支条件要能解释结果是否形成"]
+        }
+      ],
+      "speaker_script": "时序图的价值不只是把消息排成一列，而是用消息往返检查责任是否一致。预约场景中，页面首先提出目标，服务对象负责协调，再由真正掌握时段状态的 TimeSlot 判断是否可用。判断结果应该返回给发起检查的 ReservationService，而不是跳过调用者直接写成 TimeSlot 返回给 Reservation。只有在 available 分支，服务才继续创建或确认 Reservation，最后把可观察结果返回给页面。这样的链条同时约束了类图中的操作名称和时序图中的消息方向：服务可以有 requestReservation、confirmReservation、cancelReservation 等协调操作，TimeSlot 保留 checkAvailability 规则。如果类图写的是一套操作，时序图却调用另一套名称，学生应把它当作模型不一致问题而不是记号小错误。实践时请逐条检查发送者、接收者、规则归属和返回路径。",
+      "suggested_minutes": 3,
+      "demo_hint": "先让学生拖动四张消息卡，再用 available/conflict 两条分支核对返回路径。",
+      "classroom_followup": "让学生解释冲突分支为什么不会创建新的 Reservation。",
+      "pacing_note": "优先检查责任和返回路径，再讨论更细的接口命名。"
     }
   ]
 }

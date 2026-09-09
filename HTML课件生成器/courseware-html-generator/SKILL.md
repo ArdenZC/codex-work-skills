@@ -9,71 +9,84 @@ metadata:
 
 ## 目标与边界
 
-使用本 Skill 时，Agent 负责读取用户资料、理解课程主题、规划页面和创作完整的 `Courseware Content Contract 1.0` JSON。内置 Python 脚本负责确定性校验、布局、CSS/JavaScript、单文件输出和 QA；不要让模型直接拼接最终 HTML，也不要在输入中提交任意 JavaScript。
+Agent 负责读取资料、建立课程蓝图并创作 `Courseware Content Contract 1.1`；内置 Python 负责确定性校验、布局、CSS/JavaScript、单文件输出和 QA。不要让模型直接拼接最终 HTML，也不要在输入中提交任意 JavaScript。旧 1.0 只作为一次性迁移入口。
 
-本 Skill 独立于教案 DOCX 和实践任务工单 Skill。除非用户另行要求，不要解析或修改它们的输出，也不要把本 Skill 绑定到某个课程或数据结构主题。
+本 Skill 独立于教案 DOCX、实践任务工单和 Practice HTML Skill。Practice 可以消费本 Skill 的稳定 `slide.id`、`learning_units` 和 `canonical_facts`，但 Courseware 不反向依赖 Practice，也不绑定任何课程主题。
 
-## 使用流程
+## 自适应生成流程
 
-1. 阅读当前会话、附件和本 Skill 的 `通用提示词.md`。从资料提取课程事实；未知事实不得伪造。
-2. 先规划整章的页面顺序，再逐页创作学生内容和可以直接在讲台上朗读的 `speaker_script`。每页保留一个稳定的 `id`。
-3. 将内容写成 `schemas/courseware-content.schema.json` 描述的 JSON。至少提供课程标题、章节标题、授课对象、内部内容储备字段、主题和 `slides`。
-4. 每页提供标题、布局、blocks、逐字稿和建议分钟数。block 只能使用合同声明的 paragraph、bullets、cards、table、code、formula、svg、quiz、stepper、comparison、summary 类型。
-5. 用 `scripts/render_courseware.py` 生成 `student.html`、`teacher.html` 和 QA 报告；生成器会先在 candidate 目录中完成合同、内容、离线和输出 QA，再原子替换正式目录。
-6. 运行 `scripts/validate_courseware.py` 或包内测试。交付前必须真实打开生成的 HTML，验证任意非交互区域点击翻页、滚轮上下翻页和交互按钮不误翻页。
+严格按以下顺序工作，并为每一步留下可公开、可复核的结果：
 
-## 内容要求
+1. **Raw Source**：读取用户资料，区分资料事实、课程约定和未知项；未知事实不得伪造。为事实建立 Source Truth provenance：`source_refs`、`evidence`、`verification.status`；按 direct text、structured data、computed、code-derived、relationship/model、pedagogical inference 区分证据强度。
+2. **Teaching Blueprint**：先写课程目标、`session_minutes`/`prepared_minutes`、对象起点与弱项、学习单元、canonical facts、`not_yet_taught` 边界、教学阶段、视觉/活动需求、误解点和预备扩展方案。
+3. **Draft Contract**：依据蓝图创作 1.1 JSON。每个学习单元都要有至少一页承载，核心路径和扩展路径要能被教师识别。
+4. **Source/Time Gates**：新生成先运行 `source_truth_validator.py --mode strict` 与 `activity_time_reviewer.py --mode strict`。CSV 由共享语义模型推导 header/data row/worksheet row、列号和 cell address；禁止按课程或案例硬编码结果。每个正 `activity_minutes` 必须有 type、教师提示、学生动作、预期产物、检查方法及分段分钟数；`prepared_minutes` 由核心路径和真实 extension reserve 组成。
+5. **Structural Validation**：运行 `content_contract.py`，检查字段、语义链、时长、资源和学生答案隔离。
+6. **Pedagogical Review**：运行 `pedagogical_review.py`，判断页序、讲稿可讲量、视觉解释、例子、误解、提问和过渡，并纳入 source/time evidence。讲稿的有效容量低于约 80 字/讲解分钟判为内容失败；约 120–160 字/分钟是正常目标区间，偏低是 DEGRADED 信号，不把它伪装成结构错误。
+7. **Automatic Contract Repair**：只允许 `scripts/repair_courseware.py` 最多修复两轮可从同一合同推导的遗漏，例如学习单元链接、教学意图字段和已声明页级时长合计；不能凭空补事实、扩展内容或讲稿。修复后必须重新做所有 gates、结构和教学审查。
+8. **Revalidation → Render → Browser QA**：只有全部门禁通过才运行 renderer；真实浏览器打开 `file://` 学生页，验证点击、滚轮、键盘和控件边界。时间证据失败时下游 Practice 为 NOT_RUN。
+9. **Final Package**：只交付通过门禁的 student/teacher HTML、QA、最终合同和公开生成决策摘要；保留 Agent 草稿与修复报告供审计。
 
-- 默认面向高职/大专学生；保持课程需要的理论深度，不自动写成考研教材。
-- 学生页要像成熟课堂 PPT：明亮冷白/浅灰蓝底色、深色正文、高信息密度、完整细边框卡片、双栏/表格/对比/图示合理组合。禁止深色背景和 `border-left: 4px solid ...` 粗色强调条。
-- 学生页不得出现制作信息、教师备注、来源式措辞或内部控时信息，包括“120分钟”“备课版”“学生版”“教师版”“最大可用”“本页建议”“教师提示”“原PPT”“上传资料”“高职学生”等；`content_reserve_minutes` 和 `suggested_minutes` 只用于内部 QA 和教师版。
-- SVG 必须是自包含教学图，承担树、图、UML、流程、架构、状态、数据变化或对比等教学信息；不得依赖外部字体、图片、网络资源或跨 SVG 的 id。renderer 会给合法 id 加稳定命名空间。
-- 教师版必须与学生版逐页对应。逐字稿是连续自然中文口语，必须包含进入本页、讲解、例子、对图/代码/表格的说明、自然提问、可能回答后的接话、易错点和到下一页的过渡；不能用“讲一下定义”“追问学生”“控时7分钟”这类提纲代替正文。
-- `suggested_minutes` 只是教师版页首和逐字稿长度 QA 的内部字段，绝不渲染到学生页。逐字稿需要达到页时长的合理最低容量，不能用底部提示框凑时长。
-- 练习支持判断、单选、看图回答、小计算和代码预测；答案默认隐藏，按钮必须阻止全局翻页。stepper/过程动画要可重置、能上一步/下一步、停在最终状态，静态显示时也能理解。
+蓝图是公开规划摘要，不包含 chain-of-thought、私有推理或隐藏思考。课程数量、页数和互动数量都只能由目标、时长和学习证据推导，不能作为固定模板或通过数量获得质量分。
 
-## 运行时要求
+## Teaching Blueprint 最小字段
 
-renderer 内置并固定以下行为，不能仅写在提示词里：
-
-- 学生版在任意非交互区域的真实单击（背景、标题、文字、卡片、表格普通区域、SVG、代码区域）进入下一页；拖拽选择文字不翻页；button、a、input、textarea、select、`[role=button]` 等控件不触发翻页。
-- 鼠标滚轮向下/向上翻页；使用非被动监听、deltaMode 归一化、累积阈值和冷却，防止一次触控板手势连续跳页；`file://` 直接打开也工作。
-- `←/→`、`PageUp/PageDown`、Space、Home/End 可翻页。
-- 学生版提供小型“投影增强”按钮，只提高正文、次级文字、SVG 和卡片边框对比度，不改变布局。
-- 页面中只使用 renderer 固定的内联 CSS/JavaScript。输入中的代码按文本转义，SVG 经过安全检查；不得执行输入 JSON 中的脚本。
-
-## QA 门禁
-
-生成失败时不要覆盖已有正式目录。必须检查：
-
-- 合同字段、block 类型和必要字段合法；学生/教师页数相同，page id 一一对应；教师每页有逐字稿且长度达到建议分钟数阈值。
-- 学生输出没有禁用词、分钟/来源/制作措辞；无粗色 `border-left`；SVG 成对闭合且无脚本、事件属性、外部引用；没有外部 stylesheet、script、字体、图片或 CDN。
-- 两份输出都是单文件 HTML，资源全部内联，学生页只含学生可见内容，教师页左栏复用同一学生页内容并显示教师右栏。
-- 至少执行一组真实浏览器交互测试：点击背景、标题、普通卡片、SVG、代码区，滚轮上下，一次 wheel 不多跳页，交互按钮不额外翻页，以及本地 `file://` 加载。
-
-## 命令
-
-```powershell
-python scripts/render_courseware.py `
-  --content-json examples/data-structures.example.json `
-  --output-dir .\out\courseware `
-  --replace --json
-
-python scripts/validate_courseware.py `
-  --content-json examples/data-structures.example.json `
-  --student-html .\out\courseware\student.html `
-  --teacher-html .\out\courseware\teacher.html `
-  --json
+```json
+{
+  "blueprint_version": "1.0",
+  "course_goal": "学生完成后能做出的可观察结果",
+  "session_minutes": 90,
+  "prepared_minutes": 120,
+  "core_minutes": 90,
+  "extension_minutes": 30,
+  "audience_profile": {
+    "level": "授课层级",
+    "prior_knowledge": ["已确认的前置知识"],
+    "likely_weaknesses": ["可能卡点"]
+  },
+  "learning_units": [{"id": "unit-1", "title": "知识单元"}],
+  "canonical_facts": [{"id": "fact-1", "statement": "可复核事实"}],
+  "not_yet_taught": ["明确留到后续的内容"],
+  "teaching_sequence": [{"phase": "进入", "purpose": "为什么现在讲", "minutes": 10}],
+  "visual_needs": ["必须看懂的图/表/代码"],
+  "activity_needs": ["需要学生判断或操作的节点"],
+  "likely_misconceptions": ["可观察误解"],
+  "prepared_extension_plan": ["教师在有余量时展开的内容"]
+}
 ```
 
-输出目录包含 `student.html`、`teacher.html` 和 `qa-report.json`。它们可以直接复制到用户指定目录；测试过程中的临时目录、浏览器 profile 和日志应在验证后删除。
+`prepared_minutes` 大于 `session_minutes` 时必须显式区分核心路径和扩展路径；扩展内容每项有 `title`、`minutes`、`content`、`activity`、`use_when`，教师可见为“备用内容 / 讲得快时使用”，学生页不显示制作时长。若没有扩展容量，蓝图和合同应明确写零，而不是虚构扩展页。历史合同只可在显式 `migration-trust` 下回归；它不会把缺证据事实标成 verified。
 
-## 多 Agent 适配
+## 合同与内容要求
 
-默认安装到 Codex skills 目录只复制 Skill 本身。需要将规则写入其他项目时，运行：
+- 根级必须提供四个时长字段、`learning_units`、`canonical_facts` 和 `slides`；每个 learning unit 至少由一页的 `learning_unit_ids` 覆盖。
+- 每页提供稳定 `id`、合法布局、`lecture_minutes`、`activity_minutes`、`suggested_minutes`、完整 `teaching_intent`、`learning_unit_ids`、blocks 和连续 `speaker_script`。`suggested_minutes` 必须等于前两者之和。
+- 讲稿要自然完成进入/承接、当前图表/代码/表格说明、核心解释、例子、易错点、提问与接话和过渡；不要机械拼成固定段落，也不能用“讲一下定义”“追问学生”或提示框凑字数。
+- 学生页不得出现教师备注、来源、合同/制作信息、内部时长或答案。教师页与学生页逐页对应。
+- block 只使用合同声明的 paragraph、bullets、cards、table、code、formula、svg、image、quiz、stepper、comparison、summary。SVG 必须自包含并承担教学信息；资源离线内联。
+- 学生页保持明亮冷白/浅灰蓝课堂视觉，避免深色背景、粗色左边条和装饰性动画。
+
+## 运行时与 QA
+
+renderer 内置并固定：非交互区域真实单击翻页；文字拖选不翻页；按钮、链接、输入、选择器和 `[role=button]` 不误翻页；滚轮使用非被动监听、deltaMode 归一化、累积阈值和冷却；键盘支持箭头、PageUp/PageDown、Space、Home/End；投影增强只改变对比度。
 
 ```powershell
-python scripts/install_adapters.py --target-dir <project>
+python scripts/teaching_blueprint.py --blueprint-json <blueprint.json> --json
+python scripts/repair_courseware.py --content-json <draft.json> --output-json <repaired.json> --max-rounds 2
+python scripts/render_courseware.py --content-json <repaired.json> --output-dir <out> --replace --json
+python scripts/validate_courseware.py --content-json <repaired.json> --student-html <out>/student.html --teacher-html <out>/teacher.html --json
 ```
 
-它支持 Codex/AGENTS、Claude、Gemini、Copilot、Aider、Cursor、Cline、Continue、Windsurf 和 OpenCode 的 namespaced 规则；默认不覆盖目标项目已有内容，只有 `--replace` 才替换。需要在目标项目直接运行完整 engine 时显式追加 `--copy-engine`。
+生成失败时不覆盖正式目录。交付前必须真实打开 HTML，至少检查背景/标题/普通卡片/SVG/代码区的点击、上下滚轮、一次 wheel 不多跳页，以及答案/stepper/投影控件不会触发翻页。
+
+## 适配器
+
+运行 `scripts/install_adapters.py --target-dir <project>` 可写入 namespaced 的 Codex/Claude/Gemini/Copilot/Aider/Cursor/Cline/Continue/Windsurf/OpenCode 规则；只有显式 `--copy-engine` 才复制 Skill 文件。
+
+## G3.2 Courseware Gold 闭环（Skill 1.2.1）
+
+新生成必须先读取 `docs/planning-integrity-v1.md`，遵循 Integrity Contract 1.0；Content Contract 仍为 1.1。Courseware 默认 `session_delivery_mode: "theory-led"`，活动可声明 `activity_role`：教师带领演示、全班引导推理、学生短检查或学生独立练习。存在独立 Practice 时，理论课不能让独立练习主导课堂活动；边界审查是启发式，不使用固定比例。
+
+讲稿有两个不同语义：80 个有效字符/讲解分钟是硬下限，120–160 是 Courseware Gold 的正常生成目标。正常目标不是 schema 配额；不得用重复扩句填充。Gold 批量门禁记录合格核心页、字符/讲解分钟、最小/中位/最大密度、低于正常目标比例、近下限比例、重复 n-gram、重复段落和代码/表格/SVG 的视觉解释覆盖。封面、目录、极短总结和扩展页不进入密度分母；低于正常目标低于 25% 才可通过该 Gold 门禁，超过 50% 进入 DEGRADED，接近全量或触碰硬下限则 FAIL。
+
+生成顺序固定为：blocks + 教学意图 + 视觉/代码/表格 + lecture_minutes → script planning → 完整 speaker_script。教师讲稿必须直接说明当前图表/代码/表格：代码讲关键行和结构，表格讲列/行和比较，SVG 讲节点/箭头/变化。教师页活动只显示人类标签；“讲得快时可补充”的 reserve 放在教师备用内容中，不增加课堂主线分钟。先验证草稿，再渲染最终内容，不手工修补已生成包。所有行为、资产、公式和规划证据按文档保存，自动评分不得掩盖 DEGRADED 或不可用检查。

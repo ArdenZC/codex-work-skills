@@ -34,4 +34,4 @@ python3 path/to/skill/scripts/install_adapters.py --target-dir path/to/project
 
 工具规则文件会随工具版本变化；如果某个工具暂时不识别专用目录，直接加载对应 skill 的 通用提示词.md 并执行内置脚本即可。
 
-HTML 课件生成器的适配器只安装规则时不复制完整 engine；只有显式 `--copy-engine` 才会复制 `courseware-html-generator` runtime。它要求 Agent 生成 `Courseware Content Contract 1.0`，再由 deterministic renderer 输出两个离线 HTML，并保留真实浏览器 click/wheel QA。
+HTML 课件生成器的适配器只安装规则时不复制完整 engine；只有显式 `--copy-engine` 才会复制 `courseware-html-generator` runtime。它要求 Agent 生成 `Courseware Content Contract 1.1`，再由 deterministic renderer 输出两个离线 HTML，并保留真实浏览器 click/wheel QA、source truth、time evidence、learning unit 和 canonical fact 兼容性。

@@ -1,41 +1,647 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/ArdenZC/codex-work-skills/courseware-html-generator/courseware-content.schema.json",
-  "title": "Courseware Content Contract 1.0",
+  "title": "Courseware Content Contract 1.1",
+  "description": "Stable theory source contract. Legacy 1.0 is migrated by scripts/content_contract.py before rendering.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["contract_version", "course_title", "chapter_title", "audience", "content_reserve_minutes", "slides"],
+  "required": [
+    "contract_version",
+    "course_title",
+    "chapter_title",
+    "audience",
+    "session_minutes",
+    "prepared_minutes",
+    "core_minutes",
+    "extension_minutes",
+    "learning_units",
+    "canonical_facts",
+    "slides"
+  ],
   "properties": {
-    "contract_version": {"const": "1.0"},
-    "course_title": {"type": "string", "minLength": 1},
-    "chapter_title": {"type": "string", "minLength": 1},
-    "audience": {"type": "string", "minLength": 1},
-    "content_reserve_minutes": {"type": "integer", "minimum": 1},
-    "theme": {"type": "string", "minLength": 1},
+    "contract_version": {
+      "const": "1.1"
+    },
+    "course_title": {
+      "$ref": "#/$defs/nonEmpty"
+    },
+    "chapter_title": {
+      "$ref": "#/$defs/nonEmpty"
+    },
+    "audience": {
+      "$ref": "#/$defs/nonEmpty"
+    },
+    "session_minutes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "prepared_minutes": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "core_minutes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "extension_minutes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "theme": {
+      "$ref": "#/$defs/nonEmpty"
+    },
+    "course_context": {
+      "$ref": "#/$defs/courseContext"
+    },
+    "learning_units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/learningUnit"
+      }
+    },
+    "canonical_facts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/canonicalFact"
+      }
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/extension"
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/imageAsset"
+      }
+    },
     "slides": {
       "type": "array",
       "minItems": 2,
-      "items": {"$ref": "#/$defs/slide"}
+      "items": {
+        "$ref": "#/$defs/slide"
+      }
+    },
+    "integrity_version": {
+      "const": "1.0"
+    },
+    "session_delivery_mode": {
+      "enum": [
+        "theory-led",
+        "mixed",
+        "practice-led"
+      ]
+    },
+    "formula_facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "formula",
+          "example_scope"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "formula": {
+            "type": "string"
+          },
+          "example_scope": {
+            "enum": [
+              "abstract",
+              "current-dataset"
+            ]
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "semantic_intent": {
+            "type": "string"
+          },
+          "bindings": {
+            "type": "object"
+          },
+          "operation_location": {
+            "type": "string"
+          },
+          "expected_result": {},
+          "task_id": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$defs": {
-    "nonEmpty": {"type": "string", "minLength": 1},
-    "stringList": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/nonEmpty"}},
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/nonEmpty"
+      }
+    },
+    "requiredStringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/nonEmpty"
+      }
+    },
+    "courseContext": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "course_name": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "audience": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "language": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "tools": {
+          "$ref": "#/$defs/requiredStringList"
+        },
+        "platform": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "software": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "database_dialect": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "framework": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "other_constraints": {
+          "$ref": "#/$defs/requiredStringList"
+        },
+        "delivery_environment": {
+          "type": "string"
+        }
+      }
+    },
+    "learningUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "students_should_know",
+        "students_should_be_able_to",
+        "prerequisites",
+        "not_yet_taught",
+        "canonical_fact_ids"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "students_should_know": {
+          "$ref": "#/$defs/requiredStringList"
+        },
+        "students_should_be_able_to": {
+          "$ref": "#/$defs/requiredStringList"
+        },
+        "prerequisites": {
+          "$ref": "#/$defs/stringList"
+        },
+        "not_yet_taught": {
+          "$ref": "#/$defs/stringList"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "canonicalFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "statement",
+        "source_slide_ids",
+        "learning_unit_ids"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "kind": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "statement": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "source_slide_ids": {
+          "$ref": "#/$defs/stringList"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/stringList"
+        },
+        "source_refs": {
+          "$ref": "#/$defs/stringList"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/factEvidence"
+          }
+        },
+        "verification": {
+          "$ref": "#/$defs/factVerification"
+        }
+      }
+    },
+    "factEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "evidence_type"
+      ],
+      "properties": {
+        "source_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "evidence_type": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "locator": {
+          "type": [
+            "string",
+            "object"
+          ]
+        },
+        "quote": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      }
+    },
+    "factVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "type": "integer",
+          "enum": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "status": {
+          "enum": [
+            "verified",
+            "source-supported",
+            "inferred",
+            "unverified"
+          ]
+        },
+        "method": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "verifier": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "expected_value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "expected_result": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        },
+        "expression": {
+          "type": "string"
+        },
+        "derivation_summary": {
+          "type": "string"
+        },
+        "token_family": {
+          "type": "string"
+        },
+        "key_tokens": {
+          "$ref": "#/$defs/stringList"
+        },
+        "allowed_tokens": {
+          "$ref": "#/$defs/stringList"
+        },
+        "conflict_tokens": {
+          "$ref": "#/$defs/stringList"
+        }
+      }
+    },
+    "extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "minutes",
+        "content",
+        "activity",
+        "use_when"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "activity": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "use_when": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
+    },
+    "activitySegment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "minutes"
+      ],
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "activityPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "teacher_prompt",
+        "student_action",
+        "expected_artifact_or_response",
+        "check_method",
+        "segments"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "question-discussion",
+            "guided-practice",
+            "demonstration-observation",
+            "individual-exercise",
+            "pair-check",
+            "tool-operation",
+            "code-run",
+            "model-analysis",
+            "case-analysis",
+            "mini-quiz"
+          ]
+        },
+        "activity_role": {
+          "enum": [
+            "teacher-led-demonstration",
+            "guided-whole-class-reasoning",
+            "short-student-check",
+            "student-independent-practice"
+          ]
+        },
+        "teacher_prompt": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "student_action": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "expected_artifact_or_response": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "check_method": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/activitySegment"
+          }
+        }
+      }
+    },
+    "imageAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "path"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "kind": {
+          "const": "image"
+        },
+        "path": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
+    },
+    "teachingIntent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opening",
+        "core_explanation",
+        "example",
+        "misconception",
+        "question",
+        "transition"
+      ],
+      "properties": {
+        "opening": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "core_explanation": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "example": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "misconception": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "question": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "transition": {
+          "$ref": "#/$defs/nonEmpty"
+        }
+      }
+    },
     "slide": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title", "layout", "blocks", "speaker_script", "suggested_minutes"],
+      "required": [
+        "id",
+        "title",
+        "layout",
+        "blocks",
+        "speaker_script",
+        "lecture_minutes",
+        "activity_minutes",
+        "suggested_minutes",
+        "teaching_intent",
+        "learning_unit_ids"
+      ],
       "properties": {
-        "id": {"$ref": "#/$defs/nonEmpty"},
-        "title": {"$ref": "#/$defs/nonEmpty"},
-        "kicker": {"type": "string"},
-        "layout": {"enum": ["hero", "split", "grid", "focus", "comparison", "timeline", "default"]},
-        "blocks": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["type"]}},
-        "speaker_script": {"$ref": "#/$defs/nonEmpty"},
-        "suggested_minutes": {"type": "integer", "minimum": 1},
-        "demo_hint": {"type": "string"},
-        "classroom_followup": {"type": "string"},
-        "pacing_note": {"type": "string"}
+        "id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "kicker": {
+          "type": "string"
+        },
+        "layout": {
+          "enum": [
+            "hero",
+            "split",
+            "grid",
+            "focus",
+            "comparison",
+            "timeline",
+            "default"
+          ]
+        },
+        "blocks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/block"
+          }
+        },
+        "speaker_script": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "lecture_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "activity_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suggested_minutes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "teaching_intent": {
+          "$ref": "#/$defs/teachingIntent"
+        },
+        "learning_unit_ids": {
+          "$ref": "#/$defs/requiredStringList"
+        },
+        "canonical_fact_ids": {
+          "$ref": "#/$defs/stringList"
+        },
+        "delivery_track": {
+          "enum": [
+            "core",
+            "extension"
+          ]
+        },
+        "activity_plan": {
+          "$ref": "#/$defs/activityPlan"
+        },
+        "demo_hint": {
+          "type": "string"
+        },
+        "classroom_followup": {
+          "type": "string"
+        },
+        "pacing_note": {
+          "type": "string"
+        },
+        "script_coverage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "planning_rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "paragraph",
+            "bullets",
+            "cards",
+            "table",
+            "code",
+            "formula",
+            "svg",
+            "image",
+            "quiz",
+            "stepper",
+            "comparison",
+            "summary"
+          ]
+        },
+        "asset_id": {
+          "$ref": "#/$defs/nonEmpty"
+        },
+        "caption": {
+          "type": "string"
+        }
       }
     }
   }
