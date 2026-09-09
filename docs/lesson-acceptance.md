@@ -9,6 +9,8 @@ Lesson Acceptance V2 是一个本地、只读的验收证据汇总器。它读�
 
 报告目录必须放在输出目录之外，例如 `F:\\acceptance\\database-20260901`。工具不会修改输入 JSON、DOCX、qa-report 或模板，也不会生成 32 课/64 学时的 CI E2E。大批量输出应保留在本地验收工作区，不提交仓库。
 
+对于 Content Contract 2.2，输出目录还必须有生成器写出的 `artifact-manifest.json`。它是 DOCX、保留的 rendered PDF、SHA-256、实际 PDF 页数、QA status、render status 和唯一 `run_id` 的唯一映射来源；验收报告从 manifest 解析文件路径与页数，并校验文件存在、指纹和 QA/render 状态，不能从报告文本手填页数。
+
 ## 运行
 
 在仓库根目录运行：
@@ -36,10 +38,10 @@ $head = git rev-parse HEAD
 报告新增 `delivery_metrics`、`reference_metrics` 和 `practice_handoff_metrics`，并在 `structural_hard_gates.gates` 中记录：
 
 - `delivery_plan` 总课时、理论/实践课时、理论 Lesson 与 Practice Task 的实际合计必须一致；Lesson DOCX 只计理论，理论课次数量按默认单课课时向上取整并保留余数；
-- reference pool 占位文本、教材重叠（未显式 override）、同课重复 ID 和未解析 ID 必须为零；跨课重复只记录 reuse frequency，不失败；
+- reference pool 占位文本、教材重叠（未显式 override）、同课重复 ID 和未解析 ID 必须为零；有可核验来源时记录来源结构与 reuse frequency；来源检索明确无结果时允许空 reference pool，不填占位来源；
 - Practice Task Contract 的任务数量、实践学时、任务 ID 和理论准备链接必须一致；实践不要求对应实践 Lesson DOCX，纯实践课程可以没有 Lesson。
 
-这些门禁不改变既有 Content QA 的正文重复、progression 或 implementation coherence 算法；它们只收口 Content 2.1/2.2 的课程基础与 artifact 合同。
+当前 2.2 production QA 只呈现 schema/事实、精确重复和 Agent review 结果；历史 2.0/2.1 的相似度证据仅在显式 `--legacy` 验收中读取，不得成为当前生产门禁。
 
 ## 四层验收
 
@@ -55,13 +57,13 @@ $head = git rev-parse HEAD
 - 现有 Content QA status；
 - 所有 DOCX 的 render smoke。
 
-这些值全部来自输入和现有 `qa-report.json`；工具不复制生产 duplicate、progression 或 implementation-coherence 算法。
+这些值全部来自输入和现有 `qa-report.json`；当前 Content 2.2 的语义审查结果必须来自 Agent review，工具不复制领域词、动作词或字符重叠算法。
 
 ### 2. Content quality evidence
 
-报告只汇总现有 QA 的 whole-lesson、adjacent、字段、implementation、evaluation remark 相似度，以及 duplicate detector 计数和错误证据。它不增加新的相似度阈值，也不要求每课必须不同。
+当前 2.2 报告只汇总现有 QA 的 Agent review、精确重复、结构/来源/事实证据；历史版本的相似度计数仅作为显式 `--legacy` evidence，不增加当前生产阈值，也不要求每课必须不同。
 
-2.2 的 `course_materials.textbook` 与 `reference_pool` 分离，教材默认不进入 Word references。每个理论 Lesson 至少选择一项具体文献/文档；课次只携带 `reference_ids`；`reference_provenance` 负责报告 catalog reuse frequency、placeholder、textbook overlap、same-lesson duplicate、resource-only 和 unresolved ID。参考资料按国内来源优先，国内占比只是质量信号；`references` 的跨课重复由 Content QA 的 `reference_reusable` 证据表示且不得触发正文反重复 hard-fail；同一课内部重复项和 resource-only 项仍按生产 QA 结果处理。空 `reference_ids` 在 2.2 直接失败，不写“无/暂无/资料不足”。
+2.2 的 `course_materials.textbook`、lesson `resources` 和 `reference_pool` 分离，教材默认不进入 Word references；课次只携带 `reference_ids`。有来源时，`reference_provenance` 负责报告 catalog reuse frequency、placeholder、textbook overlap、same-lesson duplicate、resource-only 和 unresolved ID；跨课复用不触发正文反重复 hard-fail。若检索状态明确表示无可核验外部来源，`reference_pool` 与 `reference_ids` 可以为空；不写“无/暂无/资料不足”等占位正文。
 
 ### 3. Teaching design review
 
@@ -86,7 +88,7 @@ $head = git rev-parse HEAD
 
 ## Sequence 与项目边界
 
-`sequence_review` 读取现有 `content_quality.progression.sequence_links`，报告物理相邻转换数量（32 课应为 31），并只展开 `REVIEW`、`FAIL` 和项目边界的详细证据。输出状态统一为 `PASS`、`REVIEW`、`FAIL`。
+`sequence_review` 读取现有 `content_quality.progression.sequence_links`，报告物理相邻转换数量，并只展开 Agent 标记的 `REVIEW`、`FAIL` 和项目边界详细证据。输出状态统一为 `PASS`、`REVIEW`、`FAIL`。
 
 对于历史 Software Modeling 64 学时、32 课的验收，必须特别复核：
 
@@ -102,8 +104,8 @@ render smoke 仍应覆盖全部 DOCX。人工视觉样本按风险选择：首�
 
 验收工作区应保留一个旧输出目录和可识别 sentinel，然后逐项通过真实生成器验证候选失败、候选清理和旧输出保持不变：
 
-1. nursing SQL contamination；
-2. database patient blood pressure；
+1. 与冻结课程画像冲突的领域内容；
+2. 将另一领域的实体或流程带入当前课程；
 3. 三课复制 `teacher_actions`；
 4. 机械评分（全同/简单循环/等差）；
 5. 带虚构详细书目信息的 generic reference；

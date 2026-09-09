@@ -181,6 +181,26 @@ def run_script(
     *args: str,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
+    command_args = list(args)
+    if (
+        script.resolve().is_relative_to(LESSON.resolve())
+        and script.name in {"generate_lesson_plans.py", "validate_output.py"}
+        and "--legacy" not in command_args
+    ):
+        source_flag = "--tasks-json" if script.name == "generate_lesson_plans.py" else "--input-json"
+        if source_flag in command_args:
+            source_index = command_args.index(source_flag) + 1
+            if source_index < len(command_args):
+                try:
+                    source_version = json.loads(Path(command_args[source_index]).read_text(encoding="utf-8-sig")).get(
+                        "content_contract_version"
+                    )
+                except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+                    source_version = "2.2"
+                if source_version != "2.2":
+                    # The legacy test fixtures opt into the compatibility adapter explicitly.
+                    command_args.append("--legacy")
+
     if env is None:
         env = os.environ.copy()
         if (
@@ -191,7 +211,7 @@ def run_script(
             # production callers still need to opt in through the environment.
             env.setdefault("LESSON_ALLOW_UNSAFE_VALIDATION_SKIP", "1")
     return subprocess.run(
-        [str(PYTHON), str(script), *args],
+        [str(PYTHON), str(script), *command_args],
         cwd=ROOT,
         env=env,
         text=True,
@@ -3666,7 +3686,13 @@ esac
         ci_data = yaml.safe_load(ci_workflow)
         helper_run = ".github/scripts/install_libreoffice_macos.sh"
 
-        for job_name in ("template-gradebook", "template-workorder", "template-tooling", "template-release"):
+        for job_name in (
+            "template-lesson",
+            "template-gradebook",
+            "template-workorder",
+            "template-tooling",
+            "template-release",
+        ):
             with self.subTest(job=job_name):
                 mac_steps = [
                     step
@@ -3798,7 +3824,7 @@ esac
         practice_class_text = str(jobs["practice-class-html"]).lower()
         release_text = str(jobs["template-release"]).lower()
         self.assertIn("libreoffice", tooling_text)
-        self.assertNotIn("libreoffice", lesson_text)
+        self.assertIn("libreoffice", lesson_text)
         self.assertIn("libreoffice", gradebook_text)
         self.assertIn("practice-task-workorder-generator", workorder_text)
         self.assertIn("cross_artifact", workorder_text)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import hashlib
 import re
@@ -47,6 +48,7 @@ from content_contract import (
     lesson_references,
     reference_identity,
     reference_metadata_errors,
+    reference_source_binding_errors,
     reference_looks_like_placeholder,
     reference_looks_like_resource_only,
 )
@@ -78,9 +80,45 @@ REFERENCE_EVIDENCE_URL_PATTERN = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 REFERENCE_EVIDENCE_LOCATOR_PATTERN = re.compile(
     r"(?:官方|政府|教育部|国家卫生健康|行业协会).*(?:官网|章节|条款|第[一二三四五六七八九十百0-9]+[章节条]|页|文号|检索|路径)",
 )
+REFERENCE_PLACEHOLDER_TOKENS = (
+    "某职业院校",
+    "某高校",
+    "某大学",
+    "示例出版社",
+    "example.edu",
+    "example.com",
+    "placeholder",
+    "test fixture",
+    "测试夹具",
+    "虚构",
+)
 REPOSITORY_ROOT = SKILL_DIR.parents[1]
 PRACTICE_CONTRACT_SCHEMA = REPOSITORY_ROOT / "schemas" / "shared" / "practice-task-contract.schema.json"
-PRACTICE_CONTRACT_SCHEMA_ID = "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.json"
+PRACTICE_CONTRACT_SCHEMA_ID = "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.1.json"
+
+AGENT_OWNED_LESSON_FIELDS = (
+    "progression",
+    "student_analysis",
+    "teaching_content",
+    "goals",
+    "key_point",
+    "difficult_point",
+    "teaching_methods",
+    "resources",
+    "reference_ids",
+    "implementation",
+    "evaluation",
+    "reflection",
+)
+AGENT_REVIEW_ISSUE_CATEGORIES = (
+    "domain_naturalness",
+    "template_repetition",
+    "activity_feasibility",
+    "capacity",
+    "reference_relevance",
+    "other",
+)
+SHA256_TEXT_PATTERN = re.compile(r"^[A-Fa-f0-9]{64}$")
 
 
 def require_meaningful_text(value: Any, field_name: str, minimum: int = 1) -> str:
@@ -118,6 +156,227 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest().upper()
+
+
+def canonical_json_sha256(value: Any) -> str:
+    """Hash a JSON value for provenance, never for semantic quality scoring."""
+
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest().upper()
+
+
+def content_digest_rollup(digests: list[str]) -> str:
+    """Hash the ordered per-lesson content digests for course-level provenance."""
+
+    return canonical_json_sha256({"lesson_content_sha256": [str(value).upper() for value in digests]})
+
+
+def lesson_agent_content(lesson: dict[str, Any]) -> dict[str, Any]:
+    """Return the complete narrative payload owned by the authoring Agent."""
+
+    return {field: copy.deepcopy(lesson[field]) for field in AGENT_OWNED_LESSON_FIELDS}
+
+
+def apply_reviewed_lesson_content(data: dict[str, Any]) -> dict[str, Any]:
+    """Overlay the Agent's reviewed content before any DOCX/QA consumer reads it."""
+
+    result = copy.deepcopy(data)
+    for index, lesson in enumerate(result.get("lessons", [])):
+        review = lesson.get("pedagogical_review") if isinstance(lesson, dict) else None
+        revised = review.get("revised_content") if isinstance(review, dict) else None
+        if not isinstance(revised, dict):
+            raise ValueError(
+                f"lessons[{index}].pedagogical_review.revised_content is required before production generation"
+            )
+        for field in AGENT_OWNED_LESSON_FIELDS:
+            if field not in revised:
+                raise ValueError(
+                    f"lessons[{index}].pedagogical_review.revised_content.{field} is required"
+                )
+            lesson[field] = copy.deepcopy(revised[field])
+    return result
+
+
+def _reference_text_for_placeholder_check(reference: dict[str, Any]) -> str:
+    values = (
+        reference.get("title", ""),
+        reference.get("institution", ""),
+        reference.get("publisher", ""),
+        reference.get("evidence", ""),
+        reference.get("source_url", ""),
+        reference.get("authoritative_source", ""),
+    )
+    return " ".join(str(value) for value in values if value is not None).casefold()
+
+
+def _reference_has_placeholder_identity(reference: dict[str, Any]) -> bool:
+    text = _reference_text_for_placeholder_check(reference)
+    return any(token.casefold() in text for token in REFERENCE_PLACEHOLDER_TOKENS)
+
+
+def _validate_sha256(value: Any, field_name: str) -> str:
+    text = require_meaningful_text(value, field_name)
+    if not SHA256_TEXT_PATTERN.fullmatch(text):
+        raise ValueError(f"{field_name} must be a 64-character SHA-256 hex digest")
+    return text.upper()
+
+
+def _validate_agent_authoring_provenance(data: dict[str, Any], *, allow_test_fixture: bool = False) -> None:
+    """Require an explicit Agent handoff; never infer authoring success."""
+
+    provenance = data.get("authoring_provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError(
+            "authoring_provenance is required for Content Contract 2.2 production generation; "
+            "Agent authoring failure or absence is fail-closed"
+        )
+    mode = provenance.get("mode")
+    if mode != "agent" and not (allow_test_fixture and mode == "synthetic_fixture"):
+        raise ValueError(
+            "authoring_provenance.mode must be 'agent' for production; synthetic fixtures are accepted only by the explicit test-fixture validator"
+        )
+    if provenance.get("status") != "completed":
+        raise ValueError("authoring_provenance.status must be completed")
+    require_meaningful_text(provenance.get("authoring_id"), "authoring_provenance.authoring_id")
+    rounds = provenance.get("review_rounds")
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or rounds < 1:
+        raise ValueError("authoring_provenance.review_rounds must be a positive integer")
+    snapshots = provenance.get("source_snapshot")
+    if not isinstance(snapshots, dict):
+        raise ValueError("authoring_provenance.source_snapshot is required")
+    expected_snapshot_keys = {
+        "confirmed_course_profile_sha256",
+        "whole_course_outline_sha256",
+        "reference_pool_sha256",
+    }
+    if set(snapshots) != expected_snapshot_keys:
+        raise ValueError(
+            "authoring_provenance.source_snapshot must contain exactly the confirmed profile, whole-course outline, and reference pool digests"
+        )
+    for key in sorted(expected_snapshot_keys):
+        _validate_sha256(snapshots.get(key), f"authoring_provenance.source_snapshot.{key}")
+    expected_profile = data.get("confirmed_course_info")
+    if not isinstance(expected_profile, dict):
+        raise ValueError("confirmed_course_info is required for Agent authoring provenance")
+    if canonical_json_sha256(expected_profile) != snapshots["confirmed_course_profile_sha256"].upper():
+        raise ValueError("authoring_provenance.source_snapshot.confirmed_course_profile_sha256 does not match confirmed_course_info")
+    if canonical_json_sha256(data.get("outline", [])) != snapshots["whole_course_outline_sha256"].upper():
+        raise ValueError("authoring_provenance.source_snapshot.whole_course_outline_sha256 does not match outline")
+    if canonical_json_sha256(data.get("reference_pool", [])) != snapshots["reference_pool_sha256"].upper():
+        raise ValueError("authoring_provenance.source_snapshot.reference_pool_sha256 does not match reference_pool")
+    _validate_sha256(provenance.get("draft_content_sha256"), "authoring_provenance.draft_content_sha256")
+    _validate_sha256(provenance.get("final_content_sha256"), "authoring_provenance.final_content_sha256")
+
+
+def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
+    """Validate review state transitions while leaving pedagogy to the Agent."""
+
+    provenance = data["authoring_provenance"]
+    expected_rounds = int(provenance["review_rounds"])
+    first_round_digests: list[str] = []
+    final_round_digests: list[str] = []
+    for index, lesson in enumerate(data.get("lessons", [])):
+        prefix = f"lessons[{index}].pedagogical_review"
+        review = lesson.get("pedagogical_review")
+        if not isinstance(review, dict):
+            raise ValueError(f"{prefix} is required")
+        issues = review.get("issues")
+        draft = review.get("draft_content")
+        revised = review.get("revised_content")
+        decision = review.get("decision")
+        history = review.get("review_history")
+        if not isinstance(issues, list):
+            raise ValueError(f"{prefix}.issues must be an array")
+        if not isinstance(revised, dict):
+            raise ValueError(f"{prefix}.revised_content must contain the final Agent-authored lesson content")
+        if not isinstance(draft, dict):
+            raise ValueError(f"{prefix}.draft_content must contain the pre-review Agent-authored lesson content")
+        if decision not in {"approved", "needs_revision"}:
+            raise ValueError(f"{prefix}.decision must be approved or needs_revision")
+        if decision != "approved" or issues:
+            raise ValueError(f"{prefix} must be the final approved review with issues=[]")
+        if set(revised) != set(AGENT_OWNED_LESSON_FIELDS):
+            raise ValueError(
+                f"{prefix}.revised_content must contain exactly the Agent-owned lesson fields"
+            )
+        if set(draft) != set(AGENT_OWNED_LESSON_FIELDS):
+            raise ValueError(
+                f"{prefix}.draft_content must contain exactly the Agent-owned lesson fields"
+            )
+        if canonical_json_sha256(lesson_agent_content(lesson)) != canonical_json_sha256(revised):
+            raise ValueError(
+                f"{prefix}.revised_content must equal the lesson content consumed by production DOCX"
+            )
+        if not isinstance(history, list) or not history:
+            raise ValueError(f"{prefix}.review_history must record at least one review round")
+        if len(history) != expected_rounds:
+            raise ValueError(
+                f"{prefix}.review_history length must equal authoring_provenance.review_rounds ({expected_rounds})"
+            )
+        final_digest = canonical_json_sha256(revised)
+        draft_digest = canonical_json_sha256(draft)
+        first_digest = ""
+        for round_index, record in enumerate(history, 1):
+            if not isinstance(record, dict):
+                raise ValueError(f"{prefix}.review_history[{round_index}] must be an object")
+            if record.get("round") != round_index:
+                raise ValueError(f"{prefix}.review_history rounds must be sequential from 1")
+            round_issues = record.get("issues")
+            if not isinstance(round_issues, list):
+                raise ValueError(f"{prefix}.review_history[{round_index}].issues must be an array")
+            round_decision = record.get("decision")
+            if round_decision not in {"approved", "needs_revision"}:
+                raise ValueError(f"{prefix}.review_history[{round_index}].decision is invalid")
+            digest = _validate_sha256(
+                record.get("content_sha256"),
+                f"{prefix}.review_history[{round_index}].content_sha256",
+            )
+            if round_index == 1:
+                first_digest = digest
+            if round_index == len(history):
+                if round_decision != "approved" or round_issues or digest != final_digest:
+                    raise ValueError(f"{prefix}.review_history final round must approve the final revised content")
+            elif round_decision == "needs_revision":
+                next_digest = str(history[round_index].get("content_sha256", "")).upper()
+                if digest == next_digest:
+                    raise ValueError(
+                        f"{prefix}.review_history[{round_index}] claims a rewrite but the next round has the same content digest"
+                    )
+        if expected_rounds < 2 and any(record.get("decision") == "needs_revision" for record in history):
+            raise ValueError(f"{prefix}.review_history needs a second review after a revision")
+        first_round_digests.append(first_digest)
+        final_round_digests.append(final_digest)
+        if first_digest != draft_digest:
+            raise ValueError(f"{prefix}.review_history first content digest must match draft_content")
+        if not any(record.get("decision") == "needs_revision" for record in history) and draft_digest != final_digest:
+            raise ValueError(f"{prefix}.draft_content differs from final content without a revision round")
+    expected_draft_rollup = content_digest_rollup(first_round_digests)
+    expected_final_rollup = content_digest_rollup(final_round_digests)
+    if provenance.get("draft_content_sha256", "").upper() != expected_draft_rollup:
+        raise ValueError(
+            "authoring_provenance.draft_content_sha256 must match the ordered first-review lesson digest rollup"
+        )
+    if provenance.get("final_content_sha256", "").upper() != expected_final_rollup:
+        raise ValueError(
+            "authoring_provenance.final_content_sha256 must match the ordered final reviewed lesson digest rollup"
+        )
+    rewritten = any(
+        record.get("decision") == "needs_revision"
+        for lesson in data.get("lessons", [])
+        for record in ((lesson.get("pedagogical_review") or {}).get("review_history", []) if isinstance(lesson, dict) else [])
+        if isinstance(record, dict)
+    )
+    if rewritten and expected_draft_rollup == expected_final_rollup:
+        raise ValueError("review_history attests a rewrite but course draft and final digests are identical")
+
+
+def validate_agent_owned_content(data: dict[str, Any], *, allow_test_fixture: bool = False) -> None:
+    """Production boundary for Agent authoring, revision, and final consumption."""
+
+    if data.get("content_contract_version") != "2.2":
+        return
+    _validate_agent_authoring_provenance(data, allow_test_fixture=allow_test_fixture)
+    _validate_pedagogical_review_contract(data)
 
 
 def _known_template_version(path: Path) -> str | None:
@@ -697,7 +956,14 @@ def _decimal_hours(value: Any, field_name: str, *, allow_zero: bool = False) -> 
     return Decimal(str(value))
 
 
-def _validate_locator_evidence(reference: dict[str, Any], prefix: str, *, allow_generic: bool) -> None:
+def _validate_locator_evidence(
+    reference: dict[str, Any],
+    prefix: str,
+    *,
+    allow_generic: bool,
+    require_authority: bool = False,
+    reject_placeholder: bool = False,
+) -> None:
     title = require_meaningful_text(reference.get("title", reference.get("text", "")), f"{prefix}.title", 2)
     source_kind = reference.get("source_kind")
     if source_kind not in REFERENCE_SOURCE_KINDS:
@@ -706,6 +972,8 @@ def _validate_locator_evidence(reference: dict[str, Any], prefix: str, *, allow_
         raise ValueError(f"{prefix} is a resource-only item, not a citable document")
     if reference_looks_like_placeholder(title):
         raise ValueError(f"{prefix}.title is a generic reference placeholder and is not renderable")
+    if reject_placeholder and _reference_has_placeholder_identity(reference):
+        raise ValueError(f"{prefix} contains placeholder identity or evidence")
     evidence = reference.get("evidence")
     evidence_text = require_meaningful_text(evidence, f"{prefix}.evidence") if evidence is not None else None
     if source_kind == "generic":
@@ -726,13 +994,23 @@ def _validate_locator_evidence(reference: dict[str, Any], prefix: str, *, allow_
         or REFERENCE_EVIDENCE_LOCATOR_PATTERN.search(evidence_text)
     ):
         raise ValueError(f"{prefix}.verified_public evidence must contain a URL or an official locatable source")
+    if require_authority and source_kind == "verified_public":
+        source_url = require_meaningful_text(reference.get("source_url"), f"{prefix}.source_url")
+        if not REFERENCE_EVIDENCE_URL_PATTERN.fullmatch(source_url):
+            raise ValueError(f"{prefix}.source_url must be an http(s) URL")
+        require_meaningful_text(reference.get("authoritative_source"), f"{prefix}.authoritative_source", 2)
 
 
 def _validate_materials_v21(data: dict[str, Any]) -> None:
     materials = data["course_materials"]
     textbook = materials.get("textbook") if isinstance(materials, dict) else None
     if textbook is not None:
-        _validate_locator_evidence(textbook, "course_materials.textbook", allow_generic=False)
+        _validate_locator_evidence(
+            textbook,
+            "course_materials.textbook",
+            allow_generic=False,
+            reject_placeholder=True,
+        )
 
     pool = data.get("reference_pool", [])
     reference_ids: set[str] = set()
@@ -785,9 +1063,24 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
     materials = data["course_materials"]
     textbook = materials.get("textbook") if isinstance(materials, dict) else None
     if textbook is not None:
-        _validate_locator_evidence(textbook, "course_materials.textbook", allow_generic=False)
+        _validate_locator_evidence(
+            textbook,
+            "course_materials.textbook",
+            allow_generic=False,
+            reject_placeholder=True,
+        )
 
     pool = data.get("reference_pool", [])
+    research = data.get("reference_research") or {}
+    research_status = research.get("status") if isinstance(research, dict) else None
+    if research_status not in {"verified_external_source", "no_verified_external_source"}:
+        raise ValueError(
+            "reference_research.status must record whether a verified external source was available"
+        )
+    if research_status == "no_verified_external_source" and pool:
+        raise ValueError(
+            "reference_pool must be empty when reference_research.status=no_verified_external_source"
+        )
     reference_by_id: dict[str, dict[str, Any]] = {}
     for index, reference in enumerate(pool, 1):
         prefix = f"reference_pool[{index}]"
@@ -799,15 +1092,109 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
             raise ValueError(f"{prefix}.reference_type must be one of {', '.join(REFERENCE_TYPES)}")
         if reference.get("source_region") not in {"domestic", "foreign", "unknown"}:
             raise ValueError(f"{prefix}.source_region must be domestic, foreign, or unknown")
-        _validate_locator_evidence(reference, prefix, allow_generic=True)
+        _validate_locator_evidence(
+            reference,
+            prefix,
+            allow_generic=False,
+            require_authority=True,
+            reject_placeholder=True,
+        )
         metadata_errors = reference_metadata_errors(reference, prefix)
         if metadata_errors:
             raise ValueError("; ".join(metadata_errors))
 
+    queries = research.get("queries", []) if isinstance(research, dict) else []
+    sources = research.get("sources", []) if isinstance(research, dict) else []
+    if research_status == "no_verified_external_source":
+        if queries or sources:
+            raise ValueError(
+                "reference_research queries and sources must be empty when no verified external source is available"
+            )
+    else:
+        query_by_lesson: dict[str, str] = {}
+        for index, query_record in enumerate(queries, 1):
+            if not isinstance(query_record, dict):
+                raise ValueError(f"reference_research.queries[{index}] must be an object")
+            lesson_id = require_meaningful_text(
+                query_record.get("lesson_id"),
+                f"reference_research.queries[{index}].lesson_id",
+            )
+            if lesson_id in query_by_lesson:
+                raise ValueError(f"reference_research.queries contains duplicate lesson_id {lesson_id!r}")
+            query = require_meaningful_text(
+                query_record.get("query"),
+                f"reference_research.queries[{index}].query",
+                6,
+            )
+            query_by_lesson[lesson_id] = query
+        known_lesson_ids = {str(lesson.get("lesson_id")) for lesson in data.get("lessons", [])}
+        unknown_queries = sorted(set(query_by_lesson) - known_lesson_ids)
+        if unknown_queries:
+            raise ValueError(
+                "reference_research.queries contains unknown lesson IDs: " + ", ".join(unknown_queries)
+            )
+        for lesson in data.get("lessons", []):
+            lesson_id = str(lesson.get("lesson_id"))
+            if not lesson.get("reference_ids"):
+                continue
+            query = query_by_lesson.get(lesson_id)
+            if not query:
+                raise ValueError(
+                    f"reference_research.queries must include the course/major/topic query for {lesson_id}"
+                )
+            compact_query = re.sub(r"\s+", "", query).casefold()
+            for source_term, label in (
+                (data.get("course_name"), "course_name"),
+                (data.get("major"), "major"),
+                (lesson.get("task"), f"{lesson_id}.task"),
+            ):
+                compact_term = re.sub(r"\s+", "", str(source_term)).casefold()
+                if compact_term and compact_term not in compact_query:
+                    raise ValueError(
+                        f"reference_research.queries[{lesson_id}] must be derived from {label}"
+                    )
+        source_by_id: dict[str, dict[str, Any]] = {}
+        for index, source in enumerate(sources, 1):
+            if not isinstance(source, dict):
+                raise ValueError(f"reference_research.sources[{index}] must be an object")
+            reference_id = require_meaningful_text(
+                source.get("reference_id"),
+                f"reference_research.sources[{index}].reference_id",
+            )
+            if reference_id in source_by_id:
+                raise ValueError(f"reference_research.sources contains duplicate reference_id {reference_id!r}")
+            source_by_id[reference_id] = source
+        verified_reference_ids = {
+            reference_id
+            for reference_id, reference in reference_by_id.items()
+            if reference.get("source_kind") == "verified_public"
+        }
+        unexpected_source_ids = sorted(set(source_by_id) - verified_reference_ids)
+        if unexpected_source_ids:
+            raise ValueError(
+                "reference_research.sources contains evidence for non-verified or unknown references: "
+                + ", ".join(unexpected_source_ids)
+            )
+        for reference_id, reference in reference_by_id.items():
+            if reference.get("source_kind") != "verified_public":
+                continue
+            source = source_by_id.get(reference_id)
+            if source is None:
+                raise ValueError(
+                    f"reference_research.sources is missing evidence for verified reference {reference_id}"
+                )
+            binding_errors = reference_source_binding_errors(
+                reference,
+                source,
+                f"reference_research.sources[{reference_id}]",
+            )
+            if binding_errors:
+                raise ValueError("; ".join(binding_errors))
+
     textbook_identity = reference_identity(textbook) if textbook is not None else ""
     if data.get("allow_textbook_as_reference", False):
         raise ValueError(
-            "allow_textbook_as_reference is not supported in Content Contract 2.2.2; "
+            "allow_textbook_as_reference is not supported in Content Contract 2.2; "
             "course_materials.textbook and reference_pool are separate"
         )
     if textbook_identity:
@@ -822,8 +1209,10 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
         if lesson["lesson_type"] != "theory":
             raise ValueError(f"{prefix}.lesson_type must be theory; practice belongs to Practice Task/WorkOrder artifacts")
         ids = [str(value) for value in lesson.get("reference_ids", [])]
-        if not ids:
-            raise ValueError(f"{prefix}.reference_ids must contain at least one citable reference")
+        if not ids and research_status != "no_verified_external_source":
+            raise ValueError(
+                f"{prefix}.reference_ids may be empty only when reference_research.status=no_verified_external_source"
+            )
         if len(ids) != len(set(ids)):
             raise ValueError(f"{prefix}.reference_ids must not contain duplicate IDs within one lesson")
         missing = [value for value in ids if value not in reference_by_id]
@@ -840,9 +1229,15 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
                 )
             if normalized_text:
                 seen_reference_content[normalized_text] = reference_id
+        if lesson.get("practice_task_ids") != []:
+            raise ValueError(f"{prefix}.practice_task_ids must remain [] in Content Contract 2.2")
 
 
-def _validate_implementation_stage_invariants(lessons: list[dict[str, Any]]) -> None:
+def _validate_implementation_stage_invariants(
+    lessons: list[dict[str, Any]],
+    *,
+    exact_out_of_class: bool = False,
+) -> None:
     """Validate the canonical nine-stage schedule shared by every V2 contract."""
 
     expected_stage_ids = list(IMPLEMENTATION_STAGE_IDS)
@@ -896,21 +1291,34 @@ def _validate_implementation_stage_invariants(lessons: list[dict[str, Any]]) -> 
                 f"expected {int(expected_minutes)}, got {int(classroom_minutes)}"
             )
 
-        out_of_class_limit = max(60, int(expected_minutes))
-        for stage_id, minutes in out_of_class_minutes:
-            if minutes < 0 or minutes > out_of_class_limit:
+        if exact_out_of_class:
+            expected_out_of_class = {
+                "before_class_preparation": 10,
+                "after_class_improvement": 15,
+            }
+            for stage_id, minutes in out_of_class_minutes:
+                expected_value = expected_out_of_class[stage_id]
+                if minutes != expected_value:
+                    raise ValueError(
+                        "out-of-class minutes must be fixed: "
+                        f"lesson_id={lesson_id} stage={stage_id} actual={minutes} expected={expected_value}"
+                    )
+        else:
+            out_of_class_limit = max(60, int(expected_minutes))
+            for stage_id, minutes in out_of_class_minutes:
+                if minutes < 0 or minutes > out_of_class_limit:
+                    raise ValueError(
+                        "out-of-class minutes sanity failed: "
+                        f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
+                    )
+            out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
+            total_limit = 2 * int(expected_minutes)
+            if out_of_class_total > total_limit:
                 raise ValueError(
                     "out-of-class minutes sanity failed: "
-                    f"lesson_id={lesson_id} stage={stage_id} actual={minutes} limit={out_of_class_limit}"
+                    f"lesson_id={lesson_id} stage=out_of_class_total "
+                    f"actual={out_of_class_total} limit={total_limit}"
                 )
-        out_of_class_total = sum(minutes for _stage_id, minutes in out_of_class_minutes)
-        total_limit = 2 * int(expected_minutes)
-        if out_of_class_total > total_limit:
-            raise ValueError(
-                "out-of-class minutes sanity failed: "
-                f"lesson_id={lesson_id} stage=out_of_class_total "
-                f"actual={out_of_class_total} limit={total_limit}"
-            )
 
 
 def _validate_practice_contract_v21(data: dict[str, Any]) -> None:
@@ -1086,9 +1494,8 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
         if lesson_theory != hours or lesson_practice != 0:
             raise ValueError(f"{prefix} theory Lesson must have theory_hours=hours and practice_hours=0")
         actual_theory += hours
-        for task_id in lesson.get("practice_task_ids", []):
-            if not isinstance(task_id, str) or not task_id.strip():
-                raise ValueError(f"{prefix}.practice_task_ids contains an empty task ID")
+        if lesson.get("practice_task_ids") != []:
+            raise ValueError(f"{prefix}.practice_task_ids must remain [] in Content Contract 2.2")
 
     if actual_theory != theory:
         raise ValueError(
@@ -1130,23 +1537,14 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
             if item.get(field_name) != expected:
                 raise ValueError(f"outline[{index}].{field_name} must match lessons[{index}]")
 
-    _validate_implementation_stage_invariants(data["lessons"])
+    _validate_implementation_stage_invariants(data["lessons"], exact_out_of_class=True)
 
     workorders_requested = bool(artifact_plan.get("practice_work_orders"))
     practice_contract = data.get("practice_task_contract")
-    lesson_task_ids = [
-        str(task_id)
-        for lesson in lessons
-        for task_id in lesson.get("practice_task_ids", [])
-    ]
     if not workorders_requested:
         if practice_contract is not None:
             raise ValueError(
                 "practice_task_contract is forbidden when artifact_plan.practice_work_orders=false"
-            )
-        if lesson_task_ids:
-            raise ValueError(
-                "lessons.practice_task_ids are forbidden when artifact_plan.practice_work_orders=false"
             )
         return
 
@@ -1163,8 +1561,45 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
         raise ValueError(
             "practice_task_contract is required when artifact_plan.practice_work_orders=true"
         )
-    if practice_contract["course_name"] != data["course_name"]:
-        raise ValueError("practice_task_contract.course_name must equal course_name")
+    if practice_contract.get("contract_version") != "1.1":
+        raise ValueError(
+            "practice_task_contract.contract_version must be 1.1 for the Practice Task handoff"
+        )
+    expected_profile = {
+        "course_name": data["course_name"],
+        "major": data["major"],
+        "audience": data["audience"],
+        "total_hours": data["total_hours"],
+        "theory_hours": plan["theory_hours"],
+        "practice_hours": plan["practice_hours"],
+        "delivery_mode": plan["mode"],
+        "default_lesson_hours": data["default_hours"],
+    }
+    actual_profile = practice_contract.get("course_profile")
+    if not isinstance(actual_profile, dict) or set(actual_profile) != set(expected_profile):
+        raise ValueError(
+            "practice_task_contract.course_profile must contain exactly the confirmed course profile fields"
+        )
+    for field_name, expected in expected_profile.items():
+        if field_name in {"total_hours", "theory_hours", "practice_hours", "default_lesson_hours"}:
+            actual = _decimal_hours(
+                actual_profile[field_name],
+                f"practice_task_contract.course_profile.{field_name}",
+                allow_zero=field_name in {"theory_hours", "practice_hours"},
+            )
+            expected_value = _decimal_hours(
+                expected,
+                f"course_profile.{field_name}",
+                allow_zero=field_name in {"theory_hours", "practice_hours"},
+            )
+            if actual != expected_value:
+                raise ValueError(
+                    f"practice_task_contract.course_profile.{field_name} must equal confirmed course information"
+                )
+        elif actual_profile.get(field_name) != expected:
+            raise ValueError(
+                f"practice_task_contract.course_profile.{field_name} must equal confirmed course information"
+            )
     if practice_contract.get("granularity") != "per_task":
         raise ValueError(
             "practice_task_contract.granularity must be per_task when practice_work_orders=true"
@@ -1213,16 +1648,8 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
             "practice task hours must equal delivery_plan.practice_hours: "
             f"expected {practice}, got {task_hours}"
         )
-    unresolved_task_ids = sorted(
-        {
-            str(task_id)
-            for lesson in lessons
-            for task_id in lesson.get("practice_task_ids", [])
-            if str(task_id) not in task_by_id
-        }
-    )
-    if unresolved_task_ids:
-        raise ValueError("lessons.practice_task_ids contains unresolved task IDs: " + ", ".join(unresolved_task_ids))
+    # PracticeTask -> Lesson is intentionally one-way.  Lesson records never
+    # carry reverse task IDs, so there is no reverse-link reconciliation here.
 
 
 def _validate_meaningful_contract(data: dict[str, Any]) -> None:
@@ -1314,7 +1741,12 @@ def _validate_meaningful_contract(data: dict[str, Any]) -> None:
                         )
 
 
-def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
+def _validate_content_v2(
+    data: dict[str, Any],
+    schema_path: Path | str,
+    *,
+    allow_test_fixture: bool = False,
+) -> None:
     version = data.get("content_contract_version")
     if version not in COMPATIBLE_CONTENT_CONTRACT_VERSIONS:
         raise ValueError(
@@ -1335,6 +1767,7 @@ def _validate_content_v2(data: dict[str, Any], schema_path: Path | str) -> None:
             raise ValueError("confirmed course information mismatch: " + "; ".join(confirmed_errors))
         _validate_materials_v22(data)
         _validate_practice_contract_v22(data)
+        validate_agent_owned_content(data, allow_test_fixture=allow_test_fixture)
         return
     for field_name in ("default_hours", "total_hours"):
         if field_name in data:
@@ -1463,9 +1896,23 @@ def validate_input(
     _validate_legacy_input(data)
 
 
-def validate_content_v2_input(data: dict[str, Any], schema_path: Path | str = DEFAULT_SCHEMA) -> None:
+def validate_content_v2_input(
+    data: dict[str, Any],
+    schema_path: Path | str = DEFAULT_SCHEMA,
+    *,
+    allow_test_fixture: bool = False,
+) -> None:
     """Explicit production entry point used by both generation and output QA."""
-    _validate_content_v2(data, schema_path)
+    _validate_content_v2(data, schema_path, allow_test_fixture=allow_test_fixture)
+
+
+def validate_test_fixture_content_v2_input(
+    data: dict[str, Any],
+    schema_path: Path | str = DEFAULT_SCHEMA,
+) -> None:
+    """Explicit non-production validator for synthetic acceptance fixtures."""
+
+    _validate_content_v2(data, schema_path, allow_test_fixture=True)
 
 
 def validate_input_legacy_compatibility(data: dict[str, Any]) -> None:

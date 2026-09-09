@@ -40,19 +40,12 @@
 - 完成 Gold Closure、dynamic browser smoke、multi-viewport overflow、production pipeline E2E、offline/no-external-resource 与 student/teacher separation；Final Human Gold review：PASS。
 - Courseware 作为理论课上游 Skill，不依赖或反向修改 Practice；自动化 QA 通过不等于教学内容天然完美。
 
-## 实践课 HTML 生成器 1.0.0 — 2026-09-06
+## Lesson 2.2.3 / WorkOrder 2.2.0 Structural Closeout — 2026-09-08
 
-- 新增 `practice-class-html-generator` 1.0.0：以 Courseware Content Contract 1.0 为首选上游，生成学生任务、学习中心、学习指南、动态基础工具包和教师指南，并输出合同/内链/互动 QA。
-- 加入数据结构、软件建模/UML、数据库三套内容差异明显的真实 fixture，覆盖代码 starter、建模脚手架和 ER/SQL/工具操作。
-- Courseware Skill 仅补充下游消费说明并保持稳定 `slide.id` 约束，不建立反向依赖。
-
-## HTML 课件生成器 1.0.0 — 2026-09-06
-
-- 新增独立的 `HTML课件生成器/courseware-html-generator` Skill，使用 `Courseware Content Contract 1.0` 将教材、PPT、讲义、教案或其他课程资料渲染为学生课堂展示版和教师逐页备课版。
-- 内置确定性 renderer：明亮莫兰迪学院风、16:9 投影布局、内联 CSS/JavaScript、SVG/代码/表格/quiz/stepper、投影增强、点击/滚轮/键盘翻页和逐页教师逐字稿布局。
-- 学生版不输出教师备注、来源式措辞、制作信息或内部时长；学生/教师 HTML 均为无服务器、无 CDN、无外部字体/图片依赖的单文件离线文档。
-- 新增 Content/HTML/离线 QA、事务式 Codex 安装器、跨工具 adapter、数据结构与 UML fixture，以及真实 Playwright 浏览器交互 smoke，覆盖任意非交互位置点击、滚轮上下翻页、单 wheel 不多跳和交互按钮不误翻页。
-- 本 Skill 独立于 Lesson DOCX 与 Practice WorkOrder，不修改既有模板或上游合同。
+- Lesson 继续使用 Content Contract 2.2，固定每课课前 10 分钟、课后 15 分钟；课中仍按 `hours × 45` 分配，课外时间不计入课程课时。
+- 课程级教材、教学资源和参考文献继续分离；书籍作者/编辑、书名、出版社必填，年份可选；无可验证外部来源时允许空 reference pool 并记录检索状态。
+- Lesson 的实践任务反向字段保持空数组；Practice Task Contract 1.1 从已确认课程基本盘单向连接理论 Lesson。
+- WorkOrder Content 1.1 增加显式 linked/standalone 模式、课程基本盘、完整来源任务快照和 Agent pedagogical review；每项 2 学时，固定 10+90=100 分，交付物—验收使用 ID 映射。
 
 ## Lesson / WorkOrder Contract Fix 2.2.1 — 2026-09-05
 

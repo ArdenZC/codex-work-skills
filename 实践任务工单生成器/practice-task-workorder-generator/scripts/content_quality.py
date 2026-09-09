@@ -1,367 +1,245 @@
-"""Deterministic Content V1 quality checks for practice work orders."""
+"""Small deterministic gates for Practice WorkOrder Content 1.1.
+
+The Agent owns pedagogical judgement. This module only checks schema-shaped
+facts, fixed scoring, empty fields, exact duplicate narratives, and explicit
+deliverable-to-criterion ID mappings.
+"""
 
 from __future__ import annotations
 
 import re
-import unicodedata
-from typing import Any, Iterable
+from typing import Any
 
-from content_contract import normalise_text
+from content_contract import (
+    WorkOrderContractError,
+    canonicalise_content,
+    normalise_text,
+    validate_canonical_content,
+)
 
 
 class WorkOrderQualityError(ValueError):
     pass
 
 
-_ANSWER_MARKERS = (
-    "标准答案",
-    "参考答案",
-    "教师答案",
-    "完整sql",
-    "最终sql",
-    "最终e-r图",
-    "最终er图",
-    "操作结论",
-)
-_VAGUE_ONLY = {
-    "完成任务",
-    "按照要求完成任务",
-    "按要求完成",
-    "认真操作",
-    "认真完成任务",
-    "完成相关工作",
-    "完成相关内容",
-    "进行实践",
-    "提交作业",
-    "提交任务成果",
-    "完成练习",
-    "检查任务结果",
-}
-_VAGUE_FRAGMENTS = (
-    "认真",
-    "按要求",
-    "按照要求",
-    "相关工作",
-    "相关内容",
-    "完成任务",
-    "进行实践",
-    "提交作业",
-    "提交任务成果",
-    "检查任务结果",
-)
-_ACTION_MARKERS = (
-    "创建",
-    "设计",
-    "分析",
-    "绘制",
-    "配置",
-    "记录",
-    "测量",
-    "核对",
-    "整理",
-    "编写",
-    "实施",
-    "观察",
-    "清洁",
-    "评估",
-    "验证",
-    "操作",
-    "建立",
-    "提取",
-    "划分",
-    "设置",
-    "复核",
-    "收集",
-    "分类",
-    "标记",
-    "执行",
-    "检查",
-    "提交",
-    "阅读",
-    "圈定",
-    "选择",
-    "补充",
-    "签名",
-    "完成",
-)
-_IT_MARKERS = ("sql", "数据库索引", "java", "ide", "mysql", "api")
-_NURSING_MARKERS = ("患者", "血压", "无菌", "生命体征", "护理操作")
-_RESOURCE_ONLY = (
-    "投影仪",
-    "ppt",
-    "mysql workbench",
-    "血压计",
-    "数据库服务器",
-    "护理模型",
-    "计算机机房",
-)
+def _compact(value: Any) -> str:
+    return re.sub(r"\s+", "", normalise_text(value)).casefold()
 
 
-def _compact(text: Any) -> str:
-    value = unicodedata.normalize("NFKC", normalise_text(text)).casefold()
-    return re.sub(r"[\s\W_]+", "", value, flags=re.UNICODE)
-
-
-def _all_text(content: dict[str, Any]) -> str:
-    values: list[Any] = [
-        content.get("course_name", ""),
-        content.get("major", ""),
-        content.get("class_or_audience", ""),
-        content.get("project_name", ""),
-        content.get("task_title", ""),
-        content.get("project_id", ""),
-        *content.get("safety_or_compliance", []),
-    ]
-    for item in content.get("task_items", []):
-        values.extend([item.get("title", ""), item.get("description", "")])
-        for key in ("tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
-            values.extend(item.get(key, []))
-    return " ".join(normalise_text(value) for value in values).casefold()
-
-
-def _reference_looks_like_resource_only(text: str) -> bool:
-    """Compatibility helper; WorkOrder has no reference field of its own."""
-
-    cleaned = normalise_text(text).casefold().strip("。；;:：")
-    return cleaned in {item.casefold() for item in _RESOURCE_ONLY}
-
-
-def _is_vague_only(text: Any) -> bool:
-    compact = _compact(text)
-    if not compact:
-        return True
-    if compact in {_compact(value) for value in _VAGUE_ONLY}:
-        return True
-    remainder = compact
-    for fragment in _VAGUE_FRAGMENTS:
-        remainder = remainder.replace(_compact(fragment), "")
-    return len(remainder) < 4
-
-
-def _is_vague_deliverable(text: Any) -> bool:
-    return _compact(text) in {
-        "完成任务",
-        "实验结果",
-        "学习成果",
-        "任务成果",
-        "相关材料",
-        "提交成果",
-        "结果",
-    }
-
-
-def _is_vague_criterion(text: Any) -> bool:
-    return _compact(text) in {
-        "认真完成任务",
-        "按照要求完成",
-        "按要求完成",
-        "符合要求",
-        "质量合格",
-        "完成任务",
-        "结果正确",
-    }
+def _display(value: Any) -> str:
+    if isinstance(value, dict):
+        return normalise_text(value.get("text", ""))
+    return normalise_text(value)
 
 
 def _narrative_key(item: dict[str, Any]) -> tuple[Any, ...]:
     return (
         _compact(item.get("title", "")),
         _compact(item.get("description", "")),
-        tuple(_compact(value) for value in item.get("deliverables", [])),
-        tuple(_compact(value) for value in item.get("acceptance_criteria", [])),
+        tuple(
+            (_compact(value.get("deliverable_id")), _compact(value.get("text")))
+            if isinstance(value, dict)
+            else _compact(value)
+            for value in item.get("deliverables", [])
+        ),
+        tuple(
+            (_compact(value.get("criterion_id")), _compact(value.get("text")))
+            if isinstance(value, dict)
+            else _compact(value)
+            for value in item.get("acceptance_criteria", [])
+        ),
     )
 
 
-def _coverage_anchor(value: Any) -> set[str]:
-    compact = _compact(value)
-    if not compact:
-        return set()
-    anchors = {compact}
-    if len(compact) >= 2:
-        anchors.update(compact[index : index + 2] for index in range(len(compact) - 1))
-    anchors.update(token.casefold() for token in re.findall(r"[a-z0-9]+", str(value)))
-    return anchors
+def _review_ok(content: dict[str, Any]) -> bool:
+    review = content.get("pedagogical_review")
+    return (
+        isinstance(review, dict)
+        and review.get("status") == "approved"
+        and review.get("capacity") == "fit"
+        and len(normalise_text(review.get("summary", ""))) >= 12
+        and isinstance(review.get("checks"), dict)
+        and bool(review.get("checks"))
+    )
 
 
-def _has_coverage(source: Any, targets: Iterable[Any]) -> bool:
-    source_text = _compact(source)
-    if not source_text:
-        return False
-    source_anchors = _coverage_anchor(source)
-    for target in targets:
-        target_text = _compact(target)
-        if source_text == target_text or (len(source_text) >= 3 and source_text in target_text):
-            return True
-        if any(len(anchor) >= 2 for anchor in source_anchors & _coverage_anchor(target)):
-            return True
-    return False
+def _answer_leakage(content: dict[str, Any]) -> bool:
+    """Keep the student-facing contract free of explicit answer material."""
 
-
-def _step_has_action_and_object(text: Any) -> bool:
-    """Apply the minimum deterministic action + object step gate."""
-
-    value = normalise_text(text)
-    if _is_vague_only(value):
-        return False
-    compact = _compact(value)
-    actions = [
-        (compact.find(_compact(marker)), _compact(marker))
-        for marker in _ACTION_MARKERS
-        if _compact(marker) in compact
-    ]
-    if not actions:
-        return False
-    position, action = min(actions, key=lambda item: item[0])
-    remainder = compact[:position] + compact[position + len(action) :]
-    # A concrete target may be short (for example, “结果” in “检查结果”),
-    # but an action by itself must not pass.
-    return len(remainder) >= 2
-
-
-def validate_content(content: dict[str, Any]) -> dict[str, Any]:
-    """Run semantic checks after JSON Schema validation."""
-
-    errors: list[str] = []
-    executability_errors: list[str] = []
-    deliverable_errors: list[str] = []
-    acceptance_errors: list[str] = []
-    cross_domain_errors: list[str] = []
-    total_task_score = 0
-    major_text = normalise_text(content.get("major", "")).casefold()
-    try:
-        practice_hours = int(content.get("practice_hours"))
-    except (TypeError, ValueError):
-        practice_hours = 0
-    if practice_hours != 2:
-        errors.append(
-            "practice_hours must equal 2 because one WorkOrder represents exactly one 2-hour Practice Task"
-        )
-
-    for index, item in enumerate(content.get("task_items", []), start=1):
-        for key in ("title", "description"):
-            if not normalise_text(item.get(key)):
-                errors.append(f"task_items[{index}].{key} is empty")
-        for key in ("tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
-            values = item.get(key, [])
-            if not values or any(not normalise_text(value) for value in values):
-                errors.append(f"task_items[{index}].{key} must contain non-empty text")
-        total_task_score += int(item.get("score", 0) or 0)
-        combined = " ".join(
-            [normalise_text(item.get("title")), normalise_text(item.get("description"))]
-            + [
-                normalise_text(value)
-                for key in ("steps", "deliverables", "acceptance_criteria")
-                for value in item.get(key, [])
+    fragments: list[str] = []
+    for item in content.get("task_items", []):
+        if not isinstance(item, dict):
+            continue
+        fragments.extend(
+            [
+                normalise_text(item.get("title")),
+                normalise_text(item.get("description")),
+                *[normalise_text(value) for value in item.get("steps", [])],
+                *[_display(value) for value in item.get("deliverables", [])],
+                *[_display(value) for value in item.get("acceptance_criteria", [])],
             ]
-        ).casefold()
-        if any(marker.casefold() in combined for marker in _ANSWER_MARKERS):
-            errors.append(f"task_items[{index}] contains answer/key leakage")
-        if _is_vague_only(item.get("description")) or _is_vague_only(item.get("title")):
-            executability_errors.append(f"task_items[{index}] is only a generic task phrase")
-        if not any(marker.casefold() in combined for marker in _ACTION_MARKERS):
-            executability_errors.append(f"task_items[{index}] has no substantive action")
-        if len(_compact(combined)) < 8:
-            executability_errors.append(f"task_items[{index}] does not name a professional object")
-        for step_index, step in enumerate(item.get("steps", []), start=1):
-            if not _step_has_action_and_object(step):
-                executability_errors.append(
-                    f"{content.get('practice_task_id', '<unknown>')} task_item[{index}] "
-                    f"step[{step_index}] is vague or lacks action/object: {normalise_text(step)!r}"
-                )
+        )
+    text = "\n".join(fragments)
+    return bool(
+        re.search(
+            r"(?:标准答案|参考答案|正确答案|教师答案|答案\s*[:：]|完整(?:的)?\s*(?:SQL|代码|模型|结果))",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
 
-        for deliverable in item.get("deliverables", []):
-            if _is_vague_deliverable(deliverable):
-                deliverable_errors.append(
-                    f"task_items[{index}] has an unobservable deliverable: {deliverable}"
-                )
-        criteria = item.get("acceptance_criteria", [])
-        observable_criteria = [value for value in criteria if not _is_vague_criterion(value)]
-        if not criteria or not observable_criteria:
-            acceptance_errors.append(
-                f"{content.get('practice_task_id', '<unknown>')} task_item[{index}]: "
-                "missing observable acceptance criterion (category=acceptance)"
+
+def _mapping_errors(item: dict[str, Any], index: int) -> list[str]:
+    errors: list[str] = []
+    deliverables = item.get("deliverables", [])
+    criteria = item.get("acceptance_criteria", [])
+    if any(not isinstance(value, dict) for value in deliverables):
+        errors.append(f"task_items[{index}].deliverables must use objects with deliverable_id and text")
+        return errors
+    if any(not isinstance(value, dict) for value in criteria):
+        errors.append(f"task_items[{index}].acceptance_criteria must use objects with criterion_id, text, and covers")
+        return errors
+    deliverable_ids = [str(value.get("deliverable_id")) for value in deliverables]
+    criterion_ids = [str(value.get("criterion_id")) for value in criteria]
+    if len(deliverable_ids) != len(set(deliverable_ids)):
+        errors.append(f"task_items[{index}].deliverables contains duplicate deliverable_id")
+    if len(criterion_ids) != len(set(criterion_ids)):
+        errors.append(f"task_items[{index}].acceptance_criteria contains duplicate criterion_id")
+    covered: set[str] = set()
+    known = set(deliverable_ids)
+    for criterion in criteria:
+        covers = criterion.get("covers", [])
+        unknown = [str(value) for value in covers if str(value) not in known]
+        if unknown:
+            errors.append(
+                f"task_items[{index}] criterion {criterion.get('criterion_id')} covers unknown deliverable IDs: {', '.join(unknown)}"
             )
-        else:
-            for deliverable in item.get("deliverables", []):
-                if _is_vague_deliverable(deliverable):
-                    continue
-                if not _has_coverage(deliverable, observable_criteria):
-                    acceptance_errors.append(
-                        f"{content.get('practice_task_id', '<unknown>')} task_item[{index}]: "
-                        f"deliverable {normalise_text(deliverable)!r} has no observable "
-                        f"acceptance coverage; missing_deliverable={normalise_text(deliverable)!r} "
-                        "(category=acceptance)"
-                    )
+        covered.update(str(value) for value in covers if str(value) in known)
+    missing = [value for value in deliverable_ids if value not in covered]
+    if missing:
+        errors.append(
+            f"task_items[{index}] deliverables are not mapped to acceptance criteria: {', '.join(missing)}"
+        )
+    return errors
 
-    errors.extend(executability_errors)
-    errors.extend(deliverable_errors)
-    errors.extend(acceptance_errors)
+
+def _canonical_for_quality(content: dict[str, Any], *, allow_legacy: bool) -> tuple[dict[str, Any] | None, list[str]]:
+    if not isinstance(content, dict):
+        return None, ["WorkOrder Content must be an object"]
+    legacy = content.get("content_contract_version") == "1.0"
+    if legacy and not allow_legacy:
+        return None, ["WorkOrder Content 1.0 is legacy; use the explicit legacy adapter"]
+    try:
+        value = canonicalise_content(content, compatibility=legacy)
+        if not legacy:
+            value = validate_canonical_content(value)
+        return value, []
+    except WorkOrderContractError as exc:
+        return None, [str(exc)]
+
+
+def validate_content(content: dict[str, Any], *, allow_legacy: bool = False) -> dict[str, Any]:
+    """Validate fixed facts and explicit ID mappings; pedagogy is Agent-owned."""
+
+    canonical, errors = _canonical_for_quality(content, allow_legacy=allow_legacy)
+    if canonical is None:
+        return {
+            "status": "fail",
+            "errors": errors,
+            "warnings": [],
+            "categories": {"schema": "fail", "domain": "agent_reviewed"},
+            "metrics": {"semantic_quality_source": "Agent pedagogical review"},
+        }
+    structural_errors: list[str] = []
+    mapping_errors: list[str] = []
+    practice_hours = canonical.get("practice_hours")
+    if practice_hours != 2:
+        errors.append("practice_hours must equal 2 because one WorkOrder represents exactly one 2-hour Practice Task")
+    if canonical.get("mode") not in {"linked", "standalone"}:
+        errors.append("mode must be linked or standalone")
+    if not _review_ok(canonical):
+        errors.append("pedagogical_review must be approved with capacity=fit before DOCX generation")
+    answer_leakage = _answer_leakage(canonical)
+    if answer_leakage:
+        errors.append("answer/key leakage is not allowed in student-facing WorkOrder content")
+    task_items = canonical.get("task_items", [])
+    if not isinstance(task_items, list) or not 1 <= len(task_items) <= 5:
+        structural_errors.append("task_items must contain between 1 and 5 items")
+        task_items = task_items if isinstance(task_items, list) else []
+    total_task_score = 0
+    narrative_keys: list[tuple[Any, ...]] = []
+    for index, item in enumerate(task_items, start=1):
+        if not isinstance(item, dict):
+            structural_errors.append(f"task_items[{index}] must be an object")
+            continue
+        if not normalise_text(item.get("title")) or not normalise_text(item.get("description")):
+            structural_errors.append(f"task_items[{index}] title and description must be non-empty")
+        for key in ("tools_or_materials", "steps", "deliverables", "acceptance_criteria"):
+            if not item.get(key):
+                structural_errors.append(f"task_items[{index}].{key} must contain non-empty values")
+        try:
+            total_task_score += int(item.get("score", 0))
+        except (TypeError, ValueError):
+            structural_errors.append(f"task_items[{index}].score must be an integer")
+        narrative_keys.append(_narrative_key(item))
+        mapping_errors.extend(_mapping_errors(item, index))
+    errors.extend(structural_errors)
+    errors.extend(mapping_errors)
     if total_task_score != 90:
         errors.append(f"task item scores must total 90, got {total_task_score}")
-
-    all_text = _all_text(content)
-    if any(marker in major_text for marker in ("护理", "临床", "助产")):
-        if any(marker in all_text for marker in _IT_MARKERS):
-            cross_domain_errors.append("nursing content contains unrelated IT terminology")
-    if any(marker in major_text for marker in ("软件", "计算机", "信息", "数据库")):
-        if any(marker in all_text for marker in _NURSING_MARKERS):
-            cross_domain_errors.append("software content contains unrelated nursing terminology")
-    errors.extend(cross_domain_errors)
-
-    safety_values = content.get("safety_or_compliance", [])
-    if safety_values and any(not normalise_text(value) for value in safety_values):
-        errors.append("safety_or_compliance contains empty text")
-
-    narrative_keys = [_narrative_key(item) for item in content.get("task_items", [])]
-    repetition_failed = len(narrative_keys) != len(set(narrative_keys))
-    if repetition_failed:
-        errors.append("task item narrative duplicates are not allowed within one work order")
-
-    total_score = 10 + total_task_score
+    duplicate_narrative = len(narrative_keys) != len(set(narrative_keys))
+    if duplicate_narrative:
+        errors.append("task item narrative duplicates are not allowed within one WorkOrder")
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,
         "warnings": [],
         "categories": {
+            "schema": "pass",
             "practice_hours_unit": "pass" if practice_hours == 2 else "fail",
-            "executability": "fail" if executability_errors else "pass",
-            "deliverable": "fail" if deliverable_errors else "pass",
-            "acceptance": "fail" if acceptance_errors else "pass",
-            "cross_domain": "fail" if cross_domain_errors else "pass",
-            "repetition": "fail" if repetition_failed else "pass",
+            "executability": "fail" if structural_errors else "pass",
+            "capacity": "pass" if _review_ok(canonical) else "fail",
+            "deliverable": "fail" if mapping_errors else "pass",
+            "acceptance": "fail" if mapping_errors else "pass",
+            "repetition": "fail" if duplicate_narrative else "pass",
             "score": "pass" if total_task_score == 90 else "fail",
+            "domain": "agent_reviewed",
+            "answer_boundary": "fail" if answer_leakage else "pass",
         },
         "metrics": {
             "practice_hours": practice_hours,
-            "task_count": len(content.get("task_items", [])),
+            "task_count": len(task_items),
             "attendance_score": 10,
             "task_score": total_task_score,
-            "total_score": total_score,
+            "total_score": 100 if total_task_score == 90 else 10 + total_task_score,
+            "deliverable_acceptance_mapping": "id_based",
+            "semantic_quality_source": "Agent pedagogical review",
         },
     }
 
 
-def validate_collection(contents: list[dict[str, Any]]) -> dict[str, Any]:
-    """Check each work order and only its student-facing narrative for reuse."""
-
-    reports = [validate_content(content) for content in contents]
+def validate_collection(contents: list[dict[str, Any]], *, allow_legacy: bool = False) -> dict[str, Any]:
+    reports = [validate_content(content, allow_legacy=allow_legacy) for content in contents]
     errors = [
         f"content[{index}]: {error}"
         for index, report in enumerate(reports)
         for error in report["errors"]
     ]
-    skeletons = [
-        tuple(_narrative_key(item) for item in content["task_items"])
+    canonical_items = [
+        canonicalise_content(content, compatibility=allow_legacy and content.get("content_contract_version") == "1.0")
         for content in contents
     ]
+    skeletons = [tuple(_narrative_key(item) for item in content.get("task_items", [])) for content in canonical_items]
     if len(skeletons) > 1 and len(set(skeletons)) == 1:
-        errors.append("all generated work orders have the same task narrative skeleton")
+        errors.append("all generated WorkOrders have the same task narrative skeleton")
     all_narratives = [
         _narrative_key(item)
-        for content in contents
-        for item in content["task_items"]
+        for content in canonical_items
+        for item in content.get("task_items", [])
+        if isinstance(item, dict)
     ]
     if len(all_narratives) != len(set(all_narratives)):
-        errors.append("duplicate task narrative is not allowed across work orders")
+        errors.append("duplicate task narrative is not allowed across WorkOrders")
     return {
         "status": "pass" if not errors else "fail",
         "errors": errors,
@@ -370,11 +248,7 @@ def validate_collection(contents: list[dict[str, Any]]) -> dict[str, Any]:
         "metrics": {
             "content_count": len(contents),
             "total_score": 100,
-            "repetition_scope": [
-                "task_items.title",
-                "task_items.description",
-                "task_items.deliverables",
-                "task_items.acceptance_criteria",
-            ],
+            "repetition_scope": ["task_items.title", "task_items.description", "task_items.deliverables", "task_items.acceptance_criteria"],
+            "semantic_quality_source": "Agent pedagogical review",
         },
     }

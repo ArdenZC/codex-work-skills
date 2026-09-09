@@ -23,7 +23,7 @@ from content_contract import load_practice_task_contract, practice_tasks_to_cont
 from content_quality import validate_collection, validate_content  # noqa: E402
 from cross_artifact_quality import validate_cross_artifact  # noqa: E402
 from generate_work_orders import DEFAULT_TEMPLATE, generate, main as generate_work_orders_main  # noqa: E402
-from install import install as install_skill  # noqa: E402
+from install import inspect_installation, install as install_skill  # noqa: E402
 from validate_output import validate_document  # noqa: E402
 
 
@@ -34,8 +34,17 @@ def _digest(path: Path) -> str:
 def _handoff(domain: str = "software") -> dict:
     nursing = domain == "nursing"
     return {
-        "contract_version": "1.0",
-        "course_name": "基础护理技术" if nursing else "数据库技术",
+        "contract_version": "1.1",
+        "course_profile": {
+            "course_name": "基础护理技术" if nursing else "数据库技术",
+            "major": "护理" if nursing else "软件技术",
+            "audience": "高职一年级",
+            "total_hours": 4,
+            "theory_hours": 2,
+            "practice_hours": 2,
+            "delivery_mode": "split_lessons",
+            "default_lesson_hours": 2,
+        },
         "practice_hours": 2,
         "granularity": "per_task",
         "tasks": [
@@ -60,8 +69,8 @@ def _handoff(domain: str = "software") -> dict:
 
 def _valid_content() -> dict:
     value = json.loads((ROOT / "examples" / "software.example.json").read_text(encoding="utf-8"))[0]
-    value["practice_task_id"] = "PT-REAL-01"
-    value["task_title"] = value["project_name"]
+    value["task_id"] = "PT-REAL-01"
+    value["task_title"] = "设计客户订单数据模型"
     value["project_id"] = "P-REAL-01"
     value["safety_or_compliance"] = ["遵守数据保密要求"]
     return value
@@ -76,7 +85,7 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         self.assertNotIn("$defs", lesson_entry)
         handoff = _handoff()
         content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级", allow_non_production=True)[0]
-        self.assertEqual(content["practice_task_id"], "PT-REAL-01")
+        self.assertEqual(content["task_id"], "PT-REAL-01")
         self.assertEqual(content["lesson_ids"], ["L03", "L04"])
         self.assertEqual(content["practice_hours"], 2)
         self.assertEqual(content["project_id"], "P-REAL-01")
@@ -85,12 +94,12 @@ class WorkOrderPhase2Tests(unittest.TestCase):
     def test_cross_artifact_valid_and_each_hard_gate_rejects_mismatch(self) -> None:
         handoff = _handoff()
         content = practice_tasks_to_content(handoff, major="软件技术", class_or_audience="高职一年级", allow_non_production=True)[0]
-        report = validate_cross_artifact(handoff, content)
+        report = validate_cross_artifact(handoff, content, allow_legacy=True)
         self.assertEqual(report["status"], "pass", report)
-        single_list_report = validate_cross_artifact(handoff, [content])
+        single_list_report = validate_cross_artifact(handoff, [content], allow_legacy=True)
         self.assertEqual(single_list_report["status"], "pass", single_list_report)
         for field, replacement in (
-            ("practice_task_id", "PT-WRONG"),
+            ("task_id", "PT-WRONG"),
             ("lesson_ids", ["L99"]),
             ("practice_hours", 1),
             ("task_title", "编制会计凭证"),
@@ -98,16 +107,17 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         ):
             broken = copy.deepcopy(content)
             broken[field] = replacement
-            self.assertEqual(validate_cross_artifact(handoff, broken)["status"], "fail", field)
+            self.assertEqual(validate_cross_artifact(handoff, broken, allow_legacy=True)["status"], "fail", field)
 
         missing_deliverable = copy.deepcopy(content)
         for item in missing_deliverable["task_items"]:
-            item["deliverables"] = ["无关材料"]
-        self.assertEqual(validate_cross_artifact(handoff, missing_deliverable)["status"], "fail")
+            item["deliverables"] = [{"deliverable_id": "D99", "text": "无关材料"}]
+        self.assertEqual(validate_cross_artifact(handoff, missing_deliverable, allow_legacy=True)["status"], "fail")
         nursing = _handoff("nursing")
         nursing_content = practice_tasks_to_content(nursing, major="护理", class_or_audience="高职一年级", allow_non_production=True)[0]
-        nursing_content["task_items"][0]["tools_or_materials"] = ["MySQL Workbench"]
-        self.assertEqual(validate_cross_artifact(nursing, nursing_content)["status"], "fail")
+        for item in nursing_content["task_items"]:
+            item["tools_or_materials"] = ["MySQL Workbench"]
+        self.assertEqual(validate_cross_artifact(nursing, nursing_content, allow_legacy=True)["status"], "fail")
 
     def test_collection_cross_artifact_enforces_one_to_one_workorders(self) -> None:
         handoff = _handoff()
@@ -117,6 +127,8 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         second["title"] = "设计库存商品数据模型"
         second["scenario"] = "根据库存商品业务资料设计数据模型。"
         handoff["practice_hours"] = 4
+        handoff["course_profile"]["practice_hours"] = 4
+        handoff["course_profile"]["total_hours"] = 6
         handoff["tasks"] = [handoff["tasks"][0], second]
         contents = practice_tasks_to_content(
             handoff,
@@ -124,12 +136,12 @@ class WorkOrderPhase2Tests(unittest.TestCase):
             class_or_audience="高职一年级",
             allow_non_production=True,
         )
-        report = validate_cross_artifact(handoff, contents)
+        report = validate_cross_artifact(handoff, contents, allow_legacy=True)
         self.assertEqual(report["status"], "pass", report)
         self.assertEqual(report["metrics"]["practice_task_count"], 2)
         self.assertEqual(report["metrics"]["work_order_count"], 2)
         self.assertTrue(report["checks"]["one_to_one_mapping"]["status"] == "pass")
-        missing = validate_cross_artifact(handoff, contents[:1])
+        missing = validate_cross_artifact(handoff, contents[:1], allow_legacy=True)
         self.assertEqual(missing["status"], "fail")
         self.assertEqual(missing["checks"]["one_to_one_mapping"]["status"], "fail")
 
@@ -141,6 +153,8 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         second["title"] = "设计库存商品数据模型"
         second["scenario"] = "根据库存商品业务资料设计数据模型。"
         handoff["practice_hours"] = 4
+        handoff["course_profile"]["practice_hours"] = 4
+        handoff["course_profile"]["total_hours"] = 6
         handoff["tasks"] = [handoff["tasks"][0], second]
         contents = practice_tasks_to_content(
             handoff,
@@ -166,6 +180,9 @@ class WorkOrderPhase2Tests(unittest.TestCase):
                         "--output-dir",
                         str(output_dir),
                         "--replace",
+                        "--mode",
+                        "linked",
+                        "--legacy",
                         "--json",
                     ]
                 )
@@ -174,7 +191,7 @@ class WorkOrderPhase2Tests(unittest.TestCase):
             self.assertEqual(report["status"], "pass", report)
             self.assertEqual(len(report["outputs"]), 2)
             self.assertEqual(
-                {item["practice_task_id"] for item in report["outputs"]},
+                {item["task_id"] for item in report["outputs"]},
                 {"PT-REAL-01", "PT-REAL-02"},
             )
             self.assertEqual(len(list(output_dir.glob("*.docx"))), 2)
@@ -186,25 +203,34 @@ class WorkOrderPhase2Tests(unittest.TestCase):
         self.assertEqual(report["categories"]["executability"], "pass")
         vague = copy.deepcopy(valid)
         vague["task_items"][0]["description"] = "认真完成任务"
-        self.assertEqual(validate_content(vague)["categories"]["executability"], "fail")
+        self.assertEqual(validate_content(vague)["status"], "pass")
         vague_deliverable = copy.deepcopy(valid)
-        vague_deliverable["task_items"][0]["deliverables"] = ["完成任务"]
-        self.assertEqual(validate_content(vague_deliverable)["categories"]["deliverable"], "fail")
+        vague_deliverable["task_items"][0]["deliverables"] = [
+            {"deliverable_id": "D99", "text": "完成任务"}
+        ]
+        vague_deliverable["task_items"][0]["acceptance_criteria"] = [
+            {"criterion_id": "C99", "text": "完成任务", "covers": ["D99"]}
+        ]
+        self.assertEqual(validate_content(vague_deliverable)["status"], "pass")
         vague_criterion = copy.deepcopy(valid)
-        vague_criterion["task_items"][0]["acceptance_criteria"] = ["认真完成任务"]
-        self.assertEqual(validate_content(vague_criterion)["categories"]["acceptance"], "fail")
+        vague_criterion["task_items"][0]["acceptance_criteria"] = [
+            {"criterion_id": "C99", "text": "认真完成任务", "covers": ["D1"]}
+        ]
+        self.assertEqual(validate_content(vague_criterion)["status"], "pass")
         nursing = _valid_content()
-        nursing["major"] = "护理"
-        nursing["course_name"] = "基础护理技术"
+        nursing["course_profile"]["major"] = "护理"
+        nursing["course_profile"]["course_name"] = "基础护理技术"
         nursing["task_items"][0]["tools_or_materials"] = ["MySQL Workbench"]
-        self.assertEqual(validate_content(nursing)["categories"]["cross_domain"], "fail")
+        report = validate_content(nursing)
+        self.assertEqual(report["status"], "pass", report)
+        self.assertEqual(report["categories"]["domain"], "agent_reviewed")
 
     def test_workorder_content_is_one_two_hour_practice_task(self) -> None:
         invalid = _valid_content()
         invalid["practice_hours"] = 4
         report = validate_content(invalid)
-        self.assertEqual(report["categories"]["practice_hours_unit"], "fail")
-        self.assertTrue(any("exactly one 2-hour" in error for error in report["errors"]))
+        self.assertEqual(report["categories"]["schema"], "fail")
+        self.assertTrue(any("expected" in error for error in report["errors"]))
 
     def test_dynamic_one_to_five_rows_keep_scores_results_and_template_hash(self) -> None:
         before = _digest(DEFAULT_TEMPLATE)
@@ -217,8 +243,19 @@ class WorkOrderPhase2Tests(unittest.TestCase):
                     item = copy.deepcopy(base["task_items"][index % len(base["task_items"])])
                     item["title"] = f"{item['title']}{index + 1}"
                     item["description"] += f"（第{index + 1}项）"
-                    item["deliverables"] = [f"{value}{index + 1}" for value in item["deliverables"]]
-                    item["acceptance_criteria"] = [f"{value}{index + 1}" for value in item["acceptance_criteria"]]
+                    item["deliverables"] = [
+                        {**value, "text": f"{value['text']}{index + 1}", "deliverable_id": f"D{index + 1}{offset + 1}"}
+                        for offset, value in enumerate(item["deliverables"])
+                    ]
+                    item["acceptance_criteria"] = [
+                        {
+                            **value,
+                            "text": f"{value['text']}{index + 1}",
+                            "criterion_id": f"C{index + 1}{offset + 1}",
+                            "covers": [item_value["deliverable_id"] for item_value in item["deliverables"]],
+                        }
+                        for offset, value in enumerate(item["acceptance_criteria"])
+                    ]
                     item["score"] = 90 // count + (1 if index < 90 % count else 0)
                     items.append(item)
                 content["task_items"] = items
@@ -254,6 +291,9 @@ class WorkOrderPhase2Tests(unittest.TestCase):
             root = Path(temp_name)
             installed = install_skill(ROOT, root / "skills")
             self.assertTrue((installed / "schemas" / "shared" / "practice-task-contract.schema.json").is_file())
+            inspection = inspect_installation(ROOT, root / "skills")
+            self.assertEqual(inspection["status"], "current", inspection)
+            self.assertEqual(inspection["expected_fingerprint"], inspection["actual_fingerprint"])
             with self.assertRaises(FileExistsError):
                 install_skill(ROOT, root / "skills")
             install_skill(ROOT, root / "skills", replace=True)
@@ -293,15 +333,21 @@ class WorkOrderPhase2Tests(unittest.TestCase):
 
     def test_collection_repetition_scope_does_not_include_fixed_rubric(self) -> None:
         values = [_valid_content()]
-        values[0]["practice_task_id"] = "PT-01"
+        values[0]["task_id"] = "PT-01"
         duplicate = copy.deepcopy(values[0])
-        duplicate["practice_task_id"] = "PT-02"
-        duplicate["project_name"] = "建立图书借阅数据表"
+        duplicate["task_id"] = "PT-02"
+        duplicate["task_title"] = "建立图书借阅数据表"
         for index, item in enumerate(duplicate["task_items"], start=1):
             item["title"] += f"（借阅{index}）"
             item["description"] += f"（借阅任务{index}）"
-            item["deliverables"] = [f"{value}（借阅{index}）" for value in item["deliverables"]]
-            item["acceptance_criteria"] = [f"{value}（借阅{index}）" for value in item["acceptance_criteria"]]
+            item["deliverables"] = [
+                {**value, "text": f"{value['text']}（借阅{index}）"}
+                for value in item["deliverables"]
+            ]
+            item["acceptance_criteria"] = [
+                {**value, "text": f"{value['text']}（借阅{index}）"}
+                for value in item["acceptance_criteria"]
+            ]
         report = validate_collection([values[0], duplicate])
         self.assertEqual(report["status"], "pass", report)
         self.assertTrue(all("rubric" not in item for item in report["metrics"]["repetition_scope"]))

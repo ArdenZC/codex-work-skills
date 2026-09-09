@@ -1,13 +1,22 @@
 [
   {
-    "content_contract_version": "1.0",
-    "course_name": "数据库技术",
-    "major": "软件技术",
-    "class_or_audience": "高职软件技术一年级",
-    "practice_task_id": "DB-WO-01",
+    "content_contract_version": "1.1",
+    "mode": "standalone",
+    "course_profile": {
+      "course_name": "数据库技术",
+      "major": "软件技术",
+      "audience": "高职软件技术一年级",
+      "total_hours": 40,
+      "theory_hours": 20,
+      "practice_hours": 20,
+      "delivery_mode": "split_lessons",
+      "default_lesson_hours": 2
+    },
+    "task_id": "DB-WO-01",
+    "project_id": "DB-P-01",
+    "task_title": "设计客户订单数据模型",
     "lesson_ids": ["L03", "L04"],
     "granularity": "per_task",
-    "project_name": "设计客户订单数据模型",
     "practice_hours": 2,
     "group": {
       "name": "第____组",
@@ -21,8 +30,10 @@
         "score": 30,
         "tools_or_materials": ["业务说明单", "建模记录表"],
         "steps": ["圈定业务对象", "记录对象之间的关系及其依据"],
-        "deliverables": ["业务对象与关系分析表"],
-        "acceptance_criteria": ["对象命名统一", "每条关系都能回指业务说明"]
+        "deliverables": [{"deliverable_id": "D1", "text": "业务对象与关系分析表"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C1", "text": "对象命名统一且每条关系都能回指业务说明", "covers": ["D1"]}
+        ]
       },
       {
         "title": "绘制概念模型",
@@ -30,10 +41,13 @@
         "score": 35,
         "tools_or_materials": ["建模工具", "概念模型检查表"],
         "steps": ["建立实体和联系", "补充主要属性并核对基数"],
-        "deliverables": ["概念模型图", "模型说明页"],
+        "deliverables": [
+          {"deliverable_id": "D2", "text": "概念模型图"},
+          {"deliverable_id": "D3", "text": "模型说明页"}
+        ],
         "acceptance_criteria": [
-          "概念模型图和模型说明页的实体、联系及属性说明保持一致",
-          "关系基数有业务依据"
+          {"criterion_id": "C2", "text": "概念模型图与模型说明页的实体、联系及属性保持一致", "covers": ["D2", "D3"]},
+          {"criterion_id": "C3", "text": "关系基数有业务依据", "covers": ["D2"]}
         ]
       },
       {
@@ -42,20 +56,47 @@
         "score": 25,
         "tools_or_materials": ["文件清单", "版本记录表"],
         "steps": ["核对图表名称和版本", "整理材料并记录小组修改点"],
-        "deliverables": ["小组提交包", "版本记录表"],
-        "acceptance_criteria": ["提交包文件齐全", "版本记录能够说明本次修改"]
+        "deliverables": [
+          {"deliverable_id": "D4", "text": "小组提交包"},
+          {"deliverable_id": "D5", "text": "版本记录表"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C4", "text": "提交包文件齐全", "covers": ["D4"]},
+          {"criterion_id": "C5", "text": "版本记录能够说明本次修改", "covers": ["D5"]}
+        ]
       }
-    ]
+    ],
+    "safety_or_compliance": ["遵守数据保密要求"],
+    "pedagogical_review": {
+      "status": "approved",
+      "capacity": "fit",
+      "summary": "任务围绕业务资料、模型产出与版本复核组织，普通学生可在九十分钟内完成核心交付并留下可核验证据。",
+      "checks": {
+        "professional_accuracy": true,
+        "ordinary_student_90_minutes": true,
+        "deliverable_acceptance_mapping": true,
+        "no_teacher_answer": true
+      }
+    }
   },
   {
-    "content_contract_version": "1.0",
-    "course_name": "数据库技术",
-    "major": "软件技术",
-    "class_or_audience": "高职软件技术一年级",
-    "practice_task_id": "DB-WO-02",
+    "content_contract_version": "1.1",
+    "mode": "standalone",
+    "course_profile": {
+      "course_name": "数据库技术",
+      "major": "软件技术",
+      "audience": "高职软件技术一年级",
+      "total_hours": 40,
+      "theory_hours": 20,
+      "practice_hours": 20,
+      "delivery_mode": "split_lessons",
+      "default_lesson_hours": 2
+    },
+    "task_id": "DB-WO-02",
+    "project_id": "DB-P-02",
+    "task_title": "建立图书借阅数据表",
     "lesson_ids": ["L07", "L08"],
     "granularity": "per_task",
-    "project_name": "建立图书借阅数据表",
     "practice_hours": 2,
     "group": {
       "name": "第____组",
@@ -69,8 +110,10 @@
         "score": 30,
         "tools_or_materials": ["借阅业务资料", "字段分析表"],
         "steps": ["提取业务字段", "核对字段含义和取值要求"],
-        "deliverables": ["字段分析表"],
-        "acceptance_criteria": ["字段覆盖业务资料", "每个字段都有清晰含义"]
+        "deliverables": [{"deliverable_id": "D1", "text": "字段分析表"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C1", "text": "字段覆盖业务资料且每个字段都有清晰含义", "covers": ["D1"]}
+        ]
       },
       {
         "title": "设计数据表结构",
@@ -78,11 +121,9 @@
         "score": 35,
         "tools_or_materials": ["表结构设计表", "数据库客户端"],
         "steps": ["划分数据表", "设置字段类型和标识字段", "记录设计理由"],
-        "deliverables": ["数据表结构设计表"],
+        "deliverables": [{"deliverable_id": "D2", "text": "数据表结构设计表"}],
         "acceptance_criteria": [
-          "数据表结构设计表的字段类型、标识字段和表间关系均有设计记录",
-          "字段类型与业务含义匹配",
-          "表间关系表达清楚"
+          {"criterion_id": "C2", "text": "字段类型、标识字段和表间关系均有设计记录", "covers": ["D2"]}
         ]
       },
       {
@@ -91,20 +132,47 @@
         "score": 25,
         "tools_or_materials": ["结构检查表", "版本记录表"],
         "steps": ["核对结构和命名", "整理提交文件并记录修改点"],
-        "deliverables": ["结构检查记录", "设计提交包"],
-        "acceptance_criteria": ["检查项均有记录", "提交材料与最终记录一致"]
+        "deliverables": [
+          {"deliverable_id": "D3", "text": "结构检查记录"},
+          {"deliverable_id": "D4", "text": "设计提交包"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C3", "text": "检查项均有记录", "covers": ["D3"]},
+          {"criterion_id": "C4", "text": "提交材料与最终记录一致", "covers": ["D4"]}
+        ]
       }
-    ]
+    ],
+    "safety_or_compliance": ["遵守数据保密要求"],
+    "pedagogical_review": {
+      "status": "approved",
+      "capacity": "fit",
+      "summary": "字段分析、结构设计和提交复核形成连续产出，工具准备与核验步骤适合普通学生在九十分钟内完成。",
+      "checks": {
+        "professional_accuracy": true,
+        "ordinary_student_90_minutes": true,
+        "deliverable_acceptance_mapping": true,
+        "no_teacher_answer": true
+      }
+    }
   },
   {
-    "content_contract_version": "1.0",
-    "course_name": "数据库技术",
-    "major": "软件技术",
-    "class_or_audience": "高职软件技术一年级",
-    "practice_task_id": "DB-WO-03",
+    "content_contract_version": "1.1",
+    "mode": "standalone",
+    "course_profile": {
+      "course_name": "数据库技术",
+      "major": "软件技术",
+      "audience": "高职软件技术一年级",
+      "total_hours": 40,
+      "theory_hours": 20,
+      "practice_hours": 20,
+      "delivery_mode": "split_lessons",
+      "default_lesson_hours": 2
+    },
+    "task_id": "DB-WO-03",
+    "project_id": "DB-P-03",
+    "task_title": "检查数据查询需求",
     "lesson_ids": ["L12", "L13"],
     "granularity": "per_task",
-    "project_name": "检查数据查询需求",
     "practice_hours": 2,
     "group": {
       "name": "第____组",
@@ -118,8 +186,10 @@
         "score": 30,
         "tools_or_materials": ["查询需求单", "需求记录表"],
         "steps": ["标记查询对象", "整理条件和排序要求"],
-        "deliverables": ["查询需求拆解表"],
-        "acceptance_criteria": ["需求项没有遗漏", "每项需求均有来源说明"]
+        "deliverables": [{"deliverable_id": "D1", "text": "查询需求拆解表"}],
+        "acceptance_criteria": [
+          {"criterion_id": "C1", "text": "需求项没有遗漏且每项需求均有来源说明", "covers": ["D1"]}
+        ]
       },
       {
         "title": "设计验证样例",
@@ -127,8 +197,14 @@
         "score": 35,
         "tools_or_materials": ["案例数据集", "验证记录表"],
         "steps": ["选择代表性数据", "整理验证样例并标注观察点"],
-        "deliverables": ["验证样例表", "观察点记录"],
-        "acceptance_criteria": ["样例覆盖关键条件", "观察点与需求对应"]
+        "deliverables": [
+          {"deliverable_id": "D2", "text": "验证样例表"},
+          {"deliverable_id": "D3", "text": "观察点记录"}
+        ],
+        "acceptance_criteria": [
+          {"criterion_id": "C2", "text": "样例覆盖关键条件", "covers": ["D2"]},
+          {"criterion_id": "C3", "text": "观察点与需求对应", "covers": ["D3"]}
+        ]
       },
       {
         "title": "完成检查记录",
@@ -136,13 +212,27 @@
         "score": 25,
         "tools_or_materials": ["查询检查表", "小组记录表"],
         "steps": ["复核需求与样例对应关系", "记录小组意见和修改点"],
-        "deliverables": ["查询检查记录", "小组意见记录"],
+        "deliverables": [
+          {"deliverable_id": "D4", "text": "查询检查记录"},
+          {"deliverable_id": "D5", "text": "小组意见记录"}
+        ],
         "acceptance_criteria": [
-          "查询检查记录的每项检查有结论依据",
-          "小组意见记录中的修改点可定位到具体材料",
-          "修改点可定位到具体材料"
+          {"criterion_id": "C4", "text": "每项检查有结论依据", "covers": ["D4"]},
+          {"criterion_id": "C5", "text": "修改点可定位到具体材料", "covers": ["D5"]}
         ]
       }
-    ]
+    ],
+    "safety_or_compliance": ["遵守数据保密要求"],
+    "pedagogical_review": {
+      "status": "approved",
+      "capacity": "fit",
+      "summary": "需求拆解、样例设计和检查记录分别留下分析、验证与复核证据，任务边界适合九十分钟课堂实践。",
+      "checks": {
+        "professional_accuracy": true,
+        "ordinary_student_90_minutes": true,
+        "deliverable_acceptance_mapping": true,
+        "no_teacher_answer": true
+      }
+    }
   }
 ]

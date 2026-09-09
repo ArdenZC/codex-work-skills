@@ -17,6 +17,8 @@ from tests.test_lesson_content_v2 import (
     bookmark_text,
     field_bookmark,
     lesson_generator,
+    lesson_package_common,
+    lesson_content_contract,
     load_manifest,
     run_script,
 )
@@ -122,24 +124,24 @@ def _pool(*, include_foreign: bool = False, generic: bool = False) -> list[dict[
         },
         {
             "reference_id": "REF-STANDARD",
-            "reference_type": "formal_course_document",
-            "authors": ["数据结构课程团队"],
-            "institution": "某职业院校",
-            "title": "数据结构课程标准",
-            "publisher": "某职业院校",
+            "reference_type": "official_documentation",
+            "title": "Python Documentation: Data Structures",
+            "publisher": "Python Software Foundation",
             "source_kind": "verified_public",
-            "source_region": "domestic",
-            "evidence": "https://example.edu.cn/curriculum/data-structure-standard",
+            "source_region": "foreign",
+            "evidence": "https://docs.python.org/3/tutorial/datastructures.html",
+            "source_url": "https://docs.python.org/3/tutorial/datastructures.html",
+            "authoritative_source": "Python Software Foundation official documentation",
         },
     ]
     if generic:
         items[1] = {
             "reference_id": "REF-STANDARD",
             "reference_type": "formal_course_document",
-            "authors": ["数据结构课程团队"],
-            "institution": "某职业院校",
+            "authors": ["课程建设团队"],
+            "institution": "课程建设单位",
             "title": "数据结构课程标准相关章节",
-            "publisher": "某职业院校",
+            "publisher": "课程建设单位",
             "source_kind": "generic",
             "source_region": "domestic",
         }
@@ -153,6 +155,8 @@ def _pool(*, include_foreign: bool = False, generic: bool = False) -> list[dict[
                 "source_kind": "verified_public",
                 "source_region": "foreign",
                 "evidence": "https://docs.python.org/3/tutorial/datastructures.html",
+                "source_url": "https://docs.python.org/3/tutorial/datastructures.html",
+                "authoritative_source": "Python Software Foundation official documentation",
             }
         )
     return items
@@ -228,8 +232,25 @@ def make_v22_payload(
         lesson["hours"] = lesson_hours[index - 1]
         lesson["theory_hours"] = lesson_hours[index - 1]
         lesson["practice_hours"] = 0
-        lesson["reference_ids"] = [str(item["reference_id"]) for item in (references or _pool())[:2]]
+        reference_source = _pool() if references is None else references
+        lesson["reference_ids"] = [str(item["reference_id"]) for item in reference_source[:2]]
         lesson["practice_task_ids"] = []
+        lesson["pedagogical_review"] = {
+            "status": "approved",
+            "capacity": "fit",
+            "summary": "已按课程目标、前置基础、课堂容量、阶段闭环、递进关系和参考资料相关性完成教学审阅。",
+            "checks": {
+                "professional_accuracy": True,
+                "goal_activity_evidence": True,
+                "stage_coherence": True,
+                "capacity_fit": True,
+                "progression": True,
+                "reference_relevance": True,
+            },
+        }
+        lesson["teaching_methods"] = [
+            f"{method}（{focus}）" for method in lesson["teaching_methods"]
+        ]
         lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"L{index - 1:02d}"
         for progression_field in ("prior_learning", "deliverable", "next_bridge"):
             value = str(lesson["progression"][progression_field])
@@ -239,7 +260,7 @@ def make_v22_payload(
         if lesson_hours[index - 1] == 1:
             for stage, minutes in zip(
                 lesson["implementation"],
-                (5, 5, 10, 12, 5, 5, 3, 5, 5),
+                (10, 5, 10, 12, 5, 5, 3, 5, 15),
             ):
                 stage["minutes"] = minutes
         lessons.append(lesson)
@@ -254,10 +275,8 @@ def make_v22_payload(
         related_lessons = [lesson["lesson_id"] for lesson in lessons[: min(2, len(lessons))]]
         for index, hours in enumerate(task_hours, 1):
             tasks.append(_task(f"PT-{index:02d}", hours, course, related_lessons if theory_hours else []))
-        if lessons:
-            lessons[0]["practice_task_ids"] = [task["task_id"] for task in tasks]
 
-    pool = copy.deepcopy(references or _pool())
+    pool = copy.deepcopy(_pool() if references is None else references)
     lesson_ids = [lesson["lesson_id"] for lesson in lessons]
     outline = [
         {
@@ -291,6 +310,45 @@ def make_v22_payload(
         },
         "course_materials": {"textbook": copy.deepcopy(textbook)},
         "reference_pool": pool,
+        "reference_research": {
+            "status": "verified_external_source" if pool else "no_verified_external_source",
+            "note": "测试夹具使用可核实来源" if pool else "测试夹具没有可核实外部来源",
+            "queries": [
+                {
+                    "lesson_id": lesson["lesson_id"],
+                    "query": f"{course} {major} {lesson['task']} reference research",
+                }
+                for lesson in lessons
+                if lesson.get("reference_ids")
+            ],
+            "sources": [
+                {
+                    "reference_id": reference["reference_id"],
+                    "source_url": reference["source_url"],
+                    "source_title": reference["title"],
+                    "source_author_or_organization": (
+                        reference.get("publisher")
+                        or reference.get("institution")
+                        or (reference.get("authors") or [None])[0]
+                    ),
+                    **(
+                        {"source_year": reference["year"]}
+                        if reference.get("year") is not None
+                        else {}
+                    ),
+                    **(
+                        {"source_identifier": reference["source_identifier"]}
+                        if reference.get("source_identifier")
+                        else {}
+                    ),
+                    "authoritative_source": reference["authoritative_source"],
+                }
+                for reference in pool
+                if reference.get("source_kind") == "verified_public"
+                and reference.get("source_url")
+                and reference.get("authoritative_source")
+            ],
+        },
         "allow_textbook_as_reference": allow_textbook,
         "artifact_plan": {
             "lesson_plans": theory_hours > 0,
@@ -301,25 +359,125 @@ def make_v22_payload(
     }
     if practice_work_orders:
         payload["practice_task_contract"] = {
-            "contract_version": "1.0",
-            "course_name": course,
+            "contract_version": "1.1",
+            "course_profile": {
+                "course_name": course,
+                "major": major,
+                "audience": audience,
+                "total_hours": total_hours,
+                "theory_hours": theory_hours,
+                "practice_hours": practice_hours,
+                "delivery_mode": payload["delivery_plan"]["mode"],
+                "default_lesson_hours": default_hours,
+            },
             "practice_hours": practice_hours,
             "granularity": "per_task",
             "tasks": tasks,
         }
+    confirmed = {
+        "course_name": course,
+        "major": major,
+        "audience": audience,
+        "total_hours": total_hours,
+        "theory_hours": theory_hours,
+        "practice_hours": practice_hours,
+        "delivery_mode": payload["delivery_plan"]["mode"],
+    }
+    payload["confirmed_course_info"] = confirmed
+    for lesson in lessons:
+        revised = lesson_package_common.lesson_agent_content(lesson)
+        digest = lesson_package_common.canonical_json_sha256(revised)
+        lesson["pedagogical_review"] = {
+            "issues": [],
+            "draft_content": copy.deepcopy(revised),
+            "revised_content": copy.deepcopy(revised),
+            "decision": "approved",
+            "review_history": [
+                {
+                    "round": 1,
+                    "issues": [],
+                    "decision": "approved",
+                    "content_sha256": digest,
+                }
+            ],
+        }
+    draft_rollup = lesson_package_common.content_digest_rollup([
+        lesson["pedagogical_review"]["review_history"][0]["content_sha256"] for lesson in lessons
+    ])
+    final_rollup = lesson_package_common.content_digest_rollup([
+        lesson_package_common.canonical_json_sha256(lesson_package_common.lesson_agent_content(lesson))
+        for lesson in lessons
+    ])
+    payload["authoring_provenance"] = {
+        "mode": "synthetic_fixture",
+        "status": "completed",
+        "authoring_id": "synthetic-fixture-contract-test",
+        "source_snapshot": {
+            "confirmed_course_profile_sha256": lesson_package_common.canonical_json_sha256(confirmed),
+            "whole_course_outline_sha256": lesson_package_common.canonical_json_sha256(payload["outline"]),
+            "reference_pool_sha256": lesson_package_common.canonical_json_sha256(payload["reference_pool"]),
+        },
+        "draft_content_sha256": draft_rollup,
+        "final_content_sha256": final_rollup,
+        "review_rounds": 1,
+    }
     return payload
 
 
 class LessonContentV22Tests(unittest.TestCase):
     def assert_rejected(self, payload: dict[str, object], pattern: str) -> None:
         with self.assertRaisesRegex(ValueError, pattern):
-            lesson_generator.validate_content_v2_input(payload)
+            lesson_generator.validate_test_fixture_content_v2_input(payload)
 
     def assert_valid_and_qa(self, payload: dict[str, object]) -> dict[str, object]:
-        lesson_generator.validate_content_v2_input(payload)
+        lesson_generator.validate_test_fixture_content_v2_input(payload)
         report = assess_content_quality(payload)
         self.assertEqual(report["status"], "passed", report)
         return report
+
+    def test_production_validator_rejects_synthetic_authoring_without_explicit_test_path(self) -> None:
+        payload = make_v22_payload(theory_hours=2, lesson_count=1, specs=DB_SPECS)
+        with self.assertRaisesRegex(ValueError, r"mode must be 'agent'.*synthetic fixtures"):
+            lesson_generator.validate_content_v2_input(payload)
+
+    def test_production_consumes_reviewed_content_not_the_draft(self) -> None:
+        payload = make_v22_payload(theory_hours=2, lesson_count=1, specs=DB_SPECS)
+        lesson = payload["lessons"][0]
+        revised = copy.deepcopy(lesson_package_common.lesson_agent_content(lesson))
+        revised["student_analysis"]["base"][0] = "根据调研任务拆分角色职责，先处理借阅登记，再验证异常分支。"
+        lesson["pedagogical_review"]["draft_content"] = copy.deepcopy(
+            lesson_package_common.lesson_agent_content(lesson)
+        )
+        lesson["pedagogical_review"]["revised_content"] = revised
+        for field in lesson_package_common.AGENT_OWNED_LESSON_FIELDS:
+            lesson[field] = copy.deepcopy(revised[field])
+        lesson["pedagogical_review"]["review_history"] = [
+            {
+                "round": 1,
+                "issues": [{"category": "template_repetition", "severity": "major", "message": "rewrite"}],
+                "decision": "needs_revision",
+                "content_sha256": lesson_package_common.canonical_json_sha256(
+                    lesson["pedagogical_review"]["draft_content"]
+                ),
+            },
+            {
+                "round": 2,
+                "issues": [],
+                "decision": "approved",
+                "content_sha256": lesson_package_common.canonical_json_sha256(revised),
+            },
+        ]
+        payload["authoring_provenance"]["review_rounds"] = 2
+        payload["authoring_provenance"]["draft_content_sha256"] = lesson_package_common.content_digest_rollup([
+            lesson["pedagogical_review"]["review_history"][0]["content_sha256"]
+        ])
+        payload["authoring_provenance"]["final_content_sha256"] = lesson_package_common.content_digest_rollup([
+            lesson_package_common.canonical_json_sha256(revised)
+        ])
+        lesson_generator.validate_test_fixture_content_v2_input(payload)
+        consumed = lesson_package_common.apply_reviewed_lesson_content(payload)
+        self.assertEqual(consumed["lessons"][0]["student_analysis"], revised["student_analysis"])
+        self.assertNotEqual(consumed["lessons"][0]["student_analysis"], lesson["pedagogical_review"]["draft_content"]["student_analysis"])
 
     def test_40h_and_64h_artifact_hours_have_fixed_two_hour_workorders(self) -> None:
         cases = (
@@ -349,7 +507,7 @@ class LessonContentV22Tests(unittest.TestCase):
 
     def test_theory_remainder_uses_ceil_and_one_hour_lesson(self) -> None:
         payload = make_v22_payload(theory_hours=21, lesson_hours=[2] * 10 + [1], specs=DB_SPECS)
-        lesson_generator.validate_content_v2_input(payload)
+        lesson_generator.validate_test_fixture_content_v2_input(payload)
         self.assertEqual(len(payload["lessons"]), 11)
         self.assertEqual(payload["lessons"][-1]["hours"], 1)
         self.assertEqual(sum(lesson["hours"] for lesson in payload["lessons"]), 21)
@@ -357,11 +515,11 @@ class LessonContentV22Tests(unittest.TestCase):
         rounded = copy.deepcopy(payload)
         rounded["lessons"] = rounded["lessons"][:-1]
         rounded["outline"] = rounded["outline"][:-1]
-        self.assert_rejected(rounded, r"ceil\(theory_hours / default_hours\)")
+        self.assert_rejected(rounded, r"unknown lesson IDs|ceil\(theory_hours / default_hours\)")
 
     def test_pure_theory_and_pure_practice_do_not_invent_opposite_artifact(self) -> None:
         theory = make_v22_payload(theory_hours=32, practice_hours=0, lesson_count=16, specs=SOFTWARE_SPECS)
-        lesson_generator.validate_content_v2_input(theory)
+        lesson_generator.validate_test_fixture_content_v2_input(theory)
         self.assertEqual(len(theory["lessons"]), 16)
         self.assertNotIn("practice_task_contract", theory)
 
@@ -376,7 +534,7 @@ class LessonContentV22Tests(unittest.TestCase):
             specs=NURSING_SPECS,
         )
         report = self.assert_valid_and_qa(practice)
-        lesson_generator.validate_content_v2_input(practice)
+        lesson_generator.validate_test_fixture_content_v2_input(practice)
         self.assertEqual(practice["lessons"], [])
         self.assertEqual(sum(task["practice_hours"] for task in practice["practice_task_contract"]["tasks"]), 32)
         self.assertEqual(len(practice["practice_task_contract"]["tasks"]), 16)
@@ -419,10 +577,15 @@ class LessonContentV22Tests(unittest.TestCase):
         for label, refs in (
             ("provided", _pool()),
             ("verified_public", [
-                {**_pool()[0], "source_kind": "verified_public", "evidence": "https://example.edu.cn/book"},
+                {
+                    **_pool()[0],
+                    "source_kind": "verified_public",
+                    "evidence": "https://docs.python.org/3/tutorial/datastructures.html",
+                    "source_url": "https://docs.python.org/3/tutorial/datastructures.html",
+                    "authoritative_source": "Python Software Foundation official documentation",
+                },
                 _pool()[1],
             ]),
-            ("generic", _pool(generic=True)),
         ):
             with self.subTest(source_kind=label):
                 payload = make_v22_payload(theory_hours=12, lesson_count=6, references=refs, specs=DB_SPECS)
@@ -448,6 +611,13 @@ class LessonContentV22Tests(unittest.TestCase):
                                 finding.get("allowed"),
                                 {"detector": detector, "finding": finding},
                             )
+        generic_payload = make_v22_payload(
+            theory_hours=12,
+            lesson_count=6,
+            references=_pool(generic=True),
+            specs=DB_SPECS,
+        )
+        self.assert_rejected(generic_payload, "compatibility-only")
 
     def test_reference_boundary_and_textbook_exclusion_are_fail_closed(self) -> None:
         for title in ("投影仪", "血压计", "MySQL Workbench"):
@@ -458,7 +628,7 @@ class LessonContentV22Tests(unittest.TestCase):
 
         invented = _pool(generic=True)
         invented[0].update({"title": "《虚构教材》 作者甲 ISBN 978-7-0000-0000-0", "source_kind": "generic"})
-        self.assert_rejected(make_v22_payload(references=invented), "cannot claim a specific bibliographic identity")
+        self.assert_rejected(make_v22_payload(references=invented), "placeholder identity|compatibility-only")
 
         textbook = {
             "title": "数据结构（C语言版）",
@@ -497,7 +667,48 @@ class LessonContentV22Tests(unittest.TestCase):
 
         empty = make_v22_payload(references=_pool())
         empty["lessons"][0]["reference_ids"] = []
-        self.assert_rejected(empty, r"(?:at least one citable reference|should be non-empty)")
+        self.assert_rejected(empty, "may be empty only when reference_research.status=no_verified_external_source")
+
+    def test_verified_public_research_is_bound_to_exact_bibliographic_identity(self) -> None:
+        references = _pool()
+        references[1].update(
+            {
+                "year": 2024,
+                "source_identifier": "Python 3 Data Structures",
+            }
+        )
+        wrong_locator = make_v22_payload(references=references)
+        wrong_locator["reference_research"]["sources"][0]["source_title"] = "A different document"
+        self.assert_rejected(wrong_locator, "source_title must match the canonical reference title")
+
+        wrong_identifier = make_v22_payload(references=references)
+        wrong_identifier["reference_research"]["sources"][0]["source_url"] = (
+            "https://docs.python.org/3/tutorial/other-topic.html"
+        )
+        self.assert_rejected(wrong_identifier, "source_url must match reference_pool exactly")
+
+        missing_one_to_one = make_v22_payload(references=references)
+        missing_one_to_one["reference_research"]["sources"].append(
+            {
+                "reference_id": "REF-UNKNOWN",
+                "source_url": "https://example.org/reference",
+                "source_title": "Unknown reference",
+                "source_author_or_organization": "Unknown organization",
+                "authoritative_source": "Unknown official source",
+            }
+        )
+        self.assert_rejected(missing_one_to_one, "non-verified or unknown references")
+
+    def test_book_year_is_optional_and_edition_identity_is_normalized(self) -> None:
+        first = {"title": "《数据结构（第二版）》"}
+        second = {"title": "《数据结构》第2版"}
+        self.assertEqual(
+            lesson_content_contract.reference_identity(first),
+            lesson_content_contract.reference_identity(second),
+        )
+        references = _pool()
+        references[0].pop("year")
+        self.assert_valid_and_qa(make_v22_payload(references=references))
 
     def test_real_manual_and_domestic_majority_are_quality_passes(self) -> None:
         manual = [
@@ -509,15 +720,17 @@ class LessonContentV22Tests(unittest.TestCase):
                 "source_kind": "verified_public",
                 "source_region": "foreign",
                 "evidence": "https://dev.mysql.com/doc/refman/8.0/en/",
+                "source_url": "https://dev.mysql.com/doc/refman/8.0/en/",
+                "authoritative_source": "Oracle MySQL official reference manual",
             }
         ]
         self.assert_valid_and_qa(make_v22_payload(references=manual))
 
         refs = _pool(include_foreign=True)
         report = self.assert_valid_and_qa(make_v22_payload(references=refs))
-        self.assertEqual(report["coverage"]["reference_metrics"]["domestic_source_count"], 2)
-        self.assertEqual(report["coverage"]["reference_metrics"]["foreign_source_count"], 1)
-        self.assertEqual(report["coverage"]["reference_metrics"]["domestic_share"], 2 / 3)
+        self.assertEqual(report["coverage"]["reference_metrics"]["domestic_source_count"], 1)
+        self.assertEqual(report["coverage"]["reference_metrics"]["foreign_source_count"], 2)
+        self.assertEqual(report["coverage"]["reference_metrics"]["domestic_share"], 1 / 3)
         self.assertTrue(any("below 70%" in warning for warning in report["warnings"]))
 
     def test_reference_reuse_does_not_exempt_same_lesson_or_narrative_duplicates(self) -> None:
@@ -555,7 +768,7 @@ class LessonContentV22Tests(unittest.TestCase):
                 document = Document(path)
                 references = bookmark_text(document, field_bookmark(manifest, "references"))
                 self.assertIn("数据结构（C语言版·第2版）", references)
-                self.assertIn("数据结构课程标准", references)
+                self.assertIn("Python Documentation: Data Structures", references)
                 self.assertNotIn("投影仪", references)
 
 

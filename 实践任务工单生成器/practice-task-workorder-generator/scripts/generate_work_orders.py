@@ -1,4 +1,4 @@
-"""Generate Practice Work Order Content V1 DOCX files transactionally."""
+"""Generate Practice WorkOrder Content 1.1 DOCX files transactionally."""
 
 from __future__ import annotations
 
@@ -20,10 +20,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from content_contract import (  # noqa: E402
     WorkOrderContractError,
+    canonicalise_content,
     load_practice_task_contract,
     load_work_order_content,
     practice_tasks_to_authoring_skeleton,
     safe_filename,
+    validate_canonical_content,
 )
 from content_quality import validate_collection, validate_content  # noqa: E402
 from cross_artifact_quality import validate_cross_artifact  # noqa: E402
@@ -83,12 +85,17 @@ def _format_content_description(item: dict[str, Any]) -> str:
     def joined(values: Iterable[str]) -> str:
         return "；".join(str(value).strip() for value in values if str(value).strip())
 
+    def display(value: Any) -> str:
+        if isinstance(value, dict):
+            return str(value.get("text", "")).strip()
+        return str(value).strip()
+
     return (
         f"{item['description'].strip()}\n"
         f"工具/材料：{joined(item['tools_or_materials'])}\n"
         f"步骤：{joined(item['steps'])}\n"
-        f"交付物：{joined(item['deliverables'])}\n"
-        f"验收：{joined(item['acceptance_criteria'])}"
+        f"交付物：{joined(display(value) for value in item['deliverables'])}\n"
+        f"验收：{joined(display(value) for value in item['acceptance_criteria'])}"
     )
 
 
@@ -104,16 +111,16 @@ def _source_project_name(document: Any) -> str:
     return "项目实训2 设计数据库"
 
 
-def _set_title_paragraphs(document: Any, old_project: str, project_name: str) -> None:
+def _set_title_paragraphs(document: Any, old_project: str, task_title: str) -> None:
     for paragraph in document.paragraphs:
         if "学习工单" in paragraph.text:
-            _replace_paragraph_text(paragraph, f"《{project_name}》学习工单")
+            _replace_paragraph_text(paragraph, f"《{task_title}》学习工单")
         elif "课堂评价表-学生" in paragraph.text:
-            _replace_paragraph_text(paragraph, f"《{project_name}》课堂评价表-学生")
+            _replace_paragraph_text(paragraph, f"《{task_title}》课堂评价表-学生")
         elif "课堂评价表-教师" in paragraph.text:
-            _replace_paragraph_text(paragraph, f"《{project_name}》课堂评价表-教师")
+            _replace_paragraph_text(paragraph, f"《{task_title}》课堂评价表-教师")
         elif old_project in paragraph.text:
-            _replace_in_paragraph(paragraph, old_project, project_name)
+            _replace_in_paragraph(paragraph, old_project, task_title)
 
 
 def _clone_task_rows(table: Any, items: list[dict[str, Any]]) -> None:
@@ -134,19 +141,17 @@ def _write_document(template: Path, output: Path, content: dict[str, Any]) -> No
     if len(document.tables) != 3:
         raise WorkOrderContractError("canonical template must contain exactly three top-level tables")
     old_project = _source_project_name(document)
-    project_name = content["project_name"].strip()
-    _set_title_paragraphs(document, old_project, project_name)
+    task_title = content["task_title"].strip()
+    _set_title_paragraphs(document, old_project, task_title)
     work_table, student_table, teacher_table = document.tables
     _clone_task_rows(work_table, content["task_items"])
+    profile = content["course_profile"]
     metadata_parts = [
-        content["course_name"],
-        f"专业：{content['major']}",
-        f"对象：{content['class_or_audience']}",
-        f"实践任务ID：{content['practice_task_id']}",
-        f"任务标题：{content.get('task_title', content['project_name'])}",
+        profile["course_name"],
+        f"专业：{profile['major']}",
+        f"对象：{profile['audience']}",
+        f"任务主题：{task_title}",
     ]
-    if content.get("project_id"):
-        metadata_parts.append(f"项目ID：{content['project_id']}")
     metadata_parts.extend(
         [
             f"实践学时：{content['practice_hours']}",
@@ -159,19 +164,16 @@ def _write_document(template: Path, output: Path, content: dict[str, Any]) -> No
     if content.get("safety_or_compliance"):
         metadata += "\n安全/合规：" + "；".join(content["safety_or_compliance"])
     _replace_cell_text(work_table.rows[1].cells[0], metadata)
-    _replace_in_table(student_table, old_project, project_name)
-    _replace_in_table(teacher_table, old_project, project_name)
-    document.core_properties.title = f"《{project_name}》学习工单"
-    document.core_properties.subject = (
-        f"Practice Task {content['practice_task_id']} / "
-        f"{content.get('task_title', project_name)}"
-    )
+    _replace_in_table(student_table, old_project, task_title)
+    _replace_in_table(teacher_table, old_project, task_title)
+    document.core_properties.title = f"《{task_title}》学习工单"
+    document.core_properties.subject = f"{profile['course_name']}实践任务学习工单"
     document.core_properties.keywords = " ".join(
         value
         for value in (
-            content["course_name"],
-            content["practice_task_id"],
-            content.get("project_id", ""),
+            profile["course_name"],
+            profile["major"],
+            profile["audience"],
         )
         if value
     )
@@ -260,13 +262,40 @@ def generate(
     output_dir: Path,
     template: Path,
     replace: bool = False,
-    render: bool = False,
+    render: bool | None = None,
+    skip_render: bool = False,
+    legacy: bool = False,
 ) -> dict[str, Any]:
     if not template.is_file():
         raise FileNotFoundError(f"template not found: {template}")
     if not contents:
-        raise WorkOrderContractError("at least one WorkOrder Content V1 item is required")
-    collection_report = validate_collection(contents)
+        raise WorkOrderContractError("at least one WorkOrder Content 1.1 item is required")
+    canonical_contents: list[dict[str, Any]] = []
+    for index, item in enumerate(contents):
+        if not isinstance(item, dict):
+            raise WorkOrderContractError(f"WorkOrder Content item {index} must be an object")
+        is_legacy = item.get("content_contract_version") == "1.0"
+        if is_legacy and not legacy:
+            raise WorkOrderContractError("WorkOrder Content 1.0 is legacy; rerun with --legacy or regenerate as 1.1")
+        canonical_contents.append(
+            canonicalise_content(item, compatibility=is_legacy)
+            if is_legacy
+            else validate_canonical_content(item)
+        )
+    modes = {item.get("mode") for item in canonical_contents}
+    if len(modes) != 1:
+        raise WorkOrderContractError("a WorkOrder batch must use one explicit mode")
+    mode = next(iter(modes))
+    if mode not in {"linked", "standalone"}:
+        raise WorkOrderContractError("mode must be linked or standalone")
+    if mode == "linked" and (skip_render or render is False):
+        raise WorkOrderContractError("linked WorkOrder production requires DOCX render; use standalone for explicit skip-render")
+    effective_render = (mode == "linked") if render is None else bool(render)
+    if skip_render and effective_render:
+        raise WorkOrderContractError("--skip-render cannot be combined with render")
+    if skip_render:
+        effective_render = False
+    collection_report = validate_collection(canonical_contents)
     if collection_report["status"] != "pass":
         raise WorkOrderContractError("Content QA failed: " + "; ".join(collection_report["errors"]))
     output_dir = output_dir.expanduser().absolute()
@@ -275,10 +304,10 @@ def generate(
 
     plans: list[dict[str, Any]] = []
     seen_targets: set[Path] = set()
-    for content in contents:
-        final = output_dir / f"{safe_filename(content['practice_task_id'])}_{safe_filename(content['project_name'])}.docx"
+    for content in canonical_contents:
+        final = output_dir / f"{safe_filename(content['task_id'])}_{safe_filename(content['task_title'])}.docx"
         targets = [final]
-        if render:
+        if effective_render:
             targets.append(output_dir / "render" / final.stem)
         for target in targets:
             if target in seen_targets:
@@ -311,7 +340,7 @@ def generate(
             output_report = validate_document(plan["candidate"], content)
             if output_report["status"] != "pass":
                 raise WorkOrderContractError(
-                    f"Output QA failed for {content['practice_task_id']}: "
+                    f"Output QA failed for {content['task_id']}: "
                     + "; ".join(output_report["errors"])
                 )
             plan["output_qa"] = output_report
@@ -320,30 +349,41 @@ def generate(
             content = plan["content"]
             final = plan["final"]
             result: dict[str, Any] = {
-                "practice_task_id": content["practice_task_id"],
+                "task_id": content["task_id"],
                 "path": str(final),
                 "content_qa": validate_content(content),
                 "output_qa": plan["output_qa"],
             }
-            if render:
+            if effective_render:
                 staged_render_dir = render_dir / final.stem
                 render_report = _render_optional(plan["candidate"], staged_render_dir)
                 if render_report.get("status") != "pass":
                     status = render_report.get("status", "unknown")
                     reason = render_report.get("reason", "no reason supplied")
                     raise WorkOrderContractError(
-                        f"Render QA failed for {content['practice_task_id']}: status={status}; {reason}"
+                        f"Render QA failed for {content['task_id']}: status={status}; {reason}"
                     )
                 plan["render"] = _relocate_render_report(
                     render_report, output_dir / "render" / final.stem
                 )
                 publications.append((output_dir / "render" / final.stem, staged_render_dir))
                 result["render"] = plan["render"]
+            else:
+                result["render"] = {
+                    "status": "skipped" if skip_render else "not_requested",
+                    "reason": "explicit standalone/debug skip-render" if skip_render else "render not requested",
+                }
             publications.append((final, plan["candidate"]))
             results.append(result)
 
         _publish_batch(publications, output_dir=output_dir, stage=stage)
-        return {"status": "pass", "content_qa": collection_report, "outputs": results}
+        return {
+            "status": "pass",
+            "mode": mode,
+            "production_status": "pass" if mode == "linked" and effective_render else "not_production",
+            "content_qa": collection_report,
+            "outputs": results,
+        }
     finally:
         _remove_path(stage)
 
@@ -362,7 +402,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
     parser.add_argument("--replace", action="store_true")
-    parser.add_argument("--render", action="store_true")
+    render_group = parser.add_mutually_exclusive_group()
+    render_group.add_argument("--render", action="store_true")
+    render_group.add_argument("--skip-render", action="store_true")
+    parser.add_argument("--mode", choices=("linked", "standalone"))
+    parser.add_argument("--legacy", action="store_true", help="explicitly enable the 1.0 migration adapter")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     try:
@@ -371,8 +415,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.authoring_skeleton_output and args.content_json:
             raise WorkOrderContractError("--authoring-skeleton-output is only valid for handoff-only input")
         if args.practice_task_json and not args.content_json:
-            handoff = load_practice_task_contract(args.practice_task_json)
-            if args.render:
+            if args.mode == "standalone":
+                raise WorkOrderContractError("--mode standalone cannot be used with Practice Task handoff")
+            handoff = load_practice_task_contract(args.practice_task_json, allow_legacy=args.legacy)
+            if args.render or args.skip_render:
                 raise WorkOrderContractError(
                     "handoff-only input cannot render or generate DOCX; "
                     "Agent-authored --content-json is required"
@@ -393,13 +439,27 @@ def main(argv: list[str] | None = None) -> int:
                 else None,
             }
         else:
-            contents = load_work_order_content(args.content_json)
+            contents = load_work_order_content(args.content_json, allow_legacy=args.legacy)
             if not args.output_dir:
                 raise WorkOrderContractError("--output-dir is required with Agent-authored --content-json")
+            if args.mode and any(item.get("mode") != args.mode for item in contents):
+                raise WorkOrderContractError("--mode does not match the WorkOrder Content mode")
+            detected_mode = {item.get("mode") for item in contents}
+            if len(detected_mode) != 1:
+                raise WorkOrderContractError("WorkOrder Content must contain one explicit mode")
+            content_mode = next(iter(detected_mode))
+            if args.practice_task_json and content_mode != "linked":
+                raise WorkOrderContractError("Practice Task handoff requires WorkOrder Content mode=linked")
+            if not args.practice_task_json and content_mode != "standalone":
+                raise WorkOrderContractError("mode=linked requires Practice Task Contract handoff; standalone content must pass --mode standalone")
+            if not args.practice_task_json and not args.mode:
+                raise WorkOrderContractError("content-only generation requires explicit --mode standalone")
+            if content_mode == "standalone" and not args.render and not args.skip_render:
+                raise WorkOrderContractError("standalone generation requires explicit --render or --skip-render")
             cross_reports: list[dict[str, Any]] = []
             if args.practice_task_json:
-                handoff = load_practice_task_contract(args.practice_task_json)
-                collection_report = validate_cross_artifact(handoff, contents)
+                handoff = load_practice_task_contract(args.practice_task_json, allow_legacy=args.legacy)
+                collection_report = validate_cross_artifact(handoff, contents, allow_legacy=args.legacy)
                 if collection_report["status"] != "pass":
                     raise WorkOrderContractError(
                         "Cross-Artifact QA failed: " + "; ".join(collection_report["errors"])
@@ -415,7 +475,9 @@ def main(argv: list[str] | None = None) -> int:
                 output_dir=args.output_dir,
                 template=args.template,
                 replace=args.replace,
-                render=args.render,
+                render=True if args.render else None,
+                skip_render=args.skip_render,
+                legacy=args.legacy,
             )
             if cross_reports:
                 report["cross_artifact_qa"] = cross_reports

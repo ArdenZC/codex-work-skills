@@ -38,7 +38,7 @@ _LESSON_DEPENDENCIES = {
     "semantic_bookmarks": (),
     "content_contract": (),
     "bookmark_utils": ("semantic_bookmarks",),
-    "content_quality": ("content_contract",),
+    "content_quality": ("content_contract", "package_common"),
     "path_safety": (),
     "render_qa": (),
     "record_visual_inspection": ("path_safety",),
@@ -58,6 +58,7 @@ _LESSON_DEPENDENCIES = {
         "content_quality",
         "package_common",
         "path_safety",
+        "render_qa",
         "validate_output",
         "validate_template",
     ),
@@ -163,14 +164,41 @@ manifest_field_text = lesson_output.manifest_field_text
 def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
     import subprocess
 
+    command_args = list(args)
+    if script.name in {"generate_lesson_plans.py", "validate_output.py"} and "--legacy" not in command_args:
+        source_flag = "--tasks-json" if script.name == "generate_lesson_plans.py" else "--input-json"
+        if source_flag in command_args:
+            source_index = command_args.index(source_flag) + 1
+            if source_index < len(command_args):
+                try:
+                    source_version = json.loads(Path(command_args[source_index]).read_text(encoding="utf-8-sig")).get(
+                        "content_contract_version"
+                    )
+                except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+                    source_version = "2.2"
+                if source_version != "2.2":
+                    # The legacy test fixtures opt into the compatibility adapter explicitly.
+                    command_args.append("--legacy")
+                else:
+                    try:
+                        source_mode = json.loads(Path(command_args[source_index]).read_text(encoding="utf-8-sig")).get(
+                            "authoring_provenance", {}
+                        ).get("mode")
+                    except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+                        source_mode = None
+                    if source_mode == "synthetic_fixture":
+                        command_args.append("--allow-test-fixture-authoring")
+
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    if "--allow-test-fixture-authoring" in command_args:
+        env["LESSON_ALLOW_TEST_FIXTURE_AUTHORING"] = "1"
     if "--skip-template-validation" in args or "--skip-output-validation" in args:
         # Existing compatibility tests exercise the legacy switches explicitly;
         # the dedicated unsafe-skip test overrides this to assert fail-closed.
         env.setdefault("LESSON_ALLOW_UNSAFE_VALIDATION_SKIP", "1")
     return subprocess.run(
-        [sys.executable, str(script), *args],
+        [sys.executable, str(script), *command_args],
         cwd=ROOT,
         env=env,
         capture_output=True,
@@ -1495,6 +1523,7 @@ class LessonContentV2Mixin:
             output = folder / "output"
             argv = [
                 "generate_lesson_plans.py",
+                "--legacy",
                 "--tasks-json",
                 str(source),
                 "--output-dir",
@@ -1718,6 +1747,7 @@ class LessonContentV2Mixin:
             with patch.object(lesson_generator.tempfile, "mkstemp", side_effect=OSError("injected external temp write failure")):
                 argv = [
                     "generate_lesson_plans.py",
+                    "--legacy",
                     "--tasks-json",
                     str(source),
                     "--output-dir",
@@ -1946,6 +1976,7 @@ class LessonContentV2Mixin:
 
             argv = [
                 "generate_lesson_plans.py",
+                "--legacy",
                 "--tasks-json",
                 str(source),
                 "--output-dir",
@@ -1970,6 +2001,7 @@ class LessonContentV2Mixin:
             (output / "old.txt").write_bytes(b"old")
             argv = [
                 "generate_lesson_plans.py",
+                "--legacy",
                 "--tasks-json",
                 str(source),
                 "--output-dir",

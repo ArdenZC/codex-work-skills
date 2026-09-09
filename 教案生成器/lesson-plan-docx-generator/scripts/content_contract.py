@@ -163,14 +163,26 @@ def _clean(value: Any) -> str:
     return str(value).strip()
 
 
+MECHANICAL_TOPIC_MARKERS = (
+    "聚焦",
+    "聚焦于",
+    "围绕",
+    "针对",
+    "对应主题",
+    "核心主题",
+    "本节主题",
+    "任务主题",
+    "本节关联",
+)
+_MECHANICAL_TOPIC_MARKER_PATTERN = r"(?:聚焦(?:于)?|围绕|针对|对应主题|核心主题|本节主题|任务主题|本节关联)"
 MECHANICAL_TOPIC_PAREN_SUFFIX_PATTERN = re.compile(
-    r"\s*[（(]\s*(?:聚焦(?:于)?|围绕|针对)\s*(?:[:：])?\s*[^（）()]*[）)]\s*$"
+    rf"\s*[（(]\s*{_MECHANICAL_TOPIC_MARKER_PATTERN}\s*(?:[:：])?\s*[^（）()]*[）)]\s*$"
 )
 MECHANICAL_TOPIC_TAIL_SUFFIX_PATTERN = re.compile(
-    r"(?:[。！？；;]\s*|\s+)(?:聚焦(?:于)?|围绕|针对)\s*[:：]\s*[^。！？；;\n]+$"
+    rf"(?:[。！？；;,，]\s*|\s+){_MECHANICAL_TOPIC_MARKER_PATTERN}\s*[:：]\s*[^。！？；;,，\n]+$"
 )
 MECHANICAL_TOPIC_ONLY_PATTERN = re.compile(
-    r"^(?:聚焦(?:于)?|围绕|针对)\s*[:：]\s*.+$"
+    rf"^{_MECHANICAL_TOPIC_MARKER_PATTERN}\s*[:：]\s*.+$"
 )
 
 
@@ -277,10 +289,29 @@ def format_numbered_list(items: Iterable[Any]) -> str:
     return "\n".join(f"{index}. {value}" for index, value in enumerate(values, 1))
 
 
+_EDITION_PAREN_PATTERN = re.compile(
+    r"[（(]\s*第\s*[一二三四五六七八九十百千万零〇0-9]+\s*版\s*[）)]$",
+    re.IGNORECASE,
+)
+_EDITION_SUFFIX_PATTERN = re.compile(
+    r"(?:[》>】\]）)]\s*)?(?:[·,，;；:/\s]*)第\s*[一二三四五六七八九十百千万零〇0-9]+\s*版$",
+    re.IGNORECASE,
+)
+
+
 def _normalize_reference_title(value: Any) -> str:
-    title = _clean(value)
-    title = re.sub(r"^[《<【\[]|[》>】\]]$", "", title)
-    return re.sub(r"\s+", "", title).casefold()
+    """Normalize identity without collapsing distinct subject titles."""
+
+    title = unicodedata.normalize("NFKC", _clean(value))
+    title = re.sub(r"\s+", "", title)
+    previous = None
+    while title and title != previous:
+        previous = title
+        title = re.sub(r"^[《<【\[]", "", title)
+        title = re.sub(r"[》>】\]]$", "", title)
+        title = _EDITION_PAREN_PATTERN.sub("", title)
+        title = _EDITION_SUFFIX_PATTERN.sub("", title)
+    return title.casefold()
 
 
 def reference_identity(reference: dict[str, Any]) -> str:
@@ -295,6 +326,139 @@ def reference_identity(reference: dict[str, Any]) -> str:
     else:
         author_text = _clean(authors)
     return re.sub(r"\s+", "", author_text).casefold()
+
+
+def _normalize_reference_text(value: Any) -> str:
+    """Normalize bibliographic text without dropping identity-bearing words."""
+
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFKC", _clean(value))).strip().casefold()
+
+
+def _compact_reference_identifier(value: Any) -> str:
+    """Normalize an ISBN, standard number, or named identifier for comparison."""
+
+    normalized = unicodedata.normalize("NFKC", _clean(value)).casefold()
+    return "".join(char for char in normalized if char.isalnum())
+
+
+def _reference_responsible_parties(reference: dict[str, Any]) -> list[str]:
+    values: list[str] = []
+    for field_name in ("responsible_party", "institution", "publisher"):
+        value = _clean(reference.get(field_name, ""))
+        if value:
+            values.append(value)
+    authors = reference.get("authors", [])
+    if isinstance(authors, (list, tuple)):
+        values.extend(_clean(value) for value in authors if _clean(value))
+    elif _clean(authors):
+        values.append(_clean(authors))
+    return list(dict.fromkeys(values))
+
+
+def reference_canonical_identity(reference: dict[str, Any]) -> dict[str, Any]:
+    """Return the normalized identity fields used to bind research evidence.
+
+    This identity is deliberately domain-neutral: the contract binds a named
+    source to its title, responsible party, date/identifier when declared, and
+    exact locator rather than accepting a domain-only or organization-only
+    match.
+    """
+
+    authors = reference.get("authors", [])
+    if isinstance(authors, (list, tuple)):
+        normalized_authors = [
+            _normalize_reference_text(value)
+            for value in authors
+            if _normalize_reference_text(value)
+        ]
+    else:
+        normalized_authors = [_normalize_reference_text(authors)] if _normalize_reference_text(authors) else []
+    return {
+        "reference_id": _clean(reference.get("reference_id", "")),
+        "reference_type": _clean(reference.get("reference_type", "")),
+        "title": _normalize_reference_title(reference.get("title", reference.get("text", ""))),
+        "authors": normalized_authors,
+        "institution": _normalize_reference_text(reference.get("institution", "")),
+        "publisher": _normalize_reference_text(reference.get("publisher", "")),
+        "responsible_party": _normalize_reference_text(reference.get("responsible_party", "")),
+        "year": _clean(reference.get("year", "")),
+        "source_identifier": _compact_reference_identifier(reference.get("source_identifier", "")),
+        "source_url": _clean(reference.get("source_url", "")),
+        "authoritative_source": _normalize_reference_text(reference.get("authoritative_source", "")),
+    }
+
+
+def _same_reference_party(actual: Any, expected: Any) -> bool:
+    actual_text = _normalize_reference_text(actual)
+    expected_text = _normalize_reference_text(expected)
+    if not actual_text or not expected_text:
+        return False
+    if actual_text == expected_text:
+        return True
+    # Official pages often expand or parenthesize an acronym.  Permit that
+    # presentation difference only after the title and locator also bind.
+    return len(actual_text) >= 4 and len(expected_text) >= 4 and (
+        actual_text in expected_text or expected_text in actual_text
+    )
+
+
+def reference_source_binding_errors(
+    reference: dict[str, Any],
+    source: dict[str, Any],
+    prefix: str = "reference",
+) -> list[str]:
+    """Return fail-closed errors for one-to-one pool/research source binding."""
+
+    errors: list[str] = []
+    reference_id = _clean(reference.get("reference_id", ""))
+    source_id = _clean(source.get("reference_id", ""))
+    if not source_id:
+        errors.append(f"{prefix}.reference_id is required")
+    elif source_id != reference_id:
+        errors.append(f"{prefix}.reference_id must match reference_pool.reference_id")
+
+    for field_name in ("source_url", "source_title", "source_author_or_organization", "authoritative_source"):
+        if not _clean(source.get(field_name, "")):
+            errors.append(f"{prefix}.{field_name} is required for exact provenance binding")
+
+    if _clean(source.get("source_url", "")) != _clean(reference.get("source_url", "")):
+        errors.append(f"{prefix}.source_url must match reference_pool exactly")
+    if _clean(source.get("authoritative_source", "")) != _clean(reference.get("authoritative_source", "")):
+        errors.append(f"{prefix}.authoritative_source must match reference_pool exactly")
+
+    expected_title = _normalize_reference_title(reference.get("title", ""))
+    actual_title = _normalize_reference_title(source.get("source_title", ""))
+    if not actual_title or actual_title != expected_title:
+        errors.append(f"{prefix}.source_title must match the canonical reference title")
+
+    source_party = source.get("source_author_or_organization", "")
+    parties = _reference_responsible_parties(reference)
+    if not any(_same_reference_party(source_party, party) for party in parties):
+        errors.append(f"{prefix}.source_author_or_organization must match the reference responsibility identity")
+
+    expected_year = _clean(reference.get("year", ""))
+    if expected_year:
+        actual_year = _clean(source.get("source_year", ""))
+        if not actual_year:
+            errors.append(f"{prefix}.source_year is required because reference_pool.year is declared")
+        elif actual_year != expected_year:
+            errors.append(f"{prefix}.source_year must match reference_pool.year")
+
+    expected_identifier = _compact_reference_identifier(reference.get("source_identifier", ""))
+    if expected_identifier:
+        actual_identifier = _compact_reference_identifier(source.get("source_identifier", ""))
+        if not actual_identifier:
+            errors.append(
+                f"{prefix}.source_identifier is required because reference_pool.source_identifier is declared"
+            )
+        elif actual_identifier != expected_identifier:
+            errors.append(f"{prefix}.source_identifier must match the canonical reference identifier")
+        source_url_identifier = _compact_reference_identifier(source.get("source_url", ""))
+        if expected_identifier not in source_url_identifier:
+            errors.append(
+                f"{prefix}.source_identifier must be evidenced by source_url; locator identity does not match"
+            )
+    return errors
 
 
 def reference_looks_like_resource_only(text: Any) -> bool:
@@ -374,8 +538,6 @@ def reference_metadata_errors(reference: dict[str, Any], prefix: str = "referenc
             errors.append(f"{prefix}.authors must preserve the real book author or editor")
         if not publisher:
             errors.append(f"{prefix}.publisher is required for a book")
-        if not year:
-            errors.append(f"{prefix}.year is required for a book")
     elif reference_type == "formal_course_document":
         if not author_values:
             errors.append(f"{prefix}.authors must preserve the course responsible teacher or team")
@@ -409,16 +571,9 @@ def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> li
     for reference_id in lesson.get("reference_ids", []):
         reference = pool.get(str(reference_id))
         if reference is None:
-            resolved.append(
-                {
-                    "reference_id": str(reference_id),
-                    "reference_type": "formal_course_document",
-                    "title": str(reference_id),
-                    "source_kind": "",
-                    "text": str(reference_id),
-                }
+            raise ValueError(
+                f"lesson reference_id {reference_id!r} is unresolved; production formatting must fail closed"
             )
-            continue
         item = dict(reference)
         item["text"] = format_reference(item)
         resolved.append(item)

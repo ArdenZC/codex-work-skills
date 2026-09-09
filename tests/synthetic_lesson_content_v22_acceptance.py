@@ -51,7 +51,7 @@ def _nursing_references() -> list[dict[str, Any]]:
 
 
 def _run_case(label: str, payload: dict[str, Any]) -> dict[str, Any]:
-    lesson_generator.validate_content_v2_input(payload)
+    lesson_generator.validate_test_fixture_content_v2_input(payload)
     quality = assess_content_quality(payload)
     if quality["status"] != "passed":
         raise AssertionError({"case": label, "errors": quality["errors"], "warnings": quality["warnings"]})

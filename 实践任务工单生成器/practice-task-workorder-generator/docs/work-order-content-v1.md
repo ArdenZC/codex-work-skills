@@ -1,37 +1,25 @@
-# Practice Work Order Content V1
+# Practice WorkOrder Content 1.1
 
-## 输入与来源
+WorkOrder Content 1.1 是 WorkOrder Skill 的生产写入合同。它不是 Lesson 的第二份课程规划；在 linked 模式下，唯一上游事实是 Lesson 交付的 Practice Task Contract 1.1 和其中的 `source_task_snapshot`。
 
-Content V1 是 WorkOrder Skill 的直接写入合同，`content_contract_version` 保持 `1.0`。每份输入包含课程基本信息、`practice_task_id`、项目名、正整数实践学时、组信息和 1–5 个由 Agent 完整创作的任务项。可选的 `task_title`、`project_id`、`safety_or_compliance` 用于保留 Practice Task 的追踪和约束信息。
+## 模式与来源
 
-Lesson handoff 使用 canonical `schemas/shared/practice-task-contract.schema.json` 中的 Practice Task Contract V1。它是上游事实源，不是 WorkOrder 的第二份课程合同。WorkOrder 映射不得随机生成新的任务 ID、改变 `lesson_ids` 集合或改变 `practice_hours`。
+- `mode=linked`：必须有完整 `source_task_snapshot`，并逐字段继承课程基本信息、任务身份、课次集合、2 学时、情境、目标、输入、工具/材料、交付物、验收标准和安全约束。
+- `mode=standalone`：必须显式选择 standalone，不能伪造 Lesson 来源快照；适合独立创作或验收样例。
+- linked 模式一项 Practice Task 只产生一份 WorkOrder。学生任务项可以把上游步骤重新分组或展开，但不得改变目标、交付物、验收、工具/材料、安全约束或课程基本信息。
 
-## 字段边界
+## 固定合同
 
-上游继承字段：`practice_task_id`、`project_id`、`task_title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`deliverables`、`acceptance_criteria` 和 `safety_or_compliance`。
+Content 1.1 的根对象固定包含 `contract_version=1.1`、模式、课程基本信息、任务身份、`lesson_ids`、`granularity=per_task`、`practice_hours=2`、组信息、任务项和 Agent pedagogical review。课程基本信息必须与 Practice Task Contract 1.1 逐字段相等；任务标题只使用 `task_title`，不以项目名或内部 ID 冒充。
 
-WorkOrder 渲染字段：课程/专业/对象、`project_name`、组占位符、由 Agent 完整创作的 `task_items`、固定评价占位。Python 只做验证、有限格式化、模板映射和 QA，不重新创作任务正文或答案。`--practice-task-json` 只校验上游 handoff 并输出 authoring skeleton，不能直接生成 Content V1 或 DOCX。
+每份工单包含 1–5 个 `task_items`。每项由 Agent 提供可执行的标题、说明、步骤、工具/材料、交付物和验收标准；交付物使用 `{deliverable_id,text}`，验收使用 `{criterion_id,text,covers:[deliverable_id...]}`。学生可见正文不显示 `PT-*`、`WO-*`、`L-*` 等内部追踪 ID。
 
-每个 task item 包含：
+评分合同固定为课堂考勤 10 分、任务项合计 90 分、总分 100 分。学生“结果”栏保持空白，不能写答案、完整最终 SQL、最终模型、护理/会计最终结果或任何教师答案。统一 Agent review 负责专业准确性、目标—活动—证据、阶段连贯性、容量、递进和交付物验收映射；Python 只验证结构与硬事实，不用动作词、专业词、IT/护理 marker、字符或 n-gram 重叠判断教学质量。
 
-- `title`：任务标题；
-- `description`：给学生看的任务说明；
-- `score`：正整数，所有任务合计必须为 90；
-- `tools_or_materials`：实施所需工具、设备、环境或材料；
-- `steps`：可执行步骤；
-- `deliverables`：学生应提交的可观察产物；
-- `acceptance_criteria`：能判断产物是否完成的标准；每个 substantive deliverable 至少被一条可观察标准覆盖，一条标准可以覆盖多个相关交付物。
+## QA、渲染与事务
 
-课堂考勤固定 10 分，任务固定 90 分，合计 100 分。具体 task item 分值由 Agent 按工作量、难度和交付物权重决定，Python 只校验合计；合同不增加可漂移的 `total_score` 字段。主要步骤至少包含动作和对象/产物/目标。
+Content QA、Cross-Artifact QA 和 Output QA 通过后才生成 candidate。linked 模式默认必须真实 render；`--skip-render` 被拒绝，render 未执行或失败都不是 Production PASS。standalone 只有在明确 `--mode standalone` 且显式选择 `--render` 或 `--skip-render` 时才可运行，跳过渲染只能得到非生产结果。
 
-## QA 与输出
+整批候选在正式目录之外完成 QA、渲染和检查；任何一项失败都保持正式输出目录原有字节不变。`--replace` 是整批原子替换，不是逐文件放行。模板 `practice-task-workorder v1.0.0` 的二进制和 SHA-256 不变。
 
-Content QA 拒绝空泛任务、不可观察交付物、无覆盖验收标准、明显跨专业污染、同一工单内叙述重复和分值错误；跨工单只比较任务叙述、交付物及验收叙述。固定课堂考勤、学生/教师评价 rubric 不参与反重复 hard-fail。
-
-Cross-Artifact QA 检查上游与工单的 ID、课次集合、小时、标题意图、交付物、验收标准、工具/材料和安全/合规约束。上游 `tools_or_materials` 必须逐项在下游任务项中保持可识别；只允许确定性空白/标点归一和明确 alias，不能静默丢失。失败时 WorkOrder 失败，不自动修改 Practice Task 或 Lesson。
-
-## 生成事务
-
-整批输入先完成 Content/Cross-Artifact QA，再生成全部 candidate，完成全部 Output QA；请求 render 时，全部 candidate 必须得到 `render.status=pass`。只有整批通过才发布 DOCX 和 render 产物。任一失败都保持正式输出目录的原有字节不变，并清理 staging/candidate；`--replace` 是整批替换，不是逐文件放行。
-
-任务结果列保持空白；不能写标准答案、完整 SQL、最终模型、护理/会计最终结果或教师答案。学生评价的自评/小组评价/教师评价以及教师评价表的固定问题保持模板原样。
+旧的 Practice Task Contract V1 / WorkOrder Content V1 只允许通过显式 legacy/兼容入口读取，不得混入 1.1 生产路径。

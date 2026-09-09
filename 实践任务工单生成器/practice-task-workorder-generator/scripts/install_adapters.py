@@ -17,7 +17,8 @@ from typing import Iterable
 ENGINE_NAME = ".practice-task-workorder-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
-CONTENT_CONTRACT_VERSION = "1.0"
+SKILL_VERSION = "2.2.0"
+CONTENT_CONTRACT_VERSION = "1.1"
 MARKER_ID = "practice-task-workorder-generator"
 MARKER_START = f"<!-- codex-skill: {MARKER_ID}:start -->"
 MARKER_END = f"<!-- codex-skill: {MARKER_ID}:end -->"
@@ -62,15 +63,14 @@ SOURCE_ADAPTERS = {
     "copilot": Path(".github/copilot-instructions.md"),
     "aider": Path("CONVENTIONS.md"),
 }
-ADAPTER_PAYLOAD = """Practice Task WorkOrder integration rules:
+ADAPTER_PAYLOAD = """实践任务工单生成器 2.2.0 的协作边界：
 
-- Read the canonical Practice Task Contract V1 first; it is the upstream fact source.
-- Do not redesign or silently edit the upstream Practice Task.
-- Preserve practice_task_id, lesson_ids, practice_hours, deliverables, acceptance criteria, tools/materials, and safety/compliance constraints.
-- Keep classroom attendance at 10 points and task items at 90 points; total is 100. The Agent assigns individual task-item scores; Python only validates their sum.
-- Leave the student task-result area blank and never generate a teacher answer, standard SQL, or final clinical/accounting result.
-- Run WorkOrder Content QA, Cross-Artifact QA, and Output QA before delivering the DOCX.
-- Use the canonical practice-work-order v1.0.0 template; Phase 3 / 64-hour expansion is out of scope.
+- 先读取 canonical Practice Task Contract 1.1；它是已确认课程信息和实践任务事实的唯一上游来源。
+- 不重写、猜测或静默修改上游实践任务；关联工单必须保留完整的来源任务快照。
+- 工单 Content 1.1 必须由 Agent 独立创作，完成专业性、九十分钟可完成性、交付物和验收映射审阅后再生成 DOCX。
+- 课堂考勤固定 10 分，任务项合计 90 分，总分 100 分；学生任务结果区保持空白，不生成教师答案或最终业务结论。
+- 关联模式必须执行跨文档一致性校验和真实渲染；仅有上游 handoff 时只能生成创作骨架，不能伪造工单 DOCX。
+- 默认使用实践任务学习工单模板 v1.0.0；Phase 3 和整门课程批量扩展不在本轮范围。
 """
 
 
@@ -212,6 +212,7 @@ def _engine_state_payload(source_root: Path) -> bytes:
     state = {
         "schema_version": ENGINE_STATE_SCHEMA_VERSION,
         "skill": MARKER_ID,
+        "skill_version": SKILL_VERSION,
         "content_contract_version": CONTENT_CONTRACT_VERSION,
         "runtime_fingerprint": _runtime_fingerprint(inventory),
         "runtime_inventory": inventory,
@@ -235,7 +236,7 @@ def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) 
     expected = {relative.as_posix() for relative in FULL_ENGINE_INVENTORY_FILES}
     if not isinstance(inventory, dict) or set(inventory) != expected:
         return False
-    if state.get("schema_version") != ENGINE_STATE_SCHEMA_VERSION or state.get("skill") != MARKER_ID or state.get("content_contract_version") != CONTENT_CONTRACT_VERSION:
+    if state.get("schema_version") != ENGINE_STATE_SCHEMA_VERSION or state.get("skill") != MARKER_ID or state.get("skill_version") != SKILL_VERSION or state.get("content_contract_version") != CONTENT_CONTRACT_VERSION:
         return False
     if state.get("runtime_fingerprint") != _runtime_fingerprint(inventory):
         return False

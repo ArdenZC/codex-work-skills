@@ -413,6 +413,29 @@ jobs:
             教案生成器/lesson-plan-docx-generator/requirements.txt
             .github/scripts/requirements-ci-lesson-tests.txt
 
+      - name: Install LibreOffice on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: .github/scripts/install_libreoffice_macos.sh
+
+      - name: Install LibreOffice on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $started = Get-Date
+          choco install libreoffice-fresh --yes --no-progress
+          $programPaths = @(
+            (Join-Path $env:ProgramFiles "LibreOffice\program"),
+            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
+          )
+          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $programPath) { throw "LibreOffice installation path was not found." }
+          $soffice = Join-Path $programPath "soffice.com"
+          if (-not (Test-Path $soffice)) { throw "LibreOffice command was not found: $soffice" }
+          & $soffice --version | Select-Object -First 1
+          $seconds = [math]::Round(((Get-Date) - $started).TotalSeconds, 2)
+          "- LibreOffice setup: ${seconds}s" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
       - name: Install Python dependencies
         run: >-
           python .github/scripts/run_timed.py
@@ -656,10 +679,10 @@ jobs:
           mkdir -p "$workorder_dir"
           python "实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py" \
             --content-json "实践任务工单生成器/practice-task-workorder-generator/examples/software.example.json" \
-            --output-dir "$workorder_dir/software" --replace --render --json > "$workorder_dir/software-report.json"
+            --output-dir "$workorder_dir/software" --replace --mode standalone --render --json > "$workorder_dir/software-report.json"
           python "实践任务工单生成器/practice-task-workorder-generator/scripts/generate_work_orders.py" \
             --content-json "实践任务工单生成器/practice-task-workorder-generator/examples/nursing.example.json" \
-            --output-dir "$workorder_dir/nursing" --replace --render --json > "$workorder_dir/nursing-report.json"
+            --output-dir "$workorder_dir/nursing" --replace --mode standalone --render --json > "$workorder_dir/nursing-report.json"
           python - "$workorder_dir/software-report.json" "$workorder_dir/nursing-report.json" <<'PY'
           import json
           import sys

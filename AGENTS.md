@@ -5,7 +5,7 @@
 当前已有 skill：
 - 教案生成器：教案生成器/lesson-plan-docx-generator
 - 平时成绩记分册生成器：平时成绩记分册生成器/course-gradebook-generator
-- 实践任务工单生成器：实践任务工单生成器/practice-task-workorder-generator（Phase 2.1 / 2.1.0）
+- 实践任务工单生成器：实践任务工单生成器/practice-task-workorder-generator（Phase 2.2 / 2.2.0）
 - HTML 课件生成器：HTML课件生成器/courseware-html-generator（1.2.1，Courseware Content Contract 1.1）
 - 实践课 HTML 生成器：实践课HTML生成器/practice-class-html-generator（1.2.0，Practice Class Content Contract 1.1）
 

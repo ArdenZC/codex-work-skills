@@ -2,11 +2,4 @@ interface:
   display_name: "实践任务工单生成器"
   short_description: "将实践任务写入真实 Word 学习工单模板"
   default_prompt: >-
-    使用 practice-task-workorder-generator Phase 2.1；先读取 canonical Practice Task
-    Contract V1，使用 Agent authored Practice Work Order Content V1 写入默认
-    practice-work-order v1.0.0 模板。--practice-task-json 只能校验并输出 authoring
-    skeleton，不能直接生成 Content 或 DOCX；正式生成必须有完整 --content-json，可同时
-    用原始 handoff 做 Cross-Artifact QA。保留 practice_task_id、lesson_ids、practice_hours、
-    交付物、验收、工具/材料和安全约束；固定出勤10分、任务90分、总分100，具体任务分值
-    由 Agent 决定且只校验合计，学生任务结果区留空；完成 Content/Cross-Artifact/Output
-    QA，逐项覆盖交付物，请求 render 时必须 status=pass，不生成教师答案，不修改上游 Lesson。
+    使用实践任务工单生成器 2.2.0：先读取同目录 SKILL.md，关联模式依据已确认的上游实践任务创作完整学生工单，独立模式只在用户明确选择时使用。生成前完成专业性、九十分钟可完成性、目标—活动—证据链、交付物—验收映射和安全合规审阅；关联工单完成跨文档校验和真实渲染，独立调试明确标注跳过渲染。固定考勤 10 分、任务项 90 分、总分 100 分，学生结果区保持空白，学生可见内容隐藏内部追溯编号，不生成教师答案。

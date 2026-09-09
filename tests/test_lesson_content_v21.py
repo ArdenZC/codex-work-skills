@@ -336,7 +336,7 @@ class LessonContentV21Tests(unittest.TestCase):
             (LESSON / name).read_text(encoding="utf-8")
             for name in ("SKILL.md", "通用提示词.md", "AGENTS.md", "CLAUDE.md", "GEMINI.md", "CONVENTIONS.md", "agents/openai.yaml")
         )
-        for token in ("course_name", "major", "audience", "total_hours", "theory_hours", "practice_hours", "default_hours=2", "textbook", "auxiliary_references", "practice_work_orders", "course_reference_pool"):
+        for token in ("course_name", "major", "audience", "total_hours", "theory_hours", "practice_hours", "default_hours=2", "textbook", "reference_pool", "practice_work_orders", "course_reference_pool"):
             self.assertIn(token, canonical)
         self.assertRegex(canonical, re.compile(r"一次集中|一次性|one[- ]time", re.IGNORECASE))
         self.assertRegex(canonical, re.compile(r"不得再问.*(?:模板|输出目录|DOCX)|不再询问.*(?:模板|输出目录|DOCX)", re.IGNORECASE | re.DOTALL))

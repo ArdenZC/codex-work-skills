@@ -60,16 +60,18 @@ class PracticeTaskWorkOrderPackageTests(unittest.TestCase):
 
     def test_generic_schema_accepts_accounting_tasks(self) -> None:
         content = self.load_examples("software.example.json")[0]
-        content["course_name"] = "会计信息化"
-        content["major"] = "大数据与会计"
-        content["project_name"] = "整理月度凭证核对记录"
-        content["practice_task_id"] = "AC-WO-01"
+        content["course_profile"]["course_name"] = "会计信息化"
+        content["course_profile"]["major"] = "大数据与会计"
+        content["task_title"] = "整理月度凭证核对记录"
+        content["task_id"] = "AC-WO-01"
         content["task_items"][0]["title"] = "核对凭证信息"
         content["task_items"][0]["description"] = "根据凭证资料核对日期、摘要和金额，记录需要复核的项目。"
         content["task_items"][0]["tools_or_materials"] = ["凭证资料", "核对表"]
         content["task_items"][0]["steps"] = ["核对凭证字段", "记录复核项目"]
-        content["task_items"][0]["deliverables"] = ["凭证核对表"]
-        content["task_items"][0]["acceptance_criteria"] = ["字段核对完整", "复核项目可定位"]
+        content["task_items"][0]["deliverables"] = [{"deliverable_id": "D1", "text": "凭证核对表"}]
+        content["task_items"][0]["acceptance_criteria"] = [
+            {"criterion_id": "C1", "text": "字段核对完整", "covers": ["D1"]}
+        ]
         report = validate_content(content)
         self.assertEqual(report["status"], "pass", report)
 
@@ -100,7 +102,7 @@ class PracticeTaskWorkOrderPackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="work-order-handoff-") as temp:
             path = Path(temp) / "practice-task-contract.json"
             path.write_text(json.dumps(handoff, ensure_ascii=False), encoding="utf-8")
-            loaded = load_practice_task_contract(path)
+            loaded = load_practice_task_contract(path, allow_legacy=True)
             contents = practice_tasks_to_content(loaded, major="软件技术", class_or_audience="一年级", allow_non_production=True)
         self.assertEqual(len(contents), 1)
         self.assertEqual(contents[0]["lesson_ids"], ["L03", "L04"])
@@ -138,7 +140,7 @@ class PracticeTaskWorkOrderPackageTests(unittest.TestCase):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         prompt = (ROOT / "通用提示词.md").read_text(encoding="utf-8")
         for text in (skill, prompt):
-            for token in ("Practice Task Contract V1", "Content V1", "10", "90", "100", "结果", "答案"):
+            for token in ("Practice Task Contract 1.1", "Content 1.1", "10", "90", "100", "结果", "答案"):
                 self.assertIn(token, text)
         self.assertIn("Phase 2", skill)
 

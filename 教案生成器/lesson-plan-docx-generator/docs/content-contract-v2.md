@@ -1,152 +1,36 @@
-# Lesson Content V2 / V2.1 / V2.2
+# Lesson Content Contract 2.2
 
-## 2.2.2 Lesson Content Quality Hotfix
+Lesson Skill 2.2.3 的当前生产输入是完整的 Lesson Content Contract 2.2。2.1/2.0 只作为显式兼容输入；命令行必须明确传入 `--legacy`，兼容输入不会被静默改写为 2.2。Lesson 模板仍为 v1.1.2，二进制和 SHA-256 不变。
 
-Content Contract `2.2` is the current production contract and its Lesson / WorkOrder integration remains fixed by Skill `2.2.2`. This hotfix only closes Lesson content-quality boundaries: confirmed course metadata is frozen, textbook/resources/references are separated, connected Agents must retrieve real public sources before authoring references, and mechanical topic tails are removed. Runtime continues to read `2.1` and `2.0` inputs for compatibility; those versions retain their existing lesson semantics. The default Word template remains `lesson-plan v1.1.2` and its binary is unchanged; the shared Practice Task Contract remains V1 and reusable outside this integration.
+## 课程边界
 
-When the intake has been confirmed, a 2.2.2 input may carry a `confirmed_course_info` snapshot containing `course_name`, `major`, `audience`, `total_hours`, `theory_hours`, `practice_hours`, and `delivery_mode`. If present, every value must match the corresponding contract value exactly (hours numerically), and the generator uses the snapshot for DOCX metadata. A content Agent must not recreate or rename these fields.
-
-`course_materials.textbook`, lesson `resources`, and `reference_pool` are separate categories. A textbook is never a Lesson reference in 2.2.2; `allow_textbook_as_reference` is rejected. PPT, courseware, case tables/datasets, internal teaching resources, task sheets, equipment, and environments are resources, not citable references. When web search is available, the Agent must actually search public sources before building `reference_pool`; if reliable sources are insufficient, it records fewer references rather than filling the list with textbooks or internal materials. Evidence/URLs remain internal to JSON/QA, while the DOCX receives only normalized citation text. The formatter removes mechanical trailing `（聚焦：…）`, `（聚焦于：…）`, `（围绕：…）`, and `（针对：…）` clauses.
-
-Before planning, the Agent enters `INTAKE_PENDING` and makes exactly one concentrated Chinese confirmation containing course name, major, audience, and total hours. The same confirmation displays theory hours, practice hours, organization, default single-lesson duration of 2 hours, textbook, auxiliary references, and work-order preference. Textbook confirmation is recommended but not blocking. After the user confirms, the Agent enters `INTAKE_CONFIRMED` and completes retrieval, course outline, Content 2.2, the Practice Task handoff only when work orders were explicitly requested, QA, and DOCX without asking again about outline, projects/tasks, scores, template, output directory, or whether to start DOCX generation. Only a user change, an unresolvable direct conflict, or a real safety/file-overwrite decision may pause the workflow again.
-
-Content 2.2 separates artifact ownership:
-
-```text
-theory hours  -> theory Lessons -> Lesson DOCX
-practice hours -> (only when explicitly requested) Practice Task Contract V1 -> WorkOrder Content/DOCX
-practice hours -> (when explicitly declined) course-hour accounting only; no practice artifact
-```
-
-The invariants are:
+课程先完成一次中文 intake 和整门 outline，再生成逐课内容。确认后的课程名称、专业、授课对象、总课时、理论/实践课时和组织方式冻结在课程快照中，正文 Agent 不得改写。Lesson DOCX 只承载理论课时：
 
 ```text
 sum(lesson.hours) == delivery_plan.theory_hours
-theory_hours + practice_hours == total_hours
+delivery_plan.theory_hours + delivery_plan.practice_hours == delivery_plan.total_hours
 ```
 
-When `artifact_plan.practice_work_orders=true`, also require:
+理论课次为 `ceil(theory_hours / default_hours)`，最后一课保留真实余数；1 学时不能被四舍五入成 2 学时。每个 Lesson 是理论 Lesson，`practice_hours=0`，`practice_task_ids=[]`。
 
-```text
-practice_hours is a positive even number
-each Practice Task.practice_hours == 2
-Practice Task count == WorkOrder count == practice_hours / 2
-```
+## 时间与教学质量
 
-When `artifact_plan.practice_work_orders=false`, `practice_task_contract` is absent and every `lesson.practice_task_ids` array is empty (no task IDs). The declared practice hours still participate in course reconciliation; they do not create a JSON handoff or a practice-side extra file.
+九个实施阶段顺序固定。课前准备固定 10 分钟，七个课中阶段合计严格为 `lesson.hours × 45` 分钟，课后完善固定 15 分钟；课前和课后属于课外活动，不计入课堂学时。1 学时必须在内容、步骤、证据和任务复杂度上实质少于 2 学时。
 
-Every 2.2 Lesson is a theory Lesson with `practice_hours=0`; practice does not create a practice Lesson DOCX. `delivery_plan.mode` describes organization only and does not change this count/hour contract. `integrated_lessons` means artifact-level integration between theory Lessons and related practice tasks, not a fixed 1+1 split or a requirement to turn all course hours into Lesson DOCX.
+每个阶段形成 `content → teacher_actions → student_actions → student evidence/output → objective` 的语义链。完整正文、阶段内容、评价备注和反思由 Agent 提供；统一 Agent pedagogical review 负责专业准确性、目标—活动—证据、阶段连贯性、容量、递进和参考资料相关性。出现问题时 Agent 必须重写，Python 不追加教学 prose，也不以动作词、领域词、字符阈值或 n-gram 重叠替代 review。
 
-The number of theory Lessons is `ceil(theory_hours / default_hours)`. The final Lesson uses the true remainder, so 21 theory hours at default 2 means ten 2-hour Lessons plus one 1-hour Lesson. Hours are never rounded to 20 or 22; if the selected template/contract cannot express the remainder, generation fails closed. The default Lesson duration is 2 hours. Under the 2.2.2 WorkOrder integration, WorkOrder count is not a free planning variable: each 2-hour Practice Task maps to exactly one WorkOrder, while `project_id` may group tasks.
+## 资料边界
 
-For every theory Lesson, `reference_ids` must select at least one citable source, normally two to four when reliable sources are available. Before lesson authoring the Agent forms a course-level `reference_catalog`/`course_reference_pool` planning concept; the persisted contract field remains `reference_pool`. References are concrete readable/citable documents or sources, while `resources` are teaching tools, equipment, environments, and materials. The textbook is a separate `course_materials.textbook` object and is always excluded from references in 2.2.2. Prefer a mixed catalog of formal publications and university open courses when reliable sources are available.
+`course_materials.textbook`、lesson `resources`、`reference_pool` 和 `reference_research` 分离。教材、PPT、课件、案例/数据、任务单、设备、环境和内部教学资源不是 references；reference 必须是可阅读、查阅、引用或作为课程依据的文献/文档。书籍保留真实作者/编者、标题和出版社，年份可选且不得写“年份未知”；课程文档保留真实责任者、高校和平台/出版社。来源不足时少写，不填占位来源，不伪造书目信息；同一真实 reference 可以跨课复用，同课重复 ID 失败。
 
-Reference priority is domestic-first: user-provided material, domestic published books/monographs, domestic university references, national/industry/occupational standards and authoritative domestic documents, then foreign classics or international sources when relevant. `source_region` is `domestic`, `foreign`, or `unknown`; a catalog domestic share below 70% is a quality warning, not a hard failure. `source_kind` remains `provided`, `generic`, or `verified_public`: provided and verified public sources need evidence, generic sources must stay document-like and must not invent authors, publishers, ISBNs, editions, years, or standard numbers. A `book` must preserve real `authors`, `publisher`, and `year`; a `formal_course_document` must preserve real responsible `authors`, offering university `institution`, and course platform/publisher `publisher`. The visible citation must not collapse an online course to a platform-only form. If no auxiliary material is supplied, the Agent still builds a credible catalog and never emits a shortage placeholder.
+有联网能力时 Agent 在写入 reference pool 前检索真实公开来源；无可靠外部来源时明确记录 `no_verified_external_source`，reference pool 可为空，不能把检索要求变成 Python 的内容判断。
 
-The same reference may be reused across any number of Lessons. It is `reference_reusable` and is excluded from exact/item/sentence/field/structural/frequency/whole-course repetition hard-fails. Duplicate references within one Lesson still fail. A resource-only item such as a projector, PPT, MySQL Workbench, blood-pressure monitor, database server, nursing model, or computer room is not a reference; a document such as `MySQL 8.0 Reference Manual` remains valid. Reference repetition is not teaching-body repetition: never fabricate different bibliographic identities merely to lower a course repetition rate.
+## Practice Task 单向 handoff
 
-## 2.1 production addendum
+只有用户明确选择 `practice_work_orders=true` 才创建 Practice Task Contract 1.1。实践学时必须为正偶数；每个任务固定 2 学时，任务数等于 `practice_hours / 2`，由 Lesson Agent 在 Lesson QA/DOCX 完成后交给 WorkOrder Skill Agent。Practice Task 的课程基本信息逐字段继承 Lesson；`lesson_ids` 只是理论准备/前置关系。明确 false 时不生成 contract、handoff、WorkOrder 或实践侧文件。
 
-Content Contract `2.1` is the compatibility contract below. Runtime continues to read `2.0` inputs; a 2.0 input keeps its lesson-level `references` objects and does not get silently rewritten. The default Word template remains `lesson-plan v1.1.2`.
+若 WorkOrder Skill 不可用，必须保存 handoff 数据并提示：`实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`，不得由 Lesson Python subprocess 调用 WorkOrder Python 或伪造工单。
 
-Before planning, the Agent enters `INTAKE_PENDING` and makes one concentrated, Chinese-language confirmation containing the course name, major, audience, and total hours, while also displaying theory hours, practice hours, theory/practice organization, default single-lesson duration of 2 hours, textbook, auxiliary references, and whether practice work orders are wanted. Unknown theory/practice structure, organization, and work-order preference remain pending; no 50/50, integrated, or false default is allowed. After the user confirms, the Agent enters `INTAKE_CONFIRMED` and does not ask again about outline, template, output directory, or DOCX generation. The internal field mapping is defined by `intake-contract-v2.1.1.json`.
+## 输出
 
-The 2.1 course fields add:
-
-```text
-delivery_plan: mode, total_hours, theory_hours, practice_hours
-course_materials: textbook (object or null)
-reference_pool: concrete document/source objects (the Agent's course_reference_pool planning concept)
-artifact_plan: lesson_plans=true, practice_work_orders=boolean
-outline: lesson_id, unit, task, lesson_type, hours, theory_hours,
-         practice_hours, prior_learning, capability_stage, deliverable,
-         next_bridge, practice_task_ids
-```
-
-Each lesson adds `lesson_type` (`theory`, `practice`, or `integrated`), `theory_hours`, `practice_hours`, `reference_ids`, and `practice_task_ids`. All hour values are integer hours; lesson components and course totals must reconcile. A theory lesson cannot carry practice task IDs.
-
-`course_materials.textbook` is not automatically a reference. It is rendered in a lesson only when `allow_textbook_as_reference: true` explicitly allows the same source in `reference_pool`. A 2.1 lesson may use `reference_ids: []`; the Word reference cell is blank, not a placeholder such as “无” or “资料不足”. `reference_pool` entries use `reference_type` (`book`, `standard`, `official_manual`, `official_documentation`, `guideline`, `paper`, `formal_course_document`) and concrete `title`/evidence. In 2.2.2, `book` entries require real authors/ editors, publisher, and year; `formal_course_document` entries require responsible teachers/teams, offering university, and platform/publisher. Generic placeholder phrases such as “统一建模语言相关公开文档” are rejected; real named organization/title documents are not rejected by that pattern. Pure tools and equipment remain resources, not references.
-
-The same document reference may be reused in every lesson. Cross-lesson reference reuse is a reusable category and is excluded from exact, item, sentence, field, structural, frequency, and whole-course repetition hard-fails. Duplicate IDs inside one lesson and unresolved IDs remain hard failures. Do not invent different bibliographic identities merely to reduce repetition.
-
-When `delivery_plan.practice_hours` is positive, `practice_task_contract` uses the independent [Practice Task Contract V1](practice-task-contract-v1.md) schema and must reconcile task hours and lesson links. If no work-order generator is available, the Lesson generator writes `practice-task-contract.json` as a handoff only.
-
-Content Contract V2 (`2.0`) describes the compatibility teaching-content contract, Content Contract `2.1` is the previous production contract, and Content Contract `2.2` is current. All are independent of the Word template version (`1.1.2` by default). The production generator accepts a complete V2.2 document or a complete compatible V2.1/V2.0 document; a missing or different `content_contract_version` is rejected with the legacy sparse-input message. A compatibility document is not silently rewritten to 2.2.
-
-## Course fields
-
-```text
-content_contract_version
-course_name
-major
-audience
-default_hours
-total_hours
-lessons
-```
-
-`total_hours` must equal the sum of lesson `hours`. `default_hours` is the default single-lesson duration used by the Agent when creating lessons; an explicit `lesson.hours` may override it, so it does not have to equal every lesson's hours. `default_hours`, `total_hours`, and `lessons[].hours` are positive integer lesson hours: integer JSON numbers and strings such as `"1"`, `"2"`, and `"2.0"` are accepted, while fractions, zero, negatives, whitespace, `NaN`, and `Infinity` are rejected. `major` and `audience` are required input, not Python defaults.
-
-## Lesson fields
-
-```text
-lesson_id, unit, task, hours
-progression: prior_lesson_id, prior_learning, capability_stage, deliverable, next_bridge
-student_analysis: base, problems, strategies
-teaching_content
-goals: knowledge, ability, quality
-key_point: content, strategy
-difficult_point: content, strategy
-teaching_methods, resources, references
-implementation
-evaluation: score, remarks
-reflection: summary, innovation, improvement
-```
-
-The JSON schema defines item counts and character limits. `capability_stage` uses the closed vocabulary `认知`, `理解`, `模仿`, `独立`, `综合`, `优化`, `迁移`; it is varied across a long course but is not required to be mechanically monotonic. Content QA additionally requires meaningful text and checks course-level differentiation. `teaching_methods` and necessary tool/resource names may recur; substantive teaching prose may not be a renamed copy.
-
-## Implementation stages
-
-The nine stages and their order are fixed because they map to the existing semantic rows:
-
-```text
-before_class_preparation
-task_introduction
-operation_demonstration
-task_implementation
-task_extension
-project_practice
-peer_review
-lesson_summary
-after_class_improvement
-```
-
-Each stage supplies `id`, `label`, `minutes`, `modality`, `content`, `teacher_actions`, `student_actions`, and `objective`. The seven in-class stages are stages 2 through 8, each must be positive, and they must total `hours * 45` minutes. The first and last stages are outside the classroom total; each may be zero but must be no greater than `max(60, hours * 45)`, and together they must be no greater than `2 * hours * 45`. Runtime errors report lesson ID, stage, actual, and limit.
-
-## Evaluation criteria
-
-The remarks object is closed and must use exactly these IDs:
-
-```text
-attendance, attention, participation, compliance, values, ethics,
-habits, online_learning, discussion, homework, practice, presentation,
-improvement
-```
-
-The score is explicit, must be between 85 and 96, and uses half-point increments. Existing `score_breakdown()` only distributes that score across the protected 13-row table; it does not invent remarks. Every remark must be meaningful, and every Content V2 template version applies the 48-character contract limit without truncation; a manifest may only make that limit stricter. The schema `maxLength=80` remains a syntactic compatibility bound, not the rendered-density safety limit. Generated score sequences must not be all identical, strict monotonic/arithmetic sequences, or genuine simple cycles. A non-divisible partial tail is only cyclic after one initial period when the repeated tail is at least `max(3, ceil(period / 2))`; two coincidental tail values do not fail. Reports include `cycle_confidence`, `full_cycles`, `tail_length`, and `tail_fraction`.
-
-References are objects with a visible `text`, internal `source_kind` (`provided`, `generic`, or `verified_public`), and optional internal `evidence`. A reference is a readable, citable document or source used as course basis: a textbook, course/teaching standard, national/industry/occupational standard, guideline, paper, public document, official technical manual, official product manual, or formal user-supplied teaching document. `resources` are teaching tools, equipment, environments, and materials such as PPT, projectors, MySQL Workbench, blood-pressure monitors, database servers, nursing models, computer rooms, task sheets, and datasets; standalone resource names do not satisfy `references`. A course-level reference pool may be reused across lessons, and cross-lesson reference repetition is explicitly allowed by `reference_reusable`; only same-lesson exact duplicates fail. In 2.2.2, the formatter preserves author/editor, institution, publisher/platform, and year fields in visible citations; evidence/URL stays internal. Generic references must not contain ISBN, standard numbers, publishers, authors, explicit years, editions, file numbers, or a specific book-title form. `verified_public` requires URL or locatable official-source evidence; `provided` requires a real user-supplied file name or material identifier. Without real supplied material, the agent must not invent `provided` evidence. The deterministic boundary is `contract_and_locator_only`: Python validates evidence presence, locator form, and the conservative resource-only boundary, but does not prove an upload occurred or that a public source is true; the Agent verifies those facts before authoring JSON. The formatter writes only `text` to DOCX.
-
-## Agent workflow
-
-Read all supplied course material once, then enter `INTAKE_PENDING` and make one concentrated Chinese confirmation of the course name, major, audience, and total hours, with theory/practice hours, organization, default 2-hour lesson duration, textbook, auxiliary references, and work-order preference shown in the same summary. Textbook confirmation is recommended but not blocking. After confirmation, enter `INTAKE_CONFIRMED`, create the course outline and author all lessons in JSON without asking again about the outline, template, output directory, or DOCX generation. Python formats existing values with numbering and line breaks. It must not author teaching prose, fall back to `flows`, cycle scores, or silently truncate over-capacity content.
-
-After schema validation, run `scripts/content_quality.py` for adjacent and non-adjacent exact/item duplicates, calibrated field/implementation/whole-lesson and entity-masked structural similarity, repeated sentences, old boilerplate, independent intra-lesson task/body/deliverable coherence, separate artifact-inheritance and forward-transition progression gates, completeness, the 48-character evaluation remark contract, score patterns, and lesson-scoped domain contamination. `non_it_contamination` is scoped to IT-default terms absent from the input but injected into the rendered output by a template or generator; it is not a general course-domain classifier. Every detector uses one reuse policy: narrative fields are strict; teaching terminology, resources, references, and attendance/compliance/habits rubric remarks are reusable; metadata labels are ignored. References are excluded from every cross-lesson duplicate/similarity hard-fail path, while same-lesson duplicate references and conservative resource-only reference checks remain hard failures. Repetition diagnostics expose only limited fragments (maximum 120 characters) with stable SHA-256 digests. Short course-term exemptions never apply to narrative fields.
-
-Each progression gate passes only when both lexical/coherence evidence and `substantive_anchor` evidence pass. Generic action overlap such as design, operation, analysis, checking, flow, or implementation cannot be an anchor; concrete Chinese fragments and technical acronyms can. A non-adjacent declared prior remains valid, but any physical sequence link with `status=review` sets `requires_agent_review=true` and records from/to/reason/score/declared_prior. The Agent must explicitly accept the actual teaching order or rewrite progression.
-
-Only after content QA passes should the generator create candidate DOCX files and run output/fidelity/render-smoke QA, then atomically commit the output. The render report is LibreOffice smoke evidence only; `page_count_method=pdf_page_object_regex` is not pagination or visual QA. After real representative-page inspection, the Agent explicitly runs `scripts/record_visual_inspection.py` to persist `visual-inspection.json` with checks, inspected pages, notes, related QA report, output fingerprint, and timestamp. Python never auto-claims a visual pass. A visual failure requires revised V2 content and a transactional regeneration with `--backup-existing`.
-
-## Acceptance evidence
-
-Synthetic acceptance fixtures exercise deterministic contracts and must be reported as synthetic acceptance. A true Agent E2E is separate evidence: the Agent must author the complete V2 JSON from a natural-language course brief, generate the DOCX files, inspect representative pages, and answer whether the lessons remain visibly different after masking course, task, and topic names. Model-authored E2E evidence does not belong in deterministic CI.
+只有 Content QA、模板 QA、输出 QA 和请求的真实 render 全部满足门禁，才可原子提交 DOCX。render smoke 只证明 DOCX 能被真实转换并完成基础输出检查（not pagination，也不是人工 visual QA）；render 未执行或失败时不得标记 Production PASS；人工代表页检查另行记录，不能由 Python 冒充。

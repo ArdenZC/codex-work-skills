@@ -38,6 +38,7 @@ from package_common import (
     reflection_bookmarks,
     required_bookmarks,
     score_breakdown,
+    apply_reviewed_lesson_content,
     validate_content_v2_input,
 )
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
@@ -45,6 +46,10 @@ from render_qa import render_docx_directory
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
+TEST_FIXTURE_AUTHORING_ENV = "LESSON_ALLOW_TEST_FIXTURE_AUTHORING"
+MECHANICAL_TOPIC_SUFFIX_RE = re.compile(
+    r"(?:聚焦(?:于)?|围绕|针对|对应主题|核心主题|本节主题|任务主题|本节关联)\s*[:：]"
+)
 
 
 def _same_lexical_path(left: Path | str, right: Path | str) -> bool:
@@ -736,10 +741,14 @@ def write_skipped_report(
     template_validation: bool = True,
     warnings: list[str] | None = None,
     render: bool = False,
+    render_pdf_dir: Path | str | None = None,
+    allow_test_fixture_authoring: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
-    validate_content_v2_input(data, schema_path)
+    validate_content_v2_input(data, schema_path, allow_test_fixture=allow_test_fixture_authoring)
+    if data.get("content_contract_version") == "2.2":
+        data = apply_reviewed_lesson_content(data)
     assert_output_path_safe(
         out_dir,
         lesson_protected_paths(
@@ -840,10 +849,14 @@ def validate_output_dir(
     output_validation: bool = True,
     extra_warnings: list[str] | None = None,
     render: bool = False,
+    render_pdf_dir: Path | str | None = None,
+    allow_test_fixture_authoring: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
-    validate_content_v2_input(data, schema_path)
+    validate_content_v2_input(data, schema_path, allow_test_fixture=allow_test_fixture_authoring)
+    if data.get("content_contract_version") == "2.2":
+        data = apply_reviewed_lesson_content(data)
     assert_output_path_safe(
         out_dir,
         lesson_protected_paths(
@@ -922,6 +935,7 @@ def validate_output_dir(
     course_expected = str(data["course_name"])
     total_hours = 0.0
     lesson_checks = []
+    docx_profiles: list[dict[str, Any]] = []
     anchor_results: list[dict[str, Any]] = []
     contamination_terms: set[str] = set()
     course_metadata = {
@@ -1008,6 +1022,25 @@ def validate_output_dir(
             item_errors.append("major field mismatch")
         if field_values["audience"] != expected_audience:
             item_errors.append("audience field mismatch")
+        docx_profiles.append(
+            {
+                "lesson_id": item.get("lesson_id"),
+                "file": path.name,
+                "course_name": field_values["course_name"],
+                "major": field_values["major"],
+                "audience": field_values["audience"],
+                "expected": {
+                    "course_name": expected_course,
+                    "major": expected_major,
+                    "audience": expected_audience,
+                },
+                "exact_match": (
+                    field_values["course_name"] == expected_course
+                    and field_values["major"] == expected_major
+                    and field_values["audience"] == expected_audience
+                ),
+            }
+        )
         if field_values["unit"] != expected_headers["unit"]:
             item_errors.append("unit field mismatch")
         if field_values["task"] != expected_headers["task"]:
@@ -1130,12 +1163,17 @@ def validate_output_dir(
             item_errors.append(f"evaluation table validation failed: {exc}")
 
         all_text = _document_text(document, table)
-        contamination = detect_non_it_contamination(course_metadata, item, all_text)
+        contamination = [] if is_v22 else detect_non_it_contamination(course_metadata, item, all_text)
         if contamination:
             contamination_terms.update(contamination)
             item_errors.extend(
                 f"non-IT content contamination: {term}"
                 for term in contamination
+            )
+        suffix_count = len(MECHANICAL_TOPIC_SUFFIX_RE.findall(all_text))
+        if suffix_count:
+            item_errors.append(
+                f"mechanical topic suffixes remain in rendered DOCX: {suffix_count}"
             )
         for forbidden in manifest.get("validation", {}).get("forbidden_template_text", []):
             if forbidden in {course_expected, expected_course, str(item["unit"]), str(item["task"])}:
@@ -1208,6 +1246,27 @@ def validate_output_dir(
             "practice_hours": practice_hours,
         }
     checks["lessons"] = lesson_checks
+    confirmed = data.get("confirmed_course_info") if isinstance(data.get("confirmed_course_info"), dict) else {}
+    input_profile = {
+        field_name: data.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    }
+    confirmed_profile = {
+        field_name: confirmed.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    } if confirmed else input_profile.copy()
+    report["course_profile"] = {
+        "evidence": "semantic fields read from every final DOCX after generation",
+        "confirmed_course_info": confirmed_profile,
+        "input": input_profile,
+        "docx": docx_profiles,
+        "exact_match": (
+            confirmed_profile == input_profile
+            and (not lessons or len(docx_profiles) == len(lessons))
+            and all(item.get("exact_match") for item in docx_profiles)
+        ),
+    }
+    checks["course_profile"] = report["course_profile"]
     report["files_checked"] = len(files)
     if render and not errors:
         if not files:
@@ -1223,10 +1282,13 @@ def validate_output_dir(
                 "errors": [],
             }
         else:
-            render_report = render_docx_directory(out_dir)
+            render_report = render_docx_directory(out_dir, pdf_output_dir=render_pdf_dir)
         report["render"] = render_report
-        if render_report["status"] == "failed":
-            errors.extend(f"render QA: {message}" for message in render_report["errors"])
+        if render_report["status"] != "passed":
+            render_errors = render_report.get("errors") or [
+                f"render status={render_report.get('status')}: {render_report.get('reason', 'render was not verified')}"
+            ]
+            errors.extend(f"render QA: {message}" for message in render_errors)
     if not errors:
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
@@ -1249,8 +1311,20 @@ def main() -> int:
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
+    parser.add_argument(
+        "--allow-test-fixture-authoring",
+        action="store_true",
+        help="Test-only escape hatch; requires LESSON_ALLOW_TEST_FIXTURE_AUTHORING=1",
+    )
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Explicitly enable the non-production 2.0/2.1 compatibility path",
+    )
     args = parser.parse_args()
     try:
+        if args.allow_test_fixture_authoring and os.environ.get(TEST_FIXTURE_AUTHORING_ENV) != "1":
+            raise RuntimeError("Test-fixture authoring bypass is disabled for production validation.")
         source_path = Path(args.input_json).expanduser().resolve()
         schema_path = Path(args.schema).expanduser().resolve()
         data = json.loads(source_path.read_text(encoding="utf-8-sig"))
@@ -1273,7 +1347,16 @@ def main() -> int:
         assert_output_path_safe(Path(args.output_dir), protected_paths)
         if args.qa_report and not _same_lexical_path(args.qa_report, Path(args.output_dir) / "qa-report.json"):
             assert_external_qa_path_safe(args.qa_report, args.output_dir, protected_paths)
-        validate_content_v2_input(data, schema_path)
+        if data.get("content_contract_version") != "2.2" and not args.legacy:
+            raise ValueError(
+                "Lesson Content Contract 2.2 is required for production output validation; "
+                "legacy 2.0/2.1 input requires the explicit --legacy flag."
+            )
+        validate_content_v2_input(
+            data,
+            schema_path,
+            allow_test_fixture=args.allow_test_fixture_authoring,
+        )
         custom_template = args.custom_template if args.custom_template else None
         if args.skip_validation:
             report = write_skipped_report(
@@ -1287,6 +1370,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 render=args.render,
+                allow_test_fixture_authoring=args.allow_test_fixture_authoring,
             )
         else:
             report = validate_output_dir(
@@ -1300,6 +1384,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 render=args.render,
+                allow_test_fixture_authoring=args.allow_test_fixture_authoring,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
