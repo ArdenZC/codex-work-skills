@@ -56,7 +56,8 @@
 - **1 Practice Task = 1 WorkOrder = 2 practice hours**；
 - 关联模式精确继承已确认课程基本盘和来源任务快照，不重新猜专业或授课对象；
 - 考勤固定 **10 分**，任务评价合计 **90 分**，学生结果区保持空白；
-- linked / standalone 模式明确分层，正式 linked 生产需要完整 handoff、Cross-Artifact QA 与真实 render gate。
+- linked / standalone 模式明确分层，正式 linked 生产需要完整 handoff、Cross-Artifact QA 与真实 render gate；
+- 默认使用受保护的 `practice-work-order v1.0.0` Word 模板。
 
 **Courseware / Practice HTML**
 
