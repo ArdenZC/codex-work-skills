@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from practice_contract import RENDERER_FAMILIES, load_courseware, load_json, normalize_content, validate_content
-from classroom_integrity import closure
+from classroom_integrity import _asset_root_path, closure
 
 
 STUDENT_PAGES = (Path("student") / "student-task.html", Path("student") / "learning-center.html", Path("student") / "study-guide.html", Path("student") / "foundation-kit.html")
@@ -331,10 +331,10 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
         if not isinstance(asset, dict):
             continue
         if asset.get('role', 'student-edit') in {'teacher-reference', 'test-only'}:
-            if (output_dir / 'student' / 'starter' / str(asset.get('path', ''))).exists():
+            if (output_dir / 'student' / 'starter' / _asset_root_path(asset.get('path', ''))).exists():
                 errors.append('teacher-only starter leaked')
             continue
-        target = output_dir / "student" / "starter" / str(asset.get("path", ""))
+        target = output_dir / "student" / "starter" / _asset_root_path(asset.get("path", ""))
         if not target.is_file():
             errors.append(f"starter asset output is missing: {target.relative_to(output_dir)}")
         if str(asset.get("path", "")).lower().endswith(".drawio"):
@@ -367,7 +367,7 @@ def validate_output_files(content: dict[str, Any], output_dir: Path) -> dict[str
                 asset_path = str(asset.get("path", "")).replace("\\", "/")
                 if asset_path not in starter_links:
                     errors.append(f"task {task.get('id')} starter has no clickable href: {asset_path}")
-                target = output_dir / "student" / "starter" / asset_path
+                target = output_dir / "student" / "starter" / _asset_root_path(asset_path)
                 if not target.is_file():
                     continue
                 if _asset_is_text(asset_path):

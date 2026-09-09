@@ -194,6 +194,24 @@ class PracticeClassPackageTests(unittest.TestCase):
                     self.assertIn("客户 A | 2", teacher)
                     self.assertIn("本次环境：MySQL 8.0 · MySQL Workbench · draw.io", visible_student)
 
+    def test_explicit_starter_root_path_matches_materialized_link(self) -> None:
+        content = self.fixture("data-structures.practice.json")
+        asset = next(item for item in content["starter_assets"] if item["id"] == "binary-search-bug-loop")
+        original_path = str(asset["path"]).replace("\\", "/")
+        asset["path"] = f"starter/{original_path}"
+        with tempfile.TemporaryDirectory(prefix="practice-class-explicit-starter-root-") as temp:
+            root = Path(temp)
+            practice = root / "practice.json"
+            practice.write_text(json.dumps(content, ensure_ascii=False), encoding="utf-8")
+            output = root / "output"
+            report = generate(practice, output, self.courseware_for("data-structures.practice.json"))
+            self.assertEqual(report["status"], "pass", report)
+            student = (output / "student" / "student-task.html").read_text(encoding="utf-8")
+            self.assertIn(f'data-starter-path="starter/{original_path}"', student)
+            self.assertIn(f'href="starter/{original_path}"', student)
+            self.assertNotIn(f'href="starter/starter/{original_path}"', student)
+            self.assertTrue((output / "student" / "starter" / original_path).is_file())
+
     def test_database_setup_and_query_semantics_are_non_trivial(self) -> None:
         content = self.fixture("database.practice.json")
         setup = next(asset["content"] for asset in content["starter_assets"] if asset["path"].endswith("setup.sql"))

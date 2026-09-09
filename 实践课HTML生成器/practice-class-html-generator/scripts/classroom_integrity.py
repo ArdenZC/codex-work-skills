@@ -36,6 +36,17 @@ def _normalise(value: Any) -> str:
     return str(value or "").replace("\\", "/").lstrip("./")
 
 
+def _asset_root_path(value: Any) -> str:
+    """Normalize an asset path relative to the student starter root."""
+
+    raw = _normalise(value)
+    if raw.casefold() == "starter":
+        return ""
+    if raw.casefold().startswith("starter/"):
+        return raw.split("/", 1)[1]
+    return raw
+
+
 def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -286,7 +297,7 @@ def closure(content: dict[str, Any], root: Path) -> dict[str, Any]:
     assets = _asset_index(content)
     paths: list[str] = []
     for asset in assets.values():
-        path = _normalise(asset.get("path"))
+        path = _asset_root_path(asset.get("path"))
         if not path:
             errors.append("starter asset path is empty")
             continue
@@ -313,7 +324,7 @@ def closure(content: dict[str, Any], root: Path) -> dict[str, Any]:
             asset = assets.get(str(aid))
             if not asset or asset.get("role", "student-edit") not in STUDENT_ROLES:
                 errors.append(f"task {task.get('id')} references non-student asset {aid}")
-            elif not _safe_target(root, str(asset.get("path", ""))).is_file():
+            elif not _safe_target(root, _asset_root_path(asset.get("path", ""))).is_file():
                 errors.append(f"task {task.get('id')} missing student asset {aid}")
 
     for bundle in content.get("starter_bundles", []):

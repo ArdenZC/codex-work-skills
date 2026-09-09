@@ -422,7 +422,11 @@ def _starter_html(assets: dict[str, dict[str, Any]], ids: list[str]) -> str:
         if not asset:
             continue
         relative = str(asset.get("path", "")).replace("\\", "/")
-        href = "starter/" + quote(relative, safe="/@:+,;=-._~")
+        # Asset paths are allowed to be written either relative to the
+        # starter root (``foo.py``) or with that root made explicit
+        # (``starter/foo.py``).  Keep the contract-facing data attribute as
+        # authored, but make the browser target match the materialized path.
+        href = "starter/" + quote(_safe_asset_path(relative).as_posix(), safe="/@:+,;=-._~")
         link = f'<a class="starter-link" data-starter-path="{esc(relative)}" href="{esc(href)}" download>打开起点文件</a>'
         preview = ""
         if _asset_is_text(asset):
