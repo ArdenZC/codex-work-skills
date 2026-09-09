@@ -3816,7 +3816,7 @@ esac
         workorder_text = str(jobs["template-workorder"]).lower()
         release_text = str(jobs["template-release"]).lower()
         self.assertIn("libreoffice", tooling_text)
-        self.assertNotIn("libreoffice", lesson_text)
+        self.assertIn("libreoffice", lesson_text)
         self.assertIn("libreoffice", gradebook_text)
         self.assertIn("practice-task-workorder-generator", workorder_text)
         self.assertIn("cross_artifact", workorder_text)
