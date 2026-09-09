@@ -387,6 +387,29 @@ jobs:
             教案生成器/lesson-plan-docx-generator/requirements.txt
             .github/scripts/requirements-ci-lesson-tests.txt
 
+      - name: Install LibreOffice on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: .github/scripts/install_libreoffice_macos.sh
+
+      - name: Install LibreOffice on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $started = Get-Date
+          choco install libreoffice-fresh --yes --no-progress
+          $programPaths = @(
+            (Join-Path $env:ProgramFiles "LibreOffice\program"),
+            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
+          )
+          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $programPath) { throw "LibreOffice installation path was not found." }
+          $soffice = Join-Path $programPath "soffice.com"
+          if (-not (Test-Path $soffice)) { throw "LibreOffice command was not found: $soffice" }
+          & $soffice --version | Select-Object -First 1
+          $seconds = [math]::Round(((Get-Date) - $started).TotalSeconds, 2)
+          "- LibreOffice setup: ${seconds}s" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
       - name: Install Python dependencies
         run: >-
           python .github/scripts/run_timed.py

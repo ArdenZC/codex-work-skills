@@ -3682,7 +3682,13 @@ esac
         ci_data = yaml.safe_load(ci_workflow)
         helper_run = ".github/scripts/install_libreoffice_macos.sh"
 
-        for job_name in ("template-gradebook", "template-workorder", "template-tooling", "template-release"):
+        for job_name in (
+            "template-lesson",
+            "template-gradebook",
+            "template-workorder",
+            "template-tooling",
+            "template-release",
+        ):
             with self.subTest(job=job_name):
                 mac_steps = [
                     step
