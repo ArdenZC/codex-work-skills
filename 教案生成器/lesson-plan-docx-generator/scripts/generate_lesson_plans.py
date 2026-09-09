@@ -460,7 +460,10 @@ def _build_artifact_manifest(
         for record in records
         if isinstance(record.get("actual_pdf_page_count"), int)
     ]
-    lesson_hours = sum(float(lesson.get("hours", 0)) for lesson in meta.get("lessons", []))
+    lesson_hours = sum(
+        (float(lesson.get("hours", 0)) for lesson in meta.get("lessons", [])),
+        0.0,
+    )
     if lesson_hours.is_integer():
         lesson_hours = int(lesson_hours)
     is_v22 = meta.get("content_contract_version") == "2.2"
