@@ -1,0 +1,26 @@
+skill:
+  id: practice-class-html-generator
+  name: 实践课 HTML 生成器
+  version: 1.2.0
+  phase: stable
+  content_contract: "1.1"
+generator:
+  entrypoint: scripts/render_practice.py
+  validator: scripts/validate_practice.py
+  runtime: deterministic-inline-html
+schema: schemas/practice-class-content.schema.json
+outputs:
+  - student/student-task.html
+  - student/learning-center.html
+  - student/study-guide.html
+  - student/foundation-kit.html
+  - teacher/teacher-guide.html
+  - teacher/teacher-reference.html
+  - practice-content.json
+  - qa-report.json
+  - student-package/student-manifest.json
+  - teacher-package/full-practice-content.json
+offline:
+  single_file: true
+  external_runtime: false
+integrity_contract: "1.0"

@@ -1,0 +1,482 @@
+{
+  "contract_version": "1.1",
+  "course_title": "AI 分类评估基础",
+  "chapter_title": "混淆矩阵、指标与阈值选择",
+  "audience": "高职人工智能应用专业学生",
+  "session_minutes": 90,
+  "prepared_minutes": 90,
+  "core_minutes": 72,
+  "extension_minutes": 18,
+  "theme": "morandi-academy",
+  "course_context": {
+    "course_name": "AI 分类评估基础",
+    "audience": "高职人工智能应用专业学生",
+    "language": "Python",
+    "tools": [
+      "JupyterLab",
+      "NumPy"
+    ],
+    "platform": "Windows",
+    "software": "JupyterLab",
+    "framework": "NumPy",
+    "other_constraints": [
+      "只使用已给标签和预测结果，不引入新模型训练"
+    ]
+  },
+  "learning_units": [
+    {
+      "id": "ai-evaluation-u1",
+      "title": "标签与预测",
+      "students_should_know": [
+        "评估先要明确实际标签和模型预测分别代表什么"
+      ],
+      "students_should_be_able_to": [
+        "能把一条样本放入正确的比较位置"
+      ],
+      "prerequisites": [],
+      "not_yet_taught": [],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1"
+      ]
+    },
+    {
+      "id": "ai-evaluation-u2",
+      "title": "混淆矩阵",
+      "students_should_know": [
+        "TP、FP、FN、TN 把分类结果按两个维度拆开"
+      ],
+      "students_should_be_able_to": [
+        "能从样本表数出四类结果"
+      ],
+      "prerequisites": [],
+      "not_yet_taught": [],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2"
+      ]
+    },
+    {
+      "id": "ai-evaluation-u3",
+      "title": "Precision 与 Recall",
+      "students_should_know": [
+        "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例"
+      ],
+      "students_should_be_able_to": [
+        "能根据业务风险选择关注指标"
+      ],
+      "prerequisites": [],
+      "not_yet_taught": [],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3"
+      ]
+    },
+    {
+      "id": "ai-evaluation-u4",
+      "title": "阈值变化",
+      "students_should_know": [
+        "改变阈值会同时改变预测标签和指标，不应只看单个数字"
+      ],
+      "students_should_be_able_to": [
+        "能比较两个阈值下的结果差异"
+      ],
+      "prerequisites": [],
+      "not_yet_taught": [],
+      "canonical_fact_ids": [
+        "ai-evaluation-f4"
+      ]
+    },
+    {
+      "id": "ai-evaluation-u5",
+      "title": "评估结论",
+      "students_should_know": [
+        "评估结论必须说明数据、指标、阈值和风险边界"
+      ],
+      "students_should_be_able_to": [
+        "能写出带条件的评估结论"
+      ],
+      "prerequisites": [],
+      "not_yet_taught": [],
+      "canonical_fact_ids": [
+        "ai-evaluation-f5"
+      ]
+    }
+  ],
+  "canonical_facts": [
+    {
+      "id": "ai-evaluation-f1",
+      "kind": "rule",
+      "statement": "同一个样本的预测和实际标签必须成对比较",
+      "source_slide_ids": [
+        "ai-evaluation-s1"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1"
+      ]
+    },
+    {
+      "id": "ai-evaluation-f2",
+      "kind": "rule",
+      "statement": "矩阵四格互斥且覆盖全部样本",
+      "source_slide_ids": [
+        "ai-evaluation-s2"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u2"
+      ]
+    },
+    {
+      "id": "ai-evaluation-f3",
+      "kind": "rule",
+      "statement": "分母不同导致两个指标回答不同问题",
+      "source_slide_ids": [
+        "ai-evaluation-s3"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3"
+      ]
+    },
+    {
+      "id": "ai-evaluation-f4",
+      "kind": "rule",
+      "statement": "阈值选择应由错误代价和验证证据共同决定",
+      "source_slide_ids": [
+        "ai-evaluation-s4"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u4"
+      ]
+    },
+    {
+      "id": "ai-evaluation-f5",
+      "kind": "rule",
+      "statement": "一个指标上升不自动等于模型适合部署",
+      "source_slide_ids": [
+        "ai-evaluation-s5"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u5"
+      ]
+    }
+  ],
+  "slides": [
+    {
+      "id": "ai-evaluation-s1",
+      "title": "标签与预测",
+      "kicker": "理论锚点",
+      "layout": "split",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "评估先要明确实际标签和模型预测分别代表什么 本页把概念放进预测为正但实际为负的样本，要求学生先观察证据，再做出一个可复核判断。"
+        },
+        {
+          "type": "cards",
+          "items": [
+            {
+              "title": "先看什么",
+              "text": "评估先要明确实际标签和模型预测分别代表什么"
+            },
+            {
+              "title": "再做什么",
+              "text": "能把一条样本放入正确的比较位置"
+            },
+            {
+              "title": "不要混淆",
+              "text": "预测为正就等于实际为正"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察对象",
+            "本页证据",
+            "检查动作"
+          ],
+          "rows": [
+            [
+              "标签与预测",
+              "预测为正但实际为负的样本",
+              "说出依据并记录结果"
+            ],
+            [
+              "边界",
+              "正例与负例",
+              "指出何时需要回查资料"
+            ]
+          ]
+        }
+      ],
+      "speaker_script": "本页开场可以先问学生：从标签与预测在真实工作中的一个小判断开始。 教师随后说明：评估先要明确实际标签和模型预测分别代表什么 结合例子预测为正但实际为负的样本，提醒学生不要把它误认为预测为正就等于实际为正。接着追问：学生能否用标签与预测解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把标签与预测带入实践活动。 本页开场可以先问学生：从标签与预测在真实工作中的一个小判断开始。 教师随后说明：评估先要明确实际标签和模型预测分别代表什么 结合例子预测为正但实际为负的样本，提醒学生不要把它误认为预测为正就等于实际为正。接着追问：学生能否用标签与预测解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把标签与预测带入实践活动。 本页开场可以先问学生：从标签与预测在真实工作中的一个小判断开始。 教师随后说明：评估先要明确实际标签和模型预测分别代表什么 结合例子预测为正但实际为负的样本，提醒学生不要把它误认为预测为正就等于实际为正。接着追问：学生能否用标签与预测解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把标签与预测带入实践活动。 本页开场可以先问学生：从标签与预测在真实工作中的一个小判断开始。 教师随后说明：评估先要明确实际标签和模型预测分别代表什么 结合例子预测为正但实际为负的样本，提醒学生不要把它误认为预测为正就等于实际为正。接着追问：学生能否用标签与预测解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把标签与预测带入实践活动。 ",
+      "lecture_minutes": 12,
+      "activity_minutes": 6,
+      "suggested_minutes": 18,
+      "teaching_intent": {
+        "opening": "从标签与预测在真实工作中的一个小判断开始。",
+        "core_explanation": "评估先要明确实际标签和模型预测分别代表什么",
+        "example": "预测为正但实际为负的样本",
+        "misconception": "预测为正就等于实际为正",
+        "question": "学生能否用标签与预测解释这个结果？",
+        "transition": "接下来把标签与预测带入实践活动。"
+      },
+      "learning_unit_ids": [
+        "ai-evaluation-u1"
+      ]
+    },
+    {
+      "id": "ai-evaluation-s2",
+      "title": "混淆矩阵",
+      "kicker": "理论锚点",
+      "layout": "grid",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "TP、FP、FN、TN 把分类结果按两个维度拆开 本页把概念放进四格矩阵中的误报与漏报，要求学生先观察证据，再做出一个可复核判断。"
+        },
+        {
+          "type": "cards",
+          "items": [
+            {
+              "title": "先看什么",
+              "text": "TP、FP、FN、TN 把分类结果按两个维度拆开"
+            },
+            {
+              "title": "再做什么",
+              "text": "能从样本表数出四类结果"
+            },
+            {
+              "title": "不要混淆",
+              "text": "只看正确率就能知道错误类型"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察对象",
+            "本页证据",
+            "检查动作"
+          ],
+          "rows": [
+            [
+              "混淆矩阵",
+              "四格矩阵中的误报与漏报",
+              "说出依据并记录结果"
+            ],
+            [
+              "边界",
+              "误报与漏报",
+              "指出何时需要回查资料"
+            ]
+          ]
+        }
+      ],
+      "speaker_script": "本页开场可以先问学生：从混淆矩阵在真实工作中的一个小判断开始。 教师随后说明：TP、FP、FN、TN 把分类结果按两个维度拆开 结合例子四格矩阵中的误报与漏报，提醒学生不要把它误认为只看正确率就能知道错误类型。接着追问：学生能否用混淆矩阵解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把混淆矩阵带入实践活动。 本页开场可以先问学生：从混淆矩阵在真实工作中的一个小判断开始。 教师随后说明：TP、FP、FN、TN 把分类结果按两个维度拆开 结合例子四格矩阵中的误报与漏报，提醒学生不要把它误认为只看正确率就能知道错误类型。接着追问：学生能否用混淆矩阵解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把混淆矩阵带入实践活动。 本页开场可以先问学生：从混淆矩阵在真实工作中的一个小判断开始。 教师随后说明：TP、FP、FN、TN 把分类结果按两个维度拆开 结合例子四格矩阵中的误报与漏报，提醒学生不要把它误认为只看正确率就能知道错误类型。接着追问：学生能否用混淆矩阵解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把混淆矩阵带入实践活动。 本页开场可以先问学生：从混淆矩阵在真实工作中的一个小判断开始。 教师随后说明：TP、FP、FN、TN 把分类结果按两个维度拆开 结合例子四格矩阵中的误报与漏报，提醒学生不要把它误认为只看正确率就能知道错误类型。接着追问：学生能否用混淆矩阵解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把混淆矩阵带入实践活动。 ",
+      "lecture_minutes": 12,
+      "activity_minutes": 6,
+      "suggested_minutes": 18,
+      "teaching_intent": {
+        "opening": "从混淆矩阵在真实工作中的一个小判断开始。",
+        "core_explanation": "TP、FP、FN、TN 把分类结果按两个维度拆开",
+        "example": "四格矩阵中的误报与漏报",
+        "misconception": "只看正确率就能知道错误类型",
+        "question": "学生能否用混淆矩阵解释这个结果？",
+        "transition": "接下来把混淆矩阵带入实践活动。"
+      },
+      "learning_unit_ids": [
+        "ai-evaluation-u2"
+      ]
+    },
+    {
+      "id": "ai-evaluation-s3",
+      "title": "Precision 与 Recall",
+      "kicker": "理论锚点",
+      "layout": "comparison",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例 本页把概念放进告警系统宁可少漏报还是少误报，要求学生先观察证据，再做出一个可复核判断。"
+        },
+        {
+          "type": "cards",
+          "items": [
+            {
+              "title": "先看什么",
+              "text": "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例"
+            },
+            {
+              "title": "再做什么",
+              "text": "能根据业务风险选择关注指标"
+            },
+            {
+              "title": "不要混淆",
+              "text": "两个指标只是不同叫法"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察对象",
+            "本页证据",
+            "检查动作"
+          ],
+          "rows": [
+            [
+              "Precision 与 Recall",
+              "告警系统宁可少漏报还是少误报",
+              "说出依据并记录结果"
+            ],
+            [
+              "边界",
+              "分母和业务代价",
+              "指出何时需要回查资料"
+            ]
+          ]
+        }
+      ],
+      "speaker_script": "本页开场可以先问学生：从Precision 与 Recall在真实工作中的一个小判断开始。 教师随后说明：Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例 结合例子告警系统宁可少漏报还是少误报，提醒学生不要把它误认为两个指标只是不同叫法。接着追问：学生能否用Precision 与 Recall解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把Precision 与 Recall带入实践活动。 本页开场可以先问学生：从Precision 与 Recall在真实工作中的一个小判断开始。 教师随后说明：Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例 结合例子告警系统宁可少漏报还是少误报，提醒学生不要把它误认为两个指标只是不同叫法。接着追问：学生能否用Precision 与 Recall解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把Precision 与 Recall带入实践活动。 本页开场可以先问学生：从Precision 与 Recall在真实工作中的一个小判断开始。 教师随后说明：Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例 结合例子告警系统宁可少漏报还是少误报，提醒学生不要把它误认为两个指标只是不同叫法。接着追问：学生能否用Precision 与 Recall解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把Precision 与 Recall带入实践活动。 本页开场可以先问学生：从Precision 与 Recall在真实工作中的一个小判断开始。 教师随后说明：Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例 结合例子告警系统宁可少漏报还是少误报，提醒学生不要把它误认为两个指标只是不同叫法。接着追问：学生能否用Precision 与 Recall解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把Precision 与 Recall带入实践活动。 ",
+      "lecture_minutes": 12,
+      "activity_minutes": 6,
+      "suggested_minutes": 18,
+      "teaching_intent": {
+        "opening": "从Precision 与 Recall在真实工作中的一个小判断开始。",
+        "core_explanation": "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例",
+        "example": "告警系统宁可少漏报还是少误报",
+        "misconception": "两个指标只是不同叫法",
+        "question": "学生能否用Precision 与 Recall解释这个结果？",
+        "transition": "接下来把Precision 与 Recall带入实践活动。"
+      },
+      "learning_unit_ids": [
+        "ai-evaluation-u3"
+      ]
+    },
+    {
+      "id": "ai-evaluation-s4",
+      "title": "阈值变化",
+      "kicker": "理论锚点",
+      "layout": "focus",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "改变阈值会同时改变预测标签和指标，不应只看单个数字 本页把概念放进阈值从 0.5 调到 0.7，要求学生先观察证据，再做出一个可复核判断。"
+        },
+        {
+          "type": "cards",
+          "items": [
+            {
+              "title": "先看什么",
+              "text": "改变阈值会同时改变预测标签和指标，不应只看单个数字"
+            },
+            {
+              "title": "再做什么",
+              "text": "能比较两个阈值下的结果差异"
+            },
+            {
+              "title": "不要混淆",
+              "text": "阈值越高模型一定越好"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察对象",
+            "本页证据",
+            "检查动作"
+          ],
+          "rows": [
+            [
+              "阈值变化",
+              "阈值从 0.5 调到 0.7",
+              "说出依据并记录结果"
+            ],
+            [
+              "边界",
+              "指标权衡",
+              "指出何时需要回查资料"
+            ]
+          ]
+        }
+      ],
+      "speaker_script": "本页开场可以先问学生：从阈值变化在真实工作中的一个小判断开始。 教师随后说明：改变阈值会同时改变预测标签和指标，不应只看单个数字 结合例子阈值从 0.5 调到 0.7，提醒学生不要把它误认为阈值越高模型一定越好。接着追问：学生能否用阈值变化解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把阈值变化带入实践活动。 本页开场可以先问学生：从阈值变化在真实工作中的一个小判断开始。 教师随后说明：改变阈值会同时改变预测标签和指标，不应只看单个数字 结合例子阈值从 0.5 调到 0.7，提醒学生不要把它误认为阈值越高模型一定越好。接着追问：学生能否用阈值变化解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把阈值变化带入实践活动。 本页开场可以先问学生：从阈值变化在真实工作中的一个小判断开始。 教师随后说明：改变阈值会同时改变预测标签和指标，不应只看单个数字 结合例子阈值从 0.5 调到 0.7，提醒学生不要把它误认为阈值越高模型一定越好。接着追问：学生能否用阈值变化解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把阈值变化带入实践活动。 本页开场可以先问学生：从阈值变化在真实工作中的一个小判断开始。 教师随后说明：改变阈值会同时改变预测标签和指标，不应只看单个数字 结合例子阈值从 0.5 调到 0.7，提醒学生不要把它误认为阈值越高模型一定越好。接着追问：学生能否用阈值变化解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把阈值变化带入实践活动。 ",
+      "lecture_minutes": 12,
+      "activity_minutes": 6,
+      "suggested_minutes": 18,
+      "teaching_intent": {
+        "opening": "从阈值变化在真实工作中的一个小判断开始。",
+        "core_explanation": "改变阈值会同时改变预测标签和指标，不应只看单个数字",
+        "example": "阈值从 0.5 调到 0.7",
+        "misconception": "阈值越高模型一定越好",
+        "question": "学生能否用阈值变化解释这个结果？",
+        "transition": "接下来把阈值变化带入实践活动。"
+      },
+      "learning_unit_ids": [
+        "ai-evaluation-u4"
+      ]
+    },
+    {
+      "id": "ai-evaluation-s5",
+      "title": "评估结论",
+      "kicker": "理论锚点",
+      "layout": "timeline",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "评估结论必须说明数据、指标、阈值和风险边界 本页把概念放进在验证集上 recall 提升但误报增加，要求学生先观察证据，再做出一个可复核判断。"
+        },
+        {
+          "type": "cards",
+          "items": [
+            {
+              "title": "先看什么",
+              "text": "评估结论必须说明数据、指标、阈值和风险边界"
+            },
+            {
+              "title": "再做什么",
+              "text": "能写出带条件的评估结论"
+            },
+            {
+              "title": "不要混淆",
+              "text": "最高分数就是唯一选择"
+            }
+          ]
+        },
+        {
+          "type": "table",
+          "headers": [
+            "观察对象",
+            "本页证据",
+            "检查动作"
+          ],
+          "rows": [
+            [
+              "评估结论",
+              "在验证集上 recall 提升但误报增加",
+              "说出依据并记录结果"
+            ],
+            [
+              "边界",
+              "验证与部署",
+              "指出何时需要回查资料"
+            ]
+          ]
+        }
+      ],
+      "speaker_script": "本页开场可以先问学生：从评估结论在真实工作中的一个小判断开始。 教师随后说明：评估结论必须说明数据、指标、阈值和风险边界 结合例子在验证集上 recall 提升但误报增加，提醒学生不要把它误认为最高分数就是唯一选择。接着追问：学生能否用评估结论解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把评估结论带入实践活动。 本页开场可以先问学生：从评估结论在真实工作中的一个小判断开始。 教师随后说明：评估结论必须说明数据、指标、阈值和风险边界 结合例子在验证集上 recall 提升但误报增加，提醒学生不要把它误认为最高分数就是唯一选择。接着追问：学生能否用评估结论解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把评估结论带入实践活动。 本页开场可以先问学生：从评估结论在真实工作中的一个小判断开始。 教师随后说明：评估结论必须说明数据、指标、阈值和风险边界 结合例子在验证集上 recall 提升但误报增加，提醒学生不要把它误认为最高分数就是唯一选择。接着追问：学生能否用评估结论解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把评估结论带入实践活动。 本页开场可以先问学生：从评估结论在真实工作中的一个小判断开始。 教师随后说明：评估结论必须说明数据、指标、阈值和风险边界 结合例子在验证集上 recall 提升但误报增加，提醒学生不要把它误认为最高分数就是唯一选择。接着追问：学生能否用评估结论解释这个结果？，让学生先说依据，再看表格或示例核对。接下来把评估结论带入实践活动。 ",
+      "lecture_minutes": 12,
+      "activity_minutes": 6,
+      "suggested_minutes": 18,
+      "teaching_intent": {
+        "opening": "从评估结论在真实工作中的一个小判断开始。",
+        "core_explanation": "评估结论必须说明数据、指标、阈值和风险边界",
+        "example": "在验证集上 recall 提升但误报增加",
+        "misconception": "最高分数就是唯一选择",
+        "question": "学生能否用评估结论解释这个结果？",
+        "transition": "接下来把评估结论带入实践活动。"
+      },
+      "learning_unit_ids": [
+        "ai-evaluation-u5"
+      ]
+    }
+  ]
+}

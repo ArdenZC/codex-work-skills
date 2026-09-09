@@ -4,13 +4,30 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## 实践课 HTML 生成器 1.2.0 — 2026-09-09
+
+- 收口 Practice Class Content Contract 1.1：优先消费 Courseware Contract 1.1，保留 `source_slide_ids`、`learning_unit_ids`、`canonical_fact_ids`、`not_yet_taught` 和 `course_context` 语义边界。
+- 完成 G3 Classroom Asset Integrity、Executable Reference、Behavioral Verification、Formula Truth、Editable Gap answer isolation、Starter Bundle 与 student/teacher package isolation；人工 Blind Generalization：PASS。
+- Fresh Flow 为 Raw materials → Courseware → Practice；Courseware 更新导致 ID 变化时，必须持久化兼容映射或重新生成 Practice。自动化 PASS 不替代真实教师教学审核。
+
 ## HTML 课件生成器 1.2.1 — 2026-09-09
 
-- Courseware Skill 收口到 1.2.1，使用 `Courseware Content Contract 1.1`，加入 explicit time model、learning units、canonical facts、source truth、time evidence 和 theory-led planning。
+- 收口 Courseware Content Contract 1.1：explicit time model、learning units、canonical facts、source truth、time evidence、course context、stable slide IDs 和 theory-led planning。
+- 完成 Gold Closure、dynamic browser smoke、multi-viewport overflow、production pipeline E2E、offline/no-external-resource 与 student/teacher separation；Final Human Gold review：PASS。
+- Courseware 作为理论课上游 Skill，不依赖或反向修改 Practice；自动化 QA 通过不等于教学内容天然完美。
+
+## 实践课 HTML 生成器 1.0.0 — 2026-09-06
+
+- 新增 `practice-class-html-generator` 1.0.0：以 Courseware Content Contract 1.0 为首选上游，生成学生任务、学习中心、学习指南、动态基础工具包和教师指南，并输出合同/内链/互动 QA。
+- 加入数据结构、软件建模/UML、数据库三套内容差异明显的真实 fixture，覆盖代码 starter、建模脚手架和 ER/SQL/工具操作。
+- Courseware Skill 仅补充下游消费说明并保持稳定 `slide.id` 约束，不建立反向依赖。
+
+## HTML 课件生成器 1.0.0 — 2026-09-06
+
+- 新增独立的 `HTML课件生成器/courseware-html-generator` Skill，使用 `Courseware Content Contract 1.0` 将教材、PPT、讲义、教案或其他课程资料渲染为学生课堂展示版和教师逐页备课版。
 - 内置确定性 renderer：明亮莫兰迪学院风、16:9 投影布局、内联 CSS/JavaScript、SVG/代码/表格/quiz/stepper、投影增强、点击/滚轮/键盘翻页和逐页教师逐字稿布局。
 - 学生版不输出教师备注、来源式措辞、制作信息或内部时长；学生/教师 HTML 均为无服务器、无 CDN、无外部字体/图片依赖的单文件离线文档。
 - 新增 Content/HTML/离线 QA、事务式 Codex 安装器、跨工具 adapter、数据结构与 UML fixture，以及真实 Playwright 浏览器交互 smoke，覆盖任意非交互位置点击、滚轮上下翻页、单 wheel 不多跳和交互按钮不误翻页。
-- 完成 Courseware Gold Closure、动态 browser smoke、多 viewport overflow、production pipeline E2E、offline/no-external-resource、student/teacher separation、本地图片资源与人工 Blind Generalization PASS 验收；自动化通过不替代课堂人工教学审核。
 - 本 Skill 独立于 Lesson DOCX 与 Practice WorkOrder，不修改既有模板或上游合同。
 
 ## Lesson / WorkOrder Contract Fix 2.2.1 — 2026-09-05

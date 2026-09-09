@@ -32,6 +32,7 @@ jobs:
       run_gradebook: ${{ steps.classify.outputs.run_gradebook }}
       run_workorder: ${{ steps.classify.outputs.run_workorder }}
       run_courseware: ${{ steps.classify.outputs.run_courseware }}
+      run_practice_class: ${{ steps.classify.outputs.run_practice_class }}
       run_tooling: ${{ steps.classify.outputs.run_tooling }}
       run_release: ${{ steps.classify.outputs.run_release }}
       run_package_contracts: ${{ steps.classify.outputs.run_package_contracts }}
@@ -124,6 +125,7 @@ jobs:
               root / "教案生成器" / "简介.md",
               root / "平时成绩记分册生成器" / "简介.md",
               root / "HTML课件生成器" / "简介.md",
+              root / "实践课HTML生成器" / "简介.md",
           ]
           sources.extend(sorted((root / "docs").rglob("*.md")))
           link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
@@ -162,6 +164,7 @@ jobs:
               root / "教案生成器" / "lesson-plan-docx-generator" / "scripts" / "install.py",
               root / "平时成绩记分册生成器" / "course-gradebook-generator" / "scripts" / "install.py",
               root / "HTML课件生成器" / "courseware-html-generator" / "scripts" / "install.py",
+              root / "实践课HTML生成器" / "practice-class-html-generator" / "scripts" / "install.py",
           ]
           missing = [str(path.relative_to(root)) for path in install_paths if not path.is_file()]
           if missing:
@@ -194,18 +197,25 @@ jobs:
           if not courseware_match:
               raise SystemExit(f"Courseware Skill version not found: {courseware_manifest}")
           courseware_version = courseware_match.group(1)
+          practice_manifest = root / "实践课HTML生成器" / "practice-class-html-generator" / "manifest.yaml"
+          practice_text = practice_manifest.read_text(encoding="utf-8")
+          practice_match = re.search(r"^  version:\s*([^\s#]+)", practice_text, re.MULTILINE)
+          if not practice_match:
+              raise SystemExit(f"Practice Class Skill version not found: {practice_manifest}")
+          practice_version = practice_match.group(1)
           documents = {
-              root / "README.md": (lesson_version, gradebook_version, courseware_version),
+              root / "README.md": (lesson_version, gradebook_version, courseware_version, practice_version),
               root / "教案生成器" / "简介.md": (lesson_version,),
               root / "平时成绩记分册生成器" / "简介.md": (gradebook_version,),
               root / "HTML课件生成器" / "简介.md": (courseware_version,),
+              root / "实践课HTML生成器" / "简介.md": (practice_version,),
           }
           for document, versions in documents.items():
               text = document.read_text(encoding="utf-8")
               for version in versions:
                   if f"v{version}" not in text:
                       raise SystemExit(f"template version v{version} missing from {document.relative_to(root)}")
-          print(f"versions: lesson-plan v{lesson_version}; course-gradebook v{gradebook_version}; courseware {courseware_version}")
+          print(f"versions: lesson-plan v{lesson_version}; course-gradebook v{gradebook_version}; courseware {courseware_version}; practice-class {practice_version}")
           PY
 
       - name: Check WorkOrder Skill facade
@@ -748,6 +758,97 @@ jobs:
         shell: bash
         run: test -z "$(git status --porcelain)"
 
+  practice-class-html:
+    name: Practice Class HTML / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_practice_class == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            python-version: "3.11"
+          - os: macos-14
+            python-version: "3.11"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: .github/scripts/requirements-ci-practice-tests.txt
+
+      - name: Install Practice test dependencies
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "practice test dependency setup"
+          --
+          python -m pip install
+          -r .github/scripts/requirements-ci-practice-tests.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Run Practice Class unit tests and compile
+        run: |
+          python -m compileall -q 实践课HTML生成器/practice-class-html-generator
+          python -m unittest discover -s 实践课HTML生成器/practice-class-html-generator/tests -p "test_*.py" -v
+
+      - name: Install Playwright browser for real practice interaction smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/practice-class-node" --no-save playwright
+          "$RUNNER_TEMP/practice-class-node/node_modules/.bin/playwright" install chromium
+
+      - name: Generate all three practice fixtures and validate outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          skill="实践课HTML生成器/practice-class-html-generator"
+          output_root="$RUNNER_TEMP/practice-class-output"
+          mkdir -p "$output_root"
+          python "$skill/scripts/render_practice.py" \
+            --practice-json "$skill/examples/data-structures.practice.json" \
+            --courseware-json "HTML课件生成器/courseware-html-generator/examples/data-structures.example.json" \
+            --output-dir "$output_root/data-structures" --replace --json
+          python "$skill/scripts/render_practice.py" \
+            --practice-json "$skill/examples/uml.practice.json" \
+            --courseware-json "HTML课件生成器/courseware-html-generator/examples/uml.example.json" \
+            --output-dir "$output_root/uml" --replace --json
+          python "$skill/scripts/render_practice.py" \
+            --practice-json "$skill/examples/database.practice.json" \
+            --courseware-json "$skill/examples/database-courseware.example.json" \
+            --output-dir "$output_root/database" --replace --json
+          python "$skill/scripts/validate_practice.py" --practice-json "$skill/examples/data-structures.practice.json" --courseware-json "HTML课件生成器/courseware-html-generator/examples/data-structures.example.json" --output-dir "$output_root/data-structures" --json
+          python "$skill/scripts/validate_practice.py" --practice-json "$skill/examples/uml.practice.json" --courseware-json "HTML课件生成器/courseware-html-generator/examples/uml.example.json" --output-dir "$output_root/uml" --json
+          python "$skill/scripts/validate_practice.py" --practice-json "$skill/examples/database.practice.json" --courseware-json "$skill/examples/database-courseware.example.json" --output-dir "$output_root/database" --json
+
+      - name: Run Practice Class browser smoke and internal-link checks
+        shell: bash
+        env:
+          PRACTICE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/practice-class-node/node_modules/playwright
+        run: |
+          set -euo pipefail
+          node 实践课HTML生成器/practice-class-html-generator/tests/browser_smoke.mjs "$RUNNER_TEMP/practice-class-output"
+
+      - name: Verify Practice Class worktree is clean
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
   template-release:
     name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs:
@@ -853,6 +954,7 @@ jobs:
       - template-gradebook
       - template-workorder
       - template-courseware
+      - practice-class-html
       - template-release
     runs-on: ubuntu-latest
     steps:
@@ -866,6 +968,7 @@ jobs:
           GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
           COURSEWARE_RESULT: ${{ needs.template-courseware.result }}
+          PRACTICE_CLASS_RESULT: ${{ needs.practice-class-html.result }}
           RELEASE_RESULT: ${{ needs.template-release.result }}
           RUN_DOCS: ${{ needs.classify-changes.outputs.run_docs }}
           RUN_PACKAGE: ${{ needs.classify-changes.outputs.run_package_contracts }}
@@ -874,6 +977,7 @@ jobs:
           RUN_GRADEBOOK: ${{ needs.classify-changes.outputs.run_gradebook }}
           RUN_WORKORDER: ${{ needs.classify-changes.outputs.run_workorder }}
           RUN_COURSEWARE: ${{ needs.classify-changes.outputs.run_courseware }}
+          RUN_PRACTICE_CLASS: ${{ needs.classify-changes.outputs.run_practice_class }}
           RUN_RELEASE: ${{ needs.classify-changes.outputs.run_release }}
           FORCE_FULL: ${{ needs.classify-changes.outputs.force_full }}
           CLASSIFICATION: ${{ needs.classify-changes.outputs.classification }}
@@ -910,6 +1014,7 @@ jobs:
           check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"
           check_job template-courseware "$RUN_COURSEWARE" "$COURSEWARE_RESULT"
+          check_job practice-class-html "$RUN_PRACTICE_CLASS" "$PRACTICE_CLASS_RESULT"
           check_job template-release "$RUN_RELEASE" "$RELEASE_RESULT"
 
           {

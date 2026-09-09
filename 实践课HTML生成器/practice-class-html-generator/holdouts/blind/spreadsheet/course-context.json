@@ -1,0 +1,22 @@
+{
+  "course_id": "H2-spreadsheet",
+  "course_title": "Excel 数据处理基础",
+  "chapter_title": "公式、筛选与结果呈现",
+  "audience": "高职/大专，Excel 基础一般，能打开工作簿并录入数据",
+  "theory_requirements": {
+    "session_minutes": 120,
+    "prepared_minutes": 120,
+    "description": "本次理论课按 120 分钟准备；课程安排为 2 课时。"
+  },
+  "practice_requirements": {
+    "session_minutes": 120,
+    "description": "本次实践课为 2 课时，在 Windows 机房使用桌面版 Excel 完成。"
+  },
+  "environment": {
+    "os": "Windows",
+    "software": "Microsoft Excel 桌面版",
+    "data_file": "starter-data/sales-records.csv",
+    "language": "中文界面或能使用英文函数名的 Excel"
+  },
+  "source_role": "教师提供的本次章节原始资料与课堂背景"
+}

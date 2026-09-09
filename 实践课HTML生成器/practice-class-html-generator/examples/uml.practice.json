@@ -1,0 +1,1600 @@
+{
+  "contract_version": "1.0",
+  "course_title": "软件建模与设计",
+  "practice_title": "实践：从预约场景到可编辑 UML 模型",
+  "audience": "高职软件技术专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "软件建模与设计",
+    "audience": "高职软件技术专业学生",
+    "language": "UML 建模",
+    "tools": [
+      "draw.io",
+      "StarUML"
+    ],
+    "platform": "Windows 实训室",
+    "software": "draw.io / StarUML",
+    "framework": "UML 2.x",
+    "other_constraints": [
+      "优先使用可编辑模型，不以截图替代模型",
+      "先确认责任再细化实现"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.0",
+    "chapter_title": "预约系统的领域对象与时序责任",
+    "taught_slide_ids": [
+      "uml-01",
+      "uml-02",
+      "uml-03",
+      "uml-04",
+      "uml-05"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "uml-scenario",
+      "title": "从业务场景识别建模边界",
+      "summary": "先说清目标、参与者和业务结果，再决定哪些概念进入哪个 UML 视图。",
+      "source_slide_ids": [
+        "uml-01"
+      ],
+      "student_can_do": "能把同一现实概念放到正确的视图语境中。"
+    },
+    {
+      "id": "uml-domain",
+      "title": "稳定领域对象与属性",
+      "summary": "领域类图关注长期存在的对象、属性和业务关系，不把一次操作名称误画成类。",
+      "source_slide_ids": [
+        "uml-01",
+        "uml-04"
+      ],
+      "student_can_do": "能从预约场景提取 Student、Reservation、TimeSlot 等领域类。"
+    },
+    {
+      "id": "uml-association",
+      "title": "关联、多重性与关系语义",
+      "summary": "关系线要表达业务规则，多重性要能从场景中的数量约束解释出来。",
+      "source_slide_ids": [
+        "uml-03"
+      ],
+      "student_can_do": "能为核心关系补方向和多重性，并说明依据。"
+    },
+    {
+      "id": "uml-sequence",
+      "title": "时序消息与执行顺序",
+      "summary": "时序图按时间表达请求、检查、返回和确认，消息接收者必须能承担该动作。",
+      "source_slide_ids": [
+        "uml-02",
+        "uml-05"
+      ],
+      "student_can_do": "能把预约成功与冲突分支排成可执行的消息链。"
+    },
+    {
+      "id": "uml-responsibility",
+      "title": "对象责任与服务协调",
+      "summary": "领域对象持有状态，服务/控制对象编排流程，边界对象负责与用户或外部系统交互。",
+      "source_slide_ids": [
+        "uml-04",
+        "uml-05"
+      ],
+      "student_can_do": "能解释 Student 在不同视图中的角色差异，并修正责任错位。"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "uml-context-core",
+      "level": "core",
+      "title": "从预约场景划出建模边界",
+      "knowledge_link_ids": [
+        "uml-scenario"
+      ],
+      "source_slide_ids": [
+        "uml-01"
+      ],
+      "modality": "analysis",
+      "overview": "先把“谁发起、系统要完成什么、什么结果可观察”写成建模边界，再决定使用领域类图还是时序图。",
+      "scaffold": "任务给出同一预约场景的角色卡、业务目标卡和结果卡；学生只需完成视图选择和一句理由。",
+      "steps": [
+        {
+          "title": "拆场景",
+          "instruction": "圈出发起者、业务目标和最终结果。",
+          "check": "三类信息都被圈出。"
+        },
+        {
+          "title": "选视图",
+          "instruction": "判断哪些信息先进入领域类图，哪些信息先进入时序图。",
+          "check": "每个选择都有理由。"
+        },
+        {
+          "title": "说边界",
+          "instruction": "向同伴说明本次不处理支付、通知等未讲范围。",
+          "check": "范围没有无依据扩张。"
+        }
+      ],
+      "acceptance": [
+        "能区分目标、参与者和稳定对象。",
+        "能为两个视图各给出一个输入。"
+      ],
+      "help_refs": [
+        "uml-context",
+        "uml-domain-kit"
+      ],
+      "estimated_minutes": 8
+    },
+    {
+      "id": "uml-role-core",
+      "level": "core",
+      "title": "区分领域类与视图角色",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-domain"
+      ],
+      "source_slide_ids": [
+        "uml-01",
+        "uml-04"
+      ],
+      "modality": "modeling",
+      "overview": "在分类互动和领域 starter 中区分实体、边界、协调/控制服务，以及只在用例语境中作为参与者出现的 Student。",
+      "scaffold": "starter 已给出五个候选对象；Student 同时提供“用例参与者视图”和“领域类图”两个标签，避免把现实概念永久绑定为一个 UML 形状。",
+      "steps": [
+        {
+          "title": "先分类",
+          "instruction": "在学习中心完成角色分类，解释 Student 的语境差异。",
+          "check": "每项分类能说出依据。"
+        },
+        {
+          "title": "看 starter",
+          "instruction": "打开 reservation-domain.drawio，确认 Student 使用 class/domain object 形状。",
+          "check": "没有把 Student 画成 actor。"
+        },
+        {
+          "title": "补责任",
+          "instruction": "为 ReservationService 和 ReservationPage 各写一句职责。",
+          "check": "服务负责协调，页面负责交互。"
+        }
+      ],
+      "acceptance": [
+        "五个对象分类正确。",
+        "Student 在领域类图中为 class/domain object。",
+        "能解释 Control / Service 与 Entity 的差别。"
+      ],
+      "help_refs": [
+        "uml-domain-kit",
+        "uml-context"
+      ],
+      "estimated_minutes": 10,
+      "starter_asset_ids": [
+        "uml-domain-drawio"
+      ]
+    },
+    {
+      "id": "uml-relation-core",
+      "level": "core",
+      "title": "补出预约领域关系与多重性",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-association"
+      ],
+      "source_slide_ids": [
+        "uml-01",
+        "uml-03",
+        "uml-04"
+      ],
+      "modality": "modeling",
+      "overview": "在可编辑 draw.io starter 中补齐预约、时段和学生之间的关系；直接使用题面业务规则解释每个多重性，不再自行猜测容量规则。",
+      "scaffold": "已有 Student、Reservation、TimeSlot 三个领域类和两个待补关系槽；题面已给出：一次预约只选择一个时段，同一个时段可以被多个学生预约，具体容量控制属于后续业务规则。",
+      "steps": [
+        {
+          "title": "读对象",
+          "instruction": "把每个类的属性和责任与场景句子对照。",
+          "check": "没有把动作名称当成领域类。"
+        },
+        {
+          "title": "补关系",
+          "instruction": "在 Reservation 与 TimeSlot 之间建立关联，并按端点语义标注 Reservation 端 0..*、TimeSlot 端 1。",
+          "check": "能说清一次预约只选一个时段，而一个时段可被 0..* 个预约使用。"
+        },
+        {
+          "title": "口头验证",
+          "instruction": "任选一条关系，说明如果多重性改变会影响什么业务。",
+          "check": "说明具体后果。"
+        }
+      ],
+      "acceptance": [
+        "Student—Reservation 关系保留。",
+        "Reservation—TimeSlot 关系可解释。",
+        "Reservation 端标 0..*、TimeSlot 端标 1，且能用题面业务规则解释端点。"
+      ],
+      "help_refs": [
+        "uml-association",
+        "uml-domain-kit"
+      ],
+      "estimated_minutes": 14,
+      "starter_asset_ids": [
+        "uml-domain-drawio"
+      ]
+    },
+    {
+      "id": "uml-sequence-core",
+      "level": "core",
+      "title": "把预约流程排成可执行消息链",
+      "knowledge_link_ids": [
+        "uml-sequence",
+        "uml-responsibility"
+      ],
+      "source_slide_ids": [
+        "uml-02",
+        "uml-04",
+        "uml-05"
+      ],
+      "modality": "modeling",
+      "overview": "用消息卡表达请求、可用性检查、返回状态和成功分支，保证消息接收者承担得起动作。",
+      "scaffold": "sequence-card 已给出大部分消息和空槽；先排序，再把返回消息回给调用者。",
+      "steps": [
+        {
+          "title": "排序",
+          "instruction": "在互动中心按时间排列五步消息。",
+          "check": "请求先发生，结果最后返回页面。"
+        },
+        {
+          "title": "补接收者",
+          "instruction": "填写页面请求和 available 分支的消息接收者。",
+          "check": "ReservationService 负责编排。"
+        },
+        {
+          "title": "画返回",
+          "instruction": "在 draw.io/StarUML 中标出 available 与 conflict 两条结果路径。",
+          "check": "冲突不会创建 Reservation。"
+        }
+      ],
+      "acceptance": [
+        "消息顺序正确。",
+        "TimeSlot 返回 ReservationService，而不是直接跳到 Reservation。",
+        "能解释成功分支为何才创建/确认。"
+      ],
+      "help_refs": [
+        "uml-message",
+        "uml-tool"
+      ],
+      "estimated_minutes": 14,
+      "starter_asset_ids": [
+        "uml-sequence-card"
+      ]
+    },
+    {
+      "id": "uml-tool-core",
+      "level": "core",
+      "title": "在建模工具中完成可编辑模型",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-association",
+        "uml-sequence"
+      ],
+      "source_slide_ids": [
+        "uml-01",
+        "uml-02",
+        "uml-03",
+        "uml-04",
+        "uml-05"
+      ],
+      "modality": "modeling-tool",
+      "overview": "把前四个任务的对象、关系和消息落入可编辑模型，形成一个教师可直接检查的最小预约模型。",
+      "scaffold": "draw.io starter 分成领域类图页与交互/责任视图页，已有类框、属性和一个示例关系；sequence-card 给出消息文字。学生完成缺口并保存可编辑状态即可。",
+      "steps": [
+        {
+          "title": "整理类图",
+          "instruction": "移动并连接类框，使关系标签可读。",
+          "check": "Student、Reservation、TimeSlot、ReservationService 均保留。"
+        },
+        {
+          "title": "完成时序",
+          "instruction": "用消息卡在同一文件或第二页排出成功/冲突链。",
+          "check": "服务协调与对象返回语义一致。"
+        },
+        {
+          "title": "走查",
+          "instruction": "用场景从 Student 发起到页面得到结果走一遍。",
+          "check": "每个业务动作都有接收者。"
+        },
+        {
+          "title": "解释",
+          "instruction": "向同伴指出一处可接受的建模变体。",
+          "check": "变体不改变责任和结果。"
+        }
+      ],
+      "acceptance": [
+        "draw.io 文件仍可编辑。",
+        "类图和时序都能回到场景。",
+        "没有用截图替代模型。"
+      ],
+      "help_refs": [
+        "uml-domain-kit",
+        "uml-message",
+        "uml-tool"
+      ],
+      "estimated_minutes": 18,
+      "starter_asset_ids": [
+        "uml-domain-drawio",
+        "uml-sequence-card"
+      ]
+    },
+    {
+      "id": "uml-critique-optional",
+      "level": "optional",
+      "title": "诊断并修复责任错位",
+      "knowledge_link_ids": [
+        "uml-sequence",
+        "uml-responsibility"
+      ],
+      "source_slide_ids": [
+        "uml-02",
+        "uml-04",
+        "uml-05"
+      ],
+      "modality": "model-critique",
+      "overview": "对一份含有“TimeSlot 直接创建 Reservation”和“页面持有容量状态”的模型做诊断，修复一处责任错位。",
+      "scaffold": "review-sheet 已列出检查问题；互动中心先给错误诊断，再回到模型修改。",
+      "steps": [
+        {
+          "title": "找症状",
+          "instruction": "完成 Debug 诊断，选择最影响可维护性的责任错位。",
+          "check": "诊断指向责任而非排版。"
+        },
+        {
+          "title": "改一处",
+          "instruction": "把可用性检查和状态持有放回 TimeSlot，把流程编排放回服务。",
+          "check": "修改后的消息链可执行。"
+        },
+        {
+          "title": "复核",
+          "instruction": "说明修复前后谁掌握哪条规则。",
+          "check": "解释包含对象责任。"
+        }
+      ],
+      "acceptance": [
+        "能指出至少一处责任错位。",
+        "修复后消息链返回方向正确。"
+      ],
+      "help_refs": [
+        "uml-debug",
+        "uml-message"
+      ],
+      "estimated_minutes": 10,
+      "starter_asset_ids": [
+        "uml-review-sheet"
+      ]
+    },
+    {
+      "id": "uml-alternate-optional",
+      "level": "optional",
+      "title": "同一概念换一个视图仍保持语义",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-association"
+      ],
+      "source_slide_ids": [
+        "uml-01",
+        "uml-03",
+        "uml-04"
+      ],
+      "modality": "modeling",
+      "overview": "把 Student 在用例参与者语境和领域类图语境分别表示，比较两种视图各自回答的问题。",
+      "scaffold": "给出两个视图标题和同一个现实概念，学生只改标签/形状和一句说明，不新增未讲的业务。",
+      "steps": [
+        {
+          "title": "写视图问题",
+          "instruction": "分别写出用例图和领域类图要回答的问题。",
+          "check": "问题不混用。"
+        },
+        {
+          "title": "调整表示",
+          "instruction": "为 Student 选择对应语境的表示方式。",
+          "check": "领域类图仍是 class/domain object。"
+        },
+        {
+          "title": "解释不矛盾",
+          "instruction": "说明同一现实概念在不同视图中角色不同并不冲突。",
+          "check": "能用上下文解释。"
+        }
+      ],
+      "acceptance": [
+        "两个视图的角色说明清楚。",
+        "没有把 Student 永久绑定成唯一 Actor。"
+      ],
+      "help_refs": [
+        "uml-domain-kit",
+        "uml-transfer"
+      ],
+      "estimated_minutes": 8,
+      "starter_asset_ids": [
+        "uml-domain-drawio"
+      ]
+    },
+    {
+      "id": "uml-challenge",
+      "level": "challenge",
+      "title": "综合迁移：为取消预约加一条分支",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-association",
+        "uml-responsibility"
+      ],
+      "source_slide_ids": [
+        "uml-01",
+        "uml-03",
+        "uml-04",
+        "uml-05"
+      ],
+      "modality": "model-critique",
+      "overview": "在已有预约模型上增加取消预约场景，只扩展必要的消息和状态变化，不重画整套系统。",
+      "scaffold": "提供 Reservation 的 status 属性和原有成功链；学生只需补一条取消入口、状态变化和返回结果。",
+      "steps": [
+        {
+          "title": "划范围",
+          "instruction": "确定取消由谁发起、影响哪个状态。",
+          "check": "不引入未讲的支付/通知模块。"
+        },
+        {
+          "title": "补消息",
+          "instruction": "在时序链中补取消请求、服务协调和状态更新。",
+          "check": "接收者与责任一致。"
+        },
+        {
+          "title": "验收",
+          "instruction": "用一句话说明取消后 TimeSlot 是否释放，给出模型中的证据。",
+          "check": "结论与模型标注一致。"
+        }
+      ],
+      "acceptance": [
+        "新增分支不破坏原有预约成功链。",
+        "状态变化有明确持有者。"
+      ],
+      "help_refs": [
+        "uml-transfer",
+        "uml-review"
+      ],
+      "estimated_minutes": 8,
+      "starter_asset_ids": [
+        "uml-review-sheet"
+      ]
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "uml-view-map",
+      "title": "视图地图：先问模型要回答什么",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-domain"
+      ],
+      "task_ids": [
+        "uml-context-core",
+        "uml-role-core"
+      ],
+      "purpose": "把业务目标、稳定对象和交互顺序分到合适的 UML 视图。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 4,
+        "prompt": "预约场景中，哪个结果最适合先放进领域类图？",
+        "options": [
+          {
+            "label": "Reservation 持有的 status 状态",
+            "feedback": "正确：它是稳定领域对象的状态。"
+          },
+          {
+            "label": "页面点击按钮的时间顺序",
+            "feedback": "这是时序视图更擅长表达的内容。"
+          },
+          {
+            "label": "用户看到的提示颜色",
+            "feedback": "这不是本次理论范围内的领域核心。"
+          }
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "uml-role-lab",
+      "title": "角色分类：同一现实概念的上下文",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-domain",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-role-core",
+        "uml-alternate-optional"
+      ],
+      "purpose": "用分类互动练习 Entity、Boundary、Control/Service 和用例参与者的差异。",
+      "interaction": {
+        "type": "classify",
+        "estimated_minutes": 7,
+        "prompt": "为对象选择最合适的当前建模角色。",
+        "categories": [
+          "Entity",
+          "Boundary",
+          "Control / Service",
+          "Actor-in-use-case-context"
+        ],
+        "items": [
+          {
+            "id": "student-domain",
+            "label": "Student（领域类图）",
+            "answer": "Entity",
+            "feedback": "领域类图中它是持久/业务概念，应使用 class/domain object。"
+          },
+          {
+            "id": "student-usecase",
+            "label": "Student（用例参与者视图）",
+            "answer": "Actor-in-use-case-context",
+            "feedback": "参与者角色取决于当前视图语境。"
+          },
+          {
+            "id": "reservation-service",
+            "label": "ReservationService",
+            "answer": "Control / Service",
+            "feedback": "它协调检查与确认，不是一个 operation。"
+          },
+          {
+            "id": "reservation-page",
+            "label": "ReservationPage",
+            "answer": "Boundary",
+            "feedback": "它负责与外部用户交互。"
+          },
+          {
+            "id": "reservation",
+            "label": "Reservation",
+            "answer": "Entity",
+            "feedback": "它持有预约标识和状态。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "uml-association-lab",
+      "title": "关系槽：从业务数量推导多重性",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-association"
+      ],
+      "task_ids": [
+        "uml-relation-core",
+        "uml-tool-core"
+      ],
+      "purpose": "在真实可编辑 starter 上补关系，再用场景句子解释方向和数量约束。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 5,
+        "prompt": "Reservation 与 TimeSlot 的关系没有多重性，最先补什么证据？",
+        "options": [
+          {
+            "label": "先回到一次预约占用几个时段的业务句子",
+            "feedback": "正确：多重性必须从业务数量约束推导。"
+          },
+          {
+            "label": "先把 Student 改成 actor",
+            "feedback": "这不会产生关系数量证据。"
+          },
+          {
+            "label": "先增加更多颜色",
+            "feedback": "视觉变化不能替代模型语义。"
+          }
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "uml-message-order",
+      "title": "消息排序：让责任落到接收者",
+      "knowledge_link_ids": [
+        "uml-sequence",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-sequence-core",
+        "uml-tool-core"
+      ],
+      "purpose": "先排序再建图，避免把返回直接画到无关对象。",
+      "interaction": {
+        "type": "reorder",
+        "estimated_minutes": 7,
+        "prompt": "把预约成功/冲突消息排成时间顺序。",
+        "items": [
+          {
+            "id": "check",
+            "label": "ReservationService -> TimeSlot：checkAvailability()"
+          },
+          {
+            "id": "request",
+            "label": "ReservationPage -> ReservationService：requestReservation()"
+          },
+          {
+            "id": "return",
+            "label": "TimeSlot --> ReservationService：available / conflict"
+          },
+          {
+            "id": "confirm",
+            "label": "available 分支：ReservationService -> Reservation：create/confirm(...)"
+          },
+          {
+            "id": "result",
+            "label": "ReservationService --> ReservationPage：result"
+          }
+        ],
+        "correct_order": [
+          "request",
+          "check",
+          "return",
+          "confirm",
+          "result"
+        ]
+      }
+    },
+    {
+      "id": "uml-sequence-trace",
+      "title": "时序分支：一步一步看成功与冲突",
+      "knowledge_link_ids": [
+        "uml-sequence",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-sequence-core",
+        "uml-critique-optional"
+      ],
+      "purpose": "按时间推进一条成功链，再指出冲突分支在哪里停止。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "沿着服务协调的消息链检查对象责任。",
+        "steps": [
+          {
+            "title": "请求",
+            "text": "页面只负责提交选择，不直接判断时段容量。"
+          },
+          {
+            "title": "检查",
+            "text": "ReservationService 向 TimeSlot 请求可用性。"
+          },
+          {
+            "title": "返回",
+            "text": "TimeSlot 把 available/conflict 返回给调用者 ReservationService。"
+          },
+          {
+            "title": "分支",
+            "text": "只有 available 才创建或确认 Reservation；冲突直接返回页面。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "uml-debug",
+      "title": "模型 Debug：诊断责任错位",
+      "knowledge_link_ids": [
+        "uml-association",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-critique-optional",
+        "uml-challenge"
+      ],
+      "purpose": "用错误模型练习发现错位，而不是只检查线是否相交。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 5,
+        "prompt": "错误模型中 TimeSlot 直接创建 Reservation，最需要修正什么？",
+        "options": [
+          {
+            "label": "让 ReservationService 接收可用性返回并协调 Reservation",
+            "feedback": "正确：服务编排流程，TimeSlot 返回自身掌握的状态。"
+          },
+          {
+            "label": "让 ReservationPage 修改 TimeSlot.capacity",
+            "feedback": "边界对象不应直接持有领域状态。"
+          },
+          {
+            "label": "把所有对象合并成一个类",
+            "feedback": "合并会隐藏责任而不是修复责任。"
+          }
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "uml-multi-check",
+      "title": "连续检查：关系、形状和消息链",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-association",
+        "uml-sequence"
+      ],
+      "task_ids": [
+        "uml-tool-core",
+        "uml-alternate-optional"
+      ],
+      "purpose": "用多题连续核对模型是否回答场景，而不是只看图面完整。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 8,
+        "prompt": "每题先选判断，再回到 starter 找证据。",
+        "questions": [
+          {
+            "prompt": "领域类图中的 Student 应画成什么？",
+            "options": [
+              {
+                "label": "class/domain object",
+                "feedback": "正确：当前视图关注领域对象。"
+              },
+              {
+                "label": "永远是 actor",
+                "feedback": "角色必须随视图语境区分。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "available/conflict 应先返回给谁？",
+            "options": [
+              {
+                "label": "ReservationService",
+                "feedback": "正确：服务是调用者并负责分支编排。"
+              },
+              {
+                "label": "直接返回 Reservation",
+                "feedback": "Reservation 不是 TimeSlot 的调用者。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "多重性最可靠的来源是什么？",
+            "options": [
+              {
+                "label": "场景中的数量约束",
+                "feedback": "正确：关系语义应能被业务句子解释。"
+              },
+              {
+                "label": "图上颜色数量",
+                "feedback": "视觉样式不提供业务规则。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "uml-transfer",
+      "title": "迁移挑战：新增取消分支",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-association",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-alternate-optional",
+        "uml-challenge"
+      ],
+      "purpose": "把同一套责任原则迁移到取消预约，不要求增加无关系统模块。",
+      "interaction": {
+        "type": "scenario-decision",
+        "estimated_minutes": 6,
+        "prompt": "取消预约时，谁最适合协调状态变更并通知页面结果？",
+        "options": [
+          {
+            "label": "ReservationService",
+            "feedback": "正确：它协调流程，Reservation 持有状态，页面显示结果。"
+          },
+          {
+            "label": "ReservationPage",
+            "feedback": "页面可以发起请求，但不应直接改领域状态。"
+          },
+          {
+            "label": "TimeSlot",
+            "feedback": "它可以提供时段状态，但不应独自编排取消流程。"
+          }
+        ],
+        "answer_index": 0
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "uml-context",
+      "title": "1. 场景句子先于图形",
+      "knowledge_link_ids": [
+        "uml-scenario"
+      ],
+      "task_ids": [
+        "uml-context-core",
+        "uml-challenge"
+      ],
+      "body": "建模前先回答谁发起、系统要完成什么、什么结果可以观察。本次只处理预约核心，不扩展支付、通知等未讲范围。",
+      "worked_example": "“学生选择时段并预约”先得到参与者 Student、目标 Reservation、结果 confirmed/conflict。",
+      "quick_reference": [
+        "目标=业务结果，不是按钮。",
+        "对象=稳定概念，不是每个动词。",
+        "范围=本次理论已覆盖的内容。"
+      ],
+      "common_errors": [
+        "看到“点击”就画成领域类。",
+        "为了显得完整加入未讲模块。"
+      ],
+      "checkpoints": [
+        "写出一个参与者、一个稳定对象和一个结果。",
+        "说明领域类图和时序图各回答什么。"
+      ]
+    },
+    {
+      "id": "uml-domain-kit",
+      "title": "2. 领域类：状态和责任",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-role-core",
+        "uml-relation-core",
+        "uml-tool-core"
+      ],
+      "body": "领域类图先表达 Student、Reservation、TimeSlot 等稳定概念及其状态；ReservationService 是协调/控制服务，ReservationPage 是边界。",
+      "worked_example": "Student 的 class/domain object 表示学生资料；同一现实概念在用例图中可以作为参与者，但不能把两个语境混为同一个形状。",
+      "quick_reference": [
+        "Entity 持有业务状态。",
+        "Boundary 负责外部交互。",
+        "Control / Service 编排多个对象。"
+      ],
+      "common_errors": [
+        "把 Service 当成 operation。",
+        "在领域类图中把 Student 画成 actor。"
+      ],
+      "checkpoints": [
+        "分类互动五项全对。",
+        "能说出 Student 的两种语境。"
+      ]
+    },
+    {
+      "id": "uml-association",
+      "title": "3. 关系与多重性",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-association"
+      ],
+      "task_ids": [
+        "uml-relation-core",
+        "uml-tool-core",
+        "uml-challenge"
+      ],
+      "body": "关系线不是装饰：要能用业务数量、拥有关系或使用关系解释方向和多重性。先读场景句，再填槽。",
+      "worked_example": "如果一个 Student 可以有多个 Reservation，而每个 Reservation 对应一个 Student，可写 Student 1 对 Reservation 0..*；具体数值仍要以题设为准。",
+      "quick_reference": [
+        "先写关系语义，再选线。",
+        "多重性来自数量约束。",
+        "没有证据时先标待确认槽，不臆造。"
+      ],
+      "common_errors": [
+        "只画线不写语义。",
+        "把属性重复成关系类。"
+      ],
+      "checkpoints": [
+        "补出 Reservation—TimeSlot 关系。",
+        "能解释一处多重性变化的业务后果。"
+      ]
+    },
+    {
+      "id": "uml-message",
+      "title": "4. 时序消息的四个阶段",
+      "knowledge_link_ids": [
+        "uml-sequence",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-sequence-core",
+        "uml-tool-core"
+      ],
+      "body": "预约链应体现请求、检查、返回、成功分支和结果。返回消息通常先回到调用者；服务再根据返回决定是否创建/确认 Reservation。",
+      "worked_example": "ReservationService -> TimeSlot: checkAvailability()；TimeSlot --> ReservationService: available/conflict；available 时 ReservationService -> Reservation: create/confirm(...)",
+      "quick_reference": [
+        "调用者先发请求。",
+        "状态持有者返回自己的状态。",
+        "协调服务负责分支。",
+        "冲突分支不创建预约。"
+      ],
+      "common_errors": [
+        "TimeSlot 直接调用 Reservation。",
+        "页面直接修改容量。"
+      ],
+      "checkpoints": [
+        "完成五步排序。",
+        "指出 available 与 conflict 的分叉位置。"
+      ]
+    },
+    {
+      "id": "uml-tool",
+      "title": "5. draw.io / StarUML 操作路径",
+      "knowledge_link_ids": [
+        "uml-domain",
+        "uml-association",
+        "uml-sequence"
+      ],
+      "task_ids": [
+        "uml-tool-core",
+        "uml-critique-optional"
+      ],
+      "body": "本课以可编辑模型为成果。先打开 starter，再移动/连接类框，补关系标签，最后用消息卡建立第二视图或页面。",
+      "worked_example": "reservation-domain.drawio 已有 Student、Reservation、TimeSlot、ReservationService、ReservationPage；不要删掉现有属性再从空白重画。",
+      "quick_reference": [
+        "双击文本改属性/操作。",
+        "拖连接线到类框边缘。",
+        "用 note 作为待补关系提示。",
+        "保存为可继续编辑的 .drawio。"
+      ],
+      "common_errors": [
+        "只导出 PNG。",
+        "把 note 当成正式类。"
+      ],
+      "checkpoints": [
+        "文件可重新打开。",
+        "核心类和关系仍在。"
+      ]
+    },
+    {
+      "id": "uml-debug",
+      "title": "6. 模型 Debug 与可维护责任",
+      "knowledge_link_ids": [
+        "uml-association",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-critique-optional",
+        "uml-challenge"
+      ],
+      "body": "模型 Debug 先问“谁掌握规则、谁调用谁、谁显示结果”，再修一处责任。不要用颜色或排版掩盖语义错误。",
+      "worked_example": "TimeSlot 只能回答可用/冲突；ReservationService 接收结果并协调 Reservation；页面只负责请求和显示。",
+      "quick_reference": [
+        "现象：消息找不到接收者。",
+        "原因：责任放错对象。",
+        "修复：移动责任后重新走一遍链。"
+      ],
+      "common_errors": [
+        "看到线多就认为模型好。",
+        "一次改动太多无法复核。"
+      ],
+      "checkpoints": [
+        "能诊断一处责任错位。",
+        "修复后成功/冲突都能走通。"
+      ]
+    },
+    {
+      "id": "uml-transfer",
+      "title": "7. 新增分支仍保持模型语义",
+      "knowledge_link_ids": [
+        "uml-scenario",
+        "uml-responsibility"
+      ],
+      "task_ids": [
+        "uml-alternate-optional",
+        "uml-challenge"
+      ],
+      "body": "新增取消预约时只扩展必要的请求、状态变化和结果返回。原有成功链不应被重画成另一套无关系统。",
+      "worked_example": "Student -> ReservationPage: cancel；ReservationPage -> ReservationService: cancelReservation；ReservationService -> Reservation: setCancelled；Service -> Page: result。",
+      "quick_reference": [
+        "新增分支先定状态持有者。",
+        "服务仍负责协调。",
+        "页面仍只处理交互。"
+      ],
+      "common_errors": [
+        "把取消逻辑塞进页面。",
+        "添加未讲的通知/支付服务。"
+      ],
+      "checkpoints": [
+        "能标出新增的状态变化。",
+        "能说明原成功分支未被破坏。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "uml-context",
+      "title": "UML 视图选择最小卡",
+      "kind": "建模基础",
+      "task_ids": [
+        "uml-context-core",
+        "uml-role-core"
+      ],
+      "content": "用例语境回答谁与系统交互；领域类图回答有哪些稳定业务对象；时序图回答消息如何按时间推进。",
+      "when_to_use": "不知道一个信息该放在哪张图时。",
+      "steps": [
+        "先写信息要回答的问题。",
+        "选视图而不是先选形状。",
+        "把不属于本次范围的内容放回待定。"
+      ],
+      "self_check": [
+        "能给三个信息各选视图。",
+        "不会因看到按钮就自动画领域类。"
+      ]
+    },
+    {
+      "id": "uml-domain-kit",
+      "title": "领域类起点与职责",
+      "kind": "建模工具",
+      "task_ids": [
+        "uml-role-core",
+        "uml-relation-core",
+        "uml-tool-core"
+      ],
+      "content": "starter 已给出五个对象和少量属性。领域类用 class/domain object 形状；Boundary、Control/Service 和 Entity 用职责区分。",
+      "when_to_use": "打开 draw.io starter 前，或分类互动出现混淆时。",
+      "steps": [
+        "保留对象名称和属性。",
+        "先补职责再补关系。",
+        "不要用颜色替代角色说明。"
+      ],
+      "self_check": [
+        "Student 在领域类图中不是 actor。",
+        "ReservationService 不被写成 operation。"
+      ]
+    },
+    {
+      "id": "uml-association",
+      "title": "关系与多重性读法",
+      "kind": "关系语义",
+      "task_ids": [
+        "uml-relation-core",
+        "uml-challenge"
+      ],
+      "content": "多重性是数量约束的可视化表达；没有场景证据时先保留待补槽，再回到业务句子确认。",
+      "when_to_use": "关系槽没有把握，或老师追问“为什么是 0..*”时。",
+      "steps": [
+        "找出数量词或唯一性词。",
+        "写出两端对象的数量。",
+        "再决定线的方向和标注。"
+      ],
+      "self_check": [
+        "每条核心关系都能指回场景。",
+        "能解释一处变化的后果。"
+      ]
+    },
+    {
+      "id": "uml-message",
+      "title": "时序消息语法与返回",
+      "kind": "工具操作",
+      "task_ids": [
+        "uml-sequence-core",
+        "uml-critique-optional"
+      ],
+      "content": "消息格式使用“发送者 -> 接收者：操作()”；返回可用 -->，返回先到调用者，再由服务编排后续动作。",
+      "when_to_use": "排序卡正确但画图时不知箭头/接收者怎么写时。",
+      "steps": [
+        "列出生命线。",
+        "从请求到结果编号。",
+        "把返回箭头指回调用者。"
+      ],
+      "self_check": [
+        "TimeSlot 的返回先给 ReservationService。",
+        "冲突路径不会进入 create/confirm。"
+      ]
+    },
+    {
+      "id": "uml-tool",
+      "title": "draw.io 可编辑操作",
+      "kind": "软件工具",
+      "task_ids": [
+        "uml-tool-core",
+        "uml-alternate-optional"
+      ],
+      "content": "本课要求继续编辑模型文件，不用截图代替。熟悉移动、连接、双击文本、保存和重新打开。",
+      "when_to_use": "模型线条混乱或保存后无法继续编辑时。",
+      "steps": [
+        "打开 .drawio starter。",
+        "先移动再连接，避免遮住文字。",
+        "保存并重新打开确认可编辑。"
+      ],
+      "self_check": [
+        "文件仍可解析和编辑。",
+        "对象名称、关系槽和消息卡都保留。"
+      ]
+    },
+    {
+      "id": "uml-review",
+      "title": "建模复核四问",
+      "kind": "排错",
+      "task_ids": [
+        "uml-critique-optional",
+        "uml-challenge"
+      ],
+      "content": "复核不看“图是否漂亮”，而看谁持有状态、谁负责协调、谁与外部交互、返回是否回到调用者。",
+      "when_to_use": "准备解释模型或发现责任错位时。",
+      "steps": [
+        "逐对象说责任。",
+        "逐消息找接收者。",
+        "逐关系找业务依据。"
+      ],
+      "self_check": [
+        "能指出一处不合理责任。",
+        "能用成功/冲突两条路径复核。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "用一个预约场景贯穿视图选择、领域对象、关系多重性、消息责任和可编辑工具操作；弱基础学生完成核心模型即可达标。",
+    "theory_bridge": "本次实践依次衔接理论课中的五个主题：从用例目标识别稳定建模对象；明确对象责任与协作；使用关联与多重性表达业务关系；区分 Entity、Boundary 与 Control；通过时序消息检查责任分配和结果返回。实践中的领域模型、多重性、对象职责和消息链，均对应以上已讲内容。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "场景边界：完成 uml-context-core，明确两个视图各回答什么。"
+      },
+      {
+        "minutes": 10,
+        "focus": "角色分类：讨论 Student 的视图语境，巡视 uml-role-core 的形状与职责。"
+      },
+      {
+        "minutes": 14,
+        "focus": "关系建模：补 Reservation—TimeSlot 关系和多重性，要求说出场景依据。"
+      },
+      {
+        "minutes": 14,
+        "focus": "消息排序：先做排序互动，再在卡片/工具中形成成功与冲突链。"
+      },
+      {
+        "minutes": 18,
+        "focus": "可编辑工具模型：完成最小领域类图和时序页，教师检查能否重新打开。"
+      },
+      {
+        "minutes": 10,
+        "focus": "有余力责任 Debug：修复错误模型，不增加无关模块。"
+      },
+      {
+        "minutes": 8,
+        "focus": "视图迁移：用 Student 语境差异检查模型边界。"
+      },
+      {
+        "minutes": 8,
+        "focus": "收尾：新增取消分支或随机抽查成功/冲突责任链。"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "uml-context-core",
+        "look_for": "学生是否先写业务目标和范围，再选择视图。",
+        "ask_when_stuck": "这个信息要回答‘谁与系统交互’、‘有哪些稳定对象’还是‘消息怎样发生’？"
+      },
+      {
+        "task_id": "uml-role-core",
+        "look_for": "Student 在领域类图中是否使用 class/domain object，Service 是否被归到 Control / Service。",
+        "ask_when_stuck": "你现在看的是什么视图？这个对象持有状态、与用户交互，还是协调流程？"
+      },
+      {
+        "task_id": "uml-relation-core",
+        "look_for": "多重性是否能由场景数量约束解释，未确定处是否保留待补槽。",
+        "ask_when_stuck": "题目中的‘一次’、‘多个’或‘最多一个’对应哪一端？"
+      },
+      {
+        "task_id": "uml-sequence-core",
+        "look_for": "返回是否先回到 ReservationService，成功分支是否才创建/确认预约。",
+        "ask_when_stuck": "谁发起了 checkAvailability，结果应该先回给谁？"
+      },
+      {
+        "task_id": "uml-tool-core",
+        "look_for": "文件是否可编辑，类、关系和消息是否仍能从场景走通。",
+        "ask_when_stuck": "请从 Student 发起请求走到页面结果，每一步的接收者是谁？"
+      },
+      {
+        "task_id": "uml-critique-optional",
+        "look_for": "诊断是否指向责任错位，而不是颜色或布局。",
+        "ask_when_stuck": "TimeSlot 掌握的是状态还是流程？ReservationService 应该编排什么？"
+      },
+      {
+        "task_id": "uml-alternate-optional",
+        "look_for": "学生能否说明同一现实概念在不同视图的语境角色。",
+        "ask_when_stuck": "你是在描述领域对象，还是在描述用例参与者？"
+      },
+      {
+        "task_id": "uml-challenge",
+        "look_for": "取消分支是否只增加必要状态和消息，不破坏原成功链。",
+        "ask_when_stuck": "谁持有取消后的状态？谁把结果告诉页面？"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "Student 在领域类图中被画成 actor。",
+        "intervention": "让学生先写当前视图标题，再把 Student 换成 class/domain object；actor 只在用例语境讨论。"
+      },
+      {
+        "symptom": "ReservationService 被分类为 operation。",
+        "intervention": "问它是否是一次动作还是承担协调职责，引导归入 Control / Service。"
+      },
+      {
+        "symptom": "TimeSlot 直接创建 Reservation。",
+        "intervention": "把返回消息改回 ReservationService，再由服务发起 create/confirm。"
+      },
+      {
+        "symptom": "多重性只凭习惯填写。",
+        "intervention": "要求指出场景中支持该数量的词句，找不到就保留待补槽。"
+      },
+      {
+        "symptom": "学生只导出图片。",
+        "intervention": "现场重新打开 draw.io 文件，检查对象和关系是否仍可编辑。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱：先完成角色分类、消息排序和 draw.io starter 中的两个待补槽；允许使用 uml-context、uml-domain-kit 和 uml-message。",
+      "进度正常：完成全部 core，并能从成功/冲突两条路径解释责任。",
+      "进度较快：修复错误模型，再为取消预约增加一条不破坏原链的分支。"
+    ],
+    "closing_checks": [
+      "随机问 Student 在领域类图和用例参与者视图中的差异。",
+      "让学生指出 TimeSlot 返回消息的接收者。",
+      "打开一份 draw.io 文件检查它不是图片替代物。",
+      "让学生用场景句解释一条多重性。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "uml-context-core",
+        "title": "从预约场景划出建模边界",
+        "source_slide_ids": [
+          "uml-01"
+        ],
+        "reference_answer": "场景边界：Student 发起预约；核心领域对象是 Reservation、TimeSlot；交互过程用时序图表达。",
+        "reference_result": "学生能为每条信息选择视图并说明范围。",
+        "key_steps": [
+          "识别参与者/目标/结果",
+          "区分稳定对象和过程消息",
+          "明确本次不扩展范围"
+        ],
+        "acceptable_variants": [
+          "可使用 booking/reservation 同义词。"
+        ],
+        "common_errors": [
+          "把按钮或提示颜色当领域类。"
+        ],
+        "acceptance_basis": [
+          "视图选择与场景目标一致。"
+        ]
+      },
+      {
+        "task_id": "uml-role-core",
+        "title": "区分领域类与视图角色",
+        "source_slide_ids": [
+          "uml-01",
+          "uml-04"
+        ],
+        "reference_answer": "Student（领域类图）= Entity/class；Student（用例参与者）= Actor-in-use-case-context；ReservationService=Control/Service；Reservation=Entity；ReservationPage=Boundary。",
+        "reference_result": "Student 在 draw.io 领域模型中使用 class/domain object，而非 umlActor。",
+        "model_visual": {
+          "kind": "domain-model",
+          "title": "预约领域参考模型",
+          "nodes": [
+            {
+              "id": "student",
+              "title": "Student",
+              "fields": ["studentId", "name"]
+            },
+            {
+              "id": "reservation",
+              "title": "Reservation",
+              "fields": ["reservationId", "status", "date"]
+            },
+            {
+              "id": "timeslot",
+              "title": "TimeSlot",
+              "fields": ["start", "end", "capacity"]
+            }
+          ],
+          "relations": [
+            {
+              "from": "student",
+              "to": "reservation",
+              "label": "Student 端 1 —— Reservation 端 0..*"
+            },
+            {
+              "from": "reservation",
+              "to": "timeslot",
+              "label": "Reservation 端 0..* —— TimeSlot 端 1"
+            }
+          ]
+        },
+        "key_steps": [
+          "完成分类",
+          "检查 Student 形状",
+          "写出 Service/Page 职责"
+        ],
+        "acceptable_variants": [
+          "不同工具的 class 样式名称可不同，但语义必须是类/领域对象。"
+        ],
+        "common_errors": [
+          "永久把 Student 绑定成 actor。",
+          "把 Service 当 operation。"
+        ],
+        "acceptance_basis": [
+          "五项分类、形状和职责解释一致。"
+        ]
+      },
+      {
+        "task_id": "uml-relation-core",
+        "title": "补出预约领域关系与多重性",
+        "source_slide_ids": [
+          "uml-01",
+          "uml-03",
+          "uml-04"
+        ],
+      "reference_answer": "保留 Student 端 1—Reservation 端 0..*；补 Reservation—TimeSlot 关系，并遵循明确业务规则：一次预约只选择一个时段，同一个时段可以被多个学生预约，具体容量控制属于后续业务规则。因此 Reservation 端标 0..*，TimeSlot 端标 1。端点读法是：一个 Reservation 对应 1 个 TimeSlot；一个 TimeSlot 可对应 0..* 个 Reservation。",
+      "reference_result": "关系线和标注可编辑，学生能从题面规则读出 Reservation 端 0..* / TimeSlot 端 1，并解释两个端点各自代表什么。",
+        "key_steps": [
+          "对照场景",
+          "补连接和标签",
+          "口头走查关系后果"
+        ],
+        "acceptable_variants": [
+          "若题设明确不同数量，可使用不同但有证据的多重性。"
+        ],
+        "common_errors": [
+          "无依据填 1..*。"
+        ],
+        "acceptance_basis": [
+          "每条关系都可追溯到场景。"
+        ]
+      },
+      {
+        "task_id": "uml-sequence-core",
+        "title": "把预约流程排成可执行消息链",
+        "source_slide_ids": [
+          "uml-02",
+          "uml-04",
+          "uml-05"
+        ],
+        "reference_answer": "ReservationPage -> ReservationService: requestReservation()；ReservationService -> TimeSlot: checkAvailability()；TimeSlot --> ReservationService: available/conflict；available 时 ReservationService -> Reservation: create/confirm(...)；ReservationService --> ReservationPage: result。",
+        "reference_result": "成功路径创建/确认 Reservation，冲突路径不创建，并最终返回页面。",
+        "model_visual": {
+          "kind": "interaction-model",
+          "title": "预约交互责任参考模型",
+          "nodes": [
+            {
+              "id": "page",
+              "title": "ReservationPage",
+              "fields": ["selectSlot()", "showResult()"]
+            },
+            {
+              "id": "service",
+              "title": "ReservationService",
+              "fields": ["requestReservation()", "confirmReservation()", "cancelReservation()"]
+            },
+            {
+              "id": "slot",
+              "title": "TimeSlot",
+              "fields": ["checkAvailability()"]
+            },
+            {
+              "id": "reservation",
+              "title": "Reservation",
+              "fields": ["create()", "confirm()", "status"]
+            }
+          ],
+          "relations": [
+            {
+              "from": "page",
+              "to": "service",
+              "label": "requestReservation()"
+            },
+            {
+              "from": "service",
+              "to": "slot",
+              "label": "checkAvailability()"
+            },
+            {
+              "from": "service",
+              "to": "reservation",
+              "label": "create / confirm"
+            }
+          ],
+          "messages": [
+            {
+              "from": "ReservationPage",
+              "to": "ReservationService",
+              "label": "requestReservation()"
+            },
+            {
+              "from": "ReservationService",
+              "to": "TimeSlot",
+              "label": "checkAvailability()"
+            },
+            {
+              "from": "TimeSlot",
+              "to": "ReservationService",
+              "label": "available / conflict"
+            },
+            {
+              "from": "ReservationService",
+              "to": "Reservation",
+              "label": "available 时 create / confirm()"
+            },
+            {
+              "from": "ReservationService",
+              "to": "ReservationPage",
+              "label": "result"
+            }
+          ]
+        },
+        "key_steps": [
+          "先排序",
+          "补两个消息槽",
+          "画成功/冲突分支"
+        ],
+        "acceptable_variants": [
+          "消息名可用 reserve/check/cancel 等同义表达。"
+        ],
+        "common_errors": [
+          "TimeSlot 直接调用 Reservation。",
+          "返回箭头跳过调用者。"
+        ],
+        "acceptance_basis": [
+          "消息顺序、接收者责任和分支结果一致。"
+        ]
+      },
+      {
+        "task_id": "uml-tool-core",
+        "title": "在建模工具中完成可编辑模型",
+        "source_slide_ids": [
+          "uml-01",
+          "uml-02",
+          "uml-03",
+          "uml-04",
+          "uml-05"
+        ],
+        "reference_answer": "可编辑 draw.io 最小模型把 Student、Reservation、TimeSlot 放在领域类图页，把 ReservationPage、ReservationService、TimeSlot、Reservation 放在交互/责任视图页；关系和时序能走通成功/冲突。",
+        "reference_result": "文件可重新打开并继续编辑，学生能现场解释一条关系和一条消息。",
+        "key_steps": [
+          "整理类框",
+          "补关系槽",
+          "按消息卡建时序",
+          "重新打开检查"
+        ],
+        "acceptable_variants": [
+          "可以把时序放在同一文件第二页或另一个可编辑文件。"
+        ],
+        "common_errors": [
+          "只交截图。",
+          "删除 starter 后从空白重画导致范围失控。"
+        ],
+        "acceptance_basis": [
+          "工具文件存在、可编辑、语义与场景一致。"
+        ]
+      },
+      {
+        "task_id": "uml-critique-optional",
+        "title": "诊断并修复责任错位",
+        "source_slide_ids": [
+          "uml-02",
+          "uml-04",
+          "uml-05"
+        ],
+        "reference_answer": "消息责任应为 TimeSlot → ReservationService：available / conflict；ReservationService → Reservation：available 时 create/confirm()；ReservationService → ReservationPage：result。TimeSlot 不直接创建 Reservation，页面也不越过服务调用实体。",
+        "reference_result": "责任从状态对象与协调服务分离，消息链可执行。",
+        "key_steps": [
+          "指出责任错位",
+          "移动返回/创建消息",
+          "重新走成功和冲突"
+        ],
+        "acceptable_variants": [
+          "可以将 Service 命名为 Controller，但要保持协调职责。"
+        ],
+        "common_errors": [
+          "只改颜色或箭头样式。"
+        ],
+        "acceptance_basis": [
+          "能说明修复前后责任差异。"
+        ]
+      },
+      {
+        "task_id": "uml-alternate-optional",
+        "title": "同一概念换一个视图仍保持语义",
+        "source_slide_ids": [
+          "uml-01",
+          "uml-03",
+          "uml-04"
+        ],
+        "reference_answer": "用例视图中的 Student → 预约用例，表示参与者；领域类图中的 Student 是 class/domain object。两个视图的语境不同，但 ReservationPage → ReservationService 的责任关系仍要保持一致，不能把参与者图形直接当成领域类。",
+        "reference_result": "两种视图各自回答自己的问题，模型没有把角色混为一谈。",
+        "key_steps": [
+          "写视图问题",
+          "调整表示",
+          "解释语境差异"
+        ],
+        "acceptable_variants": [
+          "可以使用 StudentRecord 作为领域类名，但必须说明语义并保持场景一致。"
+        ],
+        "common_errors": [
+          "把所有 Student 都固定成 actor。"
+        ],
+        "acceptance_basis": [
+          "两视图角色、形状和解释对应。"
+        ]
+      },
+      {
+        "task_id": "uml-challenge",
+        "title": "综合迁移：为取消预约加一条分支",
+        "source_slide_ids": [
+          "uml-01",
+          "uml-03",
+          "uml-04",
+          "uml-05"
+        ],
+        "reference_answer": "取消分支：Student -> ReservationPage: cancel；Page -> ReservationService: cancelReservation；Service -> Reservation: setCancelled；Service -> Page: result。",
+        "reference_result": "Reservation 持有取消状态，Service 协调，原预约成功链仍然成立。",
+        "key_steps": [
+          "划定新增范围",
+          "补状态持有者",
+          "补请求与结果",
+          "核对原链"
+        ],
+        "acceptable_variants": [
+          "是否释放 TimeSlot 可按题设另行标注，但不能让 Page 直接改领域状态。"
+        ],
+        "common_errors": [
+          "新增通知/支付等未讲模块。"
+        ],
+        "acceptance_basis": [
+          "分支必要、责任清晰、原链不破坏。"
+        ]
+      }
+    ]
+  },
+  "starter_assets": [
+    {
+      "id": "uml-domain-drawio",
+      "path": "reservation-domain.drawio",
+      "language": "UML 2.x / draw.io",
+      "task_id": "uml-role-core",
+      "content": "<mxfile host=\"app.diagrams.net\" modified=\"2026-09-07T00:00:00.000Z\" agent=\"practice-class\" version=\"24.7.17\">\n  <diagram id=\"reservation-domain\" name=\"Reservation domain view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"0\"/><mxCell id=\"1\" parent=\"0\"/>\n        <mxCell id=\"domain-title\" value=\"领域类图：稳定业务对象\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"25\" width=\"300\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student\" value=\"Student&#xa;---&#xa;studentId&#xa;name\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#e8f1f2;strokeColor=#527d86;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"90\" width=\"190\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"reservation\" value=\"Reservation&#xa;---&#xa;reservationId&#xa;status&#xa;date\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"350\" y=\"90\" width=\"210\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"timeslot\" value=\"TimeSlot&#xa;---&#xa;start&#xa;end&#xa;capacity\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"680\" y=\"90\" width=\"190\" height=\"125\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"student-reservation\" value=\"1        0..*\" style=\"edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=none;\" edge=\"1\" parent=\"1\" source=\"student\" target=\"reservation\"><mxGeometry relative=\"1\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-a\" value=\"待补关系 A：Reservation 与 TimeSlot 的业务关联/多重性\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"640\" y=\"290\" width=\"280\" height=\"70\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"gap-b\" value=\"待补多重性 B：按规则补 Reservation 端 0..* / TimeSlot 端 1\" style=\"shape=note;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;\" vertex=\"1\" parent=\"1\"><mxGeometry x=\"60\" y=\"310\" width=\"300\" height=\"70\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n  <diagram id=\"reservation-interaction\" name=\"Reservation interaction view\">\n    <mxGraphModel dx=\"1200\" dy=\"800\" grid=\"1\" gridSize=\"10\" page=\"1\" pageScale=\"1\" pageWidth=\"827\" pageHeight=\"1169\" math=\"0\" shadow=\"0\">\n      <root>\n        <mxCell id=\"2\"/><mxCell id=\"3\" parent=\"2\"/>\n        <mxCell id=\"interaction-title\" value=\"交互/责任视图：页面与服务编排\" style=\"text;html=1;fontStyle=1;fontSize=18;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"25\" width=\"420\" height=\"30\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"page\" value=\"ReservationPage&#xa;---&#xa;selectSlot()&#xa;showResult()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f7ece7;strokeColor=#a56a52;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"50\" y=\"100\" width=\"210\" height=\"120\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"service\" value=\"ReservationService&#xa;---&#xa;requestReservation()&#xa;confirmReservation()&#xa;cancelReservation()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#f2eafa;strokeColor=#7e67a3;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"340\" y=\"100\" width=\"260\" height=\"145\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-timeslot\" value=\"TimeSlot&#xa;---&#xa;checkAvailability()\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#eaf2e9;strokeColor=#668f6d;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"680\" y=\"100\" width=\"220\" height=\"100\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"interaction-reservation\" value=\"Reservation&#xa;---&#xa;create() / confirm()&#xa;status\" style=\"shape=umlClass;whiteSpace=wrap;html=1;rounded=0;fillColor=#fff4df;strokeColor=#bd8b47;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"360\" y=\"350\" width=\"220\" height=\"110\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-1\" value=\"ReservationPage → ReservationService : requestReservation()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"520\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-2\" value=\"ReservationService → TimeSlot : checkAvailability()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"580\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-3\" value=\"TimeSlot → ReservationService : available / conflict\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#f8eade;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"60\" y=\"640\" width=\"360\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-4\" value=\"available → ReservationService → Reservation : create/confirm()\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#dcecef;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"520\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n        <mxCell id=\"message-5\" value=\"ReservationService → ReservationPage : result\" style=\"rounded=1;whiteSpace=wrap;html=1;fillColor=#e6efe9;\" vertex=\"1\" parent=\"3\"><mxGeometry x=\"470\" y=\"580\" width=\"380\" height=\"45\" as=\"geometry\"/></mxCell>\n      </root>\n    </mxGraphModel>\n  </diagram>\n</mxfile>",
+      "editable_gaps": [
+        {
+          "marker": "待补关系 A",
+          "target": "待补关系 A",
+          "replacement": "Reservation — TimeSlot：Reservation 0..*；TimeSlot 1",
+          "student_instruction": "在图中补出 Reservation 与 TimeSlot 的业务关系，并让两端含义可读。",
+          "kind": "association-slot"
+        },
+        {
+          "marker": "待补多重性 B",
+          "target": "待补多重性 B",
+          "replacement": "Reservation 端 0..*；TimeSlot 端 1",
+          "student_instruction": "按题面规则在关系两端补基数，并用一句话说明端点语义。",
+          "kind": "multiplicity-slot"
+        }
+      ]
+    },
+    {
+      "id": "uml-sequence-card",
+      "path": "reservation-sequence-card.md",
+      "language": "UML sequence / draw.io",
+      "task_id": "uml-sequence-core",
+      "content": "# 预约成功/冲突时序卡\n\n工具：draw.io 或 StarUML。把下面的消息槽拖成一条从上到下的时序链，并在返回消息处写出成功/冲突。\n\n1. [待补消息 A]：ReservationPage -> [待补接收者]：requestReservation()\n2. ReservationService -> TimeSlot：checkAvailability()\n3. TimeSlot --> ReservationService：available / conflict\n4. [待补消息 B]：available 分支下创建或确认 Reservation\n5. ReservationService --> ReservationPage：result\n\n操作验收：服务对象负责协调；TimeSlot 返回状态给调用者；只有 available 分支才创建/确认 Reservation。\n",
+      "editable_gaps": [
+        {
+          "marker": "待补消息 A",
+          "target": "待补消息 A",
+          "replacement": "ReservationPage → ReservationService：requestReservation()",
+          "student_instruction": "补出页面发起预约时发送给协调服务的消息。",
+          "kind": "message-slot"
+        },
+        {
+          "marker": "待补消息 B",
+          "target": "待补消息 B",
+          "replacement": "ReservationService → Reservation：available 时 create / confirm()",
+          "student_instruction": "补出 available 分支创建或确认 Reservation 的消息。",
+          "kind": "message-slot"
+        }
+      ]
+    },
+    {
+      "id": "uml-review-sheet",
+      "path": "reservation-review-sheet.md",
+      "language": "UML review card",
+      "task_id": "uml-critique-optional",
+      "content": "# 领域模型复核卡\n\n请在模型旁逐项打勾：\n\n- Student（领域类图）是 class/domain object；只有用例视图中的 Student（用例参与者）才按 actor 讨论。\n- ReservationService 是 Control / Service，不把它归为 operation。\n- Reservation 持有预约状态；TimeSlot 持有时段容量与时间。\n- 每条关系的多重性都能回到场景中的数量规则。\n- 时序返回先回到调用者，再由协调者触发后续动作。\n"
+    }
+  ]
+}

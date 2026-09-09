@@ -1,0 +1,4 @@
+interface:
+  display_name: "实践课 HTML 生成器"
+  short_description: "生成理论关联、分层任务和互动学习中心 HTML"
+  default_prompt: "根据已讲理论生成可完成的 Practice Class Content Contract，并输出实践课 HTML、starter 与 QA。"

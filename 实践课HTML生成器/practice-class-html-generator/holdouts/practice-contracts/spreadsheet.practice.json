@@ -1,0 +1,1775 @@
+{
+  "contract_version": "1.1",
+  "course_title": "Excel 数据处理基础",
+  "practice_title": "实践：从明细表到可复核汇总",
+  "audience": "高职财经与信息管理专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "Excel 数据处理基础",
+    "audience": "高职财经与信息管理专业学生",
+    "language": "Excel 公式",
+    "tools": [
+      "Microsoft Excel",
+      "Power Query"
+    ],
+    "platform": "Windows",
+    "software": "Microsoft Excel 365",
+    "other_constraints": [
+      "不使用宏，保留每一步可追溯"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.1",
+    "chapter_title": "字段清洗与可解释汇总",
+    "taught_slide_ids": [
+      "spreadsheet-s1",
+      "spreadsheet-s2",
+      "spreadsheet-s3",
+      "spreadsheet-s4",
+      "spreadsheet-s5"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "spreadsheet-k1",
+      "title": "字段与数据类型",
+      "summary": "字段含义和数据类型决定后续筛选与计算是否可靠",
+      "source_slide_ids": [
+        "spreadsheet-s1"
+      ],
+      "student_can_do": "能识别日期、文本和数值字段",
+      "learning_unit_ids": [
+        "spreadsheet-u1"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1"
+      ]
+    },
+    {
+      "id": "spreadsheet-k2",
+      "title": "清洗与筛选",
+      "summary": "清洗要保留原始证据并明确每个修正规则",
+      "source_slide_ids": [
+        "spreadsheet-s2"
+      ],
+      "student_can_do": "能用筛选找出空值和异常格式",
+      "learning_unit_ids": [
+        "spreadsheet-u2"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2"
+      ]
+    },
+    {
+      "id": "spreadsheet-k3",
+      "title": "公式与引用",
+      "summary": "相对引用和绝对引用决定填充公式是否仍指向正确条件",
+      "source_slide_ids": [
+        "spreadsheet-s3"
+      ],
+      "student_can_do": "能解释一个公式在下拉后的引用变化",
+      "learning_unit_ids": [
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f3"
+      ]
+    },
+    {
+      "id": "spreadsheet-k4",
+      "title": "汇总与透视",
+      "summary": "汇总结果的粒度必须和业务问题一致",
+      "source_slide_ids": [
+        "spreadsheet-s4"
+      ],
+      "student_can_do": "能按月份或地区得到可解释汇总",
+      "learning_unit_ids": [
+        "spreadsheet-u4"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f4"
+      ]
+    },
+    {
+      "id": "spreadsheet-k5",
+      "title": "结果复核",
+      "summary": "结果复核要用总量、边界行和抽样行交叉检查",
+      "source_slide_ids": [
+        "spreadsheet-s5"
+      ],
+      "student_can_do": "能找到一个汇总异常并说明检查路径",
+      "learning_unit_ids": [
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f5"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "spreadsheet-inspect",
+      "level": "core",
+      "title": "识别表格字段与粒度",
+      "knowledge_link_ids": [
+        "spreadsheet-k1"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s1"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1"
+      ],
+      "task_kind": "observation",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "file_editing",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "打开订单样例，给字段贴上类型和含义标签。",
+      "scaffold": "提供带表头和六行数据的 CSV 起点。",
+      "steps": [
+        {
+          "title": "看表头",
+          "instruction": "逐列写出业务含义。",
+          "check": "每列都有解释。"
+        },
+        {
+          "title": "标类型",
+          "instruction": "区分日期、文本、数值和空值。",
+          "check": "类型与样例一致。"
+        },
+        {
+          "title": "说粒度",
+          "instruction": "说明一行订单还是一项商品。",
+          "check": "能指导后续汇总。"
+        }
+      ],
+      "acceptance": [
+        "完成字段标签",
+        "说出一行代表的对象"
+      ],
+      "help_refs": [
+        "spreadsheet-g1",
+        "spreadsheet-kit1"
+      ],
+      "estimated_minutes": 8,
+      "verification": "按验收条件复核输入、动作和结果。",
+      "starter_asset_ids": [
+        "spreadsheet-orders"
+      ]
+    },
+    {
+      "id": "spreadsheet-clean",
+      "level": "core",
+      "title": "按规则清洗异常字段",
+      "knowledge_link_ids": [
+        "spreadsheet-k2"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s2"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2"
+      ],
+      "task_kind": "tooling",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "file_editing",
+        "diagnosis"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "在副本上清理空格、空值和重复订单。",
+      "scaffold": "给出三条异常记录和清洗规则卡。",
+      "steps": [
+        {
+          "title": "筛异常",
+          "instruction": "用筛选找出三类异常。",
+          "check": "每类至少找到一行。"
+        },
+        {
+          "title": "留证据",
+          "instruction": "记录原值和修正动作。",
+          "check": "原值可回查。"
+        },
+        {
+          "title": "再筛选",
+          "instruction": "重新筛选确认规则已生效。",
+          "check": "异常行状态可解释。"
+        }
+      ],
+      "acceptance": [
+        "三类异常都有处理记录",
+        "清洗后能解释改变范围"
+      ],
+      "help_refs": [
+        "spreadsheet-g2",
+        "spreadsheet-kit2"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "spreadsheet-formula",
+      "level": "core",
+      "title": "填充公式并核对引用",
+      "knowledge_link_ids": [
+        "spreadsheet-k3"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s3"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f3"
+      ],
+      "task_kind": "implementation",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "file_editing",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "填写金额计算列，检查税率条件在下拉时是否固定。",
+      "scaffold": "提供金额、税率和地区列，公式列留出首行起点。",
+      "steps": [
+        {
+          "title": "写首行",
+          "instruction": "在首行建立金额乘税率公式。",
+          "check": "首行结果可手算复核。"
+        },
+        {
+          "title": "拖填",
+          "instruction": "向下填充并观察引用变化。",
+          "check": "固定条件仍指向税率单元格。"
+        },
+        {
+          "title": "抽查",
+          "instruction": "挑一行手算并对照。",
+          "check": "差异能定位到引用。"
+        }
+      ],
+      "acceptance": [
+        "公式填充完整",
+        "能解释一个相对/绝对引用"
+      ],
+      "help_refs": [
+        "spreadsheet-g3",
+        "spreadsheet-kit3"
+      ],
+      "estimated_minutes": 14,
+      "verification": "按验收条件复核输入、动作和结果。",
+      "starter_asset_ids": [
+        "spreadsheet-formula-card"
+      ]
+    },
+    {
+      "id": "spreadsheet-pivot",
+      "level": "core",
+      "title": "按正确粒度做汇总",
+      "knowledge_link_ids": [
+        "spreadsheet-k4"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s4"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u4"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f4"
+      ],
+      "task_kind": "experiment",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "file_editing",
+        "visualization",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "按地区汇总订单笔数和金额，并说明一行汇总代表什么。",
+      "scaffold": "提供明细表和两个业务问题。",
+      "steps": [
+        {
+          "title": "定粒度",
+          "instruction": "先写每一行汇总代表的地区。",
+          "check": "粒度先于拖字段。"
+        },
+        {
+          "title": "建汇总",
+          "instruction": "放入地区、笔数和金额。",
+          "check": "两种指标都出现。"
+        },
+        {
+          "title": "解释",
+          "instruction": "比较华东与华南差异。",
+          "check": "解释引用明细证据。"
+        }
+      ],
+      "acceptance": [
+        "汇总粒度正确",
+        "笔数和金额均可解释"
+      ],
+      "help_refs": [
+        "spreadsheet-g4",
+        "spreadsheet-kit4"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "spreadsheet-verify",
+      "level": "core",
+      "title": "找出汇总与明细的差异",
+      "knowledge_link_ids": [
+        "spreadsheet-k5"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s5"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f5"
+      ],
+      "task_kind": "debugging",
+      "artifact_kind": "result",
+      "capabilities": [
+        "diagnosis",
+        "comparison",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "根据总量和抽样行定位一次汇总异常。",
+      "scaffold": "给出明细总额、汇总总额和两条抽样记录。",
+      "steps": [
+        {
+          "title": "比总量",
+          "instruction": "比较明细与汇总总额。",
+          "check": "确认是否存在差异。"
+        },
+        {
+          "title": "抽样行",
+          "instruction": "回到一条边界日期记录。",
+          "check": "能提出一个原因。"
+        },
+        {
+          "title": "最小修复",
+          "instruction": "只修正一个筛选或重复条件并回算。",
+          "check": "总量恢复一致。"
+        }
+      ],
+      "acceptance": [
+        "指出差异来源",
+        "给出最小修复并复核总量"
+      ],
+      "help_refs": [
+        "spreadsheet-g5",
+        "spreadsheet-kit5"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "spreadsheet-chart",
+      "level": "optional",
+      "title": "把汇总转成可读图表",
+      "knowledge_link_ids": [
+        "spreadsheet-k4",
+        "spreadsheet-k5"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s4",
+        "spreadsheet-s5"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "task_kind": "tooling",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "visualization",
+        "comparison"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "选择适合比较地区金额的图表，并标注口径。",
+      "scaffold": "提供同一汇总表和两种图表候选。",
+      "steps": [
+        {
+          "title": "选图",
+          "instruction": "比较柱形和折线适用条件。",
+          "check": "选择与离散类别匹配的形式。"
+        },
+        {
+          "title": "加口径",
+          "instruction": "标注金额单位和时间范围。",
+          "check": "图表读者不需猜口径。"
+        },
+        {
+          "title": "复核",
+          "instruction": "从图表回查一个明细数字。",
+          "check": "图表与表格一致。"
+        }
+      ],
+      "acceptance": [
+        "图表选择有依据",
+        "标注口径并完成回查"
+      ],
+      "help_refs": [
+        "spreadsheet-g4",
+        "spreadsheet-kit4"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "spreadsheet-power",
+      "level": "optional",
+      "title": "设计一条可复用清洗路径",
+      "knowledge_link_ids": [
+        "spreadsheet-k2",
+        "spreadsheet-k3"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s2",
+        "spreadsheet-s3"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2",
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2",
+        "spreadsheet-f3"
+      ],
+      "task_kind": "tooling",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "file_editing",
+        "scenario_reasoning"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "把一次清洗步骤排成可重复执行的路径。",
+      "scaffold": "提供原始表、规则卡和操作顺序槽。",
+      "steps": [
+        {
+          "title": "拆步骤",
+          "instruction": "分离导入、清洗和检查。",
+          "check": "每步有输入输出。"
+        },
+        {
+          "title": "排顺序",
+          "instruction": "把不可交换的步骤放对位置。",
+          "check": "先保留证据再改值。"
+        },
+        {
+          "title": "写自检",
+          "instruction": "给每步加一个可观察检查。",
+          "check": "路径可复用。"
+        }
+      ],
+      "acceptance": [
+        "完成可重复路径",
+        "每步都有检查点"
+      ],
+      "help_refs": [
+        "spreadsheet-g2",
+        "spreadsheet-kit2"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "spreadsheet-dashboard",
+      "level": "challenge",
+      "title": "为业务问题构造小型看板",
+      "knowledge_link_ids": [
+        "spreadsheet-k1",
+        "spreadsheet-k4",
+        "spreadsheet-k5"
+      ],
+      "source_slide_ids": [
+        "spreadsheet-s1",
+        "spreadsheet-s4",
+        "spreadsheet-s5"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "workbook",
+      "capabilities": [
+        "visualization",
+        "scenario_reasoning",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "从业务问题出发选择字段、粒度和一个可解释图表。",
+      "scaffold": "提供问题卡、字段清单和看板草图。",
+      "steps": [
+        {
+          "title": "拆问题",
+          "instruction": "把业务问题拆成指标与筛选条件。",
+          "check": "指标可计算。"
+        },
+        {
+          "title": "定粒度",
+          "instruction": "说明一行图表数据代表什么。",
+          "check": "粒度不混乱。"
+        },
+        {
+          "title": "讲结果",
+          "instruction": "向同伴说明看板如何支持判断。",
+          "check": "说明有证据。"
+        }
+      ],
+      "acceptance": [
+        "完成问题—指标—图表链",
+        "能用一条明细记录解释看板结果"
+      ],
+      "help_refs": [
+        "spreadsheet-g1",
+        "spreadsheet-kit1"
+      ],
+      "estimated_minutes": 14,
+      "verification": "按验收条件复核输入、动作和结果。"
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "spreadsheet-lab1",
+      "title": "字段类型映射",
+      "knowledge_link_ids": [
+        "spreadsheet-k1"
+      ],
+      "task_ids": [
+        "spreadsheet-inspect"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1"
+      ],
+      "purpose": "用字段类型映射把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 6,
+        "prompt": "围绕字段类型映射，先做一个判断，再把反馈带回任务。",
+        "options": [
+          {
+            "label": "证据支持字段类型映射的关键条件",
+            "feedback": "正确。请把这条证据写入任务验收。"
+          },
+          {
+            "label": "只凭结果表面相似就直接通过",
+            "feedback": "还不够，需要回到条件或过程证据。"
+          },
+          {
+            "label": "跳过检查直接改变工具设置",
+            "feedback": "先保留可解释的检查步骤，再改变设置。"
+          }
+        ],
+        "answer_index": 0,
+        "success_feedback": "判断完成，请回到对应任务执行。",
+        "retry_feedback": "请从理论页的条件和当前证据重新核对。"
+      }
+    },
+    {
+      "id": "spreadsheet-lab2",
+      "title": "清洗状态推演",
+      "knowledge_link_ids": [
+        "spreadsheet-k1",
+        "spreadsheet-k2"
+      ],
+      "task_ids": [
+        "spreadsheet-inspect",
+        "spreadsheet-clean"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u2"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f2"
+      ],
+      "purpose": "用清洗状态推演把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "state-simulator",
+        "estimated_minutes": 6,
+        "prompt": "根据清洗状态推演的过程状态，填写下一步字段；输入框不会预填答案。",
+        "state_fields": [
+          {
+            "id": "phase",
+            "label": "当前阶段",
+            "input_type": "text"
+          },
+          {
+            "id": "action",
+            "label": "下一动作",
+            "input_type": "text"
+          }
+        ],
+        "state": {
+          "context_label": "当前场景",
+          "context": "清洗状态推演的过程被拆成两个可观察状态。"
+        },
+        "visualization": {
+          "kind": "state-machine",
+          "title": "清洗状态推演状态图",
+          "items": [
+            {
+              "label": "观察",
+              "value": "先收集证据"
+            },
+            {
+              "label": "检查",
+              "value": "按标准核对"
+            },
+            {
+              "label": "处理",
+              "value": "做一个最小动作"
+            }
+          ]
+        },
+        "rounds": [
+          {
+            "given": {
+              "phase": "观察",
+              "action": "等待"
+            },
+            "expected": {
+              "action": "检查"
+            },
+            "next_expected": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "status": "continue",
+            "observation": "已经从描述转向证据检查。",
+            "feedback": "下一动作应当能产生可观察证据。"
+          },
+          {
+            "given": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "expected": {
+              "action": "处理"
+            },
+            "status": "found",
+            "observation": "已完成一次最小、可解释的处理。",
+            "feedback": "过程到达终止状态，可以回到任务验收。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "spreadsheet-lab3",
+      "title": "公式引用逐步检查",
+      "knowledge_link_ids": [
+        "spreadsheet-k3"
+      ],
+      "task_ids": [
+        "spreadsheet-formula"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f3"
+      ],
+      "purpose": "用公式引用逐步检查把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "围绕公式引用逐步检查，先做一个判断，再把反馈带回任务。",
+        "steps": [
+          {
+            "title": "定位输入",
+            "text": "列出公式引用逐步检查的输入、观察对象和当前已知条件。"
+          },
+          {
+            "title": "执行一步",
+            "text": "只改变一个与公式引用逐步检查相关的操作，记录状态变化。"
+          },
+          {
+            "title": "核对结果",
+            "text": "用理论中的判断标准解释结果，并决定是否进入下一步。"
+          },
+          {
+            "title": "回到任务",
+            "text": "把观察到的规律写成任务中的一个小验收条件。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "spreadsheet-lab4",
+      "title": "汇总异常诊断",
+      "knowledge_link_ids": [
+        "spreadsheet-k4",
+        "spreadsheet-k5"
+      ],
+      "task_ids": [
+        "spreadsheet-pivot",
+        "spreadsheet-verify"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "purpose": "用汇总异常诊断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 6,
+        "prompt": "连续处理汇总异常诊断中的两个诊断案例，先说现象，再选最小修复。",
+        "diagnostic_cases": [
+          {
+            "id": "spreadsheet-case-1",
+            "title": "结果为空或没有变化",
+            "context": "在汇总异常诊断操作中出现：结果为空或没有变化。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          },
+          {
+            "id": "spreadsheet-case-2",
+            "title": "结果与理论条件不一致",
+            "context": "在汇总异常诊断操作中出现：结果与理论条件不一致。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          }
+        ],
+        "completion_feedback": "两个诊断案例都完成；请把最小修复带回实践任务。"
+      }
+    },
+    {
+      "id": "spreadsheet-lab5",
+      "title": "结果复核题组",
+      "knowledge_link_ids": [
+        "spreadsheet-k4",
+        "spreadsheet-k5"
+      ],
+      "task_ids": [
+        "spreadsheet-pivot",
+        "spreadsheet-verify"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "purpose": "用结果复核题组把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 6,
+        "prompt": "逐题完成结果复核题组的三个检查点，每题反馈后再进入下一题。",
+        "questions": [
+          {
+            "prompt": "结果复核题组：第一步应保留什么证据？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "结果复核题组：哪个动作最能验证理论？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "结果复核题组：什么时候需要打开补给资料？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "spreadsheet-lab6",
+      "title": "动作角色分类",
+      "knowledge_link_ids": [
+        "spreadsheet-k2",
+        "spreadsheet-k3"
+      ],
+      "task_ids": [
+        "spreadsheet-clean",
+        "spreadsheet-formula"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2",
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2",
+        "spreadsheet-f3"
+      ],
+      "purpose": "用动作角色分类把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "classify",
+        "estimated_minutes": 6,
+        "prompt": "把动作角色分类中的动作分到正确的工作角色。",
+        "categories": [
+          "证据",
+          "动作",
+          "验收"
+        ],
+        "items": [
+          {
+            "id": "evidence",
+            "label": "读取现象、条件和原始记录",
+            "answer": "证据",
+            "feedback": "先形成可复核证据。"
+          },
+          {
+            "id": "action",
+            "label": "只修改一个关键设置或字段",
+            "answer": "动作",
+            "feedback": "动作要小且能回退。"
+          },
+          {
+            "id": "accept",
+            "label": "按标准解释结果并决定下一步",
+            "answer": "验收",
+            "feedback": "验收连接理论与实践。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "spreadsheet-lab7",
+      "title": "看板制作排序",
+      "knowledge_link_ids": [
+        "spreadsheet-k1",
+        "spreadsheet-k4",
+        "spreadsheet-k5"
+      ],
+      "task_ids": [
+        "spreadsheet-chart",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "purpose": "用看板制作排序把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "reorder",
+        "estimated_minutes": 6,
+        "prompt": "排列看板制作排序的实际工作顺序，先恢复证据链，再做判断。",
+        "items": [
+          {
+            "id": "observe",
+            "label": "执行最小操作并观察结果"
+          },
+          {
+            "id": "check",
+            "label": "核对输入和前置条件"
+          },
+          {
+            "id": "explain",
+            "label": "用理论解释结果"
+          },
+          {
+            "id": "verify",
+            "label": "按验收清单回归"
+          }
+        ],
+        "correct_order": [
+          "check",
+          "observe",
+          "explain",
+          "verify"
+        ],
+        "success_feedback": "顺序正确，已经形成可复核的实践闭环。",
+        "retry_feedback": "先把证据和前置条件放在最前面。"
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "spreadsheet-g1",
+      "title": "1. 字段与数据类型怎么用",
+      "knowledge_link_ids": [
+        "spreadsheet-k1"
+      ],
+      "task_ids": [
+        "spreadsheet-inspect",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "body": "字段含义和数据类型决定后续筛选与计算是否可靠 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以订单日期、地区和金额三列为例：先读条件，再执行一个最小动作，最后用“能识别日期、文本和数值字段”解释观察到的结果。",
+      "quick_reference": [
+        "字段含义和数据类型决定后续筛选与计算是否可靠",
+        "能识别日期、文本和数值字段",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "看到数字就一定可以直接相加",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "spreadsheet-g2",
+      "title": "2. 清洗与筛选怎么用",
+      "knowledge_link_ids": [
+        "spreadsheet-k2"
+      ],
+      "task_ids": [
+        "spreadsheet-clean",
+        "spreadsheet-power"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2",
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2",
+        "spreadsheet-f3"
+      ],
+      "body": "清洗要保留原始证据并明确每个修正规则 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以地区名称有前后空格为例：先读条件，再执行一个最小动作，最后用“能用筛选找出空值和异常格式”解释观察到的结果。",
+      "quick_reference": [
+        "清洗要保留原始证据并明确每个修正规则",
+        "能用筛选找出空值和异常格式",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "直接覆盖原表就算完成清洗",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "spreadsheet-g3",
+      "title": "3. 公式与引用怎么用",
+      "knowledge_link_ids": [
+        "spreadsheet-k3"
+      ],
+      "task_ids": [
+        "spreadsheet-formula",
+        "spreadsheet-power"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2",
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2",
+        "spreadsheet-f3"
+      ],
+      "body": "相对引用和绝对引用决定填充公式是否仍指向正确条件 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以金额乘税率并按地区查找为例：先读条件，再执行一个最小动作，最后用“能解释一个公式在下拉后的引用变化”解释观察到的结果。",
+      "quick_reference": [
+        "相对引用和绝对引用决定填充公式是否仍指向正确条件",
+        "能解释一个公式在下拉后的引用变化",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "所有引用在复制时都应移动",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "spreadsheet-g4",
+      "title": "4. 汇总与透视怎么用",
+      "knowledge_link_ids": [
+        "spreadsheet-k4"
+      ],
+      "task_ids": [
+        "spreadsheet-pivot",
+        "spreadsheet-chart",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "body": "汇总结果的粒度必须和业务问题一致 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以按地区统计订单金额和笔数为例：先读条件，再执行一个最小动作，最后用“能按月份或地区得到可解释汇总”解释观察到的结果。",
+      "quick_reference": [
+        "汇总结果的粒度必须和业务问题一致",
+        "能按月份或地区得到可解释汇总",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "结果数字对了就不必说明粒度",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "spreadsheet-g5",
+      "title": "5. 结果复核怎么用",
+      "knowledge_link_ids": [
+        "spreadsheet-k5"
+      ],
+      "task_ids": [
+        "spreadsheet-verify",
+        "spreadsheet-chart",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "body": "结果复核要用总量、边界行和抽样行交叉检查 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以透视总额与明细总额不一致为例：先读条件，再执行一个最小动作，最后用“能找到一个汇总异常并说明检查路径”解释观察到的结果。",
+      "quick_reference": [
+        "结果复核要用总量、边界行和抽样行交叉检查",
+        "能找到一个汇总异常并说明检查路径",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "只看图表外观就算验证",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "spreadsheet-g6",
+      "title": "6. 从证据到解释的自助路径",
+      "knowledge_link_ids": [
+        "spreadsheet-k1",
+        "spreadsheet-k2",
+        "spreadsheet-k3",
+        "spreadsheet-k4",
+        "spreadsheet-k5"
+      ],
+      "task_ids": [
+        "spreadsheet-inspect",
+        "spreadsheet-clean",
+        "spreadsheet-formula",
+        "spreadsheet-pivot",
+        "spreadsheet-verify",
+        "spreadsheet-chart",
+        "spreadsheet-power",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u2",
+        "spreadsheet-u3",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f2",
+        "spreadsheet-f3",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "body": "当结果不符合预期时，沿着条件—动作—证据—解释四步回查；每一步都能指向一个具体学习资料或基础补给。",
+      "worked_example": "先复述当前输入和预期，再只做一个最小修复，重新观察并把变化解释给同伴。",
+      "quick_reference": [
+        "先找最早出现差异的步骤。",
+        "优先回到对应理论页和基础补给。",
+        "能解释为什么修复有效才算完成。"
+      ],
+      "common_errors": [
+        "同时改动多个变量，无法归因。",
+        "把教师参考答案当成第一步，而不先观察。"
+      ],
+      "checkpoints": [
+        "我知道每个 core task 卡住时的入口。",
+        "我能把一次操作连接到一个理论事实。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "spreadsheet-kit1",
+      "title": "字段与数据类型基础补给",
+      "kind": "工作表基础",
+      "content": "这是开始字段与数据类型任务前的最小工具卡：字段含义和数据类型决定后续筛选与计算是否可靠",
+      "task_ids": [
+        "spreadsheet-inspect",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "when_to_use": "看到字段与数据类型相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是字段与数据类型。",
+        "按卡片中的一个动作检查空值与文本数字。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释字段与数据类型。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "spreadsheet-kit2",
+      "title": "清洗与筛选基础补给",
+      "kind": "筛选清洗",
+      "content": "这是开始清洗与筛选任务前的最小工具卡：清洗要保留原始证据并明确每个修正规则",
+      "task_ids": [
+        "spreadsheet-clean",
+        "spreadsheet-power"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2",
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2",
+        "spreadsheet-f3"
+      ],
+      "when_to_use": "看到清洗与筛选相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是清洗与筛选。",
+        "按卡片中的一个动作检查空格、空值和重复行。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释清洗与筛选。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "spreadsheet-kit3",
+      "title": "公式与引用基础补给",
+      "kind": "公式引用",
+      "content": "这是开始公式与引用任务前的最小工具卡：相对引用和绝对引用决定填充公式是否仍指向正确条件",
+      "task_ids": [
+        "spreadsheet-formula",
+        "spreadsheet-power"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u2",
+        "spreadsheet-u3"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f2",
+        "spreadsheet-f3"
+      ],
+      "when_to_use": "看到公式与引用相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是公式与引用。",
+        "按卡片中的一个动作检查固定税率与变化金额。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释公式与引用。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "spreadsheet-kit4",
+      "title": "汇总与透视基础补给",
+      "kind": "透视分析",
+      "content": "这是开始汇总与透视任务前的最小工具卡：汇总结果的粒度必须和业务问题一致",
+      "task_ids": [
+        "spreadsheet-pivot",
+        "spreadsheet-chart",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "when_to_use": "看到汇总与透视相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是汇总与透视。",
+        "按卡片中的一个动作检查明细行与汇总行。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释汇总与透视。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "spreadsheet-kit5",
+      "title": "结果复核基础补给",
+      "kind": "结果复核",
+      "content": "这是开始结果复核任务前的最小工具卡：结果复核要用总量、边界行和抽样行交叉检查",
+      "task_ids": [
+        "spreadsheet-verify",
+        "spreadsheet-chart",
+        "spreadsheet-dashboard"
+      ],
+      "learning_unit_ids": [
+        "spreadsheet-u1",
+        "spreadsheet-u4",
+        "spreadsheet-u5"
+      ],
+      "canonical_fact_ids": [
+        "spreadsheet-f1",
+        "spreadsheet-f4",
+        "spreadsheet-f5"
+      ],
+      "when_to_use": "看到结果复核相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是结果复核。",
+        "按卡片中的一个动作检查漏行与重复计数。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释结果复核。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "带领学生用Excel 数据处理基础的理论完成一条可观察实践闭环。",
+    "theory_bridge": "每次巡视先让学生指出 source 理论事实，再看操作证据；不要用教师答案替代学生判断。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "理论回看与第一个可观察判断"
+      },
+      {
+        "minutes": 30,
+        "focus": "core 前半段：小步操作和即时核对"
+      },
+      {
+        "minutes": 24,
+        "focus": "core 后半段：完成、运行或诊断"
+      },
+      {
+        "minutes": 20,
+        "focus": "差异化路径和连续互动"
+      },
+      {
+        "minutes": 8,
+        "focus": "解释性收束与个别抽查"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "spreadsheet-inspect",
+        "look_for": "检查学生是否真的完成“识别表格字段与粒度”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述打开订单样例，给字段贴上类型和含义标签。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-clean",
+        "look_for": "检查学生是否真的完成“按规则清洗异常字段”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述在副本上清理空格、空值和重复订单。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-formula",
+        "look_for": "检查学生是否真的完成“填充公式并核对引用”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述填写金额计算列，检查税率条件在下拉时是否固定。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-pivot",
+        "look_for": "检查学生是否真的完成“按正确粒度做汇总”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述按地区汇总订单笔数和金额，并说明一行汇总代表什么。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-verify",
+        "look_for": "检查学生是否真的完成“找出汇总与明细的差异”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述根据总量和抽样行定位一次汇总异常。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-chart",
+        "look_for": "检查学生是否真的完成“把汇总转成可读图表”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述选择适合比较地区金额的图表，并标注口径。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-power",
+        "look_for": "检查学生是否真的完成“设计一条可复用清洗路径”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述把一次清洗步骤排成可重复执行的路径。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "spreadsheet-dashboard",
+        "look_for": "检查学生是否真的完成“为业务问题构造小型看板”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述从业务问题出发选择字段、粒度和一个可解释图表。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "学生直接改结果而不记录条件",
+        "intervention": "让学生回到理论页，写出输入、动作和预期后再做一次最小变化。"
+      },
+      {
+        "symptom": "学生把一次偶然成功当成规则",
+        "intervention": "要求换一个边界或反例，说明规则是否仍成立。"
+      },
+      {
+        "symptom": "学生卡在工具操作而非本课知识",
+        "intervention": "先打开对应 foundation-kit，完成自检后再回到 core task。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱时只要求完成所有 core 的第一验收点，并把 optional 改为教师示范。",
+      "进度较快时要求比较两个条件或处理 challenge，但不打断基础学生路径。",
+      "课堂时间不足时保留理论关联、一个可观察结果和一次解释性抽查。"
+    ],
+    "closing_checks": [
+      "随机请学生解释一个结果背后的理论事实。",
+      "检查每个 core 是否至少留下一个可复核结果。",
+      "确认学生知道下次卡住时打开哪份资料。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "spreadsheet-inspect",
+        "title": "识别表格字段与粒度",
+        "source_slide_ids": [
+          "spreadsheet-s1"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u1"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f1"
+        ],
+        "reference_answer": "order_id,order_date,region,amount\nA01,2025-04-01,华东,120\nA02,2025-04-02,华南,80\nA03,2025-04-02,华东,50\n",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "逐列写出业务含义。",
+          "区分日期、文本、数值和空值。",
+          "说明一行订单还是一项商品。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成字段标签",
+          "说出一行代表的对象"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-clean",
+        "title": "按规则清洗异常字段",
+        "source_slide_ids": [
+          "spreadsheet-s2"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u2"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f2"
+        ],
+        "reference_answer": "完成按规则清洗异常字段：三类异常都有处理记录；清洗后能解释改变范围。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "用筛选找出三类异常。",
+          "记录原值和修正动作。",
+          "重新筛选确认规则已生效。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三类异常都有处理记录",
+          "清洗后能解释改变范围"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-formula",
+        "title": "填充公式并核对引用",
+        "source_slide_ids": [
+          "spreadsheet-s3"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u3"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f3"
+        ],
+        "reference_answer": "region,amount,tax_rate,total\n华东,120,0.06,TODO\n华南,80,0.06,TODO\n",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "在首行建立金额乘税率公式。",
+          "向下填充并观察引用变化。",
+          "挑一行手算并对照。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "公式填充完整",
+          "能解释一个相对/绝对引用"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-pivot",
+        "title": "按正确粒度做汇总",
+        "source_slide_ids": [
+          "spreadsheet-s4"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u4"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f4"
+        ],
+        "reference_answer": "完成按正确粒度做汇总：汇总粒度正确；笔数和金额均可解释。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "先写每一行汇总代表的地区。",
+          "放入地区、笔数和金额。",
+          "比较华东与华南差异。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "汇总粒度正确",
+          "笔数和金额均可解释"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-verify",
+        "title": "找出汇总与明细的差异",
+        "source_slide_ids": [
+          "spreadsheet-s5"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u5"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f5"
+        ],
+        "reference_answer": "完成找出汇总与明细的差异：指出差异来源；给出最小修复并复核总量。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "比较明细与汇总总额。",
+          "回到一条边界日期记录。",
+          "只修正一个筛选或重复条件并回算。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "指出差异来源",
+          "给出最小修复并复核总量"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-chart",
+        "title": "把汇总转成可读图表",
+        "source_slide_ids": [
+          "spreadsheet-s4",
+          "spreadsheet-s5"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u4",
+          "spreadsheet-u5"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f4",
+          "spreadsheet-f5"
+        ],
+        "reference_answer": "完成把汇总转成可读图表：图表选择有依据；标注口径并完成回查。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "比较柱形和折线适用条件。",
+          "标注金额单位和时间范围。",
+          "从图表回查一个明细数字。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "图表选择有依据",
+          "标注口径并完成回查"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-power",
+        "title": "设计一条可复用清洗路径",
+        "source_slide_ids": [
+          "spreadsheet-s2",
+          "spreadsheet-s3"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u2",
+          "spreadsheet-u3"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f2",
+          "spreadsheet-f3"
+        ],
+        "reference_answer": "完成设计一条可复用清洗路径：完成可重复路径；每步都有检查点。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "分离导入、清洗和检查。",
+          "把不可交换的步骤放对位置。",
+          "给每步加一个可观察检查。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成可重复路径",
+          "每步都有检查点"
+        ]
+      },
+      {
+        "task_id": "spreadsheet-dashboard",
+        "title": "为业务问题构造小型看板",
+        "source_slide_ids": [
+          "spreadsheet-s1",
+          "spreadsheet-s4",
+          "spreadsheet-s5"
+        ],
+        "learning_unit_ids": [
+          "spreadsheet-u1",
+          "spreadsheet-u4",
+          "spreadsheet-u5"
+        ],
+        "canonical_fact_ids": [
+          "spreadsheet-f1",
+          "spreadsheet-f4",
+          "spreadsheet-f5"
+        ],
+        "reference_answer": "完成为业务问题构造小型看板：完成问题—指标—图表链；能用一条明细记录解释看板结果。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "把业务问题拆成指标与筛选条件。",
+          "说明一行图表数据代表什么。",
+          "向同伴说明看板如何支持判断。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成问题—指标—图表链",
+          "能用一条明细记录解释看板结果"
+        ]
+      }
+    ]
+  },
+  "starter_assets": [
+    {
+      "id": "spreadsheet-orders",
+      "path": "orders.csv",
+      "language": "CSV",
+      "content": "order_id,order_date,region,amount\nA01,2025-04-01,华东,120\nA02,2025-04-02,华南,80\nA03,2025-04-02,华东,50\n",
+      "task_id": "spreadsheet-inspect"
+    },
+    {
+      "id": "spreadsheet-formula-card",
+      "path": "formula-card.csv",
+      "language": "CSV",
+      "content": "region,amount,tax_rate,total\n华东,120,0.06,TODO\n华南,80,0.06,TODO\n",
+      "task_id": "spreadsheet-formula"
+    }
+  ]
+}

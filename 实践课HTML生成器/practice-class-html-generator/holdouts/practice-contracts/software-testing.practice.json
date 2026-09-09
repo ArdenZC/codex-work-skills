@@ -1,0 +1,1727 @@
+{
+  "contract_version": "1.1",
+  "course_title": "软件测试设计基础",
+  "practice_title": "实践：从需求规则设计可执行测试",
+  "audience": "高职软件技术专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "软件测试设计基础",
+    "audience": "高职软件技术专业学生",
+    "language": "测试设计",
+    "tools": [
+      "TestRail",
+      "Microsoft Excel"
+    ],
+    "platform": "Windows",
+    "software": "TestRail",
+    "framework": "Gherkin",
+    "other_constraints": [
+      "本次只设计可执行测试，不要求编写应用代码"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.1",
+    "chapter_title": "等价类、决策表与风险回归",
+    "taught_slide_ids": [
+      "software-testing-s1",
+      "software-testing-s2",
+      "software-testing-s3",
+      "software-testing-s4",
+      "software-testing-s5"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "software-testing-k1",
+      "title": "需求与测试目标",
+      "summary": "测试目标要从需求行为和可观察结果中来",
+      "source_slide_ids": [
+        "software-testing-s1"
+      ],
+      "student_can_do": "能把一句需求拆成可验证行为",
+      "learning_unit_ids": [
+        "software-testing-u1"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1"
+      ]
+    },
+    {
+      "id": "software-testing-k2",
+      "title": "等价类与边界",
+      "summary": "等价类减少重复，边界值暴露规则切换处的错误",
+      "source_slide_ids": [
+        "software-testing-s2"
+      ],
+      "student_can_do": "能为一个输入划分有效和无效类",
+      "learning_unit_ids": [
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f2"
+      ]
+    },
+    {
+      "id": "software-testing-k3",
+      "title": "决策表",
+      "summary": "多个条件共同决定结果时需要显式列出组合",
+      "source_slide_ids": [
+        "software-testing-s3"
+      ],
+      "student_can_do": "能把条件组合整理成互斥规则",
+      "learning_unit_ids": [
+        "software-testing-u3"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3"
+      ]
+    },
+    {
+      "id": "software-testing-k4",
+      "title": "缺陷分诊",
+      "summary": "缺陷优先级要同时看影响范围、复现稳定性和业务风险",
+      "source_slide_ids": [
+        "software-testing-s4"
+      ],
+      "student_can_do": "能为缺陷选择优先级并说明依据",
+      "learning_unit_ids": [
+        "software-testing-u4"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4"
+      ]
+    },
+    {
+      "id": "software-testing-k5",
+      "title": "回归与覆盖",
+      "summary": "回归集合要覆盖修复点和受影响路径，而不是无限增加用例",
+      "source_slide_ids": [
+        "software-testing-s5"
+      ],
+      "student_can_do": "能从一个缺陷选择最小回归集合",
+      "learning_unit_ids": [
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f5"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "software-testing-goal",
+      "level": "core",
+      "title": "把需求改写成可观察目标",
+      "knowledge_link_ids": [
+        "software-testing-k1"
+      ],
+      "source_slide_ids": [
+        "software-testing-s1"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "从一条登录需求拆出触发条件、动作和结果。",
+      "scaffold": "提供需求句、三列表和一个反例。",
+      "steps": [
+        {
+          "title": "找触发",
+          "instruction": "标出前置条件和输入。",
+          "check": "触发条件具体。"
+        },
+        {
+          "title": "写动作",
+          "instruction": "写学生或系统要做的动作。",
+          "check": "动作可执行。"
+        },
+        {
+          "title": "写结果",
+          "instruction": "写出可观察结果和失败结果。",
+          "check": "结果不含模糊词。"
+        }
+      ],
+      "acceptance": [
+        "完成三列表",
+        "正反结果都可观察"
+      ],
+      "help_refs": [
+        "software-testing-g1",
+        "software-testing-kit1"
+      ],
+      "estimated_minutes": 8,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-boundary",
+      "level": "core",
+      "title": "设计等价类与边界用例",
+      "knowledge_link_ids": [
+        "software-testing-k2"
+      ],
+      "source_slide_ids": [
+        "software-testing-s2"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f2"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "scenario_reasoning"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为密码长度规则选择最小而有代表性的输入。",
+      "scaffold": "提供 8—20 位规则、输入槽和预期槽。",
+      "steps": [
+        {
+          "title": "划分",
+          "instruction": "写出有效、过短、过长三类。",
+          "check": "每类有代表。"
+        },
+        {
+          "title": "选边界",
+          "instruction": "填写 7、8、20、21 四个值。",
+          "check": "边界覆盖完整。"
+        },
+        {
+          "title": "说明",
+          "instruction": "解释为什么不需要遍历所有长度。",
+          "check": "说明引用等价类。"
+        }
+      ],
+      "acceptance": [
+        "三类等价类完整",
+        "四个边界值有预期结果"
+      ],
+      "help_refs": [
+        "software-testing-g2",
+        "software-testing-kit2"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-decision",
+      "level": "core",
+      "title": "把条件组合变成决策表",
+      "knowledge_link_ids": [
+        "software-testing-k3"
+      ],
+      "source_slide_ids": [
+        "software-testing-s3"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3"
+      ],
+      "task_kind": "modeling",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "visualization",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为会员、库存和优惠券规则构造互斥测试列。",
+      "scaffold": "提供三个条件、四种结果和空决策表。",
+      "steps": [
+        {
+          "title": "列条件",
+          "instruction": "把条件拆成可判断的是/否。",
+          "check": "条件互斥清楚。"
+        },
+        {
+          "title": "补组合",
+          "instruction": "覆盖正常、缺货和无券组合。",
+          "check": "每列有动作。"
+        },
+        {
+          "title": "查遗漏",
+          "instruction": "用反例检查是否有组合没有结果。",
+          "check": "遗漏可定位。"
+        }
+      ],
+      "acceptance": [
+        "每列是一条可执行规则",
+        "至少覆盖一个缺货反例"
+      ],
+      "help_refs": [
+        "software-testing-g3",
+        "software-testing-kit3"
+      ],
+      "estimated_minutes": 14,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-triage",
+      "level": "core",
+      "title": "按证据给缺陷分诊",
+      "knowledge_link_ids": [
+        "software-testing-k4"
+      ],
+      "source_slide_ids": [
+        "software-testing-s4"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4"
+      ],
+      "task_kind": "debugging",
+      "artifact_kind": "result",
+      "capabilities": [
+        "diagnosis",
+        "comparison",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "根据影响、复现和业务风险安排缺陷顺序。",
+      "scaffold": "提供三个缺陷卡和统一分诊表。",
+      "steps": [
+        {
+          "title": "读现象",
+          "instruction": "分离用户影响和技术描述。",
+          "check": "现象可复述。"
+        },
+        {
+          "title": "看复现",
+          "instruction": "标记稳定、偶发和不可复现。",
+          "check": "证据明确。"
+        },
+        {
+          "title": "定优先",
+          "instruction": "写出排序及至少一条依据。",
+          "check": "排序不是凭感觉。"
+        }
+      ],
+      "acceptance": [
+        "三条缺陷均有优先级",
+        "排序有风险和复现依据"
+      ],
+      "help_refs": [
+        "software-testing-g4",
+        "software-testing-kit4"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-regression",
+      "level": "core",
+      "title": "选择最小回归集合",
+      "knowledge_link_ids": [
+        "software-testing-k5"
+      ],
+      "source_slide_ids": [
+        "software-testing-s5"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f5"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "document",
+      "capabilities": [
+        "scenario_reasoning",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "从修复点和影响路径中选出必须回归的用例。",
+      "scaffold": "提供修复描述、五条候选用例和影响图。",
+      "steps": [
+        {
+          "title": "找修复点",
+          "instruction": "标出直接改变的规则。",
+          "check": "规则与用例相连。"
+        },
+        {
+          "title": "扩影响",
+          "instruction": "沿依赖路径选择间接影响。",
+          "check": "不漏关键路径。"
+        },
+        {
+          "title": "定集合",
+          "instruction": "删除不必要重复用例并解释。",
+          "check": "集合最小但有理由。"
+        }
+      ],
+      "acceptance": [
+        "直接和间接影响均覆盖",
+        "能解释一个被删除的重复项"
+      ],
+      "help_refs": [
+        "software-testing-g5",
+        "software-testing-kit5"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-gherkin",
+      "level": "optional",
+      "title": "把用例改写成 Given-When-Then",
+      "knowledge_link_ids": [
+        "software-testing-k1",
+        "software-testing-k2"
+      ],
+      "source_slide_ids": [
+        "software-testing-s1",
+        "software-testing-s2"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f2"
+      ],
+      "task_kind": "tooling",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "将一个边界用例改写成清晰的场景步骤。",
+      "scaffold": "提供三列表和 Gherkin 句式槽位。",
+      "steps": [
+        {
+          "title": "写 Given",
+          "instruction": "补前置数据和状态。",
+          "check": "前置可复现。"
+        },
+        {
+          "title": "写 When",
+          "instruction": "写一个动作。",
+          "check": "动作不混合多个行为。"
+        },
+        {
+          "title": "写 Then",
+          "instruction": "写可观察结果。",
+          "check": "结果可判定。"
+        }
+      ],
+      "acceptance": [
+        "完成一个边界场景",
+        "每个步骤可执行"
+      ],
+      "help_refs": [
+        "software-testing-g1",
+        "software-testing-kit1"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-coverage",
+      "level": "optional",
+      "title": "比较覆盖与用例成本",
+      "knowledge_link_ids": [
+        "software-testing-k3",
+        "software-testing-k5"
+      ],
+      "source_slide_ids": [
+        "software-testing-s3",
+        "software-testing-s5"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3",
+        "software-testing-f5"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "result",
+      "capabilities": [
+        "comparison",
+        "scenario_reasoning"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "比较两套回归集合的覆盖和执行成本。",
+      "scaffold": "提供需求规则、用例集合和执行时长。",
+      "steps": [
+        {
+          "title": "看覆盖",
+          "instruction": "标出各集合覆盖的规则。",
+          "check": "覆盖证据明确。"
+        },
+        {
+          "title": "看成本",
+          "instruction": "比较执行时长和重复项。",
+          "check": "成本可计算。"
+        },
+        {
+          "title": "做取舍",
+          "instruction": "选择一套并说明风险。",
+          "check": "选择有依据。"
+        }
+      ],
+      "acceptance": [
+        "完成两套集合比较",
+        "说明取舍风险"
+      ],
+      "help_refs": [
+        "software-testing-g3",
+        "software-testing-kit3"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "software-testing-release",
+      "level": "challenge",
+      "title": "设计一次发布前风险回归",
+      "knowledge_link_ids": [
+        "software-testing-k4",
+        "software-testing-k5"
+      ],
+      "source_slide_ids": [
+        "software-testing-s4",
+        "software-testing-s5"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "scenario",
+      "capabilities": [
+        "scenario_reasoning",
+        "explanation",
+        "comparison"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为高风险支付变更设计发布前的最小回归和停线条件。",
+      "scaffold": "提供变更说明、影响路径和时间预算。",
+      "steps": [
+        {
+          "title": "识别风险",
+          "instruction": "连接业务影响和缺陷证据。",
+          "check": "风险可排序。"
+        },
+        {
+          "title": "选回归",
+          "instruction": "安排最小高价值用例。",
+          "check": "用例覆盖关键规则。"
+        },
+        {
+          "title": "定停线",
+          "instruction": "写出出现什么证据就不能发布。",
+          "check": "停线条件可观察。"
+        }
+      ],
+      "acceptance": [
+        "回归集合和停线条件完整",
+        "能说明每个选择的理论依据"
+      ],
+      "help_refs": [
+        "software-testing-g4",
+        "software-testing-kit4"
+      ],
+      "estimated_minutes": 14,
+      "verification": "按验收条件复核输入、动作和结果。"
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "software-testing-lab1",
+      "title": "需求目标映射",
+      "knowledge_link_ids": [
+        "software-testing-k1"
+      ],
+      "task_ids": [
+        "software-testing-goal"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1"
+      ],
+      "purpose": "用需求目标映射把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 6,
+        "prompt": "围绕需求目标映射，先做一个判断，再把反馈带回任务。",
+        "options": [
+          {
+            "label": "证据支持需求目标映射的关键条件",
+            "feedback": "正确。请把这条证据写入任务验收。"
+          },
+          {
+            "label": "只凭结果表面相似就直接通过",
+            "feedback": "还不够，需要回到条件或过程证据。"
+          },
+          {
+            "label": "跳过检查直接改变工具设置",
+            "feedback": "先保留可解释的检查步骤，再改变设置。"
+          }
+        ],
+        "answer_index": 0,
+        "success_feedback": "判断完成，请回到对应任务执行。",
+        "retry_feedback": "请从理论页的条件和当前证据重新核对。"
+      }
+    },
+    {
+      "id": "software-testing-lab2",
+      "title": "边界值过程",
+      "knowledge_link_ids": [
+        "software-testing-k2"
+      ],
+      "task_ids": [
+        "software-testing-boundary"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f2"
+      ],
+      "purpose": "用边界值过程把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "state-simulator",
+        "estimated_minutes": 6,
+        "prompt": "根据边界值过程的过程状态，填写下一步字段；输入框不会预填答案。",
+        "state_fields": [
+          {
+            "id": "phase",
+            "label": "当前阶段",
+            "input_type": "text"
+          },
+          {
+            "id": "action",
+            "label": "下一动作",
+            "input_type": "text"
+          }
+        ],
+        "state": {
+          "context_label": "当前场景",
+          "context": "边界值过程的过程被拆成两个可观察状态。"
+        },
+        "visualization": {
+          "kind": "state-machine",
+          "title": "边界值过程状态图",
+          "items": [
+            {
+              "label": "观察",
+              "value": "先收集证据"
+            },
+            {
+              "label": "检查",
+              "value": "按标准核对"
+            },
+            {
+              "label": "处理",
+              "value": "做一个最小动作"
+            }
+          ]
+        },
+        "rounds": [
+          {
+            "given": {
+              "phase": "观察",
+              "action": "等待"
+            },
+            "expected": {
+              "action": "检查"
+            },
+            "next_expected": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "status": "continue",
+            "observation": "已经从描述转向证据检查。",
+            "feedback": "下一动作应当能产生可观察证据。"
+          },
+          {
+            "given": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "expected": {
+              "action": "处理"
+            },
+            "status": "found",
+            "observation": "已完成一次最小、可解释的处理。",
+            "feedback": "过程到达终止状态，可以回到任务验收。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "software-testing-lab3",
+      "title": "决策表排序",
+      "knowledge_link_ids": [
+        "software-testing-k3"
+      ],
+      "task_ids": [
+        "software-testing-decision"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3"
+      ],
+      "purpose": "用决策表排序把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "围绕决策表排序，先做一个判断，再把反馈带回任务。",
+        "steps": [
+          {
+            "title": "定位输入",
+            "text": "列出决策表排序的输入、观察对象和当前已知条件。"
+          },
+          {
+            "title": "执行一步",
+            "text": "只改变一个与决策表排序相关的操作，记录状态变化。"
+          },
+          {
+            "title": "核对结果",
+            "text": "用理论中的判断标准解释结果，并决定是否进入下一步。"
+          },
+          {
+            "title": "回到任务",
+            "text": "把观察到的规律写成任务中的一个小验收条件。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "software-testing-lab4",
+      "title": "缺陷分诊诊断",
+      "knowledge_link_ids": [
+        "software-testing-k4"
+      ],
+      "task_ids": [
+        "software-testing-triage"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4"
+      ],
+      "purpose": "用缺陷分诊诊断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 6,
+        "prompt": "连续处理缺陷分诊诊断中的两个诊断案例，先说现象，再选最小修复。",
+        "diagnostic_cases": [
+          {
+            "id": "software-testing-case-1",
+            "title": "结果为空或没有变化",
+            "context": "在缺陷分诊诊断操作中出现：结果为空或没有变化。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          },
+          {
+            "id": "software-testing-case-2",
+            "title": "结果与理论条件不一致",
+            "context": "在缺陷分诊诊断操作中出现：结果与理论条件不一致。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          }
+        ],
+        "completion_feedback": "两个诊断案例都完成；请把最小修复带回实践任务。"
+      }
+    },
+    {
+      "id": "software-testing-lab5",
+      "title": "连续回归题组",
+      "knowledge_link_ids": [
+        "software-testing-k4",
+        "software-testing-k5"
+      ],
+      "task_ids": [
+        "software-testing-triage",
+        "software-testing-regression"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "purpose": "用连续回归题组把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 6,
+        "prompt": "逐题完成连续回归题组的三个检查点，每题反馈后再进入下一题。",
+        "questions": [
+          {
+            "prompt": "连续回归题组：第一步应保留什么证据？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续回归题组：哪个动作最能验证理论？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续回归题组：什么时候需要打开补给资料？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "software-testing-lab6",
+      "title": "证据动作分类",
+      "knowledge_link_ids": [
+        "software-testing-k1",
+        "software-testing-k4"
+      ],
+      "task_ids": [
+        "software-testing-goal",
+        "software-testing-triage"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u4"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f4"
+      ],
+      "purpose": "用证据动作分类把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "classify",
+        "estimated_minutes": 6,
+        "prompt": "把证据动作分类中的动作分到正确的工作角色。",
+        "categories": [
+          "证据",
+          "动作",
+          "验收"
+        ],
+        "items": [
+          {
+            "id": "evidence",
+            "label": "读取现象、条件和原始记录",
+            "answer": "证据",
+            "feedback": "先形成可复核证据。"
+          },
+          {
+            "id": "action",
+            "label": "只修改一个关键设置或字段",
+            "answer": "动作",
+            "feedback": "动作要小且能回退。"
+          },
+          {
+            "id": "accept",
+            "label": "按标准解释结果并决定下一步",
+            "answer": "验收",
+            "feedback": "验收连接理论与实践。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "software-testing-lab7",
+      "title": "发布风险排序",
+      "knowledge_link_ids": [
+        "software-testing-k4",
+        "software-testing-k5"
+      ],
+      "task_ids": [
+        "software-testing-regression",
+        "software-testing-release"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "purpose": "用发布风险排序把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "reorder",
+        "estimated_minutes": 6,
+        "prompt": "排列发布风险排序的实际工作顺序，先恢复证据链，再做判断。",
+        "items": [
+          {
+            "id": "observe",
+            "label": "执行最小操作并观察结果"
+          },
+          {
+            "id": "check",
+            "label": "核对输入和前置条件"
+          },
+          {
+            "id": "explain",
+            "label": "用理论解释结果"
+          },
+          {
+            "id": "verify",
+            "label": "按验收清单回归"
+          }
+        ],
+        "correct_order": [
+          "check",
+          "observe",
+          "explain",
+          "verify"
+        ],
+        "success_feedback": "顺序正确，已经形成可复核的实践闭环。",
+        "retry_feedback": "先把证据和前置条件放在最前面。"
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "software-testing-g1",
+      "title": "1. 需求与测试目标怎么用",
+      "knowledge_link_ids": [
+        "software-testing-k1"
+      ],
+      "task_ids": [
+        "software-testing-goal",
+        "software-testing-gherkin"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f2"
+      ],
+      "body": "测试目标要从需求行为和可观察结果中来 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以登录失败三次后锁定账户为例：先读条件，再执行一个最小动作，最后用“能把一句需求拆成可验证行为”解释观察到的结果。",
+      "quick_reference": [
+        "测试目标要从需求行为和可观察结果中来",
+        "能把一句需求拆成可验证行为",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "把功能名称当成测试目标",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "software-testing-g2",
+      "title": "2. 等价类与边界怎么用",
+      "knowledge_link_ids": [
+        "software-testing-k2"
+      ],
+      "task_ids": [
+        "software-testing-boundary",
+        "software-testing-gherkin"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f2"
+      ],
+      "body": "等价类减少重复，边界值暴露规则切换处的错误 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以密码长度 8 到 20 位为例：先读条件，再执行一个最小动作，最后用“能为一个输入划分有效和无效类”解释观察到的结果。",
+      "quick_reference": [
+        "等价类减少重复，边界值暴露规则切换处的错误",
+        "能为一个输入划分有效和无效类",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "只测一个正常值就代表整个范围",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "software-testing-g3",
+      "title": "3. 决策表怎么用",
+      "knowledge_link_ids": [
+        "software-testing-k3"
+      ],
+      "task_ids": [
+        "software-testing-decision",
+        "software-testing-coverage"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3",
+        "software-testing-f5"
+      ],
+      "body": "多个条件共同决定结果时需要显式列出组合 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以会员、库存和优惠券共同决定折扣为例：先读条件，再执行一个最小动作，最后用“能把条件组合整理成互斥规则”解释观察到的结果。",
+      "quick_reference": [
+        "多个条件共同决定结果时需要显式列出组合",
+        "能把条件组合整理成互斥规则",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "把条件写在一段话里就等于覆盖组合",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "software-testing-g4",
+      "title": "4. 缺陷分诊怎么用",
+      "knowledge_link_ids": [
+        "software-testing-k4"
+      ],
+      "task_ids": [
+        "software-testing-triage",
+        "software-testing-release"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "body": "缺陷优先级要同时看影响范围、复现稳定性和业务风险 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以支付成功但订单状态未更新为例：先读条件，再执行一个最小动作，最后用“能为缺陷选择优先级并说明依据”解释观察到的结果。",
+      "quick_reference": [
+        "缺陷优先级要同时看影响范围、复现稳定性和业务风险",
+        "能为缺陷选择优先级并说明依据",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "所有阻塞都按个人感觉排序",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "software-testing-g5",
+      "title": "5. 回归与覆盖怎么用",
+      "knowledge_link_ids": [
+        "software-testing-k5"
+      ],
+      "task_ids": [
+        "software-testing-regression",
+        "software-testing-coverage",
+        "software-testing-release"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3",
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3",
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "body": "回归集合要覆盖修复点和受影响路径，而不是无限增加用例 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以修复优惠券后检查结算和退款为例：先读条件，再执行一个最小动作，最后用“能从一个缺陷选择最小回归集合”解释观察到的结果。",
+      "quick_reference": [
+        "回归集合要覆盖修复点和受影响路径，而不是无限增加用例",
+        "能从一个缺陷选择最小回归集合",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "用例越多覆盖就一定越好",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "software-testing-g6",
+      "title": "6. 从证据到解释的自助路径",
+      "knowledge_link_ids": [
+        "software-testing-k1",
+        "software-testing-k2",
+        "software-testing-k3",
+        "software-testing-k4",
+        "software-testing-k5"
+      ],
+      "task_ids": [
+        "software-testing-goal",
+        "software-testing-boundary",
+        "software-testing-decision",
+        "software-testing-triage",
+        "software-testing-regression",
+        "software-testing-gherkin",
+        "software-testing-coverage",
+        "software-testing-release"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u2",
+        "software-testing-u3",
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f2",
+        "software-testing-f3",
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "body": "当结果不符合预期时，沿着条件—动作—证据—解释四步回查；每一步都能指向一个具体学习资料或基础补给。",
+      "worked_example": "先复述当前输入和预期，再只做一个最小修复，重新观察并把变化解释给同伴。",
+      "quick_reference": [
+        "先找最早出现差异的步骤。",
+        "优先回到对应理论页和基础补给。",
+        "能解释为什么修复有效才算完成。"
+      ],
+      "common_errors": [
+        "同时改动多个变量，无法归因。",
+        "把教师参考答案当成第一步，而不先观察。"
+      ],
+      "checkpoints": [
+        "我知道每个 core task 卡住时的入口。",
+        "我能把一次操作连接到一个理论事实。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "software-testing-kit1",
+      "title": "需求与测试目标基础补给",
+      "kind": "需求拆解",
+      "content": "这是开始需求与测试目标任务前的最小工具卡：测试目标要从需求行为和可观察结果中来",
+      "task_ids": [
+        "software-testing-goal",
+        "software-testing-gherkin"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f2"
+      ],
+      "when_to_use": "看到需求与测试目标相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是需求与测试目标。",
+        "按卡片中的一个动作检查前置条件与结果。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释需求与测试目标。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "software-testing-kit2",
+      "title": "等价类与边界基础补给",
+      "kind": "边界设计",
+      "content": "这是开始等价类与边界任务前的最小工具卡：等价类减少重复，边界值暴露规则切换处的错误",
+      "task_ids": [
+        "software-testing-boundary",
+        "software-testing-gherkin"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u1",
+        "software-testing-u2"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f1",
+        "software-testing-f2"
+      ],
+      "when_to_use": "看到等价类与边界相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是等价类与边界。",
+        "按卡片中的一个动作检查7、8、20、21。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释等价类与边界。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "software-testing-kit3",
+      "title": "决策表基础补给",
+      "kind": "决策表",
+      "content": "这是开始决策表任务前的最小工具卡：多个条件共同决定结果时需要显式列出组合",
+      "task_ids": [
+        "software-testing-decision",
+        "software-testing-coverage"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3",
+        "software-testing-f5"
+      ],
+      "when_to_use": "看到决策表相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是决策表。",
+        "按卡片中的一个动作检查组合遗漏与重复。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释决策表。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "software-testing-kit4",
+      "title": "缺陷分诊基础补给",
+      "kind": "缺陷分诊",
+      "content": "这是开始缺陷分诊任务前的最小工具卡：缺陷优先级要同时看影响范围、复现稳定性和业务风险",
+      "task_ids": [
+        "software-testing-triage",
+        "software-testing-release"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "when_to_use": "看到缺陷分诊相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是缺陷分诊。",
+        "按卡片中的一个动作检查影响与复现。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释缺陷分诊。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "software-testing-kit5",
+      "title": "回归与覆盖基础补给",
+      "kind": "回归选择",
+      "content": "这是开始回归与覆盖任务前的最小工具卡：回归集合要覆盖修复点和受影响路径，而不是无限增加用例",
+      "task_ids": [
+        "software-testing-regression",
+        "software-testing-coverage",
+        "software-testing-release"
+      ],
+      "learning_unit_ids": [
+        "software-testing-u3",
+        "software-testing-u4",
+        "software-testing-u5"
+      ],
+      "canonical_fact_ids": [
+        "software-testing-f3",
+        "software-testing-f4",
+        "software-testing-f5"
+      ],
+      "when_to_use": "看到回归与覆盖相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是回归与覆盖。",
+        "按卡片中的一个动作检查最小集合与遗漏风险。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释回归与覆盖。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "带领学生用软件测试设计基础的理论完成一条可观察实践闭环。",
+    "theory_bridge": "每次巡视先让学生指出 source 理论事实，再看操作证据；不要用教师答案替代学生判断。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "理论回看与第一个可观察判断"
+      },
+      {
+        "minutes": 30,
+        "focus": "core 前半段：小步操作和即时核对"
+      },
+      {
+        "minutes": 24,
+        "focus": "core 后半段：完成、运行或诊断"
+      },
+      {
+        "minutes": 20,
+        "focus": "差异化路径和连续互动"
+      },
+      {
+        "minutes": 8,
+        "focus": "解释性收束与个别抽查"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "software-testing-goal",
+        "look_for": "检查学生是否真的完成“把需求改写成可观察目标”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述从一条登录需求拆出触发条件、动作和结果。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-boundary",
+        "look_for": "检查学生是否真的完成“设计等价类与边界用例”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为密码长度规则选择最小而有代表性的输入。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-decision",
+        "look_for": "检查学生是否真的完成“把条件组合变成决策表”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为会员、库存和优惠券规则构造互斥测试列。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-triage",
+        "look_for": "检查学生是否真的完成“按证据给缺陷分诊”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述根据影响、复现和业务风险安排缺陷顺序。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-regression",
+        "look_for": "检查学生是否真的完成“选择最小回归集合”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述从修复点和影响路径中选出必须回归的用例。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-gherkin",
+        "look_for": "检查学生是否真的完成“把用例改写成 Given-When-Then”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述将一个边界用例改写成清晰的场景步骤。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-coverage",
+        "look_for": "检查学生是否真的完成“比较覆盖与用例成本”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述比较两套回归集合的覆盖和执行成本。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "software-testing-release",
+        "look_for": "检查学生是否真的完成“设计一次发布前风险回归”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为高风险支付变更设计发布前的最小回归和停线条件。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "学生直接改结果而不记录条件",
+        "intervention": "让学生回到理论页，写出输入、动作和预期后再做一次最小变化。"
+      },
+      {
+        "symptom": "学生把一次偶然成功当成规则",
+        "intervention": "要求换一个边界或反例，说明规则是否仍成立。"
+      },
+      {
+        "symptom": "学生卡在工具操作而非本课知识",
+        "intervention": "先打开对应 foundation-kit，完成自检后再回到 core task。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱时只要求完成所有 core 的第一验收点，并把 optional 改为教师示范。",
+      "进度较快时要求比较两个条件或处理 challenge，但不打断基础学生路径。",
+      "课堂时间不足时保留理论关联、一个可观察结果和一次解释性抽查。"
+    ],
+    "closing_checks": [
+      "随机请学生解释一个结果背后的理论事实。",
+      "检查每个 core 是否至少留下一个可复核结果。",
+      "确认学生知道下次卡住时打开哪份资料。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "software-testing-goal",
+        "title": "把需求改写成可观察目标",
+        "source_slide_ids": [
+          "software-testing-s1"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u1"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f1"
+        ],
+        "reference_answer": "完成把需求改写成可观察目标：完成三列表；正反结果都可观察。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "标出前置条件和输入。",
+          "写学生或系统要做的动作。",
+          "写出可观察结果和失败结果。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成三列表",
+          "正反结果都可观察"
+        ]
+      },
+      {
+        "task_id": "software-testing-boundary",
+        "title": "设计等价类与边界用例",
+        "source_slide_ids": [
+          "software-testing-s2"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u2"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f2"
+        ],
+        "reference_answer": "完成设计等价类与边界用例：三类等价类完整；四个边界值有预期结果。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "写出有效、过短、过长三类。",
+          "填写 7、8、20、21 四个值。",
+          "解释为什么不需要遍历所有长度。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三类等价类完整",
+          "四个边界值有预期结果"
+        ]
+      },
+      {
+        "task_id": "software-testing-decision",
+        "title": "把条件组合变成决策表",
+        "source_slide_ids": [
+          "software-testing-s3"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u3"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f3"
+        ],
+        "reference_answer": "完成把条件组合变成决策表：每列是一条可执行规则；至少覆盖一个缺货反例。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "把条件拆成可判断的是/否。",
+          "覆盖正常、缺货和无券组合。",
+          "用反例检查是否有组合没有结果。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "每列是一条可执行规则",
+          "至少覆盖一个缺货反例"
+        ]
+      },
+      {
+        "task_id": "software-testing-triage",
+        "title": "按证据给缺陷分诊",
+        "source_slide_ids": [
+          "software-testing-s4"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u4"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f4"
+        ],
+        "reference_answer": "完成按证据给缺陷分诊：三条缺陷均有优先级；排序有风险和复现依据。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "分离用户影响和技术描述。",
+          "标记稳定、偶发和不可复现。",
+          "写出排序及至少一条依据。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三条缺陷均有优先级",
+          "排序有风险和复现依据"
+        ]
+      },
+      {
+        "task_id": "software-testing-regression",
+        "title": "选择最小回归集合",
+        "source_slide_ids": [
+          "software-testing-s5"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u5"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f5"
+        ],
+        "reference_answer": "完成选择最小回归集合：直接和间接影响均覆盖；能解释一个被删除的重复项。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "标出直接改变的规则。",
+          "沿依赖路径选择间接影响。",
+          "删除不必要重复用例并解释。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "直接和间接影响均覆盖",
+          "能解释一个被删除的重复项"
+        ]
+      },
+      {
+        "task_id": "software-testing-gherkin",
+        "title": "把用例改写成 Given-When-Then",
+        "source_slide_ids": [
+          "software-testing-s1",
+          "software-testing-s2"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u1",
+          "software-testing-u2"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f1",
+          "software-testing-f2"
+        ],
+        "reference_answer": "完成把用例改写成 Given-When-Then：完成一个边界场景；每个步骤可执行。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "补前置数据和状态。",
+          "写一个动作。",
+          "写可观察结果。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成一个边界场景",
+          "每个步骤可执行"
+        ]
+      },
+      {
+        "task_id": "software-testing-coverage",
+        "title": "比较覆盖与用例成本",
+        "source_slide_ids": [
+          "software-testing-s3",
+          "software-testing-s5"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u3",
+          "software-testing-u5"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f3",
+          "software-testing-f5"
+        ],
+        "reference_answer": "完成比较覆盖与用例成本：完成两套集合比较；说明取舍风险。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "标出各集合覆盖的规则。",
+          "比较执行时长和重复项。",
+          "选择一套并说明风险。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成两套集合比较",
+          "说明取舍风险"
+        ]
+      },
+      {
+        "task_id": "software-testing-release",
+        "title": "设计一次发布前风险回归",
+        "source_slide_ids": [
+          "software-testing-s4",
+          "software-testing-s5"
+        ],
+        "learning_unit_ids": [
+          "software-testing-u4",
+          "software-testing-u5"
+        ],
+        "canonical_fact_ids": [
+          "software-testing-f4",
+          "software-testing-f5"
+        ],
+        "reference_answer": "完成设计一次发布前风险回归：回归集合和停线条件完整；能说明每个选择的理论依据。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "连接业务影响和缺陷证据。",
+          "安排最小高价值用例。",
+          "写出出现什么证据就不能发布。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "回归集合和停线条件完整",
+          "能说明每个选择的理论依据"
+        ]
+      }
+    ]
+  },
+  "starter_assets": []
+}

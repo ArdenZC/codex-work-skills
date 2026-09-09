@@ -1,0 +1,1772 @@
+{
+  "contract_version": "1.1",
+  "course_title": "Python Web 接口基础",
+  "practice_title": "实践：把请求契约落成可验证响应",
+  "audience": "高职软件开发专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "Python Web 接口基础",
+    "audience": "高职软件开发专业学生",
+    "language": "Python",
+    "tools": [
+      "Python",
+      "VS Code"
+    ],
+    "platform": "Windows",
+    "software": "Python 3.12",
+    "framework": "Flask",
+    "other_constraints": [
+      "本次只关注请求校验与响应结构"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.1",
+    "chapter_title": "请求校验与可观察接口",
+    "taught_slide_ids": [
+      "web-api-s1",
+      "web-api-s2",
+      "web-api-s3",
+      "web-api-s4",
+      "web-api-s5"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "web-api-k1",
+      "title": "请求与响应",
+      "summary": "接口输入、处理结果和响应字段要有明确对应",
+      "source_slide_ids": [
+        "web-api-s1"
+      ],
+      "student_can_do": "能从一条请求记录说出预期响应",
+      "learning_unit_ids": [
+        "web-api-u1"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1"
+      ]
+    },
+    {
+      "id": "web-api-k2",
+      "title": "路由与参数",
+      "summary": "路径参数和查询参数在接口中承担不同输入角色",
+      "source_slide_ids": [
+        "web-api-s2"
+      ],
+      "student_can_do": "能把一个业务输入放到正确参数位置",
+      "learning_unit_ids": [
+        "web-api-u2"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2"
+      ]
+    },
+    {
+      "id": "web-api-k3",
+      "title": "输入校验",
+      "summary": "校验要在业务处理前拦住不满足契约的输入",
+      "source_slide_ids": [
+        "web-api-s3"
+      ],
+      "student_can_do": "能为一个字段写出可观察的校验条件",
+      "learning_unit_ids": [
+        "web-api-u3"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f3"
+      ]
+    },
+    {
+      "id": "web-api-k4",
+      "title": "可观察调试",
+      "summary": "调试要比较预期响应和实际响应，而不是盲目改代码",
+      "source_slide_ids": [
+        "web-api-s4"
+      ],
+      "student_can_do": "能根据现象定位最早发生差异的步骤",
+      "learning_unit_ids": [
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f4"
+      ]
+    },
+    {
+      "id": "web-api-k5",
+      "title": "接口场景验收",
+      "summary": "接口验收要覆盖正常、边界和错误输入",
+      "source_slide_ids": [
+        "web-api-s5"
+      ],
+      "student_can_do": "能为一个接口设计三条可复核场景",
+      "learning_unit_ids": [
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f5"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "web-api-observe",
+      "level": "core",
+      "title": "读懂一条请求的证据",
+      "knowledge_link_ids": [
+        "web-api-k1"
+      ],
+      "source_slide_ids": [
+        "web-api-s1"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1"
+      ],
+      "task_kind": "observation",
+      "artifact_kind": "result",
+      "capabilities": [
+        "state_tracking",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "从请求样例中标出输入、处理动作和响应字段。",
+      "scaffold": "已给出一条带姓名字段的请求记录和响应草稿。",
+      "steps": [
+        {
+          "title": "圈出输入",
+          "instruction": "标记方法、路径、字段和值。",
+          "check": "能解释每个字段来自哪里。"
+        },
+        {
+          "title": "对齐响应",
+          "instruction": "把响应字段连回处理动作。",
+          "check": "不遗漏状态字段。"
+        },
+        {
+          "title": "口头解释",
+          "instruction": "用一句话说明输入变化会影响哪个输出。",
+          "check": "同伴能复述。"
+        }
+      ],
+      "acceptance": [
+        "写出输入—动作—响应三段关系",
+        "指出一个边界字段"
+      ],
+      "help_refs": [
+        "web-api-g1",
+        "web-api-kit1"
+      ],
+      "estimated_minutes": 8,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "web-api-route",
+      "level": "core",
+      "title": "把参数放回路由契约",
+      "knowledge_link_ids": [
+        "web-api-k2"
+      ],
+      "source_slide_ids": [
+        "web-api-s2"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "document",
+      "capabilities": [
+        "file_editing",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "依据接口契约卡修改参数位置表。",
+      "scaffold": "提供三条路径和参数槽位，只需填入参数来源与用途。",
+      "steps": [
+        {
+          "title": "读取契约",
+          "instruction": "比较路径参数和查询参数的语义。",
+          "check": "每个输入有唯一位置。"
+        },
+        {
+          "title": "填写表格",
+          "instruction": "将三个输入放入对应槽位。",
+          "check": "表格不出现重复归属。"
+        },
+        {
+          "title": "举反例",
+          "instruction": "写出一个放错位置会造成的现象。",
+          "check": "能说明为什么错。"
+        }
+      ],
+      "acceptance": [
+        "完成参数位置表",
+        "解释一个放错参数的后果"
+      ],
+      "help_refs": [
+        "web-api-g2",
+        "web-api-kit2"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "web-api-validate",
+      "level": "core",
+      "title": "补齐输入校验 starter",
+      "knowledge_link_ids": [
+        "web-api-k3"
+      ],
+      "source_slide_ids": [
+        "web-api-s3"
+      ],
+      "learning_unit_ids": [
+        "web-api-u3"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f3"
+      ],
+      "task_kind": "implementation",
+      "artifact_kind": "source-code",
+      "capabilities": [
+        "code_editing",
+        "execution",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "在完整 Python 函数框架中补三个会改变响应语义的 TODO。",
+      "scaffold": "保留函数、输入字典、返回结构和三个关键空位；先按阶段修改，再运行 py_compile 和样例。",
+      "steps": [
+        {
+          "title": "先改状态",
+          "instruction": "完成 TODO 1 后解释成功状态的契约。",
+          "check": "状态文本符合接口约定。"
+        },
+        {
+          "title": "补边界",
+          "instruction": "完成 TODO 2，分别测试有效、空白和缺失姓名。",
+          "check": "三类输入得到可解释差异。"
+        },
+        {
+          "title": "补字段",
+          "instruction": "完成 TODO 3 并检查返回字段是否完整。",
+          "check": "响应结构与样例一致。"
+        },
+        {
+          "title": "回归",
+          "instruction": "运行编译检查并口头解释三个 TODO 的作用。",
+          "check": "能说明修改如何影响结果。"
+        }
+      ],
+      "acceptance": [
+        "三个 TODO 都有真实改动",
+        "样例和边界输入结果可解释",
+        "能说明校验发生在业务处理前"
+      ],
+      "help_refs": [
+        "web-api-g3",
+        "web-api-kit3"
+      ],
+      "estimated_minutes": 16,
+      "verification": "用 Python 3.12 执行 py_compile，并用三条字典输入检查响应字段。",
+      "starter_asset_ids": [
+        "web-api-request-checker"
+      ],
+      "todo_count": 3
+    },
+    {
+      "id": "web-api-debug",
+      "level": "core",
+      "title": "诊断响应字段缺失",
+      "knowledge_link_ids": [
+        "web-api-k4"
+      ],
+      "source_slide_ids": [
+        "web-api-s4"
+      ],
+      "learning_unit_ids": [
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f4"
+      ],
+      "task_kind": "debugging",
+      "artifact_kind": "result",
+      "capabilities": [
+        "diagnosis",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "根据现象卡找出响应不完整的最小原因。",
+      "scaffold": "给出预期/实际对照表和三条可能原因。",
+      "steps": [
+        {
+          "title": "对照字段",
+          "instruction": "逐项比较预期与实际响应。",
+          "check": "找到第一个差异。"
+        },
+        {
+          "title": "回查动作",
+          "instruction": "回到校验和返回结构，排除无关修改。",
+          "check": "说出最小原因。"
+        },
+        {
+          "title": "写回归",
+          "instruction": "增加一条能暴露同类问题的检查。",
+          "check": "检查能重复执行。"
+        }
+      ],
+      "acceptance": [
+        "指出最早差异",
+        "给出一个最小修复和回归检查"
+      ],
+      "help_refs": [
+        "web-api-g4",
+        "web-api-kit4"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "web-api-scenario",
+      "level": "core",
+      "title": "设计三条接口验收场景",
+      "knowledge_link_ids": [
+        "web-api-k5"
+      ],
+      "source_slide_ids": [
+        "web-api-s5"
+      ],
+      "learning_unit_ids": [
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f5"
+      ],
+      "task_kind": "experiment",
+      "artifact_kind": "scenario",
+      "capabilities": [
+        "scenario_reasoning",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为同一接口安排正常、边界和缺失输入三类场景。",
+      "scaffold": "提供场景表头、输入槽和预期响应槽。",
+      "steps": [
+        {
+          "title": "写正常例",
+          "instruction": "填入有效姓名并写预期字段。",
+          "check": "结果覆盖状态和姓名。"
+        },
+        {
+          "title": "写边界例",
+          "instruction": "填入空白姓名并写预期状态。",
+          "check": "边界能区分实现。"
+        },
+        {
+          "title": "交换检查",
+          "instruction": "与同伴互换场景表并找一个遗漏。",
+          "check": "能解释遗漏影响。"
+        }
+      ],
+      "acceptance": [
+        "三类场景均有输入和预期",
+        "至少一条边界能区分错误实现"
+      ],
+      "help_refs": [
+        "web-api-g5",
+        "web-api-kit5"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "web-api-docs",
+      "level": "optional",
+      "title": "比较两种参数设计",
+      "knowledge_link_ids": [
+        "web-api-k2",
+        "web-api-k4"
+      ],
+      "source_slide_ids": [
+        "web-api-s2",
+        "web-api-s4"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2",
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2",
+        "web-api-f4"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "document",
+      "capabilities": [
+        "comparison",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "比较路径参数与查询参数在接口可读性上的取舍。",
+      "scaffold": "提供两种方案和同一业务场景。",
+      "steps": [
+        {
+          "title": "看方案",
+          "instruction": "标出两种方案的输入差别。",
+          "check": "能指出差别。"
+        },
+        {
+          "title": "比影响",
+          "instruction": "比较缓存、可读性和错误提示。",
+          "check": "至少写两个依据。"
+        },
+        {
+          "title": "做选择",
+          "instruction": "为当前场景选择方案并解释。",
+          "check": "解释与理论一致。"
+        }
+      ],
+      "acceptance": [
+        "完成两方案比较",
+        "能为选择给出依据"
+      ],
+      "help_refs": [
+        "web-api-g2",
+        "web-api-kit2"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "web-api-boundary",
+      "level": "optional",
+      "title": "扩展边界检查表",
+      "knowledge_link_ids": [
+        "web-api-k3",
+        "web-api-k5"
+      ],
+      "source_slide_ids": [
+        "web-api-s3",
+        "web-api-s5"
+      ],
+      "learning_unit_ids": [
+        "web-api-u3",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f3",
+        "web-api-f5"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "document",
+      "capabilities": [
+        "scenario_reasoning",
+        "comparison"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为接口增加长度、空白和类型边界。",
+      "scaffold": "提供已有三条场景和四个边界槽位。",
+      "steps": [
+        {
+          "title": "列边界",
+          "instruction": "按字段类型补充边界。",
+          "check": "每个边界可执行。"
+        },
+        {
+          "title": "排序",
+          "instruction": "按风险排列测试顺序。",
+          "check": "先测最能区分实现的项。"
+        },
+        {
+          "title": "回带代码",
+          "instruction": "指出哪些边界由 TODO 2 覆盖。",
+          "check": "能对应代码位置。"
+        }
+      ],
+      "acceptance": [
+        "新增至少两个边界",
+        "边界能回连到代码或理论"
+      ],
+      "help_refs": [
+        "web-api-g3",
+        "web-api-kit3"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "web-api-transfer",
+      "level": "challenge",
+      "title": "为新资源写接口契约",
+      "knowledge_link_ids": [
+        "web-api-k1",
+        "web-api-k5"
+      ],
+      "source_slide_ids": [
+        "web-api-s1",
+        "web-api-s5"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f5"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "document",
+      "capabilities": [
+        "scenario_reasoning",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "把同样的校验思路迁移到课程资源查询接口。",
+      "scaffold": "提供资源字段清单和契约模板。",
+      "steps": [
+        {
+          "title": "选字段",
+          "instruction": "区分路径、查询和响应字段。",
+          "check": "字段有明确语义。"
+        },
+        {
+          "title": "定边界",
+          "instruction": "写一个空结果和一个无效条件。",
+          "check": "边界可观察。"
+        },
+        {
+          "title": "讲清楚",
+          "instruction": "向同伴说明契约如何支持回归。",
+          "check": "说明有理论依据。"
+        }
+      ],
+      "acceptance": [
+        "完成一个可读契约",
+        "包含正常与边界场景"
+      ],
+      "help_refs": [
+        "web-api-g1",
+        "web-api-kit1"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "web-api-lab1",
+      "title": "请求证据映射",
+      "knowledge_link_ids": [
+        "web-api-k1"
+      ],
+      "task_ids": [
+        "web-api-observe"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1"
+      ],
+      "purpose": "用请求证据映射把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 6,
+        "prompt": "围绕请求证据映射，先做一个判断，再把反馈带回任务。",
+        "options": [
+          {
+            "label": "证据支持请求证据映射的关键条件",
+            "feedback": "正确。请把这条证据写入任务验收。"
+          },
+          {
+            "label": "只凭结果表面相似就直接通过",
+            "feedback": "还不够，需要回到条件或过程证据。"
+          },
+          {
+            "label": "跳过检查直接改变工具设置",
+            "feedback": "先保留可解释的检查步骤，再改变设置。"
+          }
+        ],
+        "answer_index": 0,
+        "success_feedback": "判断完成，请回到对应任务执行。",
+        "retry_feedback": "请从理论页的条件和当前证据重新核对。"
+      }
+    },
+    {
+      "id": "web-api-lab2",
+      "title": "接口状态推演",
+      "knowledge_link_ids": [
+        "web-api-k1",
+        "web-api-k3"
+      ],
+      "task_ids": [
+        "web-api-observe",
+        "web-api-validate"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u3"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f3"
+      ],
+      "purpose": "用接口状态推演把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "state-simulator",
+        "estimated_minutes": 6,
+        "prompt": "根据接口状态推演的过程状态，填写下一步字段；输入框不会预填答案。",
+        "state_fields": [
+          {
+            "id": "phase",
+            "label": "当前阶段",
+            "input_type": "text"
+          },
+          {
+            "id": "action",
+            "label": "下一动作",
+            "input_type": "text"
+          }
+        ],
+        "state": {
+          "context_label": "当前场景",
+          "context": "接口状态推演的过程被拆成两个可观察状态。"
+        },
+        "visualization": {
+          "kind": "state-machine",
+          "title": "接口状态推演状态图",
+          "items": [
+            {
+              "label": "观察",
+              "value": "先收集证据"
+            },
+            {
+              "label": "检查",
+              "value": "按标准核对"
+            },
+            {
+              "label": "处理",
+              "value": "做一个最小动作"
+            }
+          ]
+        },
+        "rounds": [
+          {
+            "given": {
+              "phase": "观察",
+              "action": "等待"
+            },
+            "expected": {
+              "action": "检查"
+            },
+            "next_expected": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "status": "continue",
+            "observation": "已经从描述转向证据检查。",
+            "feedback": "下一动作应当能产生可观察证据。"
+          },
+          {
+            "given": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "expected": {
+              "action": "处理"
+            },
+            "status": "found",
+            "observation": "已完成一次最小、可解释的处理。",
+            "feedback": "过程到达终止状态，可以回到任务验收。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "web-api-lab3",
+      "title": "参数契约逐步检查",
+      "knowledge_link_ids": [
+        "web-api-k2"
+      ],
+      "task_ids": [
+        "web-api-route"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2"
+      ],
+      "purpose": "用参数契约逐步检查把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "围绕参数契约逐步检查，先做一个判断，再把反馈带回任务。",
+        "steps": [
+          {
+            "title": "定位输入",
+            "text": "列出参数契约逐步检查的输入、观察对象和当前已知条件。"
+          },
+          {
+            "title": "执行一步",
+            "text": "只改变一个与参数契约逐步检查相关的操作，记录状态变化。"
+          },
+          {
+            "title": "核对结果",
+            "text": "用理论中的判断标准解释结果，并决定是否进入下一步。"
+          },
+          {
+            "title": "回到任务",
+            "text": "把观察到的规律写成任务中的一个小验收条件。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "web-api-lab4",
+      "title": "响应缺失诊断",
+      "knowledge_link_ids": [
+        "web-api-k4"
+      ],
+      "task_ids": [
+        "web-api-debug"
+      ],
+      "learning_unit_ids": [
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f4"
+      ],
+      "purpose": "用响应缺失诊断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 6,
+        "prompt": "连续处理响应缺失诊断中的两个诊断案例，先说现象，再选最小修复。",
+        "diagnostic_cases": [
+          {
+            "id": "web-api-case-1",
+            "title": "结果为空或没有变化",
+            "context": "在响应缺失诊断操作中出现：结果为空或没有变化。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          },
+          {
+            "id": "web-api-case-2",
+            "title": "结果与理论条件不一致",
+            "context": "在响应缺失诊断操作中出现：结果与理论条件不一致。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          }
+        ],
+        "completion_feedback": "两个诊断案例都完成；请把最小修复带回实践任务。"
+      }
+    },
+    {
+      "id": "web-api-lab5",
+      "title": "连续验收题组",
+      "knowledge_link_ids": [
+        "web-api-k3",
+        "web-api-k5"
+      ],
+      "task_ids": [
+        "web-api-validate",
+        "web-api-scenario"
+      ],
+      "learning_unit_ids": [
+        "web-api-u3",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f3",
+        "web-api-f5"
+      ],
+      "purpose": "用连续验收题组把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 6,
+        "prompt": "逐题完成连续验收题组的三个检查点，每题反馈后再进入下一题。",
+        "questions": [
+          {
+            "prompt": "连续验收题组：第一步应保留什么证据？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续验收题组：哪个动作最能验证理论？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续验收题组：什么时候需要打开补给资料？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "web-api-lab6",
+      "title": "动作角色分类",
+      "knowledge_link_ids": [
+        "web-api-k2",
+        "web-api-k4"
+      ],
+      "task_ids": [
+        "web-api-route",
+        "web-api-debug"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2",
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2",
+        "web-api-f4"
+      ],
+      "purpose": "用动作角色分类把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "classify",
+        "estimated_minutes": 6,
+        "prompt": "把动作角色分类中的动作分到正确的工作角色。",
+        "categories": [
+          "证据",
+          "动作",
+          "验收"
+        ],
+        "items": [
+          {
+            "id": "evidence",
+            "label": "读取现象、条件和原始记录",
+            "answer": "证据",
+            "feedback": "先形成可复核证据。"
+          },
+          {
+            "id": "action",
+            "label": "只修改一个关键设置或字段",
+            "answer": "动作",
+            "feedback": "动作要小且能回退。"
+          },
+          {
+            "id": "accept",
+            "label": "按标准解释结果并决定下一步",
+            "answer": "验收",
+            "feedback": "验收连接理论与实践。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "web-api-lab7",
+      "title": "场景验收排序",
+      "knowledge_link_ids": [
+        "web-api-k1",
+        "web-api-k5"
+      ],
+      "task_ids": [
+        "web-api-scenario",
+        "web-api-transfer"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f5"
+      ],
+      "purpose": "用场景验收排序把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "reorder",
+        "estimated_minutes": 6,
+        "prompt": "排列场景验收排序的实际工作顺序，先恢复证据链，再做判断。",
+        "items": [
+          {
+            "id": "observe",
+            "label": "执行最小操作并观察结果"
+          },
+          {
+            "id": "check",
+            "label": "核对输入和前置条件"
+          },
+          {
+            "id": "explain",
+            "label": "用理论解释结果"
+          },
+          {
+            "id": "verify",
+            "label": "按验收清单回归"
+          }
+        ],
+        "correct_order": [
+          "check",
+          "observe",
+          "explain",
+          "verify"
+        ],
+        "success_feedback": "顺序正确，已经形成可复核的实践闭环。",
+        "retry_feedback": "先把证据和前置条件放在最前面。"
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "web-api-g1",
+      "title": "1. 请求与响应怎么用",
+      "knowledge_link_ids": [
+        "web-api-k1"
+      ],
+      "task_ids": [
+        "web-api-observe",
+        "web-api-transfer"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f5"
+      ],
+      "body": "接口输入、处理结果和响应字段要有明确对应 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以用户提交姓名后返回状态与规范化标记为例：先读条件，再执行一个最小动作，最后用“能从一条请求记录说出预期响应”解释观察到的结果。",
+      "quick_reference": [
+        "接口输入、处理结果和响应字段要有明确对应",
+        "能从一条请求记录说出预期响应",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "把浏览器显示出来的文字当成完整响应",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "web-api-g2",
+      "title": "2. 路由与参数怎么用",
+      "knowledge_link_ids": [
+        "web-api-k2"
+      ],
+      "task_ids": [
+        "web-api-route",
+        "web-api-docs"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2",
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2",
+        "web-api-f4"
+      ],
+      "body": "路径参数和查询参数在接口中承担不同输入角色 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以/users/42 与 ?active=true 的差别为例：先读条件，再执行一个最小动作，最后用“能把一个业务输入放到正确参数位置”解释观察到的结果。",
+      "quick_reference": [
+        "路径参数和查询参数在接口中承担不同输入角色",
+        "能把一个业务输入放到正确参数位置",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "所有输入都塞进同一个字符串",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "web-api-g3",
+      "title": "3. 输入校验怎么用",
+      "knowledge_link_ids": [
+        "web-api-k3"
+      ],
+      "task_ids": [
+        "web-api-validate",
+        "web-api-boundary"
+      ],
+      "learning_unit_ids": [
+        "web-api-u3",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f3",
+        "web-api-f5"
+      ],
+      "body": "校验要在业务处理前拦住不满足契约的输入 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以姓名为空白时返回可解释状态为例：先读条件，再执行一个最小动作，最后用“能为一个字段写出可观察的校验条件”解释观察到的结果。",
+      "quick_reference": [
+        "校验要在业务处理前拦住不满足契约的输入",
+        "能为一个字段写出可观察的校验条件",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "只检查字段是否存在就等于校验",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "web-api-g4",
+      "title": "4. 可观察调试怎么用",
+      "knowledge_link_ids": [
+        "web-api-k4"
+      ],
+      "task_ids": [
+        "web-api-debug",
+        "web-api-docs"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2",
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2",
+        "web-api-f4"
+      ],
+      "body": "调试要比较预期响应和实际响应，而不是盲目改代码 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以状态正确但响应缺少字段为例：先读条件，再执行一个最小动作，最后用“能根据现象定位最早发生差异的步骤”解释观察到的结果。",
+      "quick_reference": [
+        "调试要比较预期响应和实际响应，而不是盲目改代码",
+        "能根据现象定位最早发生差异的步骤",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "把所有条件一起改掉更快",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "web-api-g5",
+      "title": "5. 接口场景验收怎么用",
+      "knowledge_link_ids": [
+        "web-api-k5"
+      ],
+      "task_ids": [
+        "web-api-scenario",
+        "web-api-boundary",
+        "web-api-transfer"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u3",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f3",
+        "web-api-f5"
+      ],
+      "body": "接口验收要覆盖正常、边界和错误输入 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以有效姓名、空白姓名和缺失姓名为例：先读条件，再执行一个最小动作，最后用“能为一个接口设计三条可复核场景”解释观察到的结果。",
+      "quick_reference": [
+        "接口验收要覆盖正常、边界和错误输入",
+        "能为一个接口设计三条可复核场景",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "只测正常输入就能证明接口完成",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "web-api-g6",
+      "title": "6. 从证据到解释的自助路径",
+      "knowledge_link_ids": [
+        "web-api-k1",
+        "web-api-k2",
+        "web-api-k3",
+        "web-api-k4",
+        "web-api-k5"
+      ],
+      "task_ids": [
+        "web-api-observe",
+        "web-api-route",
+        "web-api-validate",
+        "web-api-debug",
+        "web-api-scenario",
+        "web-api-docs",
+        "web-api-boundary",
+        "web-api-transfer"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u2",
+        "web-api-u3",
+        "web-api-u4",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f2",
+        "web-api-f3",
+        "web-api-f4",
+        "web-api-f5"
+      ],
+      "body": "当结果不符合预期时，沿着条件—动作—证据—解释四步回查；每一步都能指向一个具体学习资料或基础补给。",
+      "worked_example": "先复述当前输入和预期，再只做一个最小修复，重新观察并把变化解释给同伴。",
+      "quick_reference": [
+        "先找最早出现差异的步骤。",
+        "优先回到对应理论页和基础补给。",
+        "能解释为什么修复有效才算完成。"
+      ],
+      "common_errors": [
+        "同时改动多个变量，无法归因。",
+        "把教师参考答案当成第一步，而不先观察。"
+      ],
+      "checkpoints": [
+        "我知道每个 core task 卡住时的入口。",
+        "我能把一次操作连接到一个理论事实。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "web-api-kit1",
+      "title": "请求与响应基础补给",
+      "kind": "HTTP 观察",
+      "content": "这是开始请求与响应任务前的最小工具卡：接口输入、处理结果和响应字段要有明确对应",
+      "task_ids": [
+        "web-api-observe",
+        "web-api-transfer"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f5"
+      ],
+      "when_to_use": "看到请求与响应相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是请求与响应。",
+        "按卡片中的一个动作检查缺少字段与空白字段。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释请求与响应。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "web-api-kit2",
+      "title": "路由与参数基础补给",
+      "kind": "路由识别",
+      "content": "这是开始路由与参数任务前的最小工具卡：路径参数和查询参数在接口中承担不同输入角色",
+      "task_ids": [
+        "web-api-route",
+        "web-api-docs"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2",
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2",
+        "web-api-f4"
+      ],
+      "when_to_use": "看到路由与参数相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是路由与参数。",
+        "按卡片中的一个动作检查路径缺失与查询可选。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释路由与参数。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "web-api-kit3",
+      "title": "输入校验基础补给",
+      "kind": "Python 字符串",
+      "content": "这是开始输入校验任务前的最小工具卡：校验要在业务处理前拦住不满足契约的输入",
+      "task_ids": [
+        "web-api-validate",
+        "web-api-boundary"
+      ],
+      "learning_unit_ids": [
+        "web-api-u3",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f3",
+        "web-api-f5"
+      ],
+      "when_to_use": "看到输入校验相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是输入校验。",
+        "按卡片中的一个动作检查空值、空白、有效值。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释输入校验。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "web-api-kit4",
+      "title": "可观察调试基础补给",
+      "kind": "调试记录",
+      "content": "这是开始可观察调试任务前的最小工具卡：调试要比较预期响应和实际响应，而不是盲目改代码",
+      "task_ids": [
+        "web-api-debug",
+        "web-api-docs"
+      ],
+      "learning_unit_ids": [
+        "web-api-u2",
+        "web-api-u4"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f2",
+        "web-api-f4"
+      ],
+      "when_to_use": "看到可观察调试相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是可观察调试。",
+        "按卡片中的一个动作检查状态与字段分别核对。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释可观察调试。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "web-api-kit5",
+      "title": "接口场景验收基础补给",
+      "kind": "场景清单",
+      "content": "这是开始接口场景验收任务前的最小工具卡：接口验收要覆盖正常、边界和错误输入",
+      "task_ids": [
+        "web-api-scenario",
+        "web-api-boundary",
+        "web-api-transfer"
+      ],
+      "learning_unit_ids": [
+        "web-api-u1",
+        "web-api-u3",
+        "web-api-u5"
+      ],
+      "canonical_fact_ids": [
+        "web-api-f1",
+        "web-api-f3",
+        "web-api-f5"
+      ],
+      "when_to_use": "看到接口场景验收相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是接口场景验收。",
+        "按卡片中的一个动作检查正常与边界响应。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释接口场景验收。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "带领学生用Python Web 接口基础的理论完成一条可观察实践闭环。",
+    "theory_bridge": "每次巡视先让学生指出 source 理论事实，再看操作证据；不要用教师答案替代学生判断。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "理论回看与第一个可观察判断"
+      },
+      {
+        "minutes": 30,
+        "focus": "core 前半段：小步操作和即时核对"
+      },
+      {
+        "minutes": 24,
+        "focus": "core 后半段：完成、运行或诊断"
+      },
+      {
+        "minutes": 20,
+        "focus": "差异化路径和连续互动"
+      },
+      {
+        "minutes": 8,
+        "focus": "解释性收束与个别抽查"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "web-api-observe",
+        "look_for": "检查学生是否真的完成“读懂一条请求的证据”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述从请求样例中标出输入、处理动作和响应字段。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-route",
+        "look_for": "检查学生是否真的完成“把参数放回路由契约”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述依据接口契约卡修改参数位置表。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-validate",
+        "look_for": "检查学生是否真的完成“补齐输入校验 starter”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述在完整 Python 函数框架中补三个会改变响应语义的 TODO。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-debug",
+        "look_for": "检查学生是否真的完成“诊断响应字段缺失”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述根据现象卡找出响应不完整的最小原因。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-scenario",
+        "look_for": "检查学生是否真的完成“设计三条接口验收场景”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为同一接口安排正常、边界和缺失输入三类场景。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-docs",
+        "look_for": "检查学生是否真的完成“比较两种参数设计”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述比较路径参数与查询参数在接口可读性上的取舍。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-boundary",
+        "look_for": "检查学生是否真的完成“扩展边界检查表”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为接口增加长度、空白和类型边界。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "web-api-transfer",
+        "look_for": "检查学生是否真的完成“为新资源写接口契约”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述把同样的校验思路迁移到课程资源查询接口。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "学生直接改结果而不记录条件",
+        "intervention": "让学生回到理论页，写出输入、动作和预期后再做一次最小变化。"
+      },
+      {
+        "symptom": "学生把一次偶然成功当成规则",
+        "intervention": "要求换一个边界或反例，说明规则是否仍成立。"
+      },
+      {
+        "symptom": "学生卡在工具操作而非本课知识",
+        "intervention": "先打开对应 foundation-kit，完成自检后再回到 core task。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱时只要求完成所有 core 的第一验收点，并把 optional 改为教师示范。",
+      "进度较快时要求比较两个条件或处理 challenge，但不打断基础学生路径。",
+      "课堂时间不足时保留理论关联、一个可观察结果和一次解释性抽查。"
+    ],
+    "closing_checks": [
+      "随机请学生解释一个结果背后的理论事实。",
+      "检查每个 core 是否至少留下一个可复核结果。",
+      "确认学生知道下次卡住时打开哪份资料。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "web-api-observe",
+        "title": "读懂一条请求的证据",
+        "source_slide_ids": [
+          "web-api-s1"
+        ],
+        "learning_unit_ids": [
+          "web-api-u1"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f1"
+        ],
+        "reference_answer": "完成读懂一条请求的证据：写出输入—动作—响应三段关系；指出一个边界字段。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "标记方法、路径、字段和值。",
+          "把响应字段连回处理动作。",
+          "用一句话说明输入变化会影响哪个输出。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "写出输入—动作—响应三段关系",
+          "指出一个边界字段"
+        ]
+      },
+      {
+        "task_id": "web-api-route",
+        "title": "把参数放回路由契约",
+        "source_slide_ids": [
+          "web-api-s2"
+        ],
+        "learning_unit_ids": [
+          "web-api-u2"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f2"
+        ],
+        "reference_answer": "完成把参数放回路由契约：完成参数位置表；解释一个放错参数的后果。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "比较路径参数和查询参数的语义。",
+          "将三个输入放入对应槽位。",
+          "写出一个放错位置会造成的现象。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成参数位置表",
+          "解释一个放错参数的后果"
+        ]
+      },
+      {
+        "task_id": "web-api-validate",
+        "title": "补齐输入校验 starter",
+        "source_slide_ids": [
+          "web-api-s3"
+        ],
+        "learning_unit_ids": [
+          "web-api-u3"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f3"
+        ],
+        "reference_answer": "def normalize_request(request):\n    status = \"accepted\"  # TODO 1\n    if not request.get(\"name\") or not request.get(\"name\").strip():  # TODO 2\n        status = \"invalid\"\n    return {\"status\": status, \"name\": request.get(\"name\", \"guest\"), \"normalized\": True}  # TODO 3\n",
+        "reference_result": "有效输入返回 accepted 和 normalized=true；空白输入返回 invalid。",
+        "key_steps": [
+          "完成 TODO 1 后解释成功状态的契约。",
+          "完成 TODO 2，分别测试有效、空白和缺失姓名。",
+          "完成 TODO 3 并检查返回字段是否完整。",
+          "运行编译检查并口头解释三个 TODO 的作用。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三个 TODO 都有真实改动",
+          "样例和边界输入结果可解释",
+          "能说明校验发生在业务处理前"
+        ]
+      },
+      {
+        "task_id": "web-api-debug",
+        "title": "诊断响应字段缺失",
+        "source_slide_ids": [
+          "web-api-s4"
+        ],
+        "learning_unit_ids": [
+          "web-api-u4"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f4"
+        ],
+        "reference_answer": "完成诊断响应字段缺失：指出最早差异；给出一个最小修复和回归检查。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "逐项比较预期与实际响应。",
+          "回到校验和返回结构，排除无关修改。",
+          "增加一条能暴露同类问题的检查。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "指出最早差异",
+          "给出一个最小修复和回归检查"
+        ]
+      },
+      {
+        "task_id": "web-api-scenario",
+        "title": "设计三条接口验收场景",
+        "source_slide_ids": [
+          "web-api-s5"
+        ],
+        "learning_unit_ids": [
+          "web-api-u5"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f5"
+        ],
+        "reference_answer": "完成设计三条接口验收场景：三类场景均有输入和预期；至少一条边界能区分错误实现。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "填入有效姓名并写预期字段。",
+          "填入空白姓名并写预期状态。",
+          "与同伴互换场景表并找一个遗漏。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三类场景均有输入和预期",
+          "至少一条边界能区分错误实现"
+        ]
+      },
+      {
+        "task_id": "web-api-docs",
+        "title": "比较两种参数设计",
+        "source_slide_ids": [
+          "web-api-s2",
+          "web-api-s4"
+        ],
+        "learning_unit_ids": [
+          "web-api-u2",
+          "web-api-u4"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f2",
+          "web-api-f4"
+        ],
+        "reference_answer": "完成比较两种参数设计：完成两方案比较；能为选择给出依据。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "标出两种方案的输入差别。",
+          "比较缓存、可读性和错误提示。",
+          "为当前场景选择方案并解释。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成两方案比较",
+          "能为选择给出依据"
+        ]
+      },
+      {
+        "task_id": "web-api-boundary",
+        "title": "扩展边界检查表",
+        "source_slide_ids": [
+          "web-api-s3",
+          "web-api-s5"
+        ],
+        "learning_unit_ids": [
+          "web-api-u3",
+          "web-api-u5"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f3",
+          "web-api-f5"
+        ],
+        "reference_answer": "完成扩展边界检查表：新增至少两个边界；边界能回连到代码或理论。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "按字段类型补充边界。",
+          "按风险排列测试顺序。",
+          "指出哪些边界由 TODO 2 覆盖。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "新增至少两个边界",
+          "边界能回连到代码或理论"
+        ]
+      },
+      {
+        "task_id": "web-api-transfer",
+        "title": "为新资源写接口契约",
+        "source_slide_ids": [
+          "web-api-s1",
+          "web-api-s5"
+        ],
+        "learning_unit_ids": [
+          "web-api-u1",
+          "web-api-u5"
+        ],
+        "canonical_fact_ids": [
+          "web-api-f1",
+          "web-api-f5"
+        ],
+        "reference_answer": "完成为新资源写接口契约：完成一个可读契约；包含正常与边界场景。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "区分路径、查询和响应字段。",
+          "写一个空结果和一个无效条件。",
+          "向同伴说明契约如何支持回归。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成一个可读契约",
+          "包含正常与边界场景"
+        ]
+      }
+    ]
+  },
+  "starter_assets": [
+    {
+      "id": "web-api-request-checker",
+      "path": "request_checker.py",
+      "language": "Python",
+      "content": "def normalize_request(request):\n    status = \"valid\"  # TODO 1\n    if not request.get(\"name\"):  # TODO 2\n        status = \"invalid\"\n    return {\"status\": status, \"name\": request.get(\"name\", \"guest\")}  # TODO 3\n",
+      "editable_gaps": [
+        {
+          "marker": "status = \"valid\"  # TODO 1",
+          "target": "status = \"valid\"  # TODO 1",
+          "replacement": "status = \"accepted\"  # TODO 1",
+          "student_instruction": "把成功状态改成接口约定的 accepted。",
+          "kind": "logic"
+        },
+        {
+          "marker": "if not request.get(\"name\"):  # TODO 2",
+          "target": "if not request.get(\"name\"):  # TODO 2",
+          "replacement": "if not request.get(\"name\") or not request.get(\"name\").strip():  # TODO 2",
+          "student_instruction": "补上只有空白字符时也应拒绝的条件。",
+          "kind": "logic"
+        },
+        {
+          "marker": "return {\"status\": status, \"name\": request.get(\"name\", \"guest\")}  # TODO 3",
+          "target": "return {\"status\": status, \"name\": request.get(\"name\", \"guest\")}  # TODO 3",
+          "replacement": "return {\"status\": status, \"name\": request.get(\"name\", \"guest\"), \"normalized\": True}  # TODO 3",
+          "student_instruction": "在响应中加入已完成规范化的布尔标记。",
+          "kind": "response"
+        }
+      ],
+      "task_id": "web-api-validate"
+    }
+  ]
+}
