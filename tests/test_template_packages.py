@@ -182,7 +182,11 @@ def run_script(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     command_args = list(args)
-    if script.name in {"generate_lesson_plans.py", "validate_output.py"} and "--legacy" not in command_args:
+    if (
+        script.resolve().is_relative_to(LESSON.resolve())
+        and script.name in {"generate_lesson_plans.py", "validate_output.py"}
+        and "--legacy" not in command_args
+    ):
         source_flag = "--tasks-json" if script.name == "generate_lesson_plans.py" else "--input-json"
         if source_flag in command_args:
             source_index = command_args.index(source_flag) + 1
