@@ -4,6 +4,30 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## Dual Teaching Skills Generalization 1.0 — 2026-09-09
+
+### Added
+
+- 完成 Courseware HTML Generator 1.2.1 与 Practice Class HTML Generator 1.2.0 的正式发布闭环。
+- 建立 Raw teaching materials → Courseware → Practice 的最终用户工作流与理论课更新后的 Practice 处理说明。
+
+### Changed
+
+- Courseware 作为理论课上游，Practice 通过 `source_slide_ids`、`learning_unit_ids`、`canonical_fact_ids` 和 `not_yet_taught` 消费已讲理论语义。
+- 两个 Skill 的正式版本和 Content Contract 版本分别记录，不把 Skill 自动化 QA 通过解释为最终教学质量通过。
+
+### Validated
+
+- PR #20 已合并至 `87dad9509c8f416c15a4eddfe14d096a666815a5`；PR #24 已合并至 `f97f0dcbb88db2c467aefabd77003d1532810a31`。
+- Courseware 1.2.1 / Contract 1.1 与 Practice 1.2.0 / Contract 1.1 的 final master smoke、browser smoke、student/teacher isolation、冻结 blind deterministic regression 和 cross-skill linkage 均通过。
+- Final human Courseware Gold / Practice review 结论保留为 PASS；自动化 QA 不替代教师最终课堂判断。
+
+### Known limitations
+
+- Courseware 更新可能改变 slide、learning unit 或 canonical fact ID；已有 Practice 应重新生成，或使用经过验证的 compatibility mapping。
+- Excel 原生界面、Wireshark、Packet Tracer 等现场工具行为仍可能需要人工 evidence。
+- Lesson / LibreOffice / Gradebook 的既有环境失败不属于本次双 Skill 引入的问题。
+
 ## 实践课 HTML 生成器 1.2.0 — 2026-09-09
 
 - 收口 Practice Class Content Contract 1.1：优先消费 Courseware Contract 1.1，保留 `source_slide_ids`、`learning_unit_ids`、`canonical_fact_ids`、`not_yet_taught` 和 `course_context` 语义边界。

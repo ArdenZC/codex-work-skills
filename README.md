@@ -5,8 +5,8 @@
 - **教案生成器 2.2.1**：批量生成、整理和校验项目化中文职业教育教案 DOCX；Lesson DOCX 只承载理论，实践工单按明确选择交付；
 - **平时成绩记分册生成器**：根据课程成绩单生成并校验平时成绩记分册 XLS。
 - **实践任务工单生成器 2.1.0**：由 Agent 将 Lesson Practice Task Contract 创作成 WorkOrder Content，再写入真实 Word 学习工单模板（Phase 2.1 Hardening）。
-- **HTML 课件生成器 1.2.1**：由 Agent 创作 Courseware Content Contract 1.1，再确定性生成理论课离线学生展示版与教师逐字稿版 HTML。
-- **实践课 HTML 生成器 1.2.0**：消费已讲理论的 Courseware Content Contract 1.1，按真实任务、理论边界和课堂能力生成可执行实践课 HTML。
+- **HTML 课件生成器 v1.2.1**：由 Agent 创作 Courseware Content Contract 1.1，再确定性生成理论课离线学生展示版与教师逐字稿版 HTML。
+- **实践课 HTML 生成器 v1.2.0**：消费已讲理论的 Courseware Content Contract 1.1，按真实任务、理论边界和课堂能力生成可执行实践课 HTML。
 
 AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本负责确定性模板写入、格式保护、事务提交和结果 QA。
 
@@ -21,14 +21,45 @@ AI / Agent 负责理解课程资料和生成结构化内容，Skill 自带脚本
 | [教案生成器](教案生成器/lesson-plan-docx-generator) | **2.2.1** | **Lesson Content Contract 2.2**（兼容 2.1/2.0） | `lesson-plan v1.1.2` | 稳定 |
 | [平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | 当前稳定版 | — | `course-gradebook v1.1.0` | 稳定 |
 | [实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **Phase 2.1 / 2.1.0** | **Practice Work Order Content 1.0** | `practice-work-order v1.0.0` | 联动候选 |
-| [HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** | **Courseware Content Contract 1.1** | `student.html` + `teacher.html` | 稳定 |
-| [实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.2.0** | **Practice Class Content Contract 1.1**（首选上游 Courseware 1.1） | student/ 与 teacher/ 隔离 HTML + JSON/Starter | 稳定 |
+| [HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **v1.2.1** | **Courseware Content Contract 1.1** | `student.html` + `teacher.html` | 稳定 |
+| [实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **v1.2.0** | **Practice Class Content Contract 1.1**（首选上游 Courseware 1.1） | student/ 与 teacher/ 隔离 HTML + JSON/Starter | 稳定 |
 
 **Skill 版本、内容合同版本和模板版本是三个不同概念。** 教案生成器已经进入 **2.2**，但默认 Word 模板仍是经过保护和兼容验证的 `lesson-plan v1.1.2`；升级 Skill 不代表必须把模板版本同步改成 2.2。
 
 完整用户可见更新见 [CHANGELOG.md](CHANGELOG.md)。
 
 双 Skill 的直接流程是 **Raw materials → Courseware → Practice**：Courseware 负责理论课讲授与教师备课，Practice 只在已讲理论边界内组织实践任务。自动化 QA 通过不等于教学内容天然完美，真实教师审核仍是内容质量的最终边界。
+
+## 双 Skill 用户流程
+
+### 理论课
+
+- 输入：课程资料、课时和学生层次；也可以直接提供已经确认的 Courseware Content Contract 1.1。
+- 使用：HTML 课件生成器。
+- 输出：`student.html` 和 `teacher.html`。
+- Courseware 是理论课上游；它保存可供实践课消费的 stable slide、learning unit、canonical fact 和课程上下文。
+
+### 实践课
+
+- 输入：已经生成并确认的 Courseware Content Contract 1.1，加上课程环境、工具和任务约束。
+- 使用：实践课 HTML 生成器。
+- 输出：隔离的 `student-package/` 和 `teacher-package/`，以及可直接使用的实践课 HTML、starter 与参考资产。
+- Practice 依赖 Courseware 的理论语义，不应脱离已讲理论自行扩展学生任务。
+
+### Fresh Flow 与 Update Flow
+
+Fresh Flow：
+
+```text
+Raw teaching materials → Courseware → Practice
+```
+
+如果只重新生成 Courseware，而已有 Practice 仍要复用：
+
+- 方案 A：重新生成 Practice（普通用户的推荐方案）；
+- 方案 B：使用 compatibility mapping，并验证 `slide`、`learning unit`、`canonical fact` 的对应关系。
+
+不要让普通用户手工维护复杂 ID。Courseware 的理论语义发生变化时，重新生成 Practice 是最可靠的更新路径。
 
 Lesson Acceptance V2 的本地验收、报告和人工复核协议见 [docs/lesson-acceptance.md](docs/lesson-acceptance.md)。
 
@@ -317,6 +348,8 @@ course-gradebook-*.zip
 ```
 
 是**版本化模板包**，不是完整 Skill 安装包。完整 Skill 仍从仓库 `master` 安装。模板 Release 主要用于模板包的验证、分发、升级和回滚。
+
+Courseware 和 Practice 是从仓库 `master` 安装的 Skill；本次 Generalization 1.0 使用独立的 annotated SemVer tags 标识两个 Skill，不创建 GitHub Release，因为仓库现有 Release convention 专用于模板 ZIP。
 
 ## 多 Agent 与模型支持
 
