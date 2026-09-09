@@ -702,14 +702,21 @@ def _manifest_artifact_path(output_dir: Path, relative_path: Any) -> Path | None
     return candidate if _is_within(candidate, output_dir) else None
 
 
+def _retained_pdf_page_count(path: Path) -> int:
+    """Count pages from the retained final PDF, never from a transient report."""
+
+    return len(re.findall(rb"/Type\s*/Page(?:\s|/|>)", path.read_bytes()))
+
+
 def _artifact_manifest_gate(
     data: Mapping[str, Any],
     qa_report: Mapping[str, Any],
     output_inventory: Mapping[str, Any],
     output_dir: Path,
     manifest: Mapping[str, Any] | None,
+    source_json_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Verify that report page evidence names the files actually delivered."""
+    """Verify the final disk artifacts and the complete source/evidence chain."""
 
     errors: list[str] = []
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
@@ -718,23 +725,64 @@ def _artifact_manifest_gate(
     if not isinstance(manifest, Mapping):
         errors.append("artifact-manifest.json is missing")
         records = []
-    if isinstance(manifest, Mapping) and not str(manifest.get("run_id", "")).strip():
-        errors.append("manifest run_id is missing")
-    expected_hours = _number(data.get("total_hours"))
+    required_fields = {
+        "run_id",
+        "course_name",
+        "major",
+        "lesson_hours",
+        "source_json_path",
+        "source_json_sha256",
+        "final_docx_path",
+        "final_docx_sha256",
+        "final_pdf_path",
+        "final_pdf_sha256",
+        "actual_pdf_page_count",
+        "qa_status",
+        "render_status",
+        "created_at",
+    }
     if isinstance(manifest, Mapping):
-        if manifest.get("course") != data.get("course_name"):
-            errors.append("manifest course does not match input")
+        if str(manifest.get("manifest_version", "")) != "2.0":
+            errors.append("manifest_version must be 2.0")
+        missing_fields = sorted(field for field in required_fields if field not in manifest)
+        if missing_fields:
+            errors.append("manifest is missing required fields: " + ", ".join(missing_fields))
+        if not str(manifest.get("run_id", "")).strip():
+            errors.append("manifest run_id is missing")
+        if not str(manifest.get("created_at", "")).strip():
+            errors.append("manifest created_at is missing")
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
+    expected_hours = _number(plan.get("theory_hours")) if str(data.get("content_contract_version")) == "2.2" else _number(data.get("total_hours"))
+    if isinstance(manifest, Mapping):
+        if manifest.get("course_name") != data.get("course_name"):
+            errors.append("manifest course_name does not match input")
         if manifest.get("major") != data.get("major"):
             errors.append("manifest major does not match input")
-        manifest_hours = _number(manifest.get("hours"))
+        manifest_hours = _number(manifest.get("lesson_hours"))
         if manifest_hours is None or expected_hours is None or not math.isclose(manifest_hours, expected_hours, abs_tol=0.01):
-            errors.append("manifest hours do not match input")
+            errors.append("manifest lesson_hours do not match input theory hours")
         if manifest.get("qa_status") != qa_report.get("status"):
             errors.append("manifest qa_status does not match QA report")
         if manifest.get("render_status") != render.get("status"):
             errors.append("manifest render_status does not match QA report")
         if qa_report.get("artifact_manifest") != "artifact-manifest.json":
             errors.append("QA report does not point to artifact-manifest.json")
+        reference_evidence_path = _manifest_artifact_path(output_dir, manifest.get("reference_evidence_path"))
+        if reference_evidence_path is None or not reference_evidence_path.is_file():
+            errors.append("manifest reference_evidence_path is not an accessible retained file")
+        elif manifest.get("reference_evidence_sha256") and _sha256_file(reference_evidence_path) != str(manifest.get("reference_evidence_sha256")).upper():
+            errors.append("manifest reference_evidence_sha256 mismatch")
+        source_value = manifest.get("source_json_path")
+        if not isinstance(source_value, str) or not source_value.strip():
+            errors.append("manifest source_json_path is missing")
+        else:
+            manifest_source = Path(source_value).resolve()
+            if not manifest_source.is_file():
+                errors.append("manifest source_json_path is not an accessible file")
+            elif _sha256_file(manifest_source) != str(manifest.get("source_json_sha256", "")).upper():
+                errors.append("manifest source_json_sha256 mismatch")
+            if source_json_path is not None and manifest_source != source_json_path.resolve():
+                errors.append("manifest source_json_path does not match the acceptance input JSON")
     if not isinstance(records, list) or len(records) != len(lessons):
         errors.append(f"manifest artifacts must contain exactly {len(lessons)} lesson records")
         records = records if isinstance(records, list) else []
@@ -744,22 +792,32 @@ def _artifact_manifest_gate(
         if not isinstance(record, Mapping):
             errors.append(f"manifest artifacts[{index}] is not an object")
             continue
-        docx_path = _manifest_artifact_path(output_dir, record.get("docx_path"))
-        pdf_path = _manifest_artifact_path(output_dir, record.get("rendered_pdf_path")) if record.get("rendered_pdf_path") else None
+        docx_path = _manifest_artifact_path(output_dir, record.get("final_docx_path"))
+        pdf_path = _manifest_artifact_path(output_dir, record.get("final_pdf_path"))
         if docx_path is None or not docx_path.is_file():
-            errors.append(f"manifest artifacts[{index}] docx_path is not an accessible file")
-        elif _sha256_file(docx_path) != str(record.get("docx_sha256", "")).upper():
-            errors.append(f"manifest artifacts[{index}] docx_sha256 mismatch")
-        page_count = _number(record.get("actual_page_count"))
+            errors.append(f"manifest artifacts[{index}] final_docx_path is not an accessible file")
+        elif _sha256_file(docx_path) != str(record.get("final_docx_sha256", "")).upper():
+            errors.append(f"manifest artifacts[{index}] final_docx_sha256 mismatch")
+        page_count = _number(record.get("actual_pdf_page_count"))
         if page_count is None or page_count < 1:
-            errors.append(f"manifest artifacts[{index}] actual_page_count is not positive")
+            errors.append(f"manifest artifacts[{index}] actual_pdf_page_count is not positive")
         else:
             manifest_page_total += int(page_count)
         if pdf_path is None or not pdf_path.is_file():
-            errors.append(f"manifest artifacts[{index}] rendered_pdf_path is not an accessible file")
-        elif _sha256_file(pdf_path) != str(record.get("rendered_pdf_sha256", "")).upper():
-            errors.append(f"manifest artifacts[{index}] rendered_pdf_sha256 mismatch")
-        docx_name = str(record.get("docx_path", ""))
+            errors.append(f"manifest artifacts[{index}] final_pdf_path is not an accessible file")
+        else:
+            if _sha256_file(pdf_path) != str(record.get("final_pdf_sha256", "")).upper():
+                errors.append(f"manifest artifacts[{index}] final_pdf_sha256 mismatch")
+            try:
+                actual_page_count = _retained_pdf_page_count(pdf_path)
+            except OSError as exc:
+                errors.append(f"manifest artifacts[{index}] retained PDF could not be read: {exc}")
+            else:
+                if page_count is not None and actual_page_count != int(page_count):
+                    errors.append(
+                        f"manifest artifacts[{index}] actual PDF page count mismatch: declared={int(page_count)}, actual={actual_page_count}"
+                    )
+        docx_name = str(record.get("final_docx_path", ""))
         qa_count = qa_page_counts.get(docx_name) if isinstance(qa_page_counts, Mapping) else None
         if qa_count is None and docx_path is not None:
             qa_count = qa_page_counts.get(docx_path.name) if isinstance(qa_page_counts, Mapping) else None
@@ -768,15 +826,22 @@ def _artifact_manifest_gate(
         elif page_count is not None and not math.isclose(page_count, _number(qa_count) or 0, abs_tol=0.01):
             errors.append(f"manifest artifacts[{index}] page count disagrees with QA report")
     if isinstance(manifest, Mapping):
-        manifest_total = _number(manifest.get("actual_page_count"))
+        manifest_total = _number(manifest.get("actual_pdf_page_count"))
         if manifest_total is None or not math.isclose(manifest_total, manifest_page_total, abs_tol=0.01):
-            errors.append("manifest actual_page_count does not equal artifact page-count sum")
+            errors.append("manifest actual_pdf_page_count does not equal artifact page-count sum")
         if len(records) == 1 and isinstance(records[0], Mapping):
             record = records[0]
-            if manifest.get("docx_sha256") != record.get("docx_sha256"):
-                errors.append("manifest docx_sha256 does not match its artifact record")
-            if manifest.get("rendered_pdf_sha256") != record.get("rendered_pdf_sha256"):
-                errors.append("manifest rendered_pdf_sha256 does not match its artifact record")
+            for path_field, sha_field in (
+                ("final_docx_path", "final_docx_sha256"),
+                ("final_pdf_path", "final_pdf_sha256"),
+            ):
+                if manifest.get(path_field) != record.get(path_field):
+                    errors.append(f"manifest {path_field} does not match its artifact record")
+                if manifest.get(sha_field) != record.get(sha_field):
+                    errors.append(f"manifest {sha_field} does not match its artifact record")
+        digest = manifest.get("reviewed_content_digest")
+        if isinstance(digest, Mapping) and digest.get("match") is not True:
+            errors.append("manifest reviewed_content_digest.match is not true")
     return _gate(
         "artifact_manifest",
         not errors,
@@ -784,10 +849,10 @@ def _artifact_manifest_gate(
             "path": str(output_dir / "artifact-manifest.json"),
             "run_id": manifest.get("run_id") if isinstance(manifest, Mapping) else None,
             "records": len(records),
-            "page_count": manifest.get("actual_page_count") if isinstance(manifest, Mapping) else None,
+            "page_count": manifest.get("actual_pdf_page_count") if isinstance(manifest, Mapping) else None,
             "errors": errors,
         },
-        "Manifest must map each accessible DOCX to its retained PDF, SHA-256, actual page count, QA status, and render status.",
+        "Manifest must map the source JSON and each final DOCX/PDF to SHA-256, actual retained-PDF page count, QA status, and render status.",
     )
 
 
@@ -800,6 +865,7 @@ def structural_hard_gates(
     template_version: str,
     output_dir: Path | None = None,
     artifact_manifest: Mapping[str, Any] | None = None,
+    source_json_path: Path | None = None,
 ) -> dict[str, Any]:
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     expected_count = len(lessons)
@@ -862,12 +928,56 @@ def structural_hard_gates(
             output_inventory,
             output_dir or Path(str(qa_report.get("output_dir", "."))),
             artifact_manifest,
+            source_json_path,
         )
         if version == "2.2"
         else _not_applicable_gate(
             "artifact_manifest",
             {"content_contract_version": version},
             "Artifact manifests are required for Content Contract 2.2 smoke/final reports.",
+        )
+    )
+    expected_profile = {
+        field_name: data.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    }
+    confirmed_info = data.get("confirmed_course_info") if isinstance(data.get("confirmed_course_info"), Mapping) else {}
+    observed_profile = qa_report.get("course_profile") if isinstance(qa_report.get("course_profile"), Mapping) else {}
+    profile_records = observed_profile.get("docx") if isinstance(observed_profile.get("docx"), list) else []
+    profile_errors: list[str] = []
+    if observed_profile.get("exact_match") is not True:
+        profile_errors.append("QA course_profile.exact_match is not true")
+    if observed_profile.get("confirmed_course_info") != {
+        field_name: confirmed_info.get(field_name) if confirmed_info else data.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    }:
+        profile_errors.append("QA course_profile.confirmed_course_info does not match the input snapshot")
+    if len(profile_records) != len(lessons):
+        profile_errors.append("QA course_profile does not contain one DOCX profile for every lesson")
+    for index, item in enumerate(profile_records):
+        if not isinstance(item, Mapping):
+            profile_errors.append(f"QA course_profile.docx[{index}] is not an object")
+            continue
+        for field_name, expected_value in expected_profile.items():
+            if item.get(field_name) != expected_value:
+                profile_errors.append(f"QA course_profile.docx[{index}].{field_name} does not match input")
+    course_profile_gate = (
+        _gate(
+            "course_profile",
+            not profile_errors,
+            {
+                "expected": expected_profile,
+                "confirmed_course_info": confirmed_info,
+                "observed": observed_profile,
+                "errors": profile_errors,
+            },
+            "The final DOCX must independently reproduce the confirmed course, major, and audience profile.",
+        )
+        if version == "2.2"
+        else _not_applicable_gate(
+            "course_profile",
+            {"content_contract_version": version},
+            "Independent confirmed-course-profile evidence is required for Content Contract 2.2.",
         )
     )
     gates = [
@@ -912,6 +1022,7 @@ def structural_hard_gates(
             {"input": contract, "qa": qa_report.get("content_contract_version"), "current": CONTENT_CONTRACT_VERSION},
             "Acceptance V2 reads Content Contract 2.0/2.1 compatibility and current Content Contract 2.2; it does not author content.",
         ),
+        course_profile_gate,
         _gate(
             "delivery_consistency",
             delivery.get("status") in {"PASS", "not_applicable"},
@@ -1085,10 +1196,10 @@ def _page_count_map(
     if isinstance(artifact_manifest, Mapping) and isinstance(artifact_manifest.get("artifacts"), list):
         values: dict[str, int] = {}
         for item in artifact_manifest["artifacts"]:
-            if not isinstance(item, Mapping) or _number(item.get("actual_page_count")) is None:
+            if not isinstance(item, Mapping) or _number(item.get("actual_pdf_page_count")) is None:
                 continue
-            count = int(item["actual_page_count"])
-            docx_path = str(item.get("docx_path", ""))
+            count = int(item["actual_pdf_page_count"])
+            docx_path = str(item.get("final_docx_path", ""))
             for key in (docx_path, Path(docx_path).name):
                 if key:
                     values[key] = count
@@ -1422,6 +1533,7 @@ def build_acceptance_report(
         template_version=template_version,
         output_dir=output_dir,
         artifact_manifest=artifact_manifest,
+        source_json_path=input_json,
     )
     contract_version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     delivery = delivery_metrics(data)
@@ -1452,6 +1564,16 @@ def build_acceptance_report(
         "artifact_manifest_sha256": _sha256_file(output_dir / "artifact-manifest.json") if (output_dir / "artifact-manifest.json").is_file() else None,
     }
     final_status = _final_status(structural, visual, design, teacher, negative)
+    report_expected_profile = {
+        field_name: data.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    }
+    report_confirmed_info = data.get("confirmed_course_info") if isinstance(data.get("confirmed_course_info"), Mapping) else {}
+    report_profile_gate = next(
+        (gate for gate in structural.get("gates", []) if isinstance(gate, Mapping) and gate.get("name") == "course_profile"),
+        {},
+    )
+    report_observed_profile = qa_report.get("course_profile") if isinstance(qa_report.get("course_profile"), Mapping) else {}
     report = {
         "acceptance_schema_version": ACCEPTANCE_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -1478,6 +1600,14 @@ def build_acceptance_report(
             "sha256": metadata["artifact_manifest_sha256"],
             "data": _json_safe(artifact_manifest),
         },
+        "course_profile": _json_safe(
+            {
+                "expected": report_expected_profile,
+                "confirmed_course_info": report_confirmed_info,
+                "qa_evidence": report_observed_profile,
+                "status": report_profile_gate.get("status", "FAIL"),
+            }
+        ),
         "output_inventory": inventory,
         "structural_hard_gates": structural,
         "content_quality_evidence": content_quality_evidence(qa_report),
@@ -1519,6 +1649,9 @@ def build_acceptance_report(
 def acceptance_markdown(report: Mapping[str, Any]) -> str:
     metadata = report.get("metadata", {})
     structural = report.get("structural_hard_gates", {})
+    course_profile = report.get("course_profile", {})
+    artifact_manifest = report.get("artifact_manifest", {})
+    artifact_data = artifact_manifest.get("data", {}) if isinstance(artifact_manifest, Mapping) else {}
     sequence = report.get("sequence_review", {})
     quality = report.get("content_quality_evidence", {})
     lines = [
@@ -1544,6 +1677,22 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
         lines.append(f"- `{gate.get('status')}` {gate.get('name')}: {gate.get('details')}")
     lines.extend(
         [
+            "",
+            "## Confirmed course profile evidence",
+            "",
+            f"- Status: **{course_profile.get('status')}**; expected: `{json.dumps(course_profile.get('expected', {}), ensure_ascii=False, sort_keys=True)}`",
+            f"- Evidence: `{json.dumps((course_profile.get('qa_evidence') or {}).get('docx', []), ensure_ascii=False, sort_keys=True)}`",
+            "- Profile values are read from every final DOCX semantic field after generation; this is an independent smoke profile check.",
+            "",
+            "## Final artifact chain",
+            "",
+            f"- Source JSON: `{artifact_data.get('source_json_path')}` / `{artifact_data.get('source_json_sha256')}`",
+            f"- Final DOCX: `{artifact_data.get('final_docx_path')}` / `{artifact_data.get('final_docx_sha256')}`",
+            f"- Final PDF: `{artifact_data.get('final_pdf_path')}` / `{artifact_data.get('final_pdf_sha256')}`",
+            f"- Retained final PDF pages: `{artifact_data.get('actual_pdf_page_count')}`; QA: `{artifact_data.get('qa_status')}`; render: `{artifact_data.get('render_status')}`",
+            f"- Reference evidence: `{artifact_data.get('reference_evidence_path')}` / `{artifact_data.get('reference_evidence_sha256')}`",
+            "- Page count and hashes are read from the retained final files; this report does not handwrite them.",
+            "",
             "",
             "## Existing Content QA evidence",
             "",

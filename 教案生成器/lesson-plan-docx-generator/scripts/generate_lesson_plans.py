@@ -22,10 +22,40 @@ from docx.text.paragraph import Paragraph
 from docx.table import _Cell
 
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
-from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
+from content_contract import (
+    format_evaluation_values,
+    format_implementation,
+    format_reflection,
+    lesson_content_field_values,
+    lesson_filename,
+    lesson_header_values,
+    format_title,
+    reference_canonical_identity,
+    reference_source_binding_errors,
+)
 from content_quality import ContentQualityError, validate_content_quality
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, apply_reviewed_lesson_content, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input, validate_test_fixture_content_v2_input
+from package_common import (
+    DEFAULT_MANIFEST,
+    DEFAULT_SCHEMA,
+    apply_reviewed_lesson_content,
+    canonical_json_sha256,
+    content_digest_rollup,
+    ensure_supported_major,
+    field_bookmark,
+    field_spec,
+    implementation_bookmarks,
+    is_semantic_manifest,
+    lesson_agent_content,
+    load_manifest,
+    manifest_template_path,
+    reflection_bookmarks,
+    resolve_template_package,
+    score_breakdown,
+    validate_content_v2_input,
+    validate_test_fixture_content_v2_input,
+)
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
+from render_qa import pdf_page_count
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
@@ -304,25 +334,95 @@ def _relative_posix(path: Path, root: Path) -> str:
 
 def _stable_render_artifacts(report: dict[str, Any], candidate: Path) -> list[dict[str, Any]]:
     render = report.get("render") if isinstance(report.get("render"), dict) else {}
-    page_counts = render.get("page_counts") if isinstance(render.get("page_counts"), dict) else {}
     raw_pdf_files = render.get("pdf_files") if isinstance(render.get("pdf_files"), dict) else {}
     artifacts: list[dict[str, Any]] = []
-    for docx_name in sorted(page_counts):
+    final_page_counts: dict[str, int] = {}
+    for docx_name in sorted(raw_pdf_files):
         raw_pdf = raw_pdf_files.get(docx_name)
         pdf_path = Path(raw_pdf).resolve() if raw_pdf else None
         if pdf_path is None or not pdf_path.is_file():
             continue
+        actual_page_count = pdf_page_count(pdf_path)
+        if actual_page_count <= 0:
+            continue
+        final_page_counts[docx_name] = actual_page_count
         artifacts.append(
             {
                 "docx_path": docx_name,
-                "rendered_pdf_path": _relative_posix(pdf_path, candidate),
-                "actual_page_count": int(page_counts[docx_name]),
+                "final_pdf_path": _relative_posix(pdf_path, candidate),
+                "actual_pdf_page_count": actual_page_count,
             }
         )
+    render["page_counts"] = final_page_counts
+    render["page_count"] = sum(final_page_counts.values())
     render["pdf_artifacts"] = artifacts
     render.pop("pdf_files", None)
     report["render"] = render
     return artifacts
+
+
+def _reviewed_content_digest(meta: dict[str, Any]) -> str:
+    return content_digest_rollup(
+        [canonical_json_sha256(lesson_agent_content(lesson)) for lesson in meta.get("lessons", [])]
+    )
+
+
+def _reference_evidence_payload(meta: dict[str, Any], source_path: Path, run_id: str) -> dict[str, Any]:
+    research = meta.get("reference_research") if isinstance(meta.get("reference_research"), dict) else {}
+    sources = research.get("sources", []) if isinstance(research, dict) else []
+    source_by_id = {
+        str(source.get("reference_id")): source
+        for source in sources
+        if isinstance(source, dict) and source.get("reference_id")
+    }
+    references: list[dict[str, Any]] = []
+    for reference in meta.get("reference_pool", []):
+        if not isinstance(reference, dict):
+            continue
+        reference_id = str(reference.get("reference_id"))
+        source = source_by_id.get(reference_id)
+        binding_errors = (
+            []
+            if reference.get("source_kind") != "verified_public"
+            else (
+                ["research source is missing"]
+                if source is None
+                else reference_source_binding_errors(reference, source, f"reference_research.sources[{reference_id}]")
+            )
+        )
+        references.append(
+            {
+                "reference_id": reference_id,
+                "source_kind": reference.get("source_kind"),
+                "canonical_identity": reference_canonical_identity(reference),
+                "research_evidence": (
+                    {
+                        key: source.get(key)
+                        for key in (
+                            "reference_id",
+                            "source_url",
+                            "source_title",
+                            "source_author_or_organization",
+                            "source_year",
+                            "source_identifier",
+                            "authoritative_source",
+                        )
+                    }
+                    if isinstance(source, dict)
+                    else None
+                ),
+                "binding_status": "not_applicable" if reference.get("source_kind") != "verified_public" else ("passed" if not binding_errors else "failed"),
+                "binding_errors": binding_errors,
+            }
+        )
+    return {
+        "evidence_version": "1.0",
+        "run_id": run_id,
+        "course_name": meta.get("course_name"),
+        "major": meta.get("major"),
+        "source_json_path": str(source_path.resolve()),
+        "references": references,
+    }
 
 
 def _build_artifact_manifest(
@@ -331,6 +431,8 @@ def _build_artifact_manifest(
     report: dict[str, Any],
     generated_filenames: list[str],
     run_id: str,
+    source_path: Path,
+    created_at: str,
 ) -> dict[str, Any]:
     render_artifacts = {
         item["docx_path"]: item
@@ -341,32 +443,153 @@ def _build_artifact_manifest(
     for lesson, filename in zip(meta.get("lessons", []), generated_filenames):
         docx_path = candidate / filename
         render_item = render_artifacts.get(filename, {})
-        pdf_path = candidate / str(render_item["rendered_pdf_path"]) if render_item.get("rendered_pdf_path") else None
+        pdf_path = candidate / str(render_item["final_pdf_path"]) if render_item.get("final_pdf_path") else None
         records.append(
             {
                 "lesson_id": lesson.get("lesson_id"),
-                "docx_path": _relative_posix(docx_path, candidate),
-                "docx_sha256": _file_sha256(docx_path),
-                "rendered_pdf_path": render_item.get("rendered_pdf_path"),
-                "rendered_pdf_sha256": _file_sha256(pdf_path) if pdf_path is not None and pdf_path.is_file() else None,
-                "actual_page_count": render_item.get("actual_page_count"),
+                "lesson_hours": lesson.get("hours"),
+                "final_docx_path": _relative_posix(docx_path, candidate),
+                "final_docx_sha256": _file_sha256(docx_path),
+                "final_pdf_path": render_item.get("final_pdf_path"),
+                "final_pdf_sha256": _file_sha256(pdf_path) if pdf_path is not None and pdf_path.is_file() else None,
+                "actual_pdf_page_count": render_item.get("actual_pdf_page_count"),
             }
         )
-    page_counts = [record["actual_page_count"] for record in records if isinstance(record.get("actual_page_count"), int)]
+    page_counts = [
+        record["actual_pdf_page_count"]
+        for record in records
+        if isinstance(record.get("actual_pdf_page_count"), int)
+    ]
+    lesson_hours = sum(float(lesson.get("hours", 0)) for lesson in meta.get("lessons", []))
+    if lesson_hours.is_integer():
+        lesson_hours = int(lesson_hours)
+    is_v22 = meta.get("content_contract_version") == "2.2"
+    source_final_content_sha256 = str((meta.get("authoring_provenance") or {}).get("final_content_sha256", "")).upper()
+    packaged_content_sha256 = _reviewed_content_digest(meta) if is_v22 else None
+    reference_evidence_path = candidate / "reference-evidence.json"
     return {
-        "manifest_version": "1.0",
+        "manifest_version": "2.0",
         "run_id": run_id,
-        "course": meta.get("course_name"),
+        "course_name": meta.get("course_name"),
         "major": meta.get("major"),
-        "hours": meta.get("total_hours"),
-        "docx_sha256": records[0]["docx_sha256"] if len(records) == 1 else None,
-        "rendered_pdf_sha256": records[0]["rendered_pdf_sha256"] if len(records) == 1 else None,
-        "actual_page_count": sum(page_counts),
+        "lesson_hours": lesson_hours,
+        "source_json_path": str(source_path.resolve()),
+        "source_json_sha256": _file_sha256(source_path),
+        "final_docx_path": records[0]["final_docx_path"] if len(records) == 1 else None,
+        "final_docx_sha256": records[0]["final_docx_sha256"] if len(records) == 1 else None,
+        "final_pdf_path": records[0]["final_pdf_path"] if len(records) == 1 else None,
+        "final_pdf_sha256": records[0]["final_pdf_sha256"] if len(records) == 1 else None,
+        "actual_pdf_page_count": sum(page_counts),
         "qa_status": report.get("status"),
         "render_status": (report.get("render") or {}).get("status") if isinstance(report.get("render"), dict) else None,
         "qa_report_path": "qa-report.json",
+        "reference_evidence_path": "reference-evidence.json",
+        "reference_evidence_sha256": _file_sha256(reference_evidence_path) if reference_evidence_path.is_file() else None,
+        "confirmed_course_info": meta.get("confirmed_course_info"),
+        "course_profile": report.get("course_profile"),
+        "reviewed_content_digest": (
+            {
+                "source_final_content_sha256": source_final_content_sha256,
+                "packaged_final_content_sha256": packaged_content_sha256,
+                "match": bool(source_final_content_sha256) and source_final_content_sha256 == packaged_content_sha256,
+            }
+            if is_v22
+            else {"status": "not_applicable"}
+        ),
+        "created_at": created_at,
         "artifacts": records,
     }
+
+
+def _artifact_relative_path(root: Path, value: Any) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    candidate = (root / Path(value)).resolve()
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError:
+        return None
+    return candidate
+
+
+def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> None:
+    """Rehash final disk artifacts and fail closed before and after commit."""
+
+    required = {
+        "run_id",
+        "course_name",
+        "major",
+        "lesson_hours",
+        "source_json_path",
+        "source_json_sha256",
+        "final_docx_path",
+        "final_docx_sha256",
+        "final_pdf_path",
+        "final_pdf_sha256",
+        "actual_pdf_page_count",
+        "qa_status",
+        "render_status",
+        "created_at",
+    }
+    missing = sorted(field for field in required if field not in manifest)
+    if missing:
+        raise RuntimeError("artifact manifest is missing required fields: " + ", ".join(missing))
+    if Path(str(manifest["source_json_path"])).resolve() != source_path.resolve():
+        raise RuntimeError("artifact manifest source_json_path does not match the source JSON")
+    if str(manifest["source_json_sha256"]).upper() != _file_sha256(source_path):
+        raise RuntimeError("artifact manifest source_json_sha256 does not match the source JSON")
+    reference_evidence = _artifact_relative_path(root, manifest.get("reference_evidence_path"))
+    if reference_evidence is None or not reference_evidence.is_file():
+        raise RuntimeError("reference-evidence.json is missing from the final artifact directory")
+    if manifest.get("reference_evidence_sha256") and str(manifest["reference_evidence_sha256"]).upper() != _file_sha256(reference_evidence):
+        raise RuntimeError("artifact manifest reference-evidence SHA-256 mismatch")
+    records = manifest.get("artifacts")
+    if not isinstance(records, list):
+        raise RuntimeError("artifact manifest artifacts must be a list")
+    require_retained_pdf = manifest.get("render_status") == "passed"
+    if not records:
+        if manifest.get("actual_pdf_page_count") != 0:
+            raise RuntimeError("artifact manifest without Lesson DOCX records must have zero PDF pages")
+        digest = manifest.get("reviewed_content_digest")
+        if isinstance(digest, dict) and "match" in digest and not digest.get("match"):
+            raise RuntimeError("packaged final content digest does not match authoring provenance")
+        return
+    page_total = 0
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            raise RuntimeError(f"artifact manifest artifacts[{index}] is not an object")
+        docx_path = _artifact_relative_path(root, record.get("final_docx_path"))
+        pdf_path = _artifact_relative_path(root, record.get("final_pdf_path"))
+        if docx_path is None or not docx_path.is_file():
+            raise RuntimeError(f"artifact manifest artifacts[{index}] final DOCX is missing")
+        if _file_sha256(docx_path) != str(record.get("final_docx_sha256", "")).upper():
+            raise RuntimeError(f"artifact manifest artifacts[{index}] final DOCX SHA-256 mismatch")
+        if not require_retained_pdf and (pdf_path is None or not pdf_path.is_file()):
+            continue
+        if pdf_path is None or not pdf_path.is_file():
+            raise RuntimeError(f"artifact manifest artifacts[{index}] final PDF is missing")
+        if _file_sha256(pdf_path) != str(record.get("final_pdf_sha256", "")).upper():
+            raise RuntimeError(f"artifact manifest artifacts[{index}] final PDF SHA-256 mismatch")
+        actual_pages = pdf_page_count(pdf_path)
+        declared_pages = record.get("actual_pdf_page_count")
+        if not isinstance(declared_pages, int) or declared_pages <= 0 or actual_pages != declared_pages:
+            raise RuntimeError(
+                f"artifact manifest artifacts[{index}] PDF page count mismatch: declared={declared_pages}, actual={actual_pages}"
+            )
+        page_total += actual_pages
+    if manifest.get("actual_pdf_page_count") != page_total:
+        raise RuntimeError("artifact manifest actual_pdf_page_count does not equal retained PDF page-count sum")
+    if len(records) == 1:
+        record = records[0]
+        for path_field, sha_field in (
+            ("final_docx_path", "final_docx_sha256"),
+            ("final_pdf_path", "final_pdf_sha256"),
+        ):
+            if manifest.get(path_field) != record.get(path_field) or manifest.get(sha_field) != record.get(sha_field):
+                raise RuntimeError(f"artifact manifest top-level {path_field}/{sha_field} does not match its record")
+    digest = manifest.get("reviewed_content_digest")
+    if isinstance(digest, dict) and "match" in digest and not digest.get("match"):
+        raise RuntimeError("packaged final content digest does not match authoring provenance")
 
 
 def _unique_backup_path(out_dir: Path) -> Path:
@@ -684,14 +907,33 @@ def main() -> None:
                 allow_test_fixture_authoring=allow_test_fixture_authoring,
             )
         _stable_render_artifacts(report, candidate)
-        manifest_data = _build_artifact_manifest(candidate, meta, report, generated_filenames, run_id)
-        manifest_path = candidate / "artifact-manifest.json"
-        manifest_path.write_text(json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        created_at = datetime.now(timezone.utc).isoformat()
+        reference_evidence_path = candidate / "reference-evidence.json"
+        reference_evidence_path.write_text(
+            json.dumps(_reference_evidence_payload(meta, source_path, run_id), ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        manifest_data = _build_artifact_manifest(
+            candidate,
+            meta,
+            report,
+            generated_filenames,
+            run_id,
+            source_path,
+            created_at,
+        )
+        artifact_manifest_path = candidate / "artifact-manifest.json"
+        artifact_manifest_path.write_text(
+            json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        _verify_artifact_manifest(candidate, manifest_data, source_path)
         final_qa = requested_qa or internal_qa
         report["output_dir"] = str(out_dir)
         report["qa_report"] = str(final_qa)
         report["run_id"] = run_id
         report["artifact_manifest"] = "artifact-manifest.json"
+        report["reference_evidence"] = "reference-evidence.json"
         report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         candidate_qa.write_text(report_text, encoding="utf-8")
         if external_qa is not None:
@@ -715,6 +957,8 @@ def main() -> None:
             )
         else:
             backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
+        committed_manifest = json.loads((out_dir / "artifact-manifest.json").read_text(encoding="utf-8"))
+        _verify_artifact_manifest(out_dir, committed_manifest, source_path)
         for filename in generated_filenames:
             print(out_dir / filename)
         if backup is not None:

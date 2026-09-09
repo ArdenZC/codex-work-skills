@@ -284,6 +284,7 @@
         "reference_type": {"type": "string", "enum": ["book", "standard", "official_manual", "official_documentation", "guideline", "paper", "formal_course_document"]},
         "authors": {"$ref": "#/$defs/citationAuthors"},
         "institution": {"type": "string", "minLength": 2, "maxLength": 160},
+        "responsible_party": {"type": "string", "minLength": 2, "maxLength": 160},
         "title": {"type": "string", "minLength": 2, "maxLength": 240},
         "edition": {"type": "string", "minLength": 1, "maxLength": 80},
         "publisher": {"type": "string", "minLength": 1, "maxLength": 160},
@@ -292,6 +293,7 @@
         "source_region": {"type": "string", "enum": ["domestic", "foreign", "unknown"]},
         "evidence": {"type": ["string", "null"], "maxLength": 800},
         "source_url": {"type": "string", "minLength": 8, "maxLength": 500},
+        "source_identifier": {"type": "string", "minLength": 2, "maxLength": 160},
         "authoritative_source": {"type": "string", "minLength": 2, "maxLength": 240}
       }
     },
@@ -373,10 +375,14 @@
     "referenceSource": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["reference_id", "source_url", "authoritative_source"],
+      "required": ["reference_id", "source_url", "source_title", "source_author_or_organization", "authoritative_source"],
       "properties": {
         "reference_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
         "source_url": {"type": "string", "pattern": "^https?://[^\\s]+$", "maxLength": 500},
+        "source_title": {"type": "string", "minLength": 2, "maxLength": 240},
+        "source_author_or_organization": {"type": "string", "minLength": 2, "maxLength": 240},
+        "source_year": {"$ref": "#/$defs/citationYear"},
+        "source_identifier": {"type": "string", "minLength": 2, "maxLength": 160},
         "authoritative_source": {"type": "string", "minLength": 2, "maxLength": 240}
       }
     },

@@ -325,6 +325,22 @@ def make_v22_payload(
                 {
                     "reference_id": reference["reference_id"],
                     "source_url": reference["source_url"],
+                    "source_title": reference["title"],
+                    "source_author_or_organization": (
+                        reference.get("publisher")
+                        or reference.get("institution")
+                        or (reference.get("authors") or [None])[0]
+                    ),
+                    **(
+                        {"source_year": reference["year"]}
+                        if reference.get("year") is not None
+                        else {}
+                    ),
+                    **(
+                        {"source_identifier": reference["source_identifier"]}
+                        if reference.get("source_identifier")
+                        else {}
+                    ),
                     "authoritative_source": reference["authoritative_source"],
                 }
                 for reference in pool
@@ -652,6 +668,36 @@ class LessonContentV22Tests(unittest.TestCase):
         empty = make_v22_payload(references=_pool())
         empty["lessons"][0]["reference_ids"] = []
         self.assert_rejected(empty, "may be empty only when reference_research.status=no_verified_external_source")
+
+    def test_verified_public_research_is_bound_to_exact_bibliographic_identity(self) -> None:
+        references = _pool()
+        references[1].update(
+            {
+                "year": 2024,
+                "source_identifier": "Python 3 Data Structures",
+            }
+        )
+        wrong_locator = make_v22_payload(references=references)
+        wrong_locator["reference_research"]["sources"][0]["source_title"] = "A different document"
+        self.assert_rejected(wrong_locator, "source_title must match the canonical reference title")
+
+        wrong_identifier = make_v22_payload(references=references)
+        wrong_identifier["reference_research"]["sources"][0]["source_url"] = (
+            "https://docs.python.org/3/tutorial/other-topic.html"
+        )
+        self.assert_rejected(wrong_identifier, "source_url must match reference_pool exactly")
+
+        missing_one_to_one = make_v22_payload(references=references)
+        missing_one_to_one["reference_research"]["sources"].append(
+            {
+                "reference_id": "REF-UNKNOWN",
+                "source_url": "https://example.org/reference",
+                "source_title": "Unknown reference",
+                "source_author_or_organization": "Unknown organization",
+                "authoritative_source": "Unknown official source",
+            }
+        )
+        self.assert_rejected(missing_one_to_one, "non-verified or unknown references")
 
     def test_book_year_is_optional_and_edition_identity_is_normalized(self) -> None:
         first = {"title": "《数据结构（第二版）》"}

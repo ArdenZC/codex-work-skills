@@ -935,6 +935,7 @@ def validate_output_dir(
     course_expected = str(data["course_name"])
     total_hours = 0.0
     lesson_checks = []
+    docx_profiles: list[dict[str, Any]] = []
     anchor_results: list[dict[str, Any]] = []
     contamination_terms: set[str] = set()
     course_metadata = {
@@ -1021,6 +1022,25 @@ def validate_output_dir(
             item_errors.append("major field mismatch")
         if field_values["audience"] != expected_audience:
             item_errors.append("audience field mismatch")
+        docx_profiles.append(
+            {
+                "lesson_id": item.get("lesson_id"),
+                "file": path.name,
+                "course_name": field_values["course_name"],
+                "major": field_values["major"],
+                "audience": field_values["audience"],
+                "expected": {
+                    "course_name": expected_course,
+                    "major": expected_major,
+                    "audience": expected_audience,
+                },
+                "exact_match": (
+                    field_values["course_name"] == expected_course
+                    and field_values["major"] == expected_major
+                    and field_values["audience"] == expected_audience
+                ),
+            }
+        )
         if field_values["unit"] != expected_headers["unit"]:
             item_errors.append("unit field mismatch")
         if field_values["task"] != expected_headers["task"]:
@@ -1226,6 +1246,27 @@ def validate_output_dir(
             "practice_hours": practice_hours,
         }
     checks["lessons"] = lesson_checks
+    confirmed = data.get("confirmed_course_info") if isinstance(data.get("confirmed_course_info"), dict) else {}
+    input_profile = {
+        field_name: data.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    }
+    confirmed_profile = {
+        field_name: confirmed.get(field_name)
+        for field_name in ("course_name", "major", "audience")
+    } if confirmed else input_profile.copy()
+    report["course_profile"] = {
+        "evidence": "semantic fields read from every final DOCX after generation",
+        "confirmed_course_info": confirmed_profile,
+        "input": input_profile,
+        "docx": docx_profiles,
+        "exact_match": (
+            confirmed_profile == input_profile
+            and (not lessons or len(docx_profiles) == len(lessons))
+            and all(item.get("exact_match") for item in docx_profiles)
+        ),
+    }
+    checks["course_profile"] = report["course_profile"]
     report["files_checked"] = len(files)
     if render and not errors:
         if not files:

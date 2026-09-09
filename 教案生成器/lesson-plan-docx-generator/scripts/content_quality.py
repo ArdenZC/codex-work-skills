@@ -29,8 +29,10 @@ from content_contract import (
     format_title,
     lesson_content_field_values,
     lesson_references,
+    reference_canonical_identity,
     reference_identity,
     reference_metadata_errors,
+    reference_source_binding_errors,
     reference_looks_like_placeholder,
     reference_looks_like_resource_only as contract_reference_looks_like_resource_only,
 )
@@ -2526,6 +2528,8 @@ def _reference_provenance_report(
     unresolved_ids: list[dict[str, Any]] = []
     placeholder_items: list[dict[str, Any]] = []
     textbook_overlap: list[dict[str, Any]] = []
+    provenance_binding_errors: list[dict[str, Any]] = []
+    source_evidence: list[dict[str, Any]] = []
     is_reference_pool_contract = bool(
         data and data.get("content_contract_version") in {"2.1", "2.2"}
     )
@@ -2542,6 +2546,60 @@ def _reference_provenance_report(
     for reference in pool.values():
         catalog_source_regions[_reference_region(reference)] += 1
     if is_v22:
+        research = (data or {}).get("reference_research") or {}
+        research_sources = research.get("sources", []) if isinstance(research, dict) else []
+        source_by_id = {
+            str(source.get("reference_id")): source
+            for source in research_sources
+            if isinstance(source, dict) and source.get("reference_id")
+        }
+        verified_ids = {
+            reference_id
+            for reference_id, reference in pool.items()
+            if reference.get("source_kind") == "verified_public"
+        }
+        for source_id in sorted(set(source_by_id) - verified_ids):
+            provenance_binding_errors.append(
+                {
+                    "reference_id": source_id,
+                    "errors": ["research source is not bound to one verified reference_pool item"],
+                }
+            )
+        for reference_id in sorted(verified_ids):
+            reference = pool[reference_id]
+            source = source_by_id.get(reference_id)
+            binding_errors = (
+                ["research source is missing"]
+                if source is None
+                else reference_source_binding_errors(
+                    reference,
+                    source,
+                    f"reference_research.sources[{reference_id}]",
+                )
+            )
+            source_evidence.append(
+                {
+                    "reference_id": reference_id,
+                    "canonical_identity": reference_canonical_identity(reference),
+                    "research_evidence": {
+                        key: source.get(key) if isinstance(source, dict) else None
+                        for key in (
+                            "reference_id",
+                            "source_url",
+                            "source_title",
+                            "source_author_or_organization",
+                            "source_year",
+                            "source_identifier",
+                            "authoritative_source",
+                        )
+                    },
+                    "binding_status": "passed" if not binding_errors else "failed",
+                }
+            )
+            if binding_errors:
+                provenance_binding_errors.append(
+                    {"reference_id": reference_id, "errors": binding_errors}
+                )
         for pool_index, reference in enumerate(pool.values(), 1):
             metadata_errors = reference_metadata_errors(reference, f"reference_pool[{pool_index}]")
             if metadata_errors:
@@ -2631,7 +2689,11 @@ def _reference_provenance_report(
         by_lesson[lesson_id] = entries
     return {
         "by_lesson": by_lesson,
-        "validation_scope": "contract_and_locator_only",
+        "validation_scope": (
+            "contract_locator_and_exact_source_binding"
+            if is_v22
+            else "contract_and_locator_only"
+        ),
         "reuse_policy": REUSE_REFERENCE,
         "cross_lesson_reuse": "allowed",
         "same_lesson_duplicate_policy": "hard_fail",
@@ -2640,6 +2702,8 @@ def _reference_provenance_report(
         "invalid_verified_public": invalid_verified_public,
         "invalid_resource_only": invalid_resource_only,
         "invalid_metadata": invalid_metadata,
+        "provenance_binding_errors": provenance_binding_errors,
+        "source_evidence": source_evidence,
         "same_lesson_duplicates": same_lesson_duplicates,
         "unresolved_ids": unresolved_ids,
         "placeholder_items": placeholder_items,
@@ -3076,6 +3140,11 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
         errors.append(f"{item['lesson']}.references[{item['reference']}] is a resource-only item")
     for item in references.get("invalid_metadata", []):
         errors.append(f"reference_pool[{item['reference']}] bibliography metadata is incomplete: " + "; ".join(item["errors"]))
+    for item in references.get("provenance_binding_errors", []):
+        errors.append(
+            f"reference provenance binding failed for {item.get('reference_id')}: "
+            + "; ".join(item.get("errors", []))
+        )
     for item in references.get("same_lesson_duplicates", []):
         errors.append(f"{item['lesson']}.references[{item['reference']}] duplicates reference {item['duplicate_of']}")
     for item in references.get("unresolved_ids", []):
@@ -3682,6 +3751,11 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         errors.append(
             f"reference_pool[{item['reference']}] bibliography metadata is incomplete: "
             + "; ".join(item["errors"])
+        )
+    for item in reference_provenance.get("provenance_binding_errors", []):
+        errors.append(
+            f"reference provenance binding failed for {item.get('reference_id')}: "
+            + "; ".join(item.get("errors", []))
         )
     for item in reference_provenance["same_lesson_duplicates"]:
         errors.append(

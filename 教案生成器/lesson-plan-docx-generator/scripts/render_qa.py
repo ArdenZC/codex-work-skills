@@ -22,11 +22,16 @@ def find_renderer() -> str | None:
     return next((candidate for candidate in candidates if candidate and Path(candidate).exists()), None)
 
 
-def _pdf_page_count(path: Path) -> int:
-    """Count page objects without adding a heavyweight PDF dependency."""
+def pdf_page_count(path: Path | str) -> int:
+    """Count page objects in a retained PDF without adding a heavyweight dependency."""
 
-    payload = path.read_bytes()
+    payload = Path(path).read_bytes()
     return len(re.findall(rb"/Type\s*/Page(?:\s|/|>)", payload))
+
+
+# Keep the private name available for compatibility with older callers while
+# exposing the same implementation to the final-artifact manifest verifier.
+_pdf_page_count = pdf_page_count
 
 
 def render_docx_directory(

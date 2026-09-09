@@ -58,6 +58,7 @@ _LESSON_DEPENDENCIES = {
         "content_quality",
         "package_common",
         "path_safety",
+        "render_qa",
         "validate_output",
         "validate_template",
     ),

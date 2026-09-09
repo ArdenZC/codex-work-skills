@@ -48,6 +48,7 @@ from content_contract import (
     lesson_references,
     reference_identity,
     reference_metadata_errors,
+    reference_source_binding_errors,
     reference_looks_like_placeholder,
     reference_looks_like_resource_only,
 )
@@ -1163,6 +1164,17 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
             if reference_id in source_by_id:
                 raise ValueError(f"reference_research.sources contains duplicate reference_id {reference_id!r}")
             source_by_id[reference_id] = source
+        verified_reference_ids = {
+            reference_id
+            for reference_id, reference in reference_by_id.items()
+            if reference.get("source_kind") == "verified_public"
+        }
+        unexpected_source_ids = sorted(set(source_by_id) - verified_reference_ids)
+        if unexpected_source_ids:
+            raise ValueError(
+                "reference_research.sources contains evidence for non-verified or unknown references: "
+                + ", ".join(unexpected_source_ids)
+            )
         for reference_id, reference in reference_by_id.items():
             if reference.get("source_kind") != "verified_public":
                 continue
@@ -1171,14 +1183,13 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
                 raise ValueError(
                     f"reference_research.sources is missing evidence for verified reference {reference_id}"
                 )
-            if source.get("source_url") != reference.get("source_url"):
-                raise ValueError(
-                    f"reference_research.sources[{reference_id}].source_url must match reference_pool"
-                )
-            if source.get("authoritative_source") != reference.get("authoritative_source"):
-                raise ValueError(
-                    f"reference_research.sources[{reference_id}].authoritative_source must match reference_pool"
-                )
+            binding_errors = reference_source_binding_errors(
+                reference,
+                source,
+                f"reference_research.sources[{reference_id}]",
+            )
+            if binding_errors:
+                raise ValueError("; ".join(binding_errors))
 
     textbook_identity = reference_identity(textbook) if textbook is not None else ""
     if data.get("allow_textbook_as_reference", False):
