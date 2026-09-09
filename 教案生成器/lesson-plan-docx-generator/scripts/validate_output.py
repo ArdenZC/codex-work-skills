@@ -38,6 +38,7 @@ from package_common import (
     reflection_bookmarks,
     required_bookmarks,
     score_breakdown,
+    apply_reviewed_lesson_content,
     validate_content_v2_input,
 )
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
@@ -45,6 +46,7 @@ from render_qa import render_docx_directory
 
 
 LESSON_FILE_PATTERN = re.compile(r"^教案(?P<sequence>\d+)_")
+TEST_FIXTURE_AUTHORING_ENV = "LESSON_ALLOW_TEST_FIXTURE_AUTHORING"
 MECHANICAL_TOPIC_SUFFIX_RE = re.compile(
     r"(?:聚焦(?:于)?|围绕|针对|对应主题|核心主题|本节主题|任务主题|本节关联)\s*[:：]"
 )
@@ -739,10 +741,14 @@ def write_skipped_report(
     template_validation: bool = True,
     warnings: list[str] | None = None,
     render: bool = False,
+    render_pdf_dir: Path | str | None = None,
+    allow_test_fixture_authoring: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
-    validate_content_v2_input(data, schema_path)
+    validate_content_v2_input(data, schema_path, allow_test_fixture=allow_test_fixture_authoring)
+    if data.get("content_contract_version") == "2.2":
+        data = apply_reviewed_lesson_content(data)
     assert_output_path_safe(
         out_dir,
         lesson_protected_paths(
@@ -843,10 +849,14 @@ def validate_output_dir(
     output_validation: bool = True,
     extra_warnings: list[str] | None = None,
     render: bool = False,
+    render_pdf_dir: Path | str | None = None,
+    allow_test_fixture_authoring: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
-    validate_content_v2_input(data, schema_path)
+    validate_content_v2_input(data, schema_path, allow_test_fixture=allow_test_fixture_authoring)
+    if data.get("content_contract_version") == "2.2":
+        data = apply_reviewed_lesson_content(data)
     assert_output_path_safe(
         out_dir,
         lesson_protected_paths(
@@ -1231,7 +1241,7 @@ def validate_output_dir(
                 "errors": [],
             }
         else:
-            render_report = render_docx_directory(out_dir)
+            render_report = render_docx_directory(out_dir, pdf_output_dir=render_pdf_dir)
         report["render"] = render_report
         if render_report["status"] != "passed":
             render_errors = render_report.get("errors") or [
@@ -1261,12 +1271,19 @@ def main() -> int:
     parser.add_argument("--skip-validation", action="store_true")
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
     parser.add_argument(
+        "--allow-test-fixture-authoring",
+        action="store_true",
+        help="Test-only escape hatch; requires LESSON_ALLOW_TEST_FIXTURE_AUTHORING=1",
+    )
+    parser.add_argument(
         "--legacy",
         action="store_true",
         help="Explicitly enable the non-production 2.0/2.1 compatibility path",
     )
     args = parser.parse_args()
     try:
+        if args.allow_test_fixture_authoring and os.environ.get(TEST_FIXTURE_AUTHORING_ENV) != "1":
+            raise RuntimeError("Test-fixture authoring bypass is disabled for production validation.")
         source_path = Path(args.input_json).expanduser().resolve()
         schema_path = Path(args.schema).expanduser().resolve()
         data = json.loads(source_path.read_text(encoding="utf-8-sig"))
@@ -1294,7 +1311,11 @@ def main() -> int:
                 "Lesson Content Contract 2.2 is required for production output validation; "
                 "legacy 2.0/2.1 input requires the explicit --legacy flag."
             )
-        validate_content_v2_input(data, schema_path)
+        validate_content_v2_input(
+            data,
+            schema_path,
+            allow_test_fixture=args.allow_test_fixture_authoring,
+        )
         custom_template = args.custom_template if args.custom_template else None
         if args.skip_validation:
             report = write_skipped_report(
@@ -1308,6 +1329,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 render=args.render,
+                allow_test_fixture_authoring=args.allow_test_fixture_authoring,
             )
         else:
             report = validate_output_dir(
@@ -1321,6 +1343,7 @@ def main() -> int:
                 engine=args.engine or None,
                 template_validation=not args.skip_template_validation,
                 render=args.render,
+                allow_test_fixture_authoring=args.allow_test_fixture_authoring,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

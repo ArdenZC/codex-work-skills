@@ -688,6 +688,109 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
     }
 
 
+def _load_artifact_manifest(output_dir: Path) -> dict[str, Any] | None:
+    path = output_dir / "artifact-manifest.json"
+    if not path.is_file():
+        return None
+    return _read_json(path, "artifact manifest")
+
+
+def _manifest_artifact_path(output_dir: Path, relative_path: Any) -> Path | None:
+    if not isinstance(relative_path, str) or not relative_path.strip():
+        return None
+    candidate = (output_dir / Path(relative_path)).resolve()
+    return candidate if _is_within(candidate, output_dir) else None
+
+
+def _artifact_manifest_gate(
+    data: Mapping[str, Any],
+    qa_report: Mapping[str, Any],
+    output_inventory: Mapping[str, Any],
+    output_dir: Path,
+    manifest: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Verify that report page evidence names the files actually delivered."""
+
+    errors: list[str] = []
+    lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
+    render = qa_report.get("render") if isinstance(qa_report.get("render"), Mapping) else {}
+    records = manifest.get("artifacts") if isinstance(manifest, Mapping) and isinstance(manifest.get("artifacts"), list) else None
+    if not isinstance(manifest, Mapping):
+        errors.append("artifact-manifest.json is missing")
+        records = []
+    if isinstance(manifest, Mapping) and not str(manifest.get("run_id", "")).strip():
+        errors.append("manifest run_id is missing")
+    expected_hours = _number(data.get("total_hours"))
+    if isinstance(manifest, Mapping):
+        if manifest.get("course") != data.get("course_name"):
+            errors.append("manifest course does not match input")
+        if manifest.get("major") != data.get("major"):
+            errors.append("manifest major does not match input")
+        manifest_hours = _number(manifest.get("hours"))
+        if manifest_hours is None or expected_hours is None or not math.isclose(manifest_hours, expected_hours, abs_tol=0.01):
+            errors.append("manifest hours do not match input")
+        if manifest.get("qa_status") != qa_report.get("status"):
+            errors.append("manifest qa_status does not match QA report")
+        if manifest.get("render_status") != render.get("status"):
+            errors.append("manifest render_status does not match QA report")
+        if qa_report.get("artifact_manifest") != "artifact-manifest.json":
+            errors.append("QA report does not point to artifact-manifest.json")
+    if not isinstance(records, list) or len(records) != len(lessons):
+        errors.append(f"manifest artifacts must contain exactly {len(lessons)} lesson records")
+        records = records if isinstance(records, list) else []
+    qa_page_counts = render.get("page_counts") if isinstance(render.get("page_counts"), Mapping) else {}
+    manifest_page_total = 0
+    for index, record in enumerate(records):
+        if not isinstance(record, Mapping):
+            errors.append(f"manifest artifacts[{index}] is not an object")
+            continue
+        docx_path = _manifest_artifact_path(output_dir, record.get("docx_path"))
+        pdf_path = _manifest_artifact_path(output_dir, record.get("rendered_pdf_path")) if record.get("rendered_pdf_path") else None
+        if docx_path is None or not docx_path.is_file():
+            errors.append(f"manifest artifacts[{index}] docx_path is not an accessible file")
+        elif _sha256_file(docx_path) != str(record.get("docx_sha256", "")).upper():
+            errors.append(f"manifest artifacts[{index}] docx_sha256 mismatch")
+        page_count = _number(record.get("actual_page_count"))
+        if page_count is None or page_count < 1:
+            errors.append(f"manifest artifacts[{index}] actual_page_count is not positive")
+        else:
+            manifest_page_total += int(page_count)
+        if pdf_path is None or not pdf_path.is_file():
+            errors.append(f"manifest artifacts[{index}] rendered_pdf_path is not an accessible file")
+        elif _sha256_file(pdf_path) != str(record.get("rendered_pdf_sha256", "")).upper():
+            errors.append(f"manifest artifacts[{index}] rendered_pdf_sha256 mismatch")
+        docx_name = str(record.get("docx_path", ""))
+        qa_count = qa_page_counts.get(docx_name) if isinstance(qa_page_counts, Mapping) else None
+        if qa_count is None and docx_path is not None:
+            qa_count = qa_page_counts.get(docx_path.name) if isinstance(qa_page_counts, Mapping) else None
+        if page_count is not None and _number(qa_count) is None:
+            errors.append(f"manifest artifacts[{index}] page count is absent from QA report")
+        elif page_count is not None and not math.isclose(page_count, _number(qa_count) or 0, abs_tol=0.01):
+            errors.append(f"manifest artifacts[{index}] page count disagrees with QA report")
+    if isinstance(manifest, Mapping):
+        manifest_total = _number(manifest.get("actual_page_count"))
+        if manifest_total is None or not math.isclose(manifest_total, manifest_page_total, abs_tol=0.01):
+            errors.append("manifest actual_page_count does not equal artifact page-count sum")
+        if len(records) == 1 and isinstance(records[0], Mapping):
+            record = records[0]
+            if manifest.get("docx_sha256") != record.get("docx_sha256"):
+                errors.append("manifest docx_sha256 does not match its artifact record")
+            if manifest.get("rendered_pdf_sha256") != record.get("rendered_pdf_sha256"):
+                errors.append("manifest rendered_pdf_sha256 does not match its artifact record")
+    return _gate(
+        "artifact_manifest",
+        not errors,
+        {
+            "path": str(output_dir / "artifact-manifest.json"),
+            "run_id": manifest.get("run_id") if isinstance(manifest, Mapping) else None,
+            "records": len(records),
+            "page_count": manifest.get("actual_page_count") if isinstance(manifest, Mapping) else None,
+            "errors": errors,
+        },
+        "Manifest must map each accessible DOCX to its retained PDF, SHA-256, actual page count, QA status, and render status.",
+    )
+
+
 def structural_hard_gates(
     data: Mapping[str, Any],
     qa_report: Mapping[str, Any],
@@ -695,6 +798,8 @@ def structural_hard_gates(
     *,
     template_id: str,
     template_version: str,
+    output_dir: Path | None = None,
+    artifact_manifest: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     expected_count = len(lessons)
@@ -750,6 +855,21 @@ def structural_hard_gates(
     delivery = delivery_metrics(data)
     references = reference_metrics(data, qa_report)
     practice = practice_handoff_metrics(data, qa_report)
+    manifest_gate = (
+        _artifact_manifest_gate(
+            data,
+            qa_report,
+            output_inventory,
+            output_dir or Path(str(qa_report.get("output_dir", "."))),
+            artifact_manifest,
+        )
+        if version == "2.2"
+        else _not_applicable_gate(
+            "artifact_manifest",
+            {"content_contract_version": version},
+            "Artifact manifests are required for Content Contract 2.2 smoke/final reports.",
+        )
+    )
     gates = [
         lesson_docx_gate(
             "docx_inventory",
@@ -840,6 +960,7 @@ def structural_hard_gates(
             {"status": render.get("status"), "files_checked": render.get("files_checked"), "page_count": render.get("page_count")},
             "All DOCX render smoke must pass; visual review remains a separate manual layer.",
         ),
+        manifest_gate,
     ]
     return {
         "status": "PASS" if all(gate["status"] in {"PASS", "NOT_APPLICABLE"} for gate in gates) else "FAIL",
@@ -957,7 +1078,22 @@ def teaching_design_review(payload: Mapping[str, Any] | None = None) -> dict[str
     return result
 
 
-def _page_count_map(qa_report: Mapping[str, Any]) -> dict[str, int]:
+def _page_count_map(
+    qa_report: Mapping[str, Any],
+    artifact_manifest: Mapping[str, Any] | None = None,
+) -> dict[str, int]:
+    if isinstance(artifact_manifest, Mapping) and isinstance(artifact_manifest.get("artifacts"), list):
+        values: dict[str, int] = {}
+        for item in artifact_manifest["artifacts"]:
+            if not isinstance(item, Mapping) or _number(item.get("actual_page_count")) is None:
+                continue
+            count = int(item["actual_page_count"])
+            docx_path = str(item.get("docx_path", ""))
+            for key in (docx_path, Path(docx_path).name):
+                if key:
+                    values[key] = count
+        if values:
+            return values
     render = qa_report.get("render") if isinstance(qa_report.get("render"), Mapping) else {}
     values = render.get("page_counts")
     if not isinstance(values, Mapping):
@@ -965,7 +1101,12 @@ def _page_count_map(qa_report: Mapping[str, Any]) -> dict[str, int]:
     return {str(key): int(value) for key, value in values.items() if _number(value) is not None}
 
 
-def visual_sample_selection(data: Mapping[str, Any], qa_report: Mapping[str, Any], output_inventory: Mapping[str, Any]) -> dict[str, Any]:
+def visual_sample_selection(
+    data: Mapping[str, Any],
+    qa_report: Mapping[str, Any],
+    output_inventory: Mapping[str, Any],
+    artifact_manifest: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     metrics = lesson_length_metrics(lessons)
     names = list(output_inventory.get("docx_files", []))
@@ -994,7 +1135,7 @@ def visual_sample_selection(data: Mapping[str, Any], qa_report: Mapping[str, Any
         add(index, "maximum_implementation_density")
     for index in sorted(range(len(metrics)), key=lambda item: metrics[item]["evaluation_remarks_chars"], reverse=True)[:1]:
         add(index, "maximum_evaluation_density")
-    page_counts = _page_count_map(qa_report)
+    page_counts = _page_count_map(qa_report, artifact_manifest)
     if names and page_counts:
         for index, name in enumerate(names[: len(lessons)]):
             if name in page_counts and page_counts[name] == max(page_counts.values()):
@@ -1018,7 +1159,7 @@ def visual_sample_selection(data: Mapping[str, Any], qa_report: Mapping[str, Any
         "sample_count": len(sample),
         "sample": sample,
         "manual_inspection_status": "not_executed",
-        "max_pages_source": "qa-report.render.page_counts",
+        "max_pages_source": "artifact-manifest.json" if artifact_manifest else "qa-report.render.page_counts",
     }
 
 
@@ -1247,6 +1388,7 @@ def build_acceptance_report(
     qa_report = _read_json(qa_report_path, "QA report")
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     inventory = output_inventory(output_dir)
+    artifact_manifest = _load_artifact_manifest(output_dir)
     render = qa_report.get("render") if isinstance(qa_report.get("render"), Mapping) else {}
     visual_payload = _load_optional_json(visual_review_path, "visual review JSON")
     scope_payload = _load_optional_json(scope_review_path, "scope review JSON")
@@ -1254,7 +1396,7 @@ def build_acceptance_report(
     teacher_payload = _load_optional_json(teacher_review_path, "teacher review JSON")
     negative_payload = _load_optional_json(negative_controls_path, "negative controls JSON")
     baseline_payload = _load_optional_json(historical_baseline_path, "historical baseline JSON")
-    sample = visual_sample_selection(data, qa_report, inventory)
+    sample = visual_sample_selection(data, qa_report, inventory, artifact_manifest)
     visual = visual_review(visual_payload, sample)
     design = teaching_design_review(design_payload)
     teacher = {
@@ -1278,6 +1420,8 @@ def build_acceptance_report(
         inventory,
         template_id=template_id,
         template_version=template_version,
+        output_dir=output_dir,
+        artifact_manifest=artifact_manifest,
     )
     contract_version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     delivery = delivery_metrics(data)
@@ -1304,6 +1448,8 @@ def build_acceptance_report(
         "delivery_mode": (data.get("delivery_plan") or {}).get("mode") if isinstance(data.get("delivery_plan"), Mapping) else None,
         "theory_hours": _number((data.get("delivery_plan") or {}).get("theory_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
         "practice_hours": _number((data.get("delivery_plan") or {}).get("practice_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
+        "run_id": artifact_manifest.get("run_id") if isinstance(artifact_manifest, Mapping) else None,
+        "artifact_manifest_sha256": _sha256_file(output_dir / "artifact-manifest.json") if (output_dir / "artifact-manifest.json").is_file() else None,
     }
     final_status = _final_status(structural, visual, design, teacher, negative)
     report = {
@@ -1327,6 +1473,11 @@ def build_acceptance_report(
         "input_json": str(input_json),
         "qa_report": str(qa_report_path),
         "output_dir": str(output_dir),
+        "artifact_manifest": {
+            "path": str(output_dir / "artifact-manifest.json"),
+            "sha256": metadata["artifact_manifest_sha256"],
+            "data": _json_safe(artifact_manifest),
+        },
         "output_inventory": inventory,
         "structural_hard_gates": structural,
         "content_quality_evidence": content_quality_evidence(qa_report),
@@ -1382,6 +1533,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
         f"- Input SHA256: `{metadata.get('input_sha256')}`",
         f"- QA SHA256: `{metadata.get('qa_report_sha256')}`",
         f"- Output inventory SHA256: `{metadata.get('output_inventory_fingerprint')}`",
+        f"- Artifact manifest: `{(report.get('artifact_manifest') or {}).get('path')}`; SHA256: `{(report.get('artifact_manifest') or {}).get('sha256')}`; run_id: `{metadata.get('run_id')}`",
         "",
         "## Structural hard gates",
         "",
@@ -1397,6 +1549,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
             "",
             f"- QA status: `{quality.get('status')}`; detector counts: `{json.dumps(quality.get('detector_counts', {}), ensure_ascii=False, sort_keys=True)}`",
             "- Similarity/duplicate values are evidence copied from the existing QA report; this harness adds no new hard threshold.",
+            "- Render page counts and file mappings are read from artifact-manifest.json, not hand-written in this report.",
             "- Reference reuse remains course-reusable; only same-lesson duplicate/resource-only decisions belong to the existing reference QA.",
             "",
             "## Sequence and boundaries",

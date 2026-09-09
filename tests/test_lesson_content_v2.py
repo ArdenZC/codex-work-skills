@@ -38,7 +38,7 @@ _LESSON_DEPENDENCIES = {
     "semantic_bookmarks": (),
     "content_contract": (),
     "bookmark_utils": ("semantic_bookmarks",),
-    "content_quality": ("content_contract",),
+    "content_quality": ("content_contract", "package_common"),
     "path_safety": (),
     "render_qa": (),
     "record_visual_inspection": ("path_safety",),
@@ -178,9 +178,20 @@ def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
                 if source_version != "2.2":
                     # The legacy test fixtures opt into the compatibility adapter explicitly.
                     command_args.append("--legacy")
+                else:
+                    try:
+                        source_mode = json.loads(Path(command_args[source_index]).read_text(encoding="utf-8-sig")).get(
+                            "authoring_provenance", {}
+                        ).get("mode")
+                    except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+                        source_mode = None
+                    if source_mode == "synthetic_fixture":
+                        command_args.append("--allow-test-fixture-authoring")
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    if "--allow-test-fixture-authoring" in command_args:
+        env["LESSON_ALLOW_TEST_FIXTURE_AUTHORING"] = "1"
     if "--skip-template-validation" in args or "--skip-output-validation" in args:
         # Existing compatibility tests exercise the legacy switches explicitly;
         # the dedicated unsafe-skip test overrides this to assert fail-closed.

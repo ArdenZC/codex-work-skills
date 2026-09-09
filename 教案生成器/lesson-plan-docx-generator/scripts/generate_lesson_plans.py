@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import re
@@ -9,6 +10,7 @@ import shutil
 import sys
 import tempfile
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +24,7 @@ from docx.table import _Cell
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
 from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
 from content_quality import ContentQualityError, validate_content_quality
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, apply_reviewed_lesson_content, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
@@ -31,6 +33,8 @@ from validate_template import validate_template
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 UNSAFE_VALIDATION_SKIP_ENV = "LESSON_ALLOW_UNSAFE_VALIDATION_SKIP"
+TEST_FIXTURE_AUTHORING_ENV = "LESSON_ALLOW_TEST_FIXTURE_AUTHORING"
+RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{5,95}$")
 
 
 
@@ -266,6 +270,8 @@ def validate_outputs(
     template_validation: bool,
     template_warnings: list[str],
     render: bool,
+    render_pdf_dir: Path | None = None,
+    allow_test_fixture_authoring: bool = False,
 ) -> dict[str, Any]:
     return validate_output_dir(
         out_dir,
@@ -279,7 +285,88 @@ def validate_outputs(
         template_validation=template_validation,
         extra_warnings=template_warnings,
         render=render,
+        render_pdf_dir=render_pdf_dir,
+        allow_test_fixture_authoring=allow_test_fixture_authoring,
     )
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest().upper()
+
+
+def _relative_posix(path: Path, root: Path) -> str:
+    return path.resolve().relative_to(root.resolve()).as_posix()
+
+
+def _stable_render_artifacts(report: dict[str, Any], candidate: Path) -> list[dict[str, Any]]:
+    render = report.get("render") if isinstance(report.get("render"), dict) else {}
+    page_counts = render.get("page_counts") if isinstance(render.get("page_counts"), dict) else {}
+    raw_pdf_files = render.get("pdf_files") if isinstance(render.get("pdf_files"), dict) else {}
+    artifacts: list[dict[str, Any]] = []
+    for docx_name in sorted(page_counts):
+        raw_pdf = raw_pdf_files.get(docx_name)
+        pdf_path = Path(raw_pdf).resolve() if raw_pdf else None
+        if pdf_path is None or not pdf_path.is_file():
+            continue
+        artifacts.append(
+            {
+                "docx_path": docx_name,
+                "rendered_pdf_path": _relative_posix(pdf_path, candidate),
+                "actual_page_count": int(page_counts[docx_name]),
+            }
+        )
+    render["pdf_artifacts"] = artifacts
+    render.pop("pdf_files", None)
+    report["render"] = render
+    return artifacts
+
+
+def _build_artifact_manifest(
+    candidate: Path,
+    meta: dict[str, Any],
+    report: dict[str, Any],
+    generated_filenames: list[str],
+    run_id: str,
+) -> dict[str, Any]:
+    render_artifacts = {
+        item["docx_path"]: item
+        for item in (report.get("render", {}).get("pdf_artifacts", []) if isinstance(report.get("render"), dict) else [])
+        if isinstance(item, dict) and item.get("docx_path")
+    }
+    records: list[dict[str, Any]] = []
+    for lesson, filename in zip(meta.get("lessons", []), generated_filenames):
+        docx_path = candidate / filename
+        render_item = render_artifacts.get(filename, {})
+        pdf_path = candidate / str(render_item["rendered_pdf_path"]) if render_item.get("rendered_pdf_path") else None
+        records.append(
+            {
+                "lesson_id": lesson.get("lesson_id"),
+                "docx_path": _relative_posix(docx_path, candidate),
+                "docx_sha256": _file_sha256(docx_path),
+                "rendered_pdf_path": render_item.get("rendered_pdf_path"),
+                "rendered_pdf_sha256": _file_sha256(pdf_path) if pdf_path is not None and pdf_path.is_file() else None,
+                "actual_page_count": render_item.get("actual_page_count"),
+            }
+        )
+    page_counts = [record["actual_page_count"] for record in records if isinstance(record.get("actual_page_count"), int)]
+    return {
+        "manifest_version": "1.0",
+        "run_id": run_id,
+        "course": meta.get("course_name"),
+        "major": meta.get("major"),
+        "hours": meta.get("total_hours"),
+        "docx_sha256": records[0]["docx_sha256"] if len(records) == 1 else None,
+        "rendered_pdf_sha256": records[0]["rendered_pdf_sha256"] if len(records) == 1 else None,
+        "actual_page_count": sum(page_counts),
+        "qa_status": report.get("status"),
+        "render_status": (report.get("render") or {}).get("status") if isinstance(report.get("render"), dict) else None,
+        "qa_report_path": "qa-report.json",
+        "artifacts": records,
+    }
 
 
 def _unique_backup_path(out_dir: Path) -> Path:
@@ -455,6 +542,16 @@ def main() -> None:
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
+    parser.add_argument(
+        "--run-id",
+        default="",
+        help="Stable smoke/artifact run identifier; generated when omitted",
+    )
+    parser.add_argument(
+        "--allow-test-fixture-authoring",
+        action="store_true",
+        help="Test-only escape hatch; requires LESSON_ALLOW_TEST_FIXTURE_AUTHORING=1",
+    )
     parser.add_argument("--qa-report", default="")
     parser.add_argument(
         "--legacy",
@@ -464,6 +561,9 @@ def main() -> None:
     args = parser.parse_args()
     if (args.skip_template_validation or args.skip_output_validation) and os.environ.get(UNSAFE_VALIDATION_SKIP_ENV) != "1":
         raise RuntimeError("Unsafe validation bypass is disabled.")
+    allow_test_fixture_authoring = args.allow_test_fixture_authoring
+    if allow_test_fixture_authoring and os.environ.get(TEST_FIXTURE_AUTHORING_ENV) != "1":
+        raise RuntimeError("Test-fixture authoring bypass is disabled for production generation.")
 
     template, manifest_path, manifest = resolve_template_package(
         args.template or None,
@@ -482,8 +582,20 @@ def main() -> None:
             "Lesson Content Contract 2.2 is required for production generation; "
             "legacy 2.0/2.1 input requires the explicit --legacy flag."
         )
-    validate_content_v2_input(meta, schema_path)
+    validate_content_v2_input(
+        meta,
+        schema_path,
+        allow_test_fixture=allow_test_fixture_authoring,
+    )
+    if meta.get("content_contract_version") == "2.2":
+        meta = apply_reviewed_lesson_content(meta)
     lessons = meta["lessons"]
+    run_id = str(
+        args.run_id
+        or f"lesson-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
+    ).strip()
+    if not RUN_ID_PATTERN.fullmatch(run_id):
+        raise ValueError("--run-id must be 6-96 characters of letters, digits, dot, underscore, or hyphen")
 
     package_roots = [manifest_path.parent]
     base_manifest = manifest.get("template", {}).get("base_manifest")
@@ -552,6 +664,8 @@ def main() -> None:
                 template_validation=not args.skip_template_validation,
                 template_warnings=template_warnings,
                 render=args.render,
+                render_pdf_dir=(candidate / "render" / "pdf") if args.render else None,
+                allow_test_fixture_authoring=allow_test_fixture_authoring,
             )
         else:
             report = write_skipped_report(
@@ -566,10 +680,18 @@ def main() -> None:
                 template_validation=not args.skip_template_validation,
                 warnings=template_warnings,
                 render=args.render,
+                render_pdf_dir=(candidate / "render" / "pdf") if args.render else None,
+                allow_test_fixture_authoring=allow_test_fixture_authoring,
             )
+        _stable_render_artifacts(report, candidate)
+        manifest_data = _build_artifact_manifest(candidate, meta, report, generated_filenames, run_id)
+        manifest_path = candidate / "artifact-manifest.json"
+        manifest_path.write_text(json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         final_qa = requested_qa or internal_qa
         report["output_dir"] = str(out_dir)
         report["qa_report"] = str(final_qa)
+        report["run_id"] = run_id
+        report["artifact_manifest"] = "artifact-manifest.json"
         report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         candidate_qa.write_text(report_text, encoding="utf-8")
         if external_qa is not None:

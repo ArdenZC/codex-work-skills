@@ -15,13 +15,13 @@ from tests.test_lesson_skill_hardening import lesson_acceptance
 class Lesson22ContractHardeningTests(unittest.TestCase):
     def assert_rejected(self, payload: dict[str, object], pattern: str | None = None) -> None:
         with self.assertRaises(ValueError) as raised:
-            lesson_generator.validate_content_v2_input(payload)
+            lesson_generator.validate_test_fixture_content_v2_input(payload)
         if pattern:
             self.assertRegex(str(raised.exception), pattern)
 
     def test_v22_canonical_stage_invariants_have_explicit_hard_negatives(self) -> None:
         valid = make_v22_payload(theory_hours=2, practice_hours=0, lesson_count=1)
-        lesson_generator.validate_content_v2_input(valid)
+        lesson_generator.validate_test_fixture_content_v2_input(valid)
 
         bad_order = copy.deepcopy(valid)
         stages = bad_order["lessons"][0]["implementation"]
@@ -71,7 +71,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             task_hours=[2, 2, 2, 2],
             practice_work_orders=True,
         )
-        lesson_generator.validate_content_v2_input(v22_pure)
+        lesson_generator.validate_test_fixture_content_v2_input(v22_pure)
         self.assertEqual(v22_pure["practice_task_contract"]["tasks"][0]["lesson_ids"], [])
 
         v22_linked = make_v22_payload(
@@ -81,7 +81,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             task_hours=[2, 2, 2, 2],
             practice_work_orders=True,
         )
-        lesson_generator.validate_content_v2_input(v22_linked)
+        lesson_generator.validate_test_fixture_content_v2_input(v22_linked)
         v22_empty = copy.deepcopy(v22_linked)
         v22_empty["practice_task_contract"]["tasks"][0]["lesson_ids"] = []
         self.assert_rejected(v22_empty, "related theory Lessons")
@@ -231,7 +231,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             lesson_count=2,
             practice_work_orders=False,
         )
-        lesson_generator.validate_content_v2_input(payload)
+        lesson_generator.validate_test_fixture_content_v2_input(payload)
         report = lesson_acceptance.delivery_metrics(payload)
         self.assertEqual(report["status"], "PASS")
         self.assertEqual(report["actual"]["practice_hours"], 20)
@@ -246,7 +246,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             lesson_count=2,
             practice_work_orders=True,
         )
-        lesson_generator.validate_content_v2_input(payload)
+        lesson_generator.validate_test_fixture_content_v2_input(payload)
         tasks = payload["practice_task_contract"]["tasks"]
         self.assertEqual(len(tasks), 10)
         self.assertTrue(all(task["practice_hours"] == 2 for task in tasks))
@@ -267,7 +267,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
         payload["delivery_plan"]["total_hours"] = 17
         payload["delivery_plan"]["practice_hours"] = 15
         payload["practice_task_contract"]["practice_hours"] = 15
-        self.assert_rejected(payload, r"divisible by 2")
+        self.assert_rejected(payload, r"confirmed course information mismatch|divisible by 2")
 
     def test_workorder_preference_can_be_enabled_without_changing_confirmed_hours(self) -> None:
         pending_choice = make_v22_payload(
@@ -285,7 +285,7 @@ class Lesson22ContractHardeningTests(unittest.TestCase):
             practice_work_orders=True,
         )
         enabled["practice_task_contract"] = source_with_handoff["practice_task_contract"]
-        lesson_generator.validate_content_v2_input(enabled)
+        lesson_generator.validate_test_fixture_content_v2_input(enabled)
         self.assertEqual(
             {
                 key: enabled["delivery_plan"][key]

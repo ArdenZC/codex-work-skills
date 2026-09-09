@@ -34,6 +34,11 @@ from content_contract import (
     reference_looks_like_placeholder,
     reference_looks_like_resource_only as contract_reference_looks_like_resource_only,
 )
+from package_common import (
+    AGENT_OWNED_LESSON_FIELDS,
+    canonical_json_sha256,
+    lesson_agent_content,
+)
 
 
 # This starts at the level where a repeated Chinese sentence is substantive,
@@ -2902,50 +2907,57 @@ def _v22_agent_review_report(
 ) -> tuple[dict[str, Any], list[str]]:
     """Read the Agent's qualitative review without re-implementing it in Python."""
 
-    required_checks = {
-        "professional_accuracy",
-        "goal_activity_evidence",
-        "stage_coherence",
-        "capacity_fit",
-        "progression",
-        "reference_relevance",
-    }
     records: list[dict[str, Any]] = []
     errors: list[str] = []
     for lesson_id, lesson in zip(lesson_ids, lessons):
         review = lesson.get("pedagogical_review")
         is_object = isinstance(review, dict)
-        status = review.get("status") if is_object else None
-        capacity = review.get("capacity") if is_object else None
-        summary = str(review.get("summary", "")).strip() if is_object else ""
-        checks = review.get("checks") if is_object else None
+        issues = review.get("issues") if is_object else None
+        revised = review.get("revised_content") if is_object else None
+        decision = review.get("decision") if is_object else None
+        history = review.get("review_history") if is_object else None
+        final_digest = canonical_json_sha256(revised) if isinstance(revised, dict) else None
+        content_matches = (
+            isinstance(revised, dict)
+            and set(revised) == set(AGENT_OWNED_LESSON_FIELDS)
+            and canonical_json_sha256(lesson_agent_content(lesson)) == final_digest
+        )
         approved = (
-            status == "approved"
-            and capacity == "fit"
-            and len(summary) >= 12
-            and isinstance(checks, dict)
-            and bool(checks)
-            and required_checks.issubset(checks)
+            decision == "approved"
+            and isinstance(issues, list)
+            and not issues
+            and isinstance(revised, dict)
+            and isinstance(history, list)
+            and bool(history)
+            and content_matches
+            and history[-1].get("decision") == "approved"
+            and not history[-1].get("issues")
+            and str(history[-1].get("content_sha256", "")).upper() == str(final_digest or "").upper()
         )
         if not approved:
             errors.append(
-                f"{lesson_id}.pedagogical_review must be approved, capacity=fit, and include all required review checks"
+                f"{lesson_id}.pedagogical_review must contain final issues=[], revised_content, decision=approved, and a matching review history"
             )
         records.append(
             {
                 "lesson_id": lesson_id,
                 "status": "passed" if approved else "failed",
-                "capacity": capacity,
-                "summary": summary,
-                "checks": sorted(checks) if isinstance(checks, dict) else [],
-                "semantic_source": "Agent review; Python performs no lexical relevance judgment",
+                "decision": decision,
+                "issues": issues if isinstance(issues, list) else [],
+                "review_rounds": len(history) if isinstance(history, list) else 0,
+                "rewrite_performed": bool(
+                    isinstance(history, list)
+                    and any(item.get("decision") == "needs_revision" for item in history if isinstance(item, dict))
+                ),
+                "revised_content_sha256": final_digest,
+                "semantic_source": "Agent review; Python only checks review state and digest linkage",
             }
         )
     return {
         "status": "passed" if not errors else "failed",
-        "scope": "lesson-level pedagogical chain and capacity",
+        "scope": "lesson-level Agent authoring, revision, pedagogical chain, and capacity",
         "records": records,
-        "required_review_checks": sorted(required_checks),
+        "required_contract_fields": ["issues", "draft_content", "revised_content", "decision", "review_history"],
     }, errors
 
 
@@ -3125,6 +3137,13 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
         "diagnostic_content_policy": {"mode": "agent_review_and_exact_facts", "hash": "sha256"},
         "errors": errors,
         "warnings": warnings,
+        "authoring_provenance": {
+            "mode": (data.get("authoring_provenance") or {}).get("mode"),
+            "status": (data.get("authoring_provenance") or {}).get("status"),
+            "authoring_id": (data.get("authoring_provenance") or {}).get("authoring_id"),
+            "review_rounds": (data.get("authoring_provenance") or {}).get("review_rounds"),
+            "semantic_source": "Agent attestation; Python checks only exact snapshot and digest linkage",
+        },
         "agent_pedagogical_review": agent_review,
         "exact_duplicates": exact_duplicates,
         "adjacent_exact_duplicates": [],

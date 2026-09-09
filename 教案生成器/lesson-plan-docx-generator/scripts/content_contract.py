@@ -438,16 +438,9 @@ def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> li
     for reference_id in lesson.get("reference_ids", []):
         reference = pool.get(str(reference_id))
         if reference is None:
-            resolved.append(
-                {
-                    "reference_id": str(reference_id),
-                    "reference_type": "formal_course_document",
-                    "title": str(reference_id),
-                    "source_kind": "",
-                    "text": str(reference_id),
-                }
+            raise ValueError(
+                f"lesson reference_id {reference_id!r} is unresolved; production formatting must fail closed"
             )
-            continue
         item = dict(reference)
         item["text"] = format_reference(item)
         resolved.append(item)

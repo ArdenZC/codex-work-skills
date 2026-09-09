@@ -17,10 +17,11 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 ## Content Contract 2.2
 
-课程级输入至少包含：
+课程级输入至少包含（2.2 production 还必须有 Agent handoff）：
 
 ```text
 content_contract_version, course_name, major, audience,
+confirmed_course_info, authoring_provenance,
 default_hours, total_hours, delivery_plan, course_materials,
 reference_pool, reference_research, artifact_plan, outline, lessons
 ```
@@ -45,6 +46,8 @@ after_class_improvement
 
 每阶段由 Agent 写入 `content`、`teacher_actions`、`student_actions` 和 `objective`。必须形成“内容 → 教师活动 → 学生活动 → 学生证据/产出 → 设计意图”的阶段级教学链；不要求每个小项机械重复课题，也不能用“所有 item status=passed”作为唯一语义判断。同一课内部可以自然复用必要术语，但不得复制机械句式。阶段语义由 Agent review 负责。
 
+`pedagogical_review` 是真正的内容交接，不是 PASS/FAIL 标签。每课必须保存 `issues`、`draft_content`、`revised_content`、`decision` 和 `review_history`。若发现专业表达不自然、跨课模板复读、活动不可执行、课时容量不合理或参考资料不相关，Agent 必须先返回重写后的 `revised_content`，再进行至少一轮复审；最终 `decision=approved` 且 `issues=[]`。生成器只消费最终 reviewed content，并用 digest 链核对初稿、重写稿和复审顺序。
+
 时间合同固定为：课前准备 10 分钟、课后完善 15 分钟；七个课中阶段合计严格等于 `lesson.hours × 45` 分钟。课前/课后不计入 `theory_hours`、`total_hours` 或课堂学时；每课必须显式写入 10 和 15，不能写 0 或可变范围。1 学时 Lesson 的课中内容、步骤、证据和任务复杂度必须实质性少于 2 学时，不能只把分钟数缩短。
 
 ## 资料、教材与参考文献
@@ -54,6 +57,8 @@ after_class_improvement
 有可验证外部来源时，Agent 先检索真实来源再建立 reference pool；`book` 至少有作者/编者、书名、出版社，`formal_course_document` 保留真实责任者、机构和平台/出版社，URL/evidence 只留在 JSON/QA。没有联网、没有可靠外部来源、只有用户提供教材/PPT/资源时，允许 `reference_pool=[]`，并写 `reference_research.status=no_verified_external_source`；此时课次 `reference_ids` 可以为空。参考资料规划概念可称 `course_reference_pool` 或 `reference_catalog`，落盘仍只有 canonical `reference_pool`；`source_region` 仅用于来源记录。不得为了“凑数”虚构作者、出版社、ISBN、标准编号或公开来源。
 
 引用身份只做保守规范化：Unicode、书名括号、空白、全/半角标点、中文/阿拉伯数字版次和常见版次后缀可统一；相近但不同的书名不能被模糊合并，例如“数据结构基础”不能等同于“高级数据结构”。教材不进入 references；同一真实来源跨课复用可以通过，单课内部重复仍失败。禁止为了降低课程重复率编造或改写参考来源。
+
+`reference_research.queries` 必须由 `course_name`、`major` 和当前课次的 `task`/主题组成；`reference_research.sources` 只登记能够回指 `source_url` 与权威来源元数据的真实证据。每课先从本课程的 verified reference pool 选择相关来源，再交给 Agent review 判断相关性；没有 verified source 时使用空池，不以无关来源填数，也不接受“某职业院校”“某高校”“示例出版社”、placeholder 或 test fixture。
 
 ## Practice Task Contract 1.1 与 WorkOrder 联动
 
@@ -82,6 +87,10 @@ Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账�
 → 请求时真实 Render Smoke → atomic commit
 → 如需工单则调用 WorkOrder Skill Agent → 统一交付与人工验收
 ```
+
+正式生产的 authoring mode 必须是 `agent` 且状态为 `completed`。Agent 失败、缺失或未完成 review 时 fail closed；`synthetic_fixture` 只能由测试代码调用显式的 fixture validator/开关，不能生成正式 DOCX。Python 只保留结构骨架、确定性字段、合同校验、文件交换和渲染，不得为学情、教学内容、目标、重难点、活动、设计意图、评价备注、反思或 reference content 写 fallback 句子。
+
+每次带 `--render` 的 smoke 都必须在唯一 `run_id` 下保留 DOCX 和 PDF，并写出同目录 `artifact-manifest.json`，记录课程、专业、学时、DOCX/PDF SHA-256、实际页数、QA status 和 render status。验收报告只从该 manifest 读取 artifact path、页数与指纹，不手写或猜测页数。
 
 默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。`--render` 的结果只代表 smoke；缺少渲染后端时报告 `RENDER UNVERIFIED` 或 fail-closed，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
 

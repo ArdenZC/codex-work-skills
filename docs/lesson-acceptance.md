@@ -9,6 +9,8 @@ Lesson Acceptance V2 是一个本地、只读的验收证据汇总器。它读�
 
 报告目录必须放在输出目录之外，例如 `F:\\acceptance\\database-20260901`。工具不会修改输入 JSON、DOCX、qa-report 或模板，也不会生成 32 课/64 学时的 CI E2E。大批量输出应保留在本地验收工作区，不提交仓库。
 
+对于 Content Contract 2.2，输出目录还必须有生成器写出的 `artifact-manifest.json`。它是 DOCX、保留的 rendered PDF、SHA-256、实际 PDF 页数、QA status、render status 和唯一 `run_id` 的唯一映射来源；验收报告从 manifest 解析文件路径与页数，并校验文件存在、指纹和 QA/render 状态，不能从报告文本手填页数。
+
 ## 运行
 
 在仓库根目录运行：
