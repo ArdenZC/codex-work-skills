@@ -24,7 +24,7 @@ from docx.table import _Cell
 from bookmark_utils import bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark
 from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
 from content_quality import ContentQualityError, validate_content_quality
-from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, apply_reviewed_lesson_content, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input
+from package_common import DEFAULT_MANIFEST, DEFAULT_SCHEMA, apply_reviewed_lesson_content, ensure_supported_major, field_bookmark, field_spec, implementation_bookmarks, is_semantic_manifest, load_manifest, manifest_template_path, reflection_bookmarks, resolve_template_package, score_breakdown, validate_content_v2_input, validate_test_fixture_content_v2_input
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
