@@ -1,0 +1,2 @@
+# Practice runtime remains standard-library-only; this is test-only CI setup.
+Flask>=3,<4
