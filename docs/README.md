@@ -29,6 +29,7 @@
 - [AGENTS.md](../AGENTS.md) — Codex / 通用 Agent 规则。
 - [CLAUDE.md](../CLAUDE.md) — Claude Code 入口。
 - [GEMINI.md](../GEMINI.md) — Gemini CLI 入口。
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — 设计边界、模板修改、测试与 PR 约定。
 - [CHANGELOG.md](../CHANGELOG.md) — 面向使用者的重要版本变化。
 
 ## 工程验收与阶段性证据
