@@ -6,10 +6,16 @@
 - 教案生成器：教案生成器/lesson-plan-docx-generator
 - 平时成绩记分册生成器：平时成绩记分册生成器/course-gradebook-generator
 - 实践任务工单生成器：实践任务工单生成器/practice-task-workorder-generator（Phase 2.2 / 2.2.0）
+- HTML 课件生成器：HTML课件生成器/courseware-html-generator（1.2.1，Courseware Content Contract 1.1）
+- 实践课 HTML 生成器：实践课HTML生成器/practice-class-html-generator（1.2.0，Practice Class Content Contract 1.1）
 
 模板包维护工具位于 `tools/template_package.py`，动态从 manifest 发现全部包，并统一执行 discover、scaffold、validate、promote、archive。模板包变更应先使用它的 identity/full validation；validator 信任根是当前 repo-root 的 Git index，validator 和 scripts 下可能被导入的支持文件必须已跟踪、为普通文件且不含 symlink；未跟踪 canonical-like Skill 或 helper 不得执行。`scripts/__pycache__/` 下的 `.pyc/.pyo` 仅作为 Python cache 忽略，普通 scripts 目录中的 `.pyc/.pyo` 即使已跟踪也必须拒绝；隔离 validation workspace 建立后不得含有 `__pycache__`、`.pyc` 或 `.pyo`。工具不会自动 `git add`，新 Skill 必须精确暂存 validator、manifest、模板、schema 和已跟踪 helper；已跟踪但未 commit 的修改仍可运行。external 包不能自带或覆盖 validator，只能使用唯一的 Git-tracked canonical Skill owner。外部包验证只能在系统临时隔离 Skill 树执行，Promote 必须经过不可变 snapshot、stage、最终 target 和动态仓库校验，并在每个阶段确认全树字节与 snapshot 一致；repository-wide validation 还必须保护并恢复每个受信任 Skill 的完整 `assets/templates` 根，任何 canonical 包的新增、删除或修改都必须失败；validator 或 repo validator 产生任何包内文件都必须回滚。Scaffold 在运行完整 base validator 前检查 lexical/resolved 工作区边界，仓库内 output 只能写入 `work/template-packages/`，仓库外路径若解析回仓库必须拒绝，解析后仍在独立 workspace 的目录或 symlink alias 仍可用；report 与依赖必须解析到同一外部 workspace，且 report 只能位于工作包目录同级。Archive 必须包含依赖闭包并在解压后复验；仓库内归档只能写入 `dist/template-packages/`，外部独立归档目录仍受 lexical/resolved 和 symlink 四象限保护。报告、snapshot、stage、backup 或归档产物不得写入受保护目录或提交到仓库。
 
 所有 skill 都遵循同一原则：模型负责理解用户资料，技能内置脚本负责稳定生成最终文件；资料不足时按各 skill 的默认规则处理，但不能伪造用户未提供的源数据。生成后执行技能自己的校验步骤，并报告实际结果。
+
+HTML 课件生成器额外保持 Agent / renderer 边界：Agent 只创作 Courseware Content Contract 1.1，Python 负责确定性页面布局、内联 CSS/JavaScript、交互和 QA。学生展示版与教师逐字稿版必须是单文件离线 HTML；学生页不得泄露教师备注、来源式措辞或控时/制作信息。合同中的 explicit time model、learning units、canonical facts、source truth、time evidence 和 theory-led planning 只在教师/QA侧使用。任意非交互位置点击、滚轮和键盘翻页属于 runtime 行为，必须用真实浏览器测试，不得只用字符串断言代替。
+
+实践课 HTML 生成器首选消费 Courseware Content Contract 1.1，通过稳定 `slide.id`、`learning_units` 和 `canonical_facts` 建立理论—实践关联，并尊重 `not_yet_taught` 边界；它是独立的下游 Skill，不能把旧实践任务工单的 Phase/Hardening 体系套进来，也不能让课件 Skill 反向依赖它。输出固定为四个学生模块和两个教师模块，模块内用 pane 承载课程数组；三套示例内容必须保持课程模态差异，并分别经过实际生成、输出 QA、学生/教师包隔离、资产/行为/公式证据和浏览器 smoke。Fresh Flow 为 Raw materials → Courseware → Practice；Courseware 重新生成导致 ID 变化时，必须持久化兼容映射或重新生成 Practice。
 
 模板包的每次完整 validator 执行，包括 canonical、external、archive 解压包、scaffold、snapshot、stage、最终 target 和动态仓库校验，均必须复制到系统临时的正常 Skill 树后再启动，不得从真实 canonical 或用户工作目录直接执行 owner validator。临时树只包含 Git-tracked 的普通源文件、模板、manifest、schema、helper 和声明依赖；真实仓库中的 `__pycache__`、`.pyc`、`.pyo` 不得被读取或修改。validator 子进程使用受控环境，移除外部 `PYTHONPATH`、`PYTHONHOME`、`PYTHONSTARTUP`、`PYTHONINSPECT` 等 Python 注入变量，禁用 user site，并把 `PYTHONPYCACHEPREFIX` 重定向到临时树内的 `python-cache`；命令使用 `python -B`，验证结束后必须检查并清理整个临时树，清理失败只能报告失败。身份检查不会执行 validator，也不会被包装成完整通过。
 

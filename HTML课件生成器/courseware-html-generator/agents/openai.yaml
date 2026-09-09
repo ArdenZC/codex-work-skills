@@ -1,0 +1,10 @@
+interface:
+  display_name: "HTML 课件生成器"
+  short_description: "生成离线学生展示版与教师逐字稿版 HTML 课件"
+  default_prompt: >-
+    使用 $courseware-html-generator，根据当前会话和用户提供的教材、PPT、讲义、教案或课程资料，
+    先规划章节，再创作 Courseware Content Contract 1.1 JSON。Agent 负责学生页面内容、教学图、代码、
+    表格、练习和可直接朗读的自然中文 speaker_script；Python 只负责确定性合同校验、统一视觉系统、
+    页面布局、交互 runtime、离线单文件 HTML 和 QA。生成 student.html 与 teacher.html：学生版不显示
+    教师/来源/制作/控时信息，教师版与学生版逐页一一对应并提供连续逐字稿。必须运行输出 QA，真实打开
+    file:// 验证任意非交互位置点击翻页、wheel 上下翻页、一次 wheel 不多跳和交互按钮不误翻页。

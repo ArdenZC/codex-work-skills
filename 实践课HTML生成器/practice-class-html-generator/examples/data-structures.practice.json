@@ -1,0 +1,1504 @@
+{
+  "contract_version": "1.0",
+  "course_title": "数据结构与算法",
+  "practice_title": "实践：从有序区间到可验证的二分查找",
+  "audience": "高职软件技术专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "数据结构与算法",
+    "audience": "高职软件技术专业学生",
+    "language": "C",
+    "tools": [
+      "Dev-C++",
+      "Code::Blocks"
+    ],
+    "platform": "Windows 实训室",
+    "software": "Dev-C++ / Code::Blocks",
+    "framework": "C 标准库",
+    "other_constraints": [
+      "实践 starter 保持可编译骨架",
+      "优先使用数组、下标和循环解释边界"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.0",
+    "chapter_title": "二分查找与区间不变量",
+    "taught_slide_ids": [
+      "search-01",
+      "search-02",
+      "search-03",
+      "search-04",
+      "search-05"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "ordered-search",
+      "title": "有序数据与问题结构",
+      "summary": "先确认数据是否按同一比较规则有序，再决定能否排除一半候选。",
+      "source_slide_ids": [
+        "search-01"
+      ],
+      "student_can_do": "能用一个小案例说出有序条件和目标位置。"
+    },
+    {
+      "id": "search-invariant",
+      "title": "二分查找的三个不变量",
+      "summary": "候选区间、比较结果和下一轮区间必须同时保持一致。",
+      "source_slide_ids": [
+        "search-02"
+      ],
+      "student_can_do": "能指出每次判断后仍然可能包含目标的闭区间。"
+    },
+    {
+      "id": "closed-interval",
+      "title": "闭区间状态变化",
+      "summary": "用 left、right、mid 记录当前候选区间，并在排除 mid 后移动到 mid+1 或 mid-1。",
+      "source_slide_ids": [
+        "search-03"
+      ],
+      "student_can_do": "能逐轮填写边界并解释为什么某一半被排除。"
+    },
+    {
+      "id": "boundary-reasoning",
+      "title": "命中、失败与边界",
+      "summary": "循环结束意味着候选区间为空；命中返回下标，失败返回约定的无效结果。",
+      "source_slide_ids": [
+        "search-04"
+      ],
+      "student_can_do": "能用边界值、空数组和缺失目标验证返回结果。"
+    },
+    {
+      "id": "implementation-check",
+      "title": "把不变量落到 C 函数",
+      "summary": "将区间规则写入完整函数，再用可重复的测试输入核对每一个分支。",
+      "source_slide_ids": [
+        "search-05"
+      ],
+      "student_can_do": "能补全关键表达式、运行测试并定位一个边界错误。"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "ds-orient-core",
+      "level": "core",
+      "title": "把问题画成候选区间",
+      "knowledge_link_ids": [
+        "ordered-search"
+      ],
+      "source_slide_ids": [
+        "search-01"
+      ],
+      "modality": "interactive",
+      "overview": "先不写代码，用同一组有序数据判断哪些搜索问题可以安全排除一半。",
+      "scaffold": "教师已给出 8 个递增数据和 3 个目标；学生只需要在卡片上标出候选范围和比较依据。",
+      "steps": [
+        {
+          "title": "看案例",
+          "instruction": "在学习中心打开理论地图，标出排序规则和目标值。",
+          "check": "能说出“为什么可以排除一半”。"
+        },
+        {
+          "title": "做映射",
+          "instruction": "完成三个场景选择，分别判断顺序条件是否满足。",
+          "check": "每个场景都能说出可继续搜索的区间。"
+        },
+        {
+          "title": "口头复述",
+          "instruction": "用一句话向同伴解释二分查找不是任意数组都能直接使用。",
+          "check": "同伴能复述你的条件。"
+        }
+      ],
+      "acceptance": [
+        "三个场景选择正确，并能说出有序条件。",
+        "能指出目标不在数组时仍需保留的停止条件。"
+      ],
+      "help_refs": [
+        "ds-order",
+        "c-toolchain"
+      ],
+      "estimated_minutes": 8
+    },
+    {
+      "id": "ds-trace-core",
+      "level": "core",
+      "title": "逐轮追踪 left / right / mid",
+      "knowledge_link_ids": [
+        "search-invariant",
+        "closed-interval"
+      ],
+      "source_slide_ids": [
+        "search-02",
+        "search-03"
+      ],
+      "modality": "analysis",
+      "overview": "用状态模拟器逐轮填写闭区间，让公式变成可以检查的状态转移。",
+      "scaffold": "互动中心已经给出数组、目标和前两轮边界；先填状态，再回到任务书核对排除理由。",
+      "steps": [
+        {
+          "title": "先预测",
+          "instruction": "在 state simulator 中先写当前 mid，不急着看反馈。",
+          "check": "mid 落在当前闭区间内。"
+        },
+        {
+          "title": "填下一轮",
+          "instruction": "根据比较结果填写 next left 和 next right。",
+          "check": "下一轮恰好排除已经比较过的 mid。"
+        },
+        {
+          "title": "解释转移",
+          "instruction": "完成两轮后写出“目标较大/较小时”的边界规则。",
+          "check": "两种分支都能用 mid±1 解释。"
+        }
+      ],
+      "acceptance": [
+        "完成至少两轮状态填写。",
+        "能说明为何不能把 mid 留在下一轮。",
+        "区间始终没有跳过目标。"
+      ],
+      "help_refs": [
+        "ds-invariant",
+        "ds-interval"
+      ],
+      "estimated_minutes": 12
+    },
+    {
+      "id": "ds-fill-core",
+      "level": "core",
+      "title": "补全二分查找的 4 个关键位置",
+      "knowledge_link_ids": [
+        "search-invariant",
+        "implementation-check"
+      ],
+      "source_slide_ids": [
+        "search-02",
+        "search-05"
+      ],
+      "modality": "coding",
+      "overview": "在完整 C 框架中只修改中点、两条边界更新和未找到返回值，不从空文件默写函数。",
+      "scaffold": "starter 已给出 main、数据、循环和命中分支；每个空位都对应学习中心已经走过的一条规则。",
+      "steps": [
+        {
+          "title": "先看骨架",
+          "instruction": "打开 starter/binary-search.c，圈出 4 行带 TODO 的真实编辑点。",
+          "check": "能把每一处编辑点对应到一个不变量。"
+        },
+        {
+          "title": "逐空填写",
+          "instruction": "按学习资料的闭区间规则修改 4 个表达式。",
+          "check": "不要改动输入数据和函数外壳。"
+        },
+        {
+          "title": "编译测试",
+          "instruction": "一次性补完本阶段空位后编译运行 4 个目标值。",
+          "check": "先完成全部空位，再执行完整测试。"
+        },
+        {
+          "title": "对照反馈",
+          "instruction": "把输出下标与理论页的逐轮追踪结果对照。",
+          "check": "命中和未命中都能解释。"
+        }
+      ],
+      "acceptance": [
+        "4 个真实编辑点均已修改。",
+        "21、首元素、末元素和缺失目标的结果正确。",
+        "能解释 left/right 为什么跨过 mid。"
+      ],
+      "help_refs": [
+        "ds-invariant",
+        "ds-code",
+        "c-compiler"
+      ],
+      "estimated_minutes": 16,
+      "starter_asset_ids": [
+        "binary-search-c-starter"
+      ],
+      "todo_count": 4
+    },
+    {
+      "id": "ds-run-core",
+      "level": "core",
+      "title": "用边界测试证明函数可靠",
+      "knowledge_link_ids": [
+        "closed-interval",
+        "boundary-reasoning"
+      ],
+      "source_slide_ids": [
+        "search-03",
+        "search-04"
+      ],
+      "modality": "verification",
+      "overview": "把“能跑一次”升级为边界、空区间和缺失值测试，观察每种输入怎样结束循环。",
+      "scaffold": "使用上一任务已经补好的函数和任务书中的测试表；不增加新算法，只改变输入和验收观察点。",
+      "steps": [
+        {
+          "title": "建立测试表",
+          "instruction": "记录空数组、一个元素、首元素、末元素和缺失值五类输入。",
+          "check": "每类输入都有预期返回形态。"
+        },
+        {
+          "title": "运行对照",
+          "instruction": "使用已有数组指针调用 binary_search(values, 0, target) 测试空数组，再运行其余输入并记录返回下标或未找到标志。",
+          "check": "空数组从 right=-1 开始且循环不进入，其他结果与学习指南的边界表一致。"
+        },
+        {
+          "title": "定位一项",
+          "instruction": "任选一项解释循环条件如何让它终止。",
+          "check": "能指出 left > right 或命中分支。"
+        }
+      ],
+      "acceptance": [
+        "五类边界至少完成四类。",
+        "缺失目标不会返回一个合法下标。",
+        "能用测试结果反推循环不变量。"
+      ],
+      "help_refs": [
+        "ds-boundary",
+        "ds-tests"
+      ],
+      "estimated_minutes": 12
+    },
+    {
+      "id": "ds-debug-core",
+      "level": "core",
+      "title": "Debug：从错误现象回到不变量",
+      "knowledge_link_ids": [
+        "boundary-reasoning",
+        "implementation-check"
+      ],
+      "source_slide_ids": [
+        "search-04",
+        "search-05"
+      ],
+      "modality": "debugging",
+      "overview": "用诊断区先判断故障类型，再回到 starter 中定位造成死循环、越界或错误返回的关键行。",
+      "scaffold": "学生包已提供三段只改动一处的 C 故障版本；先说现象，再决定检查区间、比较或返回值，不需要等待教师另发材料。",
+      "steps": [
+        {
+          "title": "读现象",
+          "instruction": "在 Debug 侦探中完成三种故障诊断，不先看参考。",
+          "check": "每题都写出一个可验证的原因。"
+        },
+        {
+          "title": "回到代码",
+          "instruction": "分别打开 student/starter 中的三个故障版本，定位造成现象的边界更新或返回行。",
+          "check": "定位理由能对应一个理论页。"
+        },
+        {
+          "title": "解释修复",
+          "instruction": "向同伴说明修复后为何不会重复处理 mid。",
+          "check": "解释包含输入、状态和结果。"
+        }
+      ],
+      "acceptance": [
+        "三种故障均能匹配原因。",
+        "至少口头解释一处“现象→原因→修改”。",
+        "不把错误归因于编译器或随机性。"
+      ],
+      "help_refs": [
+        "ds-boundary",
+        "ds-code",
+        "c-debug"
+      ],
+      "estimated_minutes": 14,
+      "starter_asset_ids": [
+        "binary-search-bug-loop",
+        "binary-search-bug-boundary",
+        "binary-search-bug-return"
+      ]
+    },
+    {
+      "id": "ds-strategy-optional",
+      "level": "optional",
+      "title": "比较线性扫描与二分查找",
+      "knowledge_link_ids": [
+        "ordered-search",
+        "closed-interval"
+      ],
+      "source_slide_ids": [
+        "search-01",
+        "search-03"
+      ],
+      "modality": "analysis",
+      "overview": "在同一组有序数据上比较线性扫描和二分查找的判断次数，说明何时值得维护有序条件。",
+      "scaffold": "互动中心提供两种策略的逐步记录表；学生只需填比较次数并结合场景选择。",
+      "steps": [
+        {
+          "title": "走一遍",
+          "instruction": "分别用线性和二分策略查找三个目标。",
+          "check": "每个目标有比较次数。"
+        },
+        {
+          "title": "看取舍",
+          "instruction": "填写“数据有序/频繁更新/单次查询”三种场景的推荐策略。",
+          "check": "推荐理由不是只写“更快”。"
+        },
+        {
+          "title": "做结论",
+          "instruction": "写一句适用边界，避免把二分查找当成万能方案。",
+          "check": "结论同时提到数据条件和维护成本。"
+        }
+      ],
+      "acceptance": [
+        "三个场景选择有理由。",
+        "能说出线性扫描仍然合理的一种情况。"
+      ],
+      "help_refs": [
+        "ds-order",
+        "ds-transfer"
+      ],
+      "estimated_minutes": 10
+    },
+    {
+      "id": "ds-tests-optional",
+      "level": "optional",
+      "title": "扩充可重复的测试清单",
+      "knowledge_link_ids": [
+        "boundary-reasoning",
+        "implementation-check"
+      ],
+      "source_slide_ids": [
+        "search-04",
+        "search-05"
+      ],
+      "modality": "verification",
+      "overview": "把零散试跑整理成可复用的小测试清单，帮助下次修改边界时快速发现回归。",
+      "scaffold": "任务给出测试表头和预期结果格式；不要求搭建测试框架，只要求覆盖风险点。",
+      "steps": [
+        {
+          "title": "选样例",
+          "instruction": "从学习指南的边界表挑选 6 个输入。",
+          "check": "包含空、单元素、两端和缺失。"
+        },
+        {
+          "title": "记录结果",
+          "instruction": "按同一格式记录实际返回和预期返回。",
+          "check": "每行有结论。"
+        },
+        {
+          "title": "找风险",
+          "instruction": "标记最容易暴露 mid 或边界错误的一行。",
+          "check": "能解释风险来源。"
+        }
+      ],
+      "acceptance": [
+        "测试清单覆盖至少六种输入。",
+        "每项有实际与预期对照。"
+      ],
+      "help_refs": [
+        "ds-tests",
+        "c-io"
+      ],
+      "estimated_minutes": 8
+    },
+    {
+      "id": "ds-transfer-challenge",
+      "level": "challenge",
+      "title": "迁移：写出自己的不变量说明",
+      "knowledge_link_ids": [
+        "ordered-search",
+        "boundary-reasoning",
+        "implementation-check"
+      ],
+      "source_slide_ids": [
+        "search-01",
+        "search-04",
+        "search-05"
+      ],
+      "modality": "reasoning",
+      "overview": "把二分查找迁移到一个新的有序字段，先写不变量再决定是否能复用区间更新。",
+      "scaffold": "给出“按编号有序的设备清单”场景；学生只需改写判断说明，不要求增加新数据结构。",
+      "steps": [
+        {
+          "title": "选字段",
+          "instruction": "为设备编号或版本号选择一个可排序字段。",
+          "check": "字段比较规则明确。"
+        },
+        {
+          "title": "写不变量",
+          "instruction": "写出候选区间、排除条件和失败结果。",
+          "check": "三者互相一致。"
+        },
+        {
+          "title": "口头迁移",
+          "instruction": "说明如果数据改为无序，哪一条前提会失效。",
+          "check": "能指出不能直接复用。"
+        }
+      ],
+      "acceptance": [
+        "新场景中的三条规则完整。",
+        "能指出无序数据带来的限制。"
+      ],
+      "help_refs": [
+        "ds-transfer",
+        "ds-boundary"
+      ],
+      "estimated_minutes": 10
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "ds-theory-map",
+      "title": "理论地图：什么时候能排除一半",
+      "knowledge_link_ids": [
+        "ordered-search",
+        "search-invariant"
+      ],
+      "task_ids": [
+        "ds-orient-core",
+        "ds-trace-core"
+      ],
+      "purpose": "把课程理论页中的有序条件和候选区间映射到今天的第一步判断。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 4,
+        "prompt": "下列哪一个条件不满足时，不能直接使用二分查找？",
+        "options": [
+          {
+            "label": "数据按比较规则有序",
+            "feedback": "正确：没有可比较的左右方向，就不能安全排除一半。"
+          },
+          {
+            "label": "数组元素必须都是正数",
+            "feedback": "二分查找不要求元素为正数，关键是有序和可比较。"
+          },
+          {
+            "label": "目标值必须存在",
+            "feedback": "目标可以不存在，失败时应让区间收缩为空。"
+          }
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "ds-interval-lab",
+      "title": "闭区间状态实验室",
+      "knowledge_link_ids": [
+        "search-invariant",
+        "closed-interval"
+      ],
+      "task_ids": [
+        "ds-trace-core",
+        "ds-run-core"
+      ],
+      "purpose": "逐轮填写当前区间和下一轮区间，观察排除 mid 后状态如何收缩。",
+      "interaction": {
+        "type": "state-simulator",
+        "estimated_minutes": 8,
+        "prompt": "数组 [3, 8, 14, 21, 29, 37, 45, 58] 查找 37：先读给定状态，再填写本轮未知字段并推导下一状态。",
+        "state_fields": [
+          {"id": "left", "label": "左边界", "input_type": "number"},
+          {"id": "right", "label": "右边界", "input_type": "number"},
+          {"id": "mid", "label": "中点位置", "input_type": "number"}
+        ],
+      "state": {
+        "context_label": "有序数据",
+        "context": "[3, 8, 14, 21, 29, 37, 45, 58]",
+        "target_label": "查找目标",
+        "target": 37
+      },
+      "state_visual": {
+        "items": [
+          {"label": "0", "value": 3},
+          {"label": "1", "value": 8},
+          {"label": "2", "value": 14},
+          {"label": "3", "value": 21},
+          {"label": "4", "value": 29},
+          {"label": "5", "value": 37},
+          {"label": "6", "value": 45},
+          {"label": "7", "value": 58}
+        ],
+        "start_field": "left",
+        "end_field": "right",
+        "focus_field": "mid",
+        "index_label": "下标",
+        "value_label": "值",
+        "candidate_label": "当前候选区间",
+        "focus_label": "已核对本轮中点",
+        "terminal_label": "已找到目标：下标 5"
+      },
+      "rounds": [
+          {
+            "given": {"left": 0, "right": 7},
+            "expected": {"mid": 3},
+            "observation": "values[3] = 21 < 37",
+            "next_expected": {"left": 4, "right": 7},
+            "status": "continue",
+            "feedback": "mid=21 小于目标，下一轮只保留右半边 [4,7]。"
+          },
+          {
+            "given": {"left": 4, "right": 7},
+            "expected": {"mid": 5},
+            "observation": "values[5] = 37 = 37",
+            "status": "found",
+            "feedback": "mid=37 命中，状态立即终止；不会再进入第三轮。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ds-code-bridge",
+      "title": "代码关键行对照台",
+      "knowledge_link_ids": [
+        "search-invariant",
+        "implementation-check",
+        "ordered-search"
+      ],
+      "task_ids": [
+        "ds-fill-core",
+        "ds-run-core"
+      ],
+      "purpose": "把互动状态与 C starter 的 4 个真实编辑点逐一对应，避免只背表达式。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "按顺序把状态规则翻译成代码判断。",
+        "steps": [
+          {
+            "title": "先定区间",
+            "text": "left=0、right=n-1 表示整段闭区间；空数组从一开始就是空区间。"
+          },
+          {
+            "title": "取中点",
+            "text": "mid 必须落在当前区间；本课先使用整数除法的中点表达式。"
+          },
+          {
+            "title": "排除中点",
+            "text": "目标较大时使用 mid+1，目标较小时使用 mid-1，避免原地重复。"
+          },
+          {
+            "title": "失败返回",
+            "text": "区间为空时返回课程约定的未找到值，并在调用处区分失败。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ds-boundary-check",
+      "title": "边界与失败结果多题核对",
+      "knowledge_link_ids": [
+        "closed-interval",
+        "boundary-reasoning"
+      ],
+      "task_ids": [
+        "ds-run-core",
+        "ds-debug-core"
+      ],
+      "purpose": "用一组连续问题覆盖首尾、单元素、缺失和空区间，练习从结果反推边界。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 6,
+        "prompt": "每题先选答案，再把原因说给同伴。",
+        "questions": [
+          {
+            "prompt": "数组只有 [9]，查找 9 的第一次 mid 是？",
+            "options": [
+              {
+                "label": "0",
+                "feedback": "正确：唯一元素同时是 left、right、mid。"
+              },
+              {
+                "label": "1",
+                "feedback": "下标从 0 开始，1 已经越界。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "查找小于最小值的目标，循环最终应怎样？",
+            "options": [
+              {
+                "label": "left 大于 right",
+                "feedback": "正确：候选区间收缩为空，表示未找到。"
+              },
+              {
+                "label": "一直保留 mid",
+                "feedback": "如果不排除 mid，可能重复判断造成死循环。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "未找到时直接返回 0 有什么风险？",
+            "options": [
+              {
+                "label": "会把失败伪装成命中首元素",
+                "feedback": "正确：应使用明确的未找到约定。"
+              },
+              {
+                "label": "没有风险，因为 0 不是下标",
+                "feedback": "0 是合法首元素下标，正是风险。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "ds-debug-detective",
+      "title": "Debug 侦探：先分类再修复",
+      "knowledge_link_ids": [
+        "boundary-reasoning",
+        "implementation-check"
+      ],
+      "task_ids": [
+        "ds-debug-core",
+        "ds-fill-core"
+      ],
+      "purpose": "把错误现象分类为中点越界、区间不收缩或失败返回错误，再定位对应行。",
+    "interaction": {
+      "type": "diagnose",
+      "estimated_minutes": 5,
+      "prompt": "连续完成三个小案例：先指出错误现象对应的规则，再选择只改一处的修复动作；每题检查后才进入下一个文件。",
+      "completion_feedback": "3 / 3 Debug 诊断完成：现在打开三个 starter 文件，分别做最小修改并回归验证。",
+      "diagnostic_cases": [
+        {
+          "id": "bug-loop",
+          "title": "bug-loop.c · 缺失目标时卡住",
+          "context": "现象：查找 20 时某一轮的 left 与 mid 不再变化。",
+          "error_prompt": "先判断错误原因",
+          "error_options": [
+            {"label": "较大目标分支保留了 mid，区间没有严格变小", "feedback": "对：mid 已经比较过，继续保留它可能让边界原地不动。"},
+            {"label": "数组元素需要改成浮点数", "feedback": "数据类型不是这个循环边界不变化现象的原因。"},
+            {"label": "必须把 while 换成 for", "feedback": "换循环形式不能修复区间更新规则。"}
+          ],
+          "error_answer_index": 0,
+          "fix_prompt": "再选择最小修复",
+          "fix_options": [
+            {"label": "把 left = mid 改为 left = mid + 1", "feedback": "对：排除已经检查过的 mid，候选区间才会缩小。"},
+            {"label": "把 left = mid 改为 left = left + 1，无需比较目标", "feedback": "这会丢失二分的比较依据。"},
+            {"label": "删除缺失目标测试", "feedback": "删掉测试不能修复函数行为。"}
+          ],
+          "fix_answer_index": 0
+        },
+        {
+          "id": "bug-boundary",
+          "title": "bug-boundary.c · 左侧区间重复判断",
+          "context": "现象：目标小于当前中点时，某些输入会重复访问同一个中点。",
+          "error_prompt": "先判断错误原因",
+          "error_options": [
+            {"label": "闭区间的左侧分支没有排除已经比较过的 mid", "feedback": "对：目标更小时应在 mid 左侧继续搜索，并排除 mid。"},
+            {"label": "right 初值应该是 n 而不是 n-1", "feedback": "这会改变区间定义，不能解释 mid 重复。"},
+            {"label": "命中分支必须继续循环", "feedback": "命中后继续循环反而会破坏终止语义。"}
+          ],
+          "error_answer_index": 0,
+          "fix_prompt": "再选择最小修复",
+          "fix_options": [
+            {"label": "把 right = mid 改为 right = mid - 1", "feedback": "对：闭区间左侧搜索必须排除 mid。"},
+            {"label": "把 right = mid 改为 right = mid + 1", "feedback": "这会把搜索移向错误的一侧。"},
+            {"label": "把所有边界初始化为 1", "feedback": "初始化不能替代当前分支的排除规则。"}
+          ],
+          "fix_answer_index": 0
+        },
+        {
+          "id": "bug-return",
+          "title": "bug-return.c · 缺失结果被误报命中",
+          "context": "现象：查找不存在的目标时返回 0，调用方误以为找到了首元素。",
+          "error_prompt": "先判断错误原因",
+          "error_options": [
+            {"label": "失败返回值与合法下标 0 冲突", "feedback": "对：失败结果必须和所有合法下标区分开。"},
+            {"label": "数组排序会自动修复返回值", "feedback": "有序只支持比较方向，不会替函数定义失败标记。"},
+            {"label": "mid 不能使用整数除法", "feedback": "本案例的症状发生在未找到后的返回约定。"}
+          ],
+          "error_answer_index": 0,
+          "fix_prompt": "再选择最小修复",
+          "fix_options": [
+            {"label": "未找到时 return -1，并在调用处识别失败", "feedback": "对：负值与合法下标区分，调用方可以明确处理失败。"},
+            {"label": "未找到时仍 return 0，但打印提示", "feedback": "打印提示不能消除返回值歧义。"},
+            {"label": "命中时改成 return 1", "feedback": "这会破坏真实下标，且没有解决失败标记。"}
+          ],
+          "fix_answer_index": 0
+        }
+      ]
+      }
+    },
+    {
+      "id": "ds-strategy-compare",
+      "title": "策略选择：维护成本与查询收益",
+      "knowledge_link_ids": [
+        "ordered-search",
+        "closed-interval"
+      ],
+      "task_ids": [
+        "ds-strategy-optional",
+        "ds-transfer-challenge"
+      ],
+      "purpose": "把“更快”放回真实场景，比较有序条件、更新成本和查询次数。",
+    "interaction": {
+      "type": "compare-strategies",
+      "estimated_minutes": 5,
+      "prompt": "一批数据几乎不再更新，但每天要查询很多次，哪种策略更合适？",
+      "comparison": {
+        "parameter_label": "选择数据量 n，观察一次查询的比较次数",
+        "chart_label": "线性扫描与二分查找的比较次数示意",
+        "parameters": [
+          {"id": "n-8", "label": "n = 8", "explanation": "n=8 时两种方法差距尚小；先确认是否值得为有序维护付出成本。"},
+          {"id": "n-32", "label": "n = 32", "explanation": "n=32 时二分把比较次数压到约 5 次，批量查询的收益开始明显。"},
+          {"id": "n-128", "label": "n = 128", "explanation": "n=128 时线性扫描可能要看 128 个位置，而二分约 7 次；维护成本可由高频查询摊薄。"}
+        ],
+        "series": [
+          {"id": "linear", "label": "线性扫描（最坏）", "counts": [8, 32, 128], "unit": "次"},
+          {"id": "binary", "label": "二分查找（约）", "counts": [3, 5, 7], "unit": "次"}
+        ]
+      },
+      "options": [
+          {
+            "label": "维护有序后使用二分查找",
+            "feedback": "正确：前置维护成本可以由大量查询摊薄。"
+          },
+          {
+            "label": "每次从头线性扫描",
+            "feedback": "单次简单，但在大量查询中比较次数通常更多。"
+          },
+          {
+            "label": "随机抽一个位置开始找",
+            "feedback": "随机不能提供排除一半的依据。"
+          }
+        ],
+        "answer_index": 0
+      }
+    },
+    {
+      "id": "ds-transfer-challenge",
+      "title": "迁移挑战：换一个有序字段仍能成立吗",
+      "knowledge_link_ids": [
+        "ordered-search",
+        "boundary-reasoning",
+        "implementation-check"
+      ],
+      "task_ids": [
+        "ds-transfer-challenge",
+        "ds-tests-optional"
+      ],
+      "purpose": "用新场景检验学生是否掌握前提、状态和验收，而不是记住某个数组。",
+      "interaction": {
+        "type": "scenario-decision",
+        "estimated_minutes": 6,
+        "prompt": "设备清单按版本号升序排列，但编号字段无序；要按哪个字段做二分？",
+        "options": [
+          {
+            "label": "版本号，并保持比较规则一致",
+            "feedback": "正确：二分依赖实际用于比较的字段有序。"
+          },
+          {
+            "label": "编号字段，因为它更像整数",
+            "feedback": "类型像整数不等于已经有序。"
+          },
+          {
+            "label": "两个字段混合比较",
+            "feedback": "比较规则不一致会破坏区间含义。"
+          }
+        ],
+        "answer_index": 0
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "ds-order",
+      "title": "1. 先确认能否排除一半",
+      "knowledge_link_ids": [
+        "ordered-search"
+      ],
+      "task_ids": [
+        "ds-orient-core",
+        "ds-strategy-optional"
+      ],
+      "body": "二分查找的入口不是“数组很长”，而是数据按同一比较规则有序。先写出比较方向，再判断目标落在左边还是右边。",
+      "worked_example": "版本号 [1.2, 1.7, 2.1, 2.8] 查 2.1：中间值 1.7 小于目标，所以只保留右半边。",
+      "quick_reference": [
+        "有序是前提，不要求目标一定存在。",
+        "比较规则必须贯穿整个数组。",
+        "线性扫描仍适合数据频繁更新或只查一次。"
+      ],
+      "common_errors": [
+        "把“元素是整数”误认为“数据有序”。",
+        "把无序数组套用 2i 之类的固定位置想象。"
+      ],
+      "checkpoints": [
+        "给出一个可以安全排除一半的条件。",
+        "解释无序时为什么下一轮区间没有意义。"
+      ]
+    },
+    {
+      "id": "ds-invariant",
+      "title": "2. 三个不变量：区间、比较、结果",
+      "knowledge_link_ids": [
+        "search-invariant"
+      ],
+      "task_ids": [
+        "ds-trace-core",
+        "ds-fill-core"
+      ],
+      "body": "每轮都要保留一个闭区间 [left,right]，目标若存在必须仍在该区间；比较 mid 后只排除已经证明不可能的一半。",
+      "worked_example": "[3,8,14,21,29] 查 14：初始 [0,4]，mid=2 命中；查 29 时 mid=2 太小，下一轮必须从 3 开始。",
+      "quick_reference": [
+        "初始 left=0、right=n-1。",
+        "目标大于 values[mid]：left=mid+1。",
+        "目标小于 values[mid]：right=mid-1。"
+      ],
+      "common_errors": [
+        "把 left=mid 或 right=mid 写成不变规则。",
+        "修改边界后忘记说明排除了 mid。"
+      ],
+      "checkpoints": [
+        "写出目标大于 mid 时的下一轮闭区间。",
+        "说明为什么命中分支不应继续移动边界。"
+      ]
+    },
+    {
+      "id": "ds-interval",
+      "title": "3. 用状态表追踪每一轮",
+      "knowledge_link_ids": [
+        "closed-interval"
+      ],
+      "task_ids": [
+        "ds-trace-core",
+        "ds-run-core"
+      ],
+      "body": "状态表不是抄运行结果，而是先预测再验证。每一行至少记录当前 left、right、mid、比较结果和下一轮区间。",
+      "worked_example": "查找 37 的状态是 [0,7]→[4,7]→命中 5；如果第二轮改成 [3,7]，说明没有排除 mid=3。",
+      "quick_reference": [
+        "当前区间必须包含 mid。",
+        "下一轮区间必须比当前更小或直接命中。",
+        "目标不存在时最终出现 left>right。"
+      ],
+      "common_errors": [
+        "把 mid 写成值而不是下标。",
+        "把下一轮边界写成上一轮的 left/right。"
+      ],
+      "checkpoints": [
+        "完成互动中心两轮状态输入，命中 37 后确认没有第三轮。",
+        "指出哪一行开始排除了不可能区间。"
+      ]
+    },
+    {
+      "id": "ds-boundary",
+      "title": "4. 边界输入与失败结果",
+      "knowledge_link_ids": [
+        "boundary-reasoning"
+      ],
+      "task_ids": [
+        "ds-run-core",
+        "ds-debug-core"
+      ],
+      "body": "可靠性来自边界测试：空数组、单元素、首尾元素、比最小值小、比最大值大、缺失但夹在中间。失败结果必须与合法下标区分。",
+      "worked_example": "数组 [3,8] 查 2：第一次区间 [0,1]，mid=0 后 right=-1，循环结束；不能把返回 0 当成命中。",
+      "quick_reference": [
+        "空数组：不需要定义新数组，调用 binary_search(values, 0, target)，right=-1，循环不进入。",
+        "单元素：left=right=0。",
+        "未找到：left>right 后返回统一未找到值。"
+      ],
+      "common_errors": [
+        "用 0 表示未找到，和首元素下标冲突。",
+        "只测命中，不测缺失。"
+      ],
+      "checkpoints": [
+        "至少说出四种边界输入。",
+        "解释为什么失败不会返回一个合法位置。"
+      ]
+    },
+    {
+      "id": "ds-code",
+      "title": "5. C 函数中的关键表达式",
+      "knowledge_link_ids": [
+        "implementation-check"
+      ],
+      "task_ids": [
+        "ds-fill-core",
+        "ds-debug-core"
+      ],
+      "body": "starter 只留下四个关键编辑点：中点表达式、右半边起点、左半边终点和未找到返回值。先用不变量推导，再修改，不要求从空白文件写循环。",
+      "worked_example": "在 `if (values[mid] < target)` 分支中，已知 mid 太小，所以下一轮必须从 mid+1 开始；这不是语法偏好，而是状态排除。",
+      "quick_reference": [
+        "中点：整数下标且在闭区间内。",
+        "右半边：mid+1。",
+        "左半边：mid-1。",
+        "失败：使用课程约定的显式值。"
+      ],
+      "common_errors": [
+        "四个 TODO 只是注释，实际行仍是正确答案。",
+        "修改一处后没有重新编译完整函数。"
+      ],
+      "checkpoints": [
+        "指出四个真实编辑点。",
+        "说明每个点对应哪一条理论规则。"
+      ]
+    },
+    {
+      "id": "ds-tests",
+      "title": "6. 用测试结果定位故障",
+      "knowledge_link_ids": [
+        "closed-interval",
+        "boundary-reasoning"
+      ],
+      "task_ids": [
+        "ds-run-core",
+        "ds-tests-optional"
+      ],
+      "body": "测试表要把输入、预期和实际分开。先看结果是否错误，再追踪哪一次边界更新违背不变量。",
+      "worked_example": "同一函数测试 21、3、58、20：前三个应返回合法下标，20 应返回未找到。若 20 返回 0，优先检查失败返回而不是数组内容。",
+      "quick_reference": [
+        "测试输入：首、尾、中间、缺失、空、单元素。",
+        "记录实际值，不只写“通过”。",
+        "错误行必须回到状态或分支解释。"
+      ],
+      "common_errors": [
+        "只使用一个命中样例。",
+        "把输出格式问题当成算法错误。"
+      ],
+      "checkpoints": [
+        "清单覆盖六类输入。",
+        "任选一项把现象追到一条代码规则。"
+      ]
+    },
+    {
+      "id": "ds-transfer",
+      "title": "7. 换字段与迁移边界",
+      "knowledge_link_ids": [
+        "ordered-search",
+        "implementation-check"
+      ],
+      "task_ids": [
+        "ds-strategy-optional",
+        "ds-transfer-challenge"
+      ],
+      "body": "迁移时保持三件事不变：比较字段有序、区间仍表示候选集合、失败结果清楚。换字段并不会自动带来有序性。",
+      "worked_example": "设备按版本号排序而编号无序：按版本号做查找可以复用流程；按编号做查找必须先建立有序条件。",
+      "quick_reference": [
+        "先问“按哪个字段比较”。",
+        "再写目标大/小的区间方向。",
+        "最后设计至少一个缺失目标测试。"
+      ],
+      "common_errors": [
+        "只因为字段是数字就直接二分。",
+        "换字段后忘记重做边界测试。"
+      ],
+      "checkpoints": [
+        "写出新场景的三条不变量。",
+        "说出一条不能直接复用的情况。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "c-toolchain",
+      "title": "C 工具链最短路径",
+      "kind": "环境",
+      "task_ids": [
+        "ds-orient-core",
+        "ds-fill-core"
+      ],
+      "content": "本课只需要在 Windows 实训室用 Dev-C++ 或 Code::Blocks 打开 .c 文件、编译并在终端观察输出。",
+      "when_to_use": "第一次运行 starter 前，或出现“没有输出/运行旧程序”时。",
+      "steps": [
+        "确认打开的是当前 starter 文件。",
+        "编译后看是否有错误，再运行新生成的 exe。",
+        "保留一条可辨认的输出行，方便和测试表对照。"
+      ],
+      "self_check": [
+        "能区分编译错误和运行结果错误。",
+        "能说明当前执行的是哪个文件。"
+      ]
+    },
+    {
+      "id": "c-function",
+      "title": "函数骨架与参数",
+      "kind": "语法",
+      "task_ids": [
+        "ds-fill-core"
+      ],
+      "content": "函数名、返回类型、数组参数和 n/target 参数已经给出；本次只修改函数内部四个关键表达式。",
+      "when_to_use": "看不懂 starter 的函数头，或想重写整个函数时。",
+      "steps": [
+        "先读参数的含义和下标范围。",
+        "把返回值分为命中下标和未找到值。",
+        "只改 TODO 所在表达式，不删除 main。"
+      ],
+      "self_check": [
+        "能说出 n 是元素个数而不是最后下标。",
+        "能指出返回值如何被 main 打印。"
+      ]
+    },
+    {
+      "id": "c-array-index",
+      "title": "数组值与下标",
+      "kind": "基础语法",
+      "task_ids": [
+        "ds-trace-core",
+        "ds-run-core"
+      ],
+      "content": "C 数组从 0 开始；`values[mid]` 的 mid 是下标，打印的 target 是值。状态表要把两者分开。",
+      "when_to_use": "互动中 mid/value 混淆，或输出看起来“差一位”时。",
+      "steps": [
+        "在纸上同时写下下标序列和值序列。",
+        "把目标值定位到下标后再填写状态。",
+        "测试首元素时确认下标是 0。"
+      ],
+      "self_check": [
+        "能区分 values[0] 和值 0。",
+        "能从数组长度推出最后合法下标。"
+      ]
+    },
+    {
+      "id": "c-while-branch",
+      "title": "while 与分支阅读",
+      "kind": "控制流",
+      "task_ids": [
+        "ds-trace-core",
+        "ds-debug-core"
+      ],
+      "content": "循环条件决定是否继续，if/else 决定保留左半还是右半；本课不需要新增循环类型。",
+      "when_to_use": "读不出某次比较后程序会走哪一支时。",
+      "steps": [
+        "先代入一次 values[mid] 与 target。",
+        "标出执行的分支。",
+        "再写下一轮 left/right。"
+      ],
+      "self_check": [
+        "能说出循环结束的条件。",
+        "能从一条分支得到正确的边界方向。"
+      ]
+    },
+    {
+      "id": "c-io",
+      "title": "输入输出与测试记录",
+      "kind": "测试",
+      "task_ids": [
+        "ds-run-core",
+        "ds-tests-optional"
+      ],
+      "content": "main 中的固定 targets 让每个人先得到可比较结果；记录格式统一比额外加功能更重要。",
+      "when_to_use": "需要增加边界样例或整理运行结果时。",
+      "steps": [
+        "先保留四个基础目标。",
+        "再一次只增加一个测试值。",
+        "把实际结果写回测试表。"
+      ],
+      "self_check": [
+        "记录包含输入、实际、预期三列。",
+        "没有用截图代替文字判断。"
+      ]
+    },
+    {
+      "id": "c-compiler",
+      "title": "逐步编译与最小回退",
+      "kind": "排错",
+      "task_ids": [
+        "ds-fill-core",
+        "ds-debug-core"
+      ],
+      "content": "四个关键空位不能假设每一处都能独立证明；先完成一组完整表达式，再编译整个函数，必要时对照参考结果定位。",
+      "when_to_use": "补空后出现语法错误或程序卡住时。",
+      "steps": [
+        "先检查括号、分号和表达式类型。",
+        "再检查 mid±1 是否让区间缩小。",
+        "最后使用边界测试验证。"
+      ],
+      "self_check": [
+        "能把语法错误和逻辑错误分开。",
+        "能说出下一次该查看哪个状态。"
+      ]
+    },
+    {
+      "id": "c-debug",
+      "title": "用现象读错误",
+      "kind": "Debug",
+      "task_ids": [
+        "ds-debug-core",
+        "ds-transfer-challenge"
+      ],
+      "content": "Debug 记录采用“现象—可能状态—对应分支—修复后测试”四格，不要求写长报告。",
+      "when_to_use": "程序死循环、返回错误下标或边界崩溃时。",
+      "steps": [
+        "先复现一个最小输入。",
+        "打印或手算 left/right/mid。",
+        "只改一条规则后重新验证。"
+      ],
+      "self_check": [
+        "能提出可证伪的原因。",
+        "修复后至少用一个命中和一个缺失样例。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "把有序条件、区间不变量和边界验证串成一节 90 分钟的 C 实践；基础学生以核心任务的大部分完成为达标。",
+    "theory_bridge": "本次实践依次衔接理论课中的五个主题：二分查找使用条件、闭区间状态变化、C 函数实现、边界测试、Debug 与失败返回。学生先从前提和状态推演入手，再把规则落到函数补空、边界验证和故障修复。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "开场：打开理论地图和 starter，完成 ds-orient-core，确认比较字段与有序前提。"
+      },
+      {
+        "minutes": 12,
+        "focus": "状态实验：全班先口算一轮，再让学生独立完成 ds-trace-core 的多轮区间。"
+      },
+      {
+        "minutes": 16,
+        "focus": "代码补空：巡视 ds-fill-core 的四个真实编辑点，提醒先推导再修改。"
+      },
+      {
+        "minutes": 12,
+        "focus": "边界验证：用首尾、单元素、缺失目标对照 ds-run-core 的测试表。"
+      },
+      {
+        "minutes": 14,
+        "focus": "Debug：让学生先在诊断区分类，再回到代码说明边界为何不动或返回为何冲突。"
+      },
+      {
+        "minutes": 10,
+        "focus": "有余力：比较线性与二分的条件和维护成本。"
+      },
+      {
+        "minutes": 8,
+        "focus": "测试清单：把一次试跑整理成可重复的六类输入。"
+      },
+      {
+        "minutes": 10,
+        "focus": "迁移和收尾：完成一个新字段场景，随机抽查不变量和失败结果。"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "ds-orient-core",
+        "look_for": "学生是否把“有序”说成可比较字段的顺序，而不是数组长度或正负号。",
+        "ask_when_stuck": "如果目标比当前值小，哪些元素可以先排除？你凭什么排除？"
+      },
+      {
+        "task_id": "ds-trace-core",
+        "look_for": "学生填写的是下标而不是数值，并且下一轮排除了已经比较的 mid。",
+        "ask_when_stuck": "请先圈出当前候选区间，再说目标与 values[mid] 的大小关系。"
+      },
+      {
+        "task_id": "ds-fill-core",
+        "look_for": "四处真实编辑点是否都被修改，尤其是 mid±1 和未找到返回值。",
+        "ask_when_stuck": "这条分支已经证明 mid 不可能，下一轮还要让它留在区间里吗？"
+      },
+      {
+        "task_id": "ds-run-core",
+        "look_for": "是否覆盖首尾、单元素和缺失输入，是否把 0 当成失败值。",
+        "ask_when_stuck": "首元素的合法下标是多少？失败时如何和它区分？"
+      },
+      {
+        "task_id": "ds-debug-core",
+        "look_for": "学生是否从现象追到边界状态，而不是只凭感觉改代码。",
+        "ask_when_stuck": "请给出卡住前最后一轮 left、right、mid，哪一个没有变化？"
+      },
+      {
+        "task_id": "ds-strategy-optional",
+        "look_for": "比较是否同时考虑查询次数和维护有序的成本。",
+        "ask_when_stuck": "如果数据每分钟都插入，保持有序还划算吗？"
+      },
+      {
+        "task_id": "ds-tests-optional",
+        "look_for": "测试记录是否有预期/实际两列，而不是只有通过截图。",
+        "ask_when_stuck": "哪一条输入最容易暴露未找到返回值错误？"
+      },
+      {
+        "task_id": "ds-transfer-challenge",
+        "look_for": "迁移时是否重新确认比较字段有序和失败条件。",
+        "ask_when_stuck": "换字段后，原来的有序前提还成立吗？"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "查找缺失值时区间不再缩小。",
+        "intervention": "让学生写出最后一轮状态，检查是否把 mid 留在下一轮。"
+      },
+      {
+        "symptom": "查找首元素返回失败。",
+        "intervention": "先核对 mid 的下标含义，再核对失败返回值是否与 0 冲突。"
+      },
+      {
+        "symptom": "数组越界或 mid 不在当前区间。",
+        "intervention": "回到闭区间定义，先检查初始 right 是否为 n-1。"
+      },
+      {
+        "symptom": "把无序数据直接交给二分。",
+        "intervention": "要求学生在理论地图中指出可排除一半的证据。"
+      },
+      {
+        "symptom": "只修改注释或复制参考实现。",
+        "intervention": "让学生指出四个 starter 空位实际改变了哪个运行结果。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱：先只要求完成 ds-orient-core、ds-trace-core、ds-fill-core 的四处关键编辑和一组命中/缺失测试；允许使用 c-function、c-array-index 和 c-compiler。",
+      "进度正常：完成全部 core，并在 ds-debug-core 中口头说明至少一处现象—原因—修复。",
+      "进度较快：进入 ds-strategy-optional、ds-tests-optional 和 ds-transfer-challenge，不增加重复抄写代码。"
+    ],
+    "closing_checks": [
+      "随机抽一名学生解释为什么下一轮是 mid+1 或 mid-1。",
+      "随机给出首元素或缺失目标，学生说出返回形态。",
+      "查看学生是否能指出一个真实 starter 编辑点，而不是只说“有 TODO”。",
+      "让学生用一句话说明二分查找的有序前提。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "ds-orient-core",
+        "title": "把问题画成候选区间",
+        "source_slide_ids": [
+          "search-01"
+        ],
+        "reference_answer": "安全使用二分查找的前提是：数据按同一比较规则有序；目标可存在也可不存在。",
+        "reference_result": "三个场景中，只有有序且比较规则一致的场景可以排除一半。",
+        "key_steps": [
+          "确认比较字段和排序方向",
+          "根据目标与中间值关系排除一半",
+          "说明失败时仍会收缩到空区间"
+        ],
+        "acceptable_variants": [
+          "使用升序或降序均可，只要比较方向保持一致。"
+        ],
+        "common_errors": [
+          "把“元素为整数”当成有序条件。",
+          "认为目标必须存在。"
+        ],
+        "acceptance_basis": [
+          "学生能在三个场景中给出正确前提和理由。"
+        ]
+      },
+      {
+        "task_id": "ds-trace-core",
+        "title": "逐轮追踪 left / right / mid",
+        "source_slide_ids": [
+          "search-02",
+          "search-03"
+        ],
+        "reference_answer": "以查找 37 为例：[0,7]，mid=3 后取 [4,7]；再 mid=5 命中。",
+        "reference_result": "每轮 left≤mid≤right，且下一轮排除了已比较且不可能的 mid。",
+        "key_steps": [
+          "先写当前闭区间",
+          "计算 mid 并比较",
+          "根据比较结果写下一轮区间"
+        ],
+        "acceptable_variants": [
+          "中点用 left+(right-left)/2 也可。"
+        ],
+        "common_errors": [
+          "把值当下标。",
+          "用 mid 而不是 mid±1。"
+        ],
+        "acceptance_basis": [
+          "状态表两轮以上正确，能解释排除理由。"
+        ]
+      },
+      {
+        "task_id": "ds-fill-core",
+        "title": "补全二分查找的 4 个关键位置",
+        "source_slide_ids": [
+          "search-02",
+          "search-05"
+        ],
+        "reference_answer": "完整参考实现：\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n\n        if (values[mid] == target) {\n            return mid;\n        }\n\n        if (values[mid] < target) {\n            left = mid + 1;\n        } else {\n            right = mid - 1;\n        }\n    }\n\n    return -1;\n}\n\n学生4处 TODO 答案：\nTODO 1：left + (right - left) / 2；\nTODO 2：left = mid + 1；\nTODO 3：right = mid - 1；\nTODO 4：return -1。",
+        "reference_result": "targets 21、3、58 返回对应下标，20 返回 -1。",
+        "key_steps": [
+          "完成四处实际编辑",
+          "编译完整函数",
+          "运行命中、两端和缺失输入"
+        ],
+        "acceptable_variants": [
+          "用 left+(right-left)/2 计算中点也可。",
+          "未找到值可使用课程另行约定的负值，但必须与合法下标区分。"
+        ],
+        "common_errors": [
+          "left=mid 或 right=mid 造成死循环。",
+          "return 0 与首元素冲突。"
+        ],
+        "acceptance_basis": [
+          "四个空位已真实修改，关键输入结果正确且能解释。"
+        ]
+      },
+      {
+        "task_id": "ds-run-core",
+        "title": "用边界测试证明函数可靠",
+        "source_slide_ids": [
+          "search-03",
+          "search-04"
+        ],
+        "reference_answer": "测试覆盖空数组、单元素、首元素、末元素和缺失值；空或缺失均不返回合法命中下标。",
+        "reference_result": "至少四类边界测试结果与预期一致。",
+        "key_steps": [
+          "建立输入/预期/实际表",
+          "先测首尾和单元素",
+          "再测缺失值并检查失败标志"
+        ],
+        "acceptable_variants": [
+          "可以增加随机目标，但不能代替边界样例。"
+        ],
+        "common_errors": [
+          "只运行一个命中样例。",
+          "用 0 表示失败。"
+        ],
+        "acceptance_basis": [
+          "测试可复现，学生能解释循环结束条件。"
+        ]
+      },
+      {
+        "task_id": "ds-debug-core",
+        "title": "Debug：从错误现象回到不变量",
+        "source_slide_ids": [
+          "search-04",
+          "search-05"
+        ],
+        "reference_answer": "三个 Debug starter 的逐文件参考：\n\nbug-loop.c\n错误：left = mid;\n修复：left = mid + 1;\n原因：mid 已经比较过；若仍保留 mid，区间可能无法缩小，导致重复比较甚至死循环。\n\nbug-boundary.c\n错误：right = mid;\n修复：right = mid - 1;\n原因：这是闭区间，mid 已经比较过，左侧搜索必须排除 mid。\n\nbug-return.c\n错误：未命中时 return 0;\n修复：return -1;\n原因：0 是合法数组下标，不能同时表示查找失败。\n\n回归验证：分别用命中、首元素、末元素和缺失目标运行三个文件，确认每次只修对应故障。",
+        "reference_result": "每种故障都能通过一个最小输入复现并修复。",
+        "key_steps": [
+          "记录现象",
+          "写出最后一轮状态",
+          "只改对应规则并回归测试"
+        ],
+        "acceptable_variants": [
+          "使用打印语句或手算状态均可。"
+        ],
+        "common_errors": [
+          "把错误归因于编译器。",
+          "一次改很多行导致无法验证原因。"
+        ],
+        "acceptance_basis": [
+          "至少一处完整的现象—原因—修改—验证链。"
+        ]
+      },
+      {
+        "task_id": "ds-strategy-optional",
+        "title": "比较线性扫描与二分查找",
+        "source_slide_ids": [
+          "search-01",
+          "search-03"
+        ],
+        "reference_answer": "数据很少且频繁更新时线性扫描更简单；静态且重复查询多时二分更有收益。",
+        "reference_result": "场景选择能同时说明有序维护和查询次数。",
+        "key_steps": [
+          "记录两种策略的比较次数",
+          "区分一次查询与重复查询",
+          "给出策略边界"
+        ],
+        "acceptable_variants": [
+          "可用近似比较次数，不要求精确复杂度证明。"
+        ],
+        "common_errors": [
+          "只说“二分一定更快”。"
+        ],
+        "acceptance_basis": [
+          "至少三个场景的理由成立。"
+        ]
+      },
+      {
+        "task_id": "ds-tests-optional",
+        "title": "扩充可重复的测试清单",
+        "source_slide_ids": [
+          "search-04",
+          "search-05"
+        ],
+        "reference_answer": "测试清单至少含空、单元素、首、尾、中间缺失和范围外目标。",
+        "reference_result": "每行都有预期和实际，并标出最容易暴露的风险。",
+        "key_steps": [
+          "选六类输入",
+          "统一记录格式",
+          "根据差异定位规则"
+        ],
+        "acceptable_variants": [
+          "可用表格或文本清单。"
+        ],
+        "common_errors": [
+          "只有截图没有判断。"
+        ],
+        "acceptance_basis": [
+          "测试覆盖主要边界并能复用。"
+        ]
+      },
+      {
+        "task_id": "ds-transfer-challenge",
+        "title": "迁移：写出自己的不变量说明",
+        "source_slide_ids": [
+          "search-01",
+          "search-04",
+          "search-05"
+        ],
+        "reference_answer": "换到按版本号有序的设备清单时可复用；换到无序编号字段时必须先排序或改用线性策略。",
+        "reference_result": "三条不变量包含有序字段、候选区间和失败结果。",
+        "key_steps": [
+          "选定比较字段",
+          "写出排除规则",
+          "设计缺失目标"
+        ],
+        "acceptable_variants": [
+          "场景可换成成绩、库存或时间戳，只要前提清楚。"
+        ],
+        "common_errors": [
+          "把字段类型当成有序保证。"
+        ],
+        "acceptance_basis": [
+          "学生能解释复用条件和失效边界。"
+        ]
+      }
+    ]
+  },
+  "starter_assets": [
+    {
+      "id": "binary-search-bug-loop",
+      "path": "bug-loop.c",
+      "language": "C",
+      "task_id": "ds-debug-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (values[mid] == target) return mid;\n        if (values[mid] < target) {\n            left = mid; /* 故障：没有排除已经比较过的 mid */\n        } else {\n            right = mid - 1;\n        }\n    }\n    return -1;\n}\n",
+      "editable_gaps": []
+    },
+    {
+      "id": "binary-search-bug-boundary",
+      "path": "bug-boundary.c",
+      "language": "C",
+      "task_id": "ds-debug-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (values[mid] == target) return mid;\n        if (values[mid] < target) {\n            left = mid + 1;\n        } else {\n            right = mid; /* 故障：没有排除已经比较过的 mid */\n        }\n    }\n    return -1;\n}\n",
+      "editable_gaps": []
+    },
+    {
+      "id": "binary-search-bug-return",
+      "path": "bug-return.c",
+      "language": "C",
+      "task_id": "ds-debug-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = left + (right - left) / 2;\n        if (values[mid] == target) return mid;\n        if (values[mid] < target) left = mid + 1;\n        else right = mid - 1;\n    }\n    return 0; /* 故障：失败结果与首元素下标混淆 */\n}\n",
+      "editable_gaps": []
+    },
+    {
+      "id": "binary-search-c-starter",
+      "path": "binary-search.c",
+      "language": "C",
+      "task_id": "ds-fill-core",
+      "content": "#include <stdio.h>\n\nint binary_search(const int values[], int n, int target) {\n    int left = 0;\n    int right = n - 1;\n    while (left <= right) {\n        int mid = 0; /* TODO 1 */\n        if (values[mid] == target) {\n            return mid;\n        }\n        if (values[mid] < target) {\n            left = mid; /* TODO 2 */\n        } else {\n            right = mid; /* TODO 3 */\n        }\n    }\n    return 0; /* TODO 4 */\n}\n\nint main(void) {\n    int values[] = {3, 8, 14, 21, 29, 37, 45, 58};\n    int n = (int)(sizeof(values) / sizeof(values[0]));\n    int targets[] = {21, 3, 58, 20};\n    for (int i = 0; i < 4; i++) {\n        printf(\"target=%d index=%d\\n\", targets[i], binary_search(values, n, targets[i]));\n    }\n    return 0;\n}\n",
+      "editable_gaps": [
+        {
+          "marker": "TODO 1",
+          "target": "int mid = 0",
+          "replacement": "int mid = left + (right - left) / 2",
+          "student_instruction": "把当前闭区间的中点表达式填入，并保持整数下标。",
+          "kind": "expression"
+        },
+        {
+          "marker": "TODO 2",
+          "target": "left = mid",
+          "replacement": "left = mid + 1",
+          "student_instruction": "目标更大时排除已经比较过的中点，再移动左边界。",
+          "kind": "boundary-update"
+        },
+        {
+          "marker": "TODO 3",
+          "target": "right = mid",
+          "replacement": "right = mid - 1",
+          "student_instruction": "目标更小时排除已经比较过的中点，再移动右边界。",
+          "kind": "boundary-update"
+        },
+        {
+          "marker": "TODO 4",
+          "target": "return 0; /* TODO 4 */",
+          "replacement": "return -1; /* TODO 4 */",
+          "student_instruction": "填入课程约定的未找到返回值。",
+          "kind": "return-value"
+        }
+      ]
+    }
+  ]
+}

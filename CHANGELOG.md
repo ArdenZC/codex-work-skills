@@ -4,13 +4,48 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## Dual Teaching Skills Generalization 1.0 — 2026-09-09
+
+### Added
+
+- 完成 Courseware HTML Generator 1.2.1 与 Practice Class HTML Generator 1.2.0 的正式发布闭环。
+- 建立 Raw teaching materials → Courseware → Practice 的最终用户工作流与理论课更新后的 Practice 处理说明。
+
+### Changed
+
+- Courseware 作为理论课上游，Practice 通过 `source_slide_ids`、`learning_unit_ids`、`canonical_fact_ids` 和 `not_yet_taught` 消费已讲理论语义。
+- 两个 Skill 的正式版本和 Content Contract 版本分别记录，不把 Skill 自动化 QA 通过解释为最终教学质量通过。
+
+### Validated
+
+- PR #20 已合并至 `87dad9509c8f416c15a4eddfe14d096a666815a5`；PR #24 已合并至 `f97f0dcbb88db2c467aefabd77003d1532810a31`。
+- Courseware 1.2.1 / Contract 1.1 与 Practice 1.2.0 / Contract 1.1 的 final master smoke、browser smoke、student/teacher isolation、冻结 blind deterministic regression 和 cross-skill linkage 均通过。
+- Final human Courseware Gold / Practice review 结论保留为 PASS；自动化 QA 不替代教师最终课堂判断。
+
+### Known limitations
+
+- Courseware 更新可能改变 slide、learning unit 或 canonical fact ID；已有 Practice 应重新生成，或使用经过验证的 compatibility mapping。
+- Excel 原生界面、Wireshark、Packet Tracer 等现场工具行为仍可能需要人工 evidence。
+- Lesson / LibreOffice / Gradebook 的既有环境失败不属于本次双 Skill 引入的问题。
+
+## 实践课 HTML 生成器 1.2.0 — 2026-09-09
+
+- 收口 Practice Class Content Contract 1.1：优先消费 Courseware Contract 1.1，保留 `source_slide_ids`、`learning_unit_ids`、`canonical_fact_ids`、`not_yet_taught` 和 `course_context` 语义边界。
+- 完成 G3 Classroom Asset Integrity、Executable Reference、Behavioral Verification、Formula Truth、Editable Gap answer isolation、Starter Bundle 与 student/teacher package isolation；人工 Blind Generalization：PASS。
+- Fresh Flow 为 Raw materials → Courseware → Practice；Courseware 更新导致 ID 变化时，必须持久化兼容映射或重新生成 Practice。自动化 PASS 不替代真实教师教学审核。
+
+## HTML 课件生成器 1.2.1 — 2026-09-09
+
+- 收口 Courseware Content Contract 1.1：explicit time model、learning units、canonical facts、source truth、time evidence、course context、stable slide IDs 和 theory-led planning。
+- 完成 Gold Closure、dynamic browser smoke、multi-viewport overflow、production pipeline E2E、offline/no-external-resource 与 student/teacher separation；Final Human Gold review：PASS。
+- Courseware 作为理论课上游 Skill，不依赖或反向修改 Practice；自动化 QA 通过不等于教学内容天然完美。
+
 ## Lesson 2.2.3 / WorkOrder 2.2.0 Structural Closeout — 2026-09-08
 
 - Lesson 继续使用 Content Contract 2.2，固定每课课前 10 分钟、课后 15 分钟；课中仍按 `hours × 45` 分配，课外时间不计入课程课时。
 - 课程级教材、教学资源和参考文献继续分离；书籍作者/编辑、书名、出版社必填，年份可选；无可验证外部来源时允许空 reference pool 并记录检索状态。
 - Lesson 的实践任务反向字段保持空数组；Practice Task Contract 1.1 从已确认课程基本盘单向连接理论 Lesson。
 - WorkOrder Content 1.1 增加显式 linked/standalone 模式、课程基本盘、完整来源任务快照和 Agent pedagogical review；每项 2 学时，固定 10+90=100 分，交付物—验收使用 ID 映射。
-- 关联 WorkOrder 默认执行 Cross-Artifact QA、Output QA 和真实 Render Smoke；standalone/debug 显式跳过渲染时不报告 Production PASS。模板 binary、`lesson-plan v1.1.2` 和 `practice-work-order v1.0.0` 均不变。
 
 ## Lesson / WorkOrder Contract Fix 2.2.1 — 2026-09-05
 

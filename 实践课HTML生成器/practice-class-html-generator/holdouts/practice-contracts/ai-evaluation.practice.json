@@ -1,0 +1,1783 @@
+{
+  "contract_version": "1.1",
+  "course_title": "AI 分类评估基础",
+  "practice_title": "实践：从分类结果到有边界的评估结论",
+  "audience": "高职人工智能应用专业学生",
+  "duration_minutes": 90,
+  "course_context": {
+    "course_name": "AI 分类评估基础",
+    "audience": "高职人工智能应用专业学生",
+    "language": "Python",
+    "tools": [
+      "JupyterLab",
+      "NumPy"
+    ],
+    "platform": "Windows",
+    "software": "JupyterLab",
+    "framework": "NumPy",
+    "other_constraints": [
+      "只使用已给标签和预测结果，不引入新模型训练"
+    ]
+  },
+  "source_courseware": {
+    "mode": "courseware",
+    "contract_version": "1.1",
+    "chapter_title": "混淆矩阵、指标与阈值选择",
+    "taught_slide_ids": [
+      "ai-evaluation-s1",
+      "ai-evaluation-s2",
+      "ai-evaluation-s3",
+      "ai-evaluation-s4",
+      "ai-evaluation-s5"
+    ]
+  },
+  "knowledge_links": [
+    {
+      "id": "ai-evaluation-k1",
+      "title": "标签与预测",
+      "summary": "评估先要明确实际标签和模型预测分别代表什么",
+      "source_slide_ids": [
+        "ai-evaluation-s1"
+      ],
+      "student_can_do": "能把一条样本放入正确的比较位置",
+      "learning_unit_ids": [
+        "ai-evaluation-u1"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1"
+      ]
+    },
+    {
+      "id": "ai-evaluation-k2",
+      "title": "混淆矩阵",
+      "summary": "TP、FP、FN、TN 把分类结果按两个维度拆开",
+      "source_slide_ids": [
+        "ai-evaluation-s2"
+      ],
+      "student_can_do": "能从样本表数出四类结果",
+      "learning_unit_ids": [
+        "ai-evaluation-u2"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2"
+      ]
+    },
+    {
+      "id": "ai-evaluation-k3",
+      "title": "Precision 与 Recall",
+      "summary": "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例",
+      "source_slide_ids": [
+        "ai-evaluation-s3"
+      ],
+      "student_can_do": "能根据业务风险选择关注指标",
+      "learning_unit_ids": [
+        "ai-evaluation-u3"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3"
+      ]
+    },
+    {
+      "id": "ai-evaluation-k4",
+      "title": "阈值变化",
+      "summary": "改变阈值会同时改变预测标签和指标，不应只看单个数字",
+      "source_slide_ids": [
+        "ai-evaluation-s4"
+      ],
+      "student_can_do": "能比较两个阈值下的结果差异",
+      "learning_unit_ids": [
+        "ai-evaluation-u4"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f4"
+      ]
+    },
+    {
+      "id": "ai-evaluation-k5",
+      "title": "评估结论",
+      "summary": "评估结论必须说明数据、指标、阈值和风险边界",
+      "source_slide_ids": [
+        "ai-evaluation-s5"
+      ],
+      "student_can_do": "能写出带条件的评估结论",
+      "learning_unit_ids": [
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f5"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "ai-evaluation-pair",
+      "level": "core",
+      "title": "配对预测与实际标签",
+      "knowledge_link_ids": [
+        "ai-evaluation-k1"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s1"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1"
+      ],
+      "task_kind": "observation",
+      "artifact_kind": "result",
+      "capabilities": [
+        "state_tracking",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "逐行对齐预测数组与实际标签数组。",
+      "scaffold": "给出八条成对数据和四格标签卡。",
+      "steps": [
+        {
+          "title": "对齐",
+          "instruction": "把每个预测和实际标签放在同一行。",
+          "check": "没有错位。"
+        },
+        {
+          "title": "标记",
+          "instruction": "标出预测正、实际负的行。",
+          "check": "找到误报候选。"
+        },
+        {
+          "title": "解释",
+          "instruction": "说明为什么只看预测值不够。",
+          "check": "解释引用标签。"
+        }
+      ],
+      "acceptance": [
+        "完成逐行配对",
+        "指出一类错误样本"
+      ],
+      "help_refs": [
+        "ai-evaluation-g1",
+        "ai-evaluation-kit1"
+      ],
+      "estimated_minutes": 8,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "ai-evaluation-matrix",
+      "level": "core",
+      "title": "填写混淆矩阵四格",
+      "knowledge_link_ids": [
+        "ai-evaluation-k2"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s2"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u2"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "result",
+      "capabilities": [
+        "state_tracking",
+        "visualization",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "把样本表归入 TP、FP、FN、TN 并核对总数。",
+      "scaffold": "提供标签对照表和四格空表。",
+      "steps": [
+        {
+          "title": "逐行分类",
+          "instruction": "按预测/实际组合给每行贴标签。",
+          "check": "每行只进一格。"
+        },
+        {
+          "title": "汇总",
+          "instruction": "数出四格数量。",
+          "check": "四格合计等于样本数。"
+        },
+        {
+          "title": "解释",
+          "instruction": "说出误报与漏报差别。",
+          "check": "业务含义清楚。"
+        }
+      ],
+      "acceptance": [
+        "四格数值正确",
+        "四格合计与样本数一致"
+      ],
+      "help_refs": [
+        "ai-evaluation-g2",
+        "ai-evaluation-kit2"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "ai-evaluation-metrics",
+      "level": "core",
+      "title": "补齐指标计算 starter",
+      "knowledge_link_ids": [
+        "ai-evaluation-k3"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s3"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3"
+      ],
+      "task_kind": "implementation",
+      "artifact_kind": "source-code",
+      "capabilities": [
+        "code_editing",
+        "execution",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "在完整 Python 函数中补三个真实统计位置，再编译并对照手算。",
+      "scaffold": "保留函数参数、返回字典和指标公式，只留下 TP/FP/FN 三个关键空位。",
+      "steps": [
+        {
+          "title": "补 TP",
+          "instruction": "按预测和实际同时为正的条件填写。",
+          "check": "TP 与手算一致。"
+        },
+        {
+          "title": "补 FP/FN",
+          "instruction": "分别填写误报和漏报条件。",
+          "check": "两个错误类型不混淆。"
+        },
+        {
+          "title": "跑样例",
+          "instruction": "用八条标签检查返回字典。",
+          "check": "输出包含三类计数和 precision。"
+        },
+        {
+          "title": "解释分母",
+          "instruction": "说明 precision 为什么使用 TP+FP。",
+          "check": "能联系理论事实。"
+        }
+      ],
+      "acceptance": [
+        "三个 TODO 都有真实统计逻辑",
+        "py_compile 通过且结果可手算",
+        "能解释 precision 分母"
+      ],
+      "help_refs": [
+        "ai-evaluation-g3",
+        "ai-evaluation-kit3"
+      ],
+      "estimated_minutes": 16,
+      "verification": "用 Python py_compile 并以八条固定标签手算 TP/FP/FN。",
+      "starter_asset_ids": [
+        "ai-evaluation-metrics"
+      ],
+      "todo_count": 3
+    },
+    {
+      "id": "ai-evaluation-threshold",
+      "level": "core",
+      "title": "比较两个阈值的指标代价",
+      "knowledge_link_ids": [
+        "ai-evaluation-k4"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s4"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u4"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f4"
+      ],
+      "task_kind": "experiment",
+      "artifact_kind": "result",
+      "capabilities": [
+        "comparison",
+        "scenario_reasoning",
+        "explanation"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "根据概率表比较阈值 0.5 和 0.7 的错误变化。",
+      "scaffold": "提供概率、标签和两个阈值的结果槽。",
+      "steps": [
+        {
+          "title": "定预测",
+          "instruction": "按每个阈值给概率贴预测标签。",
+          "check": "阈值规则一致。"
+        },
+        {
+          "title": "算变化",
+          "instruction": "比较两组误报和漏报。",
+          "check": "变化有证据。"
+        },
+        {
+          "title": "选场景",
+          "instruction": "为高漏报代价场景选择阈值。",
+          "check": "选择引用业务风险。"
+        }
+      ],
+      "acceptance": [
+        "完成两阈值比较",
+        "能说明阈值选择与风险关系"
+      ],
+      "help_refs": [
+        "ai-evaluation-g4",
+        "ai-evaluation-kit4"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "ai-evaluation-conclude",
+      "level": "core",
+      "title": "写一条带边界的评估结论",
+      "knowledge_link_ids": [
+        "ai-evaluation-k5"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s5"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f5"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "document",
+      "capabilities": [
+        "explanation",
+        "scenario_reasoning"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "把数据、指标、阈值和风险写进一段可审阅结论。",
+      "scaffold": "提供结论四要素句式和一组验证结果。",
+      "steps": [
+        {
+          "title": "填数据",
+          "instruction": "写清验证集和样本范围。",
+          "check": "范围可复核。"
+        },
+        {
+          "title": "报指标",
+          "instruction": "说明 precision/recall 的变化。",
+          "check": "不只报一个分数。"
+        },
+        {
+          "title": "写边界",
+          "instruction": "指出尚不能推出的结论。",
+          "check": "避免过度承诺。"
+        }
+      ],
+      "acceptance": [
+        "结论覆盖四要素",
+        "明确一个风险边界"
+      ],
+      "help_refs": [
+        "ai-evaluation-g5",
+        "ai-evaluation-kit5"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "ai-evaluation-tradeoff",
+      "level": "optional",
+      "title": "做一次指标取舍讨论",
+      "knowledge_link_ids": [
+        "ai-evaluation-k3",
+        "ai-evaluation-k4"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s3",
+        "ai-evaluation-s4"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3",
+        "ai-evaluation-u4"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3",
+        "ai-evaluation-f4"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "scenario",
+      "capabilities": [
+        "comparison",
+        "scenario_reasoning"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为告警、筛查和推荐三个场景选择更关注的指标。",
+      "scaffold": "提供三张业务风险卡和两组指标。",
+      "steps": [
+        {
+          "title": "看风险",
+          "instruction": "找出漏报和误报哪一个更昂贵。",
+          "check": "风险描述具体。"
+        },
+        {
+          "title": "选指标",
+          "instruction": "将场景与指标连线。",
+          "check": "选择有分母依据。"
+        },
+        {
+          "title": "说反例",
+          "instruction": "指出指标高但仍不合适的情况。",
+          "check": "能说明数据边界。"
+        }
+      ],
+      "acceptance": [
+        "三个场景都有选择",
+        "每个选择有风险依据"
+      ],
+      "help_refs": [
+        "ai-evaluation-g3",
+        "ai-evaluation-kit3"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "ai-evaluation-slice",
+      "level": "optional",
+      "title": "检查一个数据切片",
+      "knowledge_link_ids": [
+        "ai-evaluation-k1",
+        "ai-evaluation-k5"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s1",
+        "ai-evaluation-s5"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f5"
+      ],
+      "task_kind": "analysis",
+      "artifact_kind": "result",
+      "capabilities": [
+        "diagnosis",
+        "comparison"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "比较整体指标与一个子群体指标，寻找可能差异。",
+      "scaffold": "提供整体和子群体两组四格计数。",
+      "steps": [
+        {
+          "title": "比四格",
+          "instruction": "比较两组矩阵。",
+          "check": "找到一项差异。"
+        },
+        {
+          "title": "找原因",
+          "instruction": "提出一个需要继续验证的原因。",
+          "check": "不把猜测当结论。"
+        },
+        {
+          "title": "写后续",
+          "instruction": "为子群体设计一个回查动作。",
+          "check": "动作可执行。"
+        }
+      ],
+      "acceptance": [
+        "指出一个可解释差异",
+        "写出后续验证动作"
+      ],
+      "help_refs": [
+        "ai-evaluation-g1",
+        "ai-evaluation-kit1"
+      ],
+      "estimated_minutes": 10,
+      "verification": "按验收条件复核输入、动作和结果。"
+    },
+    {
+      "id": "ai-evaluation-policy",
+      "level": "challenge",
+      "title": "提出一份阈值评估策略",
+      "knowledge_link_ids": [
+        "ai-evaluation-k4",
+        "ai-evaluation-k5"
+      ],
+      "source_slide_ids": [
+        "ai-evaluation-s4",
+        "ai-evaluation-s5"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "task_kind": "scenario",
+      "artifact_kind": "document",
+      "capabilities": [
+        "scenario_reasoning",
+        "explanation",
+        "comparison"
+      ],
+      "scaffold_level": "high",
+      "modality": "practice",
+      "overview": "为一个需要控制漏报的场景提出阈值评估策略。",
+      "scaffold": "提供风险说明、概率表和结论模板。",
+      "steps": [
+        {
+          "title": "定义目标",
+          "instruction": "写明优先控制哪类错误。",
+          "check": "目标能转成指标。"
+        },
+        {
+          "title": "设计比较",
+          "instruction": "安排至少两个阈值和一条回归检查。",
+          "check": "比较可复核。"
+        },
+        {
+          "title": "说明边界",
+          "instruction": "写出尚需更多数据的地方。",
+          "check": "策略不过度承诺。"
+        }
+      ],
+      "acceptance": [
+        "策略包含指标、阈值和回归",
+        "写明数据边界"
+      ],
+      "help_refs": [
+        "ai-evaluation-g4",
+        "ai-evaluation-kit4"
+      ],
+      "estimated_minutes": 12,
+      "verification": "按验收条件复核输入、动作和结果。"
+    }
+  ],
+  "learning_center": [
+    {
+      "id": "ai-evaluation-lab1",
+      "title": "标签配对判断",
+      "knowledge_link_ids": [
+        "ai-evaluation-k1"
+      ],
+      "task_ids": [
+        "ai-evaluation-pair"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1"
+      ],
+      "purpose": "用标签配对判断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "choice",
+        "estimated_minutes": 6,
+        "prompt": "围绕标签配对判断，先做一个判断，再把反馈带回任务。",
+        "options": [
+          {
+            "label": "证据支持标签配对判断的关键条件",
+            "feedback": "正确。请把这条证据写入任务验收。"
+          },
+          {
+            "label": "只凭结果表面相似就直接通过",
+            "feedback": "还不够，需要回到条件或过程证据。"
+          },
+          {
+            "label": "跳过检查直接改变工具设置",
+            "feedback": "先保留可解释的检查步骤，再改变设置。"
+          }
+        ],
+        "answer_index": 0,
+        "success_feedback": "判断完成，请回到对应任务执行。",
+        "retry_feedback": "请从理论页的条件和当前证据重新核对。"
+      }
+    },
+    {
+      "id": "ai-evaluation-lab2",
+      "title": "混淆矩阵状态",
+      "knowledge_link_ids": [
+        "ai-evaluation-k1",
+        "ai-evaluation-k2"
+      ],
+      "task_ids": [
+        "ai-evaluation-pair",
+        "ai-evaluation-matrix"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u2"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f2"
+      ],
+      "purpose": "用混淆矩阵状态把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "state-simulator",
+        "estimated_minutes": 6,
+        "prompt": "根据混淆矩阵状态的过程状态，填写下一步字段；输入框不会预填答案。",
+        "state_fields": [
+          {
+            "id": "phase",
+            "label": "当前阶段",
+            "input_type": "text"
+          },
+          {
+            "id": "action",
+            "label": "下一动作",
+            "input_type": "text"
+          }
+        ],
+        "state": {
+          "context_label": "当前场景",
+          "context": "混淆矩阵状态的过程被拆成两个可观察状态。"
+        },
+        "visualization": {
+          "kind": "state-machine",
+          "title": "混淆矩阵状态状态图",
+          "items": [
+            {
+              "label": "观察",
+              "value": "先收集证据"
+            },
+            {
+              "label": "检查",
+              "value": "按标准核对"
+            },
+            {
+              "label": "处理",
+              "value": "做一个最小动作"
+            }
+          ]
+        },
+        "rounds": [
+          {
+            "given": {
+              "phase": "观察",
+              "action": "等待"
+            },
+            "expected": {
+              "action": "检查"
+            },
+            "next_expected": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "status": "continue",
+            "observation": "已经从描述转向证据检查。",
+            "feedback": "下一动作应当能产生可观察证据。"
+          },
+          {
+            "given": {
+              "phase": "检查",
+              "action": "核对"
+            },
+            "expected": {
+              "action": "处理"
+            },
+            "status": "found",
+            "observation": "已完成一次最小、可解释的处理。",
+            "feedback": "过程到达终止状态，可以回到任务验收。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai-evaluation-lab3",
+      "title": "指标计算过程",
+      "knowledge_link_ids": [
+        "ai-evaluation-k2",
+        "ai-evaluation-k3"
+      ],
+      "task_ids": [
+        "ai-evaluation-matrix",
+        "ai-evaluation-metrics"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u2",
+        "ai-evaluation-u3"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2",
+        "ai-evaluation-f3"
+      ],
+      "purpose": "用指标计算过程把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "stepper",
+        "estimated_minutes": 6,
+        "prompt": "围绕指标计算过程，先做一个判断，再把反馈带回任务。",
+        "steps": [
+          {
+            "title": "定位输入",
+            "text": "列出指标计算过程的输入、观察对象和当前已知条件。"
+          },
+          {
+            "title": "执行一步",
+            "text": "只改变一个与指标计算过程相关的操作，记录状态变化。"
+          },
+          {
+            "title": "核对结果",
+            "text": "用理论中的判断标准解释结果，并决定是否进入下一步。"
+          },
+          {
+            "title": "回到任务",
+            "text": "把观察到的规律写成任务中的一个小验收条件。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai-evaluation-lab4",
+      "title": "阈值变化诊断",
+      "knowledge_link_ids": [
+        "ai-evaluation-k4"
+      ],
+      "task_ids": [
+        "ai-evaluation-threshold"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u4"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f4"
+      ],
+      "purpose": "用阈值变化诊断把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "diagnose",
+        "estimated_minutes": 6,
+        "prompt": "连续处理阈值变化诊断中的两个诊断案例，先说现象，再选最小修复。",
+        "diagnostic_cases": [
+          {
+            "id": "ai-evaluation-case-1",
+            "title": "结果为空或没有变化",
+            "context": "在阈值变化诊断操作中出现：结果为空或没有变化。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          },
+          {
+            "id": "ai-evaluation-case-2",
+            "title": "结果与理论条件不一致",
+            "context": "在阈值变化诊断操作中出现：结果与理论条件不一致。",
+            "error_prompt": "先判断最可能的原因",
+            "error_options": [
+              {
+                "label": "输入/前置条件未核对",
+                "feedback": "先查证据。"
+              },
+              {
+                "label": "直接把结果当作原因",
+                "feedback": "结果只能帮助定位，不能代替原因。"
+              }
+            ],
+            "error_answer_index": 0,
+            "fix_prompt": "再选择最小修复",
+            "fix_options": [
+              {
+                "label": "补一项检查并重新观察",
+                "feedback": "修复动作可复核。"
+              },
+              {
+                "label": "一次改动所有设置",
+                "feedback": "改动太大，无法知道哪一步有效。"
+              }
+            ],
+            "fix_answer_index": 0
+          }
+        ],
+        "completion_feedback": "两个诊断案例都完成；请把最小修复带回实践任务。"
+      }
+    },
+    {
+      "id": "ai-evaluation-lab5",
+      "title": "连续评估题组",
+      "knowledge_link_ids": [
+        "ai-evaluation-k3",
+        "ai-evaluation-k4",
+        "ai-evaluation-k5"
+      ],
+      "task_ids": [
+        "ai-evaluation-metrics",
+        "ai-evaluation-threshold",
+        "ai-evaluation-conclude"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3",
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3",
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "purpose": "用连续评估题组把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "multi-question",
+        "estimated_minutes": 6,
+        "prompt": "逐题完成连续评估题组的三个检查点，每题反馈后再进入下一题。",
+        "questions": [
+          {
+            "prompt": "连续评估题组：第一步应保留什么证据？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续评估题组：哪个动作最能验证理论？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          },
+          {
+            "prompt": "连续评估题组：什么时候需要打开补给资料？",
+            "options": [
+              {
+                "label": "记录条件、动作和可观察结果",
+                "feedback": "正确，三者缺一不可。"
+              },
+              {
+                "label": "只记录最后一个数字",
+                "feedback": "缺少过程，无法复核。"
+              },
+              {
+                "label": "先跳过检查",
+                "feedback": "应先让判断可被验证。"
+              }
+            ],
+            "answer_index": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai-evaluation-lab6",
+      "title": "证据动作分类",
+      "knowledge_link_ids": [
+        "ai-evaluation-k2",
+        "ai-evaluation-k5"
+      ],
+      "task_ids": [
+        "ai-evaluation-matrix",
+        "ai-evaluation-conclude"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u2",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2",
+        "ai-evaluation-f5"
+      ],
+      "purpose": "用证据动作分类把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "classify",
+        "estimated_minutes": 6,
+        "prompt": "把证据动作分类中的动作分到正确的工作角色。",
+        "categories": [
+          "证据",
+          "动作",
+          "验收"
+        ],
+        "items": [
+          {
+            "id": "evidence",
+            "label": "读取现象、条件和原始记录",
+            "answer": "证据",
+            "feedback": "先形成可复核证据。"
+          },
+          {
+            "id": "action",
+            "label": "只修改一个关键设置或字段",
+            "answer": "动作",
+            "feedback": "动作要小且能回退。"
+          },
+          {
+            "id": "accept",
+            "label": "按标准解释结果并决定下一步",
+            "answer": "验收",
+            "feedback": "验收连接理论与实践。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ai-evaluation-lab7",
+      "title": "策略步骤排序",
+      "knowledge_link_ids": [
+        "ai-evaluation-k4",
+        "ai-evaluation-k5"
+      ],
+      "task_ids": [
+        "ai-evaluation-conclude",
+        "ai-evaluation-policy"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "purpose": "用策略步骤排序把理论判断落实到证据、动作和验收。",
+      "interaction": {
+        "type": "reorder",
+        "estimated_minutes": 6,
+        "prompt": "排列策略步骤排序的实际工作顺序，先恢复证据链，再做判断。",
+        "items": [
+          {
+            "id": "observe",
+            "label": "执行最小操作并观察结果"
+          },
+          {
+            "id": "check",
+            "label": "核对输入和前置条件"
+          },
+          {
+            "id": "explain",
+            "label": "用理论解释结果"
+          },
+          {
+            "id": "verify",
+            "label": "按验收清单回归"
+          }
+        ],
+        "correct_order": [
+          "check",
+          "observe",
+          "explain",
+          "verify"
+        ],
+        "success_feedback": "顺序正确，已经形成可复核的实践闭环。",
+        "retry_feedback": "先把证据和前置条件放在最前面。"
+      }
+    }
+  ],
+  "study_guide": [
+    {
+      "id": "ai-evaluation-g1",
+      "title": "1. 标签与预测怎么用",
+      "knowledge_link_ids": [
+        "ai-evaluation-k1"
+      ],
+      "task_ids": [
+        "ai-evaluation-pair",
+        "ai-evaluation-slice"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f5"
+      ],
+      "body": "评估先要明确实际标签和模型预测分别代表什么 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以预测为正但实际为负的样本为例：先读条件，再执行一个最小动作，最后用“能把一条样本放入正确的比较位置”解释观察到的结果。",
+      "quick_reference": [
+        "评估先要明确实际标签和模型预测分别代表什么",
+        "能把一条样本放入正确的比较位置",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "预测为正就等于实际为正",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-g2",
+      "title": "2. 混淆矩阵怎么用",
+      "knowledge_link_ids": [
+        "ai-evaluation-k2"
+      ],
+      "task_ids": [
+        "ai-evaluation-matrix"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u2"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2"
+      ],
+      "body": "TP、FP、FN、TN 把分类结果按两个维度拆开 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以四格矩阵中的误报与漏报为例：先读条件，再执行一个最小动作，最后用“能从样本表数出四类结果”解释观察到的结果。",
+      "quick_reference": [
+        "TP、FP、FN、TN 把分类结果按两个维度拆开",
+        "能从样本表数出四类结果",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "只看正确率就能知道错误类型",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-g3",
+      "title": "3. Precision 与 Recall怎么用",
+      "knowledge_link_ids": [
+        "ai-evaluation-k3"
+      ],
+      "task_ids": [
+        "ai-evaluation-metrics",
+        "ai-evaluation-tradeoff"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3",
+        "ai-evaluation-u4"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3",
+        "ai-evaluation-f4"
+      ],
+      "body": "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以告警系统宁可少漏报还是少误报为例：先读条件，再执行一个最小动作，最后用“能根据业务风险选择关注指标”解释观察到的结果。",
+      "quick_reference": [
+        "Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例",
+        "能根据业务风险选择关注指标",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "两个指标只是不同叫法",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-g4",
+      "title": "4. 阈值变化怎么用",
+      "knowledge_link_ids": [
+        "ai-evaluation-k4"
+      ],
+      "task_ids": [
+        "ai-evaluation-threshold",
+        "ai-evaluation-tradeoff",
+        "ai-evaluation-policy"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3",
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3",
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "body": "改变阈值会同时改变预测标签和指标，不应只看单个数字 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以阈值从 0.5 调到 0.7为例：先读条件，再执行一个最小动作，最后用“能比较两个阈值下的结果差异”解释观察到的结果。",
+      "quick_reference": [
+        "改变阈值会同时改变预测标签和指标，不应只看单个数字",
+        "能比较两个阈值下的结果差异",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "阈值越高模型一定越好",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-g5",
+      "title": "5. 评估结论怎么用",
+      "knowledge_link_ids": [
+        "ai-evaluation-k5"
+      ],
+      "task_ids": [
+        "ai-evaluation-conclude",
+        "ai-evaluation-slice",
+        "ai-evaluation-policy"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "body": "评估结论必须说明数据、指标、阈值和风险边界 先把本页术语换成当前任务里的对象，再按检查点推进，不必重新翻整本教材。",
+      "worked_example": "以在验证集上 recall 提升但误报增加为例：先读条件，再执行一个最小动作，最后用“能写出带条件的评估结论”解释观察到的结果。",
+      "quick_reference": [
+        "评估结论必须说明数据、指标、阈值和风险边界",
+        "能写出带条件的评估结论",
+        "每次只改变一个关键条件并保留前后结果。"
+      ],
+      "common_errors": [
+        "最高分数就是唯一选择",
+        "只看最后结果，没有记录过程证据。"
+      ],
+      "checkpoints": [
+        "我能指出本任务使用的理论页。",
+        "我能说出当前结果的证据和下一步。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-g6",
+      "title": "6. 从证据到解释的自助路径",
+      "knowledge_link_ids": [
+        "ai-evaluation-k1",
+        "ai-evaluation-k2",
+        "ai-evaluation-k3",
+        "ai-evaluation-k4",
+        "ai-evaluation-k5"
+      ],
+      "task_ids": [
+        "ai-evaluation-pair",
+        "ai-evaluation-matrix",
+        "ai-evaluation-metrics",
+        "ai-evaluation-threshold",
+        "ai-evaluation-conclude",
+        "ai-evaluation-tradeoff",
+        "ai-evaluation-slice",
+        "ai-evaluation-policy"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u2",
+        "ai-evaluation-u3",
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f2",
+        "ai-evaluation-f3",
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "body": "当结果不符合预期时，沿着条件—动作—证据—解释四步回查；每一步都能指向一个具体学习资料或基础补给。",
+      "worked_example": "先复述当前输入和预期，再只做一个最小修复，重新观察并把变化解释给同伴。",
+      "quick_reference": [
+        "先找最早出现差异的步骤。",
+        "优先回到对应理论页和基础补给。",
+        "能解释为什么修复有效才算完成。"
+      ],
+      "common_errors": [
+        "同时改动多个变量，无法归因。",
+        "把教师参考答案当成第一步，而不先观察。"
+      ],
+      "checkpoints": [
+        "我知道每个 core task 卡住时的入口。",
+        "我能把一次操作连接到一个理论事实。"
+      ]
+    }
+  ],
+  "foundation_kit": [
+    {
+      "id": "ai-evaluation-kit1",
+      "title": "标签与预测基础补给",
+      "kind": "数组配对",
+      "content": "这是开始标签与预测任务前的最小工具卡：评估先要明确实际标签和模型预测分别代表什么",
+      "task_ids": [
+        "ai-evaluation-pair",
+        "ai-evaluation-slice"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f5"
+      ],
+      "when_to_use": "看到标签与预测相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是标签与预测。",
+        "按卡片中的一个动作检查正例与负例。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释标签与预测。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-kit2",
+      "title": "混淆矩阵基础补给",
+      "kind": "矩阵填表",
+      "content": "这是开始混淆矩阵任务前的最小工具卡：TP、FP、FN、TN 把分类结果按两个维度拆开",
+      "task_ids": [
+        "ai-evaluation-matrix"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u2"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f2"
+      ],
+      "when_to_use": "看到混淆矩阵相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是混淆矩阵。",
+        "按卡片中的一个动作检查误报与漏报。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释混淆矩阵。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-kit3",
+      "title": "Precision 与 Recall基础补给",
+      "kind": "指标公式",
+      "content": "这是开始Precision 与 Recall任务前的最小工具卡：Precision 关注预测为正的可信度，Recall 关注实际正例被找回的比例",
+      "task_ids": [
+        "ai-evaluation-metrics",
+        "ai-evaluation-tradeoff"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3",
+        "ai-evaluation-u4"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3",
+        "ai-evaluation-f4"
+      ],
+      "when_to_use": "看到Precision 与 Recall相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是Precision 与 Recall。",
+        "按卡片中的一个动作检查分母和业务代价。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释Precision 与 Recall。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-kit4",
+      "title": "阈值变化基础补给",
+      "kind": "阈值实验",
+      "content": "这是开始阈值变化任务前的最小工具卡：改变阈值会同时改变预测标签和指标，不应只看单个数字",
+      "task_ids": [
+        "ai-evaluation-threshold",
+        "ai-evaluation-tradeoff",
+        "ai-evaluation-policy"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u3",
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f3",
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "when_to_use": "看到阈值变化相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是阈值变化。",
+        "按卡片中的一个动作检查指标权衡。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释阈值变化。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    },
+    {
+      "id": "ai-evaluation-kit5",
+      "title": "评估结论基础补给",
+      "kind": "结论表达",
+      "content": "这是开始评估结论任务前的最小工具卡：评估结论必须说明数据、指标、阈值和风险边界",
+      "task_ids": [
+        "ai-evaluation-conclude",
+        "ai-evaluation-slice",
+        "ai-evaluation-policy"
+      ],
+      "learning_unit_ids": [
+        "ai-evaluation-u1",
+        "ai-evaluation-u4",
+        "ai-evaluation-u5"
+      ],
+      "canonical_fact_ids": [
+        "ai-evaluation-f1",
+        "ai-evaluation-f4",
+        "ai-evaluation-f5"
+      ],
+      "when_to_use": "看到评估结论相关卡点，先打开这张补给卡。",
+      "steps": [
+        "确认当前任务使用的是评估结论。",
+        "按卡片中的一个动作检查验证与部署。",
+        "回到任务重新运行或复核，并记录变化。"
+      ],
+      "self_check": [
+        "我能用自己的话解释评估结论。",
+        "我能指出一个可观察的检查结果。"
+      ]
+    }
+  ],
+  "teacher_guide": {
+    "purpose": "带领学生用AI 分类评估基础的理论完成一条可观察实践闭环。",
+    "theory_bridge": "每次巡视先让学生指出 source 理论事实，再看操作证据；不要用教师答案替代学生判断。",
+    "timing": [
+      {
+        "minutes": 8,
+        "focus": "理论回看与第一个可观察判断"
+      },
+      {
+        "minutes": 30,
+        "focus": "core 前半段：小步操作和即时核对"
+      },
+      {
+        "minutes": 24,
+        "focus": "core 后半段：完成、运行或诊断"
+      },
+      {
+        "minutes": 20,
+        "focus": "差异化路径和连续互动"
+      },
+      {
+        "minutes": 8,
+        "focus": "解释性收束与个别抽查"
+      }
+    ],
+    "task_guidance": [
+      {
+        "task_id": "ai-evaluation-pair",
+        "look_for": "检查学生是否真的完成“配对预测与实际标签”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述逐行对齐预测数组与实际标签数组。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-matrix",
+        "look_for": "检查学生是否真的完成“填写混淆矩阵四格”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述把样本表归入 TP、FP、FN、TN 并核对总数。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-metrics",
+        "look_for": "检查学生是否真的完成“补齐指标计算 starter”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述在完整 Python 函数中补三个真实统计位置，再编译并对照手算。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-threshold",
+        "look_for": "检查学生是否真的完成“比较两个阈值的指标代价”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述根据概率表比较阈值 0.5 和 0.7 的错误变化。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-conclude",
+        "look_for": "检查学生是否真的完成“写一条带边界的评估结论”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述把数据、指标、阈值和风险写进一段可审阅结论。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-tradeoff",
+        "look_for": "检查学生是否真的完成“做一次指标取舍讨论”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为告警、筛查和推荐三个场景选择更关注的指标。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-slice",
+        "look_for": "检查学生是否真的完成“检查一个数据切片”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述比较整体指标与一个子群体指标，寻找可能差异。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      },
+      {
+        "task_id": "ai-evaluation-policy",
+        "look_for": "检查学生是否真的完成“提出一份阈值评估策略”的关键动作，并能指出对应理论证据。",
+        "ask_when_stuck": "请学生先复述为一个需要控制漏报的场景提出阈值评估策略。中的输入、动作和预期，再问哪一条理论事实能解释当前现象。"
+      }
+    ],
+    "common_errors": [
+      {
+        "symptom": "学生直接改结果而不记录条件",
+        "intervention": "让学生回到理论页，写出输入、动作和预期后再做一次最小变化。"
+      },
+      {
+        "symptom": "学生把一次偶然成功当成规则",
+        "intervention": "要求换一个边界或反例，说明规则是否仍成立。"
+      },
+      {
+        "symptom": "学生卡在工具操作而非本课知识",
+        "intervention": "先打开对应 foundation-kit，完成自检后再回到 core task。"
+      }
+    ],
+    "pace_adjustments": [
+      "基础较弱时只要求完成所有 core 的第一验收点，并把 optional 改为教师示范。",
+      "进度较快时要求比较两个条件或处理 challenge，但不打断基础学生路径。",
+      "课堂时间不足时保留理论关联、一个可观察结果和一次解释性抽查。"
+    ],
+    "closing_checks": [
+      "随机请学生解释一个结果背后的理论事实。",
+      "检查每个 core 是否至少留下一个可复核结果。",
+      "确认学生知道下次卡住时打开哪份资料。"
+    ]
+  },
+  "teacher_reference": {
+    "task_references": [
+      {
+        "task_id": "ai-evaluation-pair",
+        "title": "配对预测与实际标签",
+        "source_slide_ids": [
+          "ai-evaluation-s1"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u1"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f1"
+        ],
+        "reference_answer": "完成配对预测与实际标签：完成逐行配对；指出一类错误样本。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "把每个预测和实际标签放在同一行。",
+          "标出预测正、实际负的行。",
+          "说明为什么只看预测值不够。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成逐行配对",
+          "指出一类错误样本"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-matrix",
+        "title": "填写混淆矩阵四格",
+        "source_slide_ids": [
+          "ai-evaluation-s2"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u2"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f2"
+        ],
+        "reference_answer": "完成填写混淆矩阵四格：四格数值正确；四格合计与样本数一致。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "按预测/实际组合给每行贴标签。",
+          "数出四格数量。",
+          "说出误报与漏报差别。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "四格数值正确",
+          "四格合计与样本数一致"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-metrics",
+        "title": "补齐指标计算 starter",
+        "source_slide_ids": [
+          "ai-evaluation-s3"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u3"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f3"
+        ],
+        "reference_answer": "def classification_metrics(predicted, actual):\n    tp = sum(1 for p, a in zip(predicted, actual) if p == 1 and a == 1)  # TODO 1\n    fp = sum(1 for p, a in zip(predicted, actual) if p == 1 and a == 0)  # TODO 2\n    fn = sum(1 for p, a in zip(predicted, actual) if p == 0 and a == 1)  # TODO 3\n    precision = 0 if tp + fp == 0 else tp / (tp + fp)\n    return {\"precision\": precision, \"tp\": tp, \"fp\": fp, \"fn\": fn}\n",
+        "reference_result": "返回字典的 TP、FP、FN 与混淆矩阵一致。",
+        "key_steps": [
+          "按预测和实际同时为正的条件填写。",
+          "分别填写误报和漏报条件。",
+          "用八条标签检查返回字典。",
+          "说明 precision 为什么使用 TP+FP。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三个 TODO 都有真实统计逻辑",
+          "py_compile 通过且结果可手算",
+          "能解释 precision 分母"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-threshold",
+        "title": "比较两个阈值的指标代价",
+        "source_slide_ids": [
+          "ai-evaluation-s4"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u4"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f4"
+        ],
+        "reference_answer": "完成比较两个阈值的指标代价：完成两阈值比较；能说明阈值选择与风险关系。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "按每个阈值给概率贴预测标签。",
+          "比较两组误报和漏报。",
+          "为高漏报代价场景选择阈值。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "完成两阈值比较",
+          "能说明阈值选择与风险关系"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-conclude",
+        "title": "写一条带边界的评估结论",
+        "source_slide_ids": [
+          "ai-evaluation-s5"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u5"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f5"
+        ],
+        "reference_answer": "完成写一条带边界的评估结论：结论覆盖四要素；明确一个风险边界。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "写清验证集和样本范围。",
+          "说明 precision/recall 的变化。",
+          "指出尚不能推出的结论。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "结论覆盖四要素",
+          "明确一个风险边界"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-tradeoff",
+        "title": "做一次指标取舍讨论",
+        "source_slide_ids": [
+          "ai-evaluation-s3",
+          "ai-evaluation-s4"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u3",
+          "ai-evaluation-u4"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f3",
+          "ai-evaluation-f4"
+        ],
+        "reference_answer": "完成做一次指标取舍讨论：三个场景都有选择；每个选择有风险依据。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "找出漏报和误报哪一个更昂贵。",
+          "将场景与指标连线。",
+          "指出指标高但仍不合适的情况。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "三个场景都有选择",
+          "每个选择有风险依据"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-slice",
+        "title": "检查一个数据切片",
+        "source_slide_ids": [
+          "ai-evaluation-s1",
+          "ai-evaluation-s5"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u1",
+          "ai-evaluation-u5"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f1",
+          "ai-evaluation-f5"
+        ],
+        "reference_answer": "完成检查一个数据切片：指出一个可解释差异；写出后续验证动作。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "比较两组矩阵。",
+          "提出一个需要继续验证的原因。",
+          "为子群体设计一个回查动作。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "指出一个可解释差异",
+          "写出后续验证动作"
+        ]
+      },
+      {
+        "task_id": "ai-evaluation-policy",
+        "title": "提出一份阈值评估策略",
+        "source_slide_ids": [
+          "ai-evaluation-s4",
+          "ai-evaluation-s5"
+        ],
+        "learning_unit_ids": [
+          "ai-evaluation-u4",
+          "ai-evaluation-u5"
+        ],
+        "canonical_fact_ids": [
+          "ai-evaluation-f4",
+          "ai-evaluation-f5"
+        ],
+        "reference_answer": "完成提出一份阈值评估策略：策略包含指标、阈值和回归；写明数据边界。",
+        "reference_result": "结果与验收条件一致，并能说明关键判断依据。",
+        "key_steps": [
+          "写明优先控制哪类错误。",
+          "安排至少两个阈值和一条回归检查。",
+          "写出尚需更多数据的地方。"
+        ],
+        "acceptable_variants": [
+          "只要保留同一理论约束、证据链和可解释验收即可接受。"
+        ],
+        "common_errors": [
+          "跳过前置条件",
+          "一次改变多个关键因素",
+          "只报结果不解释依据"
+        ],
+        "acceptance_basis": [
+          "策略包含指标、阈值和回归",
+          "写明数据边界"
+        ]
+      }
+    ]
+  },
+  "starter_assets": [
+    {
+      "id": "ai-evaluation-metrics",
+      "path": "metrics.py",
+      "language": "Python",
+      "content": "def classification_metrics(predicted, actual):\n    tp = 0  # TODO 1\n    fp = 0  # TODO 2\n    fn = 0  # TODO 3\n    precision = 0 if tp + fp == 0 else tp / (tp + fp)\n    return {\"precision\": precision, \"tp\": tp, \"fp\": fp, \"fn\": fn}\n",
+      "editable_gaps": [
+        {
+          "marker": "tp = 0  # TODO 1",
+          "target": "tp = 0  # TODO 1",
+          "replacement": "tp = sum(1 for p, a in zip(predicted, actual) if p == 1 and a == 1)  # TODO 1",
+          "student_instruction": "统计预测为正且实际为正的样本。",
+          "kind": "metric"
+        },
+        {
+          "marker": "fp = 0  # TODO 2",
+          "target": "fp = 0  # TODO 2",
+          "replacement": "fp = sum(1 for p, a in zip(predicted, actual) if p == 1 and a == 0)  # TODO 2",
+          "student_instruction": "统计误报样本。",
+          "kind": "metric"
+        },
+        {
+          "marker": "fn = 0  # TODO 3",
+          "target": "fn = 0  # TODO 3",
+          "replacement": "fn = sum(1 for p, a in zip(predicted, actual) if p == 0 and a == 1)  # TODO 3",
+          "student_instruction": "统计漏报样本。",
+          "kind": "metric"
+        }
+      ],
+      "task_id": "ai-evaluation-metrics"
+    }
+  ]
+}
