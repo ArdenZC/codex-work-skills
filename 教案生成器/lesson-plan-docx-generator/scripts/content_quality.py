@@ -22,6 +22,7 @@ from content_contract import (
     IN_CLASS_STAGE_IDS,
     IMPLEMENTATION_STAGE_IDS,
     REFERENCE_SOURCE_KINDS,
+    confirmed_course_info_errors,
     format_reference,
     format_implementation_stage,
     format_reflection,
@@ -29,8 +30,9 @@ from content_contract import (
     lesson_content_field_values,
     lesson_references,
     reference_identity,
+    reference_metadata_errors,
     reference_looks_like_placeholder,
-    reference_looks_like_resource_only,
+    reference_looks_like_resource_only as contract_reference_looks_like_resource_only,
 )
 
 
@@ -541,7 +543,7 @@ def _reference_looks_like_resource_only(text: Any) -> bool:
     Workbench`` is a classroom tool.
     """
 
-    return _normalize_item(text) in REFERENCE_RESOURCE_ONLY_EXACT
+    return contract_reference_looks_like_resource_only(text)
 
 
 def _reference_region(reference: dict[str, Any]) -> str:
@@ -2514,6 +2516,7 @@ def _reference_provenance_report(
     invalid_generic: list[dict[str, Any]] = []
     invalid_verified_public: list[dict[str, Any]] = []
     invalid_resource_only: list[dict[str, Any]] = []
+    invalid_metadata: list[dict[str, Any]] = []
     same_lesson_duplicates: list[dict[str, Any]] = []
     unresolved_ids: list[dict[str, Any]] = []
     placeholder_items: list[dict[str, Any]] = []
@@ -2533,6 +2536,17 @@ def _reference_provenance_report(
     catalog_source_regions = {"domestic": 0, "foreign": 0, "unknown": 0}
     for reference in pool.values():
         catalog_source_regions[_reference_region(reference)] += 1
+    if is_v22:
+        for pool_index, reference in enumerate(pool.values(), 1):
+            metadata_errors = reference_metadata_errors(reference, f"reference_pool[{pool_index}]")
+            if metadata_errors:
+                invalid_metadata.append(
+                    {
+                        "reference": pool_index,
+                        "reference_id": reference.get("reference_id"),
+                        "errors": metadata_errors,
+                    }
+                )
     empty_reference_lessons: list[str] = []
     for lesson_id, lesson in zip(lesson_ids, lessons):
         entries: list[dict[str, Any]] = []
@@ -2584,7 +2598,8 @@ def _reference_provenance_report(
                 for duplicate_key in duplicate_keys:
                     if duplicate_key:
                         seen_references[duplicate_key] = index
-            if _reference_looks_like_resource_only(text):
+            resource_probe = reference.get("title", text) if is_reference_pool_contract else text
+            if _reference_looks_like_resource_only(resource_probe) or _reference_looks_like_resource_only(text):
                 invalid_resource_only.append({"lesson": lesson_id, "reference": index})
             if is_reference_pool_contract and reference_looks_like_placeholder(reference.get("title", text)):
                 placeholder_items.append({"lesson": lesson_id, "reference": index, "reference_id": reference_id})
@@ -2619,12 +2634,13 @@ def _reference_provenance_report(
         "invalid_generic": invalid_generic,
         "invalid_verified_public": invalid_verified_public,
         "invalid_resource_only": invalid_resource_only,
+        "invalid_metadata": invalid_metadata,
         "same_lesson_duplicates": same_lesson_duplicates,
         "unresolved_ids": unresolved_ids,
         "placeholder_items": placeholder_items,
         "empty_reference_lessons": empty_reference_lessons,
         "textbook_overlap": textbook_overlap,
-        "textbook_overlap_allowed": bool((data or {}).get("allow_textbook_as_reference", False)),
+        "textbook_overlap_allowed": bool((data or {}).get("allow_textbook_as_reference", False)) and not is_v22,
         "catalog_source_regions": catalog_source_regions,
         "reuse_frequency": dict(sorted(reuse_frequency.items())),
     }
@@ -2888,6 +2904,12 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     lessons_by_id = dict(zip(lesson_ids, lessons))
     errors: list[str] = []
     warnings: list[str] = []
+    errors.extend(f"confirmed course information: {message}" for message in confirmed_course_info_errors(data))
+    if data.get("content_contract_version") == "2.2" and data.get("allow_textbook_as_reference", False):
+        errors.append(
+            "allow_textbook_as_reference is not supported in Content Contract 2.2.2; "
+            "course_materials.textbook and reference_pool are separate"
+        )
     course_terms = _course_terms(lessons)
     intra_lesson_coherence = _intra_lesson_coherence(lessons, lesson_ids)
     intra_lesson_coherence["calibration"] = intra_lesson_coherence_calibration()
@@ -3343,6 +3365,11 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     for item in reference_provenance["invalid_resource_only"]:
         errors.append(
             f"{item['lesson']}.references[{item['reference']}] is a resource-only item, not a citable document"
+        )
+    for item in reference_provenance.get("invalid_metadata", []):
+        errors.append(
+            f"reference_pool[{item['reference']}] bibliography metadata is incomplete: "
+            + "; ".join(item["errors"])
         )
     for item in reference_provenance["same_lesson_duplicates"]:
         errors.append(
