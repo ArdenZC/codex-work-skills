@@ -1,6 +1,6 @@
 # Whole-Course Orchestration Phase 1.1 Closeout — Evidence Authenticity & Browser-Gated Batch QA
 
-Current status: `WHOLE_COURSE_ARCHITECTURE_BLOCKED`
+Current status: `READY_FOR_WHOLE_COURSE_BLIND_RETRY`
 
 This closeout stays on PR #31 and the existing `feature/whole-course-orchestration` branch. It does not open a new PR, merge, tag, upgrade the Courseware/Practice formal contract versions, run the real 9-PPT whole-course retry, or edit the frozen old UML outputs.
 
@@ -10,11 +10,12 @@ This closeout stays on PR #31 and the existing `feature/whole-course-orchestrati
 - Branch: `feature/whole-course-orchestration`
 - PR: #31
 - Pre-closeout HEAD: `2af32d574658ff43c959cd265ef8f5540184e992`
+- Validated implementation HEAD: `a1f70e580df695da91c019e5b2b27ed63b0e55af`
 - `origin/master`: `3c8fe4a29a4a057cf24e1f3d2b691eb1f9c2408a`
 - Frozen benchmark: `WHOLE_COURSE_FAILURE_BENCHMARK_V1`
 - Source boundary: the benchmark manifest and its external source/build roots are read-only evidence; no old contract, old HTML, or old repair advice is used as new-generation input.
 
-The final closeout status remains blocked until the strict browser-enabled CI job reports green. Human pedagogical acceptance is a separate boundary and is not silently converted into an automated pass.
+The final closeout gate moved to `READY_FOR_WHOLE_COURSE_BLIND_RETRY` only after the same-PR clean strict E2E, browser evidence, architecture tests, stable regression matrix, and frozen failure replay passed. Human pedagogical acceptance is a separate boundary and is not silently converted into an automated pass.
 
 ## B. Visual observation policy
 
@@ -60,37 +61,35 @@ No URL-only candidate is allowed to become authoritative.
 
 ## F. Strict Courseware E2E
 
-The strict path invokes the real Courseware renderer with `--evidence-mode strict` and a source root containing source-backed facts. It does not rely on a fake renderer or a handwritten QA result. Strict provenance requires a committed clean worktree; the two strict local tests are explicitly skipped while this worktree is dirty and run in the clean PR/CI checkout.
+The strict path invokes the real Courseware renderer with `--evidence-mode strict` and a source root containing source-backed facts. It does not rely on a fake renderer or a handwritten QA result. Strict provenance requires a committed clean worktree; the final local and CI runs both used clean committed checkouts.
 
-Local strict execution: `PENDING_CLEAN_CHECKOUT`.
+Local strict execution at final closeout HEAD: `PASS` in a committed clean worktree; three Courseware sessions reached the real renderer, strict QA passed, and typed semantic structure evidence passed. The same strict command passed in CI run [34467928760](https://github.com/ArdenZC/codex-work-skills/actions/runs/34467928760).
 
 ## G. Strict Practice E2E
 
 The strict path invokes the real Practice renderer with the same strict source-evidence boundary, observes the generated starter/manifest/QA/behavior artifacts, and keeps the migration-trust path separate. No Practice renderer version or contract version is changed.
 
-Local strict execution: `PENDING_CLEAN_CHECKOUT`.
+Local strict execution at final closeout HEAD: `PASS` in a committed clean worktree; three Practice sessions reached the real renderer, generated starters/manifests/behavior evidence, and strict QA passed. The same strict command passed in CI run [34467928760](https://github.com/ArdenZC/codex-work-skills/actions/runs/34467928760).
 
 ## H. Browser runtime gate
 
 The Whole-Course CI job now provisions Node 20, installs Playwright, installs Chromium, and passes the installed package root to the contact-sheet collector. The formal strict E2E command has no `--no-browser` and no `--allow-degraded-browser`.
 
-The local Windows host did not provide a usable Chromium/Playwright runtime during this closeout turn. Local browser-dependent tests therefore remain explicit skips; that is not a PASS. CI is the required browser evidence authority.
+The task-scoped local Windows proof used Node Playwright with Chromium `153.0.8010.12`; CI independently installed the Linux Chromium runtime and completed the real browser gate. The formal strict E2E command had no `--no-browser` or `--allow-degraded-browser`.
 
 ## I. Contact-sheet evidence
 
 `contact_sheets.py` records browser runtime, browser version, viewport, render method, screenshot count, fallback count, and browser failures. With no runtime it returns `DEGRADED`; when a browser attempt produces a partial screenshot set it returns `FAIL`; only complete real Chromium screenshots can return `PASS`.
 
-The synthetic E2E and CI formal gate request real theory-page, visual-artifact, and Practice `student-task.html` screenshots. Source-image/SVG fallback is retained as review material but cannot satisfy the browser gate.
+The synthetic E2E and CI formal gate request real theory-page, visual-artifact, and Practice `student-task.html` screenshots. At final local proof the contact sheet was `PASS` with 10 screenshots, 0 fallbacks, Chromium `153.0.8010.12`, and viewport `1280x800`. Source-image/SVG fallback is retained as review material but cannot satisfy the browser gate. CI logs independently show the strict browser command returned `PASS`.
 
 ## J. Phase 1.1 tests
 
-Local result after the implementation changes: `48 tests`, `OK`, `3 skipped`.
-
-The skips are explicit: strict provenance tests on the dirty worktree and the host-dependent real-browser screenshot test without a browser runtime. T34–T45, R1–R3, and the partial-browser-failure boundary are present in the suite. CI runs the same tests after checkout and browser installation, so the strict tests and real screenshot test are not skipped there.
+Local final result: `51 tests`, `OK`, `0 skipped`, including the real Chromium contact-sheet and supporting-SVG screenshot tests. CI run [34467928760](https://github.com/ArdenZC/codex-work-skills/actions/runs/34467928760) also reports `Ran 51 tests ... OK`. T34–T45, R1–R3, the partial-browser-failure boundary, and the cross-platform frozen-snapshot path are present in the suite.
 
 ## K. Stable downstream regressions
 
-The closeout preserves the existing downstream renderer boundaries and adds no Courseware/Practice formal version upgrade. Previously verified stable Courseware and Practice regression suites remain separate from this architecture evidence. Final CI for the new commit must re-confirm the repository’s existing Courseware, Practice, package, and release checks before this report can move from `BLOCKED` to `READY_FOR_WHOLE_COURSE_BLIND_RETRY`.
+The closeout preserves the existing downstream renderer boundaries and adds no Courseware/Practice formal version upgrade. Previously verified stable Courseware and Practice regression suites remain separate from this architecture evidence. The final same-PR CI run re-confirmed the repository’s Courseware, Practice, package-contract, tooling, release, lesson-plan, gradebook, and WorkOrder checks successfully.
 
 ## L. CI and install coverage
 
@@ -98,12 +97,11 @@ The Whole-Course job now performs, in order: Node/Playwright/Chromium setup, com
 
 The installer required-file list includes both benchmark evidence scripts. No Python dependency is silently installed by the installer.
 
-CI status for the post-closeout commit: `PENDING` until the same-PR run completes.
+CI status: `PASS` for [run 34467928760](https://github.com/ArdenZC/codex-work-skills/actions/runs/34467928760), head `a1f70e580df695da91c019e5b2b27ed63b0e55af`. The Whole-Course job passed architecture tests, strict browser-enabled E2E, the intentional migration-trust blocked regression, frozen failure replay, installer dry-run, and clean-worktree verification.
 
 ## M. Remaining P0/P1/P2 boundaries
 
-- P0: browser-enabled strict evidence is not locally proven; CI must supply the real Chromium screenshots.
-- P0: the real 9-PPT × 16 theory + 16 practice blind retry is intentionally not authorized in this phase.
+- P0: no remaining automated architecture P0 after the same-PR green CI gate. The real 9-PPT × 16 theory + 16 practice blind retry is intentionally not authorized or executed in this phase.
 - P1: human review of representative theory pages, typed diagrams, Practice starters, capacity, and cross-session differentiation remains separate and unevaluated.
 - P2: external-source copyright/licensing and pedagogical usefulness still require human review when external sources are actually selected.
 
@@ -114,7 +112,7 @@ No code path upgrades a missing browser, marker-only visual, or automated QA res
 Current final status:
 
 ```text
-WHOLE_COURSE_ARCHITECTURE_BLOCKED
+READY_FOR_WHOLE_COURSE_BLIND_RETRY
 ```
 
-The only permitted transition from this report is to `READY_FOR_WHOLE_COURSE_BLIND_RETRY` after the same PR’s clean strict E2E, real browser contact-sheet proof, architecture tests, stable regression checks, and failure replay all pass with no P0 architecture finding. The transition does not authorize the blind retry itself; that remains a later, explicit phase. Human pedagogical acceptance is reported separately and is never implied by this gate.
+This transition records only that the architecture and evidence gates are ready. It does not authorize or execute the blind retry itself; that remains a later, explicit phase. Human pedagogical acceptance is reported separately and is never implied by this gate.
