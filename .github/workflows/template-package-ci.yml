@@ -906,7 +906,7 @@ jobs:
       - name: Compile Whole-Course Orchestrator
         run: python -m compileall -q 整门课程编排器/whole-course-orchestrator
 
-      - name: Run architecture and real-browser evidence tests
+      - name: Run synthetic architecture and real-browser evidence tests
         env:
           WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
         run: python -m unittest discover -s 整门课程编排器/whole-course-orchestrator/tests -p 'test_*.py' -v
