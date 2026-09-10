@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/whole-course-qa.schema.json",
+  "title": "Whole-Course Batch QA",
+  "type": "object",
+  "required": ["schema_version", "report_type", "status", "architecture_status", "metrics", "findings"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "report_type": {"const": "whole_course_batch_qa"},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "architecture_status": {"enum": ["READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW", "WHOLE_COURSE_ARCHITECTURE_BLOCKED"]},
+    "metrics": {"type": "object"},
+    "findings": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}
