@@ -43,24 +43,24 @@ def _typed_structure_svg(artifact: str, roles: list[str]) -> str:
     if artifact == "class_model":
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="class structure" data-structure-evidence="typed">'
-            '<g data-node-id="class-a" data-semantic-role="class class_compartment"><rect x="40" y="70" width="180" height="80"/><text x="130" y="112">ClassA</text></g>'
-            '<g data-node-id="class-b" data-semantic-role="class class_compartment"><rect x="540" y="70" width="180" height="80"/><text x="630" y="112">ClassB</text></g>'
-            '<line data-edge-id="edge-1" data-semantic-role="relationship association" data-source-id="class-a" data-target-id="class-b" data-relation-kind="association" x1="220" y1="110" x2="540" y2="110"/>'
-            '<text data-label-for="edge-1" data-label-kind="multiplicity" data-label-endpoint="source" data-label="1" x="250" y="100">1</text>'
-            '<text data-label-for="edge-1" data-label-kind="multiplicity" data-label-endpoint="target" data-label="*" x="500" y="100">*</text>'
+            '<g data-node-key="class-a" data-semantic-role="class class_compartment"><rect x="40" y="70" width="180" height="80"/><text x="130" y="112">ClassA</text></g>'
+            '<g data-node-key="class-b" data-semantic-role="class class_compartment"><rect x="540" y="70" width="180" height="80"/><text x="630" y="112">ClassB</text></g>'
+            '<line data-edge-key="edge-1" data-semantic-role="relationship association" data-source-key="class-a" data-target-key="class-b" data-relation-kind="association" x1="220" y1="110" x2="540" y2="110"/>'
+            '<text data-label-for-key="edge-1" data-label-kind="multiplicity" data-label-endpoint="source" data-label="1" x="250" y="100">1</text>'
+            '<text data-label-for-key="edge-1" data-label-kind="multiplicity" data-label-endpoint="target" data-label="*" x="500" y="100">*</text>'
             '</svg>'
         )
     if artifact == "sequence_model":
         extra = (
-            '<g data-node-id="fragment-1" data-semantic-role="fragment"><rect x="320" y="28" width="300" height="150" fill="none" stroke="#999"/></g>'
+            '<g data-node-key="fragment-1" data-semantic-role="fragment"><rect x="320" y="28" width="300" height="150" fill="none" stroke="#999"/></g>'
             if "fragment" in requested else ""
         )
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="sequence structure" data-structure-evidence="typed">'
-            '<g data-node-id="lifeline-a" data-semantic-role="lifeline"><line x1="180" y1="40" x2="180" y2="190"/><text x="150" y="28">Client</text></g>'
-            '<g data-node-id="lifeline-b" data-semantic-role="lifeline"><line x1="650" y1="40" x2="650" y2="190"/><text x="620" y="28">Service</text></g>'
-            '<line data-edge-id="message-1" data-semantic-role="message" data-source-id="lifeline-a" data-target-id="lifeline-b" data-message-order="1" x1="180" y1="80" x2="650" y2="80"/>'
-            + ('<line data-edge-id="return-1" data-semantic-role="return message" data-source-id="lifeline-b" data-target-id="lifeline-a" data-message-order="2" x1="650" y1="130" x2="180" y2="130"/>' if "return" in requested else "")
+            '<g data-node-key="lifeline-a" data-semantic-role="lifeline"><line x1="180" y1="40" x2="180" y2="190"/><text x="150" y="28">Client</text></g>'
+            '<g data-node-key="lifeline-b" data-semantic-role="lifeline"><line x1="650" y1="40" x2="650" y2="190"/><text x="620" y="28">Service</text></g>'
+            '<line data-edge-key="message-1" data-semantic-role="message" data-source-key="lifeline-a" data-target-key="lifeline-b" data-message-order="1" x1="180" y1="80" x2="650" y2="80"/>'
+            + ('<line data-edge-key="return-1" data-semantic-role="return message" data-source-key="lifeline-b" data-target-key="lifeline-a" data-message-order="2" x1="650" y1="130" x2="180" y2="130"/>' if "return" in requested else "")
             + extra + '</svg>'
         )
     if artifact == "state_model":
@@ -69,42 +69,42 @@ def _typed_structure_svg(artifact: str, roles: list[str]) -> str:
             edge_roles += " guard event"
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="state structure" data-structure-evidence="typed">'
-            '<g data-node-id="state-a" data-semantic-role="state"><rect x="80" y="80" width="170" height="60" rx="22"/><text x="165" y="116">Pending</text></g>'
-            '<g data-node-id="state-b" data-semantic-role="state"><rect x="610" y="80" width="170" height="60" rx="22"/><text x="695" y="116">Done</text></g>'
-            f'<line data-edge-id="transition-1" data-semantic-role="{edge_roles}" data-source-id="state-a" data-target-id="state-b" data-relation-kind="transition" x1="250" y1="110" x2="610" y2="110"/>'
+            '<g data-node-key="state-a" data-semantic-role="state"><rect x="80" y="80" width="170" height="60" rx="22"/><text x="165" y="116">Pending</text></g>'
+            '<g data-node-key="state-b" data-semantic-role="state"><rect x="610" y="80" width="170" height="60" rx="22"/><text x="695" y="116">Done</text></g>'
+            f'<line data-edge-key="transition-1" data-semantic-role="{edge_roles}" data-source-key="state-a" data-target-key="state-b" data-relation-kind="transition" x1="250" y1="110" x2="610" y2="110"/>'
             '</svg>'
         )
     if artifact == "deployment_model":
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="deployment structure" data-structure-evidence="typed">'
-            '<g data-node-id="node-client" data-semantic-role="node"><rect x="60" y="70" width="170" height="80"/><text x="100" y="112">Client</text></g>'
-            '<g data-node-id="artifact-service" data-semantic-role="artifact"><rect x="600" y="70" width="170" height="80"/><text x="640" y="112">Service</text></g>'
-            '<line data-edge-id="link-1" data-semantic-role="communication_link deployment" data-source-id="node-client" data-target-id="artifact-service" data-relation-kind="communication_link" x1="230" y1="110" x2="600" y2="110"/>'
+            '<g data-node-key="node-client" data-semantic-role="node"><rect x="60" y="70" width="170" height="80"/><text x="100" y="112">Client</text></g>'
+            '<g data-node-key="artifact-service" data-semantic-role="artifact"><rect x="600" y="70" width="170" height="80"/><text x="640" y="112">Service</text></g>'
+            '<line data-edge-key="link-1" data-semantic-role="communication_link deployment" data-source-key="node-client" data-target-key="artifact-service" data-relation-kind="communication_link" x1="230" y1="110" x2="600" y2="110"/>'
             '</svg>'
         )
     if artifact == "use_case_model":
         relation = "include" if "include" in requested else "association"
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="use case structure" data-structure-evidence="typed">'
-            '<g data-node-id="actor-1" data-semantic-role="actor"><circle cx="120" cy="110" r="32"/><text x="90" y="165">Actor</text></g>'
-            '<g data-node-id="usecase-1" data-semantic-role="use_case"><ellipse cx="630" cy="110" rx="110" ry="42"/><text x="570" y="116">UseCase</text></g>'
-            f'<line data-edge-id="usecase-edge" data-semantic-role="{relation} association" data-source-id="actor-1" data-target-id="usecase-1" data-relation-kind="{relation}" x1="150" y1="110" x2="520" y2="110"/>'
+            '<g data-node-key="actor-1" data-semantic-role="actor"><circle cx="120" cy="110" r="32"/><text x="90" y="165">Actor</text></g>'
+            '<g data-node-key="usecase-1" data-semantic-role="use_case"><ellipse cx="630" cy="110" rx="110" ry="42"/><text x="570" y="116">UseCase</text></g>'
+            f'<line data-edge-key="usecase-edge" data-semantic-role="{relation} association" data-source-key="actor-1" data-target-key="usecase-1" data-relation-kind="{relation}" x1="150" y1="110" x2="520" y2="110"/>'
             '</svg>'
         )
     if artifact == "activity_model":
         first_target = "decision-1" if "decision" in requested else "action-2"
         decision = (
-            '<g data-node-id="decision-1" data-semantic-role="decision"><polygon points="420,110 450,80 480,110 450,140"/></g>'
-            '<line data-edge-id="flow-2" data-semantic-role="control_flow guard" data-source-id="decision-1" data-target-id="action-2" data-relation-kind="control_flow" x1="450" y1="80" x2="650" y2="55"/>'
-            '<line data-edge-id="flow-3" data-semantic-role="control_flow guard" data-source-id="decision-1" data-target-id="action-3" data-relation-kind="control_flow" x1="450" y1="140" x2="650" y2="165"/>'
+            '<g data-node-key="decision-1" data-semantic-role="decision"><polygon points="420,110 450,80 480,110 450,140"/></g>'
+            '<line data-edge-key="flow-2" data-semantic-role="control_flow guard" data-source-key="decision-1" data-target-key="action-2" data-relation-kind="control_flow" x1="450" y1="80" x2="650" y2="55"/>'
+            '<line data-edge-key="flow-3" data-semantic-role="control_flow guard" data-source-key="decision-1" data-target-key="action-3" data-relation-kind="control_flow" x1="450" y1="140" x2="650" y2="165"/>'
             if "decision" in requested else ""
         )
         return (
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="activity structure" data-structure-evidence="typed">'
-            '<g data-node-id="action-1" data-semantic-role="action"><rect x="60" y="85" width="150" height="50" rx="18"/><text x="90" y="116">Start</text></g>'
-            '<g data-node-id="action-2" data-semantic-role="action"><rect x="650" y="30" width="150" height="50" rx="18"/><text x="680" y="61">Accept</text></g>'
-            '<g data-node-id="action-3" data-semantic-role="action"><rect x="650" y="140" width="150" height="50" rx="18"/><text x="680" y="171">Reject</text></g>'
-            f'<line data-edge-id="flow-1" data-semantic-role="control_flow" data-source-id="action-1" data-target-id="{first_target}" data-relation-kind="control_flow" x1="210" y1="110" x2="420" y2="110"/>'
+            '<g data-node-key="action-1" data-semantic-role="action"><rect x="60" y="85" width="150" height="50" rx="18"/><text x="90" y="116">Start</text></g>'
+            '<g data-node-key="action-2" data-semantic-role="action"><rect x="650" y="30" width="150" height="50" rx="18"/><text x="680" y="61">Accept</text></g>'
+            '<g data-node-key="action-3" data-semantic-role="action"><rect x="650" y="140" width="150" height="50" rx="18"/><text x="680" y="171">Reject</text></g>'
+            f'<line data-edge-key="flow-1" data-semantic-role="control_flow" data-source-key="action-1" data-target-key="{first_target}" data-relation-kind="control_flow" x1="210" y1="110" x2="420" y2="110"/>'
             + decision + '</svg>'
         )
     return ""

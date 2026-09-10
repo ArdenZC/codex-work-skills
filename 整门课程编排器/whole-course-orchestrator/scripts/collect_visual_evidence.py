@@ -118,9 +118,9 @@ class _VisualDOMParser(HTMLParser):
         if tag == "img" and values.get("src"):
             page["evidence"].append({"source": self.source_name, "page_id": page["page_id"], "kind": "rendered-image", "value": values["src"][:120], "selector": selector})
 
-        node_id = values.get("data-node-id")
-        edge_id = values.get("data-edge-id")
-        label_for = values.get("data-label-for") or values.get("data-related-edge-id")
+        node_id = values.get("data-node-id") or values.get("data-node-key")
+        edge_id = values.get("data-edge-id") or values.get("data-edge-key")
+        label_for = values.get("data-label-for") or values.get("data-label-for-key") or values.get("data-related-edge-id") or values.get("data-related-edge-key")
         if node_id:
             node = {
                 "id": str(node_id),
@@ -133,8 +133,8 @@ class _VisualDOMParser(HTMLParser):
             edge = {
                 "id": str(edge_id),
                 "roles": sorted(set(_role_values(values))),
-                "source_id": values.get("data-source-id") or values.get("data-source-node-id"),
-                "target_id": values.get("data-target-id") or values.get("data-target-node-id"),
+                "source_id": values.get("data-source-id") or values.get("data-source-node-id") or values.get("data-source-key"),
+                "target_id": values.get("data-target-id") or values.get("data-target-node-id") or values.get("data-target-key"),
                 "relation_kind": values.get("data-relation-kind") or values.get("data-edge-kind"),
                 "order": _int_or_none(values.get("data-order") or values.get("data-message-order")),
                 "selector": selector,
