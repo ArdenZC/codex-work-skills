@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/practice-plan.schema.json",
+  "title": "Whole-Course Practice Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_type", "sessions"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "plan_type": {"const": "whole_course_practice_plans"},
+    "sessions": {"type": "array", "items": {"$ref": "#/$defs/session"}}
+  },
+  "$defs": {
+    "session": {
+      "type": "object",
+      "required": ["id", "tasks", "task_count", "knowledge_state_after"],
+      "properties": {
+        "id": {"type": "string"},
+        "tasks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/task"}},
+        "task_count": {"type": "integer", "minimum": 1},
+        "knowledge_state_after": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "capability", "estimated_minutes", "starter", "editable_gaps", "signature"],
+      "properties": {
+        "id": {"type": "string"},
+        "capability": {"type": "string"},
+        "artifact_type": {"type": ["string", "null"]},
+        "estimated_minutes": {"type": "number", "exclusiveMinimum": 0},
+        "starter": {"type": "object"},
+        "editable_gaps": {"type": "array"},
+        "signature": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
+  }
+}
