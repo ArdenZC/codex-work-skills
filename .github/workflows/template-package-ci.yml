@@ -33,6 +33,7 @@ jobs:
       run_workorder: ${{ steps.classify.outputs.run_workorder }}
       run_courseware: ${{ steps.classify.outputs.run_courseware }}
       run_practice_class: ${{ steps.classify.outputs.run_practice_class }}
+      run_whole_course: ${{ steps.classify.outputs.run_whole_course }}
       run_tooling: ${{ steps.classify.outputs.run_tooling }}
       run_release: ${{ steps.classify.outputs.run_release }}
       run_package_contracts: ${{ steps.classify.outputs.run_package_contracts }}
@@ -126,6 +127,8 @@ jobs:
               root / "平时成绩记分册生成器" / "简介.md",
               root / "HTML课件生成器" / "简介.md",
               root / "实践课HTML生成器" / "简介.md",
+              root / "整门课程编排器" / "简介.md",
+              root / "WHOLE-COURSE-ARCHITECTURE-REPORT.md",
           ]
           sources.extend(sorted((root / "docs").rglob("*.md")))
           link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
@@ -872,6 +875,32 @@ jobs:
         shell: bash
         run: test -z "$(git status --porcelain)"
 
+  whole-course-orchestrator:
+    name: Whole-Course Orchestrator
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_whole_course == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Compile Whole-Course Orchestrator
+        run: python -m compileall -q 整门课程编排器/whole-course-orchestrator
+
+      - name: Run architecture synthetic tests
+        run: python -m unittest discover -s 整门课程编排器/whole-course-orchestrator/tests -p 'test_*.py' -v
+
+      - name: Validate install dry-run
+        run: python 整门课程编排器/whole-course-orchestrator/scripts/install.py --skills-dir "$RUNNER_TEMP/skills" --dry-run
+
+      - name: Verify Whole-Course worktree is clean
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
   template-release:
     name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs:
@@ -978,6 +1007,7 @@ jobs:
       - template-workorder
       - template-courseware
       - practice-class-html
+      - whole-course-orchestrator
       - template-release
     runs-on: ubuntu-latest
     steps:
@@ -992,6 +1022,7 @@ jobs:
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
           COURSEWARE_RESULT: ${{ needs.template-courseware.result }}
           PRACTICE_CLASS_RESULT: ${{ needs.practice-class-html.result }}
+          WHOLE_COURSE_RESULT: ${{ needs.whole-course-orchestrator.result }}
           RELEASE_RESULT: ${{ needs.template-release.result }}
           RUN_DOCS: ${{ needs.classify-changes.outputs.run_docs }}
           RUN_PACKAGE: ${{ needs.classify-changes.outputs.run_package_contracts }}
@@ -1001,6 +1032,7 @@ jobs:
           RUN_WORKORDER: ${{ needs.classify-changes.outputs.run_workorder }}
           RUN_COURSEWARE: ${{ needs.classify-changes.outputs.run_courseware }}
           RUN_PRACTICE_CLASS: ${{ needs.classify-changes.outputs.run_practice_class }}
+          RUN_WHOLE_COURSE: ${{ needs.classify-changes.outputs.run_whole_course }}
           RUN_RELEASE: ${{ needs.classify-changes.outputs.run_release }}
           FORCE_FULL: ${{ needs.classify-changes.outputs.force_full }}
           CLASSIFICATION: ${{ needs.classify-changes.outputs.classification }}
@@ -1038,6 +1070,7 @@ jobs:
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"
           check_job template-courseware "$RUN_COURSEWARE" "$COURSEWARE_RESULT"
           check_job practice-class-html "$RUN_PRACTICE_CLASS" "$PRACTICE_CLASS_RESULT"
+          check_job whole-course-orchestrator "$RUN_WHOLE_COURSE" "$WHOLE_COURSE_RESULT"
           check_job template-release "$RUN_RELEASE" "$RELEASE_RESULT"
 
           {
