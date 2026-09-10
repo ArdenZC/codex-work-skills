@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/visual-plan.schema.json",
+  "title": "Semantic Visual Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_type", "visual_plans"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "plan_type": {"const": "semantic_visual_plans"},
+    "visual_plans": {"type": "array", "items": {"$ref": "#/$defs/visual"}}
+  },
+  "$defs": {
+    "visual": {
+      "type": "object",
+      "required": ["page_id", "visual_intent", "semantic_elements", "required_semantic_elements", "render_strategy"],
+      "properties": {
+        "page_id": {"type": "string"},
+        "artifact_type": {"type": ["string", "null"]},
+        "visual_intent": {"type": "string"},
+        "semantic_elements": {"type": "array", "items": {"type": "string"}},
+        "required_semantic_elements": {"type": "array", "items": {"type": "string"}},
+        "render_strategy": {"enum": ["reuse", "semantic_redraw", "reference_only", "generated", "generic_rectangle", "placeholder", "todo"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}
