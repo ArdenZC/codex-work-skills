@@ -390,7 +390,19 @@ class Phase11EvidenceTests(unittest.TestCase):
         benchmark_path = SKILL_ROOT.parents[1] / "benchmarks" / "WHOLE_COURSE_FAILURE_BENCHMARK_V1" / "whole-course-failure-benchmark.json"
         with tempfile.TemporaryDirectory() as temp:
             snapshot_path = Path(temp) / "failure-evidence-snapshot.json"
-            snapshot = extract(benchmark_path, snapshot_path)
+            benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+            frozen_source_root = Path(str(benchmark["source_root"])).expanduser()
+            frozen_build_root = Path(str(benchmark["build_root"])).expanduser()
+            if frozen_source_root.is_dir() and frozen_build_root.is_dir():
+                snapshot = extract(benchmark_path, snapshot_path)
+            else:
+                # The committed snapshot is the immutable CI-portable form of
+                # the real frozen output.  The original Windows roots are not
+                # expected to exist on Ubuntu; do not replace this with a
+                # synthetic reconstruction or silently rerun the old course.
+                committed_snapshot = benchmark_path.parent / "failure-evidence-snapshot.json"
+                snapshot = json.loads(committed_snapshot.read_text(encoding="utf-8"))
+                snapshot_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             self.assertTrue(snapshot["extracted_from_real_output"])
             self.assertEqual(verify_snapshot(snapshot, benchmark_path)["status"], "PASS")
             replayed = replay(snapshot_path, benchmark_path=benchmark_path, expect_fail=True)
