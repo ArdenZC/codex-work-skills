@@ -1,4 +1,4 @@
-"""Plan typed, knowledge-bounded whole-course practice tasks."""
+"""Plan typed, knowledge-bounded practice tasks with observed-evidence slots."""
 
 from __future__ import annotations
 
@@ -22,13 +22,19 @@ TYPED_STARTERS: dict[str, dict[str, Any]] = {
 def typed_starter(artifact_type: str, supplied: dict[str, Any] | None = None) -> dict[str, Any]:
     adapter = TYPED_STARTERS.get(artifact_type)
     if not adapter:
-        return {"artifact_type": artifact_type, "components": [], "editable_gaps": [], "starter_kind": "none"}
+        return {"artifact_type": artifact_type, "components": [], "editable_gaps": [], "starter_kind": "none", "starter_observed": [], "evidence_status": "PLANNED_NOT_OBSERVED"}
     supplied = supplied or {}
+    gaps = supplied.get("editable_gaps")
+    if not isinstance(gaps, list) or not gaps:
+        gaps = [{"type": gap, "semantic_target": gap} for gap in adapter["gaps"]]
     return {
         "artifact_type": artifact_type,
         "components": list(supplied.get("components") or adapter["components"]),
-        "editable_gaps": list(supplied.get("editable_gaps") or [{"type": gap, "semantic_target": gap} for gap in adapter["gaps"]]),
+        "editable_gaps": gaps,
         "starter_kind": "typed",
+        "starter_observed": list(supplied.get("starter_observed") or []),
+        "evidence": list(supplied.get("evidence") or []),
+        "evidence_status": str(supplied.get("evidence_status") or "PLANNED_NOT_OBSERVED"),
     }
 
 
@@ -48,6 +54,46 @@ def _validate_starter(task: dict[str, Any], starter: dict[str, Any]) -> list[str
         if any(token in str(starter).lower() for token in ("todo_1", "todo_2", "generic rectangle")):
             errors.append(f"{task.get('id')}: generic TODO/rectangle starter is not allowed for {artifact_type}")
     return errors
+
+
+def _gap_types(starter: dict[str, Any]) -> list[str]:
+    values: list[str] = []
+    for item in starter.get("editable_gaps", []):
+        value = item.get("type") if isinstance(item, dict) else item
+        if value:
+            values.append(str(value))
+    return list(dict.fromkeys(values))
+
+
+def _step_pattern(raw: dict[str, Any]) -> list[str]:
+    steps = raw.get("steps", [])
+    if not isinstance(steps, list):
+        steps = []
+    result: list[str] = []
+    for step in steps:
+        if isinstance(step, dict):
+            result.append(str(step.get("kind") or step.get("type") or ("check" if step.get("check") else "action")))
+        else:
+            result.append("action")
+    return result or ["action"]
+
+
+def _structural_signature(raw: dict[str, Any], task: dict[str, Any], starter: dict[str, Any]) -> str:
+    minutes = float(task.get("estimated_minutes", 0) or 0)
+    breakdown = []
+    for item in task.get("time_breakdown", []) if isinstance(task.get("time_breakdown"), list) else []:
+        if isinstance(item, dict):
+            breakdown.append((str(item.get("label") or item.get("kind") or "segment"), round(float(item.get("minutes", 0) or 0), 1)))
+    payload = {
+        "capability": str(task.get("capability") or ""),
+        "task_shape": str(raw.get("task_shape") or raw.get("shape") or ("artifact" if task.get("artifact_type") else "response")),
+        "step_pattern": _step_pattern(raw),
+        "artifact_family": str(task.get("artifact_type") or raw.get("artifact_family") or "none"),
+        "starter_gap_family": sorted(_gap_types(starter)),
+        "time_structure": {"minutes": round(minutes), "breakdown": breakdown},
+        "interaction_type": str(raw.get("interaction_type") or raw.get("modality") or task.get("capability") or "unknown"),
+    }
+    return canonical_hash(payload)
 
 
 def plan_practice_session(session: dict[str, Any], graph: dict[str, Any]) -> dict[str, Any]:
@@ -82,19 +128,29 @@ def plan_practice_session(session: dict[str, Any], graph: dict[str, Any]) -> dic
             "estimated_minutes": estimated,
             "time_breakdown": raw.get("time_breakdown", []),
             "starter": starter,
+            "starter_requirements": list(raw.get("starter_requirements") or starter.get("components", [])) + [f"editable_gap:{gap}" for gap in _gap_types(starter)],
+            "starter_plan": dict(starter),
+            "starter_observed": [],
             "editable_gaps": starter.get("editable_gaps", []),
             "observable_output": raw.get("observable_output"),
             "acceptance": raw.get("acceptance", []),
             "scaffold": raw.get("scaffold", []),
+            "task_shape": str(raw.get("task_shape") or raw.get("shape") or ("artifact" if artifact_type else "response")),
+            "interaction_type": str(raw.get("interaction_type") or raw.get("modality") or capability),
         }
-        task["signature"] = canonical_hash({key: task[key] for key in ("capability", "artifact_type", "knowledge_node_ids", "editable_gaps")})
+        task["structural_task_signature"] = _structural_signature(raw, task, starter)
+        task["semantic_task_signature"] = canonical_hash({"title": task["title"], "knowledge_node_ids": knowledge_ids, "capability": capability, "artifact_type": artifact_type, "editable_gaps": task["editable_gaps"]})
+        # Phase 1 compatibility: ``signature`` remains the semantic signature;
+        # template QA now uses structural_task_signature instead.
+        task["signature"] = task["semantic_task_signature"]
         tasks.append(task)
     if errors:
         raise OrchestrationError("practice planning failed:\n- " + "\n- ".join(errors))
+    graph_session = next((item for item in graph.get("sessions", []) if item.get("id") == session_id), None)
     return {
         "id": session_id,
         "title": str(session.get("title") or session_id),
-        "knowledge_state_after": next(item.get("knowledge_state_after", []) for item in graph.get("sessions", []) if item.get("id") == session_id),
+        "knowledge_state_after": (graph_session or {}).get("knowledge_state_after", []),
         "tasks": tasks,
         "task_count": len(tasks),
         "planned_minutes": sum(float(task["estimated_minutes"]) for task in tasks),
@@ -103,10 +159,11 @@ def plan_practice_session(session: dict[str, Any], graph: dict[str, Any]) -> dic
 
 def build_practice_plans(course: dict[str, Any], graph: dict[str, Any]) -> dict[str, Any]:
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "plan_type": "whole_course_practice_plans",
         "course_id": graph.get("course_id"),
         "sessions": [plan_practice_session(session, graph) for session in course.get("sessions", [])],
+        "evidence_state_model": {"required": "artifact-specific starter requirements", "planned": "starter plan", "observed": "real starter files and closure evidence"},
     }
 
 

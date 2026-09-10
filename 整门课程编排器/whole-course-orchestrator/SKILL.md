@@ -5,7 +5,9 @@ metadata:
   short-description: 整门课程级教学编排与批量质量审查
 ---
 
-# 整门课程编排器
+# 整门课程编排器 1.1
+
+Phase 1.1 adds evidence integrity and downstream batch QA to the 1.0 architecture. The authoritative state model is `required → planned → observed`; a planner declaration is never final evidence, and a planner cannot validate its own output.
 
 ## 目标与边界
 
@@ -31,6 +33,8 @@ metadata:
 8. **Whole-course QA**：跨 session 计算结构、文本、视觉、知识边界、素材使用和实践签名，检查模板坍缩、source underutilization、脚本同构、比较逻辑、quiz distractor、知识越界和研究质量。
 9. **Package**：输出干净的教师课程包与独立 evidence 目录。最终包不得同时暴露 `student/` 和 `student-package/student/` 两棵重复学生树；所有用户可见文件名必须经过 `safe_filename()`。
 
+10. **Observe final artifacts**：对 Courseware 从最终 DOM 读取 semantic/source markers；对 Practice 从实际 starter 文件、manifest、QA 和 behavior evidence 读取 typed evidence；对 contact sheet 区分真实浏览器 thumbnail 与无浏览器的 `DEGRADED` fallback。`PLANNED_NOT_OBSERVED`、`NOT_OBSERVED` 和 `UNAVAILABLE_OR_DEGRADED` 必须保留，不能自动升级为 PASS。
+
 ## 外部资料规则
 
 来源优先级为：用户资料 > 官方/标准/官方教程 > 高质量高校/专业教学参考 > 社区资料。外部候选必须通过 relevance、authority、student_level_fit、visual_value、teaching_value、recency 和 complexity 过滤，并记录 URL、标题、检索时间、license_note、used_for、selected/rejected reason。
@@ -43,11 +47,12 @@ metadata:
 - 外部研究不可用时记录 `EXTERNAL_RESEARCH_UNAVAILABLE` 并继续使用用户源；
 - 用户禁网时记录 `EXTERNAL_RESEARCH_DISABLED_BY_USER`，不得偷偷搜索；
 - automated QA 通过不等于教师人工教学验收通过；
-- 真实 UML failure benchmark 在架构评审前不重跑，第一阶段状态只能是 `READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW` 或 `WHOLE_COURSE_ARCHITECTURE_BLOCKED`。
+- rendered Courseware/Practice QA 通过不等于 browser smoke 或 contact-sheet proof 通过；
+- 真实 UML failure benchmark 在架构评审前不重跑，第一阶段状态只能是 `READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW` 或 `WHOLE_COURSE_ARCHITECTURE_BLOCKED`；没有 browser runtime 时必须选择后者。
 
 ## 交付合同
 
-核心输出包括：`source-assets.json`、`source-teaching-asset-report.json`、`knowledge-graph.json`、`session-plans.json`、`visual-plans.json`、`practice-plans.json`、`external-source-research.json`、`whole-course-qa.json`、`source-portfolio.html` 以及干净课程包。它们是给下游 Skill 与教师审计使用的中间层，不是新的 HTML 渲染格式。
+核心输出包括：`source-assets.json`、`source-teaching-asset-report.json`、`knowledge-graph.json`、`session-plans.json`、`visual-plans.json`、`practice-plans.json`、`external-source-research.json`、`whole-course-qa.json`、`whole-course-e2e.json`、`contact-sheet-evidence.json`、`source-portfolio.html` 以及干净课程包。它们是给下游 Skill 与教师审计使用的中间层，不是新的 HTML 渲染格式。
 
 ## 运行入口
 
@@ -58,5 +63,6 @@ python scripts/plan_sessions.py --course-json <course-map.json> --knowledge-grap
 python scripts/plan_visuals.py --session-plans <session-plans.json> --assets <source-assets.json> --output-json <visual-plans.json> --json
 python scripts/plan_practice.py --course-json <course-map.json> --knowledge-graph <knowledge-graph.json> --output-json <practice-plans.json> --json
 python scripts/review_whole_course.py --session-plans <session-plans.json> --practice-plans <practice-plans.json> --knowledge-graph <knowledge-graph.json> --assets <source-assets.json> --output-json <whole-course-qa.json> --json
+python scripts/downstream_e2e.py --output-dir <e2e-dir> --no-browser --allow-degraded-browser --json
 python scripts/package_course.py --package-json <package-manifest.json> --output-dir <course-package> --json
 ```

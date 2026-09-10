@@ -309,6 +309,27 @@ def _scope_svg(raw: str, scope: str) -> str:
     return scoped
 
 
+def _evidence_attrs(block: dict[str, Any]) -> str:
+    """Additive, non-visual evidence hooks for the course-level adapter."""
+    attrs: list[str] = []
+    artifact_type = block.get("artifact_type") or block.get("semantic_artifact_type")
+    if artifact_type:
+        attrs.append(f' data-artifact-type="{_escape(artifact_type)}"')
+    roles = block.get("semantic_roles") or block.get("semantic_elements") or []
+    if isinstance(roles, str):
+        roles = [roles]
+    if roles:
+        attrs.append(f' data-semantic-role="{_escape(" ".join(str(item) for item in roles))}"')
+    asset_ids = block.get("source_asset_ids") or block.get("derived_from_asset_ids") or []
+    if block.get("asset_id") and not asset_ids:
+        asset_ids = [block.get("asset_id")]
+    if isinstance(asset_ids, str):
+        asset_ids = [asset_ids]
+    if asset_ids:
+        attrs.append(f' data-source-asset-id="{_escape(" ".join(str(item) for item in asset_ids))}"')
+    return "".join(attrs)
+
+
 def _render_block(block: dict[str, Any], slide_index: int, block_index: int, assets: dict[str, str] | None = None) -> str:
     block_type = block["type"]
     if block_type == "paragraph":
@@ -336,14 +357,14 @@ def _render_block(block: dict[str, Any], slide_index: int, block_index: int, ass
     if block_type == "svg":
         svg = _scope_svg(block["svg"], f"cw-{slide_index}-{block_index}")
         caption = f'<figcaption>{_escape(block["caption"])}</figcaption>' if block.get("caption") else ""
-        return f'<figure class="svg-block" data-svg-block>{svg}{caption}</figure>'
+        return f'<figure class="svg-block" data-svg-block{_evidence_attrs(block)}>{svg}{caption}</figure>'
     if block_type == "image":
         asset_data = (assets or {}).get(str(block.get("asset_id")))
         if not asset_data:
             raise CoursewareContractError(f"image asset is not available: {block.get('asset_id')}")
         caption = f'<figcaption>{_escape(block["caption"])}</figcaption>' if block.get("caption") else ""
         alt = _escape(block.get("caption") or "课程图示")
-        return f'<figure class="image-block" data-image-block><img src="{_escape(asset_data)}" alt="{alt}">{caption}</figure>'
+        return f'<figure class="image-block" data-image-block{_evidence_attrs(block)}><img src="{_escape(asset_data)}" alt="{alt}">{caption}</figure>'
     if block_type == "quiz":
         options = "".join(
             f'<button class="quiz-option" data-action="quiz-choice" data-choice="{index}" data-interactive="true">{_escape(option)}</button>'

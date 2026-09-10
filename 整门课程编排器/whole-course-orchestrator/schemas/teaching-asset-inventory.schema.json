@@ -4,11 +4,23 @@
   "title": "Whole-Course Teaching Asset Inventory",
   "type": "object",
   "required": ["schema_version", "inventory_type", "sources", "assets", "coverage"],
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1"}}},
+      "then": {
+        "required": ["source_slides"],
+        "properties": {
+          "assets": {"items": {"required": ["source_slide_id", "source_element_ids", "source_kind"]}}
+        }
+      }
+    }
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"enum": ["1.0", "1.1"]},
     "inventory_type": {"const": "teaching_asset_inventory"},
     "origin_policy": {"type": "string"},
     "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+    "source_slides": {"type": "array", "items": {"$ref": "#/$defs/sourceSlide"}},
     "assets": {"type": "array", "items": {"$ref": "#/$defs/asset"}},
     "coverage": {"type": "object"}
   },
@@ -25,18 +37,35 @@
       },
       "additionalProperties": true
     },
+    "sourceSlide": {
+      "type": "object",
+      "required": ["id", "source_file", "slide", "asset_ids"],
+      "properties": {
+        "id": {"type": "string"},
+        "source_file": {"type": "string"},
+        "slide": {"type": "integer", "minimum": 1},
+        "title": {"type": "string"},
+        "asset_ids": {"type": "array", "items": {"type": "string"}},
+        "shape_graph": {"type": ["object", "null"]}
+      },
+      "additionalProperties": true
+    },
     "asset": {
       "type": "object",
       "required": [
         "id", "type", "source_file", "source_slide", "source_locator", "title",
         "content_summary", "raw_text", "confidence", "candidate_topics", "teaching_value",
-        "origin", "origin_type"
+        "origin", "origin_type", "source_slide_id", "source_element_ids", "source_kind"
       ],
       "properties": {
         "id": {"type": "string", "minLength": 1},
         "type": {"type": "string"},
         "source_file": {"type": "string", "minLength": 1},
         "source_slide": {"type": "integer", "minimum": 1},
+        "source_slide_id": {"type": "string"},
+        "source_element_ids": {"type": "array", "items": {"type": "string"}},
+        "source_region": {"type": ["object", "null"]},
+        "source_kind": {"type": "string"},
         "source_locator": {"type": "string", "minLength": 1},
         "title": {"type": "string"},
         "content_summary": {"type": "string"},

@@ -5,9 +5,9 @@
   "type": "object",
   "required": ["schema_version", "report_type", "status", "architecture_status", "metrics", "findings"],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"enum": ["1.0", "1.1"]},
     "report_type": {"const": "whole_course_batch_qa"},
-    "status": {"enum": ["PASS", "FAIL"]},
+    "status": {"enum": ["PASS", "FAIL", "NOT_EVALUATED"]},
     "architecture_status": {"enum": ["READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW", "WHOLE_COURSE_ARCHITECTURE_BLOCKED"]},
     "metrics": {"type": "object"},
     "findings": {"type": "array", "items": {"type": "object"}}

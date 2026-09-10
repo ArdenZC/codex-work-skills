@@ -894,6 +894,15 @@ jobs:
       - name: Run architecture synthetic tests
         run: python -m unittest discover -s 整门课程编排器/whole-course-orchestrator/tests -p 'test_*.py' -v
 
+      - name: Run downstream E2E and contact-sheet smoke
+        shell: bash
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
+          --output-dir "$RUNNER_TEMP/whole-course-e2e"
+          --no-browser
+          --allow-degraded-browser
+          --json
+
       - name: Validate install dry-run
         run: python 整门课程编排器/whole-course-orchestrator/scripts/install.py --skills-dir "$RUNNER_TEMP/skills" --dry-run
 

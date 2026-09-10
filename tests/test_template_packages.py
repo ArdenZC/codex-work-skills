@@ -3843,6 +3843,8 @@ esac
         self.assertIn("validate_practice.py", practice_class_text)
         self.assertIn("whole-course-orchestrator", whole_course_text)
         self.assertIn("synthetic", whole_course_text)
+        self.assertIn("downstream_e2e.py", whole_course_text)
+        self.assertIn("contact-sheet", whole_course_text)
         self.assertEqual(
             {item["os"] for item in jobs["practice-class-html"]["strategy"]["matrix"]["include"]},
             {"windows-latest", "macos-14"},

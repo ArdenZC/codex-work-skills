@@ -4,8 +4,26 @@
   "title": "Whole-Course Practice Plan",
   "type": "object",
   "required": ["schema_version", "plan_type", "sessions"],
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1"}}},
+      "then": {
+        "properties": {
+          "sessions": {
+            "items": {
+              "properties": {
+                "tasks": {
+                  "items": {"required": ["starter_requirements", "starter_plan", "starter_observed", "structural_task_signature"]}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"enum": ["1.0", "1.1"]},
     "plan_type": {"const": "whole_course_practice_plans"},
     "sessions": {"type": "array", "items": {"$ref": "#/$defs/session"}}
   },
@@ -31,7 +49,12 @@
         "estimated_minutes": {"type": "number", "exclusiveMinimum": 0},
         "starter": {"type": "object"},
         "editable_gaps": {"type": "array"},
-        "signature": {"type": "string"}
+        "signature": {"type": "string"},
+        "starter_requirements": {"type": "array"},
+        "starter_plan": {"type": "object"},
+        "starter_observed": {"type": "array"},
+        "structural_task_signature": {"type": "string"},
+        "semantic_task_signature": {"type": "string"}
       },
       "additionalProperties": true
     }

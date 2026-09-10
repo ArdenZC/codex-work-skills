@@ -40,7 +40,7 @@
 | [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.2.0 / Phase 2.2** · Practice Task **1.1** · WorkOrder Content **1.1** | 学生实践工单 `.docx` | ✅ Stable |
 | [🖥️ HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** · Courseware Contract **1.1** | `student.html` + `teacher.html` | ✅ Stable |
 | [🧪 实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.2.0** · Practice Class Contract **1.1** | student / teacher 离线 HTML 包 | ✅ Stable |
-| [🧭 整门课程编排器](整门课程编排器/whole-course-orchestrator) | **1.0.0-alpha** · Whole-Course Orchestration **1.0** | 素材清单、知识图谱、课次计划、批量 QA、课程包 | ⚠️ Architecture review |
+| [🧭 整门课程编排器](整门课程编排器/whole-course-orchestrator) | **1.0.0-alpha** · Whole-Course Orchestration **1.1 evidence integrity** | 素材清单、知识图谱、课次计划、下游 E2E、批量 QA、课程包 | ⚠️ Architecture review |
 | [📊 平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | Template **course-gradebook 1.1.0** | 平时成绩记分册 `.xls` | ✅ Stable |
 
 ### 当前稳定能力
@@ -139,7 +139,7 @@ Content-native Session Plans
 Whole-course Batch QA → clean course package
 ```
 
-编排器是 Courseware / Practice 的上层，不是第三个 renderer。它会先用 synthetic tests 和架构 QA 检查模板坍缩、素材长期未用、语义视觉退化、知识越界和实践同构；真实 UML failure benchmark 在架构评审前不会重跑。
+编排器是 Courseware / Practice 的上层，不是第三个 renderer。它会先用 synthetic tests、最终 DOM/file evidence 和下游 E2E 检查模板坍缩、素材长期未用、语义视觉退化、知识越界和实践同构；`required`、`planned`、`observed` 三态不能混用。真实 UML failure benchmark 在架构评审前不会重跑；浏览器 proof 不可用时不得宣称 whole-course PASS。
 
 ## 设计原则
 

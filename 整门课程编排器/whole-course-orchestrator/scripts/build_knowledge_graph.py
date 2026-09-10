@@ -137,13 +137,15 @@ def build_graph(course: dict[str, Any]) -> dict[str, Any]:
         raise OrchestrationError("knowledge graph validation failed:\n- " + "\n- ".join(errors))
 
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "graph_type": "course_knowledge_graph",
         "course_id": str(course.get("course_id") or course.get("course_name") or "course"),
         "course_name": str(course.get("course_name") or course.get("course_id") or ""),
         "student_level": course.get("student_level", "高职/大专"),
         "nodes": list(node_map.values()),
         "sessions": session_records,
+        "asset_knowledge_links": course.get("asset_knowledge_links", []),
+        "evidence_state_model": {"required": "course map source_assets and teaching questions", "planned": "graph resolution", "observed": "downstream artifacts only"},
         "state_policy": "knowledge_state_after is cumulative; core practice may only use it",
     }
 

@@ -41,10 +41,16 @@ REQUIRED = (
     "scripts/plan_practice.py",
     "scripts/external_research.py",
     "scripts/review_whole_course.py",
+    "scripts/collect_visual_evidence.py",
+    "scripts/collect_starter_evidence.py",
+    "scripts/contact_sheets.py",
+    "scripts/downstream_adapters.py",
+    "scripts/downstream_e2e.py",
     "scripts/package_course.py",
     "scripts/install.py",
     "tests/__init__.py",
     "tests/test_whole_course.py",
+    "tests/test_phase_1_1.py",
 )
 
 

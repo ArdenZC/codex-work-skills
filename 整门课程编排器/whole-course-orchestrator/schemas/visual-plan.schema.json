@@ -4,21 +4,37 @@
   "title": "Semantic Visual Plan",
   "type": "object",
   "required": ["schema_version", "plan_type", "visual_plans"],
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1"}}},
+      "then": {
+        "properties": {
+          "visual_plans": {
+            "items": {"required": ["planned_semantic_elements", "observed_semantic_elements"]}
+          }
+        }
+      }
+    }
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"},
+    "schema_version": {"enum": ["1.0", "1.1"]},
     "plan_type": {"const": "semantic_visual_plans"},
     "visual_plans": {"type": "array", "items": {"$ref": "#/$defs/visual"}}
   },
   "$defs": {
     "visual": {
       "type": "object",
-      "required": ["page_id", "visual_intent", "semantic_elements", "required_semantic_elements", "render_strategy"],
+      "required": ["page_id", "visual_intent", "render_strategy"],
       "properties": {
         "page_id": {"type": "string"},
         "artifact_type": {"type": ["string", "null"]},
         "visual_intent": {"type": "string"},
         "semantic_elements": {"type": "array", "items": {"type": "string"}},
         "required_semantic_elements": {"type": "array", "items": {"type": "string"}},
+        "planned_semantic_elements": {"type": "array", "items": {"type": "string"}},
+        "observed_semantic_elements": {"type": "array", "items": {"type": "string"}},
+        "evidence": {"type": "array", "items": {"type": "object"}},
+        "evidence_status": {"type": "string"},
         "render_strategy": {"enum": ["reuse", "semantic_redraw", "reference_only", "generated", "generic_rectangle", "placeholder", "todo"]}
       },
       "additionalProperties": true

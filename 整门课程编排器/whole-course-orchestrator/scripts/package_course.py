@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from orchestrator_core import dump_json, html_page, load_json, safe_filename
+from contact_sheets import build_contact_sheets
 
 
 def _require_file(path_value: str | Path) -> Path:
@@ -84,10 +86,21 @@ def _write_dashboards(root: Path, manifest: dict[str, Any], evidence: dict[str, 
     (overview / "visual-gallery.html").write_text(html_page("Visual gallery", "<h1>Visual gallery</h1><p>这是语义视觉审计索引；真实 HTML 渲染后的缩略图由下游 renderer/人工检查补充。</p><table><tr><th>Page</th><th>Artifact</th><th>Intent</th><th>Semantic elements</th><th>Strategy</th></tr>" + visual_rows + "</table>"), encoding="utf-8")
 
     contact_rows = "".join(f"<tr><td>{html.escape(str(item.get('id')))}</td><td>{html.escape(str(item.get('title')))}</td><td>{html.escape(str(len(item.get('pages', []))))}</td></tr>" for item in manifest.get("theory_sessions", [])) or "<tr><td colspan='3'>暂无课次</td></tr>"
-    (overview / "course-contact-sheet.html").write_text(html_page("Course contact sheet", "<h1>Course contact sheet</h1><table><tr><th>Session</th><th>Title</th><th>Planned pages</th></tr>" + contact_rows + "</table>"), encoding="utf-8")
-
-    practice_rows = "".join(f"<tr><td>{html.escape(str(item.get('id')))}</td><td>{html.escape(str(item.get('title')))}</td><td>{html.escape(str(item.get('task_count', '')))}</td></tr>" for item in manifest.get("practice_sessions", [])) or "<tr><td colspan='3'>暂无实践课</td></tr>"
-    (overview / "practice-contact-sheet.html").write_text(html_page("Practice contact sheet", "<h1>Practice contact sheet</h1><table><tr><th>Session</th><th>Title</th><th>Tasks</th></tr>" + practice_rows + "</table>"), encoding="utf-8")
+    # These are visual review surfaces built from the final copied artifacts,
+    # not metadata tables. A degraded SVG fallback is still marked as such by
+    # contact_sheets.py when an installed browser is unavailable.
+    packaged_theory = []
+    for index, item in enumerate(manifest.get("theory_sessions", []), start=1):
+        session_root = root / "理论课" / f"{index:02d}_{safe_filename(str(item.get('title') or item.get('id') or f'session-{index}'))}"
+        packaged_theory.append({"id": item.get("id"), "title": item.get("title"), "student_html": str(session_root / "学生课件.html")})
+    packaged_practice = []
+    planned_practice = {str(item.get("id")): item for item in evidence.get("practice_plans", {}).get("sessions", []) if isinstance(item, dict)}
+    for index, item in enumerate(manifest.get("practice_sessions", []), start=1):
+        session_root = root / "实践课" / f"{index:02d}_{safe_filename(str(item.get('title') or item.get('id') or f'session-{index}'))}"
+        packaged = {"id": item.get("id"), "title": item.get("title"), "student_dir": str(session_root / "学生资料"), "tasks": planned_practice.get(str(item.get("id")), {}).get("tasks", [])}
+        packaged_practice.append(packaged)
+    contact = build_contact_sheets(packaged_theory, packaged_practice, overview, visual_plans=evidence.get("visual_plans"), inventory=evidence.get("assets", {}))
+    (overview / "contact-sheet-evidence.json").write_text(json.dumps(contact, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     source_counts = {
         "user_sources": len([item for item in assets if item.get("origin_type") == "user-provided"]),
@@ -135,7 +148,18 @@ def package_course(manifest: dict[str, Any], output_dir: Path, *, replace: bool 
                 evidence_map[label] = destination.relative_to(course_root).as_posix()
             else:
                 raise ValueError(f"evidence path does not exist: {source_path}")
-        dump_json({"schema_version": "1.0", "evidence": evidence_map}, evidence_root / "package-manifest.json")
+        dump_json(
+            {
+                "schema_version": "1.1",
+                "evidence": evidence_map,
+                "evidence_state_model": {
+                    "required": "contract and question-specific acceptance requirement",
+                    "planned": "planner or adapter declaration",
+                    "observed": "final artifact, manifest/QA, and contact-sheet evidence",
+                },
+            },
+            evidence_root / "package-manifest.json",
+        )
         evidence = {}
         for key, path in manifest.get("evidence_data", {}).items():
             evidence[key] = load_json(path)
