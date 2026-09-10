@@ -931,6 +931,28 @@ jobs:
           --evidence-mode strict
           --json
 
+      - name: Report strict contact-sheet evidence
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = Path(os.environ["RUNNER_TEMP"]) / "whole-course-e2e" / "contact-sheets" / "contact-sheet-evidence.json"
+          evidence = json.loads(report.read_text(encoding="utf-8"))
+          print({
+              "status": evidence.get("status"),
+              "browser_rendered": evidence.get("browser_rendered"),
+              "screenshot_count": evidence.get("screenshot_count"),
+              "fallback_count": evidence.get("fallback_count"),
+              "thumbnail_count": evidence.get("thumbnail_count"),
+              "browser_runtime": evidence.get("browser_runtime"),
+          })
+          if evidence.get("status") != "PASS" or evidence.get("fallback_count") != 0 or evidence.get("screenshot_count", 0) <= 0:
+              raise SystemExit("strict contact-sheet evidence is not a complete browser proof")
+          PY
+
       - name: Preserve migration-trust compatibility E2E as an intentional blocked regression
         shell: bash
         env:
