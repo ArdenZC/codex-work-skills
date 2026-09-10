@@ -169,7 +169,11 @@ const { chromium } = require(process.env.WHOLE_COURSE_PLAYWRIGHT_ROOT);
   const browser = await chromium.launch({headless: true});
   const page = await browser.newPage({viewport: {width: 1280, height: 800}});
   await page.goto(pathToFileURL(process.env.WHOLE_COURSE_INPUT).href, {waitUntil: "load"});
-  await page.screenshot({path: process.env.WHOLE_COURSE_OUTPUT, fullPage: true});
+  if (process.env.WHOLE_COURSE_INPUT.toLowerCase().endsWith(".svg")) {
+    await page.locator("svg").first().screenshot({path: process.env.WHOLE_COURSE_OUTPUT, animations: "disabled"});
+  } else {
+    await page.screenshot({path: process.env.WHOLE_COURSE_OUTPUT, fullPage: true});
+  }
   console.log(JSON.stringify({version: browser.version()}));
   await browser.close();
 })().catch(error => { console.error(error && error.stack ? error.stack : String(error)); process.exit(2); });

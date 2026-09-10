@@ -346,6 +346,27 @@ class Phase11EvidenceTests(unittest.TestCase):
             self.assertGreater(result["screenshot_count"], 0)
             self.assertEqual(result["fallback_count"], 0)
 
+    def test_t43_browser_contact_sheet_supporting_svg_is_real_screenshot(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            student = root / "student.html"
+            student.write_text('<section data-page-id="p1"><h1>Page</h1><p>Evidence</p></section>', encoding="utf-8")
+            visual = root / "visuals" / "diagram.svg"
+            visual.parent.mkdir(parents=True)
+            visual.write_text('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 80"><text x="8" y="24">typed evidence</text></svg>', encoding="utf-8")
+            result = build_contact_sheets(
+                [{"id": "s1", "student_html": str(student)}],
+                [],
+                root / "contact",
+                inventory={"asset_root": str(root), "assets": [{"id": "diagram", "title": "Diagram", "type": "diagram", "rendered_visual_ref": "visuals/diagram.svg"}]},
+                use_browser=True,
+            )
+            if result.get("status") == "DEGRADED" and result.get("browser_unavailable"):
+                self.skipTest("no Chromium/Playwright runtime is available on this host")
+            self.assertEqual(result["status"], "PASS", result)
+            self.assertGreaterEqual(result["screenshot_count"], 2)
+            self.assertEqual(result["fallback_count"], 0)
+
     def test_t43_browser_contact_sheet_partial_screenshot_failure_is_fail(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
