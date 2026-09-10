@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/session-plan.schema.json",
+  "title": "Content Native Session Plan",
+  "type": "object",
+  "required": ["schema_version", "plan_type", "sessions"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "plan_type": {"const": "content_native_session_plans"},
+    "sessions": {"type": "array", "items": {"$ref": "#/$defs/session"}}
+  },
+  "$defs": {
+    "session": {
+      "type": "object",
+      "required": ["id", "teaching_questions", "pages", "knowledge_state_before", "knowledge_state_after"],
+      "properties": {
+        "id": {"type": "string"},
+        "teaching_questions": {"type": "array", "minItems": 1},
+        "pages": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/page"}},
+        "knowledge_state_before": {"type": "array"},
+        "knowledge_state_after": {"type": "array"}
+      },
+      "additionalProperties": true
+    },
+    "page": {
+      "type": "object",
+      "required": ["id", "teaching_question_id", "primary_job", "layout", "lecture_minutes", "activity_minutes", "suggested_minutes", "script_anchor_ids"],
+      "properties": {
+        "id": {"type": "string"},
+        "teaching_question_id": {"type": "string"},
+        "primary_job": {"type": "string"},
+        "layout": {"type": "string"},
+        "lecture_minutes": {"type": "number", "minimum": 0},
+        "activity_minutes": {"type": "number", "minimum": 0},
+        "suggested_minutes": {"type": "number", "minimum": 0},
+        "script_anchor_ids": {"type": "array", "minItems": 1}
+      },
+      "additionalProperties": true
+    }
+  }
+}
