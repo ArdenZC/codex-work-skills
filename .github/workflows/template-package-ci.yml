@@ -887,7 +887,6 @@ jobs:
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
-      WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -908,10 +907,14 @@ jobs:
         run: python -m compileall -q 整门课程编排器/whole-course-orchestrator
 
       - name: Run architecture and real-browser evidence tests
+        env:
+          WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
         run: python -m unittest discover -s 整门课程编排器/whole-course-orchestrator/tests -p 'test_*.py' -v
 
       - name: Run strict downstream E2E and real contact-sheet proof
         shell: bash
+        env:
+          WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
         run: >-
           python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
           --output-dir "$RUNNER_TEMP/whole-course-e2e"
@@ -920,6 +923,8 @@ jobs:
 
       - name: Preserve migration-trust compatibility E2E as an intentional blocked regression
         shell: bash
+        env:
+          WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
         run: >-
           python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
           --output-dir "$RUNNER_TEMP/whole-course-migration-e2e"
