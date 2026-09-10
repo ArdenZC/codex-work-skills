@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "purpose": "phase-1 synthetic calibration inputs; not a real course and not a template",
+  "courses": [
+    {
+      "course_id": "synthetic-concepts",
+      "course_name": "概念辨析样例",
+      "student_level": "高职/大专",
+      "knowledge_nodes": [
+        {"id": "concept-definition", "title": "概念定义", "type": "concept", "importance": "core"},
+        {"id": "concept-example", "title": "反例辨析", "type": "diagnosis", "prerequisites": ["concept-definition"], "importance": "core"}
+      ],
+      "sessions": [
+        {"id": "s01", "title": "先回答它是什么", "minutes": 120, "new_knowledge_ids": ["concept-definition"], "teaching_questions": [{"id": "q1", "prompt": "这个概念的边界是什么？", "learning_outcome": "能用自己的话给出定义", "primary_job": "define", "minutes": 36}, {"id": "q2", "prompt": "怎样识别一个反例？", "learning_outcome": "能指出定义中的关键条件", "primary_job": "check", "check": {"kind": "diagnostic"}, "minutes": 24}]}
+      ]
+    },
+    {
+      "course_id": "synthetic-modeling",
+      "course_name": "建模关系样例",
+      "student_level": "高职/大专",
+      "knowledge_nodes": [
+        {"id": "class-model", "title": "类模型", "type": "modeling_skill", "importance": "core"},
+        {"id": "class-relation", "title": "类之间的关系", "type": "modeling_skill", "prerequisites": ["class-model"], "importance": "core"}
+      ],
+      "sessions": [
+        {"id": "s01", "title": "把关系画出来", "minutes": 120, "new_knowledge_ids": ["class-model"], "teaching_questions": [{"id": "q1", "prompt": "对象之间的关系如何表达？", "learning_outcome": "能选择合适的关系并说明理由", "artifact_type": "class_model", "visual_intent": "relationship", "minutes": 48}, {"id": "q2", "prompt": "一个关系为什么需要多重性？", "learning_outcome": "能在模型上补充多重性", "primary_job": "worked_example", "worked_example": {"artifact": "class_model", "focus": "multiplicity"}, "minutes": 32}]}
+      ]
+    },
+    {
+      "course_id": "synthetic-procedure",
+      "course_name": "工具操作样例",
+      "student_level": "高职/大专",
+      "knowledge_nodes": [
+        {"id": "tool-open", "title": "打开建模工具", "type": "tool_skill", "importance": "core"},
+        {"id": "tool-verify", "title": "验证导出结果", "type": "procedure", "prerequisites": ["tool-open"], "importance": "core"}
+      ],
+      "sessions": [
+        {"id": "s01", "title": "从打开到验证", "minutes": 120, "new_knowledge_ids": ["tool-open"], "teaching_questions": [{"id": "q1", "prompt": "完成操作前要经过哪些步骤？", "learning_outcome": "能按顺序完成打开、编辑和验证", "procedure": ["open", "edit", "verify"], "minutes": 60}, {"id": "q2", "prompt": "结果不符合预期时先查什么？", "learning_outcome": "能根据现象定位一个常见原因", "primary_job": "diagnose", "case": {"symptom": "export-mismatch"}, "minutes": 30}]}
+      ]
+    }
+  ]
+}
