@@ -13,6 +13,7 @@
 ## 架构记录
 
 - [Generalization Architecture Report](architecture/GENERALIZATION-ARCHITECTURE-REPORT.md) — Courseware / Practice 双 Skill 架构与 generalization audit 记录。
+- [Whole-Course Architecture Report](../WHOLE-COURSE-ARCHITECTURE-REPORT.md) — Whole-Course Orchestration 1.0 第一阶段架构、failure benchmark freeze、synthetic tests 和 review boundary。
 
 ## 模板包
 
@@ -28,6 +29,7 @@
 | 实践任务工单生成器 | [SKILL.md](../实践任务工单生成器/practice-task-workorder-generator/SKILL.md) |
 | HTML 课件生成器 | [SKILL.md](../HTML课件生成器/courseware-html-generator/SKILL.md) |
 | 实践课 HTML 生成器 | [SKILL.md](../实践课HTML生成器/practice-class-html-generator/SKILL.md) |
+| 整门课程编排器 | [SKILL.md](../整门课程编排器/whole-course-orchestrator/SKILL.md) |
 | 平时成绩记分册生成器 | [SKILL.md](../平时成绩记分册生成器/course-gradebook-generator/SKILL.md) |
 
 ## 仓库级规则

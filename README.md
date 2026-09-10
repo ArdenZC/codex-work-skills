@@ -9,7 +9,7 @@
 [![Template package CI](https://github.com/ArdenZC/codex-work-skills/actions/workflows/template-package-ci.yml/badge.svg?branch=master)](https://github.com/ArdenZC/codex-work-skills/actions/workflows/template-package-ci.yml)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Platforms](https://img.shields.io/badge/CI-Windows%20%7C%20macOS-4C566A)
-![Skills](https://img.shields.io/badge/Teaching%20Skills-5-5E81AC)
+![Skills](https://img.shields.io/badge/Teaching%20Skills-6-5E81AC)
 
 [快速了解](#快速了解) · [典型工作流](#典型工作流) · [使用方式](#使用方式) · [仓库结构](#仓库结构) · [文档](docs/README.md) · [更新日志](CHANGELOG.md)
 
@@ -21,12 +21,13 @@
 
 `codex-work-skills` 是一组围绕**真实教学生产任务**构建的 AI Skills。它不是只生成一段文本的 Prompt 集合，而是把 Agent 创作、结构化内容合同、真实 Word/Excel/HTML 产物、确定性 QA、渲染验证和安装/runtime 检查放在同一条生产链上。
 
-仓库当前覆盖五类工作：
+仓库当前覆盖六类工作：
 
 - 课程教案 DOCX；
 - 实践任务工单 DOCX；
 - 理论课离线 HTML 课件；
 - 实践课离线 HTML 学习包；
+- 整门课程级教学编排（架构评审阶段）；
 - 平时成绩记分册 XLS。
 
 > **完整 Skill 的权威来源是 `master`。** GitHub Releases 中的 ZIP 主要用于版本化模板包发布，不等同于完整 Skill 安装包。
@@ -39,6 +40,7 @@
 | [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.2.0 / Phase 2.2** · Practice Task **1.1** · WorkOrder Content **1.1** | 学生实践工单 `.docx` | ✅ Stable |
 | [🖥️ HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** · Courseware Contract **1.1** | `student.html` + `teacher.html` | ✅ Stable |
 | [🧪 实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.2.0** · Practice Class Contract **1.1** | student / teacher 离线 HTML 包 | ✅ Stable |
+| [🧭 整门课程编排器](整门课程编排器/whole-course-orchestrator) | **1.0.0-alpha** · Whole-Course Orchestration **1.0** | 素材清单、知识图谱、课次计划、批量 QA、课程包 | ⚠️ Architecture review |
 | [📊 平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | Template **course-gradebook 1.1.0** | 平时成绩记分册 `.xls` | ✅ Stable |
 
 ### 当前稳定能力
@@ -121,6 +123,24 @@ Gradebook generator
 
 Windows 优先使用 Excel COM；macOS/Linux 使用 Python + LibreOffice 路径。模板样式和 `.xls` 格式由 Skill 自带合同保护。
 
+### 4. 整门课程编排
+
+```text
+Raw course sources
+        ↓
+Teaching Asset Inventory
+        ↓
+Course Knowledge Graph + research gaps
+        ↓
+Content-native Session Plans
+        ├─ Courseware HTML Generator
+        └─ Practice Class HTML Generator
+        ↓
+Whole-course Batch QA → clean course package
+```
+
+编排器是 Courseware / Practice 的上层，不是第三个 renderer。它会先用 synthetic tests 和架构 QA 检查模板坍缩、素材长期未用、语义视觉退化、知识越界和实践同构；真实 UML failure benchmark 在架构评审前不会重跑。
+
 ## 设计原则
 
 ### Agent 负责语义，工具负责事实
@@ -179,6 +199,7 @@ cd codex-work-skills
 实践任务工单生成器/practice-task-workorder-generator/SKILL.md
 HTML课件生成器/courseware-html-generator/SKILL.md
 实践课HTML生成器/practice-class-html-generator/SKILL.md
+整门课程编排器/whole-course-orchestrator/SKILL.md
 平时成绩记分册生成器/course-gradebook-generator/SKILL.md
 ```
 
@@ -207,6 +228,8 @@ codex-work-skills/
 │  └─ courseware-html-generator/
 ├─ 实践课HTML生成器/
 │  └─ practice-class-html-generator/
+├─ 整门课程编排器/
+│  └─ whole-course-orchestrator/
 ├─ 平时成绩记分册生成器/
 │  └─ course-gradebook-generator/
 ├─ schemas/                 # 跨 Skill 共享合同

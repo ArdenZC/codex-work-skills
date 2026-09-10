@@ -42,9 +42,9 @@ def freeze(source_dir: Path, build_dir: Path, output: Path) -> dict[str, Any]:
         "courseware_contracts": _records(build_dir, "contracts/session-*/courseware.json"),
         "practice_contracts": _records(build_dir, "contracts/session-*/practice.json"),
         "courseware_rendered": _records(build_dir, "rendered/courseware/session-*/*"),
-        "practice_rendered": _records(build_dir, "rendered/practice/session-*/*"),
+        "practice_rendered": _records(build_dir, "rendered/practice/session-*/**/*"),
         "qa_reports": _records(build_dir, "qa_contracts/*.json"),
-        "delivery_notes": _records(build_dir, "*.md"),
+        "audit_reports": _records(build_dir, "*.md"),
     }
     missing_required = [
         name for name, records in artifact_sets.items()
