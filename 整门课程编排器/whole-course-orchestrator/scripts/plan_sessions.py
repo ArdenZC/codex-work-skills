@@ -83,6 +83,7 @@ def _allocate_minutes(questions: list[dict[str, Any]], session_minutes: int | fl
     explicit: list[float] = []
     sources: list[str] = []
     for question in questions:
+        question = question if isinstance(question, dict) else {}
         value = float(question.get("minutes", question.get("estimated_minutes", 0)) or 0)
         if value > 0:
             explicit.append(value)
@@ -179,9 +180,38 @@ def plan_session(session: dict[str, Any], graph_session: dict[str, Any] | None, 
     errors: list[str] = []
     pages: list[dict[str, Any]] = []
     minutes, timing_status, timing_sources = _allocate_minutes(questions, session.get("minutes"), mode)
-    for index, raw in enumerate(questions, start=1):
-        if not isinstance(raw, dict):
+    page_specs: list[tuple[int, dict[str, Any], float, str, int, int]] = []
+    for index, original in enumerate(questions, start=1):
+        if not isinstance(original, dict):
             errors.append(f"{session_id}: teaching_questions[{index - 1}] is not an object")
+            continue
+        total = float(minutes[index - 1])
+        beats = original.get("beats") or original.get("teaching_beats")
+        if not isinstance(beats, list) or not all(isinstance(item, dict) for item in beats) or not beats:
+            page_specs.append((index, dict(original), total, timing_sources[index - 1], 1, 1))
+            continue
+        raw_weights = [float(item.get("minutes", item.get("estimated_minutes", 0)) or 0) for item in beats]
+        if all(weight > 0 for weight in raw_weights):
+            weight_sum = sum(raw_weights)
+            beat_minutes = [total * weight / weight_sum for weight in raw_weights]
+            beat_source = "beat_explicit_scaled"
+        else:
+            beat_minutes = [total / len(beats)] * len(beats)
+            beat_source = "question_minutes_equal_beats"
+        rounded = [round(value, 2) for value in beat_minutes]
+        if rounded:
+            rounded[-1] = round(total - sum(rounded[:-1]), 2)
+        for beat_index, (beat, beat_total) in enumerate(zip(beats, rounded), start=1):
+            merged = dict(original)
+            merged.update(beat)
+            # A beat is a page of the same teaching question, not a new
+            # question.  Keep the parent id stable for traceability.
+            merged["id"] = original.get("id")
+            merged["_beat_index"] = beat_index
+            merged["_beat_count"] = len(beats)
+            page_specs.append((index, merged, beat_total, f"{timing_sources[index - 1]}+{beat_source}", beat_index, len(beats)))
+    for index, raw, total, timing_source, beat_index, beat_count in page_specs:
+        if not isinstance(raw, dict):
             continue
         question_id = str(raw.get("id") or f"{session_id}-q{index:02d}")
         prompt = str(raw.get("prompt") or raw.get("question") or "").strip()
@@ -199,10 +229,10 @@ def plan_session(session: dict[str, Any], graph_session: dict[str, Any] | None, 
         if artifact_type and job != "visualize" and not raw.get("visual_intent"):
             errors.append(f"{session_id}/{question_id}: typed visual artifact needs a visual teaching job")
         layout, layout_rationale = _layout_for(raw, job)
-        total = float(minutes[index - 1])
         lecture, activity, delivery_mix = _delivery_mix(raw, job, total)
+        page_suffix = f"-beat{beat_index:02d}" if beat_count > 1 else ""
         page = {
-            "id": f"{session_id}-{slug(question_id, fallback=f'q{index:02d}')}",
+            "id": f"{session_id}-{slug(question_id, fallback=f'q{index:02d}')}{page_suffix}",
             "session_id": session_id,
             "title": str(raw.get("title") or prompt),
             "teaching_question_id": question_id,
@@ -221,7 +251,7 @@ def plan_session(session: dict[str, Any], graph_session: dict[str, Any] | None, 
             "lecture_minutes": lecture,
             "activity_minutes": activity,
             "delivery_mix": delivery_mix,
-            "timing_evidence": {"source": timing_sources[index - 1], "planning_mode": mode, "question_id": question_id, "effort_model": raw.get("effort_model")},
+            "timing_evidence": {"source": timing_source, "planning_mode": mode, "question_id": question_id, "beat_index": beat_index if beat_count > 1 else None, "beat_count": beat_count, "question_total_minutes": round(sum(float(item[2]) for item in page_specs if item[0] == index), 2), "effort_model": raw.get("effort_model")},
             "timing_status": timing_status,
             "content_evidence": {
                 "worked_example": raw.get("worked_example"),
@@ -234,6 +264,7 @@ def plan_session(session: dict[str, Any], graph_session: dict[str, Any] | None, 
             },
             "script_anchor_ids": [question_id, *asset_ids],
             "block_signature": _block_signature(raw, job),
+            "current_new_knowledge_ids": [str(item) for item in raw.get("current_new_knowledge_ids", raw.get("new_knowledge_ids", []))],
         }
         if raw.get("speaker_script"):
             page["planned_speaker_script"] = str(raw["speaker_script"])
@@ -243,6 +274,41 @@ def plan_session(session: dict[str, Any], graph_session: dict[str, Any] | None, 
     if errors:
         raise OrchestrationError("session planning failed:\n- " + "\n- ".join(errors))
 
+    graph_session = graph_session or {}
+    available = [str(item) for item in graph_session.get("knowledge_state_before", [])]
+    session_new = [str(item) for item in graph_session.get("new_knowledge", [])]
+    assigned_new: set[str] = set()
+    for page_index, page in enumerate(pages):
+        explicit = [str(item) for item in page.get("current_new_knowledge_ids", []) if str(item) in session_new]
+        if not explicit:
+            referenced = [str(item) for item in page.get("knowledge_node_ids", []) if str(item) in session_new and str(item) not in assigned_new]
+            explicit = referenced
+        if not explicit and page_index == 0:
+            explicit = [item for item in session_new if item not in assigned_new]
+        page["page_knowledge_state_before"] = list(dict.fromkeys(available))
+        page["current_new_knowledge_ids"] = list(dict.fromkeys(explicit))
+        assigned_new.update(explicit)
+        available = list(dict.fromkeys([*available, *explicit]))
+        page["page_knowledge_state_after"] = list(available)
+        page["future_knowledge_ids"] = [item for item in session_new if item not in assigned_new]
+
+    planned_minutes = round(sum(float(page["suggested_minutes"]) for page in pages), 2)
+    declared_minutes = session.get("minutes")
+    duration_status = "NOT_DECLARED"
+    duration_reasons: list[str] = []
+    if declared_minutes not in (None, ""):
+        try:
+            declared_value = float(declared_minutes)
+        except (TypeError, ValueError):
+            raise OrchestrationError(f"{session_id}: minutes must be numeric")
+        if abs(declared_value - planned_minutes) > 1:
+            duration_status = "MISMATCH_DEGRADED" if mode == "draft" else "MISMATCH"
+            duration_reasons.append(f"declared session minutes {declared_value:g} differs from page sum {planned_minutes:g}")
+            if mode == "release":
+                raise OrchestrationError(f"THEORY_DURATION_MISMATCH: {session_id}: declared {declared_value:g}, planned {planned_minutes:g}")
+        else:
+            duration_status = "MATCH"
+
     result = {
         "id": session_id,
         "title": str(session.get("title") or session_id),
@@ -250,19 +316,26 @@ def plan_session(session: dict[str, Any], graph_session: dict[str, Any] | None, 
         "planning_mode": mode,
         "timing_status": timing_status,
         "timing_reasons": ["one or more questions used a draft fallback because no minutes/effort_model was supplied"] if timing_status == "DEGRADED_ESTIMATE" else [],
-        "planned_minutes": round(sum(float(page["suggested_minutes"]) for page in pages), 2),
-        "teaching_questions": [
-            {"id": page["teaching_question_id"], "prompt": page["teaching_question"], "learning_outcome": page["learning_outcome"]}
+        "planned_minutes": planned_minutes,
+        "duration_status": duration_status,
+        "duration_reasons": duration_reasons,
+        "teaching_questions": list({
+            page["teaching_question_id"]: {"id": page["teaching_question_id"], "prompt": page["teaching_question"], "learning_outcome": page["learning_outcome"], "page_ids": []}
             for page in pages
-        ],
+        }.values()),
         "pages": pages,
         "knowledge_state_before": (graph_session or {}).get("knowledge_state_before", []),
         "new_knowledge": (graph_session or {}).get("new_knowledge", []),
         "review_knowledge": (graph_session or {}).get("review_knowledge", []),
-        "knowledge_state_after": (graph_session or {}).get("knowledge_state_after", []),
-        "future_knowledge": (graph_session or {}).get("future_knowledge", []),
+        "knowledge_state_after": graph_session.get("knowledge_state_after", []),
+        "future_knowledge": graph_session.get("future_knowledge", []),
         "structure_policy": "teaching_questions -> primary_job -> content evidence -> evidence-backed timing -> layout family",
     }
+    for page in pages:
+        for question in result["teaching_questions"]:
+            if question["id"] == page["teaching_question_id"]:
+                question["page_ids"].append(page["id"])
+                break
     return result
 
 

@@ -6,42 +6,14 @@ import argparse
 from typing import Any
 
 from orchestrator_core import OrchestrationError, dump_json, load_json, text_of
+from semantic_artifacts import registry_summary, structure_defaults
 
 
 # ``capabilities`` describes what an artifact adapter can observe. It is not
 # a claim that every visual of that type must contain every capability.
-SEMANTIC_ADAPTERS: dict[str, dict[str, Any]] = {
-    "use_case_model": {
-        "visual_intent": "relationship",
-        "capabilities": ["actor", "system_boundary", "use_case", "association", "include", "extend", "generalization"],
-        "default_requirements": ["actor", "use_case", "association"],
-    },
-    "class_model": {
-        "visual_intent": "hierarchy",
-        "capabilities": ["class", "class_compartment", "attribute", "operation", "association", "relationship", "multiplicity", "inheritance", "aggregation", "composition"],
-        "default_requirements": ["class", "relationship", "multiplicity"],
-    },
-    "sequence_model": {
-        "visual_intent": "sequence",
-        "capabilities": ["lifeline", "activation", "message", "return", "fragment"],
-        "default_requirements": ["lifeline", "message"],
-    },
-    "state_model": {
-        "visual_intent": "state_transition",
-        "capabilities": ["state", "event", "transition", "guard", "initial", "final"],
-        "default_requirements": ["state", "transition"],
-    },
-    "deployment_model": {
-        "visual_intent": "topology",
-        "capabilities": ["node", "artifact", "deployment", "communication_link"],
-        "default_requirements": ["node", "communication_link"],
-    },
-    "activity_model": {
-        "visual_intent": "process",
-        "capabilities": ["action", "control_flow", "decision", "guard", "fork_or_join", "initial_or_final"],
-        "default_requirements": ["action", "control_flow"],
-    },
-}
+# Compatibility-shaped view for older callers and reports.  The source of
+# truth is the domain-neutral registry in semantic_artifacts.py.
+SEMANTIC_ADAPTERS: dict[str, dict[str, Any]] = registry_summary()
 
 
 KEYWORD_REQUIREMENTS: dict[str, tuple[str, ...]] = {
@@ -70,6 +42,46 @@ KEYWORD_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     "条件": ("guard",),
     "decision": ("decision",),
     "判断": ("decision",),
+    "node": ("node",),
+    "节点": ("node",),
+    "edge": ("edge",),
+    "边": ("edge",),
+    "root": ("root",),
+    "根节点": ("root",),
+    "parent": ("parent_child",),
+    "父子": ("parent_child",),
+    "traversal": ("traversal",),
+    "遍历": ("traversal",),
+    "table": ("table",),
+    "表": ("table",),
+    "field": ("field",),
+    "字段": ("field",),
+    "key": ("key",),
+    "主键": ("key",),
+    "row": ("row",),
+    "行": ("row",),
+    "column": ("column",),
+    "列": ("column",),
+    "device": ("device",),
+    "设备": ("device",),
+    "link": ("link",),
+    "链路": ("link",),
+    "direction": ("direction",),
+    "方向": ("direction",),
+    "path": ("path",),
+    "路径": ("path",),
+    "cell": ("cell",),
+    "单元格": ("cell",),
+    "range": ("range",),
+    "区域": ("range",),
+    "formula": ("formula",),
+    "公式": ("formula",),
+    "dependency": ("dependency",),
+    "依赖": ("dependency",),
+    "input": ("input",),
+    "输入": ("input",),
+    "output": ("output",),
+    "输出": ("output",),
 }
 
 
@@ -145,6 +157,11 @@ def plan_visual(page: dict[str, Any], assets: dict[str, dict[str, Any]]) -> dict
         "selected_source_asset_ids": selected_source_assets,
         "source_image_ref": source_image,
         "render_strategy": strategy,
+        "structure_requirements": structure_defaults(
+            artifact_type,
+            required_elements,
+            visual_intent=str(page.get("visual_intent") or (adapter or {}).get("visual_intent") or ""),
+        ),
         "source_reference_policy": "reuse user asset when clear; otherwise semantic redraw; external images are reference-only unless reuse is licensed",
     }
     # Compatibility alias for Phase 1 consumers. It means planned elements,

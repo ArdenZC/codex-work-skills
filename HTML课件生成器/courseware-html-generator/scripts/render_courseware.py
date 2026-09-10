@@ -372,7 +372,7 @@ def _render_block(block: dict[str, Any], slide_index: int, block_index: int, ass
         )
         explanation = _escape(block.get("explanation", ""))
         answer = f'<div class="quiz-answer" data-answer hidden>答案：{_escape(block["options"][block["answer_index"]])}{("。" + explanation) if explanation else ""}</div>'
-        return f'<section class="quiz-block" data-quiz><p class="quiz-question">{_escape(block["question"])}</p><div class="quiz-options">{options}</div><button class="answer-button" data-action="show-answer" data-interactive="true">显示答案</button>{answer}</section>'
+        return f'<section class="quiz-block" data-quiz data-correct-index="{_escape(block["answer_index"])}" data-explanation="{_escape(block.get("explanation", ""))}"><p class="quiz-question">{_escape(block["question"])}</p><div class="quiz-options">{options}</div><button class="answer-button" data-action="show-answer" data-interactive="true">显示答案</button>{answer}</section>'
     if block_type == "stepper":
         steps = "".join(
             f'<article class="stepper-step{" is-current" if index == 0 else ""}" data-step-index="{index}"><strong>{_escape(step["title"])}</strong><span>{_escape(step["text"])}</span></article>'
@@ -385,7 +385,9 @@ def _render_block(block: dict[str, Any], slide_index: int, block_index: int, ass
         return f'<section class="stepper-block" data-stepper data-current="0"><div class="stepper-track">{steps}</div><div class="stepper-controls">{controls}</div></section>'
     if block_type == "comparison":
         left, right = block["left"], block["right"]
-        return f'<section class="comparison-block"><article class="comparison-side"><h3>{_escape(block["left_title"])}</h3>{_render_list(left)}</article><article class="comparison-side"><h3>{_escape(block["right_title"])}</h3>{_render_list(right)}</article></section>'
+        attrs = f' data-comparison data-contrast-dimension="{_escape(block.get("contrast_dimension", ""))}" data-correct-side="{_escape(block.get("correct_side", ""))}" data-wrong-side="{_escape(block.get("wrong_side", ""))}"'
+        dimension = f'<div class="comparison-dimension" data-comparison-dimension>{_escape(block.get("contrast_dimension", ""))}</div>' if block.get("contrast_dimension") else ""
+        return f'<section class="comparison-block"{attrs}>{dimension}<article class="comparison-side" data-side="left"><h3>{_escape(block["left_title"])}</h3>{_render_list(left)}</article><article class="comparison-side" data-side="right"><h3>{_escape(block["right_title"])}</h3>{_render_list(right)}</article></section>'
     raise CoursewareContractError(f"unsupported block type at render: {block_type}")
 
 

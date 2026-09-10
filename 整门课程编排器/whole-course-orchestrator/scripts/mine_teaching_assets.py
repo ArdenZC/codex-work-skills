@@ -97,6 +97,48 @@ def _rels_target(rels_xml: bytes, rel_id: str) -> str | None:
     return None
 
 
+def _presentation_slide_order(archive: zipfile.ZipFile) -> list[str]:
+    """Return slide parts in the order declared by presentation.xml.
+
+    Zip member order and numeric slide filenames are implementation details;
+    the sldIdLst relationship order is the user-visible PowerPoint order.
+    """
+
+    presentation_name = "ppt/presentation.xml"
+    rels_name = "ppt/_rels/presentation.xml.rels"
+    if presentation_name not in archive.namelist() or rels_name not in archive.namelist():
+        return []
+    try:
+        root = ET.fromstring(archive.read(presentation_name))
+        rels_root = ET.fromstring(archive.read(rels_name))
+    except ET.ParseError:
+        return []
+    targets: dict[str, str] = {}
+    for relationship in rels_root:
+        rel_id = relationship.attrib.get("Id")
+        target = relationship.attrib.get("Target", "")
+        if not rel_id or not target or relationship.attrib.get("TargetMode") == "External":
+            continue
+        targets[rel_id] = posixpath.normpath(posixpath.join("ppt", target))
+    ordered: list[str] = []
+    for slide_id in root.iter():
+        if _local(slide_id) != "sldId":
+            continue
+        # ``p:sldId`` also has an unqualified numeric ``id`` attribute.  The
+        # presentation order lives in the qualified ``r:id`` attribute; do
+        # not accidentally select the numeric slide id first.
+        rel_id = next((value for key, value in slide_id.attrib.items() if "}" in key and key.rsplit("}", 1)[-1] == "id"), None)
+        target = targets.get(str(rel_id))
+        if target and target in archive.namelist() and target not in ordered:
+            ordered.append(target)
+    return ordered
+
+
+def _physical_slide_number(name: str) -> int:
+    match = re.search(r"slide(\d+)\.xml$", name)
+    return int(match.group(1)) if match else 0
+
+
 def _relationship_id(node: ET.Element) -> str | None:
     return next((value for key, value in node.attrib.items() if key.rsplit("}", 1)[-1] == "embed"), None)
 
@@ -163,13 +205,15 @@ def _classify(text: str, *, image_count: int = 0, table_count: int = 0, shape_co
     return "fact", 0.72
 
 
-def _value(asset_type: str, text: str, image_count: int = 0) -> str:
+def _value(asset_type: str, text: str, image_count: int = 0, *, source_kind: str = "") -> str:
     lowered = text.lower()
-    if any(key in lowered for key in ("谢谢", "thank", "版权", "copyright", "目录", "agenda")):
+    if source_kind == "embedded-image" or any(key in lowered for key in ("装饰", "decorative", "谢谢", "thank", "版权", "copyright", "目录", "agenda")):
         return "low-value"
-    if asset_type in {"diagram", "screenshot", "worked_example", "case", "exercise", "procedure", "comparison", "table", "image"}:
+    if asset_type in {"worked_example", "case", "exercise", "procedure", "comparison", "definition", "code_example", "tool_operation", "misconception"} and text.strip():
         return "core"
-    if asset_type in {"definition", "fact", "code_example", "tool_operation", "question", "misconception", "speaker_note_hint"}:
+    if asset_type == "fact" and len(text.strip()) >= 12 and text.strip().lower() not in {"evidence", "supporting evidence", "shape", "text"}:
+        return "core"
+    if asset_type in {"diagram", "screenshot", "table", "image", "question", "speaker_note_hint"}:
         return "supporting"
     return "optional" if image_count else "low-value"
 
@@ -284,8 +328,8 @@ def _table_records(root: ET.Element) -> list[dict[str, Any]]:
     return records
 
 
-def _copy_media(archive: zipfile.ZipFile, name: str, output_dir: Path, source_stem: str, slide_number: int, shape_id: str) -> str:
-    target_dir = output_dir / "images" / slug(source_stem)
+def _copy_media(archive: zipfile.ZipFile, name: str, output_dir: Path, source_namespace: str, slide_number: int, shape_id: str) -> str:
+    target_dir = output_dir / "images" / slug(source_namespace)
     target_dir.mkdir(parents=True, exist_ok=True)
     suffix = Path(name).suffix or ".bin"
     target = target_dir / f"s{slide_number:03d}-shape-{slug(shape_id)}{suffix}"
@@ -294,7 +338,7 @@ def _copy_media(archive: zipfile.ZipFile, name: str, output_dir: Path, source_st
     return relative_posix(target, output_dir)
 
 
-def _diagram_svg(graph: dict[str, Any], output_dir: Path, source_stem: str, slide_number: int) -> str:
+def _diagram_svg(graph: dict[str, Any], output_dir: Path, source_namespace: str, slide_number: int) -> str:
     shapes = graph.get("shapes", [])
     connectors = graph.get("connectors", [])
     max_x = max((int(item.get("x") or 0) + int(item.get("width") or 0) for item in shapes), default=7200000)
@@ -324,7 +368,7 @@ def _diagram_svg(graph: dict[str, Any], output_dir: Path, source_stem: str, slid
     svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" role="img" aria-label="source shape diagram" data-source-shape-graph="1"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#6b8f9d"/></marker></defs>{"".join(elements)}</svg>'
     target_dir = output_dir / "visuals"
     target_dir.mkdir(parents=True, exist_ok=True)
-    target = target_dir / f"{slug(source_stem)}-s{slide_number:03d}-diagram.svg"
+    target = target_dir / f"{slug(source_namespace)}-s{slide_number:03d}-diagram.svg"
     target.write_text(svg, encoding="utf-8", newline="\n")
     return relative_posix(target, output_dir)
 
@@ -343,18 +387,24 @@ def _base_asset(
     source_kind: str,
     confidence: float,
     image_refs: list[str] | None = None,
+    provenance_path: Path | None = None,
+    source_namespace: str | None = None,
 ) -> dict[str, Any]:
     refs = list(image_refs or [])
+    original_path = provenance_path or path
+    locator_format = original_path.suffix.lower().lstrip(".") or "pptx"
     return {
         "id": asset_id,
         "type": asset_type,
-        "source_file": str(path),
+        "source_file": str(original_path),
+        "parsed_file": str(path),
+        "source_identity": str(source_namespace or slug(original_path.name)),
         "source_slide": slide_number,
         "source_slide_id": slide_id,
         "source_element_ids": source_element_ids,
         "source_region": source_region,
         "source_kind": source_kind,
-        "source_locator": f"pptx:{path.name}#slide-{slide_number}" + (f"#element-{','.join(source_element_ids)}" if source_element_ids else ""),
+        "source_locator": f"{locator_format}:{original_path.name}#slide-{slide_number}" + (f"#element-{','.join(source_element_ids)}" if source_element_ids else ""),
         "title": title,
         "content_summary": text[:500],
         "raw_text": text,
@@ -362,7 +412,7 @@ def _base_asset(
         "image_refs": refs,
         "confidence": confidence,
         "candidate_topics": _topics(title, text),
-        "teaching_value": _value(asset_type, text, len(refs)),
+        "teaching_value": _value(asset_type, text, len(refs), source_kind=source_kind),
         "origin": "user_source",
         "origin_type": "user-provided",
         "source_url": None,
@@ -372,24 +422,30 @@ def _base_asset(
     }
 
 
-def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def parse_pptx(path: Path, output_dir: Path, *, provenance_path: Path | None = None, source_namespace: str | None = None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     assets: list[dict[str, Any]] = []
     slides: list[dict[str, Any]] = []
+    provenance = provenance_path or path
+    namespace = source_namespace or slug(path.stem)
     with zipfile.ZipFile(path) as archive:
-        names = sorted((name for name in archive.namelist() if name.startswith("ppt/slides/slide") and name.endswith(".xml")), key=_natural_slide_key)
+        available = [name for name in archive.namelist() if name.startswith("ppt/slides/slide") and name.endswith(".xml")]
+        declared_order = _presentation_slide_order(archive)
+        names = [name for name in declared_order if name in available]
+        names.extend(sorted((name for name in available if name not in names), key=_natural_slide_key))
         for slide_index, name in enumerate(names, start=1):
             xml = archive.read(name)
             texts = _texts(xml)
-            notes = _notes(archive, slide_index)
+            physical_number = _physical_slide_number(name)
+            notes = _notes(archive, physical_number or slide_index)
             root = ET.fromstring(xml)
             graph = _shape_graph(root)
             tables = _table_records(root)
             image_records = _slide_images(archive, name, xml)
             image_refs: list[dict[str, str]] = []
             for record in image_records:
-                ref = _copy_media(archive, record["target"], output_dir, path.stem, slide_index, record["source_shape_id"])
+                ref = _copy_media(archive, record["target"], output_dir, namespace, slide_index, record["source_shape_id"])
                 image_refs.append({**record, "image_ref": ref, "media_sha256": sha256_bytes(archive.read(record["target"]))})
-            slide_id = f"slide-{slug(path.stem)}-{slide_index:03d}"
+            slide_id = f"slide-{slug(namespace)}-{slide_index:03d}"
             title = texts[0] if texts else f"第 {slide_index} 页"
             slide_asset_ids: list[str] = []
 
@@ -405,10 +461,10 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                 if not parts:
                     continue
                 for paragraph_index, text in enumerate(parts, start=1):
-                    asset_type, confidence = _classify(text, image_count=len(image_records), shape_count=len(graph["shapes"]), arrow=bool(graph["connectors"]))
-                    if asset_type == "diagram" and len(graph["shapes"]) <= 1 and not graph["connectors"]:
-                        asset_type = "fact"
-                    asset_id = f"asset-{slug(path.stem)}-s{slide_index:03d}-e{slug(shape_id)}-p{paragraph_index:02d}"
+                    local_image_count = sum(1 for item in image_records if item.get("source_shape_id") == shape_id)
+                    screenshot_context = local_image_count or (len(image_records) if any(key in text.lower() for key in ("截图", "屏幕", "screenshot", "界面", "点击")) else 0)
+                    asset_type, confidence = _classify(text, image_count=screenshot_context, shape_count=1, arrow=False)
+                    asset_id = f"asset-{slug(namespace)}-s{slide_index:03d}-e{slug(shape_id)}-p{paragraph_index:02d}"
                     asset = _base_asset(
                         asset_id=asset_id,
                         asset_type=asset_type,
@@ -421,6 +477,8 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                         source_region=_region(element),
                         source_kind="title" if shape_index == 1 and paragraph_index == 1 else "shape-text",
                         confidence=confidence,
+                        provenance_path=provenance,
+                        source_namespace=namespace,
                     )
                     if asset_type == "screenshot" and image_refs:
                         # Keep the Phase 1 compatibility view while still
@@ -431,16 +489,18 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                         "text_count": len(parts),
                         "speaker_note_count": len(notes),
                         "table_count": len(tables),
-                        "shape_count": len(graph["shapes"]),
-                        "connector_count": len(graph["connectors"]),
+                        "shape_count": 1,
+                        "local_shape_count": 1,
+                        "connector_count": 0,
+                        "local_image_count": local_image_count,
                         "image_count": len(image_records),
-                        "arrow_detected": bool(graph["connectors"]),
+                        "arrow_detected": False,
                     }
                     assets.append(asset)
                     slide_asset_ids.append(asset_id)
 
             for table in tables:
-                table_id = f"asset-{slug(path.stem)}-s{slide_index:03d}-table-{table['index']:02d}"
+                table_id = f"asset-{slug(namespace)}-s{slide_index:03d}-table-{table['index']:02d}"
                 table_text = " | ".join(" / ".join(row) for row in table["rows"])
                 table_asset = _base_asset(
                     asset_id=table_id,
@@ -454,13 +514,15 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                     source_region=None,
                     source_kind="table",
                     confidence=0.98,
+                    provenance_path=provenance,
+                    source_namespace=namespace,
                 )
-                table_asset.update({"rows": table["rows"], "columns": table["columns"], "cell_text": table["cell_text"], "source_locator": f"pptx:{path.name}#slide-{slide_index}#table-{table['index']}"})
+                table_asset.update({"rows": table["rows"], "columns": table["columns"], "cell_text": table["cell_text"], "source_locator": f"{provenance.suffix.lower().lstrip('.') or 'pptx'}:{provenance.name}#slide-{slide_index}#table-{table['index']}"})
                 assets.append(table_asset)
                 slide_asset_ids.append(table_id)
 
             for image_index, image in enumerate(image_refs, start=1):
-                image_id = f"asset-{slug(path.stem)}-s{slide_index:03d}-image-{image_index:02d}"
+                image_id = f"asset-{slug(namespace)}-s{slide_index:03d}-image-{image_index:02d}"
                 image_asset = _base_asset(
                     asset_id=image_id,
                     asset_type="image",
@@ -474,6 +536,8 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                     source_kind="embedded-image",
                     confidence=0.99,
                     image_refs=[image["image_ref"]],
+                    provenance_path=provenance,
+                    source_namespace=namespace,
                 )
                 image_asset.update({"image_ref": image["image_ref"], "relationship_id": image["relationship_id"], "source_shape_id": image["source_shape_id"], "media_sha256": image["media_sha256"]})
                 assets.append(image_asset)
@@ -481,8 +545,8 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
 
             graph_shapes = [shape for shape in graph["shapes"] if shape.get("kind") != "pic"]
             if len(graph_shapes) >= 2 or graph["connectors"]:
-                diagram_id = f"asset-{slug(path.stem)}-s{slide_index:03d}-diagram"
-                rendered = _diagram_svg(graph, output_dir, path.stem, slide_index)
+                diagram_id = f"asset-{slug(namespace)}-s{slide_index:03d}-diagram"
+                rendered = _diagram_svg(graph, output_dir, namespace, slide_index)
                 diagram = _base_asset(
                     asset_id=diagram_id,
                     asset_type="diagram",
@@ -495,12 +559,14 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                     source_region=None,
                     source_kind="shape-graph",
                     confidence=0.97,
+                    provenance_path=provenance,
+                    source_namespace=namespace,
                 )
                 diagram.update({"shape_graph": graph, "rendered_visual_ref": rendered, "structured_parse_status": "complete"})
                 assets.append(diagram)
                 slide_asset_ids.append(diagram_id)
             elif any(_shape_kind(element) == "graphicFrame" for element, _ in _direct_shape_elements(root)):
-                unresolved_id = f"asset-{slug(path.stem)}-s{slide_index:03d}-visual-unresolved"
+                unresolved_id = f"asset-{slug(namespace)}-s{slide_index:03d}-visual-unresolved"
                 unresolved = _base_asset(
                     asset_id=unresolved_id,
                     asset_type="visual_candidate_unresolved",
@@ -513,6 +579,8 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                     source_region=None,
                     source_kind="unsupported-graphic",
                     confidence=0.4,
+                    provenance_path=provenance,
+                    source_namespace=namespace,
                 )
                 unresolved.update({"shape_graph": graph, "structured_parse_status": "partial"})
                 assets.append(unresolved)
@@ -520,7 +588,7 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
 
             if len(notes) > 1 or any(len(note) >= 12 for note in notes):
                 note_text = " ".join(notes)
-                note_id = f"asset-{slug(path.stem)}-s{slide_index:03d}-notes"
+                note_id = f"asset-{slug(namespace)}-s{slide_index:03d}-notes"
                 note_asset = _base_asset(
                     asset_id=note_id,
                     asset_type="speaker_note_hint",
@@ -533,6 +601,8 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
                     source_region=None,
                     source_kind="speaker-notes",
                     confidence=0.99,
+                    provenance_path=provenance,
+                    source_namespace=namespace,
                 )
                 note_asset["student_visible"] = False
                 assets.append(note_asset)
@@ -541,6 +611,7 @@ def parse_pptx(path: Path, output_dir: Path) -> tuple[list[dict[str, Any]], dict
             slides.append({
                 "id": slide_id,
                 "slide": slide_index,
+                "source_slide_number": physical_number or slide_index,
                 "title": title,
                 "raw_text": " ".join(texts),
                 "speaker_notes": notes,
@@ -578,6 +649,13 @@ def mine_sources(source_root: Path, output_dir: Path) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="whole-course-ppt-") as temp_name:
         temp_dir = Path(temp_name)
         for source in source_paths:
+            source_sha = sha256_file(source)
+            try:
+                relative_source = source.resolve().relative_to(source_root.resolve()).as_posix()
+            except ValueError:
+                relative_source = source.name
+            source_identity = f"{relative_source}|sha256:{source_sha}"
+            source_namespace = slug(f"{relative_source}-{source_sha[:12]}")
             parse_path = source
             conversion = None
             if source.suffix.lower() == ".ppt":
@@ -586,17 +664,19 @@ def mine_sources(source_root: Path, output_dir: Path) -> dict[str, Any]:
                     conversion = "libreoffice-pptx"
                 except RuntimeError as exc:
                     errors.append({"source_file": str(source), "code": str(exc)})
-                    sources.append({"source_file": str(source), "format": "ppt", "sha256": sha256_file(source), "status": "unavailable", "slides": []})
+                    sources.append({"source_file": str(source), "format": "ppt", "sha256": source_sha, "source_identity": source_identity, "source_namespace": source_namespace, "status": "unavailable", "slides": []})
                     continue
             try:
-                assets, slide_info = parse_pptx(parse_path, output_dir)
+                assets, slide_info = parse_pptx(parse_path, output_dir, provenance_path=source, source_namespace=source_namespace)
                 all_assets.extend(assets)
                 source_slides.extend({"source_file": str(source), **slide} for slide in slide_info["slides"])
                 sources.append({
                     "source_file": str(source),
                     "parsed_file": str(parse_path),
                     "format": source.suffix.lower().lstrip("."),
-                    "sha256": sha256_file(source),
+                    "sha256": source_sha,
+                    "source_identity": source_identity,
+                    "source_namespace": source_namespace,
                     "parsed_sha256": sha256_file(parse_path),
                     "conversion": conversion,
                     "status": "parsed",
@@ -604,7 +684,7 @@ def mine_sources(source_root: Path, output_dir: Path) -> dict[str, Any]:
                 })
             except (OSError, zipfile.BadZipFile, ET.ParseError, ValueError) as exc:
                 errors.append({"source_file": str(source), "code": "PPT_PARSE_FAILED", "detail": str(exc)})
-                sources.append({"source_file": str(source), "format": source.suffix.lower().lstrip("."), "sha256": sha256_file(source), "status": "failed", "slides": []})
+                sources.append({"source_file": str(source), "format": source.suffix.lower().lstrip("."), "sha256": source_sha, "source_identity": source_identity, "source_namespace": source_namespace, "status": "failed", "slides": []})
     by_type = {asset_type: sum(1 for asset in all_assets if asset["type"] == asset_type) for asset_type in ASSET_TYPES}
     high_value = [asset for asset in all_assets if asset["teaching_value"] == "core"]
     multi_asset_slides = sum(1 for slide in source_slides if len(slide.get("asset_ids", [])) > 1)

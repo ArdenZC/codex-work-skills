@@ -11,7 +11,22 @@
     "course_name": {"type": "string"},
     "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
     "sessions": {"type": "array", "items": {"$ref": "#/$defs/session"}},
-    "asset_knowledge_links": {"type": "array", "items": {"type": "object"}},
+    "asset_knowledge_links": {
+      "oneOf": [
+        {"type": "array", "items": {"type": "object"}},
+        {
+          "type": "object",
+          "required": ["schema_version", "link_type", "links"],
+          "properties": {
+            "schema_version": {"enum": ["1.0", "1.1"]},
+            "link_type": {"const": "asset_knowledge_links"},
+            "links": {"type": "array", "items": {"type": "object"}},
+            "resolution_policy": {"type": "string"}
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
     "evidence_state_model": {"type": "object"}
   },
   "$defs": {

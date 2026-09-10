@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/whole-course-plan-qa.schema.json",
+  "title": "Whole-Course Plan QA",
+  "type": "object",
+  "required": ["schema_version", "report_type", "status", "plan_status", "render_status", "final_status", "architecture_status", "metrics", "findings"],
+  "properties": {
+    "schema_version": {"enum": ["1.0", "1.1"]},
+    "report_type": {"const": "whole_course_plan_qa"},
+    "status": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_EVALUATED"]},
+    "plan_status": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_EVALUATED"]},
+    "render_status": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_RUN", "NOT_EVALUATED"]},
+    "final_status": {"enum": ["PASS", "FAIL", "NOT_EVALUATED"]},
+    "architecture_status": {"enum": ["READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW", "WHOLE_COURSE_ARCHITECTURE_BLOCKED"]},
+    "metrics": {"type": "object"},
+    "findings": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": true
+}

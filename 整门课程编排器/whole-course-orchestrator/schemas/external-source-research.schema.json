@@ -6,7 +6,7 @@
   "required": ["schema_version", "research_status", "research_gaps", "sources", "conflicts"],
   "properties": {
     "schema_version": {"enum": ["1.0", "1.1"]},
-    "research_status": {"enum": ["completed", "EXTERNAL_RESEARCH_DISABLED_BY_USER", "EXTERNAL_RESEARCH_UNAVAILABLE"]},
+    "research_status": {"enum": ["USER_SOURCE_SUFFICIENT", "COMPLETED", "completed", "EXTERNAL_RESEARCH_DISABLED_BY_USER", "EXTERNAL_RESEARCH_UNAVAILABLE"]},
     "research_gaps": {"type": "array", "items": {"type": "object"}},
     "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
     "conflicts": {"type": "array", "items": {"type": "object"}},

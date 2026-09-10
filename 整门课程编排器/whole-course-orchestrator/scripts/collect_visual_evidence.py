@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from orchestrator_core import dump_json, load_json
+from semantic_artifacts import artifact_spec, structure_defaults
 
 
 KNOWN_ROLES = {
@@ -36,6 +37,10 @@ TYPED_ARTIFACTS = {
     "deployment_model",
     "use_case_model",
     "activity_model",
+    "tree_graph_structure",
+    "relational_table_model",
+    "network_topology",
+    "worksheet_dataflow",
 }
 
 
@@ -202,15 +207,24 @@ def _read_html(value: str | Path | None) -> str:
     return path.read_text(encoding="utf-8") if path.is_file() else ""
 
 
+def _records_for_html(value: str | Path | None, source_name: str) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    source = _read_html(value)
+    if not source:
+        return records
+    parser = _VisualDOMParser(source_name)
+    parser.feed(source)
+    for page_id, record in parser.pages.items():
+        records[page_id] = record
+    return records
+
+
 def _normalise_page_records(student_html: str | Path | None, teacher_html: str | Path | None) -> dict[str, dict[str, Any]]:
+    """Compatibility merged view; final evidence uses per-role records."""
+
     merged: dict[str, dict[str, Any]] = {}
     for name, value in (("student.html", student_html), ("teacher.html", teacher_html)):
-        source = _read_html(value)
-        if not source:
-            continue
-        parser = _VisualDOMParser(name)
-        parser.feed(source)
-        for page_id, record in parser.pages.items():
+        for page_id, record in _records_for_html(value, name).items():
             target = merged.setdefault(page_id, _empty_page(page_id))
             target["artifact_types"].update(record["artifact_types"])
             target["roles"].update(record["roles"])
@@ -275,7 +289,11 @@ def _structure_evidence(plan: dict[str, Any], record: dict[str, Any]) -> dict[st
     edges = list(record.get("edges", []))
     labels = list(record.get("labels", []))
     node_ids = {str(item.get("id")) for item in nodes if item.get("id")}
-    requirements = plan.get("structure_requirements") if isinstance(plan.get("structure_requirements"), dict) else {}
+    requirements = plan.get("structure_requirements") if isinstance(plan.get("structure_requirements"), dict) else structure_defaults(
+        artifact,
+        _required_roles(plan),
+        visual_intent=plan.get("visual_intent"),
+    )
     errors: list[str] = []
 
     def role_nodes(role: str) -> list[dict[str, Any]]:
@@ -293,7 +311,7 @@ def _structure_evidence(plan: dict[str, Any], record: dict[str, Any]) -> dict[st
         if len(class_nodes) < int(requirements.get("min_nodes", 2)):
             errors.append("class_model requires at least two class nodes")
         relations = endpoint_edges(role_edges("relationship", "association", "inheritance", "aggregation", "composition"))
-        if not relations:
+        if requirements.get("relationship_required") and not relations:
             errors.append("class_model requires a relationship edge with valid source/target endpoints")
         required_kinds = {str(item).lower() for item in requirements.get("relation_kinds", [])}
         if "inheritance" in _required_roles(plan):
@@ -305,6 +323,10 @@ def _structure_evidence(plan: dict[str, Any], record: dict[str, Any]) -> dict[st
         for kind in required_kinds:
             if not any(kind in _edge_roles(edge) for edge in relations):
                 errors.append(f"class_model is missing relation kind: {kind}")
+        if "attribute" in _required_roles(plan) and not any(_has_role(node, "attribute") for node in class_nodes):
+            errors.append("class_model requires an attribute-bearing class compartment")
+        if "operation" in _required_roles(plan) and not any(_has_role(node, "operation") for node in class_nodes):
+            errors.append("class_model requires an operation-bearing class compartment")
         if "multiplicity" in _required_roles(plan) or requirements.get("multiplicity_labels"):
             relation_ids = {str(edge.get("id")) for edge in relations}
             multiplicities = [label for label in labels if str(label.get("kind", "")).lower() == "multiplicity" and str(label.get("for_edge")) in relation_ids]
@@ -368,6 +390,44 @@ def _structure_evidence(plan: dict[str, Any], record: dict[str, Any]) -> dict[st
                 errors.append("activity_model decision requires a decision node with outgoing paths")
         if "guard" in _required_roles(plan) and not any(_has_role(edge, "guard") for edge in flows):
             errors.append("activity_model guard must be associated with an outgoing flow")
+    elif artifact == "tree_graph_structure":
+        nodes_for_tree = role_nodes("node")
+        if len(nodes_for_tree) < int(requirements.get("min_nodes", 1)):
+            errors.append("tree_graph_structure does not contain the required node count")
+        if "root" in _required_roles(plan) and not role_nodes("root"):
+            errors.append("tree_graph_structure requires a root node")
+        tree_edges = endpoint_edges(role_edges("edge", "parent_child", "traversal", "direction"))
+        if requirements.get("edge_required") and not tree_edges:
+            errors.append("tree_graph_structure requires a parent/child or traversal edge with endpoints")
+    elif artifact == "relational_table_model":
+        tables = role_nodes("table")
+        if len(tables) < int(requirements.get("min_tables", 1)):
+            errors.append("relational_table_model requires a table node")
+        if "field" in _required_roles(plan) and not role_nodes("field"):
+            errors.append("relational_table_model requires a field node")
+        if requirements.get("key_required") and not role_nodes("key"):
+            errors.append("relational_table_model requires a key node")
+        relational_edges = endpoint_edges(role_edges("relationship"))
+        if requirements.get("relationship_required") and not relational_edges:
+            errors.append("relational_table_model requires a relationship edge with endpoints")
+    elif artifact == "network_topology":
+        devices = role_nodes("device") or role_nodes("node")
+        if len(devices) < int(requirements.get("min_devices", 1)):
+            errors.append("network_topology does not contain the required device count")
+        links = endpoint_edges(role_edges("link", "direction", "path"))
+        if requirements.get("link_required") and not links:
+            errors.append("network_topology requires a link/path edge with endpoints")
+        if "direction" in _required_roles(plan) and not any(_has_role(edge, "direction") for edge in links):
+            errors.append("network_topology requires a directed link")
+    elif artifact == "worksheet_dataflow":
+        cells = role_nodes("cell") or role_nodes("range")
+        if len(cells) < int(requirements.get("min_cells", 1)):
+            errors.append("worksheet_dataflow requires a cell or range node")
+        if requirements.get("formula_required") and not role_nodes("formula"):
+            errors.append("worksheet_dataflow requires a formula node")
+        dependencies = endpoint_edges(role_edges("dependency", "transformation"))
+        if requirements.get("dependency_required") and not dependencies:
+            errors.append("worksheet_dataflow requires a dependency edge with endpoints")
     else:
         errors.append(f"unsupported typed artifact: {artifact}")
 
@@ -390,39 +450,60 @@ def collect_visual_evidence(
     output_path: str | Path | None = None,
 ) -> dict[str, Any]:
     plans = visual_plans.get("visual_plans", []) if isinstance(visual_plans, dict) else visual_plans
-    pages = _normalise_page_records(student_html, teacher_html)
+    student_pages = _records_for_html(student_html, "student.html")
+    teacher_pages = _records_for_html(teacher_html, "teacher.html")
     observed_plans: list[dict[str, Any]] = []
-    all_assets: set[str] = set()
+    student_assets: set[str] = set()
+    teacher_assets: set[str] = set()
     incomplete = False
     for raw in plans or []:
         plan = dict(raw)
         page_id = str(plan.get("page_id") or "")
-        record = pages.get(page_id, _empty_page(page_id))
+        student_record = student_pages.get(page_id, _empty_page(page_id))
+        teacher_record = teacher_pages.get(page_id, _empty_page(page_id))
         required = list(dict.fromkeys(str(item) for item in plan.get("required_semantic_elements", [])))
-        observed = sorted(set(str(item) for item in record["roles"]))
-        plan["observed_semantic_elements"] = observed
-        plan["evidence"] = list(record["evidence"])
-        plan["observed_artifact_types"] = sorted(record["artifact_types"])
-        plan["observed_source_asset_ids"] = sorted(record["asset_ids"])
-        marker = _marker_evidence(plan, record)
-        structure = _structure_evidence(plan, record)
-        plan["semantic_marker_evidence"] = marker
-        plan["marker_evidence"] = marker
-        plan["semantic_structure_evidence"] = structure
-        plan["structure_evidence"] = structure
-        plan["visual_container_observed"] = bool(record.get("visual_nodes"))
-        if not record.get("visual_nodes"):
+        student_observed = sorted(set(str(item) for item in student_record["roles"]))
+        teacher_observed = sorted(set(str(item) for item in teacher_record["roles"]))
+        student_marker = _marker_evidence(plan, student_record)
+        teacher_marker = _marker_evidence(plan, teacher_record)
+        student_structure = _structure_evidence(plan, student_record)
+        teacher_structure = _structure_evidence(plan, teacher_record)
+        plan["observed_semantic_elements"] = student_observed
+        plan["student_observed"] = student_observed
+        plan["teacher_observed"] = teacher_observed
+        plan["evidence"] = list(student_record["evidence"])
+        plan["student_evidence"] = list(student_record["evidence"])
+        plan["teacher_evidence"] = list(teacher_record["evidence"])
+        plan["observed_artifact_types"] = sorted(student_record["artifact_types"])
+        plan["student_observed_artifact_types"] = sorted(student_record["artifact_types"])
+        plan["teacher_observed_artifact_types"] = sorted(teacher_record["artifact_types"])
+        plan["observed_source_asset_ids"] = sorted(student_record["asset_ids"])
+        plan["student_observed_source_asset_ids"] = sorted(student_record["asset_ids"])
+        plan["teacher_observed_source_asset_ids"] = sorted(teacher_record["asset_ids"])
+        plan["semantic_marker_evidence"] = student_marker
+        plan["marker_evidence"] = student_marker
+        plan["semantic_structure_evidence"] = student_structure
+        plan["structure_evidence"] = student_structure
+        plan["student_semantic_marker_evidence"] = student_marker
+        plan["student_semantic_structure_evidence"] = student_structure
+        plan["teacher_semantic_marker_evidence"] = teacher_marker
+        plan["teacher_semantic_structure_evidence"] = teacher_structure
+        plan["visual_container_observed"] = bool(student_record.get("visual_nodes"))
+        plan["student_visual_container_observed"] = bool(student_record.get("visual_nodes"))
+        plan["teacher_visual_container_observed"] = bool(teacher_record.get("visual_nodes"))
+        if not student_record.get("visual_nodes"):
             plan["evidence_status"] = "PLANNED_NOT_OBSERVED"
-        elif marker["status"] != "PASS":
-            plan["evidence_status"] = "PLANNED_NOT_OBSERVED" if marker["status"] == "PLANNED_NOT_OBSERVED" else "FAIL"
-        elif structure["status"] == "FAIL":
+        elif student_marker["status"] != "PASS":
+            plan["evidence_status"] = "PLANNED_NOT_OBSERVED" if student_marker["status"] == "PLANNED_NOT_OBSERVED" else "FAIL"
+        elif student_structure["status"] == "FAIL":
             plan["evidence_status"] = "FAIL"
         else:
             plan["evidence_status"] = "PASS"
         plan["semantic_status"] = "PASS" if plan["evidence_status"] == "PASS" else "NOT_OBSERVED" if plan["evidence_status"] == "PLANNED_NOT_OBSERVED" else "FAIL"
         if plan["evidence_status"] != "PASS":
             incomplete = True
-        all_assets.update(record["asset_ids"])
+        student_assets.update(student_record["asset_ids"])
+        teacher_assets.update(teacher_record["asset_ids"])
         observed_plans.append(plan)
     # A session with no visual requirement is not a missing observation.  A
     # declared visual plan with no final DOM, however, is a failed observation
@@ -433,12 +514,20 @@ def collect_visual_evidence(
         "report_type": "whole_course_visual_evidence",
         "status": status,
         "visual_plans": observed_plans,
-        "rendered_asset_ids": sorted(all_assets),
-        "page_count_observed": len(pages),
-        "marker_plumbing_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["semantic_marker_evidence"]["status"] == "PASS" for item in observed_plans) else "FAIL",
-        "semantic_structure_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["semantic_structure_evidence"]["status"] in {"PASS", "NOT_APPLICABLE"} for item in observed_plans) else "FAIL",
+        "rendered_asset_ids": sorted(student_assets),
+        "student_rendered_asset_ids": sorted(student_assets),
+        "teacher_rendered_asset_ids": sorted(teacher_assets),
+        "page_count_observed": len(student_pages),
+        "student_page_count_observed": len(student_pages),
+        "teacher_page_count_observed": len(teacher_pages),
+        "marker_plumbing_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["student_semantic_marker_evidence"]["status"] == "PASS" for item in observed_plans) else "FAIL",
+        "semantic_structure_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["student_semantic_structure_evidence"]["status"] in {"PASS", "NOT_APPLICABLE"} for item in observed_plans) else "FAIL",
+        "student_marker_plumbing_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["student_semantic_marker_evidence"]["status"] == "PASS" for item in observed_plans) else "FAIL",
+        "student_semantic_structure_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["student_semantic_structure_evidence"]["status"] in {"PASS", "NOT_APPLICABLE"} for item in observed_plans) else "FAIL",
+        "teacher_marker_plumbing_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["teacher_semantic_marker_evidence"]["status"] in {"PASS", "PLANNED_NOT_OBSERVED"} for item in observed_plans) else "FAIL",
+        "teacher_semantic_structure_status": "NOT_APPLICABLE" if not plans else "PASS" if all(item["teacher_semantic_structure_evidence"]["status"] in {"PASS", "NOT_APPLICABLE", "PLANNED_NOT_OBSERVED"} for item in observed_plans) else "FAIL",
         "overall_policy": "Every declared visual plan must have a real rendered visual container and pass its marker/structure contract; no plan is allowed to disappear into an overall PASS.",
-        "collection_policy": "Observed roles come only from final Courseware DOM markers, accessible labels, classes or IDs; planner requirements are never used as observations.",
+        "collection_policy": "Student-facing visual status is computed from student.html only. Teacher evidence is retained separately and cannot fill a student-facing gap. Observed roles come only from final Courseware DOM markers, accessible labels, classes or IDs; planner requirements are never used as observations.",
     }
     if output_path:
         dump_json(result, output_path)

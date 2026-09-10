@@ -1,0 +1,2 @@
+# Whole-Course runtime output schema validation is intentionally CI-only.
+jsonschema>=4,<5

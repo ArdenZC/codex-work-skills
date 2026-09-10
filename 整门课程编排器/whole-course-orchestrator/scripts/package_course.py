@@ -112,7 +112,40 @@ def _write_dashboards(root: Path, manifest: dict[str, Any], evidence: dict[str, 
     (overview / "source-portfolio.html").write_text(html_page("Source portfolio", portfolio), encoding="utf-8")
 
 
+def _load_manifest_qa(manifest: dict[str, Any]) -> dict[str, Any] | None:
+    direct = manifest.get("qa") or manifest.get("whole_course_qa")
+    if isinstance(direct, dict):
+        return direct
+    evidence_data = manifest.get("evidence_data") if isinstance(manifest.get("evidence_data"), dict) else {}
+    value = evidence_data.get("qa") or evidence_data.get("whole_course_qa")
+    if isinstance(value, dict):
+        return value
+    if value:
+        path = Path(str(value)).expanduser().resolve()
+        if path.is_file():
+            return load_json(path)
+    return None
+
+
+def _assert_packaging_eligible(manifest: dict[str, Any]) -> None:
+    package_kind = str(manifest.get("package_kind") or manifest.get("delivery_kind") or "candidate").lower()
+    if package_kind not in {"final", "final_delivery", "teacher-facing-delivery", "teacher_facing_delivery"}:
+        return
+    qa = _load_manifest_qa(manifest)
+    if not isinstance(qa, dict):
+        raise ValueError("PACKAGING_BLOCKED: final teacher-facing delivery requires whole-course QA evidence")
+    if qa.get("architecture_status") == "WHOLE_COURSE_ARCHITECTURE_BLOCKED":
+        raise ValueError("PACKAGING_BLOCKED: whole-course architecture is blocked")
+    if str(qa.get("status") or "") != "PASS" or str(qa.get("final_status") or "") != "PASS" or str(qa.get("render_status") or "") != "PASS":
+        raise ValueError("PACKAGING_BLOCKED: final package requires QA status=PASS and final_status=PASS")
+    if str(qa.get("plan_status") or "PASS") not in {"PASS", "READY"}:
+        raise ValueError("PACKAGING_BLOCKED: plan QA is not approved for final delivery")
+
+
 def package_course(manifest: dict[str, Any], output_dir: Path, *, replace: bool = False) -> Path:
+    if not isinstance(manifest, dict):
+        raise ValueError("PACKAGING_BLOCKED: package manifest must be an object")
+    _assert_packaging_eligible(manifest)
     output_dir = output_dir.expanduser().resolve()
     if output_dir.exists() and not replace:
         raise ValueError(f"output exists; use replace explicitly: {output_dir}")

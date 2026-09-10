@@ -132,6 +132,14 @@ def detect_gaps(graph: dict[str, Any], inventory: dict[str, Any], asset_knowledg
             gaps.append({"id": f"gap-{node_id}-visual", "topic": node.get("title"), "knowledge_node_id": node_id, "type": "missing_visual", "priority": "high", "evidence": {"related_asset_ids": sorted(related_ids)}})
         if not any(asset.get("type") in {"worked_example", "case"} and asset.get("teaching_value") != "low-value" for asset in related):
             gaps.append({"id": f"gap-{node_id}-example", "topic": node.get("title"), "knowledge_node_id": node_id, "type": "weak_example", "priority": "medium", "evidence": {"related_asset_ids": sorted(related_ids)}})
+        if not any(asset.get("type") == "comparison" and asset.get("teaching_value") != "low-value" for asset in related):
+            gaps.append({"id": f"gap-{node_id}-comparison", "topic": node.get("title"), "knowledge_node_id": node_id, "type": "missing_comparison", "priority": "medium", "evidence": {"related_asset_ids": sorted(related_ids)}})
+        if not any(asset.get("type") in {"exercise", "question"} and asset.get("teaching_value") != "low-value" for asset in related):
+            gaps.append({"id": f"gap-{node_id}-exercise", "topic": node.get("title"), "knowledge_node_id": node_id, "type": "weak_exercise", "priority": "medium", "evidence": {"related_asset_ids": sorted(related_ids)}})
+        if not any(asset.get("type") == "misconception" and asset.get("teaching_value") != "low-value" for asset in related):
+            gaps.append({"id": f"gap-{node_id}-misconception", "topic": node.get("title"), "knowledge_node_id": node_id, "type": "missing_misconception", "priority": "medium", "evidence": {"related_asset_ids": sorted(related_ids)}})
+        if not node.get("practice_dependencies") and not any(asset.get("type") in {"exercise", "worked_example", "case"} and asset.get("teaching_value") != "low-value" for asset in related):
+            gaps.append({"id": f"gap-{node_id}-practice", "topic": node.get("title"), "knowledge_node_id": node_id, "type": "insufficient_practice_material", "priority": "medium", "evidence": {"related_asset_ids": sorted(related_ids)}})
     return gaps
 
 
@@ -298,6 +306,7 @@ def research(
             "selected_source_count": 0,
             "rejected_source_count": 0,
             "conflicts": [],
+            "search_performed": False,
             "provenance_policy": "user materials contain the required evidence; no external search is necessary",
         }
     if not enabled:
@@ -310,6 +319,7 @@ def research(
             "selected_source_count": 0,
             "rejected_source_count": 0,
             "conflicts": [],
+            "search_performed": False,
             "provenance_policy": "user-provided sources remain primary; no external candidates were considered",
         }
     if not network_available:
@@ -322,6 +332,7 @@ def research(
             "selected_source_count": 0,
             "rejected_source_count": 0,
             "conflicts": [],
+            "search_performed": False,
             "provenance_policy": "continue with user-provided sources; external research was not available",
         }
 
@@ -349,13 +360,14 @@ def research(
             accepted += 1
     return {
         "schema_version": "1.1",
-        "research_status": "completed",
+        "research_status": "COMPLETED",
         "retrieved_at": timestamp,
         "research_gaps": gaps,
         "sources": selected + rejected,
         "selected_source_count": len(selected),
         "rejected_source_count": len(rejected),
         "conflicts": _conflicts(user_facts or [], selected),
+        "search_performed": True,
         "authority_trust_model": {
             "layers": ["CLAIMED", "OBSERVED_METADATA", "VERIFIED_IDENTITY"],
             "statuses": sorted(AUTHORITY_STATUS_RANK),

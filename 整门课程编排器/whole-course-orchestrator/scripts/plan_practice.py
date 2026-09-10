@@ -7,6 +7,7 @@ from typing import Any
 
 from build_knowledge_graph import validate_knowledge_boundary
 from orchestrator_core import OrchestrationError, canonical_hash, dump_json, load_json
+from semantic_artifacts import starter_spec
 
 
 TYPED_STARTERS: dict[str, dict[str, Any]] = {
@@ -16,11 +17,19 @@ TYPED_STARTERS: dict[str, dict[str, Any]] = {
     "state_model": {"components": ["states", "missing_transition_event"], "gaps": ["missing_transition"]},
     "deployment_model": {"components": ["nodes", "artifact_placement"], "gaps": ["wrong_node_mapping"]},
     "activity_model": {"components": ["actions", "decision_node", "partial_control_flow"], "gaps": ["missing_transition", "wrong_guard"]},
+    "tree_graph_structure": {"components": ["nodes", "root", "partial_edges"], "gaps": ["missing_edge", "wrong_parent"]},
+    "relational_table_model": {"components": ["table", "field", "missing_key"], "gaps": ["missing_key", "wrong_relationship"]},
+    "network_topology": {"components": ["device", "link", "partial_path"], "gaps": ["missing_link", "wrong_direction"]},
+    "worksheet_dataflow": {"components": ["cell_range", "formula", "partial_dependency"], "gaps": ["missing_formula", "wrong_dependency"]},
 }
 
 
 def typed_starter(artifact_type: str, supplied: dict[str, Any] | None = None) -> dict[str, Any]:
     adapter = TYPED_STARTERS.get(artifact_type)
+    if adapter is None:
+        registry_adapter = starter_spec(artifact_type)
+        if registry_adapter:
+            adapter = {"components": registry_adapter["components"], "gaps": registry_adapter["gaps"]}
     if not adapter:
         return {"artifact_type": artifact_type, "components": [], "editable_gaps": [], "starter_kind": "none", "starter_observed": [], "evidence_status": "PLANNED_NOT_OBSERVED"}
     supplied = supplied or {}
@@ -147,13 +156,33 @@ def plan_practice_session(session: dict[str, Any], graph: dict[str, Any]) -> dic
     if errors:
         raise OrchestrationError("practice planning failed:\n- " + "\n- ".join(errors))
     graph_session = next((item for item in graph.get("sessions", []) if item.get("id") == session_id), None)
+    practice_config = session.get("practice") if isinstance(session.get("practice"), dict) else {}
+    declared_minutes = session.get("practice_minutes") or session.get("practice_duration_minutes") or practice_config.get("minutes")
+    duration_status = "NOT_DECLARED"
+    duration_reasons: list[str] = []
+    planned_minutes = round(sum(float(task["estimated_minutes"]) for task in tasks), 2)
+    if declared_minutes not in (None, ""):
+        try:
+            declared_value = float(declared_minutes)
+        except (TypeError, ValueError):
+            raise OrchestrationError(f"{session_id}: practice minutes must be numeric")
+        if abs(declared_value - planned_minutes) > 1:
+            duration_status = "MISMATCH_DEGRADED" if str(session.get("planning_mode") or "draft") == "draft" else "MISMATCH"
+            duration_reasons.append(f"declared practice minutes {declared_value:g} differs from task sum {planned_minutes:g}")
+            if str(session.get("planning_mode") or "draft") == "release":
+                raise OrchestrationError(f"PRACTICE_DURATION_MISMATCH: {session_id}: declared {declared_value:g}, planned {planned_minutes:g}")
+        else:
+            duration_status = "MATCH"
     return {
         "id": session_id,
         "title": str(session.get("title") or session_id),
         "knowledge_state_after": (graph_session or {}).get("knowledge_state_after", []),
         "tasks": tasks,
         "task_count": len(tasks),
-        "planned_minutes": sum(float(task["estimated_minutes"]) for task in tasks),
+        "planned_minutes": planned_minutes,
+        "practice_minutes": declared_minutes,
+        "duration_status": duration_status,
+        "duration_reasons": duration_reasons,
     }
 
 

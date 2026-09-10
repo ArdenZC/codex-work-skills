@@ -31,6 +31,13 @@ REQUIRED = (
     "schemas/visual-plan.schema.json",
     "schemas/practice-plan.schema.json",
     "schemas/whole-course-qa.schema.json",
+    "schemas/whole-course-plan-qa.schema.json",
+    "schemas/whole-course-render-qa.schema.json",
+    "schemas/whole-course-e2e.schema.json",
+    "schemas/whole-course-visual-evidence.schema.json",
+    "schemas/whole-course-starter-evidence.schema.json",
+    "schemas/whole-course-contact-sheet.schema.json",
+    "schemas/whole-course-failure-replay.schema.json",
     "schemas/external-source-research.schema.json",
     "scripts/orchestrator_core.py",
     "scripts/mine_teaching_assets.py",
@@ -49,10 +56,13 @@ REQUIRED = (
     "scripts/extract_failure_benchmark_evidence.py",
     "scripts/replay_failure_benchmark.py",
     "scripts/package_course.py",
+    "scripts/semantic_artifacts.py",
+    "scripts/validate_outputs.py",
     "scripts/install.py",
     "tests/__init__.py",
     "tests/test_whole_course.py",
     "tests/test_phase_1_1.py",
+    "tests/test_phase_1_2.py",
 )
 
 

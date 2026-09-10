@@ -9,6 +9,8 @@ from __future__ import annotations
 import html
 from typing import Any
 
+from orchestrator_core import OrchestrationError
+
 
 RENDERER_LAYOUTS = {"hero", "split", "grid", "focus", "comparison", "timeline", "default"}
 
@@ -41,13 +43,29 @@ def _typed_structure_svg(artifact: str, roles: list[str]) -> str:
 
     requested = {str(item).lower() for item in roles}
     if artifact == "class_model":
-        return (
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="class structure" data-structure-evidence="typed">'
-            '<g data-node-key="class-a" data-semantic-role="class class_compartment"><rect x="40" y="70" width="180" height="80"/><text x="130" y="112">ClassA</text></g>'
-            '<g data-node-key="class-b" data-semantic-role="class class_compartment"><rect x="540" y="70" width="180" height="80"/><text x="630" y="112">ClassB</text></g>'
+        class_roles = "class class_compartment"
+        if "attribute" in requested:
+            class_roles += " attribute"
+        if "operation" in requested:
+            class_roles += " operation"
+        relation = "relationship association" if requested & {"relationship", "association", "multiplicity", "inheritance", "aggregation", "composition"} else ""
+        edge = (
             '<line data-edge-key="edge-1" data-semantic-role="relationship association" data-source-key="class-a" data-target-key="class-b" data-relation-kind="association" x1="220" y1="110" x2="540" y2="110"/>'
+            if relation else ""
+        )
+        labels = (
             '<text data-label-for-key="edge-1" data-label-kind="multiplicity" data-label-endpoint="source" data-label="1" x="250" y="100">1</text>'
             '<text data-label-for-key="edge-1" data-label-kind="multiplicity" data-label-endpoint="target" data-label="*" x="500" y="100">*</text>'
+            if "multiplicity" in requested else ""
+        )
+        second = (
+            '<g data-node-key="class-b" data-semantic-role="class class_compartment"><rect x="540" y="70" width="180" height="80"/><text x="630" y="112">ClassB</text></g>'
+            if relation else ""
+        )
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="class structure" data-structure-evidence="typed">'
+            f'<g data-node-key="class-a" data-semantic-role="{class_roles}"><rect x="40" y="70" width="180" height="80"/><text x="130" y="112">ClassA</text></g>'
+            + second + edge + labels +
             '</svg>'
         )
     if artifact == "sequence_model":
@@ -107,6 +125,46 @@ def _typed_structure_svg(artifact: str, roles: list[str]) -> str:
             f'<line data-edge-key="flow-1" data-semantic-role="control_flow" data-source-key="action-1" data-target-key="{first_target}" data-relation-kind="control_flow" x1="210" y1="110" x2="420" y2="110"/>'
             + decision + '</svg>'
         )
+    if artifact == "tree_graph_structure":
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="tree graph structure" data-structure-evidence="typed">'
+            '<g data-node-key="root-1" data-semantic-role="node root"><circle cx="150" cy="70" r="30"/><text x="125" y="75">Root</text></g>'
+            '<g data-node-key="node-2" data-semantic-role="node"><circle cx="620" cy="70" r="30"/><text x="600" y="75">Child</text></g>'
+            '<line data-edge-key="tree-edge-1" data-semantic-role="edge parent_child traversal" data-source-key="root-1" data-target-key="node-2" data-relation-kind="parent_child" x1="180" y1="70" x2="590" y2="70"/>'
+            '</svg>'
+        )
+    if artifact == "relational_table_model":
+        relation = (
+            '<line data-edge-key="table-edge-1" data-semantic-role="relationship" data-source-key="table-a" data-target-key="table-b" data-relation-kind="relationship" x1="330" y1="90" x2="520" y2="90"/>'
+            if "relationship" in requested else ""
+        )
+        second = '<g data-node-key="table-b" data-semantic-role="table"><rect x="520" y="55" width="180" height="70"/><text x="560" y="95">Orders</text></g>' if relation else ""
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="relational table structure" data-structure-evidence="typed">'
+            '<g data-node-key="table-a" data-semantic-role="table"><rect x="70" y="55" width="260" height="70"/><text x="95" y="80">Users</text></g>'
+            '<g data-node-key="field-id" data-semantic-role="field key"><rect x="90" y="140" width="120" height="42"/><text x="110" y="166">user_id</text></g>'
+            + second + relation + '</svg>'
+        )
+    if artifact == "network_topology":
+        edge_roles = "link"
+        if "direction" in requested:
+            edge_roles += " direction"
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="network topology structure" data-structure-evidence="typed">'
+            '<g data-node-key="device-a" data-semantic-role="device node"><rect x="70" y="70" width="180" height="70"/><text x="105" y="110">Client</text></g>'
+            '<g data-node-key="device-b" data-semantic-role="device node"><rect x="610" y="70" width="180" height="70"/><text x="645" y="110">Server</text></g>'
+            f'<line data-edge-key="network-link-1" data-semantic-role="{edge_roles}" data-source-key="device-a" data-target-key="device-b" data-relation-kind="link" x1="250" y1="105" x2="610" y2="105"/>'
+            '</svg>'
+        )
+    if artifact == "worksheet_dataflow":
+        edge = '<line data-edge-key="dependency-1" data-semantic-role="dependency transformation" data-source-key="cell-input" data-target-key="cell-output" data-relation-kind="dependency" x1="260" y1="100" x2="600" y2="100"/>' if "dependency" in requested or "transformation" in requested else ""
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="worksheet dataflow structure" data-structure-evidence="typed">'
+            '<g data-node-key="cell-input" data-semantic-role="cell range input"><rect x="70" y="70" width="190" height="70"/><text x="105" y="110">A1:A3</text></g>'
+            '<g data-node-key="cell-formula" data-semantic-role="formula"><rect x="335" y="70" width="180" height="70"/><text x="370" y="110">SUM</text></g>'
+            '<g data-node-key="cell-output" data-semantic-role="cell range output"><rect x="590" y="70" width="190" height="70"/><text x="625" y="110">B1</text></g>'
+            + edge + '</svg>'
+        )
     return ""
 
 
@@ -122,6 +180,53 @@ def _svg_for_page(page: dict[str, Any]) -> str:
         role_markup = '<circle cx="120" cy="116" r="40" fill="#dbe8eb" stroke="#6b8f9d" data-semantic-role="visual"/><text x="120" y="121" text-anchor="middle" font-size="14">visual</text>'
     artifact_marker = f' data-artifact-type="{html.escape(artifact)}"' if artifact else ""
     return f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="semantic visual"{artifact_marker}>{role_markup}</svg>'
+
+
+def _quiz_block(page: dict[str, Any], title: str) -> dict[str, Any]:
+    evidence = page.get("content_evidence") if isinstance(page.get("content_evidence"), dict) else {}
+    raw = page.get("quiz") or evidence.get("quiz") or {}
+    raw = raw if isinstance(raw, dict) else {}
+    options = [str(item) for item in raw.get("options", []) if str(item).strip()]
+    answer_index = raw.get("answer_index")
+    if len(options) < 3 or not isinstance(answer_index, int) or not 0 <= answer_index < len(options):
+        options = [
+            "同时包含对象、必要条件和可核对依据",
+            "只重复概念名称，不说明判断条件",
+            "只给出一个例子，不说明适用条件",
+        ]
+        answer_index = 0
+    explanation = str(raw.get("explanation") or f"正确项必须回到“{title}”中的对象、条件和依据逐项核对。")
+    return {
+        "type": "quiz",
+        "question": str(raw.get("question") or raw.get("stem") or title),
+        "options": options,
+        "answer_index": answer_index,
+        "explanation": explanation,
+        "distractor_metadata": raw.get("distractor_metadata") or [
+            {"text": option, "misconception_type": "concept-boundary" if index else "correct"}
+            for index, option in enumerate(options)
+        ],
+    }
+
+
+def _comparison_block(page: dict[str, Any], title: str) -> dict[str, Any]:
+    evidence = page.get("content_evidence") if isinstance(page.get("content_evidence"), dict) else {}
+    raw = page.get("comparison") or evidence.get("comparison") or {}
+    raw = raw if isinstance(raw, dict) else {}
+    left = raw.get("left") or raw.get("left_claims") or ["先说明这一侧的对象和判断依据。"]
+    right = raw.get("right") or raw.get("right_claims") or ["再说明另一侧的对象和判断依据。"]
+    left = [str(item) for item in left] if isinstance(left, list) else [str(left)]
+    right = [str(item) for item in right] if isinstance(right, list) else [str(right)]
+    return {
+        "type": "comparison",
+        "contrast_dimension": str(raw.get("contrast_dimension") or raw.get("dimension") or page.get("contrast_dimension") or "判断依据"),
+        "left_title": str(raw.get("left_title") or raw.get("left_label") or "方案 A"),
+        "right_title": str(raw.get("right_title") or raw.get("right_label") or "方案 B"),
+        "left": left,
+        "right": right,
+        "correct_side": raw.get("correct_side") or raw.get("correct"),
+        "wrong_side": raw.get("wrong_side"),
+    }
 
 
 def adapt_session_to_courseware(session: dict[str, Any], *, course_title: str = "Synthetic Whole Course", audience: str = "高职学生", visual_plans: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -167,8 +272,10 @@ def adapt_session_to_courseware(session: dict[str, Any], *, course_title: str = 
         elif page.get("content_evidence", {}).get("steps") or page.get("content_evidence", {}).get("procedure"):
             steps = page.get("content_evidence", {}).get("steps") or page.get("content_evidence", {}).get("procedure") or ["observe", "act", "check"]
             blocks.append({"type": "bullets", "items": [str(item.get("instruction") if isinstance(item, dict) else item) for item in steps]})
-        elif page.get("primary_job") == "check":
-            blocks.append({"type": "quiz", "question": title, "options": ["依据当前证据作答", "忽略证据直接猜测"], "answer_index": 0, "explanation": "答案必须与页面证据对应。"})
+        elif page.get("primary_job") == "check" or page.get("quiz") or (isinstance(page.get("content_evidence"), dict) and page.get("content_evidence", {}).get("quiz")):
+            blocks.append(_quiz_block(page, title))
+        elif page.get("primary_job") == "compare" or page.get("comparison") or (isinstance(page.get("content_evidence"), dict) and page.get("content_evidence", {}).get("comparison")):
+            blocks.append(_comparison_block(page, title))
         else:
             blocks.append({"type": "cards", "items": [{"title": "evidence", "text": str(page.get("learning_outcome") or title), "tone": "blue"}]})
         script = str(page.get("final_speaker_script") or page.get("planned_speaker_script") or "")
@@ -246,7 +353,17 @@ def adapt_session_to_courseware(session: dict[str, Any], *, course_title: str = 
     # rendered page plan as the handoff authority after integer normalization;
     # do not add an unplanned summary page or leave a root duration that no
     # longer matches the actual slides.
-    session_minutes = max(1, int(sum(slide["suggested_minutes"] for slide in slides)))
+    rendered_minutes = int(sum(slide["suggested_minutes"] for slide in slides))
+    declared_minutes = session.get("minutes")
+    if declared_minutes not in (None, ""):
+        declared_minutes = int(round(float(declared_minutes)))
+        if abs(declared_minutes - rendered_minutes) > 1:
+            raise OrchestrationError(
+                f"THEORY_DURATION_MISMATCH: {session.get('id')}: declared {declared_minutes}, rendered plan {rendered_minutes}"
+            )
+        session_minutes = declared_minutes
+    else:
+        session_minutes = max(1, rendered_minutes)
     return {
         "contract_version": "1.1",
         "course_title": course_title,
@@ -268,6 +385,14 @@ def _drawio_starter(task: dict[str, Any]) -> str:
     artifact = str(task.get("artifact_type") or "")
     if artifact == "sequence_model":
         return '<mxfile><diagram name="starter"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="lifeline" value="lifeline lifelines" style="umlLifeline" vertex="1" parent="1"/><mxCell id="gap" value="editable_gap:missing_message editable_gap:wrong_message_order missing_messages wrong_order" style="shape=note" vertex="1" parent="1"/><mxCell id="message" value="missing_message" style="message;edgeStyle=orthogonalEdgeStyle" edge="1" parent="1" source="lifeline" target="gap"/></root></mxGraphModel></diagram></mxfile>'
+    if artifact == "tree_graph_structure":
+        return '<mxfile><diagram name="starter"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="root" value="root node" style="ellipse" vertex="1" parent="1"/><mxCell id="child" value="node editable_gap:missing_edge" style="ellipse" vertex="1" parent="1"/><mxCell id="edge" value="parent_child traversal wrong_parent" style="edgeStyle=orthogonalEdgeStyle" edge="1" parent="1" source="root" target="child"/></root></mxGraphModel></diagram></mxfile>'
+    if artifact == "relational_table_model":
+        return '<mxfile><diagram name="starter"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="table" value="table field key editable_gap:missing_key" style="swimlane" vertex="1" parent="1"/><mxCell id="relation" value="relationship editable_gap:wrong_relationship" style="edgeStyle=orthogonalEdgeStyle" edge="1" parent="1" source="table" target="table"/></root></mxGraphModel></diagram></mxfile>'
+    if artifact == "network_topology":
+        return '<mxfile><diagram name="starter"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="device" value="device node" style="shape=mxgraph.networks.router" vertex="1" parent="1"/><mxCell id="peer" value="device partial_path" style="shape=mxgraph.networks.server" vertex="1" parent="1"/><mxCell id="link" value="link direction editable_gap:missing_link wrong_direction" style="edgeStyle=orthogonalEdgeStyle" edge="1" parent="1" source="device" target="peer"/></root></mxGraphModel></diagram></mxfile>'
+    if artifact == "worksheet_dataflow":
+        return '<mxfile><diagram name="starter"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="input" value="cell range input" style="shape=table" vertex="1" parent="1"/><mxCell id="formula" value="formula editable_gap:missing_formula" style="shape=note" vertex="1" parent="1"/><mxCell id="output" value="cell range output dependency wrong_dependency" style="shape=table" vertex="1" parent="1"/></root></mxGraphModel></diagram></mxfile>'
     return '<mxfile><diagram name="starter"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="class" value="class_compartment attribute partial_classes" style="umlClass" vertex="1" parent="1"/><mxCell id="gap" value="editable_gap:missing_relation editable_gap:wrong_multiplicity missing_relationship missing_multiplicity" style="shape=note" vertex="1" parent="1"/><mxCell id="relation" value="association relationship multiplicity 1..*" style="edgeStyle=orthogonalEdgeStyle" edge="1" parent="1" source="class" target="class"/></root></mxGraphModel></diagram></mxfile>'
 
 
@@ -312,12 +437,24 @@ def adapt_session_to_practice(session: dict[str, Any], *, course_title: str = "S
         practice_tasks.append(task_record)
         references.append({"task_id": task_id, "title": str(task.get("title") or task_id), "source_slide_ids": [source_slide_id], "learning_unit_ids": [source_unit_id], "canonical_fact_ids": [source_fact_id], "reference_answer": "教师参考答案保留在教师包。", "reference_visual": {"kind": "uml-sequence" if artifact == "sequence_model" else "uml-class", "title": "教师参考结构"}, "key_steps": ["观察", "修改"], "acceptable_variants": ["语义等价结果"], "common_errors": ["只改文字不保留结构"], "acceptance_basis": ["文件存在且可继续编辑"]})
     study = [{"id": "guide-1", "title": "证据检查", "knowledge_link_ids": [item["id"] for item in knowledge_links], "task_ids": [item["id"] for item in practice_tasks], "learning_unit_ids": sorted({unit for item in practice_tasks for unit in item["learning_unit_ids"]}), "canonical_fact_ids": sorted({fact for item in practice_tasks for fact in item["canonical_fact_ids"]}), "body": "先读理论问题，再检查 starter。", "worked_example": "从一个缺口开始。", "quick_reference": ["看结构", "改缺口"], "common_errors": ["把计划当成文件"], "checkpoints": ["保存文件"]}]
+    planned_minutes = sum(float(task["estimated_minutes"]) for task in practice_tasks)
+    practice_config = session.get("practice") if isinstance(session.get("practice"), dict) else {}
+    declared_practice = session.get("practice_minutes") or session.get("practice_duration_minutes") or practice_config.get("minutes")
+    if declared_practice not in (None, ""):
+        declared_practice = int(round(float(declared_practice)))
+        if abs(declared_practice - planned_minutes) > 1:
+            raise OrchestrationError(
+                f"PRACTICE_DURATION_MISMATCH: {session.get('id')}: declared {declared_practice}, planned {planned_minutes:g}"
+            )
+        duration_minutes = declared_practice
+    else:
+        duration_minutes = max(1, int(round(planned_minutes)))
     return {
         "contract_version": "1.1",
         "course_title": course_title,
         "practice_title": str(session.get("title") or "Synthetic practice"),
         "audience": audience,
-        "duration_minutes": max(30, int(round(float(session.get("planned_minutes") or 60)))),
+        "duration_minutes": duration_minutes,
         "course_context": {**COURSEWARE_CONTEXT, "course_name": course_title, "audience": audience},
         "source_courseware": {"mode": "courseware", "contract_version": "1.1", "chapter_title": str(session.get("title") or "Synthetic"), "taught_slide_ids": slide_ids},
         "knowledge_links": knowledge_links,
@@ -325,7 +462,7 @@ def adapt_session_to_practice(session: dict[str, Any], *, course_title: str = "S
         "learning_center": [],
         "study_guide": study,
         "foundation_kit": [],
-        "teacher_guide": {"purpose": "检查课程级实践证据。", "theory_bridge": "回到理论页面证据。", "timing": [{"minutes": max(1, int(round(float(session.get("planned_minutes") or 30)))), "focus": "完成任务"}], "task_guidance": [{"task_id": task["id"], "look_for": "语义结构", "ask_when_stuck": "请学生指出证据"} for task in practice_tasks], "common_errors": [{"symptom": "只改表面文字", "intervention": "回到结构检查"}], "pace_adjustments": ["按需减少可选步骤"], "closing_checks": ["文件存在", "学生能说明依据"]},
+        "teacher_guide": {"purpose": "检查课程级实践证据。", "theory_bridge": "回到理论页面证据。", "timing": [{"minutes": duration_minutes, "focus": "完成任务"}], "task_guidance": [{"task_id": task["id"], "look_for": "语义结构", "ask_when_stuck": "请学生指出证据"} for task in practice_tasks], "common_errors": [{"symptom": "只改表面文字", "intervention": "回到结构检查"}], "pace_adjustments": ["按需减少可选步骤"], "closing_checks": ["文件存在", "学生能说明依据"]},
         "teacher_reference": {"task_references": references},
         "starter_assets": starter_assets,
     }

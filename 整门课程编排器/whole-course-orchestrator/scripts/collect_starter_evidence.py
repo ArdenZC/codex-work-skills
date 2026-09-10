@@ -181,6 +181,127 @@ def _student_leaks(paths: list[Path]) -> list[str]:
     return leaks
 
 
+def _task_asset_records(content: dict[str, Any], task_id: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for asset in content.get("starter_assets", []) if isinstance(content, dict) else []:
+        if isinstance(asset, dict) and str(asset.get("task_id") or "") == task_id:
+            records.append(asset)
+    return records
+
+
+def collect_task_evidence(
+    task: dict[str, Any],
+    practice_root: str | Path,
+    *,
+    qa_report: dict[str, Any] | str | Path | None = None,
+    behavior_verification: dict[str, Any] | str | Path | None = None,
+) -> dict[str, Any]:
+    """Collect required/planned/observed evidence for one rendered task.
+
+    The renderer's session-level ``status=pass`` is deliberately only one
+    observed fact.  This function closes each task independently against its
+    own starter, student package, and teacher reference records.
+    """
+
+    root = Path(practice_root).expanduser().resolve()
+    content = _read_json(root / "practice-content.json")
+    content = content if isinstance(content, dict) else {}
+    task_id = str(task.get("id") or "")
+    asset_records = _task_asset_records(content, task_id)
+    starter_root = root / "student" / "starter"
+    manifest_path = root / "student-package" / "student-manifest.json"
+    manifest = _read_json(manifest_path)
+    qa_value = _read_json(qa_report) if qa_report is not None else _read_json(root / "qa-report.json")
+    behavior_value = _read_json(behavior_verification) if behavior_verification is not None else _read_json(root / "behavior-verification.json")
+    required = _requirements(task.get("starter_requirements", []))
+    planned = task.get("starter_plan") if isinstance(task.get("starter_plan"), dict) else task.get("starter", {})
+    observed: list[str] = []
+    missing: list[str] = []
+    evidence: list[dict[str, Any]] = []
+    starter_paths: list[Path] = []
+    if (root / "student").is_dir():
+        observed.append("student_artifact")
+    else:
+        missing.append("student_artifact")
+    if (root / "teacher").is_dir():
+        observed.append("teacher_reference_artifact")
+    else:
+        missing.append("teacher_reference_artifact")
+    for asset in asset_records:
+        relative = str(asset.get("path") or "")
+        candidate = starter_root / relative
+        if candidate.is_file():
+            starter_paths.append(candidate)
+            observed.append(f"starter:{relative}")
+        else:
+            missing.append(f"starter:{relative or '<missing path>'}")
+    if not asset_records:
+        missing.append("starter_asset_record")
+    student_manifest_ok = isinstance(manifest, dict) and manifest.get("teacher_answers_included") is False and manifest.get("canonical_answers_included") is False
+    if student_manifest_ok:
+        observed.append("student_manifest")
+    else:
+        missing.append("student_manifest_without_teacher_answers")
+    content_task_ids = {str(item.get("id")) for item in content.get("tasks", []) if isinstance(item, dict) and item.get("id")}
+    if task_id in content_task_ids:
+        observed.append("rendered_task_id")
+    else:
+        missing.append("rendered_task_id")
+    reference_ids = {str(item.get("task_id")) for item in content.get("teacher_reference", {}).get("task_references", []) if isinstance(item, dict) and item.get("task_id")}
+    if task_id in reference_ids:
+        observed.append("teacher_reference")
+    else:
+        missing.append("teacher_reference")
+    artifact_type = str(task.get("artifact_type") or "")
+    if artifact_type and starter_paths and all(path.suffix.lower() in {".drawio", ".xml", ".svg", ".xlsx", ".xls", ".csv", ".sql", ".py", ".js", ".ts", ".html", ".css"} for path in starter_paths):
+        observed.append("editable_artifact")
+    elif artifact_type:
+        missing.append("editable_artifact")
+    if isinstance(qa_value, dict) and str(qa_value.get("status", "")).lower() == "pass":
+        observed.append("session_qa_pass")
+    else:
+        missing.append("session_qa_pass")
+    if behavior_value is not None:
+        observed.append("behavior_evidence")
+    else:
+        # The migration-trust renderer may not emit strict classroom
+        # behaviour-closure evidence.  Preserve that boundary explicitly, but
+        # do not let its absence masquerade as a missing student artifact.
+        observed.append("behavior_evidence_unavailable")
+    if starter_paths:
+        starter_observation = collect_starter_evidence(
+            task.get("starter_requirements", []),
+            planned if isinstance(planned, dict) else {},
+            starter_paths,
+            manifest=manifest,
+            qa_report=qa_value,
+            behavior_verification=behavior_value,
+            student_root=starter_root,
+        )
+        evidence.extend(starter_observation.get("evidence", []))
+        if starter_observation.get("status") != "PASS":
+            missing.extend(f"starter_observation:{item}" for item in starter_observation.get("missing_requirements", []))
+    else:
+        starter_observation = {"status": "NOT_OBSERVED", "missing_requirements": required}
+    missing = list(dict.fromkeys(item for item in missing if item))
+    status = "PASS" if not missing and starter_observation.get("status") == "PASS" else "FAIL"
+    return {
+        "task_id": task_id,
+        "required": required,
+        "planned": planned,
+        "observed": sorted(set(observed)),
+        "missing": missing,
+        "status": status,
+        "artifact_type": artifact_type or None,
+        "starter_observed": starter_observation.get("starter_observed", []),
+        "evidence": evidence,
+        "qa_status": qa_value.get("status") if isinstance(qa_value, dict) else None,
+        "teacher_reference_present": task_id in reference_ids,
+        "student_manifest_present": student_manifest_ok,
+        "policy": "Every task is closed independently; one passing task cannot mask another task's missing artifact or evidence.",
+    }
+
+
 def collect_starter_evidence(
     starter_requirements: Any,
     starter_plan: dict[str, Any] | None = None,
