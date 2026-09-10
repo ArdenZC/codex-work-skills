@@ -227,7 +227,11 @@ def run_synthetic_e2e(
     rendered_course = {"sessions": rendered_sessions}
     report = review_rendered_course(session_plans, practice_plans, graph, inventory, visual_evidence=merged_visual, starter_evidence=merged_starter, rendered_course=rendered_course, rendered_practice={"sessions": practice_outputs}, contact_sheet=contact)
     browser_status = "PASS" if contact.get("status") == "PASS" else "FAIL" if contact.get("status") == "FAIL" else "UNAVAILABLE_OR_DEGRADED"
-    final_status = report["final_status"] if browser_status == "PASS" else "WHOLE_COURSE_ARCHITECTURE_BLOCKED"
+    final_status = (
+        "PASS"
+        if browser_status == "PASS" and report.get("final_status") == "PASS"
+        else "WHOLE_COURSE_ARCHITECTURE_BLOCKED"
+    )
     strict_status = "PASS" if evidence_mode == "strict" and all(item.get("qa", {}).get("status") == "pass" for item in theory_outputs + practice_outputs) else "NOT_RUN" if evidence_mode != "strict" else "FAIL"
     result = {"schema_version": "1.1", "report_type": "whole_course_downstream_e2e", "status": final_status, "browser_smoke_status": browser_status, "evidence_mode": evidence_mode, "strict_e2e_status": strict_status, "source_mining": {"slides": len(inventory.get("source_slides", [])), "assets": len(inventory.get("assets", []))}, "courseware": theory_outputs, "practice": practice_outputs, "visual_evidence": merged_visual, "starter_evidence": merged_starter, "contact_sheets": contact, "qa": report, "pipeline": ["source fixture", "teaching asset mining", "knowledge graph", "session plan", "visual plan", "Courseware adapter", f"real Courseware renderer ({evidence_mode})", "visual evidence", "Practice adapter", f"real Practice renderer ({evidence_mode})", "starter evidence", "whole-course QA", "contact sheets"]}
     dump_json(result, root / "whole-course-e2e.json")

@@ -18,6 +18,7 @@ from collect_starter_evidence import collect_starter_evidence  # noqa: E402
 from collect_visual_evidence import collect_visual_evidence  # noqa: E402
 import contact_sheets  # noqa: E402
 from contact_sheets import build_contact_sheets  # noqa: E402
+import downstream_e2e  # noqa: E402
 from downstream_adapters import _drawio_starter, _typed_structure_svg  # noqa: E402
 from downstream_e2e import run_synthetic_e2e  # noqa: E402
 from external_research import detect_gaps, resolve_asset_knowledge_links, research  # noqa: E402
@@ -323,6 +324,13 @@ class Phase11EvidenceTests(unittest.TestCase):
             self.assertEqual(result["strict_e2e_status"], "NOT_RUN")
             self.assertEqual(result["visual_evidence"]["marker_plumbing_status"], "PASS")
             self.assertEqual(result["visual_evidence"]["semantic_structure_status"], "FAIL")
+
+    def test_t42_migration_mode_stays_blocked_when_browser_is_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            with patch.object(downstream_e2e, "build_contact_sheets", return_value={"status": "PASS", "thumbnail_count": 1}):
+                result = run_synthetic_e2e(temp, use_browser=False, evidence_mode="migration-trust")
+            self.assertEqual(result["browser_smoke_status"], "PASS")
+            self.assertEqual(result["status"], "WHOLE_COURSE_ARCHITECTURE_BLOCKED")
 
     def test_t43_browser_disabled_is_degraded_not_pass(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
