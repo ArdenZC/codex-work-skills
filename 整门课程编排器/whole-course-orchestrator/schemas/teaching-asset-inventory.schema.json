@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/teaching-asset-inventory.schema.json",
+  "title": "Whole-Course Teaching Asset Inventory",
+  "type": "object",
+  "required": ["schema_version", "inventory_type", "sources", "assets", "coverage"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "inventory_type": {"const": "teaching_asset_inventory"},
+    "origin_policy": {"type": "string"},
+    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+    "assets": {"type": "array", "items": {"$ref": "#/$defs/asset"}},
+    "coverage": {"type": "object"}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["source_file", "format", "sha256", "status"],
+      "properties": {
+        "source_file": {"type": "string", "minLength": 1},
+        "format": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "status": {"enum": ["parsed", "failed", "unavailable"]},
+        "slide_count": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "asset": {
+      "type": "object",
+      "required": [
+        "id", "type", "source_file", "source_slide", "source_locator", "title",
+        "content_summary", "raw_text", "confidence", "candidate_topics", "teaching_value",
+        "origin", "origin_type"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "type": {"type": "string"},
+        "source_file": {"type": "string", "minLength": 1},
+        "source_slide": {"type": "integer", "minimum": 1},
+        "source_locator": {"type": "string", "minLength": 1},
+        "title": {"type": "string"},
+        "content_summary": {"type": "string"},
+        "raw_text": {"type": "string"},
+        "image_ref": {"type": ["string", "null"]},
+        "image_refs": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "candidate_topics": {"type": "array", "items": {"type": "string"}},
+        "teaching_value": {"enum": ["core", "supporting", "optional", "low-value"]},
+        "origin": {"type": "string"},
+        "origin_type": {"enum": ["user-provided", "external-authoritative", "external-reference", "derived"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

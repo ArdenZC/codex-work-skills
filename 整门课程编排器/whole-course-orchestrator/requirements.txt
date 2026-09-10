@@ -1,0 +1,3 @@
+# The architecture layer uses Python's standard library.
+# Optional PPTX parsing is implemented with the OOXML package structure so that
+# a missing python-pptx dependency does not silently remove visual assets.
