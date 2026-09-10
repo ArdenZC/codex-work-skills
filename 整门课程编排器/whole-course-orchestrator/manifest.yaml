@@ -15,6 +15,7 @@ schemas:
   - schemas/visual-plan.schema.json
   - schemas/practice-plan.schema.json
   - schemas/whole-course-qa.schema.json
+  - schemas/external-source-research.schema.json
 outputs:
   - source-assets.json
   - source-teaching-asset-report.json

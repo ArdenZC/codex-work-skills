@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/external-source-research.schema.json",
+  "title": "External Source Research",
+  "type": "object",
+  "required": ["schema_version", "research_status", "research_gaps", "sources", "conflicts"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "research_status": {"enum": ["completed", "EXTERNAL_RESEARCH_DISABLED_BY_USER", "EXTERNAL_RESEARCH_UNAVAILABLE"]},
+    "research_gaps": {"type": "array", "items": {"type": "object"}},
+    "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
+    "conflicts": {"type": "array", "items": {"type": "object"}}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "required": ["source_url", "source_title", "selected", "origin", "origin_type"],
+      "properties": {
+        "source_url": {"type": ["string", "null"]},
+        "source_title": {"type": ["string", "null"]},
+        "selected": {"type": "boolean"},
+        "origin": {"type": "string"},
+        "origin_type": {"enum": ["external-authoritative", "external-reference"]},
+        "license_note": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}
