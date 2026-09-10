@@ -33,6 +33,7 @@ jobs:
       run_workorder: ${{ steps.classify.outputs.run_workorder }}
       run_courseware: ${{ steps.classify.outputs.run_courseware }}
       run_practice_class: ${{ steps.classify.outputs.run_practice_class }}
+      run_whole_course: ${{ steps.classify.outputs.run_whole_course }}
       run_tooling: ${{ steps.classify.outputs.run_tooling }}
       run_release: ${{ steps.classify.outputs.run_release }}
       run_package_contracts: ${{ steps.classify.outputs.run_package_contracts }}
@@ -126,6 +127,8 @@ jobs:
               root / "平时成绩记分册生成器" / "简介.md",
               root / "HTML课件生成器" / "简介.md",
               root / "实践课HTML生成器" / "简介.md",
+              root / "整门课程编排器" / "简介.md",
+              root / "WHOLE-COURSE-ARCHITECTURE-REPORT.md",
           ]
           sources.extend(sorted((root / "docs").rglob("*.md")))
           link_pattern = re.compile(r"\[[^\]]*\]\(([^)\s]+)")
@@ -872,6 +875,118 @@ jobs:
         shell: bash
         run: test -z "$(git status --porcelain)"
 
+  whole-course-orchestrator:
+    name: Whole-Course Orchestrator
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_whole_course == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python for Whole-Course schema validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: .github/scripts/requirements-ci-whole-course.txt
+
+      - name: Install Whole-Course schema validation dependency
+        run: python -m pip install -r .github/scripts/requirements-ci-whole-course.txt
+
+      - name: Set up Node.js for whole-course browser evidence
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Chromium and Playwright for whole-course contact sheets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/whole-course-node" --no-save playwright
+          "$RUNNER_TEMP/whole-course-node/node_modules/.bin/playwright" install chromium
+
+      - name: Compile Whole-Course Orchestrator
+        run: python -m compileall -q 整门课程编排器/whole-course-orchestrator
+
+      - name: Run synthetic architecture and real-browser evidence tests
+        env:
+          WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
+        run: python -m unittest discover -s 整门课程编排器/whole-course-orchestrator/tests -p 'test_*.py' -v
+
+      - name: Run strict downstream E2E and real contact-sheet proof
+        shell: bash
+        env:
+          WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
+          --output-dir "$RUNNER_TEMP/whole-course-e2e"
+          --evidence-mode strict
+          --json
+
+      - name: Report strict contact-sheet evidence
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = Path(os.environ["RUNNER_TEMP"]) / "whole-course-e2e" / "contact-sheets" / "contact-sheet-evidence.json"
+          evidence = json.loads(report.read_text(encoding="utf-8"))
+          print({
+              "status": evidence.get("status"),
+              "browser_rendered": evidence.get("browser_rendered"),
+              "screenshot_count": evidence.get("screenshot_count"),
+              "fallback_count": evidence.get("fallback_count"),
+              "thumbnail_count": evidence.get("thumbnail_count"),
+              "browser_runtime": evidence.get("browser_runtime"),
+          })
+          if evidence.get("status") != "PASS" or evidence.get("fallback_count") != 0 or evidence.get("screenshot_count", 0) <= 0:
+              raise SystemExit("strict contact-sheet evidence is not a complete browser proof")
+          PY
+
+      - name: Preserve migration-trust compatibility E2E as an intentional blocked regression
+        shell: bash
+        env:
+          WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
+          --output-dir "$RUNNER_TEMP/whole-course-migration-e2e"
+          --evidence-mode migration-trust
+          --expect-blocked
+          --json
+
+      - name: Replay real frozen whole-course failure benchmark
+        shell: bash
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/replay_failure_benchmark.py
+          --snapshot benchmarks/WHOLE_COURSE_FAILURE_BENCHMARK_V1/failure-evidence-snapshot.json
+          --benchmark-json benchmarks/WHOLE_COURSE_FAILURE_BENCHMARK_V1/whole-course-failure-benchmark.json
+          --output-json "$RUNNER_TEMP/whole-course-failure-replay.json"
+          --expect-fail
+          --json
+
+      - name: Validate all Whole-Course runtime JSON outputs
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/validate_outputs.py
+          --e2e-root "$RUNNER_TEMP/whole-course-e2e"
+          --replay "$RUNNER_TEMP/whole-course-failure-replay.json"
+
+      - name: Validate install dry-run
+        run: python 整门课程编排器/whole-course-orchestrator/scripts/install.py --skills-dir "$RUNNER_TEMP/skills" --dry-run
+
+      - name: Verify Whole-Course worktree is clean
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
   template-release:
     name: Template release / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs:
@@ -978,6 +1093,7 @@ jobs:
       - template-workorder
       - template-courseware
       - practice-class-html
+      - whole-course-orchestrator
       - template-release
     runs-on: ubuntu-latest
     steps:
@@ -992,6 +1108,7 @@ jobs:
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
           COURSEWARE_RESULT: ${{ needs.template-courseware.result }}
           PRACTICE_CLASS_RESULT: ${{ needs.practice-class-html.result }}
+          WHOLE_COURSE_RESULT: ${{ needs.whole-course-orchestrator.result }}
           RELEASE_RESULT: ${{ needs.template-release.result }}
           RUN_DOCS: ${{ needs.classify-changes.outputs.run_docs }}
           RUN_PACKAGE: ${{ needs.classify-changes.outputs.run_package_contracts }}
@@ -1001,6 +1118,7 @@ jobs:
           RUN_WORKORDER: ${{ needs.classify-changes.outputs.run_workorder }}
           RUN_COURSEWARE: ${{ needs.classify-changes.outputs.run_courseware }}
           RUN_PRACTICE_CLASS: ${{ needs.classify-changes.outputs.run_practice_class }}
+          RUN_WHOLE_COURSE: ${{ needs.classify-changes.outputs.run_whole_course }}
           RUN_RELEASE: ${{ needs.classify-changes.outputs.run_release }}
           FORCE_FULL: ${{ needs.classify-changes.outputs.force_full }}
           CLASSIFICATION: ${{ needs.classify-changes.outputs.classification }}
@@ -1038,6 +1156,7 @@ jobs:
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"
           check_job template-courseware "$RUN_COURSEWARE" "$COURSEWARE_RESULT"
           check_job practice-class-html "$RUN_PRACTICE_CLASS" "$PRACTICE_CLASS_RESULT"
+          check_job whole-course-orchestrator "$RUN_WHOLE_COURSE" "$WHOLE_COURSE_RESULT"
           check_job template-release "$RUN_RELEASE" "$RELEASE_RESULT"
 
           {

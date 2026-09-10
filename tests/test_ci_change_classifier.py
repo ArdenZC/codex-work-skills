@@ -20,7 +20,7 @@ class ChangeClassifierTests(unittest.TestCase):
 
     def test_documentation_allowlist_is_docs_only(self) -> None:
         result = classify(
-            ["README.md", "docs/ci.md", "教案生成器/简介.md", "平时成绩记分册生成器/简介.md", "HTML课件生成器/简介.md", "实践课HTML生成器/简介.md", "多Agent兼容规范.md"],
+            ["README.md", "docs/ci.md", "教案生成器/简介.md", "平时成绩记分册生成器/简介.md", "HTML课件生成器/简介.md", "实践课HTML生成器/简介.md", "整门课程编排器/简介.md", "WHOLE-COURSE-ARCHITECTURE-REPORT.md", "多Agent兼容规范.md"],
             event_name="pull_request",
         )
         self.assert_flags(result, docs_only=True, run_docs=True, force_full=False)
@@ -111,6 +111,23 @@ class ChangeClassifierTests(unittest.TestCase):
             force_full=False,
         )
         self.assertEqual(result["classification"], "practice_class")
+
+    def test_whole_course_changes_run_only_whole_course_suite(self) -> None:
+        result = classify(
+            ["整门课程编排器/whole-course-orchestrator/scripts/plan_sessions.py"],
+            event_name="pull_request",
+        )
+        self.assert_flags(
+            result,
+            run_whole_course=True,
+            run_courseware=False,
+            run_practice_class=False,
+            run_package_contracts=False,
+            run_tooling=False,
+            run_release=False,
+            force_full=False,
+        )
+        self.assertEqual(result["classification"], "whole_course")
 
     def test_tooling_and_release_paths_do_not_run_both_core_skills(self) -> None:
         tooling = classify(["tools/template_tooling/archive.py"], event_name="pull_request")

@@ -1,0 +1,3206 @@
+{
+  "benchmark_id": "WHOLE_COURSE_FAILURE_BENCHMARK_V1",
+  "freeze_schema_version": "1.0",
+  "frozen_at": "2026-09-10T01:11:37.012119+00:00",
+  "freeze_mode": "manifest-only-external-artifacts",
+  "availability": "complete",
+  "source_root": "F:\\work\\软件建模与设计\\ppt",
+  "build_root": "F:\\work\\软件建模与设计\\_courseware_build",
+  "source_files": [
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元1   预览与认知UML软件模型.ppt",
+      "relative_path": "单元1   预览与认知UML软件模型.ppt",
+      "bytes": 1604608,
+      "sha256": "547dac2ac35fc0d12405746a4ece1e9f520a2cc63e958b12a6563404c2c971eb"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元2　用户登录模块建模.ppt",
+      "relative_path": "单元2　用户登录模块建模.ppt",
+      "bytes": 1085952,
+      "sha256": "ff8971a11d586e10733c7eeaebaec1d922a5e5bda616f2ff5fbbb19e2c6ced8f"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元3　用户管理模块建模.ppt",
+      "relative_path": "单元3　用户管理模块建模.ppt",
+      "bytes": 916480,
+      "sha256": "22a2b212d0bc8557613471eb48b696e5e327d836315d4f3e7a99d74076833a4f"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元4　基础数据管理模块建模.ppt",
+      "relative_path": "单元4　基础数据管理模块建模.ppt",
+      "bytes": 819200,
+      "sha256": "9bd09af5744cfb380a4220715b72e06b2fb7c3fa747d65532e074b502e13dca7"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元5　业务数据管理模块建模.ppt",
+      "relative_path": "单元5　业务数据管理模块建模.ppt",
+      "bytes": 1321984,
+      "sha256": "65cd34caaddae688a9a732e61d63ba7f4ef33f31ca8d3c74aa9a809997c6e4ae"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元6　业务处理模块建模.ppt",
+      "relative_path": "单元6　业务处理模块建模.ppt",
+      "bytes": 1108480,
+      "sha256": "2f00c72e7b469d68e981b4f9fe2d016eb5e0188ca31e4729f3161d5ee09952df"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元7　CS应用系统建模.ppt",
+      "relative_path": "单元7　CS应用系统建模.ppt",
+      "bytes": 1945600,
+      "sha256": "a9b4d3f07e3a4d05efaa25b85e3138b03a8c79fd99cc1dd9a30a7e3863c4b889"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元8　Web应用系统建模.ppt",
+      "relative_path": "单元8　Web应用系统建模.ppt",
+      "bytes": 1349120,
+      "sha256": "86224fdbcf56ef2aaf6cb87a0e3d7c32723354879a30aca0ce81a6b72532d6dc"
+    },
+    {
+      "path": "F:\\work\\软件建模与设计\\ppt\\单元9　UML软件模型的实现.ppt",
+      "relative_path": "单元9　UML软件模型的实现.ppt",
+      "bytes": 1156096,
+      "sha256": "f2e3a9cf851da515222a6483a41c0a12ee3fc3ab4f1fdf8a9e194fa296e4985b"
+    }
+  ],
+  "converted_source_evidence": [
+    {
+      "source_id": "source_text/01_unit.txt",
+      "pptx_file": "单元1   预览与认知UML软件模型.pptx",
+      "pptx_sha256": "dc90a41924960ef9f72a634b3a898daabf0a46e78c4e72782745fc5a4a048399",
+      "slide_count": 115
+    },
+    {
+      "source_id": "source_text/02_unit.txt",
+      "pptx_file": "单元2　用户登录模块建模.pptx",
+      "pptx_sha256": "9e0c22cb8ffed01878914710365ec5fbdfe3768f2b9054edf53b260ad3d48754",
+      "slide_count": 143
+    },
+    {
+      "source_id": "source_text/03_unit.txt",
+      "pptx_file": "单元3　用户管理模块建模.pptx",
+      "pptx_sha256": "23350b597bf7bbc1ada0622d2c7f981f2571d5d9fa73b54f0d8d1612a8b96c25",
+      "slide_count": 105
+    },
+    {
+      "source_id": "source_text/04_unit.txt",
+      "pptx_file": "单元4　基础数据管理模块建模.pptx",
+      "pptx_sha256": "fd6ebb82a33d617f200d43393ace0073c6b8234690541341f96ada9a4fb0b596",
+      "slide_count": 68
+    },
+    {
+      "source_id": "source_text/05_unit.txt",
+      "pptx_file": "单元5　业务数据管理模块建模.pptx",
+      "pptx_sha256": "db8dbdbd6a2ff1b2194a3600a62e995b14ec5cc27d8ddcfec7c00eb292691766",
+      "slide_count": 127
+    },
+    {
+      "source_id": "source_text/06_unit.txt",
+      "pptx_file": "单元6　业务处理模块建模.pptx",
+      "pptx_sha256": "df459df539c60adda5e82436e16ad515fa5e4aef66d5e5ce868fbad115a23dbb",
+      "slide_count": 117
+    },
+    {
+      "source_id": "source_text/07_unit.txt",
+      "pptx_file": "单元7　CS应用系统建模.pptx",
+      "pptx_sha256": "db2d66bcd11332cf3c388f01b41992b42f8a5f3d3b5c8a74042f9ce73064fa93",
+      "slide_count": 196
+    },
+    {
+      "source_id": "source_text/08_unit.txt",
+      "pptx_file": "单元8　Web应用系统建模.pptx",
+      "pptx_sha256": "90da811c24d6b981753430e419e1c9e01251bf2a1e7b5000e70f3730ea95853a",
+      "slide_count": 69
+    },
+    {
+      "source_id": "source_text/09_unit.txt",
+      "pptx_file": "单元9　UML软件模型的实现.pptx",
+      "pptx_sha256": "4102519df5cbae315fc4d7117874a0302cf0cd57d754a2415cc874410506e8fb",
+      "slide_count": 95
+    }
+  ],
+  "course_shape": {
+    "course": "软件建模与设计",
+    "source_ppt_count": 9,
+    "source_slide_count": 1035,
+    "theory_session_count": 16,
+    "practice_session_count": 16,
+    "theory_minutes_per_session": 120,
+    "practice_minutes_per_session": 120,
+    "courseware_contract_version": "1.1",
+    "practice_contract_version": "1.1"
+  },
+  "generator_evidence": {
+    "courseware_skill": "1.2.1",
+    "practice_skill": "1.2.0",
+    "note": "Versions are recorded from the release baseline used by the benchmark; this freeze does not upgrade or rerun either renderer."
+  },
+  "failure_findings": {
+    "status": "FAIL",
+    "theory": {
+      "all_sessions_slide_count": 8,
+      "layout_sequence": [
+        "hero",
+        "split",
+        "grid",
+        "timeline",
+        "focus",
+        "comparison",
+        "focus",
+        "default"
+      ],
+      "lecture_minutes": 61,
+      "activity_minutes": 59,
+      "blocks_per_session": 17,
+      "svg_count_per_session": 2,
+      "finding_codes": [
+        "WHOLE_COURSE_TEMPLATE_COLLAPSE",
+        "SCRIPT_CROSS_SESSION_TEMPLATE_REUSE"
+      ]
+    },
+    "practice": {
+      "task_count_per_session": 2,
+      "task_shape": [
+        "core/modeling/60",
+        "optional/analysis/60"
+      ],
+      "step_sequence": [
+        "read_prompt",
+        "model",
+        "review",
+        "choose_scenario",
+        "find_evidence",
+        "raise_risk"
+      ],
+      "finding_codes": [
+        "WHOLE_COURSE_PRACTICE_TEMPLATE_COLLAPSE"
+      ]
+    }
+  },
+  "artifact_sets": {
+    "source_manifest": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\source_manifest.json",
+        "relative_path": "source_manifest.json",
+        "bytes": 2232,
+        "sha256": "55ae61980b377026988caf67edb038da9659bd08b9c67a53a210486b39579562"
+      }
+    ],
+    "sessions": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\sessions.json",
+        "relative_path": "sessions.json",
+        "bytes": 23961,
+        "sha256": "6037e4af2238ab78d4e2d169d73f59143b2f757b541a8ae5c077583355a726bb"
+      }
+    ],
+    "courseware_contracts": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-01\\courseware.json",
+        "relative_path": "contracts/session-01/courseware.json",
+        "bytes": 63328,
+        "sha256": "985769434030ec960eada26ed07ce6d7e49ac99ce130e0c7f70454c9ca87d05a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-02\\courseware.json",
+        "relative_path": "contracts/session-02/courseware.json",
+        "bytes": 62685,
+        "sha256": "3af936a3bdc27b84da7c8ec9bd39f0c4966105352fb9d63fc97d3e3c5729b891"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-03\\courseware.json",
+        "relative_path": "contracts/session-03/courseware.json",
+        "bytes": 64438,
+        "sha256": "bed2852157b9b17888390e2ebc054c69a2df5b8bd6cdbe56f365e5d592300759"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-04\\courseware.json",
+        "relative_path": "contracts/session-04/courseware.json",
+        "bytes": 63558,
+        "sha256": "7f81d28f49be47f4bd7b6135c0edfddd7ca1c85877eb274ed8c6b1b5557f803a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-05\\courseware.json",
+        "relative_path": "contracts/session-05/courseware.json",
+        "bytes": 63142,
+        "sha256": "7d74c9478a858751668f122ccd28370917241ecb78cbfe71b9e8bc6c4358e10e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-06\\courseware.json",
+        "relative_path": "contracts/session-06/courseware.json",
+        "bytes": 63205,
+        "sha256": "bed9cf249452e186536c882865f61a855271715363653e6d54de201e22335df8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-07\\courseware.json",
+        "relative_path": "contracts/session-07/courseware.json",
+        "bytes": 64306,
+        "sha256": "7161ba25e6fe9f4e3fb63bca926aab5ea2da1ab7d1312ead8fb2a33b05c259eb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-08\\courseware.json",
+        "relative_path": "contracts/session-08/courseware.json",
+        "bytes": 64371,
+        "sha256": "ce5b1f7dd49813d9444a03ba8a2d6296e59e5c9955114d8f4399df6514e3684a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-09\\courseware.json",
+        "relative_path": "contracts/session-09/courseware.json",
+        "bytes": 62034,
+        "sha256": "815df3ece59f82913c3bbaa74e446795a6338c18e1a63794f0d0b8d51cdee945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-10\\courseware.json",
+        "relative_path": "contracts/session-10/courseware.json",
+        "bytes": 62182,
+        "sha256": "330f527fa2537ad370e61f9a4965f894be40f7f0bae9148c809f457ddfd7d836"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-11\\courseware.json",
+        "relative_path": "contracts/session-11/courseware.json",
+        "bytes": 60219,
+        "sha256": "22d98d62e4d469187e434d6e75fd056ce436f57896e0cb794ba216f6415f6523"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-12\\courseware.json",
+        "relative_path": "contracts/session-12/courseware.json",
+        "bytes": 62328,
+        "sha256": "cb6eec57b148fd7bbca77c4c04d432c36b83340c43aa6a6c51590896fedbef7e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-13\\courseware.json",
+        "relative_path": "contracts/session-13/courseware.json",
+        "bytes": 62053,
+        "sha256": "691a24c12bc91802d99b75dfb9a36d42bff0f3d25fde83d6632463f530aafc08"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-14\\courseware.json",
+        "relative_path": "contracts/session-14/courseware.json",
+        "bytes": 62581,
+        "sha256": "24563acb08394e133c269d09530513e86337ec4142db772d035c043106e0fb45"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-15\\courseware.json",
+        "relative_path": "contracts/session-15/courseware.json",
+        "bytes": 64011,
+        "sha256": "823ecb186b2b6cd5e82cd52a70eb69c3ff40b9ead6a450c70145755e7f93dbb9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-16\\courseware.json",
+        "relative_path": "contracts/session-16/courseware.json",
+        "bytes": 62970,
+        "sha256": "0982dfd7413507e5eb0a778299befb2f554a92ae7f557f72dcb05453248dc1a2"
+      }
+    ],
+    "practice_contracts": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-01\\practice.json",
+        "relative_path": "contracts/session-01/practice.json",
+        "bytes": 20278,
+        "sha256": "ed55aecb92b731776bfdffa461228b813efdf40123f359dfb87ea56ddfc8e87e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-02\\practice.json",
+        "relative_path": "contracts/session-02/practice.json",
+        "bytes": 20129,
+        "sha256": "2c3abb94ad2cb49ea354ed4d5a7d91113a5e070d7af39b9b80abe36a7e35ca29"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-03\\practice.json",
+        "relative_path": "contracts/session-03/practice.json",
+        "bytes": 20494,
+        "sha256": "a5fe5d994b71a879c05b09e1e30b18a793c3a5cc229383fd12da7aa8db3abd5b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-04\\practice.json",
+        "relative_path": "contracts/session-04/practice.json",
+        "bytes": 20177,
+        "sha256": "6ed356a6e4794c8007cd83e2d074dae9c9938ccae6c7d8a4affc75150b4f4d80"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-05\\practice.json",
+        "relative_path": "contracts/session-05/practice.json",
+        "bytes": 20386,
+        "sha256": "6f6bf72e1c39ebeeed72ec5da2c254970395cc9166dc065a70480667b3624059"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-06\\practice.json",
+        "relative_path": "contracts/session-06/practice.json",
+        "bytes": 20023,
+        "sha256": "9ad28e36733ff115e74ca06f03cddecffb817ac75e4c02593590fa7e38c55fb3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-07\\practice.json",
+        "relative_path": "contracts/session-07/practice.json",
+        "bytes": 20386,
+        "sha256": "8717e0fe119fa2e1a7a99eb8f45efdaa8ad764236011d9a811a493c370df153f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-08\\practice.json",
+        "relative_path": "contracts/session-08/practice.json",
+        "bytes": 20494,
+        "sha256": "0083af4541680cb4872cf899e89a96868792b0ffd7d3190cde6d0e44f81067ef"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-09\\practice.json",
+        "relative_path": "contracts/session-09/practice.json",
+        "bytes": 20051,
+        "sha256": "6f03e451d4522998cb0c342987ce9f6bfa2c0f7bc1b87262f82e3165869eac55"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-10\\practice.json",
+        "relative_path": "contracts/session-10/practice.json",
+        "bytes": 20013,
+        "sha256": "e8c8ef59b1a03e37f1266105bc17104ff690641668dd80558249ac547cf06047"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-11\\practice.json",
+        "relative_path": "contracts/session-11/practice.json",
+        "bytes": 19581,
+        "sha256": "432f9c0b5af84302e194e825870a5b516bc5e641d2c71688cafc2abf79dfc83c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-12\\practice.json",
+        "relative_path": "contracts/session-12/practice.json",
+        "bytes": 19987,
+        "sha256": "8af26d080dc43e94df8666c2fc580c6f1775bc2289b0944c6e0d23b4b2cd087e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-13\\practice.json",
+        "relative_path": "contracts/session-13/practice.json",
+        "bytes": 19931,
+        "sha256": "8030b7235f1e6baee5e7586725b375982f43c377815a75ea949387e3851973d9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-14\\practice.json",
+        "relative_path": "contracts/session-14/practice.json",
+        "bytes": 20092,
+        "sha256": "07ab8c34918b880b2ae8993b24c924b9a27c07043273316b1f8e67ca5fec42f0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-15\\practice.json",
+        "relative_path": "contracts/session-15/practice.json",
+        "bytes": 20286,
+        "sha256": "2630e052666c195678cca60abdff64a24c7cf1fb0586d922cbfba95164148507"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\contracts\\session-16\\practice.json",
+        "relative_path": "contracts/session-16/practice.json",
+        "bytes": 20114,
+        "sha256": "d8318e6f4669ceac9c10597352d60ddea85cff178cca134e5fed07a805431d9f"
+      }
+    ],
+    "courseware_rendered": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-01\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-01/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "ebb34b42307313f30d9ec0d8a247aee45a841d78dc8856c9dded0ff9c85525e1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-01\\qa-report.json",
+        "relative_path": "rendered/courseware/session-01/qa-report.json",
+        "bytes": 35716,
+        "sha256": "8cc4d752ebafdaef13059000a9d55018af4331b49236d9a4ed3f7d9659cd8495"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-01\\student.html",
+        "relative_path": "rendered/courseware/session-01/student.html",
+        "bytes": 28237,
+        "sha256": "1ed7926efef795599d6c8cc67c4f3f709c58da33f9303c374b178f62912764d3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-01\\teacher.html",
+        "relative_path": "rendered/courseware/session-01/teacher.html",
+        "bytes": 66384,
+        "sha256": "6a46984f82b0911fc03222b0ac07f579d02ff1d293b0de86283b9f2f29e5315d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-02\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-02/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "5e19382703121ce4764a033a878731ee8bc6e2fa2071b7384076f8561ad6b566"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-02\\qa-report.json",
+        "relative_path": "rendered/courseware/session-02/qa-report.json",
+        "bytes": 35733,
+        "sha256": "94261ed634b1174b09d197724cb15fb52a06ffc579cf9d35ab00363e03940f56"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-02\\student.html",
+        "relative_path": "rendered/courseware/session-02/student.html",
+        "bytes": 28099,
+        "sha256": "c1837946246254fabff674e6127b82277b4e80a4ee9944be4ef15bf39ec087f4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-02\\teacher.html",
+        "relative_path": "rendered/courseware/session-02/teacher.html",
+        "bytes": 65551,
+        "sha256": "024aa8659946e9169a8d07cf8d4b8ca535315e35a202b08067e9658c5843e65d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-03\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-03/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "c373e019affb7f1c30aefecdd8bb0c4269fb26ca430d9aa6f245b4861869c089"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-03\\qa-report.json",
+        "relative_path": "rendered/courseware/session-03/qa-report.json",
+        "bytes": 35763,
+        "sha256": "a177f0dc7d51b285e8c4a0029fb22849b4455145f34849f37e5c9d935ea3c23d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-03\\student.html",
+        "relative_path": "rendered/courseware/session-03/student.html",
+        "bytes": 28461,
+        "sha256": "79f849f3756224bc6e96cde75d3d3efa1ed894519aa6d938bcc6a3f41d2506b3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-03\\teacher.html",
+        "relative_path": "rendered/courseware/session-03/teacher.html",
+        "bytes": 67514,
+        "sha256": "1ee8afbca05ec17ea7be157a571aa7f82e5d56b54dc821f9bcea6f142d18e571"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-04\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-04/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "3f0f2e22cdba42ba87e2ac5fb38114eb5e17acdafe82d20d727f0e89c6ce8bbf"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-04\\qa-report.json",
+        "relative_path": "rendered/courseware/session-04/qa-report.json",
+        "bytes": 35993,
+        "sha256": "987f8018c9f74e12a1dc99fca6a2bef33e437293b6e9c0c677f5d82c5172e4ab"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-04\\student.html",
+        "relative_path": "rendered/courseware/session-04/student.html",
+        "bytes": 28169,
+        "sha256": "e288be77b711022a1f486b5dcd6f4a8a6826237feaa8233deedd94050f700d21"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-04\\teacher.html",
+        "relative_path": "rendered/courseware/session-04/teacher.html",
+        "bytes": 67118,
+        "sha256": "b697986e7eaa32616c95453eeb54a996bdeb9d7bd8a6d7f180bc937acde85e47"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-05\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-05/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "236a8b6d384ee431ef16aa7ac5ac924c3f67878953d79c6b7ec2e7107489a65b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-05\\qa-report.json",
+        "relative_path": "rendered/courseware/session-05/qa-report.json",
+        "bytes": 35760,
+        "sha256": "4a6fe78cb66f5c75982824985a1b58c33dee3fb2a1f4cf1bbdf8f6dced55c0c1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-05\\student.html",
+        "relative_path": "rendered/courseware/session-05/student.html",
+        "bytes": 28240,
+        "sha256": "cef27312b407b43c0d8b6c1e1de7b249cc980590c23e37de1988778cef31760f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-05\\teacher.html",
+        "relative_path": "rendered/courseware/session-05/teacher.html",
+        "bytes": 66137,
+        "sha256": "a484dc41991fe68de34e37e5a6fdac4a3593f9943f4946652e0cb8b431eb2d4e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-06\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-06/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "a8ed471b2c7230082a80ff707191d432fc7feb38bc32606d62558a542bf0fff4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-06\\qa-report.json",
+        "relative_path": "rendered/courseware/session-06/qa-report.json",
+        "bytes": 31844,
+        "sha256": "2b618bce661f71db4f338e21b8fdf99081a82443ac5635447fcd94ebd4bf035b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-06\\student.html",
+        "relative_path": "rendered/courseware/session-06/student.html",
+        "bytes": 28215,
+        "sha256": "f498903ccfc9c3c1a6ba0be2d0064a1bbdce15a329d1595e66f7b57daec94b60"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-06\\teacher.html",
+        "relative_path": "rendered/courseware/session-06/teacher.html",
+        "bytes": 67269,
+        "sha256": "adb69f9d6001ac715074af2c3b37a1046bb1a442c8527d836d5dab6c6d0b15cc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-07\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-07/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "bb9e7444c97e4c122239849a9b12e3e4852c56abeada75ee3b0ace13590b025a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-07\\qa-report.json",
+        "relative_path": "rendered/courseware/session-07/qa-report.json",
+        "bytes": 36112,
+        "sha256": "fd029b48cffdfa105887ce9730fcae2d6c1e3f12838b921e331df9a7f76d722d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-07\\student.html",
+        "relative_path": "rendered/courseware/session-07/student.html",
+        "bytes": 28398,
+        "sha256": "480fc5f03e90a61f56184c11a637e82ede2e9b57f0e54c1f21a4d369caed0510"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-07\\teacher.html",
+        "relative_path": "rendered/courseware/session-07/teacher.html",
+        "bytes": 67057,
+        "sha256": "3932843929c6892c7c7c53ceba2199f1058149c9f1a71467ba924e04514e5484"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-08\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-08/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "d0cea2dd46d618a4f3e1b8cb7b848946cc23ac1e7065230da9601d076ef754e2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-08\\qa-report.json",
+        "relative_path": "rendered/courseware/session-08/qa-report.json",
+        "bytes": 35915,
+        "sha256": "8d42a26254bb7af59749af2e5cabc703b643de30eb25a991bb6f60d684815bb3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-08\\student.html",
+        "relative_path": "rendered/courseware/session-08/student.html",
+        "bytes": 28473,
+        "sha256": "c7283b7aa8c3f553f46acc10f4881e3d554d5712e08d36d39793c06c6f7ec586"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-08\\teacher.html",
+        "relative_path": "rendered/courseware/session-08/teacher.html",
+        "bytes": 67159,
+        "sha256": "800549ea198e836c2ece9cc490204550c1856c077c07663d816484e0559e1617"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-09\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-09/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "9c8b21f8210f4cb5b83accd5a491030162d34f455c9aa339bd9f52772355370d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-09\\qa-report.json",
+        "relative_path": "rendered/courseware/session-09/qa-report.json",
+        "bytes": 31678,
+        "sha256": "334ab3d88ed1d244198e3464225175d38179021417d6c8f1ea2563d2c7e22ef0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-09\\student.html",
+        "relative_path": "rendered/courseware/session-09/student.html",
+        "bytes": 28266,
+        "sha256": "75c810f98873ee741b5d0157ffc32ddb56c5fe54e56ff1659fe03353605dd57e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-09\\teacher.html",
+        "relative_path": "rendered/courseware/session-09/teacher.html",
+        "bytes": 66388,
+        "sha256": "ddbd0f4a4b41cfb2f97b1a50c02eb9de2c6eea4688497b17caed3f6a9e407413"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-10\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-10/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "da3e546c4c60fd7c98c2c03bd19cdccd16165e2f301c3ef11790afe8350d18cd"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-10\\qa-report.json",
+        "relative_path": "rendered/courseware/session-10/qa-report.json",
+        "bytes": 31703,
+        "sha256": "7c0145fd0fc3fb8b2fdf8e45bb41cbebd09146aa256a4239751f89b17aebcc63"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-10\\student.html",
+        "relative_path": "rendered/courseware/session-10/student.html",
+        "bytes": 28270,
+        "sha256": "41874ef44d11270fa801dc7fdaa748936a6899ed8a1b256638fad8dc9f45526e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-10\\teacher.html",
+        "relative_path": "rendered/courseware/session-10/teacher.html",
+        "bytes": 66323,
+        "sha256": "5f30921b30d99a35d7ac8ce23fe8328d0c679a2fd575e10193d1d19baf8d70a6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-11\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-11/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "3ea7b132a1afdd215cd5d1f38e678e85420fdb3e1c1ccc1b06adfe06ae53e9ce"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-11\\qa-report.json",
+        "relative_path": "rendered/courseware/session-11/qa-report.json",
+        "bytes": 31495,
+        "sha256": "9610c57d088969ae7d6bb95e2e5474e5e6e05df1c30514ca3aa9a1c2d5e74cd9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-11\\student.html",
+        "relative_path": "rendered/courseware/session-11/student.html",
+        "bytes": 27845,
+        "sha256": "ef73ce03aa686a3fc3daee754f43e7a6737331eec969161aebbe4b105dbc7d0e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-11\\teacher.html",
+        "relative_path": "rendered/courseware/session-11/teacher.html",
+        "bytes": 64979,
+        "sha256": "359bac1c8b3de5d4a2bbc7a4993464ab6565f9cd020c439427b8c19c4f7f304e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-12\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-12/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "31be2ea69f98371b9307a06a0d7136e1216522035f2dff6a7180a020b6a403af"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-12\\qa-report.json",
+        "relative_path": "rendered/courseware/session-12/qa-report.json",
+        "bytes": 31654,
+        "sha256": "1589f5a9888bb115aa7dbb2fbac69a2f0ac66bf6737433b085a829fddf692ddb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-12\\student.html",
+        "relative_path": "rendered/courseware/session-12/student.html",
+        "bytes": 28238,
+        "sha256": "b5c291f2f53a04004ed2d1b43e9b032d259ba64213aa82cfecf78103f39b18e9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-12\\teacher.html",
+        "relative_path": "rendered/courseware/session-12/teacher.html",
+        "bytes": 66530,
+        "sha256": "5563269a76dd77ab63f27ecd83e898a8ee9f5b54e3f93ac0a436a3b5a1e120e6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-13\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-13/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "b93f359d284aecc88722174e76ed787e71721807c6d7f3cb04fd7e7e52c0f787"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-13\\qa-report.json",
+        "relative_path": "rendered/courseware/session-13/qa-report.json",
+        "bytes": 31554,
+        "sha256": "93aa8f5864bba7aed4123baa8100a74f4d06b7bfaf007bcb74404fb5bb7bd2cc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-13\\student.html",
+        "relative_path": "rendered/courseware/session-13/student.html",
+        "bytes": 28171,
+        "sha256": "b217e2c589762038fb295b6c9d9d0559f4acc3381e983cb7f5a84b9b608ccaf2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-13\\teacher.html",
+        "relative_path": "rendered/courseware/session-13/teacher.html",
+        "bytes": 66438,
+        "sha256": "2e09cf214257216e325a632d6da4c31b94519f7e86bd845fea40abeb5020a46d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-14\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-14/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "0af632423df3eb4ae2aca1d5d0cc0557e1926894a80b20615248346e979c62fa"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-14\\qa-report.json",
+        "relative_path": "rendered/courseware/session-14/qa-report.json",
+        "bytes": 31625,
+        "sha256": "bf61f158ffcb6efbdf3ae08228925d10988fc794d8049c2200a540a3dc36d76c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-14\\student.html",
+        "relative_path": "rendered/courseware/session-14/student.html",
+        "bytes": 28300,
+        "sha256": "7947945956d7acf3afbb11c2cf570a7250eac48ce584e1da130270395175a75e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-14\\teacher.html",
+        "relative_path": "rendered/courseware/session-14/teacher.html",
+        "bytes": 66731,
+        "sha256": "d2a551bb8827df2772abc078862f04e4dfd21252aec6777e3187255d56c4c3aa"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-15\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-15/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "27d98ceece6d6176f834d78bf1086e3bda303b94afd2fa9ca2dd394f592626eb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-15\\qa-report.json",
+        "relative_path": "rendered/courseware/session-15/qa-report.json",
+        "bytes": 32018,
+        "sha256": "6dff52e43c19bbc7a77457b9aab81391d2b62faa9fa38a7fa7df23d3316cc997"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-15\\student.html",
+        "relative_path": "rendered/courseware/session-15/student.html",
+        "bytes": 28497,
+        "sha256": "dac44380938f3668438b384e7ce7c6fc0a830f87b816ce1d85a754411cbf63d5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-15\\teacher.html",
+        "relative_path": "rendered/courseware/session-15/teacher.html",
+        "bytes": 67947,
+        "sha256": "848a3056c31c2ef7f1f6341a30c4d884ca4f0fd0c803db8d0a7c97868903fc27"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-16\\generation-provenance.json",
+        "relative_path": "rendered/courseware/session-16/generation-provenance.json",
+        "bytes": 86239,
+        "sha256": "1eef98823f2c7794335b1396a2bd9889898eeaf8af9413cea9011c2e0282f4c5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-16\\qa-report.json",
+        "relative_path": "rendered/courseware/session-16/qa-report.json",
+        "bytes": 31636,
+        "sha256": "f440800f3036ba30b59b444fbb4360271e46ef44a53cb6a5da4cdcd9311ba2ca"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-16\\student.html",
+        "relative_path": "rendered/courseware/session-16/student.html",
+        "bytes": 28306,
+        "sha256": "8d84def71306a4ff9f42fd28017aa31728ff3ad35168892b11f7ed4f12e2a2a7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\courseware\\session-16\\teacher.html",
+        "relative_path": "rendered/courseware/session-16/teacher.html",
+        "bytes": 66692,
+        "sha256": "537217a77b41d8817f59176aadd4b180febc96c203ab1fd72f414a7b27ef867c"
+      }
+    ],
+    "practice_rendered": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-01/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-01/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-01/generation-provenance.json",
+        "bytes": 36194,
+        "sha256": "b6ef73091ad923455ecd3d309185e429d96e0d7af8b41062ad28667e14a132ee"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\practice-content.json",
+        "relative_path": "rendered/practice/session-01/practice-content.json",
+        "bytes": 19697,
+        "sha256": "92834da8f51ef708a2359359f3bb20388dc49d032b3e822c7a64c1f1e2e12373"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\qa-report.json",
+        "relative_path": "rendered/practice/session-01/qa-report.json",
+        "bytes": 37130,
+        "sha256": "f6f848fb87e5c98a623fdd02622d3e1772e696a57a27fd6b27a9788edd65796f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-01/student/foundation-kit.html",
+        "bytes": 35600,
+        "sha256": "963b89a5a092d65f10528358f1b8130502716b1c2ca88b6d125a084fb7b01f6c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-01/student/learning-center.html",
+        "bytes": 42016,
+        "sha256": "ef6e065d73e59d946867024a719b2dfd74a9fd3e76389e911b408c326f8255cb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student\\starter\\s01-core.drawio",
+        "relative_path": "rendered/practice/session-01/student/starter/s01-core.drawio",
+        "bytes": 879,
+        "sha256": "ef179174255cd68637722257ce67c1d802f2fc4da42f075413ba11aab7eb2bab"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-01/student/student-task.html",
+        "bytes": 40770,
+        "sha256": "f87685b0a4d190d764289cef19647005e268ca3eaa62b77e0215125bd99a5fb2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-01/student/study-guide.html",
+        "bytes": 36401,
+        "sha256": "7a5bd86f2b72d23057412b8543d917f2f9944e662c8e079f6314fe5b3f0d3933"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-01/student-package/practice-content.json",
+        "bytes": 13015,
+        "sha256": "de4e2d3782cbd0069135e77933857dda323245ee40567816cf280fbca2ea473c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-01/student-package/student/foundation-kit.html",
+        "bytes": 35600,
+        "sha256": "963b89a5a092d65f10528358f1b8130502716b1c2ca88b6d125a084fb7b01f6c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-01/student-package/student/learning-center.html",
+        "bytes": 42016,
+        "sha256": "ef6e065d73e59d946867024a719b2dfd74a9fd3e76389e911b408c326f8255cb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\student\\starter\\s01-core.drawio",
+        "relative_path": "rendered/practice/session-01/student-package/student/starter/s01-core.drawio",
+        "bytes": 879,
+        "sha256": "ef179174255cd68637722257ce67c1d802f2fc4da42f075413ba11aab7eb2bab"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-01/student-package/student/student-task.html",
+        "bytes": 40770,
+        "sha256": "f87685b0a4d190d764289cef19647005e268ca3eaa62b77e0215125bd99a5fb2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-01/student-package/student/study-guide.html",
+        "bytes": 36401,
+        "sha256": "7a5bd86f2b72d23057412b8543d917f2f9944e662c8e079f6314fe5b3f0d3933"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-01/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-01/teacher/teacher-guide.html",
+        "bytes": 38299,
+        "sha256": "7d7fdc045b3641d89cd5f9961f022217c98cc72ac3b4bd785b14237e065fb27e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-01/teacher/teacher-reference.html",
+        "bytes": 38680,
+        "sha256": "475ce9b22c87dea8b48ce9b2d2361d15ba6ea03cb635545f477f17d46f1aaf44"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-01/teacher-package/full-practice-content.json",
+        "bytes": 19697,
+        "sha256": "92834da8f51ef708a2359359f3bb20388dc49d032b3e822c7a64c1f1e2e12373"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-01/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "f6f848fb87e5c98a623fdd02622d3e1772e696a57a27fd6b27a9788edd65796f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher-package\\reference\\s01-core.drawio",
+        "relative_path": "rendered/practice/session-01/teacher-package/reference/s01-core.drawio",
+        "bytes": 886,
+        "sha256": "1ec5233114893741ba903a173d48a3d6db2d59e056e310f847f74335c2d7db0f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-01/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38299,
+        "sha256": "7d7fdc045b3641d89cd5f9961f022217c98cc72ac3b4bd785b14237e065fb27e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-01\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-01/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38680,
+        "sha256": "475ce9b22c87dea8b48ce9b2d2361d15ba6ea03cb635545f477f17d46f1aaf44"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-02/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-02/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-02/generation-provenance.json",
+        "bytes": 36194,
+        "sha256": "a20e6cc3f0a3faac2ba6f2cd9e9e16e4f87bd85d1c030763c4de610d424998ff"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\practice-content.json",
+        "relative_path": "rendered/practice/session-02/practice-content.json",
+        "bytes": 19548,
+        "sha256": "bbc7e41cfd1c527aec30916926757f902243b7093a04628607e226950c4cf904"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\qa-report.json",
+        "relative_path": "rendered/practice/session-02/qa-report.json",
+        "bytes": 37130,
+        "sha256": "d7803f172df05f2e0736e44ae8d7be070d9a56fa7d9bb020b899339ac855216f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-02/student/foundation-kit.html",
+        "bytes": 35598,
+        "sha256": "e00c53b6bb07ed7238f0da1d4c90dfbbfcad7885c88c63ebc6cf658670e72ad8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-02/student/learning-center.html",
+        "bytes": 41943,
+        "sha256": "cc1ab23aa881167466abb0dcc32a1f8389cb581c2b8aacd5ad17241f1e103bf6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student\\starter\\s02-core.drawio",
+        "relative_path": "rendered/practice/session-02/student/starter/s02-core.drawio",
+        "bytes": 878,
+        "sha256": "8145c9592aa7a8e6298c67e66d5af4b2c85a6f8fe86df3727d0b30dcdc4fcd90"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-02/student/student-task.html",
+        "bytes": 40761,
+        "sha256": "9c6c3f6b31fb90d11b59d5d235ce4fff585d71ec38ad15f3d232b2959bc03eec"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-02/student/study-guide.html",
+        "bytes": 36377,
+        "sha256": "c656826978b9f7f8756e6fef716808ac438f4cf789e1214113a030a41d720ebb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-02/student-package/practice-content.json",
+        "bytes": 12947,
+        "sha256": "bef43194066920fba19bb807d3d2754b9bbba8135a2b052bfd0d397dbd4ca391"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-02/student-package/student/foundation-kit.html",
+        "bytes": 35598,
+        "sha256": "e00c53b6bb07ed7238f0da1d4c90dfbbfcad7885c88c63ebc6cf658670e72ad8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-02/student-package/student/learning-center.html",
+        "bytes": 41943,
+        "sha256": "cc1ab23aa881167466abb0dcc32a1f8389cb581c2b8aacd5ad17241f1e103bf6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\student\\starter\\s02-core.drawio",
+        "relative_path": "rendered/practice/session-02/student-package/student/starter/s02-core.drawio",
+        "bytes": 878,
+        "sha256": "8145c9592aa7a8e6298c67e66d5af4b2c85a6f8fe86df3727d0b30dcdc4fcd90"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-02/student-package/student/student-task.html",
+        "bytes": 40761,
+        "sha256": "9c6c3f6b31fb90d11b59d5d235ce4fff585d71ec38ad15f3d232b2959bc03eec"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-02/student-package/student/study-guide.html",
+        "bytes": 36377,
+        "sha256": "c656826978b9f7f8756e6fef716808ac438f4cf789e1214113a030a41d720ebb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-02/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-02/teacher/teacher-guide.html",
+        "bytes": 38287,
+        "sha256": "165a37a5c4e195f48bbd7c7042bdbbd829cff31ae61e26594f400de4e69f935e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-02/teacher/teacher-reference.html",
+        "bytes": 38599,
+        "sha256": "bf92831f05ff0aa54bc0c34f4eaba969bb999a4aa6741377928840bc279d30c2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-02/teacher-package/full-practice-content.json",
+        "bytes": 19548,
+        "sha256": "bbc7e41cfd1c527aec30916926757f902243b7093a04628607e226950c4cf904"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-02/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "d7803f172df05f2e0736e44ae8d7be070d9a56fa7d9bb020b899339ac855216f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher-package\\reference\\s02-core.drawio",
+        "relative_path": "rendered/practice/session-02/teacher-package/reference/s02-core.drawio",
+        "bytes": 885,
+        "sha256": "d55b93418faa80f6760c086a2c691bd3adcfdfc9878545c452256369f4a6ab6f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-02/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38287,
+        "sha256": "165a37a5c4e195f48bbd7c7042bdbbd829cff31ae61e26594f400de4e69f935e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-02\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-02/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38599,
+        "sha256": "bf92831f05ff0aa54bc0c34f4eaba969bb999a4aa6741377928840bc279d30c2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-03/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-03/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-03/generation-provenance.json",
+        "bytes": 39524,
+        "sha256": "59e525e19bf9a9ad32c433e8c6b20c108645e19dbb4c17e9e55d5d1664fa1094"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\practice-content.json",
+        "relative_path": "rendered/practice/session-03/practice-content.json",
+        "bytes": 19913,
+        "sha256": "f67cfe7510ed19fe040cbc65f9c385ee7773c85f66c721545a2442ce606fd407"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\qa-report.json",
+        "relative_path": "rendered/practice/session-03/qa-report.json",
+        "bytes": 37130,
+        "sha256": "251b70d64b08380d0324236c51dae79e0c2425c41e12bef0a3e0f01a9a73691a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-03/student/foundation-kit.html",
+        "bytes": 35614,
+        "sha256": "b413d57489fa828a8f155d64e3c996e65fab7ac5faa30b7942f7068ca8db8e3e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-03/student/learning-center.html",
+        "bytes": 42084,
+        "sha256": "5ef1f6d410418b7f35eedf4f922015c124afb992dc53e7398f9bce74d19b2713"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student\\starter\\s03-core.drawio",
+        "relative_path": "rendered/practice/session-03/student/starter/s03-core.drawio",
+        "bytes": 886,
+        "sha256": "246e8f6613b0ceb0ebe89ee11614fd0da63bb28c9a77b157db753dc33d07c351"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-03/student/student-task.html",
+        "bytes": 40824,
+        "sha256": "ff6bc79b4d9905798ed698f68dbb48b58bbaf18de622b3c4d51d297c22700aff"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-03/student/study-guide.html",
+        "bytes": 36515,
+        "sha256": "4aad370fb9aa697f195f399cc905130447f97a000617e6589b88e78b61eab4d3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-03/student-package/practice-content.json",
+        "bytes": 13103,
+        "sha256": "7b80659f546e87d9272d4b6ed546dbdaf79a7e80f62a2b91462dc10e1993e17a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-03/student-package/student/foundation-kit.html",
+        "bytes": 35614,
+        "sha256": "b413d57489fa828a8f155d64e3c996e65fab7ac5faa30b7942f7068ca8db8e3e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-03/student-package/student/learning-center.html",
+        "bytes": 42084,
+        "sha256": "5ef1f6d410418b7f35eedf4f922015c124afb992dc53e7398f9bce74d19b2713"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\student\\starter\\s03-core.drawio",
+        "relative_path": "rendered/practice/session-03/student-package/student/starter/s03-core.drawio",
+        "bytes": 886,
+        "sha256": "246e8f6613b0ceb0ebe89ee11614fd0da63bb28c9a77b157db753dc33d07c351"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-03/student-package/student/student-task.html",
+        "bytes": 40824,
+        "sha256": "ff6bc79b4d9905798ed698f68dbb48b58bbaf18de622b3c4d51d297c22700aff"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-03/student-package/student/study-guide.html",
+        "bytes": 36515,
+        "sha256": "4aad370fb9aa697f195f399cc905130447f97a000617e6589b88e78b61eab4d3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-03/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-03/teacher/teacher-guide.html",
+        "bytes": 38394,
+        "sha256": "68c0befdded5de8493b90a0b3152ec1fd58d1bf0e5248a8a3262ef492bf93937"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-03/teacher/teacher-reference.html",
+        "bytes": 38797,
+        "sha256": "5963fb1248c1f4035b0914bae0011855ac9ec882982f11b98bc2bdc17b759805"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-03/teacher-package/full-practice-content.json",
+        "bytes": 19913,
+        "sha256": "f67cfe7510ed19fe040cbc65f9c385ee7773c85f66c721545a2442ce606fd407"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-03/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "251b70d64b08380d0324236c51dae79e0c2425c41e12bef0a3e0f01a9a73691a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher-package\\reference\\s03-core.drawio",
+        "relative_path": "rendered/practice/session-03/teacher-package/reference/s03-core.drawio",
+        "bytes": 893,
+        "sha256": "58846b32a5207ded8eb0aebab16b9aca014b9120a5e3c4041ca8a3af65b1f145"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-03/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38394,
+        "sha256": "68c0befdded5de8493b90a0b3152ec1fd58d1bf0e5248a8a3262ef492bf93937"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-03\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-03/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38797,
+        "sha256": "5963fb1248c1f4035b0914bae0011855ac9ec882982f11b98bc2bdc17b759805"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-04/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-04/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-04/generation-provenance.json",
+        "bytes": 42854,
+        "sha256": "0d0a5828b9e612f2d08e9d1bc763dfdf2213cbc4d5bbfb3656b6afe6fd1bb64f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\practice-content.json",
+        "relative_path": "rendered/practice/session-04/practice-content.json",
+        "bytes": 19596,
+        "sha256": "a6b0cb6cdff4bbdf56c2221b7cbc03192fba4461192367fdc2907229ff55e62c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\qa-report.json",
+        "relative_path": "rendered/practice/session-04/qa-report.json",
+        "bytes": 37130,
+        "sha256": "28925118b76994360eddbbfae4b9550fb575da22b2182e57627a9eb166b5bc6c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-04/student/foundation-kit.html",
+        "bytes": 35590,
+        "sha256": "91becc6bc2bf3b25ab8cf76fc40ae255f5afcbc58b8c8a20040bd3945e5fb630"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-04/student/learning-center.html",
+        "bytes": 41949,
+        "sha256": "e7b6f416d0c59172c850a7bb866407bdade1eebcfcd40ab19c98e1f33d408cb3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student\\starter\\s04-core.drawio",
+        "relative_path": "rendered/practice/session-04/student/starter/s04-core.drawio",
+        "bytes": 874,
+        "sha256": "df525964dfd2e99f3296be799d69290c01386195a706f892f347dad19f214c61"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-04/student/student-task.html",
+        "bytes": 40719,
+        "sha256": "04e3a45b238b3df7f023816d2e9ed7c8691af88d7331e68a5d25c05a846123f1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-04/student/study-guide.html",
+        "bytes": 36379,
+        "sha256": "5a84fa07f5bdc3530e5ae6725fed144c0016e9a8b09ebba60d484e2db544bfcc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-04/student-package/practice-content.json",
+        "bytes": 12955,
+        "sha256": "4df2340c6cf4b6d16f7bd0c0fd4e97a5fd5fda872d6a6e91b5ba86d3ae6e5f3a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-04/student-package/student/foundation-kit.html",
+        "bytes": 35590,
+        "sha256": "91becc6bc2bf3b25ab8cf76fc40ae255f5afcbc58b8c8a20040bd3945e5fb630"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-04/student-package/student/learning-center.html",
+        "bytes": 41949,
+        "sha256": "e7b6f416d0c59172c850a7bb866407bdade1eebcfcd40ab19c98e1f33d408cb3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\student\\starter\\s04-core.drawio",
+        "relative_path": "rendered/practice/session-04/student-package/student/starter/s04-core.drawio",
+        "bytes": 874,
+        "sha256": "df525964dfd2e99f3296be799d69290c01386195a706f892f347dad19f214c61"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-04/student-package/student/student-task.html",
+        "bytes": 40719,
+        "sha256": "04e3a45b238b3df7f023816d2e9ed7c8691af88d7331e68a5d25c05a846123f1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-04/student-package/student/study-guide.html",
+        "bytes": 36379,
+        "sha256": "5a84fa07f5bdc3530e5ae6725fed144c0016e9a8b09ebba60d484e2db544bfcc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-04/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-04/teacher/teacher-guide.html",
+        "bytes": 38255,
+        "sha256": "c01be8676c9b85329f8276ee6f5ab8d02bfcabb6067d9f22b83f61e5eebf348f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-04/teacher/teacher-reference.html",
+        "bytes": 38623,
+        "sha256": "ff34c161e8c73a4485b95ed94544bd6148669af1b699ee5e3912a4ec421fa3e7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-04/teacher-package/full-practice-content.json",
+        "bytes": 19596,
+        "sha256": "a6b0cb6cdff4bbdf56c2221b7cbc03192fba4461192367fdc2907229ff55e62c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-04/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "28925118b76994360eddbbfae4b9550fb575da22b2182e57627a9eb166b5bc6c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher-package\\reference\\s04-core.drawio",
+        "relative_path": "rendered/practice/session-04/teacher-package/reference/s04-core.drawio",
+        "bytes": 881,
+        "sha256": "e716f5a8a2a192119c7122a6da600878cfdddd8bc1f938c5e97c70f6c02c0f78"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-04/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38255,
+        "sha256": "c01be8676c9b85329f8276ee6f5ab8d02bfcabb6067d9f22b83f61e5eebf348f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-04\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-04/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38623,
+        "sha256": "ff34c161e8c73a4485b95ed94544bd6148669af1b699ee5e3912a4ec421fa3e7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-05/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-05/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-05/generation-provenance.json",
+        "bytes": 46184,
+        "sha256": "983330fe46bfc2084fd8c0e09618d968f785b047e7a1ada3debe27bd99408f7e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\practice-content.json",
+        "relative_path": "rendered/practice/session-05/practice-content.json",
+        "bytes": 19805,
+        "sha256": "4de292fb84edd90754b80825a77b706c57ce9e5dd683fcfa194430e0e21b6810"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\qa-report.json",
+        "relative_path": "rendered/practice/session-05/qa-report.json",
+        "bytes": 37130,
+        "sha256": "a56004822d38988722c0903f602f8c537a0b18270e3cb7d0c5ebffb09f0b70d2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-05/student/foundation-kit.html",
+        "bytes": 35620,
+        "sha256": "ba033a3a45017245d19f13f7e1d57c781a2dc9204302feabefa4e5511bce10dc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-05/student/learning-center.html",
+        "bytes": 42078,
+        "sha256": "5a6fb0fc4e5b8f24afae1018738847055c6a30989f3f6addb61c44fdc739849f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student\\starter\\s05-core.drawio",
+        "relative_path": "rendered/practice/session-05/student/starter/s05-core.drawio",
+        "bytes": 889,
+        "sha256": "aa2644ddb356a9bf214c9d77220c454880103a9eed518edb7f676b4bc660ff0f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-05/student/student-task.html",
+        "bytes": 40881,
+        "sha256": "dc264f3263f9de8d306ec6fb5052eb6ff6d0345ffbb2ff12889c6da3a83e0141"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-05/student/study-guide.html",
+        "bytes": 36500,
+        "sha256": "84c9d59b74c168b01012584883b4cc0595935b2348e4e4051fc31696e5595ebe"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-05/student-package/practice-content.json",
+        "bytes": 13072,
+        "sha256": "9c7b046d85c12d9fd594005f4495adc4ec663f4f40832ed645a9cb2e9276bd8e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-05/student-package/student/foundation-kit.html",
+        "bytes": 35620,
+        "sha256": "ba033a3a45017245d19f13f7e1d57c781a2dc9204302feabefa4e5511bce10dc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-05/student-package/student/learning-center.html",
+        "bytes": 42078,
+        "sha256": "5a6fb0fc4e5b8f24afae1018738847055c6a30989f3f6addb61c44fdc739849f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\student\\starter\\s05-core.drawio",
+        "relative_path": "rendered/practice/session-05/student-package/student/starter/s05-core.drawio",
+        "bytes": 889,
+        "sha256": "aa2644ddb356a9bf214c9d77220c454880103a9eed518edb7f676b4bc660ff0f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-05/student-package/student/student-task.html",
+        "bytes": 40881,
+        "sha256": "dc264f3263f9de8d306ec6fb5052eb6ff6d0345ffbb2ff12889c6da3a83e0141"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-05/student-package/student/study-guide.html",
+        "bytes": 36500,
+        "sha256": "84c9d59b74c168b01012584883b4cc0595935b2348e4e4051fc31696e5595ebe"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-05/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-05/teacher/teacher-guide.html",
+        "bytes": 38391,
+        "sha256": "3bc97539e96c085e2a149d567aaf604a570e5ccacd122a37300854634e2ee938"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-05/teacher/teacher-reference.html",
+        "bytes": 38759,
+        "sha256": "2c5f560c5d3bf0ce6ffdd9b1bee3f2fbc39b1048eceb376fc846774ecef3f48f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-05/teacher-package/full-practice-content.json",
+        "bytes": 19805,
+        "sha256": "4de292fb84edd90754b80825a77b706c57ce9e5dd683fcfa194430e0e21b6810"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-05/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "a56004822d38988722c0903f602f8c537a0b18270e3cb7d0c5ebffb09f0b70d2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher-package\\reference\\s05-core.drawio",
+        "relative_path": "rendered/practice/session-05/teacher-package/reference/s05-core.drawio",
+        "bytes": 896,
+        "sha256": "85b13cb71daa10d9e79b41453751f5f23c04fd8c3b6cd511fc66cc575c025e20"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-05/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38391,
+        "sha256": "3bc97539e96c085e2a149d567aaf604a570e5ccacd122a37300854634e2ee938"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-05\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-05/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38759,
+        "sha256": "2c5f560c5d3bf0ce6ffdd9b1bee3f2fbc39b1048eceb376fc846774ecef3f48f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-06/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-06/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-06/generation-provenance.json",
+        "bytes": 49514,
+        "sha256": "cf07d177fd906752021917531ee720e7644b445f67a938ceb9742930b22cefac"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\practice-content.json",
+        "relative_path": "rendered/practice/session-06/practice-content.json",
+        "bytes": 19453,
+        "sha256": "43ca210e0cba86df991a0acd8af6edf08feee8f5ad882f475e1c080330ba6eb1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\qa-report.json",
+        "relative_path": "rendered/practice/session-06/qa-report.json",
+        "bytes": 28253,
+        "sha256": "4c9c3d0b119ab42f887cf2c86f7d9ea41841ad01fe1d6ed644bbfdbf0ac40f46"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-06/student/foundation-kit.html",
+        "bytes": 35584,
+        "sha256": "ad435a2d8c27422105a6a1b89a43a2410975ebde2f6612f5ca702dd83f0f418b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-06/student/learning-center.html",
+        "bytes": 41915,
+        "sha256": "76a56dc3768cf4162322f1f00c0c00c783edd7702e6dc03a14579a1206449c56"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student\\starter\\s06-core.drawio",
+        "relative_path": "rendered/practice/session-06/student/starter/s06-core.drawio",
+        "bytes": 871,
+        "sha256": "e6da98f1cc22098541026b027bb4ba418d794f595a1e6c2d61aeace1969bf1d5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-06/student/student-task.html",
+        "bytes": 40704,
+        "sha256": "8d5921226716f8333c1dafd5fbc5cdfff763e64e67a934e16309772f75d3e30a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-06/student/study-guide.html",
+        "bytes": 36387,
+        "sha256": "9bae44f4755ca56774a95a70c06e7e3614296b66897f75ab412a285427243db8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-06/student-package/practice-content.json",
+        "bytes": 12986,
+        "sha256": "387841ecf1084d4250635a5b169fb8c25165549488a8cf52d2a92cdb8c2f1019"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-06/student-package/student/foundation-kit.html",
+        "bytes": 35584,
+        "sha256": "ad435a2d8c27422105a6a1b89a43a2410975ebde2f6612f5ca702dd83f0f418b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-06/student-package/student/learning-center.html",
+        "bytes": 41915,
+        "sha256": "76a56dc3768cf4162322f1f00c0c00c783edd7702e6dc03a14579a1206449c56"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\student\\starter\\s06-core.drawio",
+        "relative_path": "rendered/practice/session-06/student-package/student/starter/s06-core.drawio",
+        "bytes": 871,
+        "sha256": "e6da98f1cc22098541026b027bb4ba418d794f595a1e6c2d61aeace1969bf1d5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-06/student-package/student/student-task.html",
+        "bytes": 40704,
+        "sha256": "8d5921226716f8333c1dafd5fbc5cdfff763e64e67a934e16309772f75d3e30a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-06/student-package/student/study-guide.html",
+        "bytes": 36387,
+        "sha256": "9bae44f4755ca56774a95a70c06e7e3614296b66897f75ab412a285427243db8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-06/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-06/teacher/teacher-guide.html",
+        "bytes": 38237,
+        "sha256": "0e9d943838e8c281f7139875f780e3f8da75e934b3d6201aa43de700da9a84a6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-06/teacher/teacher-reference.html",
+        "bytes": 38611,
+        "sha256": "9c8cd8ed7af2ac6d747230316b98cfaef9d480583f606c4dbe58fff43100172c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-06/teacher-package/full-practice-content.json",
+        "bytes": 19453,
+        "sha256": "43ca210e0cba86df991a0acd8af6edf08feee8f5ad882f475e1c080330ba6eb1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-06/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "4c9c3d0b119ab42f887cf2c86f7d9ea41841ad01fe1d6ed644bbfdbf0ac40f46"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher-package\\reference\\s06-core.drawio",
+        "relative_path": "rendered/practice/session-06/teacher-package/reference/s06-core.drawio",
+        "bytes": 878,
+        "sha256": "f0342ebb8880e637440ee7edb8ccd43dde86ba52d27b3737107e19568ec84a1e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-06/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38237,
+        "sha256": "0e9d943838e8c281f7139875f780e3f8da75e934b3d6201aa43de700da9a84a6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-06\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-06/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38611,
+        "sha256": "9c8cd8ed7af2ac6d747230316b98cfaef9d480583f606c4dbe58fff43100172c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-07/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-07/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-07/generation-provenance.json",
+        "bytes": 52844,
+        "sha256": "db01e0f676d90747086434761ba1980c6c56921ccd3ae8042278c4a041a347c7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\practice-content.json",
+        "relative_path": "rendered/practice/session-07/practice-content.json",
+        "bytes": 19805,
+        "sha256": "209e514c81b389059dff5fd21c2d90e0c7d6e521a2dda99e5f2c5cf7f9de5894"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\qa-report.json",
+        "relative_path": "rendered/practice/session-07/qa-report.json",
+        "bytes": 37130,
+        "sha256": "e4c73f1783ad806b141a843249f0d2ec949d06bc970093a2dd36659ba120ff0e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-07/student/foundation-kit.html",
+        "bytes": 35620,
+        "sha256": "2d1a3f381880e087df183f5586988918e7fa496ceab2bca3599407884db454c0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-07/student/learning-center.html",
+        "bytes": 42148,
+        "sha256": "38d04bb8f0387ac074d534f2fe3bd526191eeea02dce7068482f4a1655bd8b68"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student\\starter\\s07-core.drawio",
+        "relative_path": "rendered/practice/session-07/student/starter/s07-core.drawio",
+        "bytes": 889,
+        "sha256": "33c8e689c9c81269ded158be8064b954b6d46b9153a28be7266f784d2bff08be"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-07/student/student-task.html",
+        "bytes": 40888,
+        "sha256": "845561d3916edf604a12e4e8a4247d02d6a99c64b629f719ac4bef243f138270"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-07/student/study-guide.html",
+        "bytes": 36462,
+        "sha256": "5ab8d9639010c48f8b2fcfaec60a512da3629efb3a14bc343936bc136557aa24"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-07/student-package/practice-content.json",
+        "bytes": 13095,
+        "sha256": "1a4140eae36295598b2205592c6f4a0a0c717c5ec611be7aaf4acbaf29a6d52f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-07/student-package/student/foundation-kit.html",
+        "bytes": 35620,
+        "sha256": "2d1a3f381880e087df183f5586988918e7fa496ceab2bca3599407884db454c0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-07/student-package/student/learning-center.html",
+        "bytes": 42148,
+        "sha256": "38d04bb8f0387ac074d534f2fe3bd526191eeea02dce7068482f4a1655bd8b68"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\student\\starter\\s07-core.drawio",
+        "relative_path": "rendered/practice/session-07/student-package/student/starter/s07-core.drawio",
+        "bytes": 889,
+        "sha256": "33c8e689c9c81269ded158be8064b954b6d46b9153a28be7266f784d2bff08be"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-07/student-package/student/student-task.html",
+        "bytes": 40888,
+        "sha256": "845561d3916edf604a12e4e8a4247d02d6a99c64b629f719ac4bef243f138270"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-07/student-package/student/study-guide.html",
+        "bytes": 36462,
+        "sha256": "5ab8d9639010c48f8b2fcfaec60a512da3629efb3a14bc343936bc136557aa24"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-07/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-07/teacher/teacher-guide.html",
+        "bytes": 38369,
+        "sha256": "c891e1c7abc681c16360fe5f78d93b75e906e469e9b9508a8f8db4e3d81f255f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-07/teacher/teacher-reference.html",
+        "bytes": 38758,
+        "sha256": "1c3becfd87b2217d130c32a8ea523acacdf0fa5f4a7e4bc7ce0c33f03accc64f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-07/teacher-package/full-practice-content.json",
+        "bytes": 19805,
+        "sha256": "209e514c81b389059dff5fd21c2d90e0c7d6e521a2dda99e5f2c5cf7f9de5894"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-07/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "e4c73f1783ad806b141a843249f0d2ec949d06bc970093a2dd36659ba120ff0e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher-package\\reference\\s07-core.drawio",
+        "relative_path": "rendered/practice/session-07/teacher-package/reference/s07-core.drawio",
+        "bytes": 896,
+        "sha256": "8c13b4366136d5ff0df4919fb067b078fd8974537bef8c493cc57271d3fd8b48"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-07/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38369,
+        "sha256": "c891e1c7abc681c16360fe5f78d93b75e906e469e9b9508a8f8db4e3d81f255f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-07\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-07/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38758,
+        "sha256": "1c3becfd87b2217d130c32a8ea523acacdf0fa5f4a7e4bc7ce0c33f03accc64f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-08/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-08/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-08/generation-provenance.json",
+        "bytes": 56174,
+        "sha256": "02f343244395a154ec66974b47325e3a8633788f5ec66a3752f398aee2046533"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\practice-content.json",
+        "relative_path": "rendered/practice/session-08/practice-content.json",
+        "bytes": 19913,
+        "sha256": "588333885bb1cfdf0815e585fcc71f9336fad3a5b2809682366486c609d4798c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\qa-report.json",
+        "relative_path": "rendered/practice/session-08/qa-report.json",
+        "bytes": 37130,
+        "sha256": "8b41b8bee52225d0afbf27ea470357d266b2d22e6870b85510547446798dfb60"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-08/student/foundation-kit.html",
+        "bytes": 35644,
+        "sha256": "01bb90a9403c2118c678a2c2a1875a22287432b2794565857d72ce303a2444c5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-08/student/learning-center.html",
+        "bytes": 42246,
+        "sha256": "99d0185b08f9495edb96cd3d360013f8e00a3efcdf2d2e673a4938040514b31f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student\\starter\\s08-core.drawio",
+        "relative_path": "rendered/practice/session-08/student/starter/s08-core.drawio",
+        "bytes": 901,
+        "sha256": "c6fe7af041ebea991042c12d70dc9e3f7c44b8160026e2aca4daf9f0f7b330da"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-08/student/student-task.html",
+        "bytes": 40991,
+        "sha256": "ae0754d8410c8b5c10572b4cfdfa8fd968accbcf37303ccb51a0fc2c6e3fb1e2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-08/student/study-guide.html",
+        "bytes": 36554,
+        "sha256": "0a9229b0adf1f313c31737fb70cc761f426ef7b19650789dfb82281e67e69962"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-08/student-package/practice-content.json",
+        "bytes": 13153,
+        "sha256": "80146570c0d4282977d4a371e0b032a3ab918c2a8f7aa60f18ee7341e96f0dcf"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-08/student-package/student/foundation-kit.html",
+        "bytes": 35644,
+        "sha256": "01bb90a9403c2118c678a2c2a1875a22287432b2794565857d72ce303a2444c5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-08/student-package/student/learning-center.html",
+        "bytes": 42246,
+        "sha256": "99d0185b08f9495edb96cd3d360013f8e00a3efcdf2d2e673a4938040514b31f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\student\\starter\\s08-core.drawio",
+        "relative_path": "rendered/practice/session-08/student-package/student/starter/s08-core.drawio",
+        "bytes": 901,
+        "sha256": "c6fe7af041ebea991042c12d70dc9e3f7c44b8160026e2aca4daf9f0f7b330da"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-08/student-package/student/student-task.html",
+        "bytes": 40991,
+        "sha256": "ae0754d8410c8b5c10572b4cfdfa8fd968accbcf37303ccb51a0fc2c6e3fb1e2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-08/student-package/student/study-guide.html",
+        "bytes": 36554,
+        "sha256": "0a9229b0adf1f313c31737fb70cc761f426ef7b19650789dfb82281e67e69962"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-08/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-08/teacher/teacher-guide.html",
+        "bytes": 38484,
+        "sha256": "332c78cec4cb48ab454bc19bc76c91e43a150767abdbf8e24688ec25222ab34a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-08/teacher/teacher-reference.html",
+        "bytes": 38837,
+        "sha256": "344edc721b7144500cbd260f71d29f09493a604bed670571704899e33620dc65"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-08/teacher-package/full-practice-content.json",
+        "bytes": 19913,
+        "sha256": "588333885bb1cfdf0815e585fcc71f9336fad3a5b2809682366486c609d4798c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-08/teacher-package/qa-report.json",
+        "bytes": 37130,
+        "sha256": "8b41b8bee52225d0afbf27ea470357d266b2d22e6870b85510547446798dfb60"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher-package\\reference\\s08-core.drawio",
+        "relative_path": "rendered/practice/session-08/teacher-package/reference/s08-core.drawio",
+        "bytes": 908,
+        "sha256": "bdb09fb01634bdb9ee940627942d0a609d23c493345454602ecaf2899a4b68eb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-08/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38484,
+        "sha256": "332c78cec4cb48ab454bc19bc76c91e43a150767abdbf8e24688ec25222ab34a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-08\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-08/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38837,
+        "sha256": "344edc721b7144500cbd260f71d29f09493a604bed670571704899e33620dc65"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-09/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-09/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-09/generation-provenance.json",
+        "bytes": 59504,
+        "sha256": "56ade0962ae9ed891f6654eb14968953dade1ff6cf2a08388ab973e35aef1ae6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\practice-content.json",
+        "relative_path": "rendered/practice/session-09/practice-content.json",
+        "bytes": 19481,
+        "sha256": "bb97b94cb71dddcb59b91bcc0786ccdf9792b84d0be762a09cb38899886a02a1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\qa-report.json",
+        "relative_path": "rendered/practice/session-09/qa-report.json",
+        "bytes": 28253,
+        "sha256": "d21d10d39e56305013996d56c36591f931414b1e393a416140e6a6305c2f18b6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-09/student/foundation-kit.html",
+        "bytes": 35632,
+        "sha256": "4b0369f8293ca64bc1817920591f391b761b167e92403d181fbfd4d961877291"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-09/student/learning-center.html",
+        "bytes": 42144,
+        "sha256": "407b0fbdfb99eed59bd8cb0e6d669a1d2b9c93ffcbbaf6670abfbc4670a673fd"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student\\starter\\s09-core.drawio",
+        "relative_path": "rendered/practice/session-09/student/starter/s09-core.drawio",
+        "bytes": 895,
+        "sha256": "0a2da583ec5dc6f6e18a675b7850ec7f61d1a62359f52f804cee50ad3aa60c21"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-09/student/student-task.html",
+        "bytes": 40898,
+        "sha256": "3deca6f65dbd91b86a815f743ce9f3032345a7100b542e6fa6ee0ee298288f5e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-09/student/study-guide.html",
+        "bytes": 36464,
+        "sha256": "9854d37566dc659485d1023c258128d25ffc93f8986e534ef742c8d8c24bf191"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-09/student-package/practice-content.json",
+        "bytes": 12964,
+        "sha256": "5d277cb2dac348ddc2bb958cbab51c157fae247d20c574c0308e380af7151588"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-09/student-package/student/foundation-kit.html",
+        "bytes": 35632,
+        "sha256": "4b0369f8293ca64bc1817920591f391b761b167e92403d181fbfd4d961877291"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-09/student-package/student/learning-center.html",
+        "bytes": 42144,
+        "sha256": "407b0fbdfb99eed59bd8cb0e6d669a1d2b9c93ffcbbaf6670abfbc4670a673fd"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\student\\starter\\s09-core.drawio",
+        "relative_path": "rendered/practice/session-09/student-package/student/starter/s09-core.drawio",
+        "bytes": 895,
+        "sha256": "0a2da583ec5dc6f6e18a675b7850ec7f61d1a62359f52f804cee50ad3aa60c21"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-09/student-package/student/student-task.html",
+        "bytes": 40898,
+        "sha256": "3deca6f65dbd91b86a815f743ce9f3032345a7100b542e6fa6ee0ee298288f5e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-09/student-package/student/study-guide.html",
+        "bytes": 36464,
+        "sha256": "9854d37566dc659485d1023c258128d25ffc93f8986e534ef742c8d8c24bf191"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-09/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-09/teacher/teacher-guide.html",
+        "bytes": 38394,
+        "sha256": "fe0a5012b228b1d9dbd5bcc007535295a4f95fe619a4a206c3d718af2e1a67cc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-09/teacher/teacher-reference.html",
+        "bytes": 38792,
+        "sha256": "aa6e571e0f9b6a6a402684d106ace64192c4f58ee8496f107d905a7e3fd4405d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-09/teacher-package/full-practice-content.json",
+        "bytes": 19481,
+        "sha256": "bb97b94cb71dddcb59b91bcc0786ccdf9792b84d0be762a09cb38899886a02a1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-09/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "d21d10d39e56305013996d56c36591f931414b1e393a416140e6a6305c2f18b6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher-package\\reference\\s09-core.drawio",
+        "relative_path": "rendered/practice/session-09/teacher-package/reference/s09-core.drawio",
+        "bytes": 902,
+        "sha256": "d7979e46ae5d4614df4350bf5d7dbc9b23daabf13e243eaf0b25daed5a59933c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-09/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38394,
+        "sha256": "fe0a5012b228b1d9dbd5bcc007535295a4f95fe619a4a206c3d718af2e1a67cc"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-09\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-09/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38792,
+        "sha256": "aa6e571e0f9b6a6a402684d106ace64192c4f58ee8496f107d905a7e3fd4405d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-10/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-10/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-10/generation-provenance.json",
+        "bytes": 62834,
+        "sha256": "51e53c4385adadebd2e29f652f838ad304c13db2edd7b1b20f03dbfbe2f8fe55"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\practice-content.json",
+        "relative_path": "rendered/practice/session-10/practice-content.json",
+        "bytes": 19443,
+        "sha256": "7f0a07a2bd7db606a934cd0d1be87b189aaf94f5ac2cbdcf59213b2ebf6bbb53"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\qa-report.json",
+        "relative_path": "rendered/practice/session-10/qa-report.json",
+        "bytes": 28253,
+        "sha256": "e8c54825f46e44d2d9c9ca6f15b1369f6479d99972a82f4e8c475577da228658"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-10/student/foundation-kit.html",
+        "bytes": 35633,
+        "sha256": "4645a545ec5c953202cb73b77f9389abb07ceed4326a04fcd85dba9eaff4a2ee"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-10/student/learning-center.html",
+        "bytes": 42154,
+        "sha256": "57b4608cbae6aea0ce194ed434471710793cdebba693e9d235d308aa99b491fb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student\\starter\\s10-core.drawio",
+        "relative_path": "rendered/practice/session-10/student/starter/s10-core.drawio",
+        "bytes": 895,
+        "sha256": "dc7fe339b14dcee65db75948fc2be95a81190b21c2e716999d1ac8f9ad80c5c3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-10/student/student-task.html",
+        "bytes": 40901,
+        "sha256": "98c32d93701bfa418513b2aadb7e762e21372c183cd99810beea02cbf9942559"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-10/student/study-guide.html",
+        "bytes": 36442,
+        "sha256": "7fd2f01e0e83c6cdcbe036bdd38ff2324c74ee362c1f02e360669cdbd1c50394"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-10/student-package/practice-content.json",
+        "bytes": 12970,
+        "sha256": "e955308d1e28606fd94996d172343d384bc568bd5c79f7e9da998b19391ec6aa"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-10/student-package/student/foundation-kit.html",
+        "bytes": 35633,
+        "sha256": "4645a545ec5c953202cb73b77f9389abb07ceed4326a04fcd85dba9eaff4a2ee"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-10/student-package/student/learning-center.html",
+        "bytes": 42154,
+        "sha256": "57b4608cbae6aea0ce194ed434471710793cdebba693e9d235d308aa99b491fb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\student\\starter\\s10-core.drawio",
+        "relative_path": "rendered/practice/session-10/student-package/student/starter/s10-core.drawio",
+        "bytes": 895,
+        "sha256": "dc7fe339b14dcee65db75948fc2be95a81190b21c2e716999d1ac8f9ad80c5c3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-10/student-package/student/student-task.html",
+        "bytes": 40901,
+        "sha256": "98c32d93701bfa418513b2aadb7e762e21372c183cd99810beea02cbf9942559"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-10/student-package/student/study-guide.html",
+        "bytes": 36442,
+        "sha256": "7fd2f01e0e83c6cdcbe036bdd38ff2324c74ee362c1f02e360669cdbd1c50394"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-10/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-10/teacher/teacher-guide.html",
+        "bytes": 38388,
+        "sha256": "5874d89fd1fa2d94f3e601a46da5ce0d6b8e247e63b6894ebbf3f494ed259f7a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-10/teacher/teacher-reference.html",
+        "bytes": 38756,
+        "sha256": "ae75a08cb3bbbc86b9cd6a65693825c8f1cec57acbd4f4a466ccb3791cd60ede"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-10/teacher-package/full-practice-content.json",
+        "bytes": 19443,
+        "sha256": "7f0a07a2bd7db606a934cd0d1be87b189aaf94f5ac2cbdcf59213b2ebf6bbb53"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-10/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "e8c54825f46e44d2d9c9ca6f15b1369f6479d99972a82f4e8c475577da228658"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher-package\\reference\\s10-core.drawio",
+        "relative_path": "rendered/practice/session-10/teacher-package/reference/s10-core.drawio",
+        "bytes": 902,
+        "sha256": "fa427b5838d118f74bb82367fabdfb0ec599148089bdeb95b8bdc7256b63cb57"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-10/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38388,
+        "sha256": "5874d89fd1fa2d94f3e601a46da5ce0d6b8e247e63b6894ebbf3f494ed259f7a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-10\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-10/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38756,
+        "sha256": "ae75a08cb3bbbc86b9cd6a65693825c8f1cec57acbd4f4a466ccb3791cd60ede"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-11/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-11/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-11/generation-provenance.json",
+        "bytes": 66164,
+        "sha256": "67aa87c5035edb55120f971da6a4ac7c3a916ff7591b7500aa10c714b07556d4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\practice-content.json",
+        "relative_path": "rendered/practice/session-11/practice-content.json",
+        "bytes": 19011,
+        "sha256": "057f7baf95e8244e2b1ca3d8f0251b6ba8b1879746cf89a12899d2054e7b9ead"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\qa-report.json",
+        "relative_path": "rendered/practice/session-11/qa-report.json",
+        "bytes": 28253,
+        "sha256": "c1f7d63c05f0717b051fdc27bfe2880791729745f46ef17eaf3bef3c994fc510"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-11/student/foundation-kit.html",
+        "bytes": 35581,
+        "sha256": "7188a025ec8a4c0019ab19cedab344cb0f4988e6ab867fdcf35a39c75319961d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-11/student/learning-center.html",
+        "bytes": 41832,
+        "sha256": "39fe36d912c0a85ec23b3c0f447f507dcf152eb6989b10a4bebdc7284a33319f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student\\starter\\s11-core.drawio",
+        "relative_path": "rendered/practice/session-11/student/starter/s11-core.drawio",
+        "bytes": 869,
+        "sha256": "e7245b8d7cb5908a16aa32bfae4e5425ad731c36ca71add9574eda14eda7816f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-11/student/student-task.html",
+        "bytes": 40608,
+        "sha256": "1898c472ef7fb1fcf8f9f8e72f1933dc2aa520049cdb4704552986c83298b623"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-11/student/study-guide.html",
+        "bytes": 36243,
+        "sha256": "be8ad15dbb64f08f50a5939a5931601a8a072cc54c8e020a85a8769129ec9357"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-11/student-package/practice-content.json",
+        "bytes": 12703,
+        "sha256": "24716f1d2b65c3d462073b2e94e53c8b6cd8d3dd593ee540d74332e41ac8467a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-11/student-package/student/foundation-kit.html",
+        "bytes": 35581,
+        "sha256": "7188a025ec8a4c0019ab19cedab344cb0f4988e6ab867fdcf35a39c75319961d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-11/student-package/student/learning-center.html",
+        "bytes": 41832,
+        "sha256": "39fe36d912c0a85ec23b3c0f447f507dcf152eb6989b10a4bebdc7284a33319f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\student\\starter\\s11-core.drawio",
+        "relative_path": "rendered/practice/session-11/student-package/student/starter/s11-core.drawio",
+        "bytes": 869,
+        "sha256": "e7245b8d7cb5908a16aa32bfae4e5425ad731c36ca71add9574eda14eda7816f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-11/student-package/student/student-task.html",
+        "bytes": 40608,
+        "sha256": "1898c472ef7fb1fcf8f9f8e72f1933dc2aa520049cdb4704552986c83298b623"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-11/student-package/student/study-guide.html",
+        "bytes": 36243,
+        "sha256": "be8ad15dbb64f08f50a5939a5931601a8a072cc54c8e020a85a8769129ec9357"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-11/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-11/teacher/teacher-guide.html",
+        "bytes": 38168,
+        "sha256": "88e7b75aa731b968d7c79cf32b4ae20147fad4be108c1dbad22e8f7e57328ec0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-11/teacher/teacher-reference.html",
+        "bytes": 38499,
+        "sha256": "f9ce535a31c2a544089ab706757e6c20ce0c21291beccf11c65f55f4103642d7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-11/teacher-package/full-practice-content.json",
+        "bytes": 19011,
+        "sha256": "057f7baf95e8244e2b1ca3d8f0251b6ba8b1879746cf89a12899d2054e7b9ead"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-11/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "c1f7d63c05f0717b051fdc27bfe2880791729745f46ef17eaf3bef3c994fc510"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher-package\\reference\\s11-core.drawio",
+        "relative_path": "rendered/practice/session-11/teacher-package/reference/s11-core.drawio",
+        "bytes": 876,
+        "sha256": "144bf3fe845ff38dc53fcd9fdb92d150dbf9a6c8f23bea0e87a3fc4ea06fc252"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-11/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38168,
+        "sha256": "88e7b75aa731b968d7c79cf32b4ae20147fad4be108c1dbad22e8f7e57328ec0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-11\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-11/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38499,
+        "sha256": "f9ce535a31c2a544089ab706757e6c20ce0c21291beccf11c65f55f4103642d7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-12/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-12/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-12/generation-provenance.json",
+        "bytes": 69494,
+        "sha256": "0e184a53ab6e51b1fcf8b322365773af496cfdc422ff68196f4dbf11c1a1da81"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\practice-content.json",
+        "relative_path": "rendered/practice/session-12/practice-content.json",
+        "bytes": 19417,
+        "sha256": "8071e99f9e4dc3aa635f40d5b110743c6d30e78bea2040228285d33ae7fa07c2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\qa-report.json",
+        "relative_path": "rendered/practice/session-12/qa-report.json",
+        "bytes": 28253,
+        "sha256": "f90b51148d24155cf9a2bbf0ef0bf9947314db8a72c4e1b1d10e740923aac81c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-12/student/foundation-kit.html",
+        "bytes": 35609,
+        "sha256": "443106857175db32f163765df1a2b4c4b84838f15e4d81ab5974d228bf1f4758"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-12/student/learning-center.html",
+        "bytes": 42038,
+        "sha256": "8ffb25d66d486bc814ef0281c3250e1781149a07d1ad4322bbbf7b8fccd3ec58"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student\\starter\\s12-core.drawio",
+        "relative_path": "rendered/practice/session-12/student/starter/s12-core.drawio",
+        "bytes": 883,
+        "sha256": "5862268846d25a9f70fb05b96101271fbf0194c7f1bc6014a307c5f96ecbd8d6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-12/student/student-task.html",
+        "bytes": 40767,
+        "sha256": "0beb71f41e444301601b3e13a447e8b89cf3e76af5a5b07c8ceb4c8dc8e65476"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-12/student/study-guide.html",
+        "bytes": 36399,
+        "sha256": "1ed164e5cd69aa7020b37a0c2c7a77f9da346d9f5bad053ca7f060bf75fb91e8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-12/student-package/practice-content.json",
+        "bytes": 12948,
+        "sha256": "42922825183a79212cd61a19a6da7f07d88f829dbc81133d2940d781814b97e8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-12/student-package/student/foundation-kit.html",
+        "bytes": 35609,
+        "sha256": "443106857175db32f163765df1a2b4c4b84838f15e4d81ab5974d228bf1f4758"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-12/student-package/student/learning-center.html",
+        "bytes": 42038,
+        "sha256": "8ffb25d66d486bc814ef0281c3250e1781149a07d1ad4322bbbf7b8fccd3ec58"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\student\\starter\\s12-core.drawio",
+        "relative_path": "rendered/practice/session-12/student-package/student/starter/s12-core.drawio",
+        "bytes": 883,
+        "sha256": "5862268846d25a9f70fb05b96101271fbf0194c7f1bc6014a307c5f96ecbd8d6"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-12/student-package/student/student-task.html",
+        "bytes": 40767,
+        "sha256": "0beb71f41e444301601b3e13a447e8b89cf3e76af5a5b07c8ceb4c8dc8e65476"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-12/student-package/student/study-guide.html",
+        "bytes": 36399,
+        "sha256": "1ed164e5cd69aa7020b37a0c2c7a77f9da346d9f5bad053ca7f060bf75fb91e8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-12/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-12/teacher/teacher-guide.html",
+        "bytes": 38320,
+        "sha256": "d8213fd9b1fe7bde77878f8af99218cd7afea088b1d89bf88f0a7902edf9bca4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-12/teacher/teacher-reference.html",
+        "bytes": 38676,
+        "sha256": "20fbc784f84cd92b207e915bd42cd22ceb451485130db62d40a148853b48afe9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-12/teacher-package/full-practice-content.json",
+        "bytes": 19417,
+        "sha256": "8071e99f9e4dc3aa635f40d5b110743c6d30e78bea2040228285d33ae7fa07c2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-12/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "f90b51148d24155cf9a2bbf0ef0bf9947314db8a72c4e1b1d10e740923aac81c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher-package\\reference\\s12-core.drawio",
+        "relative_path": "rendered/practice/session-12/teacher-package/reference/s12-core.drawio",
+        "bytes": 890,
+        "sha256": "8490d375b50bfa5476dcb46d80b4d4b3915145c32a9873c34cc5a14b2e425890"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-12/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38320,
+        "sha256": "d8213fd9b1fe7bde77878f8af99218cd7afea088b1d89bf88f0a7902edf9bca4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-12\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-12/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38676,
+        "sha256": "20fbc784f84cd92b207e915bd42cd22ceb451485130db62d40a148853b48afe9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-13/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-13/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-13/generation-provenance.json",
+        "bytes": 72824,
+        "sha256": "064581a7b5b7ecfc1d470536456eac04bc8809868ba405dc3c15713be4d2550b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\practice-content.json",
+        "relative_path": "rendered/practice/session-13/practice-content.json",
+        "bytes": 19361,
+        "sha256": "776a60c893cd052ff67072a7cb71918462ffe3c7dc7f64bd48ad1bd6578a6ff8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\qa-report.json",
+        "relative_path": "rendered/practice/session-13/qa-report.json",
+        "bytes": 28253,
+        "sha256": "72e8e7be66a59f896b61f08ba2c7368e7c9e3220ab24df88e8ec90a32186fd94"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-13/student/foundation-kit.html",
+        "bytes": 35597,
+        "sha256": "3b6beb340950118a637746d2de1121ba9f09af839795a11ca858f77704e9271c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-13/student/learning-center.html",
+        "bytes": 42004,
+        "sha256": "061f3f1c2372fda7b8acde64aef133d72c36ea4d488d21a4deeaf1c5b1f984de"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student\\starter\\s13-core.drawio",
+        "relative_path": "rendered/practice/session-13/student/starter/s13-core.drawio",
+        "bytes": 877,
+        "sha256": "f7e61c36928fcce23a100dae198062b574d2f40030fb654e6c663f19a65baf9a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-13/student/student-task.html",
+        "bytes": 40737,
+        "sha256": "aeac4906c83641bc84e630bea30b065e2cae0a76b24d2000c34428ed4c4d9f03"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-13/student/study-guide.html",
+        "bytes": 36337,
+        "sha256": "a1df78a3dffb0cf77530362a6fb84c7fc43114b3d335ae894e45c9b093aadcf5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-13/student-package/practice-content.json",
+        "bytes": 12906,
+        "sha256": "9808bb5886fa6cfe562a8f2ef8bf6300c73b7ddfadef9c6e58abaea9cf5c7635"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-13/student-package/student/foundation-kit.html",
+        "bytes": 35597,
+        "sha256": "3b6beb340950118a637746d2de1121ba9f09af839795a11ca858f77704e9271c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-13/student-package/student/learning-center.html",
+        "bytes": 42004,
+        "sha256": "061f3f1c2372fda7b8acde64aef133d72c36ea4d488d21a4deeaf1c5b1f984de"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\student\\starter\\s13-core.drawio",
+        "relative_path": "rendered/practice/session-13/student-package/student/starter/s13-core.drawio",
+        "bytes": 877,
+        "sha256": "f7e61c36928fcce23a100dae198062b574d2f40030fb654e6c663f19a65baf9a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-13/student-package/student/student-task.html",
+        "bytes": 40737,
+        "sha256": "aeac4906c83641bc84e630bea30b065e2cae0a76b24d2000c34428ed4c4d9f03"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-13/student-package/student/study-guide.html",
+        "bytes": 36337,
+        "sha256": "a1df78a3dffb0cf77530362a6fb84c7fc43114b3d335ae894e45c9b093aadcf5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-13/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-13/teacher/teacher-guide.html",
+        "bytes": 38256,
+        "sha256": "3a5e033836f45d0d1e941964db5db5dad019f67eb560d340b15a10107bbc158d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-13/teacher/teacher-reference.html",
+        "bytes": 38654,
+        "sha256": "dea847eabc43bfbfdd910314b4f0da84554412b1b74e96b1784028a1f997e944"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-13/teacher-package/full-practice-content.json",
+        "bytes": 19361,
+        "sha256": "776a60c893cd052ff67072a7cb71918462ffe3c7dc7f64bd48ad1bd6578a6ff8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-13/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "72e8e7be66a59f896b61f08ba2c7368e7c9e3220ab24df88e8ec90a32186fd94"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher-package\\reference\\s13-core.drawio",
+        "relative_path": "rendered/practice/session-13/teacher-package/reference/s13-core.drawio",
+        "bytes": 884,
+        "sha256": "e8cce1be2f192e044c3bac7c936f8f91b210620109734f106bfe9e9127c0b650"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-13/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38256,
+        "sha256": "3a5e033836f45d0d1e941964db5db5dad019f67eb560d340b15a10107bbc158d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-13\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-13/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38654,
+        "sha256": "dea847eabc43bfbfdd910314b4f0da84554412b1b74e96b1784028a1f997e944"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-14/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-14/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-14/generation-provenance.json",
+        "bytes": 76154,
+        "sha256": "7169f038d02cfc4ab0c1a10608bbf2fbf67c466ca89ffba688c6e3a280f657a0"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\practice-content.json",
+        "relative_path": "rendered/practice/session-14/practice-content.json",
+        "bytes": 19522,
+        "sha256": "222037f0fa4e68c96e573e0995d1ced4181179c82b2a906ac9919fc355471aaa"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\qa-report.json",
+        "relative_path": "rendered/practice/session-14/qa-report.json",
+        "bytes": 28253,
+        "sha256": "08f7f0e2ada44c8d23e86a19564975ecddba47aed4fcb34f91c6679d584bec5c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-14/student/foundation-kit.html",
+        "bytes": 35617,
+        "sha256": "22ff9545fee2448815e12fe099d1fbf78925167c1e82490e61856503def1f6c5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-14/student/learning-center.html",
+        "bytes": 42096,
+        "sha256": "3ef90eb52c994ac63d49c8b0622a9a57594bd4130bd4ec0d8ddb63fef9730874"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student\\starter\\s14-core.drawio",
+        "relative_path": "rendered/practice/session-14/student/starter/s14-core.drawio",
+        "bytes": 887,
+        "sha256": "5a4694f7aa66fda39a53152e860ed9503896f8cff7ca3de8a776010b01238cd1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-14/student/student-task.html",
+        "bytes": 40840,
+        "sha256": "e9aaf7e7da22f26cdb9d618f6e487eb9b27e41840c17881796754d95622f3079"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-14/student/study-guide.html",
+        "bytes": 36447,
+        "sha256": "f07557b511867a532b16ebf6842b308206aa7722a775487d39504c9d7336cfed"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-14/student-package/practice-content.json",
+        "bytes": 13011,
+        "sha256": "23cc6a1ca75c1f6c5626081cfad8f1b3b54f3b575a4e6d265f9cd03e358b513d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-14/student-package/student/foundation-kit.html",
+        "bytes": 35617,
+        "sha256": "22ff9545fee2448815e12fe099d1fbf78925167c1e82490e61856503def1f6c5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-14/student-package/student/learning-center.html",
+        "bytes": 42096,
+        "sha256": "3ef90eb52c994ac63d49c8b0622a9a57594bd4130bd4ec0d8ddb63fef9730874"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\student\\starter\\s14-core.drawio",
+        "relative_path": "rendered/practice/session-14/student-package/student/starter/s14-core.drawio",
+        "bytes": 887,
+        "sha256": "5a4694f7aa66fda39a53152e860ed9503896f8cff7ca3de8a776010b01238cd1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-14/student-package/student/student-task.html",
+        "bytes": 40840,
+        "sha256": "e9aaf7e7da22f26cdb9d618f6e487eb9b27e41840c17881796754d95622f3079"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-14/student-package/student/study-guide.html",
+        "bytes": 36447,
+        "sha256": "f07557b511867a532b16ebf6842b308206aa7722a775487d39504c9d7336cfed"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-14/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-14/teacher/teacher-guide.html",
+        "bytes": 38345,
+        "sha256": "6891f73848708e46ffdbe9eb27dd4448cdd5ad3480905cd981d31327b7d9fc74"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-14/teacher/teacher-reference.html",
+        "bytes": 38741,
+        "sha256": "6ed27105df453519e5cb52226eae8923904c57dd4d9e68ba938179e6fdb9fcfb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-14/teacher-package/full-practice-content.json",
+        "bytes": 19522,
+        "sha256": "222037f0fa4e68c96e573e0995d1ced4181179c82b2a906ac9919fc355471aaa"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-14/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "08f7f0e2ada44c8d23e86a19564975ecddba47aed4fcb34f91c6679d584bec5c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher-package\\reference\\s14-core.drawio",
+        "relative_path": "rendered/practice/session-14/teacher-package/reference/s14-core.drawio",
+        "bytes": 894,
+        "sha256": "2f60591a96e4fc1c3ce767c592b507eccc25f5e73410eb54f554bb7162c4c9e4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-14/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38345,
+        "sha256": "6891f73848708e46ffdbe9eb27dd4448cdd5ad3480905cd981d31327b7d9fc74"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-14\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-14/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38741,
+        "sha256": "6ed27105df453519e5cb52226eae8923904c57dd4d9e68ba938179e6fdb9fcfb"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-15/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-15/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-15/generation-provenance.json",
+        "bytes": 79484,
+        "sha256": "3a80f0230e565014e2a1b8e5e9cef12346aa1afe217002df761899b98a4cc989"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\practice-content.json",
+        "relative_path": "rendered/practice/session-15/practice-content.json",
+        "bytes": 19716,
+        "sha256": "d8a935e42dfc3223f9752bc4da36c465a34095847f8dedc1767d12ad3276be1e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\qa-report.json",
+        "relative_path": "rendered/practice/session-15/qa-report.json",
+        "bytes": 28253,
+        "sha256": "3a250c38995723d99a30b8350f7346e12ca7ff6ea1c54e5b215f6fa80e38030a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-15/student/foundation-kit.html",
+        "bytes": 35625,
+        "sha256": "117a849445e36ab1733225634d6c5c17ab1a13347b587c2b7694611488fd05c2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-15/student/learning-center.html",
+        "bytes": 42143,
+        "sha256": "753c4db87446131b703030bd55a3b40fa34cad14e77a57ab5e68cfb72e163fc7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student\\starter\\s15-core.drawio",
+        "relative_path": "rendered/practice/session-15/student/starter/s15-core.drawio",
+        "bytes": 891,
+        "sha256": "b8ef00b1d2a09fb2f1abcfb4af47c74afe6bb336f10fbd21d69bd51b119e2c29"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-15/student/student-task.html",
+        "bytes": 40877,
+        "sha256": "ff00c47238196230a0e2ae6de54326c18bbef4608bb33db6c28a28fd473a01b7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-15/student/study-guide.html",
+        "bytes": 36526,
+        "sha256": "85ec9099e7838611c4378d8cff386204257c60163011c36fd271e961eecf6aa2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-15/student-package/practice-content.json",
+        "bytes": 13112,
+        "sha256": "31bdde0920b8c813fa634bb2faa1c8b1dc10195b366f663a05bdd525ecae1d5c"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-15/student-package/student/foundation-kit.html",
+        "bytes": 35625,
+        "sha256": "117a849445e36ab1733225634d6c5c17ab1a13347b587c2b7694611488fd05c2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-15/student-package/student/learning-center.html",
+        "bytes": 42143,
+        "sha256": "753c4db87446131b703030bd55a3b40fa34cad14e77a57ab5e68cfb72e163fc7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\student\\starter\\s15-core.drawio",
+        "relative_path": "rendered/practice/session-15/student-package/student/starter/s15-core.drawio",
+        "bytes": 891,
+        "sha256": "b8ef00b1d2a09fb2f1abcfb4af47c74afe6bb336f10fbd21d69bd51b119e2c29"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-15/student-package/student/student-task.html",
+        "bytes": 40877,
+        "sha256": "ff00c47238196230a0e2ae6de54326c18bbef4608bb33db6c28a28fd473a01b7"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-15/student-package/student/study-guide.html",
+        "bytes": 36526,
+        "sha256": "85ec9099e7838611c4378d8cff386204257c60163011c36fd271e961eecf6aa2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-15/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-15/teacher/teacher-guide.html",
+        "bytes": 38412,
+        "sha256": "59f249fc340856e2c292a872e5de2d48cbf225e9874a181c7bc1c8e43de8833b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-15/teacher/teacher-reference.html",
+        "bytes": 38815,
+        "sha256": "0fa9e9fc234d94dc751a7b29b65e1f0bd117be40bbb395cb08955d5569e1d4ab"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-15/teacher-package/full-practice-content.json",
+        "bytes": 19716,
+        "sha256": "d8a935e42dfc3223f9752bc4da36c465a34095847f8dedc1767d12ad3276be1e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-15/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "3a250c38995723d99a30b8350f7346e12ca7ff6ea1c54e5b215f6fa80e38030a"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher-package\\reference\\s15-core.drawio",
+        "relative_path": "rendered/practice/session-15/teacher-package/reference/s15-core.drawio",
+        "bytes": 898,
+        "sha256": "d39a834aca1b03eb815f5b2e0dbf31d544ac9c874837a19ba6698e26ddd7d0a1"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-15/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38412,
+        "sha256": "59f249fc340856e2c292a872e5de2d48cbf225e9874a181c7bc1c8e43de8833b"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-15\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-15/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38815,
+        "sha256": "0fa9e9fc234d94dc751a7b29b65e1f0bd117be40bbb395cb08955d5569e1d4ab"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\asset-lineage.json",
+        "relative_path": "rendered/practice/session-16/asset-lineage.json",
+        "bytes": 2,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\behavior-verification.json",
+        "relative_path": "rendered/practice/session-16/behavior-verification.json",
+        "bytes": 310,
+        "sha256": "6c8796d6eb4c671c4d89c626940f1aeb87147b9040bc688034c8a01de7a5a699"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\generation-provenance.json",
+        "relative_path": "rendered/practice/session-16/generation-provenance.json",
+        "bytes": 82814,
+        "sha256": "f4e0c3aa63a6e48cd064c0aaf5fe8adf451a4707c7593b801cbef46d450dd61f"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\practice-content.json",
+        "relative_path": "rendered/practice/session-16/practice-content.json",
+        "bytes": 19544,
+        "sha256": "b1a7bbc329245fa650389b61263d5fe07f0aea7bba0e9757bdd43d5972f764ea"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\qa-report.json",
+        "relative_path": "rendered/practice/session-16/qa-report.json",
+        "bytes": 28253,
+        "sha256": "4541ae1ef767969b2e166c832d1b25ff4235d54e4e9d442f64cf320f4123aec5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-16/student/foundation-kit.html",
+        "bytes": 35609,
+        "sha256": "fed930fae816bc687f619687b5c7f7e75c586efd49f7fd9af541841f16b3c977"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-16/student/learning-center.html",
+        "bytes": 42025,
+        "sha256": "e2dc154615d3d53d51cb25b4082db80a6986124a2267e2cabe6b0c615005e254"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student\\starter\\s16-core.drawio",
+        "relative_path": "rendered/practice/session-16/student/starter/s16-core.drawio",
+        "bytes": 883,
+        "sha256": "71a3d54749955c0c8c819e9bd25990987da7d4f1469e31b39cdb91c5dbae3639"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-16/student/student-task.html",
+        "bytes": 40830,
+        "sha256": "7f025cc4be4ea71dce0b9fe2ed19d433635301a3cd3880ae7f2f752faa9f2544"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-16/student/study-guide.html",
+        "bytes": 36444,
+        "sha256": "95d2b473b0c2d188c6a877d9ed8b7855e469c05417b2e1db18cd5918598c0c57"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\practice-content.json",
+        "relative_path": "rendered/practice/session-16/student-package/practice-content.json",
+        "bytes": 13039,
+        "sha256": "409914f4f12eaf24bcf7f0cc972393be9357bfdac55eee19bc700563fcbf5059"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\student\\foundation-kit.html",
+        "relative_path": "rendered/practice/session-16/student-package/student/foundation-kit.html",
+        "bytes": 35609,
+        "sha256": "fed930fae816bc687f619687b5c7f7e75c586efd49f7fd9af541841f16b3c977"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\student\\learning-center.html",
+        "relative_path": "rendered/practice/session-16/student-package/student/learning-center.html",
+        "bytes": 42025,
+        "sha256": "e2dc154615d3d53d51cb25b4082db80a6986124a2267e2cabe6b0c615005e254"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\student\\starter\\s16-core.drawio",
+        "relative_path": "rendered/practice/session-16/student-package/student/starter/s16-core.drawio",
+        "bytes": 883,
+        "sha256": "71a3d54749955c0c8c819e9bd25990987da7d4f1469e31b39cdb91c5dbae3639"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\student\\student-task.html",
+        "relative_path": "rendered/practice/session-16/student-package/student/student-task.html",
+        "bytes": 40830,
+        "sha256": "7f025cc4be4ea71dce0b9fe2ed19d433635301a3cd3880ae7f2f752faa9f2544"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\student\\study-guide.html",
+        "relative_path": "rendered/practice/session-16/student-package/student/study-guide.html",
+        "bytes": 36444,
+        "sha256": "95d2b473b0c2d188c6a877d9ed8b7855e469c05417b2e1db18cd5918598c0c57"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\student-package\\student-manifest.json",
+        "relative_path": "rendered/practice/session-16/student-package/student-manifest.json",
+        "bytes": 374,
+        "sha256": "f00f2a4b83ab47c40cea5c2006422baecd30d39c0414a114dc0520d9f46fe522"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-16/teacher/teacher-guide.html",
+        "bytes": 38338,
+        "sha256": "a3726068d6e230605af3b9e7f43c4a8539034cc3193fe165384a125b4cb0dad4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-16/teacher/teacher-reference.html",
+        "bytes": 38694,
+        "sha256": "6fb711ffafadb5d725cbbfb5a41067f93311403aef6f2143d90621b1eb0f2378"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher-package\\full-practice-content.json",
+        "relative_path": "rendered/practice/session-16/teacher-package/full-practice-content.json",
+        "bytes": 19544,
+        "sha256": "b1a7bbc329245fa650389b61263d5fe07f0aea7bba0e9757bdd43d5972f764ea"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher-package\\qa-report.json",
+        "relative_path": "rendered/practice/session-16/teacher-package/qa-report.json",
+        "bytes": 28253,
+        "sha256": "4541ae1ef767969b2e166c832d1b25ff4235d54e4e9d442f64cf320f4123aec5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher-package\\reference\\s16-core.drawio",
+        "relative_path": "rendered/practice/session-16/teacher-package/reference/s16-core.drawio",
+        "bytes": 890,
+        "sha256": "0cc0901b943d2c9bcdbcf5c84919d31ce9fbe73350bcdc85e3a83b193c90e1b3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher-package\\teacher\\teacher-guide.html",
+        "relative_path": "rendered/practice/session-16/teacher-package/teacher/teacher-guide.html",
+        "bytes": 38338,
+        "sha256": "a3726068d6e230605af3b9e7f43c4a8539034cc3193fe165384a125b4cb0dad4"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\rendered\\practice\\session-16\\teacher-package\\teacher\\teacher-reference.html",
+        "relative_path": "rendered/practice/session-16/teacher-package/teacher/teacher-reference.html",
+        "bytes": 38694,
+        "sha256": "6fb711ffafadb5d725cbbfb5a41067f93311403aef6f2143d90621b1eb0f2378"
+      }
+    ],
+    "qa_reports": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-01.json",
+        "relative_path": "qa_contracts/session-01.json",
+        "bytes": 66074,
+        "sha256": "c8deeb056a2f67622b17934e2445b93d9da15e24b5fe218358530e81c57c30df"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-02.json",
+        "relative_path": "qa_contracts/session-02.json",
+        "bytes": 66091,
+        "sha256": "44455a3361140f8568278a2607a144a857c0e820226233de0850236f3aa9b964"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-03.json",
+        "relative_path": "qa_contracts/session-03.json",
+        "bytes": 66121,
+        "sha256": "1539cadcc27a0bcc67d086065562d85978d4e33c954136034121866f2c52f1f2"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-04.json",
+        "relative_path": "qa_contracts/session-04.json",
+        "bytes": 66372,
+        "sha256": "39e252788fe5c35c2e4b015b15ba0107b0d33b2657e2eb3009ce109824b26449"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-05.json",
+        "relative_path": "qa_contracts/session-05.json",
+        "bytes": 66118,
+        "sha256": "e6c4e286f419a501067c2d45dafe18e853ca23d6fb7322655aaff3c7bd3ad0f8"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-06.json",
+        "relative_path": "qa_contracts/session-06.json",
+        "bytes": 57143,
+        "sha256": "9d4feaab804688459e8a7d429d6d931dfcc9c2ed9b82800aff52e52349ce9d00"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-07.json",
+        "relative_path": "qa_contracts/session-07.json",
+        "bytes": 66491,
+        "sha256": "a01420648b435be02e702b179bac60378cc2432fee5375d97b05f4aa976a9cf5"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-08.json",
+        "relative_path": "qa_contracts/session-08.json",
+        "bytes": 66273,
+        "sha256": "e5f7c63a6dab67c98cb50f8c17ad1ea9dce963908e30a6e60dd11d9169ccc199"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-09.json",
+        "relative_path": "qa_contracts/session-09.json",
+        "bytes": 56956,
+        "sha256": "2a14774b2c51b2db7e7a5c0642a3beaad6d9845460bac58826e9be46a357f7ee"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-10.json",
+        "relative_path": "qa_contracts/session-10.json",
+        "bytes": 56982,
+        "sha256": "30ecd843a3e84b0921bef58ba9679bbe74ccf23f321fc0a3eac16ce898f504b9"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-11.json",
+        "relative_path": "qa_contracts/session-11.json",
+        "bytes": 56774,
+        "sha256": "2e6880535a73d1486d14e0313d3acb70b568359bb9c04012cd3b1372b999f791"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-12.json",
+        "relative_path": "qa_contracts/session-12.json",
+        "bytes": 56933,
+        "sha256": "01234497fe3d9187d88b938c8618ff6bc2de31b0f5f25ff65dc1da9a90d301d3"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-13.json",
+        "relative_path": "qa_contracts/session-13.json",
+        "bytes": 56833,
+        "sha256": "d557ab80974f923e6278faa7b5ab39c48ec9b5c01069294e7c7ee250287bf859"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-14.json",
+        "relative_path": "qa_contracts/session-14.json",
+        "bytes": 56904,
+        "sha256": "527f360b62054fc3828b16f692296dfea69ab1f3ce2ee9af812469b501e84675"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-15.json",
+        "relative_path": "qa_contracts/session-15.json",
+        "bytes": 57318,
+        "sha256": "ee2c2dd7674195dc426563e07fc6000e780ca0284c4e9f7dd2d3d41876e81185"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\session-16.json",
+        "relative_path": "qa_contracts/session-16.json",
+        "bytes": 56915,
+        "sha256": "71ed654420c2390264a703e1aa7ba1e5e2de4f7879a591af55228c6de0df820d"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\qa_contracts\\summary.json",
+        "relative_path": "qa_contracts/summary.json",
+        "bytes": 4236,
+        "sha256": "6c3ac62dcf1334357649db5914afb4168ca373e62d8222dccd1cf87dd51856a3"
+      }
+    ],
+    "audit_reports": [
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\BROWSER_QA_NOTE.md",
+        "relative_path": "BROWSER_QA_NOTE.md",
+        "bytes": 686,
+        "sha256": "4eb472037fda2491bc20c7bf676194f6ee063c2b8666b572269b7b8105e6ef9e"
+      },
+      {
+        "path": "F:\\work\\软件建模与设计\\_courseware_build\\DELIVERY_README.md",
+        "relative_path": "DELIVERY_README.md",
+        "bytes": 2933,
+        "sha256": "008eb23eba88f50429843e39aeabd295f3c8b151217d93e750c4b05005a14ffd"
+      }
+    ]
+  },
+  "missing_required_sets": [],
+  "preservation_rule": "This manifest freezes external evidence by path and digest. The source and generated artifacts must not be overwritten by the architecture implementation.",
+  "blind_retry_rule": "Before a later benchmark retry, read only this formal Skill, the original source files and user course requirements; do not reuse old contracts, old HTML or per-session repair advice."
+}

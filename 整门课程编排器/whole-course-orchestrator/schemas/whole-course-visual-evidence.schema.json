@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/whole-course-visual-evidence.schema.json",
+  "title": "Whole-Course Visual Evidence",
+  "type": "object",
+  "required": ["schema_version", "report_type", "status", "visual_plans", "rendered_asset_ids", "student_rendered_asset_ids", "teacher_rendered_asset_ids"],
+  "properties": {
+    "schema_version": {"enum": ["1.0", "1.1"]},
+    "report_type": {"const": "whole_course_visual_evidence"},
+    "status": {"enum": ["PASS", "FAIL", "NOT_RUN", "NOT_OBSERVED"]},
+    "visual_plans": {"type": "array", "items": {"type": "object"}},
+    "rendered_asset_ids": {"type": "array", "items": {"type": "string"}},
+    "student_rendered_asset_ids": {"type": "array", "items": {"type": "string"}},
+    "teacher_rendered_asset_ids": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,9 @@
+interface:
+  display_name: "整门课程编排器"
+  short_description: "编排整门课程的素材、知识图谱、课次计划与批量 QA"
+  default_prompt: >-
+    使用 $whole-course-orchestrator，把我提供的整套教材、PPT、讲义和课程要求先整理成
+    Teaching Asset Inventory、累计 Course Knowledge Graph、content-native session plans、
+    semantic visual plans、whole-course practice plans 和 batch QA。用户资料是 primary source，
+    外部资料只能作为可追溯的 supplementary source；不要复制 Courseware/Practice renderer，
+    不要在真实 failure benchmark blind retry 前生成整门真实课程。

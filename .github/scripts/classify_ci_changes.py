@@ -18,6 +18,8 @@ DOC_EXACT = frozenset(
         "平时成绩记分册生成器/简介.md",
         "HTML课件生成器/简介.md",
         "实践课HTML生成器/简介.md",
+        "整门课程编排器/简介.md",
+        "WHOLE-COURSE-ARCHITECTURE-REPORT.md",
         "多Agent兼容规范.md",
     }
 )
@@ -27,6 +29,8 @@ GRADEBOOK_ROOT = "平时成绩记分册生成器/course-gradebook-generator"
 WORK_ORDER_ROOT = "实践任务工单生成器/practice-task-workorder-generator"
 COURSEWARE_ROOT = "HTML课件生成器/courseware-html-generator"
 PRACTICE_CLASS_ROOT = "实践课HTML生成器/practice-class-html-generator"
+WHOLE_COURSE_ROOT = "整门课程编排器/whole-course-orchestrator"
+WHOLE_COURSE_BENCHMARK_ROOT = "benchmarks/WHOLE_COURSE_FAILURE_BENCHMARK_V1"
 ZERO_SHA = "0" * 40
 BOOLEAN_KEYS = (
     "docs_only",
@@ -36,6 +40,7 @@ BOOLEAN_KEYS = (
     "run_workorder",
     "run_courseware",
     "run_practice_class",
+    "run_whole_course",
     "run_tooling",
     "run_release",
     "run_package_contracts",
@@ -94,6 +99,7 @@ def _base_result(paths: Iterable[str]) -> dict[str, object]:
         "run_workorder": False,
         "run_courseware": False,
         "run_practice_class": False,
+        "run_whole_course": False,
         "run_tooling": False,
         "run_release": False,
         "run_package_contracts": False,
@@ -116,7 +122,7 @@ def _full_result(
     classification: str = "full",
 ) -> dict[str, object]:
     result = _base_result(paths)
-    _mark(result, "force_full", "run_lesson", "run_gradebook", "run_workorder", "run_courseware", "run_practice_class", "run_tooling", "run_release", "run_package_contracts")
+    _mark(result, "force_full", "run_lesson", "run_gradebook", "run_workorder", "run_courseware", "run_practice_class", "run_whole_course", "run_tooling", "run_release", "run_package_contracts")
     result["classification"] = classification
     result["reason"] = reason
     return result
@@ -125,7 +131,7 @@ def _full_result(
 def _classification(labels: set[str]) -> str:
     if not labels:
         return "full"
-    order = ("docs", "lesson", "gradebook", "workorder", "courseware", "practice_class", "tooling", "release")
+    order = ("docs", "lesson", "gradebook", "workorder", "courseware", "practice_class", "whole_course", "tooling", "release")
     return "+".join(label for label in order if label in labels)
 
 
@@ -210,6 +216,12 @@ def classify(
             _mark(result, "run_practice_class", "run_package_contracts")
             labels.add("practice_class")
             reasons.append("Practice Class HTML package")
+            continue
+
+        if _under(path, WHOLE_COURSE_ROOT) or _under(path, WHOLE_COURSE_BENCHMARK_ROOT):
+            _mark(result, "run_whole_course")
+            labels.add("whole_course")
+            reasons.append("Whole-Course Orchestrator architecture package")
             continue
 
         if path == "tools/template_package.py" or _under(path, "tools/template_tooling"):
@@ -336,6 +348,8 @@ def _required_jobs(result: dict[str, object]) -> list[str]:
         jobs.append("template-courseware")
     if result["run_practice_class"]:
         jobs.append("practice-class-html")
+    if result["run_whole_course"]:
+        jobs.append("whole-course-orchestrator")
     if result["run_release"]:
         jobs.append("template-release")
     return jobs
@@ -354,6 +368,7 @@ def _write_outputs(result: dict[str, object], output_path: Path | None, summary_
             "template-workorder",
             "template-courseware",
             "practice-class-html",
+            "whole-course-orchestrator",
             "template-release",
         )
         if name not in required
