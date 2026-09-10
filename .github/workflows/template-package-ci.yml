@@ -883,24 +883,58 @@ jobs:
       (needs.classify-changes.outputs.force_full == 'true' ||
       needs.classify-changes.outputs.run_whole_course == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+      WHOLE_COURSE_PLAYWRIGHT_ROOT: ${{ runner.temp }}/whole-course-node/node_modules/playwright
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js for whole-course browser evidence
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Chromium and Playwright for whole-course contact sheets
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/whole-course-node" --no-save playwright
+          "$RUNNER_TEMP/whole-course-node/node_modules/.bin/playwright" install chromium
+
       - name: Compile Whole-Course Orchestrator
         run: python -m compileall -q 整门课程编排器/whole-course-orchestrator
 
-      - name: Run architecture synthetic tests
+      - name: Run architecture and real-browser evidence tests
         run: python -m unittest discover -s 整门课程编排器/whole-course-orchestrator/tests -p 'test_*.py' -v
 
-      - name: Run downstream E2E and contact-sheet smoke
+      - name: Run strict downstream E2E and real contact-sheet proof
         shell: bash
         run: >-
           python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
           --output-dir "$RUNNER_TEMP/whole-course-e2e"
-          --no-browser
-          --allow-degraded-browser
+          --evidence-mode strict
+          --json
+
+      - name: Preserve migration-trust compatibility E2E as an intentional blocked regression
+        shell: bash
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/downstream_e2e.py
+          --output-dir "$RUNNER_TEMP/whole-course-migration-e2e"
+          --evidence-mode migration-trust
+          --expect-blocked
+          --json
+
+      - name: Replay real frozen whole-course failure benchmark
+        shell: bash
+        run: >-
+          python 整门课程编排器/whole-course-orchestrator/scripts/replay_failure_benchmark.py
+          --snapshot benchmarks/WHOLE_COURSE_FAILURE_BENCHMARK_V1/failure-evidence-snapshot.json
+          --benchmark-json benchmarks/WHOLE_COURSE_FAILURE_BENCHMARK_V1/whole-course-failure-benchmark.json
+          --output-json "$RUNNER_TEMP/whole-course-failure-replay.json"
+          --expect-fail
           --json
 
       - name: Validate install dry-run

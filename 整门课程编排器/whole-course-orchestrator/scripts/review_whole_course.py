@@ -465,6 +465,16 @@ def _render_metrics(rendered_course: dict[str, Any] | None, visual_evidence: dic
             "passed": sum(1 for item in (visual_evidence or {}).get("visual_plans", []) if item.get("evidence_status") == "PASS"),
             "total": len((visual_evidence or {}).get("visual_plans", [])),
         },
+        "semantic_marker_evidence": {
+            "status": (visual_evidence or {}).get("marker_plumbing_status", "NOT_RUN"),
+            "passed": sum(1 for item in (visual_evidence or {}).get("visual_plans", []) if item.get("semantic_marker_evidence", {}).get("status") == "PASS"),
+            "total": len((visual_evidence or {}).get("visual_plans", [])),
+        },
+        "semantic_structure_evidence": {
+            "status": (visual_evidence or {}).get("semantic_structure_status", "NOT_RUN"),
+            "passed": sum(1 for item in (visual_evidence or {}).get("visual_plans", []) if item.get("semantic_structure_evidence", {}).get("status") in {"PASS", "NOT_APPLICABLE"}),
+            "total": len((visual_evidence or {}).get("visual_plans", [])),
+        },
         "actual_asset_usage": {
             "rendered_asset_ids": sorted(set(str(item) for item in (visual_evidence or {}).get("rendered_asset_ids", []))),
             "status": "PASS" if visual_evidence and visual_evidence.get("status") == "PASS" else "NOT_RUN",
@@ -521,6 +531,8 @@ def review_rendered_course(
         )
     if visual_evidence and visual_evidence.get("status") == "FAIL":
         findings.append({"severity": "P0", "code": "RENDERED_VISUAL_EVIDENCE_INCOMPLETE"})
+    if visual_evidence and visual_evidence.get("marker_plumbing_status") == "PASS" and visual_evidence.get("semantic_structure_status") == "FAIL":
+        findings.append({"severity": "P0", "code": "SEMANTIC_MARKER_WITHOUT_STRUCTURE", "message": "semantic role markers were transported, but typed visual structure evidence failed"})
     if starter_evidence and starter_evidence.get("status") not in {"PASS"}:
         findings.append({"severity": "P0", "code": "STARTER_EVIDENCE_INCOMPLETE", "status": starter_evidence.get("status")})
     if rendered_course is not None and render_metrics["script_to_slide_grounding"]["status"] != "PASS":
@@ -561,6 +573,39 @@ def review_course(
     if any(value is not None for value in (render_evidence, starter_evidence, rendered_course, rendered_practice, contact_sheet)):
         return review_rendered_course(session_plans, practice_plans, graph, inventory, visual_evidence=render_evidence, starter_evidence=starter_evidence, rendered_course=rendered_course, rendered_practice=rendered_practice, contact_sheet=contact_sheet, research=research)
     return review_plan_architecture(session_plans, practice_plans, graph, inventory, visual_plans, research)
+
+
+def review_failure_benchmark(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Replay normalized evidence extracted from the real frozen failure.
+
+    The snapshot is intentionally converted into the same review inputs used
+    by normal planning QA.  No old renderer is rerun and no finding code is
+    injected into the result; findings must be derived from the normalized
+    session/page/task evidence.
+    """
+
+    theory = {"sessions": snapshot.get("theory_sessions", [])}
+    practice = {"sessions": snapshot.get("practice_sessions", [])}
+    session_ids = [str(item.get("id")) for item in theory.get("sessions", []) if item.get("id")]
+    graph = {"nodes": [], "sessions": [{"id": session_id, "knowledge_state_after": []} for session_id in session_ids]}
+    inventory = {"assets": snapshot.get("inventory_assets", [])}
+    result = review_course(theory, practice, graph, inventory)
+    result["report_type"] = "whole_course_failure_benchmark_replay"
+    result["benchmark_id"] = snapshot.get("source_benchmark_id")
+    result["evidence_provenance"] = {
+        "extracted_from_real_output": snapshot.get("extracted_from_real_output"),
+        "snapshot_sha256": snapshot.get("snapshot_sha256"),
+        "source_benchmark_sha256": snapshot.get("source_benchmark_sha256"),
+    }
+    return result
+
+
+def review_whole_course(value: dict[str, Any], *args: Any, **kwargs: Any) -> dict[str, Any]:
+    """Compatibility entry point for plan inputs and frozen snapshots."""
+
+    if isinstance(value, dict) and value.get("snapshot_type") == "REAL_FROZEN_FAILURE_EVIDENCE":
+        return review_failure_benchmark(value)
+    return review_course(value, *args, **kwargs)
 
 
 def main() -> None:

@@ -26,6 +26,24 @@ AUTHORITY_RANK = {
     "community": 1,
 }
 
+AUTHORITY_STATUS_RANK = {
+    "VERIFIED_OFFICIAL": 4,
+    "VERIFIED_ACADEMIC": 3,
+    "ASSESSED_REFERENCE": 2,
+    "UNVERIFIED_OFFICIAL_CLAIM": 1,
+    "UNKNOWN": 0,
+}
+
+VERIFICATION_BASES = {
+    "trusted publisher/domain identity",
+    "trusted_publisher_domain",
+    "trusted-domain-mapping",
+    "well-known-official-domain",
+    "explicit-source-registry",
+    "manual-verified-metadata",
+    "host-verified-publisher",
+}
+
 
 def _asset_is_visual(asset: dict[str, Any]) -> bool:
     return asset.get("type") in {"diagram", "screenshot", "table", "comparison", "image"} or bool(asset.get("shape_graph") or asset.get("rendered_visual_ref"))
@@ -124,6 +142,7 @@ def _url_metadata(candidate: dict[str, Any]) -> dict[str, Any]:
     metadata = dict(observed) if isinstance(observed, dict) else {}
     if parsed.netloc and "domain" not in metadata:
         metadata["domain"] = parsed.netloc.lower()
+        metadata.setdefault("domain_observation", "url-parser-only")
     if url and "url" not in metadata:
         metadata["url"] = url
     return metadata
@@ -132,23 +151,44 @@ def _url_metadata(candidate: dict[str, Any]) -> dict[str, Any]:
 def _authority_status(candidate: dict[str, Any], metadata: dict[str, Any]) -> tuple[str, str]:
     claimed = str(candidate.get("authority_level", candidate.get("authority", "community"))).lower()
     evidence = candidate.get("authority_evidence") or {}
-    issuer = candidate.get("issuer") or (evidence.get("issuer") if isinstance(evidence, dict) else None)
-    source_type = candidate.get("source_type") or (evidence.get("source_type") if isinstance(evidence, dict) else None)
-    domain = metadata.get("domain") or (evidence.get("domain") if isinstance(evidence, dict) else None)
-    if claimed in {"official", "standard", "official-documentation"} and (issuer or domain or source_type):
-        return "VERIFIED_CLAIM", "issuer/domain/source_type evidence is present"
+    if not isinstance(evidence, dict):
+        evidence = {}
+    publisher = metadata.get("publisher") or metadata.get("issuer") or candidate.get("publisher") or candidate.get("issuer") or evidence.get("publisher") or evidence.get("issuer")
+    source_type = metadata.get("source_type") or candidate.get("source_type") or evidence.get("source_type")
+    publisher_kind = str(metadata.get("publisher_kind") or metadata.get("publisher_type") or evidence.get("publisher_kind") or "").lower()
+    basis = str(metadata.get("verification_basis") or evidence.get("verification_basis") or candidate.get("verification_basis") or "").strip().lower()
+    trusted = bool(
+        candidate.get("verified_identity") is True
+        or evidence.get("verified_identity") is True
+        or metadata.get("verified_identity") is True
+        or basis in VERIFICATION_BASES
+        or basis.replace("_", "-") in VERIFICATION_BASES
+        or evidence.get("trusted_domain_mapping")
+        or candidate.get("trusted_domain_mapping")
+        or metadata.get("trusted_domain_mapping")
+    )
+    # A URL-derived domain is observed locator metadata, not an identity
+    # assertion.  Only an explicit publisher/issuer plus a trusted basis can
+    # upgrade a candidate to verified identity.
     if claimed in {"official", "standard", "official-documentation"}:
-        return "UNVERIFIED_CLAIM", "candidate authority label has no issuer/domain/source_type evidence"
-    return "ASSESSED_CLAIM", "authority is an agent assessment or source classification"
+        if trusted and publisher and (metadata.get("domain") or evidence.get("domain")):
+            return "VERIFIED_OFFICIAL", "publisher/domain identity is backed by an explicit trusted verification basis"
+        return "UNVERIFIED_OFFICIAL_CLAIM", "official authority is only a candidate claim; URL/domain presence is not identity verification"
+    if claimed in {"university-course", "academic"} or publisher_kind in {"university", "academic", "higher-education"}:
+        if trusted and publisher:
+            return "VERIFIED_ACADEMIC", "publisher metadata identifies an academic source and trusted verification evidence is present"
+        if publisher and source_type in {"university-course", "academic-paper", "university-publication"} and trusted:
+            return "VERIFIED_ACADEMIC", "academic source type and trusted publisher metadata are present"
+        return "ASSESSED_REFERENCE", "academic authority is an assessment without verified issuer identity"
+    if claimed in {"professional", "community", "reference", "unknown"} or not claimed:
+        return "ASSESSED_REFERENCE" if publisher or source_type else "UNKNOWN", "source remains a reference; no official identity was verified"
+    return "ASSESSED_REFERENCE", "authority is retained as an assessed reference and is not treated as official identity"
 
 
 def _score(candidate: dict[str, Any]) -> tuple[float, float, float, float]:
     metadata = _url_metadata(candidate)
     authority_status, _ = _authority_status(candidate, metadata)
-    authority = candidate.get("authority_level", candidate.get("authority", "community"))
-    rank = AUTHORITY_RANK.get(str(authority).lower(), 0)
-    if authority_status == "UNVERIFIED_CLAIM":
-        rank = min(rank, 1)
+    rank = AUTHORITY_STATUS_RANK.get(authority_status, 0)
     return (
         float(rank),
         float(candidate.get("relevance", 0) or 0),
@@ -169,11 +209,12 @@ def _candidate_allowed(candidate: dict[str, Any]) -> tuple[bool, str]:
     return True, ""
 
 
-def _origin_for(candidate: dict[str, Any]) -> str:
+def _origin_for(candidate: dict[str, Any], authority_status: str | None = None) -> str:
+    status = authority_status or _authority_status(candidate, _url_metadata(candidate))[0]
     authority = str(candidate.get("authority_level", candidate.get("authority", "community"))).lower()
-    if authority in {"official", "standard", "official-documentation"}:
+    if status == "VERIFIED_OFFICIAL":
         return "web_official"
-    if authority in {"university-course", "academic"}:
+    if status == "VERIFIED_ACADEMIC":
         return "web_academic"
     if authority == "professional":
         return "web_professional"
@@ -212,8 +253,8 @@ def _record_candidate(candidate: dict[str, Any], gap: dict[str, Any], timestamp:
         "gap_ids": candidate.get("gap_ids", [gap.get("id")]),
         "selected": selected,
         "selection_reason": reason,
-        "origin": _origin_for(candidate),
-        "origin_type": "external-authoritative" if authority_status == "VERIFIED_CLAIM" else "external-reference",
+        "origin": _origin_for(candidate, authority_status),
+        "origin_type": "external-authoritative" if authority_status in {"VERIFIED_OFFICIAL", "VERIFIED_ACADEMIC"} else "external-reference",
         "retrieved_at": candidate.get("retrieved_at", timestamp),
         "license_note": candidate.get("license_note"),
         "claims": candidate.get("claims", []),
@@ -228,7 +269,11 @@ def _record_candidate(candidate: dict[str, Any], gap: dict[str, Any], timestamp:
         "evidence_origin": {
             "authority_level": "candidate-claim",
             "authority_status": authority_status,
-            "verified_metadata": "candidate-observed-metadata" if metadata else "not-provided",
+            "trust_layers": {
+                "candidate_claim": candidate.get("authority_level", candidate.get("authority")),
+                "observed_metadata": metadata if metadata else None,
+                "verified_identity": authority_status in {"VERIFIED_OFFICIAL", "VERIFIED_ACADEMIC"},
+            },
         },
     }
 
@@ -288,7 +333,7 @@ def research(
         accepted = 0
         for candidate in matching:
             allowed, reason = _candidate_allowed(candidate)
-            if _authority_status(candidate, _url_metadata(candidate))[0] == "UNVERIFIED_CLAIM":
+            if _authority_status(candidate, _url_metadata(candidate))[0] == "UNVERIFIED_OFFICIAL_CLAIM":
                 reason = (reason + "; " if reason else "") + "authority claim is unverified; retained as reference only"
             record = _record_candidate(candidate, gap, timestamp, selected=False, reason=reason)
             if not allowed:
@@ -311,6 +356,11 @@ def research(
         "selected_source_count": len(selected),
         "rejected_source_count": len(rejected),
         "conflicts": _conflicts(user_facts or [], selected),
+        "authority_trust_model": {
+            "layers": ["CLAIMED", "OBSERVED_METADATA", "VERIFIED_IDENTITY"],
+            "statuses": sorted(AUTHORITY_STATUS_RANK),
+            "policy": "URL/domain presence is observed metadata only; official or academic rank requires explicit trusted publisher identity evidence",
+        },
         "provenance_policy": "user materials define the course; high-quality external sources enrich it and never silently replace it",
     }
 

@@ -2,7 +2,7 @@
 
 状态：`READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW`
 
-Phase 1.1 evidence-integrity and batch-QA repair is documented in [WHOLE-COURSE-PHASE-1.1-EVIDENCE-INTEGRITY-REPORT.md](WHOLE-COURSE-PHASE-1.1-EVIDENCE-INTEGRITY-REPORT.md). Its current final gate is `WHOLE_COURSE_ARCHITECTURE_BLOCKED` because browser/contact-sheet proof is unavailable; this Phase 1.0 report remains historical and is not upgraded by plan-only evidence.
+Phase 1.1 evidence-integrity and batch-QA repair is documented in [WHOLE-COURSE-PHASE-1.1-CLOSEOUT-REPORT.md](WHOLE-COURSE-PHASE-1.1-CLOSEOUT-REPORT.md); the earlier [evidence-integrity report](WHOLE-COURSE-PHASE-1.1-EVIDENCE-INTEGRITY-REPORT.md) is historical. Its current final gate is `WHOLE_COURSE_ARCHITECTURE_BLOCKED` because browser/contact-sheet proof is unavailable; this Phase 1.0 report remains historical and is not upgraded by plan-only evidence.
 
 本报告只覆盖架构实现、synthetic tests、基准冻结和可审计输出接口。真实 UML `9 PPT × 16 theory + 16 practice` blind retry 尚未运行，也不在本阶段声称 `WHOLE_COURSE_PASS`。
 

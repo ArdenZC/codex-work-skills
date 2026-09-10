@@ -28,6 +28,8 @@ outputs:
   - source-portfolio.html
   - whole-course-e2e.json
   - contact-sheet-evidence.json
+  - failure-evidence-snapshot.json
+  - failure-benchmark-replay.json
 integrity_contract: "1.1"
 evidence_state_model:
   required: "contract and question-specific acceptance requirement"

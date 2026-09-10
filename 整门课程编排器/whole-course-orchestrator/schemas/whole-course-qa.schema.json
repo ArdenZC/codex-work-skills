@@ -7,7 +7,7 @@
   "properties": {
     "schema_version": {"enum": ["1.0", "1.1"]},
     "report_type": {"const": "whole_course_batch_qa"},
-    "status": {"enum": ["PASS", "FAIL", "NOT_EVALUATED"]},
+    "status": {"enum": ["PASS", "FAIL", "NOT_EVALUATED", "BLOCKED"]},
     "architecture_status": {"enum": ["READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW", "WHOLE_COURSE_ARCHITECTURE_BLOCKED"]},
     "metrics": {"type": "object"},
     "findings": {"type": "array", "items": {"type": "object"}}

@@ -39,6 +39,18 @@ def _write_source_fixture(path: Path) -> None:
         archive.writestr("ppt/slides/slide3.xml", _slide_xml("Procedure: open edit verify", 1))
 
 
+def _write_source_truth_fixture(path: Path) -> None:
+    # The strict downstream handoff needs a real source-root fact that the
+    # stable Courseware/Practice validators can verify.  It is deliberately a
+    # tiny source fixture, not a replacement for the user PPT evidence.
+    path.write_text(
+        "Synthetic source fixture for strict adapter verification.\n"
+        "source-backed teaching evidence\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+
+
 class _TeacherScriptParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -93,7 +105,14 @@ def _run_renderer(script: Path, args: list[str]) -> dict[str, Any]:
     return load_json(report) if report.is_file() else {"status": "pass", "output_dir": str(output_dir)}
 
 
-def run_synthetic_e2e(output_dir: str | Path | None = None, *, use_browser: bool = True) -> dict[str, Any]:
+def run_synthetic_e2e(
+    output_dir: str | Path | None = None,
+    *,
+    use_browser: bool = True,
+    evidence_mode: str = "migration-trust",
+) -> dict[str, Any]:
+    if evidence_mode not in {"strict", "migration-trust"}:
+        raise ValueError(f"unsupported evidence mode: {evidence_mode}")
     owned_temp = tempfile.TemporaryDirectory(prefix="whole-course-e2e-") if output_dir is None else None
     root = Path(output_dir or owned_temp.name).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -101,6 +120,7 @@ def run_synthetic_e2e(output_dir: str | Path | None = None, *, use_browser: bool
     source_root.mkdir(exist_ok=True)
     source = source_root / "synthetic-course.pptx"
     _write_source_fixture(source)
+    _write_source_truth_fixture(source_root / "source_truth.txt")
     assets_dir = root / "assets"
     inventory = mine_sources(source_root, assets_dir)
     graph_input = {
@@ -159,9 +179,18 @@ def run_synthetic_e2e(output_dir: str | Path | None = None, *, use_browser: bool
         courseware_json = root / f"{session_id}-courseware.json"
         courseware_dir = root / f"{session_id}-courseware"
         session_visual_plans = [item for item in visual_plans["visual_plans"] if item.get("session_id") == session_id]
+        if evidence_mode == "strict":
+            # This is an explicit fixture for the structure adapter.  The
+            # marker-only path remains available to unit tests and migration
+            # callers that do not claim typed semantic structure.
+            session_visual_plans = [dict(item, semantic_structure_fixture=True) for item in session_visual_plans]
         dump_json(adapt_session_to_courseware(session_plan, visual_plans=session_visual_plans), courseware_json)
-        courseware_qa = _run_renderer(courseware_script, ["--content-json", str(courseware_json), "--output-dir", str(courseware_dir), "--replace", "--evidence-mode", "migration-trust", "--json"])
-        theory_item = {"id": session_id, "title": session_plan.get("title"), "student_html": str(courseware_dir / "student.html"), "teacher_html": str(courseware_dir / "teacher.html"), "qa": courseware_qa}
+        courseware_args = ["--content-json", str(courseware_json), "--output-dir", str(courseware_dir), "--replace", "--evidence-mode", evidence_mode]
+        if evidence_mode == "strict":
+            courseware_args.extend(["--source-root", str(source_root)])
+        courseware_args.append("--json")
+        courseware_qa = _run_renderer(courseware_script, courseware_args)
+        theory_item = {"id": session_id, "title": session_plan.get("title"), "student_html": str(courseware_dir / "student.html"), "teacher_html": str(courseware_dir / "teacher.html"), "evidence_mode": evidence_mode, "qa": courseware_qa}
         theory_outputs.append(theory_item)
         visual_subset = {"schema_version": "1.1", "plan_type": "semantic_visual_plans", "visual_plans": [item for item in visual_plans["visual_plans"] if item.get("session_id") == session_id]}
         visual_evidence.append(collect_visual_evidence(visual_subset, courseware_dir / "student.html", courseware_dir / "teacher.html"))
@@ -169,8 +198,12 @@ def run_synthetic_e2e(output_dir: str | Path | None = None, *, use_browser: bool
         practice_json = root / f"{session_id}-practice.json"
         practice_dir = root / f"{session_id}-practice"
         dump_json(adapt_session_to_practice(practice_plan, source_pages=session_plan.get("pages", [])), practice_json)
-        practice_qa = _run_renderer(practice_script, ["--practice-json", str(practice_json), "--courseware-json", str(courseware_json), "--output-dir", str(practice_dir), "--replace", "--evidence-mode", "migration-trust", "--json"])
-        practice_item = {"id": session_id, "title": practice_plan.get("title"), "student_dir": str(practice_dir / "student"), "teacher_dir": str(practice_dir / "teacher"), "qa": practice_qa, "tasks": practice_plan.get("tasks", [])}
+        practice_args = ["--practice-json", str(practice_json), "--courseware-json", str(courseware_json), "--output-dir", str(practice_dir), "--replace", "--evidence-mode", evidence_mode]
+        if evidence_mode == "strict":
+            practice_args.extend(["--source-root", str(source_root)])
+        practice_args.append("--json")
+        practice_qa = _run_renderer(practice_script, practice_args)
+        practice_item = {"id": session_id, "title": practice_plan.get("title"), "student_dir": str(practice_dir / "student"), "teacher_dir": str(practice_dir / "teacher"), "evidence_mode": evidence_mode, "qa": practice_qa, "tasks": practice_plan.get("tasks", [])}
         practice_outputs.append(practice_item)
         if practice_plan.get("tasks"):
             task = practice_plan["tasks"][0]
@@ -179,14 +212,24 @@ def run_synthetic_e2e(output_dir: str | Path | None = None, *, use_browser: bool
             starter_evidence = {"status": "NOT_OBSERVED"}
         practice_item["starter_evidence"] = starter_evidence
         rendered_sessions.append({"id": session_id, "pages": _courseware_rendered_pages(courseware_dir / "teacher.html")})
-    merged_visual = {"schema_version": "1.1", "report_type": "whole_course_visual_evidence", "status": "PASS" if all(item.get("status") == "PASS" for item in visual_evidence) else "FAIL", "visual_plans": [plan for item in visual_evidence for plan in item.get("visual_plans", [])], "rendered_asset_ids": sorted({asset for item in visual_evidence for asset in item.get("rendered_asset_ids", [])})}
+    merged_visual_plans = [plan for item in visual_evidence for plan in item.get("visual_plans", [])]
+    merged_visual = {
+        "schema_version": "1.1",
+        "report_type": "whole_course_visual_evidence",
+        "status": "PASS" if all(item.get("evidence_status") == "PASS" for item in merged_visual_plans) else "FAIL" if merged_visual_plans else "PASS",
+        "visual_plans": merged_visual_plans,
+        "rendered_asset_ids": sorted({asset for item in visual_evidence for asset in item.get("rendered_asset_ids", [])}),
+        "marker_plumbing_status": "PASS" if merged_visual_plans and all(item.get("semantic_marker_evidence", {}).get("status") == "PASS" for item in merged_visual_plans) else "NOT_APPLICABLE" if not merged_visual_plans else "FAIL",
+        "semantic_structure_status": "PASS" if merged_visual_plans and all(item.get("semantic_structure_evidence", {}).get("status") in {"PASS", "NOT_APPLICABLE"} for item in merged_visual_plans) else "NOT_APPLICABLE" if not merged_visual_plans else "FAIL",
+    }
     merged_starter = {"schema_version": "1.1", "report_type": "whole_course_starter_evidence", "status": "PASS" if all(item.get("starter_evidence", {}).get("status") == "PASS" for item in practice_outputs) else "FAIL", "starter_observed": sorted({value for item in practice_outputs for value in item.get("starter_evidence", {}).get("starter_observed", [])})}
     contact = build_contact_sheets(theory_outputs, practice_outputs, root / "contact-sheets", visual_plans=visual_plans, inventory=inventory, use_browser=use_browser)
     rendered_course = {"sessions": rendered_sessions}
     report = review_rendered_course(session_plans, practice_plans, graph, inventory, visual_evidence=merged_visual, starter_evidence=merged_starter, rendered_course=rendered_course, rendered_practice={"sessions": practice_outputs}, contact_sheet=contact)
-    browser_status = "PASS" if contact.get("status") == "PASS" else "UNAVAILABLE_OR_DEGRADED"
+    browser_status = "PASS" if contact.get("status") == "PASS" else "FAIL" if contact.get("status") == "FAIL" else "UNAVAILABLE_OR_DEGRADED"
     final_status = report["final_status"] if browser_status == "PASS" else "WHOLE_COURSE_ARCHITECTURE_BLOCKED"
-    result = {"schema_version": "1.1", "report_type": "whole_course_downstream_e2e", "status": final_status, "browser_smoke_status": browser_status, "source_mining": {"slides": len(inventory.get("source_slides", [])), "assets": len(inventory.get("assets", []))}, "courseware": theory_outputs, "practice": practice_outputs, "visual_evidence": merged_visual, "starter_evidence": merged_starter, "contact_sheets": contact, "qa": report, "pipeline": ["source fixture", "teaching asset mining", "knowledge graph", "session plan", "visual plan", "Courseware adapter", "real Courseware renderer", "visual evidence", "Practice adapter", "real Practice renderer", "starter evidence", "whole-course QA", "contact sheets"]}
+    strict_status = "PASS" if evidence_mode == "strict" and all(item.get("qa", {}).get("status") == "pass" for item in theory_outputs + practice_outputs) else "NOT_RUN" if evidence_mode != "strict" else "FAIL"
+    result = {"schema_version": "1.1", "report_type": "whole_course_downstream_e2e", "status": final_status, "browser_smoke_status": browser_status, "evidence_mode": evidence_mode, "strict_e2e_status": strict_status, "source_mining": {"slides": len(inventory.get("source_slides", [])), "assets": len(inventory.get("assets", []))}, "courseware": theory_outputs, "practice": practice_outputs, "visual_evidence": merged_visual, "starter_evidence": merged_starter, "contact_sheets": contact, "qa": report, "pipeline": ["source fixture", "teaching asset mining", "knowledge graph", "session plan", "visual plan", "Courseware adapter", f"real Courseware renderer ({evidence_mode})", "visual evidence", "Practice adapter", f"real Practice renderer ({evidence_mode})", "starter evidence", "whole-course QA", "contact sheets"]}
     dump_json(result, root / "whole-course-e2e.json")
     if owned_temp:
         result["output_dir"] = str(root)
@@ -199,23 +242,39 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--evidence-mode", choices=("strict", "migration-trust"), default="migration-trust")
+    parser.add_argument("--strict", action="store_true", help="shorthand for --evidence-mode strict")
     parser.add_argument(
         "--allow-degraded-browser",
         action="store_true",
         help="allow a browser-unavailable smoke to exit 0 while preserving the BLOCKED result",
     )
+    parser.add_argument(
+        "--expect-blocked",
+        action="store_true",
+        help="accept the migration-trust compatibility run only when its intentional evidence gate remains BLOCKED",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
-    result = run_synthetic_e2e(args.output_dir, use_browser=not args.no_browser)
+    evidence_mode = "strict" if args.strict else args.evidence_mode
+    result = run_synthetic_e2e(args.output_dir, use_browser=not args.no_browser, evidence_mode=evidence_mode)
     if args.json:
         print({"status": result["status"], "browser_smoke_status": result["browser_smoke_status"], "courseware": len(result["courseware"]), "practice": len(result["practice"])})
     accepted_degraded_smoke = (
         args.allow_degraded_browser
+        and evidence_mode == "migration-trust"
         and result["status"] == "WHOLE_COURSE_ARCHITECTURE_BLOCKED"
         and result["browser_smoke_status"] == "UNAVAILABLE_OR_DEGRADED"
         and result.get("qa", {}).get("final_status") == "PASS"
     )
-    raise SystemExit(0 if result["status"] in {"PASS", "READY_FOR_WHOLE_COURSE_BLIND_RETRY"} or accepted_degraded_smoke else 1)
+    accepted_expected_migration_block = (
+        args.expect_blocked
+        and evidence_mode == "migration-trust"
+        and result["status"] == "WHOLE_COURSE_ARCHITECTURE_BLOCKED"
+        and result.get("qa", {}).get("final_status") == "FAIL"
+        and result.get("visual_evidence", {}).get("semantic_structure_status") == "FAIL"
+    )
+    raise SystemExit(0 if result["status"] in {"PASS", "READY_FOR_WHOLE_COURSE_BLIND_RETRY"} or accepted_degraded_smoke or accepted_expected_migration_block else 1)
 
 
 if __name__ == "__main__":

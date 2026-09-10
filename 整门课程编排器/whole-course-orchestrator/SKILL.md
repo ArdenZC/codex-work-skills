@@ -33,7 +33,9 @@ Phase 1.1 adds evidence integrity and downstream batch QA to the 1.0 architectur
 8. **Whole-course QA**：跨 session 计算结构、文本、视觉、知识边界、素材使用和实践签名，检查模板坍缩、source underutilization、脚本同构、比较逻辑、quiz distractor、知识越界和研究质量。
 9. **Package**：输出干净的教师课程包与独立 evidence 目录。最终包不得同时暴露 `student/` 和 `student-package/student/` 两棵重复学生树；所有用户可见文件名必须经过 `safe_filename()`。
 
-10. **Observe final artifacts**：对 Courseware 从最终 DOM 读取 semantic/source markers；对 Practice 从实际 starter 文件、manifest、QA 和 behavior evidence 读取 typed evidence；对 contact sheet 区分真实浏览器 thumbnail 与无浏览器的 `DEGRADED` fallback。`PLANNED_NOT_OBSERVED`、`NOT_OBSERVED` 和 `UNAVAILABLE_OR_DEGRADED` 必须保留，不能自动升级为 PASS。
+10. **Observe final artifacts**：对 Courseware 从最终 DOM 读取 semantic/source markers，并把 marker plumbing 与 typed semantic structure 分开验证；对 Practice 从实际 starter 文件、manifest、QA 和 behavior evidence 读取 typed evidence；对 contact sheet 区分真实浏览器 thumbnail、浏览器部分失败和无浏览器的 `DEGRADED` fallback。`PLANNED_NOT_OBSERVED`、`NOT_OBSERVED` 和 `UNAVAILABLE_OR_DEGRADED` 必须保留，不能自动升级为 PASS。
+
+11. **Trust external authority explicitly**：外部来源保留 `CLAIMED`、`OBSERVED_METADATA`、`VERIFIED_IDENTITY` 三层。URL/domain 只能提供观察到的定位元数据，不能单独升级为官方或学术身份；输出状态为 `VERIFIED_OFFICIAL`、`VERIFIED_ACADEMIC`、`ASSESSED_REFERENCE`、`UNVERIFIED_OFFICIAL_CLAIM` 或 `UNKNOWN`。
 
 ## 外部资料规则
 
@@ -48,11 +50,11 @@ Phase 1.1 adds evidence integrity and downstream batch QA to the 1.0 architectur
 - 用户禁网时记录 `EXTERNAL_RESEARCH_DISABLED_BY_USER`，不得偷偷搜索；
 - automated QA 通过不等于教师人工教学验收通过；
 - rendered Courseware/Practice QA 通过不等于 browser smoke 或 contact-sheet proof 通过；
-- 真实 UML failure benchmark 在架构评审前不重跑，第一阶段状态只能是 `READY_FOR_WHOLE_COURSE_ARCHITECTURE_REVIEW` 或 `WHOLE_COURSE_ARCHITECTURE_BLOCKED`；没有 browser runtime 时必须选择后者。
+- 真实 UML failure benchmark 在架构评审前不重跑；只能从冻结输出提取 normalized snapshot 并用 `EXPECT_FAIL` 回放。正式 strict downstream gate 必须使用真实 Courseware/Practice renderer、Node/Playwright/Chromium 和真实 contact-sheet screenshots；浏览器缺失时必须选择 `WHOLE_COURSE_ARCHITECTURE_BLOCKED`。
 
 ## 交付合同
 
-核心输出包括：`source-assets.json`、`source-teaching-asset-report.json`、`knowledge-graph.json`、`session-plans.json`、`visual-plans.json`、`practice-plans.json`、`external-source-research.json`、`whole-course-qa.json`、`whole-course-e2e.json`、`contact-sheet-evidence.json`、`source-portfolio.html` 以及干净课程包。它们是给下游 Skill 与教师审计使用的中间层，不是新的 HTML 渲染格式。
+核心输出包括：`source-assets.json`、`source-teaching-asset-report.json`、`knowledge-graph.json`、`session-plans.json`、`visual-plans.json`、`practice-plans.json`、`external-source-research.json`、`whole-course-qa.json`、`contact-sheet-evidence.json`、`failure-evidence-snapshot.json`、`failure-benchmark-replay.json`、`source-portfolio.html` 以及干净课程包。它们是给下游 Skill 与教师审计使用的中间层，不是新的 HTML 渲染格式。
 
 ## 运行入口
 
@@ -63,6 +65,8 @@ python scripts/plan_sessions.py --course-json <course-map.json> --knowledge-grap
 python scripts/plan_visuals.py --session-plans <session-plans.json> --assets <source-assets.json> --output-json <visual-plans.json> --json
 python scripts/plan_practice.py --course-json <course-map.json> --knowledge-graph <knowledge-graph.json> --output-json <practice-plans.json> --json
 python scripts/review_whole_course.py --session-plans <session-plans.json> --practice-plans <practice-plans.json> --knowledge-graph <knowledge-graph.json> --assets <source-assets.json> --output-json <whole-course-qa.json> --json
-python scripts/downstream_e2e.py --output-dir <e2e-dir> --no-browser --allow-degraded-browser --json
+python scripts/downstream_e2e.py --output-dir <e2e-dir> --evidence-mode strict --json
+python scripts/downstream_e2e.py --output-dir <migration-dir> --evidence-mode migration-trust --expect-blocked --json
+python scripts/replay_failure_benchmark.py --snapshot <failure-evidence-snapshot.json> --benchmark-json <whole-course-failure-benchmark.json> --expect-fail --json
 python scripts/package_course.py --package-json <package-manifest.json> --output-dir <course-package> --json
 ```

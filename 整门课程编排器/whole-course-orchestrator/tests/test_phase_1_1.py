@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import base64
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -14,19 +16,36 @@ sys.path.insert(0, str(SKILL_ROOT / "scripts"))
 
 from collect_starter_evidence import collect_starter_evidence  # noqa: E402
 from collect_visual_evidence import collect_visual_evidence  # noqa: E402
+import contact_sheets  # noqa: E402
 from contact_sheets import build_contact_sheets  # noqa: E402
-from downstream_adapters import _drawio_starter  # noqa: E402
+from downstream_adapters import _drawio_starter, _typed_structure_svg  # noqa: E402
 from downstream_e2e import run_synthetic_e2e  # noqa: E402
-from external_research import detect_gaps, resolve_asset_knowledge_links  # noqa: E402
+from external_research import detect_gaps, resolve_asset_knowledge_links, research  # noqa: E402
+from extract_failure_benchmark_evidence import extract  # noqa: E402
 from mine_teaching_assets import mine_sources  # noqa: E402
 from plan_practice import typed_starter  # noqa: E402
 from plan_sessions import build_plans  # noqa: E402
-from review_whole_course import review_course, review_rendered_course  # noqa: E402
+from replay_failure_benchmark import replay, verify_snapshot  # noqa: E402
+from review_whole_course import review_course, review_failure_benchmark, review_rendered_course  # noqa: E402
 from build_knowledge_graph import build_graph  # noqa: E402
 from orchestrator_core import OrchestrationError  # noqa: E402
 
 
 PNG_1X1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
+
+
+def _worktree_is_clean() -> bool:
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=SKILL_ROOT.parents[1],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return False
+    return result.returncode == 0 and not result.stdout.strip()
 
 
 def _slide_xml(title: str, *, connectors: bool = False, image: bool = False, table: bool = False) -> bytes:
@@ -99,7 +118,7 @@ class Phase11EvidenceTests(unittest.TestCase):
         self.assertEqual(result["visual_plans"][0]["evidence_status"], "PLANNED_NOT_OBSERVED")
 
     def test_t18_rendered_visual_markers_pass_through_nested_dom(self) -> None:
-        html = '<section data-page-id="p1"><div><figure data-artifact-type="class_model" data-semantic-role="class relationship multiplicity" data-source-asset-id="asset-1"><svg></svg></figure></div></section>'
+        html = f'<section data-page-id="p1"><div><figure data-artifact-type="class_model" data-semantic-role="class relationship multiplicity" data-source-asset-id="asset-1">{_typed_structure_svg("class_model", ["class", "relationship", "multiplicity"])}</figure></div></section>'
         result = collect_visual_evidence({"visual_plans": [{"page_id": "p1", "artifact_type": "class_model", "required_semantic_elements": ["class", "relationship", "multiplicity"]}]}, html)
         self.assertEqual(result["status"], "PASS")
         self.assertEqual(result["visual_plans"][0]["evidence_status"], "PASS")
@@ -197,7 +216,9 @@ class Phase11EvidenceTests(unittest.TestCase):
             self.assertEqual(result["browser_smoke_status"], "UNAVAILABLE_OR_DEGRADED")
             self.assertEqual(len(result["courseware"]), 3)
             self.assertEqual(len(result["practice"]), 3)
-            self.assertEqual(result["visual_evidence"]["status"], "PASS")
+            self.assertEqual(result["visual_evidence"]["status"], "FAIL")
+            self.assertEqual(result["visual_evidence"]["marker_plumbing_status"], "PASS")
+            self.assertEqual(result["visual_evidence"]["semantic_structure_status"], "FAIL")
             self.assertEqual(result["starter_evidence"]["status"], "PASS")
             self.assertTrue(all(Path(item["student_html"]).is_file() for item in result["courseware"]))
             self.assertTrue(all(Path(item["student_dir"]).is_dir() for item in result["practice"]))
@@ -215,6 +236,146 @@ class Phase11EvidenceTests(unittest.TestCase):
             self.assertGreaterEqual(result["thumbnail_count"], 2)
             self.assertTrue(all(Path(path).is_file() for path in result["thumbnail_paths"]))
             self.assertIn("<img", (root / "contact" / "course-contact-sheet.html").read_text(encoding="utf-8"))
+
+    def test_t34_visual_plan_without_observed_visual_fails_overall(self) -> None:
+        result = collect_visual_evidence({"visual_plans": [{"page_id": "p1", "artifact_type": "class_model", "required_semantic_elements": []}]}, '<section data-page-id="p1"><p>only text</p></section>')
+        self.assertEqual(result["visual_plans"][0]["evidence_status"], "PLANNED_NOT_OBSERVED")
+        self.assertEqual(result["status"], "FAIL")
+
+    def test_t35_supporting_visual_with_real_svg_passes(self) -> None:
+        result = collect_visual_evidence({"visual_plans": [{"page_id": "p1", "visual_intent": "supporting_visual", "required_semantic_elements": []}]}, '<section data-page-id="p1"><figure><svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg></figure></section>')
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["visual_plans"][0]["semantic_structure_evidence"]["status"], "NOT_APPLICABLE")
+
+    def test_t36_semantic_markers_without_structure_fail_typed_visual(self) -> None:
+        html = '<section data-page-id="p1"><figure data-artifact-type="class_model" data-semantic-role="class relationship multiplicity"><svg><rect data-semantic-role="class"/><rect data-semantic-role="relationship"/><rect data-semantic-role="multiplicity"/></svg></figure></section>'
+        result = collect_visual_evidence({"visual_plans": [{"page_id": "p1", "artifact_type": "class_model", "required_semantic_elements": ["class", "relationship", "multiplicity"]}]}, html)
+        plan = result["visual_plans"][0]
+        self.assertEqual(plan["semantic_marker_evidence"]["status"], "PASS")
+        self.assertEqual(plan["semantic_structure_evidence"]["status"], "FAIL")
+        self.assertEqual(plan["evidence_status"], "FAIL")
+        self.assertEqual(result["status"], "FAIL")
+
+    def test_t37_real_typed_structure_fixture_passes(self) -> None:
+        html = f'<section data-page-id="p1"><figure data-artifact-type="class_model" data-semantic-role="class relationship multiplicity">{_typed_structure_svg("class_model", ["class", "relationship", "multiplicity"])}</figure></section>'
+        result = collect_visual_evidence({"visual_plans": [{"page_id": "p1", "artifact_type": "class_model", "required_semantic_elements": ["class", "relationship", "multiplicity"]}]}, html)
+        self.assertEqual(result["visual_plans"][0]["semantic_structure_evidence"]["status"], "PASS")
+        self.assertEqual(result["status"], "PASS")
+
+    def test_t38_all_typed_structure_validators_require_real_endpoints(self) -> None:
+        fixtures = {
+            "class_model": ["class", "relationship", "multiplicity"],
+            "sequence_model": ["lifeline", "message"],
+            "state_model": ["state", "transition"],
+            "deployment_model": ["node", "communication_link"],
+            "use_case_model": ["actor", "use_case", "association"],
+            "activity_model": ["action", "control_flow"],
+        }
+        for artifact, roles in fixtures.items():
+            with self.subTest(artifact=artifact):
+                svg = _typed_structure_svg(artifact, roles)
+                html = f'<section data-page-id="p1"><figure data-artifact-type="{artifact}" data-semantic-role="{" ".join(roles)}">{svg}</figure></section>'
+                result = collect_visual_evidence({"visual_plans": [{"page_id": "p1", "artifact_type": artifact, "required_semantic_elements": roles}]}, html)
+                evidence = result["visual_plans"][0]["semantic_structure_evidence"]
+                self.assertEqual(evidence["status"], "PASS", evidence)
+
+    def test_t39_fake_official_domain_is_unverified(self) -> None:
+        result = research(
+            [{"id": "g1", "type": "missing_visual", "topic": "关系"}],
+            [{"gap_ids": ["g1"], "source_url": "https://random-blog.example/article", "authority": "official", "relevance": 0.9, "student_level_fit": 0.9, "teaching_value": 0.9}],
+        )
+        self.assertEqual(result["sources"][0]["authority_status"], "UNVERIFIED_OFFICIAL_CLAIM")
+        self.assertLess(result["sources"][0]["agent_assessment"]["relevance"], 1.0)
+        self.assertEqual(result["sources"][0]["origin_type"], "external-reference")
+
+    def test_t40_verified_official_identity_can_rank_official(self) -> None:
+        result = research(
+            [{"id": "g1", "type": "missing_visual", "topic": "关系"}],
+            [{"gap_ids": ["g1"], "source_url": "https://omg.org/spec", "authority": "official", "verified_metadata": {"publisher": "OMG", "domain": "omg.org", "verification_basis": "trusted publisher/domain identity"}, "relevance": 0.9, "student_level_fit": 0.9, "teaching_value": 0.9}],
+        )
+        self.assertEqual(result["sources"][0]["authority_status"], "VERIFIED_OFFICIAL")
+        self.assertEqual(result["sources"][0]["origin"], "web_official")
+        self.assertEqual(result["sources"][0]["origin_type"], "external-authoritative")
+
+    def test_t40_verified_academic_identity_can_rank_academic(self) -> None:
+        result = research(
+            [{"id": "g1", "type": "missing_visual", "topic": "关系"}],
+            [{"gap_ids": ["g1"], "source_url": "https://university.example/course", "authority": "academic", "verified_metadata": {"publisher": "Example University", "domain": "university.example", "publisher_kind": "university", "verification_basis": "explicit-source-registry"}, "relevance": 0.9, "student_level_fit": 0.9, "teaching_value": 0.9}],
+        )
+        self.assertEqual(result["sources"][0]["authority_status"], "VERIFIED_ACADEMIC")
+        self.assertEqual(result["sources"][0]["origin"], "web_academic")
+        self.assertEqual(result["sources"][0]["origin_type"], "external-authoritative")
+
+    def test_t41_strict_downstream_e2e_reaches_both_renderers(self) -> None:
+        if not _worktree_is_clean():
+            self.skipTest("strict provenance requires a committed clean worktree; rerun after the closeout commit")
+        with tempfile.TemporaryDirectory() as temp:
+            result = run_synthetic_e2e(temp, use_browser=False, evidence_mode="strict")
+            self.assertEqual(result["strict_e2e_status"], "PASS")
+            self.assertEqual(result["visual_evidence"]["status"], "PASS")
+            self.assertEqual(result["visual_evidence"]["semantic_structure_status"], "PASS")
+            self.assertEqual(result["browser_smoke_status"], "UNAVAILABLE_OR_DEGRADED")
+
+    def test_t42_migration_mode_is_not_strict_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            result = run_synthetic_e2e(temp, use_browser=False, evidence_mode="migration-trust")
+            self.assertEqual(result["evidence_mode"], "migration-trust")
+            self.assertEqual(result["strict_e2e_status"], "NOT_RUN")
+            self.assertEqual(result["visual_evidence"]["marker_plumbing_status"], "PASS")
+            self.assertEqual(result["visual_evidence"]["semantic_structure_status"], "FAIL")
+
+    def test_t43_browser_disabled_is_degraded_not_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            student = root / "student.html"
+            student.write_text('<section data-page-id="p1"><h1>Page</h1><svg><circle cx="5" cy="5" r="4"/></svg></section>', encoding="utf-8")
+            result = build_contact_sheets([{"id": "s1", "student_html": str(student)}], [], root / "contact", use_browser=False)
+            self.assertEqual(result["status"], "DEGRADED")
+            self.assertFalse(result["browser_rendered"])
+            self.assertGreater(result["fallback_count"], 0)
+
+    def test_t43_browser_contact_sheet_real_screenshot_if_runtime_available(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            student = root / "student.html"
+            student.write_text('<section data-page-id="p1"><h1>Page</h1><p>Evidence</p></section>', encoding="utf-8")
+            result = build_contact_sheets([{"id": "s1", "student_html": str(student)}], [], root / "contact", use_browser=True)
+            if result.get("status") == "DEGRADED" and result.get("browser_unavailable"):
+                self.skipTest("no Chromium/Playwright runtime is available on this host")
+            self.assertEqual(result["status"], "PASS", result)
+            self.assertGreater(result["screenshot_count"], 0)
+            self.assertEqual(result["fallback_count"], 0)
+
+    def test_t43_browser_contact_sheet_partial_screenshot_failure_is_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            student = root / "student.html"
+            student.write_text('<section data-page-id="p1"><h1>Page</h1><p>Evidence</p></section>', encoding="utf-8")
+            with patch.object(contact_sheets, "_try_playwright", return_value=([], {"method": "playwright", "runtime": "Chromium/Playwright", "version": "test", "error": None})):
+                result = build_contact_sheets([{"id": "s1", "student_html": str(student)}], [], root / "contact", use_browser=True)
+            self.assertEqual(result["status"], "FAIL")
+            self.assertTrue(result["browser_failures"])
+            self.assertGreater(result["fallback_count"], 0)
+
+    def test_t44_failure_snapshot_provenance_and_replay(self) -> None:
+        benchmark_path = SKILL_ROOT.parents[1] / "benchmarks" / "WHOLE_COURSE_FAILURE_BENCHMARK_V1" / "whole-course-failure-benchmark.json"
+        with tempfile.TemporaryDirectory() as temp:
+            snapshot_path = Path(temp) / "failure-evidence-snapshot.json"
+            snapshot = extract(benchmark_path, snapshot_path)
+            self.assertTrue(snapshot["extracted_from_real_output"])
+            self.assertEqual(verify_snapshot(snapshot, benchmark_path)["status"], "PASS")
+            replayed = replay(snapshot_path, benchmark_path=benchmark_path, expect_fail=True)
+            self.assertEqual(replayed["status"], "PASS")
+            self.assertEqual(replayed["review"]["status"], "FAIL")
+            self.assertTrue({"WHOLE_COURSE_TEMPLATE_COLLAPSE", "SCRIPT_CROSS_SESSION_TEMPLATE_REUSE", "WHOLE_COURSE_PRACTICE_TEMPLATE_COLLAPSE"} <= set(replayed["observed_finding_codes"]))
+
+    def test_t45_browser_required_mode_does_not_allow_degraded_exit(self) -> None:
+        if not _worktree_is_clean():
+            self.skipTest("strict provenance requires a committed clean worktree; rerun after the closeout commit")
+        with tempfile.TemporaryDirectory() as temp:
+            result = run_synthetic_e2e(temp, use_browser=False, evidence_mode="strict")
+            self.assertEqual(result["status"], "WHOLE_COURSE_ARCHITECTURE_BLOCKED")
+            self.assertEqual(result["browser_smoke_status"], "UNAVAILABLE_OR_DEGRADED")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # Whole-Course Orchestration Phase 1.1 — Evidence Integrity & Batch QA Repair
 
+> Historical Phase 1.1 report. The current authoritative closeout is [WHOLE-COURSE-PHASE-1.1-CLOSEOUT-REPORT.md](WHOLE-COURSE-PHASE-1.1-CLOSEOUT-REPORT.md), which supersedes the earlier marker-only visual and degraded-browser wording below.
+
 状态：`WHOLE_COURSE_ARCHITECTURE_BLOCKED`
 
 本报告是 Phase 1.1 对 [Phase 1.0 架构报告](WHOLE-COURSE-ARCHITECTURE-REPORT.md) 的证据完整性补充。它只报告本分支上的架构修复、synthetic downstream E2E 和批量 QA；没有运行真实 `9 PPT × 16 theory × 16 practice` blind retry，也没有读取旧合同/旧 HTML 作为新生成输入。

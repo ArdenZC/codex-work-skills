@@ -46,6 +46,8 @@ REQUIRED = (
     "scripts/contact_sheets.py",
     "scripts/downstream_adapters.py",
     "scripts/downstream_e2e.py",
+    "scripts/extract_failure_benchmark_evidence.py",
+    "scripts/replay_failure_benchmark.py",
     "scripts/package_course.py",
     "scripts/install.py",
     "tests/__init__.py",

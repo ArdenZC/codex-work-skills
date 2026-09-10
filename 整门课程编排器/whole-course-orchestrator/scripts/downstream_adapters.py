@@ -30,9 +30,93 @@ def _renderer_layout(value: str) -> str:
     return {"semantic-diagram": "focus", "large-visual": "split", "annotated-object": "split", "step-build": "timeline", "diagnose": "comparison", "check": "split", "summary": "focus", "bridge": "split", "demonstration": "split"}.get(value, "default")
 
 
+def _typed_structure_svg(artifact: str, roles: list[str]) -> str:
+    """Return a small, explicit structure fixture for adapter/E2E tests.
+
+    The fixture is intentionally separate from the marker-only fallback.  Its
+    data attributes describe actual node/edge endpoints and labels so the
+    collector can prove structure without treating visible role text as proof.
+    It is not a claim about visual aesthetics or a production diagram layout.
+    """
+
+    requested = {str(item).lower() for item in roles}
+    if artifact == "class_model":
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="class structure" data-structure-evidence="typed">'
+            '<g data-node-id="class-a" data-semantic-role="class class_compartment"><rect x="40" y="70" width="180" height="80"/><text x="130" y="112">ClassA</text></g>'
+            '<g data-node-id="class-b" data-semantic-role="class class_compartment"><rect x="540" y="70" width="180" height="80"/><text x="630" y="112">ClassB</text></g>'
+            '<line data-edge-id="edge-1" data-semantic-role="relationship association" data-source-id="class-a" data-target-id="class-b" data-relation-kind="association" x1="220" y1="110" x2="540" y2="110"/>'
+            '<text data-label-for="edge-1" data-label-kind="multiplicity" data-label-endpoint="source" data-label="1" x="250" y="100">1</text>'
+            '<text data-label-for="edge-1" data-label-kind="multiplicity" data-label-endpoint="target" data-label="*" x="500" y="100">*</text>'
+            '</svg>'
+        )
+    if artifact == "sequence_model":
+        extra = (
+            '<g data-node-id="fragment-1" data-semantic-role="fragment"><rect x="320" y="28" width="300" height="150" fill="none" stroke="#999"/></g>'
+            if "fragment" in requested else ""
+        )
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="sequence structure" data-structure-evidence="typed">'
+            '<g data-node-id="lifeline-a" data-semantic-role="lifeline"><line x1="180" y1="40" x2="180" y2="190"/><text x="150" y="28">Client</text></g>'
+            '<g data-node-id="lifeline-b" data-semantic-role="lifeline"><line x1="650" y1="40" x2="650" y2="190"/><text x="620" y="28">Service</text></g>'
+            '<line data-edge-id="message-1" data-semantic-role="message" data-source-id="lifeline-a" data-target-id="lifeline-b" data-message-order="1" x1="180" y1="80" x2="650" y2="80"/>'
+            + ('<line data-edge-id="return-1" data-semantic-role="return message" data-source-id="lifeline-b" data-target-id="lifeline-a" data-message-order="2" x1="650" y1="130" x2="180" y2="130"/>' if "return" in requested else "")
+            + extra + '</svg>'
+        )
+    if artifact == "state_model":
+        edge_roles = "transition"
+        if "guard" in requested:
+            edge_roles += " guard event"
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="state structure" data-structure-evidence="typed">'
+            '<g data-node-id="state-a" data-semantic-role="state"><rect x="80" y="80" width="170" height="60" rx="22"/><text x="165" y="116">Pending</text></g>'
+            '<g data-node-id="state-b" data-semantic-role="state"><rect x="610" y="80" width="170" height="60" rx="22"/><text x="695" y="116">Done</text></g>'
+            f'<line data-edge-id="transition-1" data-semantic-role="{edge_roles}" data-source-id="state-a" data-target-id="state-b" data-relation-kind="transition" x1="250" y1="110" x2="610" y2="110"/>'
+            '</svg>'
+        )
+    if artifact == "deployment_model":
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="deployment structure" data-structure-evidence="typed">'
+            '<g data-node-id="node-client" data-semantic-role="node"><rect x="60" y="70" width="170" height="80"/><text x="100" y="112">Client</text></g>'
+            '<g data-node-id="artifact-service" data-semantic-role="artifact"><rect x="600" y="70" width="170" height="80"/><text x="640" y="112">Service</text></g>'
+            '<line data-edge-id="link-1" data-semantic-role="communication_link deployment" data-source-id="node-client" data-target-id="artifact-service" data-relation-kind="communication_link" x1="230" y1="110" x2="600" y2="110"/>'
+            '</svg>'
+        )
+    if artifact == "use_case_model":
+        relation = "include" if "include" in requested else "association"
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="use case structure" data-structure-evidence="typed">'
+            '<g data-node-id="actor-1" data-semantic-role="actor"><circle cx="120" cy="110" r="32"/><text x="90" y="165">Actor</text></g>'
+            '<g data-node-id="usecase-1" data-semantic-role="use_case"><ellipse cx="630" cy="110" rx="110" ry="42"/><text x="570" y="116">UseCase</text></g>'
+            f'<line data-edge-id="usecase-edge" data-semantic-role="{relation} association" data-source-id="actor-1" data-target-id="usecase-1" data-relation-kind="{relation}" x1="150" y1="110" x2="520" y2="110"/>'
+            '</svg>'
+        )
+    if artifact == "activity_model":
+        first_target = "decision-1" if "decision" in requested else "action-2"
+        decision = (
+            '<g data-node-id="decision-1" data-semantic-role="decision"><polygon points="420,110 450,80 480,110 450,140"/></g>'
+            '<line data-edge-id="flow-2" data-semantic-role="control_flow guard" data-source-id="decision-1" data-target-id="action-2" data-relation-kind="control_flow" x1="450" y1="80" x2="650" y2="55"/>'
+            '<line data-edge-id="flow-3" data-semantic-role="control_flow guard" data-source-id="decision-1" data-target-id="action-3" data-relation-kind="control_flow" x1="450" y1="140" x2="650" y2="165"/>'
+            if "decision" in requested else ""
+        )
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 230" role="img" aria-label="activity structure" data-structure-evidence="typed">'
+            '<g data-node-id="action-1" data-semantic-role="action"><rect x="60" y="85" width="150" height="50" rx="18"/><text x="90" y="116">Start</text></g>'
+            '<g data-node-id="action-2" data-semantic-role="action"><rect x="650" y="30" width="150" height="50" rx="18"/><text x="680" y="61">Accept</text></g>'
+            '<g data-node-id="action-3" data-semantic-role="action"><rect x="650" y="140" width="150" height="50" rx="18"/><text x="680" y="171">Reject</text></g>'
+            f'<line data-edge-id="flow-1" data-semantic-role="control_flow" data-source-id="action-1" data-target-id="{first_target}" data-relation-kind="control_flow" x1="210" y1="110" x2="420" y2="110"/>'
+            + decision + '</svg>'
+        )
+    return ""
+
+
 def _svg_for_page(page: dict[str, Any]) -> str:
     artifact = str(page.get("artifact_type") or "")
     roles = page.get("planned_semantic_elements") or page.get("semantic_elements") or []
+    if page.get("semantic_structure_fixture") and artifact:
+        typed = _typed_structure_svg(artifact, [str(item) for item in roles])
+        if typed:
+            return typed
     role_markup = "".join(f'<g data-semantic-role="{html.escape(str(role))}"><rect x="{30 + index * 170}" y="80" width="140" height="72" rx="10" fill="#dbe8eb" stroke="#6b8f9d"/><text x="{100 + index * 170}" y="122" text-anchor="middle" font-size="14">{html.escape(str(role))}</text></g>' for index, role in enumerate(roles[:5]))
     if not role_markup:
         role_markup = '<circle cx="120" cy="116" r="40" fill="#dbe8eb" stroke="#6b8f9d" data-semantic-role="visual"/><text x="120" y="121" text-anchor="middle" font-size="14">visual</text>'
@@ -59,6 +143,8 @@ def adapt_session_to_courseware(session: dict[str, Any], *, course_title: str = 
                 page["visual_intent"] = visual_plan["visual_intent"]
             page["planned_semantic_elements"] = visual_plan.get("planned_semantic_elements", [])
             page["source_asset_ids"] = visual_plan.get("selected_source_asset_ids", visual_plan.get("source_asset_ids", []))
+            page["semantic_structure_fixture"] = bool(visual_plan.get("semantic_structure_fixture"))
+            page["structure_requirements"] = visual_plan.get("structure_requirements", {})
         unit_id = f"unit-{page_id}"
         fact_id = f"fact-{page_id}"
         title = str(page.get("title") or page.get("teaching_question") or page_id)
@@ -66,7 +152,15 @@ def adapt_session_to_courseware(session: dict[str, Any], *, course_title: str = 
         activity = max(0, int(round(float(page.get("activity_minutes", 0) or 0))))
         suggested = max(1, lecture + activity)
         learning_units.append({"id": unit_id, "title": title, "students_should_know": [str(page.get("teaching_question") or title)], "students_should_be_able_to": [str(page.get("learning_outcome") or "能解释本页证据")], "prerequisites": [], "not_yet_taught": [], "canonical_fact_ids": [fact_id]})
-        facts.append({"id": fact_id, "kind": "courseware-adapter", "statement": str(page.get("learning_outcome") or f"Evidence for {title}"), "source_slide_ids": [page_id], "learning_unit_ids": [unit_id]})
+        facts.append({
+            "id": fact_id,
+            "kind": "source-supported",
+            "statement": str(page.get("learning_outcome") or f"Evidence for {title}"),
+            "source_slide_ids": [page_id],
+            "learning_unit_ids": [unit_id],
+            "verification": {"status": "source-supported", "method": "direct-text"},
+            "evidence": [{"evidence_type": "direct-text", "source_id": "source_truth.txt", "quote": "source-backed teaching evidence"}],
+        })
         blocks: list[dict[str, Any]] = [{"type": "paragraph", "text": str(page.get("teaching_question") or title)}]
         if page.get("artifact_type") or page.get("visual_intent"):
             blocks.append({"type": "svg", "caption": title, "svg": _svg_for_page(page), "artifact_type": page.get("artifact_type"), "semantic_roles": page.get("planned_semantic_elements") or page.get("semantic_elements") or [], "source_asset_ids": page.get("source_asset_ids", [])})

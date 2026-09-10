@@ -33,9 +33,25 @@
         "required_semantic_elements": {"type": "array", "items": {"type": "string"}},
         "planned_semantic_elements": {"type": "array", "items": {"type": "string"}},
         "observed_semantic_elements": {"type": "array", "items": {"type": "string"}},
+        "structure_requirements": {"type": "object"},
+        "semantic_structure_fixture": {"type": "boolean"},
+        "semantic_marker_evidence": {"$ref": "#/$defs/evidence"},
+        "semantic_structure_evidence": {"$ref": "#/$defs/evidence"},
+        "visual_container_observed": {"type": "boolean"},
         "evidence": {"type": "array", "items": {"type": "object"}},
         "evidence_status": {"type": "string"},
         "render_strategy": {"enum": ["reuse", "semantic_redraw", "reference_only", "generated", "generic_rectangle", "placeholder", "todo"]}
+      },
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["PASS", "FAIL", "NOT_APPLICABLE", "PLANNED_NOT_OBSERVED"]},
+        "observed": {"type": "array", "items": {"type": "string"}},
+        "missing": {"type": "array", "items": {"type": "string"}},
+        "details": {"type": "object"}
       },
       "additionalProperties": true
     }

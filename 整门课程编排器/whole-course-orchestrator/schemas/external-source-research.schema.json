@@ -9,7 +9,8 @@
     "research_status": {"enum": ["completed", "EXTERNAL_RESEARCH_DISABLED_BY_USER", "EXTERNAL_RESEARCH_UNAVAILABLE"]},
     "research_gaps": {"type": "array", "items": {"type": "object"}},
     "sources": {"type": "array", "items": {"$ref": "#/$defs/source"}},
-    "conflicts": {"type": "array", "items": {"type": "object"}}
+    "conflicts": {"type": "array", "items": {"type": "object"}},
+    "authority_trust_model": {"$ref": "#/$defs/authority_trust_model"}
   },
   "$defs": {
     "source": {
@@ -20,8 +21,21 @@
         "source_title": {"type": ["string", "null"]},
         "selected": {"type": "boolean"},
         "origin": {"type": "string"},
+        "authority_status": {"enum": ["VERIFIED_OFFICIAL", "VERIFIED_ACADEMIC", "ASSESSED_REFERENCE", "UNVERIFIED_OFFICIAL_CLAIM", "UNKNOWN"]},
+        "authority_status_reason": {"type": ["string", "null"]},
+        "verified_metadata": {"type": "object"},
+        "evidence_origin": {"type": "object"},
         "origin_type": {"enum": ["external-authoritative", "external-reference"]},
         "license_note": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "authority_trust_model": {
+      "type": "object",
+      "properties": {
+        "layers": {"const": ["CLAIMED", "OBSERVED_METADATA", "VERIFIED_IDENTITY"]},
+        "statuses": {"type": "array", "items": {"type": "string"}},
+        "policy": {"type": "string"}
       },
       "additionalProperties": true
     }
