@@ -4,6 +4,14 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## Lesson Skill 2.2.4 Correctness Closure — 2026-09-26
+
+- 保持 Lesson Content Contract 2.2、`lesson-plan v1.1.2`、理论/实践边界、九阶段、时间和评价合同不变。
+- 区分结构校验与生产交付状态；无真实渲染时只报告 `structural_pass`，渲染失败时 fail closed。
+- 对齐可复用教学方法、资源与真实引用的跨课复用策略；保留叙事复制检测和来源绑定约束。
+- 明确学生证据继续表达在现有 `student_actions` 与必要时 `objective` 中；独立字段、review sidecar 与课次级引用相关性留待 2.3。
+- 增加可验证的 Content 2.2 canonical example；未声明的 70% 国内来源阈值仅保留为描述性指标。
+
 ## Dual Teaching Skills Generalization 1.0 — 2026-09-09
 
 ### Added

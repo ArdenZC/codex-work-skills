@@ -570,13 +570,18 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     resource_only_count = len(provenance.get("invalid_resource_only", [])) if isinstance(provenance, Mapping) else 0
     invalid_generic_count = len(provenance.get("invalid_generic", [])) if isinstance(provenance, Mapping) else 0
     empty_count = len(provenance.get("empty_reference_lessons", [])) if isinstance(provenance, Mapping) else 0
+    research = data.get("reference_research") if isinstance(data.get("reference_research"), Mapping) else {}
+    no_verified_external_source = (
+        version == "2.2" and research.get("status") == "no_verified_external_source"
+    )
+    empty_reference_failures = 0 if no_verified_external_source else empty_count
     domestic = int(provenance.get("catalog_source_regions", {}).get("domestic", 0)) if isinstance(provenance, Mapping) else 0
     foreign = int(provenance.get("catalog_source_regions", {}).get("foreign", 0)) if isinstance(provenance, Mapping) else 0
     unknown = int(provenance.get("catalog_source_regions", {}).get("unknown", 0)) if isinstance(provenance, Mapping) else 0
     known = domestic + foreign
     domestic_share = domestic / known if known else None
     textbook_overlap_failure = 0 if data.get("allow_textbook_as_reference", False) else overlap_count
-    failures = placeholder_count + textbook_overlap_failure + duplicate_count + unresolved_count + resource_only_count + invalid_generic_count + empty_count
+    failures = placeholder_count + textbook_overlap_failure + duplicate_count + unresolved_count + resource_only_count + invalid_generic_count + empty_reference_failures
     if version == "2.2":
         return {
             "status": "PASS" if failures == 0 else "FAIL",
@@ -587,6 +592,8 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
             "lessons_with_references": sum(bool(ids) for ids in ids_by_lesson),
             "lessons_without_references": sum(not ids for ids in ids_by_lesson),
             "empty_reference_lesson_count": empty_count,
+            "empty_references_allowed": no_verified_external_source,
+            "reference_research_status": research.get("status"),
             "reference_count_by_lesson": [len(ids) for ids in ids_by_lesson],
             "reuse_frequency": dict(sorted(frequency.items())),
             "placeholder_count": placeholder_count,
@@ -603,7 +610,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
             "foreign_source_count": foreign,
             "unknown_source_count": unknown,
             "domestic_share": domestic_share,
-            "domestic_share_quality": "warning" if domestic_share is not None and domestic_share < 0.7 else "pass",
+            "domestic_share_quality": "descriptive",
             "cross_lesson_reuse_allowed": True,
             "hard_gate_failures": failures,
         }
@@ -739,6 +746,7 @@ def _artifact_manifest_gate(
         "actual_pdf_page_count",
         "qa_status",
         "render_status",
+        "content_contract_version",
         "created_at",
     }
     if isinstance(manifest, Mapping):
@@ -765,6 +773,17 @@ def _artifact_manifest_gate(
             errors.append("manifest qa_status does not match QA report")
         if manifest.get("render_status") != render.get("status"):
             errors.append("manifest render_status does not match QA report")
+        if str(data.get("content_contract_version")) == "2.2":
+            if manifest.get("content_contract_version") != "2.2":
+                errors.append("manifest content_contract_version does not match Content Contract 2.2")
+            if manifest.get("production_status") != qa_report.get("production_status"):
+                errors.append("manifest production_status does not match QA report")
+            required_production_status = "production_pass" if lessons else "structural_pass"
+            if manifest.get("production_status") != required_production_status:
+                errors.append(
+                    "Content Contract 2.2 acceptance requires "
+                    f"production_status={required_production_status} for {len(lessons)} theory Lessons"
+                )
         if qa_report.get("artifact_manifest") != "artifact-manifest.json":
             errors.append("QA report does not point to artifact-manifest.json")
         reference_evidence_path = _manifest_artifact_path(output_dir, manifest.get("reference_evidence_path"))
@@ -852,7 +871,7 @@ def _artifact_manifest_gate(
             "page_count": manifest.get("actual_pdf_page_count") if isinstance(manifest, Mapping) else None,
             "errors": errors,
         },
-        "Manifest must map the source JSON and each final DOCX/PDF to SHA-256, actual retained-PDF page count, QA status, and render status.",
+        "Manifest must map source and final DOCX/PDF hashes, retained-PDF page counts, and matching QA/render/production status.",
     )
 
 
@@ -1423,6 +1442,7 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
         "qa_report_sha256",
         "output_inventory_fingerprint",
         "render_status",
+        "production_status",
         "visual_status",
     }
     errors = [f"missing top-level key: {key}" for key in sorted(required_top - set(report))]
@@ -1556,6 +1576,11 @@ def build_acceptance_report(
         "qa_report_sha256": _sha256_file(qa_report_path),
         "output_inventory_fingerprint": inventory.get("fingerprint"),
         "render_status": render.get("status", "not_executed"),
+        "production_status": (
+            qa_report.get("production_status", "failed")
+            if contract_version == "2.2"
+            else "not_applicable"
+        ),
         "visual_status": visual_status,
         "delivery_mode": (data.get("delivery_plan") or {}).get("mode") if isinstance(data.get("delivery_plan"), Mapping) else None,
         "theory_hours": _number((data.get("delivery_plan") or {}).get("theory_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
@@ -1591,6 +1616,7 @@ def build_acceptance_report(
         "qa_report_sha256": metadata["qa_report_sha256"],
         "output_inventory_fingerprint": metadata["output_inventory_fingerprint"],
         "render_status": metadata["render_status"],
+        "production_status": metadata["production_status"],
         "visual_status": visual_status,
         "input_json": str(input_json),
         "qa_report": str(qa_report_path),
@@ -1662,6 +1688,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
         f"- Lessons/hours: {metadata.get('lesson_count')} / {metadata.get('total_hours')}",
         f"- Source: `{metadata.get('source_type')}`; master: `{metadata.get('master_commit')}`",
         f"- Content Contract: `{metadata.get('content_contract_version')}`; template: `{metadata.get('template_version')}`",
+        f"- QA/render/production: `{metadata.get('render_status')}` / `{metadata.get('production_status')}`",
         f"- Delivery: `{(report.get('delivery_metrics') or {}).get('status')}`; reference gates: `{(report.get('reference_metrics') or {}).get('status')}`; practice handoff: `{(report.get('practice_handoff_metrics') or {}).get('status')}`",
         f"- Input SHA256: `{metadata.get('input_sha256')}`",
         f"- QA SHA256: `{metadata.get('qa_report_sha256')}`",
@@ -1689,7 +1716,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
             f"- Source JSON: `{artifact_data.get('source_json_path')}` / `{artifact_data.get('source_json_sha256')}`",
             f"- Final DOCX: `{artifact_data.get('final_docx_path')}` / `{artifact_data.get('final_docx_sha256')}`",
             f"- Final PDF: `{artifact_data.get('final_pdf_path')}` / `{artifact_data.get('final_pdf_sha256')}`",
-            f"- Retained final PDF pages: `{artifact_data.get('actual_pdf_page_count')}`; QA: `{artifact_data.get('qa_status')}`; render: `{artifact_data.get('render_status')}`",
+            f"- Retained final PDF pages: `{artifact_data.get('actual_pdf_page_count')}`; QA: `{artifact_data.get('qa_status')}`; render: `{artifact_data.get('render_status')}`; production: `{artifact_data.get('production_status')}`",
             f"- Reference evidence: `{artifact_data.get('reference_evidence_path')}` / `{artifact_data.get('reference_evidence_sha256')}`",
             "- Page count and hashes are read from the retained final files; this report does not handwrite them.",
             "",

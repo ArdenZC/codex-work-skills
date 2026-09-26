@@ -3034,7 +3034,7 @@ def _v22_exact_duplicate_report(
     locations: dict[tuple[str, str], list[str]] = {}
     for lesson_id, lesson in zip(lesson_ids, lessons):
         for field, values in _item_values(lesson, {}).items():
-            if field.startswith("evaluation.") or field.startswith("references"):
+            if reuse_policy(field) != REUSE_NARRATIVE_STRICT:
                 continue
             for value in values:
                 normalized = _normalize_item(value)
@@ -3128,8 +3128,6 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
         else None
     )
     warnings: list[str] = []
-    if domestic_share is not None and domestic_share < 0.70:
-        warnings.append("domestic reference share is below 70%; review local curriculum alignment")
     for item in references.get("missing_evidence", []):
         errors.append(f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence")
     for item in references.get("invalid_generic", []):

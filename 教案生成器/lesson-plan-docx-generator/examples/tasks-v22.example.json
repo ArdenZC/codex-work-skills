@@ -1,0 +1,2298 @@
+{
+  "content_contract_version": "2.2",
+  "course_name": "数据库应用基础",
+  "major": "软件技术",
+  "audience": "高职二年级",
+  "default_hours": 2,
+  "total_hours": 6,
+  "confirmed_course_info": {
+    "course_name": "数据库应用基础",
+    "major": "软件技术",
+    "audience": "高职二年级",
+    "total_hours": 6,
+    "theory_hours": 6,
+    "practice_hours": 0,
+    "delivery_mode": "theory_only"
+  },
+  "delivery_plan": {
+    "mode": "theory_only",
+    "total_hours": 6,
+    "theory_hours": 6,
+    "practice_hours": 0
+  },
+  "course_materials": {
+    "textbook": null
+  },
+  "reference_pool": [],
+  "reference_research": {
+    "status": "no_verified_external_source",
+    "note": "本示例未随附课程来源，也没有已核验的公开来源；正文仅使用课程中给定的业务情境。",
+    "queries": [],
+    "sources": []
+  },
+  "artifact_plan": {
+    "lesson_plans": true,
+    "practice_work_orders": false
+  },
+  "outline": [
+    {
+      "lesson_id": "L01",
+      "unit": "项目一 借阅业务建模",
+      "task": "从借阅记录识别实体与属性",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "prior_learning": "学生能阅读常见业务表单并辨认字段含义，尚未系统区分业务对象与记录。",
+      "capability_stage": "认知",
+      "deliverable": "读者、图书与借阅记录的候选实体属性表",
+      "next_bridge": "下一课将依据业务规则为候选属性配置主键和关联约束。",
+      "practice_task_ids": []
+    },
+    {
+      "lesson_id": "L02",
+      "unit": "项目一 借阅业务建模",
+      "task": "依据业务规则配置主键与关联",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "prior_learning": "学生已形成读者、图书和借阅记录的候选实体属性表，并标注了未决字段。",
+      "capability_stage": "理解",
+      "deliverable": "带主键、外键与关系基数的借阅关系映射表",
+      "next_bridge": "下一课将用查询需求和依赖关系检查关系表是否存在冗余。",
+      "practice_task_ids": []
+    },
+    {
+      "lesson_id": "L03",
+      "unit": "项目二 关系模型校核",
+      "task": "检查关系表冗余并说明结构取舍",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "prior_learning": "学生已把借阅业务转换为关系表，并理解主键、外键和关联基数。",
+      "capability_stage": "独立",
+      "deliverable": "关系模型校核报告及一处有依据的结构修订",
+      "next_bridge": "后续项目将把校核后的关系模型用于查询设计与数据维护。",
+      "practice_task_ids": []
+    }
+  ],
+  "lessons": [
+    {
+      "lesson_id": "L01",
+      "unit": "项目一 借阅业务建模",
+      "task": "从借阅记录识别实体与属性",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "progression": {
+        "prior_lesson_id": null,
+        "prior_learning": "学生能阅读常见业务表单并辨认字段含义，尚未系统区分业务对象与记录。",
+        "capability_stage": "认知",
+        "deliverable": "读者、图书与借阅记录的候选实体属性表",
+        "next_bridge": "下一课将依据业务规则为候选属性配置主键和关联约束。"
+      },
+      "student_analysis": {
+        "base": [
+          "学生见过借阅登记单和读者信息卡，能够指出姓名、书名等表面字段。",
+          "学生能用表格记录业务事实，但尚未形成实体建模方法。"
+        ],
+        "problems": [
+          "同一信息可能在多张记录中重复，学生容易把表单行直接当作实体。",
+          "续借次数、借阅状态等字段的归属需要联系业务过程判断。"
+        ],
+        "strategies": [
+          "先比较不同业务记录中的稳定对象和过程信息，再归并候选属性。",
+          "以续借与归还两个边界情形检查属性是否放在合适实体中。"
+        ]
+      },
+      "teaching_content": [
+        "借阅、归还和续借记录中的业务对象与事件",
+        "实体判定依据：独立识别、稳定身份和业务职责",
+        "读者、图书与借阅记录的候选属性归属"
+      ],
+      "goals": {
+        "knowledge": [
+          "说明业务对象与业务事件的区别。",
+          "列举借阅场景中实体判定的主要依据。"
+        ],
+        "ability": [
+          "从多张借阅记录归并候选实体和属性。",
+          "用续借或归还情形解释属性归属。"
+        ],
+        "quality": [
+          "尊重原始业务信息，不擅自删改字段含义。",
+          "在分歧讨论中说明判断依据并接受证据修订。"
+        ]
+      },
+      "key_point": {
+        "content": [
+          "跨表识别稳定业务对象",
+          "区分实体属性与借阅事件属性"
+        ],
+        "strategy": [
+          "按身份稳定性和业务职责逐项核对"
+        ]
+      },
+      "difficult_point": {
+        "content": [
+          "续借次数和借阅状态的归属判断"
+        ],
+        "strategy": [
+          "沿借出、续借、归还过程追踪字段变化"
+        ]
+      },
+      "teaching_methods": [
+        "案例分析",
+        "问题导向讲授"
+      ],
+      "resources": [
+        "借阅登记单样例",
+        "实体属性分析任务单",
+        "投影设备"
+      ],
+      "reference_ids": [],
+      "practice_task_ids": [],
+      "implementation": [
+        {
+          "id": "before_class_preparation",
+          "label": "课前准备",
+          "minutes": 10,
+          "modality": "课外线上",
+          "content": [
+            "浏览两份用途不同的借阅记录并圈出重复出现的字段"
+          ],
+          "teacher_actions": [
+            "发放记录样例，提示先标明字段来源"
+          ],
+          "student_actions": [
+            "独立圈出姓名、书目、借出日期等信息并标注来源"
+          ],
+          "objective": "留下可供课堂比较的字段清单"
+        },
+        {
+          "id": "task_introduction",
+          "label": "任务导入",
+          "minutes": 10,
+          "modality": "课堂",
+          "content": [
+            "对照读者卡、借阅单和归还记录，判断哪些对象持续存在"
+          ],
+          "teacher_actions": [
+            "展示三种记录并追问“记录消失后对象是否仍存在”"
+          ],
+          "student_actions": [
+            "指出读者和图书的稳定身份，区分借阅这一业务事件"
+          ],
+          "objective": "建立从记录字段回到业务对象的判定起点"
+        },
+        {
+          "id": "operation_demonstration",
+          "label": "方法示范",
+          "minutes": 15,
+          "modality": "课堂",
+          "content": [
+            "演示从业务名词提取实体并用字段证据检查属性归属"
+          ],
+          "teacher_actions": [
+            "逐步标注读者、图书、借阅记录，解释一次误判如何修正"
+          ],
+          "student_actions": [
+            "跟随示范把读者联系方式与借出日期分别放到候选实体"
+          ],
+          "objective": "掌握从字段到对象再到属性的推理顺序"
+        },
+        {
+          "id": "task_implementation",
+          "label": "任务实施",
+          "minutes": 20,
+          "modality": "小组研讨",
+          "content": [
+            "小组整理读者、图书、借阅记录三类候选对象及字段"
+          ],
+          "teacher_actions": [
+            "提供一组混合记录，巡看归并过程并追问字段来源"
+          ],
+          "student_actions": [
+            "协作完成候选实体属性表，给每个字段标注原始记录"
+          ],
+          "objective": "形成能追溯到业务证据的候选模型"
+        },
+        {
+          "id": "task_extension",
+          "label": "任务拓展",
+          "minutes": 10,
+          "modality": "小组研讨",
+          "content": [
+            "加入续借情形，重新判断续借次数和当前状态的归属"
+          ],
+          "teacher_actions": [
+            "提出续借后旧借阅记录如何变化的反例"
+          ],
+          "student_actions": [
+            "比较两种归属方案并用字段变化过程解释取舍"
+          ],
+          "objective": "检验候选模型对业务变化的承载能力"
+        },
+        {
+          "id": "project_practice",
+          "label": "项目实训",
+          "minutes": 15,
+          "modality": "小组研讨",
+          "content": [
+            "整理实体、属性、来源记录和未决字段四栏成果"
+          ],
+          "teacher_actions": [
+            "抽查字段来源与对象职责是否对应"
+          ],
+          "student_actions": [
+            "提交候选实体属性表并标出一项仍需确认的规则"
+          ],
+          "objective": "得到下一课可继续约束化的模型输入"
+        },
+        {
+          "id": "peer_review",
+          "label": "组间互评",
+          "minutes": 10,
+          "modality": "小组研讨",
+          "content": [
+            "交换小组成果，核对对象边界与事件字段的区分"
+          ],
+          "teacher_actions": [
+            "组织互审，要求意见指向具体字段和记录证据"
+          ],
+          "student_actions": [
+            "指出一项依据充分的归属及一项需补证的判断"
+          ],
+          "objective": "用同伴复核发现建模假设中的遗漏"
+        },
+        {
+          "id": "lesson_summary",
+          "label": "课堂小结",
+          "minutes": 10,
+          "modality": "课堂",
+          "content": [
+            "回顾稳定身份、业务职责和过程字段三项判据"
+          ],
+          "teacher_actions": [
+            "根据互审争议归纳可重复使用的判断步骤"
+          ],
+          "student_actions": [
+            "写出一条实体判定规则并举出本课字段例子"
+          ],
+          "objective": "巩固实体识别方法，为键设计作准备"
+        },
+        {
+          "id": "after_class_improvement",
+          "label": "课后完善",
+          "minutes": 15,
+          "modality": "课外线上",
+          "content": [
+            "依据互审意见修订候选属性表并保存字段来源"
+          ],
+          "teacher_actions": [
+            "发布修订要求，提示保留改动理由"
+          ],
+          "student_actions": [
+            "提交修订版并标记被调整的字段及其证据"
+          ],
+          "objective": "形成可核查的模型版本和下一课问题"
+        }
+      ],
+      "evaluation": {
+        "score": 91.0,
+        "remarks": {
+          "attendance": "按时完成记录样例预读",
+          "attention": "能持续跟踪字段来源",
+          "participation": "主动解释对象归并理由",
+          "compliance": "如实保留业务字段含义",
+          "values": "尊重组内不同判断证据",
+          "ethics": "讨论围绕字段和记录展开",
+          "habits": "任务单和设备使用规范",
+          "online_learning": "完成课前记录并注明疑问",
+          "discussion": "能回应实体稳定性追问",
+          "homework": "修订说明能追溯到互审意见",
+          "practice": "实体属性归属依据充分",
+          "presentation": "展示表格清楚并标记未决项",
+          "improvement": "课后补充字段变化情形"
+        }
+      },
+      "reflection": {
+        "summary": "本课从从借阅记录识别实体与属性出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+        "innovation": "将读者、图书与借阅记录的候选实体属性表与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+        "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移认知阶段的方法。"
+      },
+      "pedagogical_review": {
+        "issues": [],
+        "draft_content": {
+          "progression": {
+            "prior_lesson_id": null,
+            "prior_learning": "学生能阅读常见业务表单并辨认字段含义，尚未系统区分业务对象与记录。",
+            "capability_stage": "认知",
+            "deliverable": "读者、图书与借阅记录的候选实体属性表",
+            "next_bridge": "下一课将依据业务规则为候选属性配置主键和关联约束。"
+          },
+          "student_analysis": {
+            "base": [
+              "学生见过借阅登记单和读者信息卡，能够指出姓名、书名等表面字段。",
+              "学生能用表格记录业务事实，但尚未形成实体建模方法。"
+            ],
+            "problems": [
+              "同一信息可能在多张记录中重复，学生容易把表单行直接当作实体。",
+              "续借次数、借阅状态等字段的归属需要联系业务过程判断。"
+            ],
+            "strategies": [
+              "先比较不同业务记录中的稳定对象和过程信息，再归并候选属性。",
+              "以续借与归还两个边界情形检查属性是否放在合适实体中。"
+            ]
+          },
+          "teaching_content": [
+            "借阅、归还和续借记录中的业务对象与事件",
+            "实体判定依据：独立识别、稳定身份和业务职责",
+            "读者、图书与借阅记录的候选属性归属"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明业务对象与业务事件的区别。",
+              "列举借阅场景中实体判定的主要依据。"
+            ],
+            "ability": [
+              "从多张借阅记录归并候选实体和属性。",
+              "用续借或归还情形解释属性归属。"
+            ],
+            "quality": [
+              "尊重原始业务信息，不擅自删改字段含义。",
+              "在分歧讨论中说明判断依据并接受证据修订。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "跨表识别稳定业务对象",
+              "区分实体属性与借阅事件属性"
+            ],
+            "strategy": [
+              "按身份稳定性和业务职责逐项核对"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "续借次数和借阅状态的归属判断"
+            ],
+            "strategy": [
+              "沿借出、续借、归还过程追踪字段变化"
+            ]
+          },
+          "teaching_methods": [
+            "案例分析",
+            "问题导向讲授"
+          ],
+          "resources": [
+            "借阅登记单样例",
+            "实体属性分析任务单",
+            "投影设备"
+          ],
+          "reference_ids": [],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "课外线上",
+              "content": [
+                "浏览两份用途不同的借阅记录并圈出重复出现的字段"
+              ],
+              "teacher_actions": [
+                "发放记录样例，提示先标明字段来源"
+              ],
+              "student_actions": [
+                "独立圈出姓名、书目、借出日期等信息并标注来源"
+              ],
+              "objective": "留下可供课堂比较的字段清单"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "对照读者卡、借阅单和归还记录，判断哪些对象持续存在"
+              ],
+              "teacher_actions": [
+                "展示三种记录并追问“记录消失后对象是否仍存在”"
+              ],
+              "student_actions": [
+                "指出读者和图书的稳定身份，区分借阅这一业务事件"
+              ],
+              "objective": "建立从记录字段回到业务对象的判定起点"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "课堂",
+              "content": [
+                "演示从业务名词提取实体并用字段证据检查属性归属"
+              ],
+              "teacher_actions": [
+                "逐步标注读者、图书、借阅记录，解释一次误判如何修正"
+              ],
+              "student_actions": [
+                "跟随示范把读者联系方式与借出日期分别放到候选实体"
+              ],
+              "objective": "掌握从字段到对象再到属性的推理顺序"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 20,
+              "modality": "小组研讨",
+              "content": [
+                "小组整理读者、图书、借阅记录三类候选对象及字段"
+              ],
+              "teacher_actions": [
+                "提供一组混合记录，巡看归并过程并追问字段来源"
+              ],
+              "student_actions": [
+                "协作完成候选实体属性表，给每个字段标注原始记录"
+              ],
+              "objective": "形成能追溯到业务证据的候选模型"
+            },
+            {
+              "id": "task_extension",
+              "label": "任务拓展",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "加入续借情形，重新判断续借次数和当前状态的归属"
+              ],
+              "teacher_actions": [
+                "提出续借后旧借阅记录如何变化的反例"
+              ],
+              "student_actions": [
+                "比较两种归属方案并用字段变化过程解释取舍"
+              ],
+              "objective": "检验候选模型对业务变化的承载能力"
+            },
+            {
+              "id": "project_practice",
+              "label": "项目实训",
+              "minutes": 15,
+              "modality": "小组研讨",
+              "content": [
+                "整理实体、属性、来源记录和未决字段四栏成果"
+              ],
+              "teacher_actions": [
+                "抽查字段来源与对象职责是否对应"
+              ],
+              "student_actions": [
+                "提交候选实体属性表并标出一项仍需确认的规则"
+              ],
+              "objective": "得到下一课可继续约束化的模型输入"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "交换小组成果，核对对象边界与事件字段的区分"
+              ],
+              "teacher_actions": [
+                "组织互审，要求意见指向具体字段和记录证据"
+              ],
+              "student_actions": [
+                "指出一项依据充分的归属及一项需补证的判断"
+              ],
+              "objective": "用同伴复核发现建模假设中的遗漏"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "回顾稳定身份、业务职责和过程字段三项判据"
+              ],
+              "teacher_actions": [
+                "根据互审争议归纳可重复使用的判断步骤"
+              ],
+              "student_actions": [
+                "写出一条实体判定规则并举出本课字段例子"
+              ],
+              "objective": "巩固实体识别方法，为键设计作准备"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "课外线上",
+              "content": [
+                "依据互审意见修订候选属性表并保存字段来源"
+              ],
+              "teacher_actions": [
+                "发布修订要求，提示保留改动理由"
+              ],
+              "student_actions": [
+                "提交修订版并标记被调整的字段及其证据"
+              ],
+              "objective": "形成可核查的模型版本和下一课问题"
+            }
+          ],
+          "evaluation": {
+            "score": 91.0,
+            "remarks": {
+              "attendance": "按时完成记录样例预读",
+              "attention": "能持续跟踪字段来源",
+              "participation": "主动解释对象归并理由",
+              "compliance": "如实保留业务字段含义",
+              "values": "尊重组内不同判断证据",
+              "ethics": "讨论围绕字段和记录展开",
+              "habits": "任务单和设备使用规范",
+              "online_learning": "完成课前记录并注明疑问",
+              "discussion": "能回应实体稳定性追问",
+              "homework": "修订说明能追溯到互审意见",
+              "practice": "实体属性归属依据充分",
+              "presentation": "展示表格清楚并标记未决项",
+              "improvement": "课后补充字段变化情形"
+            }
+          },
+          "reflection": {
+            "summary": "本课从从借阅记录识别实体与属性出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+            "innovation": "将读者、图书与借阅记录的候选实体属性表与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+            "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移认知阶段的方法。"
+          }
+        },
+        "revised_content": {
+          "progression": {
+            "prior_lesson_id": null,
+            "prior_learning": "学生能阅读常见业务表单并辨认字段含义，尚未系统区分业务对象与记录。",
+            "capability_stage": "认知",
+            "deliverable": "读者、图书与借阅记录的候选实体属性表",
+            "next_bridge": "下一课将依据业务规则为候选属性配置主键和关联约束。"
+          },
+          "student_analysis": {
+            "base": [
+              "学生见过借阅登记单和读者信息卡，能够指出姓名、书名等表面字段。",
+              "学生能用表格记录业务事实，但尚未形成实体建模方法。"
+            ],
+            "problems": [
+              "同一信息可能在多张记录中重复，学生容易把表单行直接当作实体。",
+              "续借次数、借阅状态等字段的归属需要联系业务过程判断。"
+            ],
+            "strategies": [
+              "先比较不同业务记录中的稳定对象和过程信息，再归并候选属性。",
+              "以续借与归还两个边界情形检查属性是否放在合适实体中。"
+            ]
+          },
+          "teaching_content": [
+            "借阅、归还和续借记录中的业务对象与事件",
+            "实体判定依据：独立识别、稳定身份和业务职责",
+            "读者、图书与借阅记录的候选属性归属"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明业务对象与业务事件的区别。",
+              "列举借阅场景中实体判定的主要依据。"
+            ],
+            "ability": [
+              "从多张借阅记录归并候选实体和属性。",
+              "用续借或归还情形解释属性归属。"
+            ],
+            "quality": [
+              "尊重原始业务信息，不擅自删改字段含义。",
+              "在分歧讨论中说明判断依据并接受证据修订。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "跨表识别稳定业务对象",
+              "区分实体属性与借阅事件属性"
+            ],
+            "strategy": [
+              "按身份稳定性和业务职责逐项核对"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "续借次数和借阅状态的归属判断"
+            ],
+            "strategy": [
+              "沿借出、续借、归还过程追踪字段变化"
+            ]
+          },
+          "teaching_methods": [
+            "案例分析",
+            "问题导向讲授"
+          ],
+          "resources": [
+            "借阅登记单样例",
+            "实体属性分析任务单",
+            "投影设备"
+          ],
+          "reference_ids": [],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "课外线上",
+              "content": [
+                "浏览两份用途不同的借阅记录并圈出重复出现的字段"
+              ],
+              "teacher_actions": [
+                "发放记录样例，提示先标明字段来源"
+              ],
+              "student_actions": [
+                "独立圈出姓名、书目、借出日期等信息并标注来源"
+              ],
+              "objective": "留下可供课堂比较的字段清单"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "对照读者卡、借阅单和归还记录，判断哪些对象持续存在"
+              ],
+              "teacher_actions": [
+                "展示三种记录并追问“记录消失后对象是否仍存在”"
+              ],
+              "student_actions": [
+                "指出读者和图书的稳定身份，区分借阅这一业务事件"
+              ],
+              "objective": "建立从记录字段回到业务对象的判定起点"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "课堂",
+              "content": [
+                "演示从业务名词提取实体并用字段证据检查属性归属"
+              ],
+              "teacher_actions": [
+                "逐步标注读者、图书、借阅记录，解释一次误判如何修正"
+              ],
+              "student_actions": [
+                "跟随示范把读者联系方式与借出日期分别放到候选实体"
+              ],
+              "objective": "掌握从字段到对象再到属性的推理顺序"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 20,
+              "modality": "小组研讨",
+              "content": [
+                "小组整理读者、图书、借阅记录三类候选对象及字段"
+              ],
+              "teacher_actions": [
+                "提供一组混合记录，巡看归并过程并追问字段来源"
+              ],
+              "student_actions": [
+                "协作完成候选实体属性表，给每个字段标注原始记录"
+              ],
+              "objective": "形成能追溯到业务证据的候选模型"
+            },
+            {
+              "id": "task_extension",
+              "label": "任务拓展",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "加入续借情形，重新判断续借次数和当前状态的归属"
+              ],
+              "teacher_actions": [
+                "提出续借后旧借阅记录如何变化的反例"
+              ],
+              "student_actions": [
+                "比较两种归属方案并用字段变化过程解释取舍"
+              ],
+              "objective": "检验候选模型对业务变化的承载能力"
+            },
+            {
+              "id": "project_practice",
+              "label": "项目实训",
+              "minutes": 15,
+              "modality": "小组研讨",
+              "content": [
+                "整理实体、属性、来源记录和未决字段四栏成果"
+              ],
+              "teacher_actions": [
+                "抽查字段来源与对象职责是否对应"
+              ],
+              "student_actions": [
+                "提交候选实体属性表并标出一项仍需确认的规则"
+              ],
+              "objective": "得到下一课可继续约束化的模型输入"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "交换小组成果，核对对象边界与事件字段的区分"
+              ],
+              "teacher_actions": [
+                "组织互审，要求意见指向具体字段和记录证据"
+              ],
+              "student_actions": [
+                "指出一项依据充分的归属及一项需补证的判断"
+              ],
+              "objective": "用同伴复核发现建模假设中的遗漏"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "回顾稳定身份、业务职责和过程字段三项判据"
+              ],
+              "teacher_actions": [
+                "根据互审争议归纳可重复使用的判断步骤"
+              ],
+              "student_actions": [
+                "写出一条实体判定规则并举出本课字段例子"
+              ],
+              "objective": "巩固实体识别方法，为键设计作准备"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "课外线上",
+              "content": [
+                "依据互审意见修订候选属性表并保存字段来源"
+              ],
+              "teacher_actions": [
+                "发布修订要求，提示保留改动理由"
+              ],
+              "student_actions": [
+                "提交修订版并标记被调整的字段及其证据"
+              ],
+              "objective": "形成可核查的模型版本和下一课问题"
+            }
+          ],
+          "evaluation": {
+            "score": 91.0,
+            "remarks": {
+              "attendance": "按时完成记录样例预读",
+              "attention": "能持续跟踪字段来源",
+              "participation": "主动解释对象归并理由",
+              "compliance": "如实保留业务字段含义",
+              "values": "尊重组内不同判断证据",
+              "ethics": "讨论围绕字段和记录展开",
+              "habits": "任务单和设备使用规范",
+              "online_learning": "完成课前记录并注明疑问",
+              "discussion": "能回应实体稳定性追问",
+              "homework": "修订说明能追溯到互审意见",
+              "practice": "实体属性归属依据充分",
+              "presentation": "展示表格清楚并标记未决项",
+              "improvement": "课后补充字段变化情形"
+            }
+          },
+          "reflection": {
+            "summary": "本课从从借阅记录识别实体与属性出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+            "innovation": "将读者、图书与借阅记录的候选实体属性表与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+            "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移认知阶段的方法。"
+          }
+        },
+        "decision": "approved",
+        "review_history": [
+          {
+            "round": 1,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "6D9B0F0646D0FB249572A233D8B7BE52C1F81713F24E41CBB0189CF249A3522E"
+          }
+        ]
+      }
+    },
+    {
+      "lesson_id": "L02",
+      "unit": "项目一 借阅业务建模",
+      "task": "依据业务规则配置主键与关联",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "progression": {
+        "prior_lesson_id": "L01",
+        "prior_learning": "学生已形成读者、图书和借阅记录的候选实体属性表，并标注了未决字段。",
+        "capability_stage": "理解",
+        "deliverable": "带主键、外键与关系基数的借阅关系映射表",
+        "next_bridge": "下一课将用查询需求和依赖关系检查关系表是否存在冗余。"
+      },
+      "student_analysis": {
+        "base": [
+          "学生能看懂候选实体属性表并指出读者和图书的身份字段。",
+          "学生接触过表格中的编号，但尚未把编号与实体完整性联系起来。"
+        ],
+        "problems": [
+          "在一对多借阅记录中，学生可能把读者姓名误作关联字段。",
+          "删除或重复编号对业务记录的影响需要通过规则推演才能看清。"
+        ],
+        "strategies": [
+          "从“一个读者可有多次借阅”推导关联方向，再确定外键位置。",
+          "用重复编号、缺失读者和删除图书三类情形核验键约束。"
+        ]
+      },
+      "teaching_content": [
+        "候选实体到关系表的映射规则",
+        "主键唯一性、非空性与外键参照约束",
+        "读者、图书和借阅记录之间的关系基数"
+      ],
+      "goals": {
+        "knowledge": [
+          "说明主键与外键各自保障的完整性。",
+          "辨认一对多关系中外键所在的关系表。"
+        ],
+        "ability": [
+          "把候选实体属性表转换为关系映射表。",
+          "使用业务反例检查键与关联设置。"
+        ],
+        "quality": [
+          "用业务约束支撑结构设计，不凭字段外观判断。",
+          "在模型评审中区分已确认规则和待确认假设。"
+        ]
+      },
+      "key_point": {
+        "content": [
+          "主键和外键在关系表中的位置",
+          "借阅事件与读者、图书的关联基数"
+        ],
+        "strategy": [
+          "从业务约束推导键，再用反例验证完整性"
+        ]
+      },
+      "difficult_point": {
+        "content": [
+          "读者与多次借阅之间的外键配置"
+        ],
+        "strategy": [
+          "逐条追踪关系方向和参照对象身份"
+        ]
+      },
+      "teaching_methods": [
+        "规则推演",
+        "反例讨论"
+      ],
+      "resources": [
+        "候选实体属性表",
+        "关系映射练习页",
+        "投影设备"
+      ],
+      "reference_ids": [],
+      "practice_task_ids": [],
+      "implementation": [
+        {
+          "id": "before_class_preparation",
+          "label": "课前准备",
+          "minutes": 10,
+          "modality": "课外线上",
+          "content": [
+            "复看候选实体表，标出能够稳定区分记录的字段"
+          ],
+          "teacher_actions": [
+            "提供上课前的实体表并说明标注要求"
+          ],
+          "student_actions": [
+            "圈出读者编号、图书编号和借阅日期等候选字段"
+          ],
+          "objective": "把上一课成果转化为键选择问题"
+        },
+        {
+          "id": "task_introduction",
+          "label": "任务导入",
+          "minutes": 10,
+          "modality": "课堂",
+          "content": [
+            "比较“读者有多次借阅”和“每次借阅对应一位读者”"
+          ],
+          "teacher_actions": [
+            "绘制业务关系示意，追问哪一端会重复出现"
+          ],
+          "student_actions": [
+            "说明借阅记录端会重复引用读者身份"
+          ],
+          "objective": "从业务数量关系确定关联的方向"
+        },
+        {
+          "id": "operation_demonstration",
+          "label": "方法示范",
+          "minutes": 15,
+          "modality": "课堂",
+          "content": [
+            "演示实体表转换为关系表并放置主键和外键"
+          ],
+          "teacher_actions": [
+            "逐栏说明主键唯一性与外键参照含义"
+          ],
+          "student_actions": [
+            "跟随演示检查借阅表中的读者编号对应读者表"
+          ],
+          "objective": "掌握从业务约束到键结构的转换步骤"
+        },
+        {
+          "id": "task_implementation",
+          "label": "任务实施",
+          "minutes": 20,
+          "modality": "小组研讨",
+          "content": [
+            "根据读者、图书、借阅事件三表规则完成映射"
+          ],
+          "teacher_actions": [
+            "发放业务约束卡，巡视每组主外键配置"
+          ],
+          "student_actions": [
+            "绘制三张关系表并标出字段角色与参照目标"
+          ],
+          "objective": "完成可用于后续查询讨论的关系结构"
+        },
+        {
+          "id": "task_extension",
+          "label": "任务拓展",
+          "minutes": 10,
+          "modality": "小组研讨",
+          "content": [
+            "推演删除图书、重复读者编号和孤立借阅记录的结果"
+          ],
+          "teacher_actions": [
+            "提供三种异常数据，引导说明约束如何响应"
+          ],
+          "student_actions": [
+            "修改映射方案以消除无法解释的孤立记录"
+          ],
+          "objective": "检验键设计对异常数据的约束能力"
+        },
+        {
+          "id": "project_practice",
+          "label": "项目实训",
+          "minutes": 15,
+          "modality": "小组研讨",
+          "content": [
+            "制作关系映射表并附上每条关联的业务解释"
+          ],
+          "teacher_actions": [
+            "核对主键唯一性和外键目标是否与规则一致"
+          ],
+          "student_actions": [
+            "提交关系映射表及一条被反例修正的配置"
+          ],
+          "objective": "形成关系模型评审所需的结构和依据"
+        },
+        {
+          "id": "peer_review",
+          "label": "组间互评",
+          "minutes": 10,
+          "modality": "小组研讨",
+          "content": [
+            "互换映射表，检查重复引用与错误参照目标"
+          ],
+          "teacher_actions": [
+            "要求审阅者沿一条借阅记录追到读者和图书"
+          ],
+          "student_actions": [
+            "指出具体键位置及其参照链是否闭合"
+          ],
+          "objective": "通过独立追踪发现方向判断错误"
+        },
+        {
+          "id": "lesson_summary",
+          "label": "课堂小结",
+          "minutes": 10,
+          "modality": "课堂",
+          "content": [
+            "总结实体身份、事件记录与参照完整性的关系"
+          ],
+          "teacher_actions": [
+            "结合互审差异归纳主外键设置顺序"
+          ],
+          "student_actions": [
+            "用一句话说明为何外键放在借阅记录表"
+          ],
+          "objective": "建立规则、结构和异常结果之间的联系"
+        },
+        {
+          "id": "after_class_improvement",
+          "label": "课后完善",
+          "minutes": 15,
+          "modality": "课外线上",
+          "content": [
+            "完善外键参照说明，并保留待确认业务规则"
+          ],
+          "teacher_actions": [
+            "说明交付格式，提醒区分业务假设与确定规则"
+          ],
+          "student_actions": [
+            "提交标注后的映射表和待确认规则列表"
+          ],
+          "objective": "让下一课能基于稳定结构开展冗余分析"
+        }
+      ],
+      "evaluation": {
+        "score": 88.5,
+        "remarks": {
+          "attendance": "带齐候选实体表",
+          "attention": "能跟踪关系方向推演",
+          "participation": "参与键约束讨论",
+          "compliance": "遵守数据脱敏约定",
+          "values": "承认尚未确认的关联规则",
+          "ethics": "能解释外键放置依据",
+          "habits": "按要求保留记录来源",
+          "online_learning": "课前圈出身份候选字段",
+          "discussion": "能区分关联两端的数量",
+          "homework": "反例修正有清楚原因",
+          "practice": "关系表字段角色完整",
+          "presentation": "展示时能追踪参照链",
+          "improvement": "课后补写待确认规则"
+        }
+      },
+      "reflection": {
+        "summary": "本课从依据业务规则配置主键与关联出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+        "innovation": "将带主键、外键与关系基数的借阅关系映射表与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+        "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移理解阶段的方法。"
+      },
+      "pedagogical_review": {
+        "issues": [],
+        "draft_content": {
+          "progression": {
+            "prior_lesson_id": "L01",
+            "prior_learning": "学生已形成读者、图书和借阅记录的候选实体属性表，并标注了未决字段。",
+            "capability_stage": "理解",
+            "deliverable": "带主键、外键与关系基数的借阅关系映射表",
+            "next_bridge": "下一课将用查询需求和依赖关系检查关系表是否存在冗余。"
+          },
+          "student_analysis": {
+            "base": [
+              "学生能看懂候选实体属性表并指出读者和图书的身份字段。",
+              "学生接触过表格中的编号，但尚未把编号与实体完整性联系起来。"
+            ],
+            "problems": [
+              "在一对多借阅记录中，学生可能把读者姓名误作关联字段。",
+              "删除或重复编号对业务记录的影响需要通过规则推演才能看清。"
+            ],
+            "strategies": [
+              "从“一个读者可有多次借阅”推导关联方向，再确定外键位置。",
+              "用重复编号、缺失读者和删除图书三类情形核验键约束。"
+            ]
+          },
+          "teaching_content": [
+            "候选实体到关系表的映射规则",
+            "主键唯一性、非空性与外键参照约束",
+            "读者、图书和借阅记录之间的关系基数"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明主键与外键各自保障的完整性。",
+              "辨认一对多关系中外键所在的关系表。"
+            ],
+            "ability": [
+              "把候选实体属性表转换为关系映射表。",
+              "使用业务反例检查键与关联设置。"
+            ],
+            "quality": [
+              "用业务约束支撑结构设计，不凭字段外观判断。",
+              "在模型评审中区分已确认规则和待确认假设。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "主键和外键在关系表中的位置",
+              "借阅事件与读者、图书的关联基数"
+            ],
+            "strategy": [
+              "从业务约束推导键，再用反例验证完整性"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "读者与多次借阅之间的外键配置"
+            ],
+            "strategy": [
+              "逐条追踪关系方向和参照对象身份"
+            ]
+          },
+          "teaching_methods": [
+            "规则推演",
+            "反例讨论"
+          ],
+          "resources": [
+            "候选实体属性表",
+            "关系映射练习页",
+            "投影设备"
+          ],
+          "reference_ids": [],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "课外线上",
+              "content": [
+                "复看候选实体表，标出能够稳定区分记录的字段"
+              ],
+              "teacher_actions": [
+                "提供上课前的实体表并说明标注要求"
+              ],
+              "student_actions": [
+                "圈出读者编号、图书编号和借阅日期等候选字段"
+              ],
+              "objective": "把上一课成果转化为键选择问题"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "比较“读者有多次借阅”和“每次借阅对应一位读者”"
+              ],
+              "teacher_actions": [
+                "绘制业务关系示意，追问哪一端会重复出现"
+              ],
+              "student_actions": [
+                "说明借阅记录端会重复引用读者身份"
+              ],
+              "objective": "从业务数量关系确定关联的方向"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "课堂",
+              "content": [
+                "演示实体表转换为关系表并放置主键和外键"
+              ],
+              "teacher_actions": [
+                "逐栏说明主键唯一性与外键参照含义"
+              ],
+              "student_actions": [
+                "跟随演示检查借阅表中的读者编号对应读者表"
+              ],
+              "objective": "掌握从业务约束到键结构的转换步骤"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 20,
+              "modality": "小组研讨",
+              "content": [
+                "根据读者、图书、借阅事件三表规则完成映射"
+              ],
+              "teacher_actions": [
+                "发放业务约束卡，巡视每组主外键配置"
+              ],
+              "student_actions": [
+                "绘制三张关系表并标出字段角色与参照目标"
+              ],
+              "objective": "完成可用于后续查询讨论的关系结构"
+            },
+            {
+              "id": "task_extension",
+              "label": "任务拓展",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "推演删除图书、重复读者编号和孤立借阅记录的结果"
+              ],
+              "teacher_actions": [
+                "提供三种异常数据，引导说明约束如何响应"
+              ],
+              "student_actions": [
+                "修改映射方案以消除无法解释的孤立记录"
+              ],
+              "objective": "检验键设计对异常数据的约束能力"
+            },
+            {
+              "id": "project_practice",
+              "label": "项目实训",
+              "minutes": 15,
+              "modality": "小组研讨",
+              "content": [
+                "制作关系映射表并附上每条关联的业务解释"
+              ],
+              "teacher_actions": [
+                "核对主键唯一性和外键目标是否与规则一致"
+              ],
+              "student_actions": [
+                "提交关系映射表及一条被反例修正的配置"
+              ],
+              "objective": "形成关系模型评审所需的结构和依据"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "互换映射表，检查重复引用与错误参照目标"
+              ],
+              "teacher_actions": [
+                "要求审阅者沿一条借阅记录追到读者和图书"
+              ],
+              "student_actions": [
+                "指出具体键位置及其参照链是否闭合"
+              ],
+              "objective": "通过独立追踪发现方向判断错误"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "总结实体身份、事件记录与参照完整性的关系"
+              ],
+              "teacher_actions": [
+                "结合互审差异归纳主外键设置顺序"
+              ],
+              "student_actions": [
+                "用一句话说明为何外键放在借阅记录表"
+              ],
+              "objective": "建立规则、结构和异常结果之间的联系"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "课外线上",
+              "content": [
+                "完善外键参照说明，并保留待确认业务规则"
+              ],
+              "teacher_actions": [
+                "说明交付格式，提醒区分业务假设与确定规则"
+              ],
+              "student_actions": [
+                "提交标注后的映射表和待确认规则列表"
+              ],
+              "objective": "让下一课能基于稳定结构开展冗余分析"
+            }
+          ],
+          "evaluation": {
+            "score": 88.5,
+            "remarks": {
+              "attendance": "带齐候选实体表",
+              "attention": "能跟踪关系方向推演",
+              "participation": "参与键约束讨论",
+              "compliance": "遵守数据脱敏约定",
+              "values": "承认尚未确认的关联规则",
+              "ethics": "能解释外键放置依据",
+              "habits": "按要求保留记录来源",
+              "online_learning": "课前圈出身份候选字段",
+              "discussion": "能区分关联两端的数量",
+              "homework": "反例修正有清楚原因",
+              "practice": "关系表字段角色完整",
+              "presentation": "展示时能追踪参照链",
+              "improvement": "课后补写待确认规则"
+            }
+          },
+          "reflection": {
+            "summary": "本课从依据业务规则配置主键与关联出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+            "innovation": "将带主键、外键与关系基数的借阅关系映射表与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+            "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移理解阶段的方法。"
+          }
+        },
+        "revised_content": {
+          "progression": {
+            "prior_lesson_id": "L01",
+            "prior_learning": "学生已形成读者、图书和借阅记录的候选实体属性表，并标注了未决字段。",
+            "capability_stage": "理解",
+            "deliverable": "带主键、外键与关系基数的借阅关系映射表",
+            "next_bridge": "下一课将用查询需求和依赖关系检查关系表是否存在冗余。"
+          },
+          "student_analysis": {
+            "base": [
+              "学生能看懂候选实体属性表并指出读者和图书的身份字段。",
+              "学生接触过表格中的编号，但尚未把编号与实体完整性联系起来。"
+            ],
+            "problems": [
+              "在一对多借阅记录中，学生可能把读者姓名误作关联字段。",
+              "删除或重复编号对业务记录的影响需要通过规则推演才能看清。"
+            ],
+            "strategies": [
+              "从“一个读者可有多次借阅”推导关联方向，再确定外键位置。",
+              "用重复编号、缺失读者和删除图书三类情形核验键约束。"
+            ]
+          },
+          "teaching_content": [
+            "候选实体到关系表的映射规则",
+            "主键唯一性、非空性与外键参照约束",
+            "读者、图书和借阅记录之间的关系基数"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明主键与外键各自保障的完整性。",
+              "辨认一对多关系中外键所在的关系表。"
+            ],
+            "ability": [
+              "把候选实体属性表转换为关系映射表。",
+              "使用业务反例检查键与关联设置。"
+            ],
+            "quality": [
+              "用业务约束支撑结构设计，不凭字段外观判断。",
+              "在模型评审中区分已确认规则和待确认假设。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "主键和外键在关系表中的位置",
+              "借阅事件与读者、图书的关联基数"
+            ],
+            "strategy": [
+              "从业务约束推导键，再用反例验证完整性"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "读者与多次借阅之间的外键配置"
+            ],
+            "strategy": [
+              "逐条追踪关系方向和参照对象身份"
+            ]
+          },
+          "teaching_methods": [
+            "规则推演",
+            "反例讨论"
+          ],
+          "resources": [
+            "候选实体属性表",
+            "关系映射练习页",
+            "投影设备"
+          ],
+          "reference_ids": [],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "课外线上",
+              "content": [
+                "复看候选实体表，标出能够稳定区分记录的字段"
+              ],
+              "teacher_actions": [
+                "提供上课前的实体表并说明标注要求"
+              ],
+              "student_actions": [
+                "圈出读者编号、图书编号和借阅日期等候选字段"
+              ],
+              "objective": "把上一课成果转化为键选择问题"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "比较“读者有多次借阅”和“每次借阅对应一位读者”"
+              ],
+              "teacher_actions": [
+                "绘制业务关系示意，追问哪一端会重复出现"
+              ],
+              "student_actions": [
+                "说明借阅记录端会重复引用读者身份"
+              ],
+              "objective": "从业务数量关系确定关联的方向"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "课堂",
+              "content": [
+                "演示实体表转换为关系表并放置主键和外键"
+              ],
+              "teacher_actions": [
+                "逐栏说明主键唯一性与外键参照含义"
+              ],
+              "student_actions": [
+                "跟随演示检查借阅表中的读者编号对应读者表"
+              ],
+              "objective": "掌握从业务约束到键结构的转换步骤"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 20,
+              "modality": "小组研讨",
+              "content": [
+                "根据读者、图书、借阅事件三表规则完成映射"
+              ],
+              "teacher_actions": [
+                "发放业务约束卡，巡视每组主外键配置"
+              ],
+              "student_actions": [
+                "绘制三张关系表并标出字段角色与参照目标"
+              ],
+              "objective": "完成可用于后续查询讨论的关系结构"
+            },
+            {
+              "id": "task_extension",
+              "label": "任务拓展",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "推演删除图书、重复读者编号和孤立借阅记录的结果"
+              ],
+              "teacher_actions": [
+                "提供三种异常数据，引导说明约束如何响应"
+              ],
+              "student_actions": [
+                "修改映射方案以消除无法解释的孤立记录"
+              ],
+              "objective": "检验键设计对异常数据的约束能力"
+            },
+            {
+              "id": "project_practice",
+              "label": "项目实训",
+              "minutes": 15,
+              "modality": "小组研讨",
+              "content": [
+                "制作关系映射表并附上每条关联的业务解释"
+              ],
+              "teacher_actions": [
+                "核对主键唯一性和外键目标是否与规则一致"
+              ],
+              "student_actions": [
+                "提交关系映射表及一条被反例修正的配置"
+              ],
+              "objective": "形成关系模型评审所需的结构和依据"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "互换映射表，检查重复引用与错误参照目标"
+              ],
+              "teacher_actions": [
+                "要求审阅者沿一条借阅记录追到读者和图书"
+              ],
+              "student_actions": [
+                "指出具体键位置及其参照链是否闭合"
+              ],
+              "objective": "通过独立追踪发现方向判断错误"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "总结实体身份、事件记录与参照完整性的关系"
+              ],
+              "teacher_actions": [
+                "结合互审差异归纳主外键设置顺序"
+              ],
+              "student_actions": [
+                "用一句话说明为何外键放在借阅记录表"
+              ],
+              "objective": "建立规则、结构和异常结果之间的联系"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "课外线上",
+              "content": [
+                "完善外键参照说明，并保留待确认业务规则"
+              ],
+              "teacher_actions": [
+                "说明交付格式，提醒区分业务假设与确定规则"
+              ],
+              "student_actions": [
+                "提交标注后的映射表和待确认规则列表"
+              ],
+              "objective": "让下一课能基于稳定结构开展冗余分析"
+            }
+          ],
+          "evaluation": {
+            "score": 88.5,
+            "remarks": {
+              "attendance": "带齐候选实体表",
+              "attention": "能跟踪关系方向推演",
+              "participation": "参与键约束讨论",
+              "compliance": "遵守数据脱敏约定",
+              "values": "承认尚未确认的关联规则",
+              "ethics": "能解释外键放置依据",
+              "habits": "按要求保留记录来源",
+              "online_learning": "课前圈出身份候选字段",
+              "discussion": "能区分关联两端的数量",
+              "homework": "反例修正有清楚原因",
+              "practice": "关系表字段角色完整",
+              "presentation": "展示时能追踪参照链",
+              "improvement": "课后补写待确认规则"
+            }
+          },
+          "reflection": {
+            "summary": "本课从依据业务规则配置主键与关联出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+            "innovation": "将带主键、外键与关系基数的借阅关系映射表与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+            "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移理解阶段的方法。"
+          }
+        },
+        "decision": "approved",
+        "review_history": [
+          {
+            "round": 1,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "4FA00D3F3F4F2E65ABAD0E671B1409EC6AABBCB7D27235813B57BEAC6E52E6CF"
+          }
+        ]
+      }
+    },
+    {
+      "lesson_id": "L03",
+      "unit": "项目二 关系模型校核",
+      "task": "检查关系表冗余并说明结构取舍",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "progression": {
+        "prior_lesson_id": "L02",
+        "prior_learning": "学生已把借阅业务转换为关系表，并理解主键、外键和关联基数。",
+        "capability_stage": "独立",
+        "deliverable": "关系模型校核报告及一处有依据的结构修订",
+        "next_bridge": "后续项目将把校核后的关系模型用于查询设计与数据维护。"
+      },
+      "student_analysis": {
+        "base": [
+          "学生能阅读关系映射表并沿主键外键追踪关联。",
+          "学生理解字段依赖业务对象，但对重复存储造成的更新异常经验有限。"
+        ],
+        "problems": [
+          "学生可能把减少表数量误认为设计更简单。",
+          "拆分关系表后如何保持查询需要和参照关系，需要成组论证。"
+        ],
+        "strategies": [
+          "从同一图书信息在多条借阅记录中的重复开始分析更新异常。",
+          "将函数依赖、分解结果和查询需求放在同一校核表中检查。"
+        ]
+      },
+      "teaching_content": [
+        "业务属性之间的函数依赖线索",
+        "插入、更新和删除异常的识别",
+        "依据依赖与查询需求校核关系模式"
+      ],
+      "goals": {
+        "knowledge": [
+          "说明重复存储可能引发的维护异常。",
+          "解释函数依赖对关系表分解判断的作用。"
+        ],
+        "ability": [
+          "从借阅关系表识别潜在冗余及其业务后果。",
+          "比较分解前后的依赖保持和查询影响。"
+        ],
+        "quality": [
+          "在优化结构时同时考虑数据一致与使用场景。",
+          "提交可以复核的判断依据和结构取舍。"
+        ]
+      },
+      "key_point": {
+        "content": [
+          "重复属性与更新异常的关系",
+          "依据函数依赖检查关系模式"
+        ],
+        "strategy": [
+          "先说明数据变化后果，再论证关系分解"
+        ]
+      },
+      "difficult_point": {
+        "content": [
+          "在减少冗余与保留查询语义之间作取舍"
+        ],
+        "strategy": [
+          "使用具体借阅查询检验分解方案是否保留所需信息"
+        ]
+      },
+      "teaching_methods": [
+        "问题案例分析",
+        "结构比较"
+      ],
+      "resources": [
+        "关系映射表",
+        "查询需求卡片",
+        "关系模型校核表"
+      ],
+      "reference_ids": [],
+      "practice_task_ids": [],
+      "implementation": [
+        {
+          "id": "before_class_preparation",
+          "label": "课前准备",
+          "minutes": 10,
+          "modality": "课外线上",
+          "content": [
+            "阅读包含重复书名和出版社信息的借阅明细样例"
+          ],
+          "teacher_actions": [
+            "准备两组存在差异的明细记录，先不提供结论"
+          ],
+          "student_actions": [
+            "标出重复书目信息并圈出彼此冲突的版本"
+          ],
+          "objective": "从真实数据变化现象引出模型校核目标"
+        },
+        {
+          "id": "task_introduction",
+          "label": "任务导入",
+          "minutes": 10,
+          "modality": "课堂",
+          "content": [
+            "讨论图书信息修改一处却需改多行的后果"
+          ],
+          "teacher_actions": [
+            "呈现更新前后不一致案例，追问错误如何扩散"
+          ],
+          "student_actions": [
+            "判断重复字段可能造成的插入、更新或删除异常"
+          ],
+          "objective": "把结构问题与业务维护成本联系起来"
+        },
+        {
+          "id": "operation_demonstration",
+          "label": "方法示范",
+          "minutes": 15,
+          "modality": "课堂",
+          "content": [
+            "示范用业务规则写出属性依赖并检查模式分解"
+          ],
+          "teacher_actions": [
+            "选取图书编号与书名关系，演示依赖表达和判断"
+          ],
+          "student_actions": [
+            "记录依赖前提，指出假设不成立时结论需重审"
+          ],
+          "objective": "理解依赖结论必须受业务规则支持"
+        },
+        {
+          "id": "task_implementation",
+          "label": "任务实施",
+          "minutes": 20,
+          "modality": "小组研讨",
+          "content": [
+            "独立校核借阅关系表，填写冗余、异常和依赖依据"
+          ],
+          "teacher_actions": [
+            "发放查询需求卡，按需提示依赖表达但不代做判断"
+          ],
+          "student_actions": [
+            "完成校核表并提出一处可解释的关系分解"
+          ],
+          "objective": "将规则分析转化为可复核的结构审查成果"
+        },
+        {
+          "id": "task_extension",
+          "label": "任务拓展",
+          "minutes": 10,
+          "modality": "小组研讨",
+          "content": [
+            "比较保留明细表与拆分图书信息两种方案的查询路径"
+          ],
+          "teacher_actions": [
+            "要求逐项说明连接成本、更新一致性和信息保持"
+          ],
+          "student_actions": [
+            "用“查某读者当前借阅书目”需求检验两个方案"
+          ],
+          "objective": "避免只按表数量或局部冗余作单一取舍"
+        },
+        {
+          "id": "project_practice",
+          "label": "项目实训",
+          "minutes": 15,
+          "modality": "小组研讨",
+          "content": [
+            "整合异常案例、依赖证据和最终模式图"
+          ],
+          "teacher_actions": [
+            "抽查每项结构改动是否有业务规则与查询证据"
+          ],
+          "student_actions": [
+            "提交校核报告、模式图和一条明确的设计取舍"
+          ],
+          "objective": "形成可审阅的关系模型质量结论"
+        },
+        {
+          "id": "peer_review",
+          "label": "组间互评",
+          "minutes": 10,
+          "modality": "小组研讨",
+          "content": [
+            "交换校核报告，复走分解前后的查询需求"
+          ],
+          "teacher_actions": [
+            "组织评议，要求质疑前提而非只评价结论"
+          ],
+          "student_actions": [
+            "指出一项未写明的函数依赖假设并提出核验问题"
+          ],
+          "objective": "通过独立检查发现结论适用范围"
+        },
+        {
+          "id": "lesson_summary",
+          "label": "课堂小结",
+          "minutes": 10,
+          "modality": "课堂",
+          "content": [
+            "回顾从异常现象到依赖依据再到结构取舍的路径"
+          ],
+          "teacher_actions": [
+            "按学生报告归纳校核步骤及证据标准"
+          ],
+          "student_actions": [
+            "写下一个未来模型评审时必须追问的问题"
+          ],
+          "objective": "巩固能迁移到其他业务模型的审查路径"
+        },
+        {
+          "id": "after_class_improvement",
+          "label": "课后完善",
+          "minutes": 15,
+          "modality": "课外线上",
+          "content": [
+            "根据评议补充依赖前提并修订模式说明"
+          ],
+          "teacher_actions": [
+            "布置短修订并要求保留结构变动记录"
+          ],
+          "student_actions": [
+            "提交最终校核报告及修订理由"
+          ],
+          "objective": "为后续查询设计留下可信的模型版本"
+        }
+      ],
+      "evaluation": {
+        "score": 94.5,
+        "remarks": {
+          "attendance": "准备好上一课映射成果",
+          "attention": "持续记录案例中的数据变化",
+          "participation": "主动比较两种关系方案",
+          "compliance": "遵守数据使用约束",
+          "values": "讨论时说明优化影响",
+          "ethics": "贡献查询需求检验思路",
+          "habits": "保护样例中的业务信息",
+          "online_learning": "课前圈出重复属性",
+          "discussion": "能区分异常现象和原因",
+          "homework": "作业包含依赖依据",
+          "practice": "校核报告覆盖异常与分解",
+          "presentation": "展示时演示一条查询路径",
+          "improvement": "课后记录可迁移的审查问题"
+        }
+      },
+      "reflection": {
+        "summary": "本课从检查关系表冗余并说明结构取舍出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+        "innovation": "将关系模型校核报告及一处有依据的结构修订与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+        "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移独立阶段的方法。"
+      },
+      "pedagogical_review": {
+        "issues": [],
+        "draft_content": {
+          "progression": {
+            "prior_lesson_id": "L02",
+            "prior_learning": "学生已把借阅业务转换为关系表，并理解主键、外键和关联基数。",
+            "capability_stage": "独立",
+            "deliverable": "关系模型校核报告及一处有依据的结构修订",
+            "next_bridge": "后续项目将把校核后的关系模型用于查询设计与数据维护。"
+          },
+          "student_analysis": {
+            "base": [
+              "学生能阅读关系映射表并沿主键外键追踪关联。",
+              "学生理解字段依赖业务对象，但对重复存储造成的更新异常经验有限。"
+            ],
+            "problems": [
+              "学生可能把减少表数量误认为设计更简单。",
+              "拆分关系表后如何保持查询需要和参照关系，需要成组论证。"
+            ],
+            "strategies": [
+              "从同一图书信息在多条借阅记录中的重复开始分析更新异常。",
+              "将函数依赖、分解结果和查询需求放在同一校核表中检查。"
+            ]
+          },
+          "teaching_content": [
+            "业务属性之间的函数依赖线索",
+            "插入、更新和删除异常的识别",
+            "依据依赖与查询需求校核关系模式"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明重复存储可能引发的维护异常。",
+              "解释函数依赖对关系表分解判断的作用。"
+            ],
+            "ability": [
+              "从借阅关系表识别潜在冗余及其业务后果。",
+              "比较分解前后的依赖保持和查询影响。"
+            ],
+            "quality": [
+              "在优化结构时同时考虑数据一致与使用场景。",
+              "提交可以复核的判断依据和结构取舍。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "重复属性与更新异常的关系",
+              "依据函数依赖检查关系模式"
+            ],
+            "strategy": [
+              "先说明数据变化后果，再论证关系分解"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "在减少冗余与保留查询语义之间作取舍"
+            ],
+            "strategy": [
+              "使用具体借阅查询检验分解方案是否保留所需信息"
+            ]
+          },
+          "teaching_methods": [
+            "问题案例分析",
+            "结构比较"
+          ],
+          "resources": [
+            "关系映射表",
+            "查询需求卡片",
+            "关系模型校核表"
+          ],
+          "reference_ids": [],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "课外线上",
+              "content": [
+                "阅读包含重复书名和出版社信息的借阅明细样例"
+              ],
+              "teacher_actions": [
+                "准备两组存在差异的明细记录，先不提供结论"
+              ],
+              "student_actions": [
+                "标出重复书目信息并圈出彼此冲突的版本"
+              ],
+              "objective": "从真实数据变化现象引出模型校核目标"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "讨论图书信息修改一处却需改多行的后果"
+              ],
+              "teacher_actions": [
+                "呈现更新前后不一致案例，追问错误如何扩散"
+              ],
+              "student_actions": [
+                "判断重复字段可能造成的插入、更新或删除异常"
+              ],
+              "objective": "把结构问题与业务维护成本联系起来"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "课堂",
+              "content": [
+                "示范用业务规则写出属性依赖并检查模式分解"
+              ],
+              "teacher_actions": [
+                "选取图书编号与书名关系，演示依赖表达和判断"
+              ],
+              "student_actions": [
+                "记录依赖前提，指出假设不成立时结论需重审"
+              ],
+              "objective": "理解依赖结论必须受业务规则支持"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 20,
+              "modality": "小组研讨",
+              "content": [
+                "独立校核借阅关系表，填写冗余、异常和依赖依据"
+              ],
+              "teacher_actions": [
+                "发放查询需求卡，按需提示依赖表达但不代做判断"
+              ],
+              "student_actions": [
+                "完成校核表并提出一处可解释的关系分解"
+              ],
+              "objective": "将规则分析转化为可复核的结构审查成果"
+            },
+            {
+              "id": "task_extension",
+              "label": "任务拓展",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "比较保留明细表与拆分图书信息两种方案的查询路径"
+              ],
+              "teacher_actions": [
+                "要求逐项说明连接成本、更新一致性和信息保持"
+              ],
+              "student_actions": [
+                "用“查某读者当前借阅书目”需求检验两个方案"
+              ],
+              "objective": "避免只按表数量或局部冗余作单一取舍"
+            },
+            {
+              "id": "project_practice",
+              "label": "项目实训",
+              "minutes": 15,
+              "modality": "小组研讨",
+              "content": [
+                "整合异常案例、依赖证据和最终模式图"
+              ],
+              "teacher_actions": [
+                "抽查每项结构改动是否有业务规则与查询证据"
+              ],
+              "student_actions": [
+                "提交校核报告、模式图和一条明确的设计取舍"
+              ],
+              "objective": "形成可审阅的关系模型质量结论"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "交换校核报告，复走分解前后的查询需求"
+              ],
+              "teacher_actions": [
+                "组织评议，要求质疑前提而非只评价结论"
+              ],
+              "student_actions": [
+                "指出一项未写明的函数依赖假设并提出核验问题"
+              ],
+              "objective": "通过独立检查发现结论适用范围"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "回顾从异常现象到依赖依据再到结构取舍的路径"
+              ],
+              "teacher_actions": [
+                "按学生报告归纳校核步骤及证据标准"
+              ],
+              "student_actions": [
+                "写下一个未来模型评审时必须追问的问题"
+              ],
+              "objective": "巩固能迁移到其他业务模型的审查路径"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "课外线上",
+              "content": [
+                "根据评议补充依赖前提并修订模式说明"
+              ],
+              "teacher_actions": [
+                "布置短修订并要求保留结构变动记录"
+              ],
+              "student_actions": [
+                "提交最终校核报告及修订理由"
+              ],
+              "objective": "为后续查询设计留下可信的模型版本"
+            }
+          ],
+          "evaluation": {
+            "score": 94.5,
+            "remarks": {
+              "attendance": "准备好上一课映射成果",
+              "attention": "持续记录案例中的数据变化",
+              "participation": "主动比较两种关系方案",
+              "compliance": "遵守数据使用约束",
+              "values": "讨论时说明优化影响",
+              "ethics": "贡献查询需求检验思路",
+              "habits": "保护样例中的业务信息",
+              "online_learning": "课前圈出重复属性",
+              "discussion": "能区分异常现象和原因",
+              "homework": "作业包含依赖依据",
+              "practice": "校核报告覆盖异常与分解",
+              "presentation": "展示时演示一条查询路径",
+              "improvement": "课后记录可迁移的审查问题"
+            }
+          },
+          "reflection": {
+            "summary": "本课从检查关系表冗余并说明结构取舍出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+            "innovation": "将关系模型校核报告及一处有依据的结构修订与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+            "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移独立阶段的方法。"
+          }
+        },
+        "revised_content": {
+          "progression": {
+            "prior_lesson_id": "L02",
+            "prior_learning": "学生已把借阅业务转换为关系表，并理解主键、外键和关联基数。",
+            "capability_stage": "独立",
+            "deliverable": "关系模型校核报告及一处有依据的结构修订",
+            "next_bridge": "后续项目将把校核后的关系模型用于查询设计与数据维护。"
+          },
+          "student_analysis": {
+            "base": [
+              "学生能阅读关系映射表并沿主键外键追踪关联。",
+              "学生理解字段依赖业务对象，但对重复存储造成的更新异常经验有限。"
+            ],
+            "problems": [
+              "学生可能把减少表数量误认为设计更简单。",
+              "拆分关系表后如何保持查询需要和参照关系，需要成组论证。"
+            ],
+            "strategies": [
+              "从同一图书信息在多条借阅记录中的重复开始分析更新异常。",
+              "将函数依赖、分解结果和查询需求放在同一校核表中检查。"
+            ]
+          },
+          "teaching_content": [
+            "业务属性之间的函数依赖线索",
+            "插入、更新和删除异常的识别",
+            "依据依赖与查询需求校核关系模式"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明重复存储可能引发的维护异常。",
+              "解释函数依赖对关系表分解判断的作用。"
+            ],
+            "ability": [
+              "从借阅关系表识别潜在冗余及其业务后果。",
+              "比较分解前后的依赖保持和查询影响。"
+            ],
+            "quality": [
+              "在优化结构时同时考虑数据一致与使用场景。",
+              "提交可以复核的判断依据和结构取舍。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "重复属性与更新异常的关系",
+              "依据函数依赖检查关系模式"
+            ],
+            "strategy": [
+              "先说明数据变化后果，再论证关系分解"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "在减少冗余与保留查询语义之间作取舍"
+            ],
+            "strategy": [
+              "使用具体借阅查询检验分解方案是否保留所需信息"
+            ]
+          },
+          "teaching_methods": [
+            "问题案例分析",
+            "结构比较"
+          ],
+          "resources": [
+            "关系映射表",
+            "查询需求卡片",
+            "关系模型校核表"
+          ],
+          "reference_ids": [],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "课外线上",
+              "content": [
+                "阅读包含重复书名和出版社信息的借阅明细样例"
+              ],
+              "teacher_actions": [
+                "准备两组存在差异的明细记录，先不提供结论"
+              ],
+              "student_actions": [
+                "标出重复书目信息并圈出彼此冲突的版本"
+              ],
+              "objective": "从真实数据变化现象引出模型校核目标"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "讨论图书信息修改一处却需改多行的后果"
+              ],
+              "teacher_actions": [
+                "呈现更新前后不一致案例，追问错误如何扩散"
+              ],
+              "student_actions": [
+                "判断重复字段可能造成的插入、更新或删除异常"
+              ],
+              "objective": "把结构问题与业务维护成本联系起来"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "课堂",
+              "content": [
+                "示范用业务规则写出属性依赖并检查模式分解"
+              ],
+              "teacher_actions": [
+                "选取图书编号与书名关系，演示依赖表达和判断"
+              ],
+              "student_actions": [
+                "记录依赖前提，指出假设不成立时结论需重审"
+              ],
+              "objective": "理解依赖结论必须受业务规则支持"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 20,
+              "modality": "小组研讨",
+              "content": [
+                "独立校核借阅关系表，填写冗余、异常和依赖依据"
+              ],
+              "teacher_actions": [
+                "发放查询需求卡，按需提示依赖表达但不代做判断"
+              ],
+              "student_actions": [
+                "完成校核表并提出一处可解释的关系分解"
+              ],
+              "objective": "将规则分析转化为可复核的结构审查成果"
+            },
+            {
+              "id": "task_extension",
+              "label": "任务拓展",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "比较保留明细表与拆分图书信息两种方案的查询路径"
+              ],
+              "teacher_actions": [
+                "要求逐项说明连接成本、更新一致性和信息保持"
+              ],
+              "student_actions": [
+                "用“查某读者当前借阅书目”需求检验两个方案"
+              ],
+              "objective": "避免只按表数量或局部冗余作单一取舍"
+            },
+            {
+              "id": "project_practice",
+              "label": "项目实训",
+              "minutes": 15,
+              "modality": "小组研讨",
+              "content": [
+                "整合异常案例、依赖证据和最终模式图"
+              ],
+              "teacher_actions": [
+                "抽查每项结构改动是否有业务规则与查询证据"
+              ],
+              "student_actions": [
+                "提交校核报告、模式图和一条明确的设计取舍"
+              ],
+              "objective": "形成可审阅的关系模型质量结论"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 10,
+              "modality": "小组研讨",
+              "content": [
+                "交换校核报告，复走分解前后的查询需求"
+              ],
+              "teacher_actions": [
+                "组织评议，要求质疑前提而非只评价结论"
+              ],
+              "student_actions": [
+                "指出一项未写明的函数依赖假设并提出核验问题"
+              ],
+              "objective": "通过独立检查发现结论适用范围"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "课堂",
+              "content": [
+                "回顾从异常现象到依赖依据再到结构取舍的路径"
+              ],
+              "teacher_actions": [
+                "按学生报告归纳校核步骤及证据标准"
+              ],
+              "student_actions": [
+                "写下一个未来模型评审时必须追问的问题"
+              ],
+              "objective": "巩固能迁移到其他业务模型的审查路径"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "课外线上",
+              "content": [
+                "根据评议补充依赖前提并修订模式说明"
+              ],
+              "teacher_actions": [
+                "布置短修订并要求保留结构变动记录"
+              ],
+              "student_actions": [
+                "提交最终校核报告及修订理由"
+              ],
+              "objective": "为后续查询设计留下可信的模型版本"
+            }
+          ],
+          "evaluation": {
+            "score": 94.5,
+            "remarks": {
+              "attendance": "准备好上一课映射成果",
+              "attention": "持续记录案例中的数据变化",
+              "participation": "主动比较两种关系方案",
+              "compliance": "遵守数据使用约束",
+              "values": "讨论时说明优化影响",
+              "ethics": "贡献查询需求检验思路",
+              "habits": "保护样例中的业务信息",
+              "online_learning": "课前圈出重复属性",
+              "discussion": "能区分异常现象和原因",
+              "homework": "作业包含依赖依据",
+              "practice": "校核报告覆盖异常与分解",
+              "presentation": "展示时演示一条查询路径",
+              "improvement": "课后记录可迁移的审查问题"
+            }
+          },
+          "reflection": {
+            "summary": "本课从检查关系表冗余并说明结构取舍出发形成了可复核的阶段成果，学生能够说明主要判断依据。",
+            "innovation": "将关系模型校核报告及一处有依据的结构修订与具体业务记录或查询需求配对，使抽象结构判断能由证据检验。",
+            "improvement": "下次教学可补充不同规模的业务样例，并观察学生能否独立迁移独立阶段的方法。"
+          }
+        },
+        "decision": "approved",
+        "review_history": [
+          {
+            "round": 1,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "FB2CEE29AA0CC15CC0A10A0E5946ED8D79ECB0EA875EBA1FD1FEFF1D01AA06FA"
+          }
+        ]
+      }
+    }
+  ],
+  "authoring_provenance": {
+    "mode": "agent",
+    "status": "completed",
+    "authoring_id": "agent-authored-lesson-v22-example-2026",
+    "source_snapshot": {
+      "confirmed_course_profile_sha256": "AD1BE51326409A80540CB6189C134F61C643F08D5BADDEA405F7C15AFBE32220",
+      "whole_course_outline_sha256": "D7BABD1186E60EC3AA11AA853E7FB779354DE329D42E9F64FC4CCDB5324C623D",
+      "reference_pool_sha256": "4F53CDA18C2BAA0C0354BB5F9A3ECBE5ED12AB4D8E11BA873C2F11161202B945"
+    },
+    "draft_content_sha256": "E009A9ED041C1E89A1A075E21BFAB3E52D42B4C2A1DED022DB33A2DCF139C4D6",
+    "final_content_sha256": "E009A9ED041C1E89A1A075E21BFAB3E52D42B4C2A1DED022DB33A2DCF139C4D6",
+    "review_rounds": 1
+  }
+}

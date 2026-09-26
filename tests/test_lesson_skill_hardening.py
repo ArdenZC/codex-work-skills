@@ -179,7 +179,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
         self.assertEqual(
-            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.3"),
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.4"),
             1,
         )
 
@@ -343,6 +343,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertEqual(list(Draft202012Validator(schema).iter_errors(report)), [])
             self.assertEqual(report["metadata"]["content_contract_version"], "2.0")
             self.assertEqual(report["metadata"]["template_version"], "v1.1.2")
+            self.assertEqual(report["metadata"]["production_status"], "not_applicable")
             self.assertEqual(report["metadata"]["lesson_count"], 3)
             self.assertEqual(report["structural_hard_gates"]["status"], "PASS")
             self.assertEqual(report["final_status"], "PENDING_MANUAL_REVIEW")

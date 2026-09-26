@@ -56,7 +56,7 @@ from package_common import (
 )
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from render_qa import pdf_page_count
-from validate_output import validate_output_dir, write_skipped_report
+from validate_output import production_status_for_qa, validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
 
@@ -470,8 +470,9 @@ def _build_artifact_manifest(
     source_final_content_sha256 = str((meta.get("authoring_provenance") or {}).get("final_content_sha256", "")).upper()
     packaged_content_sha256 = _reviewed_content_digest(meta) if is_v22 else None
     reference_evidence_path = candidate / "reference-evidence.json"
-    return {
+    manifest = {
         "manifest_version": "2.0",
+        "content_contract_version": meta.get("content_contract_version"),
         "run_id": run_id,
         "course_name": meta.get("course_name"),
         "major": meta.get("major"),
@@ -502,6 +503,9 @@ def _build_artifact_manifest(
         "created_at": created_at,
         "artifacts": records,
     }
+    if is_v22:
+        manifest["production_status"] = report.get("production_status")
+    return manifest
 
 
 def _artifact_relative_path(root: Path, value: Any) -> Path | None:
@@ -532,6 +536,7 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         "actual_pdf_page_count",
         "qa_status",
         "render_status",
+        "content_contract_version",
         "created_at",
     }
     missing = sorted(field for field in required if field not in manifest)
@@ -549,6 +554,29 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
     records = manifest.get("artifacts")
     if not isinstance(records, list):
         raise RuntimeError("artifact manifest artifacts must be a list")
+    if manifest.get("content_contract_version") == "2.2":
+        expected_production_status = production_status_for_qa(
+            {
+                "content_contract_version": "2.2",
+                "lessons": records,
+            },
+            {
+                "status": manifest.get("qa_status"),
+                "render": {
+                    "status": manifest.get("render_status"),
+                    "renderer": "retained-pdf-artifacts" if records else None,
+                    "files_checked": len(records),
+                    "page_count": manifest.get("actual_pdf_page_count"),
+                },
+            },
+        )
+        if manifest.get("production_status") != expected_production_status:
+            raise RuntimeError(
+                "artifact manifest production_status is inconsistent with QA/render status: "
+                f"declared={manifest.get('production_status')!r}, expected={expected_production_status!r}"
+            )
+        if expected_production_status == "failed":
+            raise RuntimeError("Content Contract 2.2 artifact manifest is not eligible for publication")
     require_retained_pdf = manifest.get("render_status") == "passed"
     if not records:
         if manifest.get("actual_pdf_page_count") != 0:
@@ -909,6 +937,8 @@ def main() -> None:
                 render_pdf_dir=(candidate / "render" / "pdf") if args.render else None,
                 allow_test_fixture_authoring=allow_test_fixture_authoring,
             )
+        if meta.get("content_contract_version") == "2.2" and report.get("production_status") == "failed":
+            raise RuntimeError("Content Contract 2.2 output did not pass production readiness checks")
         _stable_render_artifacts(report, candidate)
         created_at = datetime.now(timezone.utc).isoformat()
         reference_evidence_path = candidate / "reference-evidence.json"
@@ -966,8 +996,19 @@ def main() -> None:
             print(out_dir / filename)
         if backup is not None:
             print(f"backup={backup}")
-        action = "skipped validation" if report["status"] == "skipped" else "validated"
-        print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
+        if meta.get("content_contract_version") == "2.2":
+            print(
+                "Content Contract 2.2 "
+                f"production_status={report['production_status']} "
+                f"qa_status={report['status']} "
+                f"render_status={report['render']['status']} "
+                f"files={report['checks']['file_count']['actual']} "
+                f"total_hours={report['checks']['total_hours']['actual']:g} "
+                f"qa={report['qa_report']}"
+            )
+        else:
+            action = "skipped validation" if report["status"] == "skipped" else "validated"
+            print(f"{action} files={report['checks']['file_count']['actual']} total_hours={report['checks']['total_hours']['actual']:g} qa={report['qa_report']}")
     except BaseException as exc:
         operation_error = exc
         raise

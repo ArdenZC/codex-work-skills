@@ -1077,9 +1077,13 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
         raise ValueError(
             "reference_research.status must record whether a verified external source was available"
         )
-    if research_status == "no_verified_external_source" and pool:
+    if research_status == "no_verified_external_source" and any(
+        not isinstance(reference, dict) or reference.get("source_kind") != "provided"
+        for reference in pool
+    ):
         raise ValueError(
-            "reference_pool must be empty when reference_research.status=no_verified_external_source"
+            "reference_pool may contain only source_kind=provided items when "
+            "reference_research.status=no_verified_external_source"
         )
     reference_by_id: dict[str, dict[str, Any]] = {}
     for index, reference in enumerate(pool, 1):

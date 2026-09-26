@@ -5,6 +5,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import DEFAULT, patch
 
 from docx import Document
 
@@ -19,6 +20,8 @@ from tests.test_lesson_content_v2 import (
     lesson_generator,
     lesson_package_common,
     lesson_content_contract,
+    lesson_content_quality,
+    lesson_output,
     load_manifest,
     run_script,
 )
@@ -424,6 +427,84 @@ def make_v22_payload(
     return payload
 
 
+def _refresh_review_digests(payload: dict[str, object]) -> None:
+    """Keep the fixture's review chain bound after test-only content edits."""
+
+    lessons = payload["lessons"]
+    draft_digests: list[str] = []
+    final_digests: list[str] = []
+    for lesson in lessons:
+        content = lesson_package_common.lesson_agent_content(lesson)
+        digest = lesson_package_common.canonical_json_sha256(content)
+        review = lesson["pedagogical_review"]
+        review["draft_content"] = copy.deepcopy(content)
+        review["revised_content"] = copy.deepcopy(content)
+        review["review_history"] = [
+            {
+                "round": 1,
+                "issues": [],
+                "decision": "approved",
+                "content_sha256": digest,
+            }
+        ]
+        draft_digests.append(digest)
+        final_digests.append(digest)
+    provenance = payload["authoring_provenance"]
+    provenance["draft_content_sha256"] = lesson_package_common.content_digest_rollup(draft_digests)
+    provenance["final_content_sha256"] = lesson_package_common.content_digest_rollup(final_digests)
+
+
+def _scaled_context_payload(source: dict[str, object], lesson_count: int) -> dict[str, object]:
+    """Scale a complete reviewed Content 2.2 payload for byte-size analysis only."""
+
+    payload = copy.deepcopy(source)
+    examples = source["lessons"]
+    lessons = []
+    for index in range(lesson_count):
+        lesson = copy.deepcopy(examples[index % len(examples)])
+        lesson_id = f"L{index + 1:02d}"
+        lesson["lesson_id"] = lesson_id
+        lesson["progression"]["prior_lesson_id"] = None if index == 0 else f"L{index:02d}"
+        lessons.append(lesson)
+    total_hours = lesson_count * 2
+    payload["total_hours"] = total_hours
+    payload["confirmed_course_info"].update(
+        {"total_hours": total_hours, "theory_hours": total_hours, "practice_hours": 0}
+    )
+    payload["delivery_plan"].update(
+        {"total_hours": total_hours, "theory_hours": total_hours, "practice_hours": 0}
+    )
+    payload["outline"] = [
+        {
+            "lesson_id": lesson["lesson_id"],
+            "unit": lesson["unit"],
+            "task": lesson["task"],
+            "lesson_type": "theory",
+            "hours": 2,
+            "theory_hours": 2,
+            "practice_hours": 0,
+            "prior_learning": lesson["progression"]["prior_learning"],
+            "capability_stage": lesson["progression"]["capability_stage"],
+            "deliverable": lesson["progression"]["deliverable"],
+            "next_bridge": lesson["progression"]["next_bridge"],
+            "practice_task_ids": [],
+        }
+        for lesson in lessons
+    ]
+    payload["lessons"] = lessons
+    _refresh_review_digests(payload)
+    payload["authoring_provenance"]["authoring_id"] = f"context-sizing-agent-{lesson_count:02d}"
+    payload["authoring_provenance"]["source_snapshot"] = {
+        "confirmed_course_profile_sha256": lesson_package_common.canonical_json_sha256(
+            payload["confirmed_course_info"]
+        ),
+        "whole_course_outline_sha256": lesson_package_common.canonical_json_sha256(payload["outline"]),
+        "reference_pool_sha256": lesson_package_common.canonical_json_sha256(payload["reference_pool"]),
+    }
+    lesson_generator.validate_content_v2_input(payload)
+    return payload
+
+
 class LessonContentV22Tests(unittest.TestCase):
     def assert_rejected(self, payload: dict[str, object], pattern: str) -> None:
         with self.assertRaisesRegex(ValueError, pattern):
@@ -438,6 +519,12 @@ class LessonContentV22Tests(unittest.TestCase):
     def test_production_validator_rejects_synthetic_authoring_without_explicit_test_path(self) -> None:
         payload = make_v22_payload(theory_hours=2, lesson_count=1, specs=DB_SPECS)
         with self.assertRaisesRegex(ValueError, r"mode must be 'agent'.*synthetic fixtures"):
+            lesson_generator.validate_content_v2_input(payload)
+
+    def test_malformed_review_digest_is_rejected_for_agent_example(self) -> None:
+        payload = json.loads((LESSON / "examples" / "tasks-v22.example.json").read_text(encoding="utf-8"))
+        payload["lessons"][0]["pedagogical_review"]["review_history"][0]["content_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "review_history final round must approve"):
             lesson_generator.validate_content_v2_input(payload)
 
     def test_production_consumes_reviewed_content_not_the_draft(self) -> None:
@@ -611,6 +698,22 @@ class LessonContentV22Tests(unittest.TestCase):
                                 finding.get("allowed"),
                                 {"detector": detector, "finding": finding},
                             )
+        one_provided = make_v22_payload(
+            theory_hours=12,
+            lesson_count=6,
+            references=[_pool()[0]],
+            specs=DB_SPECS,
+        )
+        one_provided["reference_research"] = {
+            "status": "no_verified_external_source",
+            "note": "只有课程提供的正式教材来源",
+            "queries": [],
+            "sources": [],
+        }
+        report = self.assert_valid_and_qa(one_provided)
+        self.assertEqual(report["reference_provenance"]["cross_lesson_reuse"], "allowed")
+        self.assertEqual(report["coverage"]["reference_metrics"]["reuse_frequency"]["REF-DOMESTIC"], 6)
+
         generic_payload = make_v22_payload(
             theory_hours=12,
             lesson_count=6,
@@ -669,6 +772,49 @@ class LessonContentV22Tests(unittest.TestCase):
         empty["lessons"][0]["reference_ids"] = []
         self.assert_rejected(empty, "may be empty only when reference_research.status=no_verified_external_source")
 
+    def test_no_verified_external_source_allows_only_provided_formal_references(self) -> None:
+        standard = {
+            "reference_id": "STD-GB-T-1-1-2020",
+            "reference_type": "standard",
+            "title": "GB/T 1.1—2020 标准化工作导则 第1部分：标准化文件的结构和起草规则",
+            "authors": ["国家市场监督管理总局", "国家标准化管理委员会"],
+            "publisher": "中国标准出版社",
+            "year": 2020,
+            "source_identifier": "GB/T 1.1-2020",
+            "source_kind": "provided",
+            "source_region": "domestic",
+            "evidence": "课程组提供的标准文本：GB/T 1.1—2020.pdf",
+        }
+        payload = make_v22_payload(references=[standard])
+        payload["reference_research"] = {
+            "status": "no_verified_external_source",
+            "note": "没有核实到公开网络来源；课程组提供了正式标准文本",
+            "queries": [],
+            "sources": [],
+        }
+        self.assert_valid_and_qa(payload)
+        self.assertEqual(payload["lessons"][0]["reference_ids"], [standard["reference_id"]])
+
+        empty_pool = make_v22_payload(references=[])
+        empty_pool["reference_research"] = {
+            "status": "no_verified_external_source",
+            "note": "没有可用来源",
+            "queries": [],
+            "sources": [],
+        }
+        self.assert_valid_and_qa(empty_pool)
+
+        fake_verified = copy.deepcopy(payload)
+        fake_verified["reference_pool"][0]["source_kind"] = "verified_public"
+        fake_verified["reference_pool"][0]["source_url"] = "https://example.invalid/standard"
+        fake_verified["reference_pool"][0]["authoritative_source"] = "示例标准机构"
+        fake_verified["reference_pool"][0]["evidence"] = "https://example.invalid/standard"
+        self.assert_rejected(fake_verified, "only source_kind=provided")
+
+        unbound_verified = make_v22_payload(references=_pool())
+        unbound_verified["reference_research"]["sources"] = []
+        self.assert_rejected(unbound_verified, "missing evidence for verified reference")
+
     def test_verified_public_research_is_bound_to_exact_bibliographic_identity(self) -> None:
         references = _pool()
         references[1].update(
@@ -710,7 +856,7 @@ class LessonContentV22Tests(unittest.TestCase):
         references[0].pop("year")
         self.assert_valid_and_qa(make_v22_payload(references=references))
 
-    def test_real_manual_and_domestic_majority_are_quality_passes(self) -> None:
+    def test_real_manual_and_reference_region_shares_are_descriptive(self) -> None:
         manual = [
             {
                 "reference_id": "REF-MANUAL",
@@ -731,7 +877,172 @@ class LessonContentV22Tests(unittest.TestCase):
         self.assertEqual(report["coverage"]["reference_metrics"]["domestic_source_count"], 1)
         self.assertEqual(report["coverage"]["reference_metrics"]["foreign_source_count"], 2)
         self.assertEqual(report["coverage"]["reference_metrics"]["domestic_share"], 1 / 3)
-        self.assertTrue(any("below 70%" in warning for warning in report["warnings"]))
+        self.assertFalse(any("70%" in warning for warning in report["warnings"]))
+
+    def test_v22_duplicate_audit_uses_reuse_policy_for_methods_and_resources(self) -> None:
+        payload = make_v22_payload(theory_hours=6, lesson_count=3, specs=DB_SPECS[:3])
+        for lesson in payload["lessons"]:
+            lesson["teaching_methods"] = ["讲授法", "案例分析"]
+            lesson["resources"] = ["投影仪", "课程任务单"]
+        _refresh_review_digests(payload)
+        report = assess_content_quality(payload)
+        self.assertEqual(report["status"], "passed", report["errors"])
+        self.assertEqual(report["exact_duplicates"], [])
+
+    def test_three_lesson_teacher_action_copy_remains_a_hard_failure(self) -> None:
+        payload = make_v22_payload(theory_hours=6, lesson_count=3, specs=DB_SPECS[:3])
+        for lesson in payload["lessons"]:
+            lesson["implementation"][1]["teacher_actions"] = [
+                "教师逐项追问判断依据并记录可复查的证据"
+            ]
+        _refresh_review_digests(payload)
+        report = assess_content_quality(payload)
+        self.assertNotEqual(report["status"], "passed")
+        self.assertTrue(
+            any(
+                item["field"] == "implementation.task_introduction.teacher_actions"
+                and len(item["lessons"]) == 3
+                for item in report["exact_duplicates"]
+            ),
+            report["exact_duplicates"],
+        )
+
+    def test_v22_quality_does_not_call_legacy_similarity_detectors(self) -> None:
+        payload = json.loads((LESSON / "examples" / "tasks-v22.example.json").read_text(encoding="utf-8"))
+        legacy_detectors = (
+            "_similarity",
+            "_character_ngrams",
+            "_structural_item_pairs",
+            "_pairwise_similarity",
+            "_similarity_record",
+            "_similarity_exceeds",
+            "_progression_gates",
+        )
+        with patch.multiple(
+            lesson_content_quality,
+            **{name: DEFAULT for name in legacy_detectors},
+        ) as mocks:
+            for name, mocked in mocks.items():
+                mocked.side_effect = AssertionError(f"legacy detector called: {name}")
+            report = assess_content_quality(payload)
+        self.assertEqual(report["status"], "passed", report["errors"])
+
+    def test_complete_v22_review_context_size_at_4_20_32_lessons(self) -> None:
+        example = json.loads((LESSON / "examples" / "tasks-v22.example.json").read_text(encoding="utf-8"))
+        measurements = []
+        for lesson_count in (4, 20, 32):
+            payload = _scaled_context_payload(example, lesson_count)
+            serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            draft_bytes = sum(
+                len(json.dumps(lesson["pedagogical_review"]["draft_content"], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+                for lesson in payload["lessons"]
+            )
+            revised_bytes = sum(
+                len(json.dumps(lesson["pedagogical_review"]["revised_content"], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+                for lesson in payload["lessons"]
+            )
+            share = (draft_bytes + revised_bytes) / len(serialized)
+            measurements.append((lesson_count, len(serialized), draft_bytes, revised_bytes, share))
+            self.assertEqual(len(payload["lessons"]), lesson_count)
+            self.assertEqual(draft_bytes, revised_bytes)
+        print("Complete Content 2.2 context size (UTF-8 bytes): lessons | payload | draft | revised | draft+revised/payload")
+        for lesson_count, payload_bytes, draft_bytes, revised_bytes, share in measurements:
+            print(f"{lesson_count:>7} | {payload_bytes:>7} | {draft_bytes:>7} | {revised_bytes:>7} | {share:.1%}")
+
+    def test_canonical_example_generation_reports_structural_not_production_pass(self) -> None:
+        source = LESSON / "examples" / "tasks-v22.example.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        self.assertEqual(payload["authoring_provenance"]["mode"], "agent")
+        self.assertEqual(len(payload["lessons"]), 3)
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-structural-") as temp_name:
+            output = Path(temp_name) / "output"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(qa["status"], "passed")
+            self.assertEqual(qa["render"]["status"], "not_executed")
+            self.assertEqual(qa["production_status"], "structural_pass")
+            self.assertEqual(manifest["production_status"], qa["production_status"])
+            self.assertEqual(manifest["render_status"], qa["render"]["status"])
+            self.assertIn("production_status=structural_pass", result.stdout)
+
+            manifest["production_status"] = "production_pass"
+            with self.assertRaisesRegex(RuntimeError, "production_status is inconsistent"):
+                lesson_generator._verify_artifact_manifest(output, manifest, source)
+
+    def test_failed_render_status_never_counts_as_production_pass(self) -> None:
+        payload = {"content_contract_version": "2.2", "lessons": [{"lesson_id": "L01"}]}
+        for render_status in ("failed", "not_executed", "unknown"):
+            status = lesson_output.production_status_for_qa(
+                payload,
+                {
+                    "status": "failed" if render_status == "failed" else "passed",
+                    "render": {
+                        "status": render_status,
+                        "renderer": None,
+                        "files_checked": 0,
+                        "page_count": 0,
+                    },
+                },
+            )
+            self.assertNotEqual(status, "production_pass")
+
+    def test_renderer_failure_and_missing_renderer_are_fail_closed(self) -> None:
+        source = LESSON / "examples" / "tasks-v22.example.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-render-failure-") as temp_name:
+            output = Path(temp_name) / "output"
+            generated = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr + generated.stdout)
+            render_outcomes = (
+                {
+                    "status": "failed",
+                    "reason": "injected renderer failure",
+                    "renderer": "injected",
+                    "files_checked": len(payload["lessons"]),
+                    "page_count": 0,
+                    "page_counts": {},
+                    "errors": ["lesson document did not render"],
+                },
+                {
+                    "status": "not_executed",
+                    "reason": "LibreOffice was not found",
+                    "renderer": None,
+                    "files_checked": 0,
+                    "page_count": 0,
+                    "page_counts": {},
+                    "errors": [],
+                },
+            )
+            for render_outcome in render_outcomes:
+                with self.subTest(render_status=render_outcome["status"]):
+                    with patch.object(lesson_output, "render_docx_directory", return_value=render_outcome):
+                        with self.assertRaisesRegex(RuntimeError, "render QA"):
+                            lesson_output.validate_output_dir(
+                                output,
+                                payload,
+                                load_manifest(V112_MANIFEST),
+                                output / "qa-report.json",
+                                LESSON / "schemas" / "lesson-plan-input.schema.json",
+                                template_path=LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx",
+                                render=True,
+                            )
+                    report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+                    self.assertEqual(report["status"], "failed")
+                    self.assertEqual(report["production_status"], "failed")
 
     def test_reference_reuse_does_not_exempt_same_lesson_or_narrative_duplicates(self) -> None:
         payload = make_v22_payload(theory_hours=12, lesson_count=6, specs=DB_SPECS)
@@ -759,8 +1070,15 @@ class LessonContentV22Tests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertEqual(qa["status"], "passed", qa)
+            self.assertEqual(qa["production_status"], "production_pass", qa)
+            self.assertEqual(qa["render"]["status"], "passed", qa["render"])
             self.assertEqual(qa["checks"]["total_hours"]["actual"], 6)
             self.assertEqual(qa["checks"]["course_hours"]["actual"], 8)
+            artifact_manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(artifact_manifest["production_status"], "production_pass")
+            self.assertEqual(artifact_manifest["render_status"], "passed")
+            self.assertEqual(len(artifact_manifest["artifacts"]), 3)
+            self.assertTrue(all(item["final_pdf_sha256"] and item["actual_pdf_page_count"] > 0 for item in artifact_manifest["artifacts"]))
             manifest = load_manifest(V112_MANIFEST)
             files = sorted(output.glob("*.docx"))
             self.assertEqual(len(files), 3)

@@ -3,7 +3,7 @@ name: lesson-plan-docx-generator
 description: Generate projectized Chinese vocational-course lesson plan DOCX files from Lesson Content Contract 2.2, using the protected Word template, deterministic QA, and optional render smoke.
 ---
 
-# 教案生成器 Skill 2.2.3
+# 教案生成器 Skill 2.2.4
 
 本文件是 Lesson 的唯一人类行为合同。当前 Content Contract 仍为 2.2，默认 Word 模板为 `lesson-plan v1.1.2`，模板 binary 和模板版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
 
@@ -44,7 +44,7 @@ lesson_summary
 after_class_improvement
 ```
 
-每阶段由 Agent 写入 `content`、`teacher_actions`、`student_actions` 和 `objective`。必须形成“内容 → 教师活动 → 学生活动 → 学生证据/产出 → 设计意图”的阶段级教学链；不要求每个小项机械重复课题，也不能用“所有 item status=passed”作为唯一语义判断。同一课内部可以自然复用必要术语，但不得复制机械句式。阶段语义由 Agent review 负责。
+每阶段由 Agent 写入 `content`、`teacher_actions`、`student_actions` 和 `objective`。学生可观察的证据/产出写在现有 `student_actions`；需要时在 `objective` 中说明证据与学习目标的对应关系。Content Contract 2.2 没有独立的 `student_evidence` 或 `success_criteria` 字段，它们是未来契约升级候选，不得作为 2.2 输入字段。必须形成“内容 → 教师活动 → 学生活动及证据/产出 → 设计意图”的阶段级教学链；不要求每个小项机械重复课题，也不能用“所有 item status=passed”作为唯一语义判断。同一课内部可以自然复用必要术语，但不得复制机械句式。阶段语义由 Agent review 负责。
 
 `pedagogical_review` 是真正的内容交接，不是 PASS/FAIL 标签。每课必须保存 `issues`、`draft_content`、`revised_content`、`decision` 和 `review_history`。若发现专业表达不自然、跨课模板复读、活动不可执行、课时容量不合理或参考资料不相关，Agent 必须先返回重写后的 `revised_content`，再进行至少一轮复审；最终 `decision=approved` 且 `issues=[]`。生成器只消费最终 reviewed content，并用 digest 链核对初稿、重写稿和复审顺序。
 
@@ -54,7 +54,7 @@ after_class_improvement
 
 `course_materials.textbook`、课次 `resources` 和课程级 `reference_pool` 始终分离。教材、PPT、课件、案例表/案例数据、任务单、设备、环境和内部教学文件不是 references。教材对象要求真实 `authors`/编者、`title`、`publisher`、`source_kind`；`edition`、`year`、ISBN 等可选，可靠时才写年份；不写“年份未知”、空逗号或猜测书目信息。
 
-有可验证外部来源时，Agent 先检索真实来源再建立 reference pool；`book` 至少有作者/编者、书名、出版社，`formal_course_document` 保留真实责任者、机构和平台/出版社，URL/evidence 只留在 JSON/QA。没有联网、没有可靠外部来源、只有用户提供教材/PPT/资源时，允许 `reference_pool=[]`，并写 `reference_research.status=no_verified_external_source`；此时课次 `reference_ids` 可以为空。参考资料规划概念可称 `course_reference_pool` 或 `reference_catalog`，落盘仍只有 canonical `reference_pool`；`source_region` 仅用于来源记录。不得为了“凑数”虚构作者、出版社、ISBN、标准编号或公开来源。
+有可验证外部来源时，Agent 先检索真实来源再建立 reference pool；`book` 至少有作者/编者、书名、出版社，`formal_course_document` 保留真实责任者、机构和平台/出版社，URL/evidence 只留在 JSON/QA。`reference_research.status=no_verified_external_source` 只表示没有核实到公开来源，不表示没有用户提供的来源；reference pool 可以为空，也可以只包含真实且有出处的 `source_kind=provided` 正式资料。此状态下 query/source 列表必须为空，且不能出现 `verified_public`。此时课次 `reference_ids` 可以为空。只要存在 `verified_public` references，当前兼容硬门槛仍要求每课至少关联一条；逐课相关性门槛留待 2.3 重新设计。参考资料规划概念可称 `course_reference_pool` 或 `reference_catalog`，落盘仍只有 canonical `reference_pool`；`source_region` 只作描述统计，不设国内来源占比门槛。不得为了“凑数”虚构作者、出版社、ISBN、标准编号或公开来源。
 
 引用身份只做保守规范化：Unicode、书名括号、空白、全/半角标点、中文/阿拉伯数字版次和常见版次后缀可统一；相近但不同的书名不能被模糊合并，例如“数据结构基础”不能等同于“高级数据结构”。教材不进入 references；同一真实来源跨课复用可以通过，单课内部重复仍失败。禁止为了降低课程重复率编造或改写参考来源。
 
@@ -92,7 +92,7 @@ Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账�
 
 每次带 `--render` 的 smoke 都必须在唯一 `run_id` 下保留 DOCX 和 PDF，并写出同目录 `artifact-manifest.json`，记录课程、专业、学时、DOCX/PDF SHA-256、实际页数、QA status 和 render status。验收报告只从该 manifest 读取 artifact path、页数与指纹，不手写或猜测页数。
 
-默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。`--render` 的结果只代表 smoke；缺少渲染后端时报告 `RENDER UNVERIFIED` 或 fail-closed，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
+默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。Content 2.2 不请求 render 时可报告 `qa_status=passed`、`production_status=structural_pass`，不得称为生产通过。只有真实 render 成功且每课 PDF 已保留并完成 SHA-256/页数校验时才是 `production_status=production_pass`；缺少渲染后端或 render 失败须 fail-closed。`--render` 只代表 smoke，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
 
 生产命令：
 

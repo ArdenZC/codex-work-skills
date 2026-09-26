@@ -36,6 +36,7 @@
         "qa_report_sha256",
         "output_inventory_fingerprint",
         "render_status",
+        "production_status",
         "visual_status"
       ],
       "properties": {
@@ -49,6 +50,7 @@
         "input_sha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
         "qa_report_sha256": { "type": "string", "pattern": "^[A-F0-9]{64}$" },
         "output_inventory_fingerprint": { "type": ["string", "null"] },
+        "production_status": { "enum": ["production_pass", "structural_pass", "failed", "not_applicable"] },
         "delivery_mode": { "type": ["string", "null"] },
         "theory_hours": { "type": ["number", "null"] },
         "practice_hours": { "type": ["number", "null"] }

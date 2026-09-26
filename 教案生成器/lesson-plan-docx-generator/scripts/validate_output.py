@@ -728,6 +728,30 @@ def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
+def production_status_for_qa(data: dict[str, Any], report: dict[str, Any]) -> str | None:
+    """Distinguish structural QA from a rendered Content 2.2 production pass."""
+
+    if data.get("content_contract_version") != "2.2":
+        return None
+    if report.get("status") != "passed":
+        return "failed"
+    render = report.get("render") if isinstance(report.get("render"), dict) else {}
+    if render.get("status") == "not_executed":
+        return "structural_pass"
+    lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
+    if not lessons and render.get("status") == "passed":
+        return "structural_pass"
+    if (
+        render.get("status") == "passed"
+        and bool(render.get("renderer"))
+        and render.get("files_checked") == len(lessons)
+        and isinstance(render.get("page_count"), int)
+        and render.get("page_count", 0) > 0
+    ):
+        return "production_pass"
+    return "failed"
+
+
 def write_skipped_report(
     output_dir: Path | str,
     data: dict[str, Any],
@@ -829,6 +853,9 @@ def write_skipped_report(
             "page_count_method": "pdf_page_object_regex",
             "errors": [],
         }
+    production_status = production_status_for_qa(data, report)
+    if production_status is not None:
+        report["production_status"] = production_status
     _write_qa_report(report)
     if report["errors"]:
         raise RuntimeError("Content quality validation failed: " + "; ".join(report["errors"][:8]))
@@ -1292,6 +1319,9 @@ def validate_output_dir(
     if not errors:
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
+    production_status = production_status_for_qa(data, report)
+    if production_status is not None:
+        report["production_status"] = production_status
     _write_qa_report(report)
     if errors:
         raise RuntimeError("Output validation failed: " + "; ".join(errors[:8]))
@@ -1391,8 +1421,17 @@ def main() -> int:
         return 1
     for warning in report.get("warnings", []):
         print(f"WARNING: {warning}")
-    action = "skipped validation" if report["status"] == "skipped" else "validated"
-    print(f"{action} files={report['checks']['file_count']['actual']} qa={report['qa_report']}")
+    if data.get("content_contract_version") == "2.2":
+        print(
+            "Content Contract 2.2 "
+            f"production_status={report['production_status']} "
+            f"qa_status={report['status']} "
+            f"render_status={report['render']['status']} "
+            f"files={report['checks']['file_count']['actual']} qa={report['qa_report']}"
+        )
+    else:
+        action = "skipped validation" if report["status"] == "skipped" else "validated"
+        print(f"{action} files={report['checks']['file_count']['actual']} qa={report['qa_report']}")
     return 0
 
 
