@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
+import copy
 import importlib
 import importlib.util
 import io
@@ -350,6 +351,27 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertEqual(report["visual_review"]["status"], "not_executed")
             self.assertTrue(report["metadata"]["output_inventory_fingerprint"])
             self.assertEqual({path: path.read_bytes() for path in output.iterdir()}, before)
+
+            markdown_report = copy.deepcopy(report)
+            markdown_report["artifact_manifest"] = {"data": {}}
+            markdown = lesson_acceptance.acceptance_markdown(markdown_report)
+            self.assertIn(
+                f"- Render/production: `{report['metadata']['render_status']}` / `not_applicable`",
+                markdown,
+            )
+            self.assertNotIn("QA/render/production:", markdown)
+
+            old_report = copy.deepcopy(report)
+            old_report["metadata"].pop("production_status")
+            self.assertEqual(lesson_acceptance.validate_report_schema(old_report), [])
+            self.assertEqual(list(Draft202012Validator(schema).iter_errors(old_report)), [])
+
+            invalid_report = copy.deepcopy(report)
+            invalid_report["metadata"]["production_status"] = "banana"
+            self.assertTrue(
+                any("metadata.production_status" in error for error in lesson_acceptance.validate_report_schema(invalid_report))
+            )
+            self.assertTrue(list(Draft202012Validator(schema).iter_errors(invalid_report)))
 
             with self.assertRaisesRegex(ValueError, "must not overlap"):
                 lesson_acceptance.build_acceptance_report(

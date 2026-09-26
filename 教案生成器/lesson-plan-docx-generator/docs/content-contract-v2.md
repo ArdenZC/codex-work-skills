@@ -35,6 +35,6 @@ Reference 的国内/国外/未知数量和占比只作为描述性指标，不�
 
 ## 输出
 
-只有 Content QA、模板 QA、输出 QA 和请求的真实 render 全部满足门禁，才可原子提交 DOCX。Content 2.2 在没有请求 render 时可得到 `qa_status=passed` 与 `production_status=structural_pass`，这只证明结构和确定性检查通过，不是生产就绪。真实 `--render` 成功并为每个 Lesson 保留 PDF、校验 SHA-256 和页数后才是 `production_status=production_pass`；缺少 renderer、render 失败或跳过输出校验都不能得到生产通过。render smoke 只证明 DOCX 能被真实转换并完成基础输出检查（not pagination，也不是人工 visual QA）；人工代表页检查另行记录，不能由 Python 冒充。
+只有 Content QA、模板 QA、输出 QA 和请求的真实 render 全部满足门禁，才可原子提交 DOCX。Content 2.2 在没有请求 render 时可得到 `qa_status=passed` 与 `production_status=structural_pass`，这只证明结构和确定性检查通过，不是生产就绪。含理论 Lesson 的课程只有在 `generate_lesson_plans.py --render` 成功、每课 PDF 均已保留且 SHA-256/页数校验通过后才是 `production_status=production_pass`；无 Lesson 产物时保持 `structural_pass`。缺少 renderer、render 失败或跳过输出校验都不能得到生产通过。standalone `validate_output.py --render` 只执行临时诊断 render，最多报告 `structural_pass`。render smoke 只证明 DOCX 能被真实转换并完成基础输出检查（not pagination，也不是人工 visual QA）；人工代表页检查另行记录，不能由 Python 冒充。
 
 后续 2.3 需要单独评估 Teaching Exemplar Benchmark、Authoring Set/Holdout Set、显式 `student_evidence` 字段、pedagogical review sidecar、逐课 reference relevance，以及独立 reviewer；这些不是 2.2.4 的部分实现。

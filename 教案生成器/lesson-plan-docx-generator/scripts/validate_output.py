@@ -683,6 +683,7 @@ def _base_qa_report(
         },
         "render": {
             "status": "not_executed",
+            "requested": False,
             "reason": "render was not requested",
             "scope": "smoke",
             "renderer": None,
@@ -728,8 +729,11 @@ def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
     return report
 
 
-def production_status_for_qa(data: dict[str, Any], report: dict[str, Any]) -> str | None:
-    """Distinguish structural QA from a rendered Content 2.2 production pass."""
+def production_status_for_qa(
+    data: dict[str, Any],
+    report: dict[str, Any],
+) -> str | None:
+    """Report only QA-level state; final artifact verification owns production readiness."""
 
     if data.get("content_contract_version") != "2.2":
         return None
@@ -737,19 +741,10 @@ def production_status_for_qa(data: dict[str, Any], report: dict[str, Any]) -> st
         return "failed"
     render = report.get("render") if isinstance(report.get("render"), dict) else {}
     if render.get("status") == "not_executed":
-        return "structural_pass"
-    lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
-    if not lessons and render.get("status") == "passed":
-        return "structural_pass"
-    if (
-        render.get("status") == "passed"
-        and bool(render.get("renderer"))
-        and render.get("files_checked") == len(lessons)
-        and isinstance(render.get("page_count"), int)
-        and render.get("page_count", 0) > 0
-    ):
-        return "production_pass"
-    return "failed"
+        return "failed" if render.get("requested") is True else "structural_pass"
+    if render.get("status") != "passed":
+        return "failed"
+    return "structural_pass"
 
 
 def write_skipped_report(
@@ -844,12 +839,14 @@ def write_skipped_report(
     if render:
         report["render"] = {
             "status": "not_executed",
+            "requested": True,
             "reason": "render is unavailable when output validation is skipped",
             "scope": "smoke",
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
             "page_counts": {},
+            "pdf_files": {},
             "page_count_method": "pdf_page_object_regex",
             "errors": [],
         }
@@ -1299,6 +1296,7 @@ def validate_output_dir(
         if not files:
             render_report = {
                 "status": "passed",
+                "requested": True,
                 "reason": "no theory Lesson DOCX is expected for this artifact plan",
                 "scope": "smoke",
                 "renderer": None,
@@ -1310,6 +1308,7 @@ def validate_output_dir(
             }
         else:
             render_report = render_docx_directory(out_dir, pdf_output_dir=render_pdf_dir)
+            render_report["requested"] = True
         report["render"] = render_report
         if render_report["status"] != "passed":
             render_errors = render_report.get("errors") or [
@@ -1320,6 +1319,15 @@ def validate_output_dir(
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
     production_status = production_status_for_qa(data, report)
+    if (
+        data.get("content_contract_version") == "2.2"
+        and render
+        and production_status == "failed"
+        and report.get("status") == "passed"
+    ):
+        errors.append("production render QA requires one retained, readable PDF per theory Lesson")
+        report["status"] = "failed"
+        production_status = "failed"
     if production_status is not None:
         report["production_status"] = production_status
     _write_qa_report(report)
@@ -1340,7 +1348,15 @@ def main() -> int:
     parser.add_argument("--engine", default="")
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
-    parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
+    parser.add_argument(
+        "--render",
+        action="store_true",
+        help=(
+            "Render validated DOCX files to disposable PDFs when a renderer is available; "
+            "standalone render smoke does not establish production readiness, which requires "
+            "generator artifact verification"
+        ),
+    )
     parser.add_argument(
         "--allow-test-fixture-authoring",
         action="store_true",

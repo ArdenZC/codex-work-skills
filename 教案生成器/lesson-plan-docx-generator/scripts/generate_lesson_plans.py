@@ -56,7 +56,7 @@ from package_common import (
 )
 from path_safety import assert_external_qa_path_safe, assert_output_path_safe, lesson_protected_paths, paths_equal
 from render_qa import pdf_page_count
-from validate_output import production_status_for_qa, validate_output_dir, write_skipped_report
+from validate_output import validate_output_dir, write_skipped_report
 from validate_template import validate_template
 
 
@@ -332,19 +332,83 @@ def _relative_posix(path: Path, root: Path) -> str:
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
-def _stable_render_artifacts(report: dict[str, Any], candidate: Path) -> list[dict[str, Any]]:
+def _stable_render_artifacts(
+    report: dict[str, Any],
+    candidate: Path,
+    expected_docx_names: list[str],
+) -> list[dict[str, Any]]:
     render = report.get("render") if isinstance(report.get("render"), dict) else {}
-    raw_pdf_files = render.get("pdf_files") if isinstance(render.get("pdf_files"), dict) else {}
+    if render.get("status") != "passed":
+        if render.get("status") != "not_executed":
+            raise RuntimeError("render evidence is not eligible for artifact stabilization")
+        render["pdf_artifacts"] = []
+        render.pop("pdf_files", None)
+        report["render"] = render
+        return []
+
+    expected_names = list(expected_docx_names)
+    if (
+        any(not isinstance(name, str) or not name or Path(name).name != name for name in expected_names)
+        or len(set(expected_names)) != len(expected_names)
+    ):
+        raise RuntimeError("expected DOCX names for render artifacts are invalid")
+    raw_pdf_files = render.get("pdf_files")
+    if not isinstance(raw_pdf_files, dict):
+        raw_pdf_files = {} if not expected_names else None
+    page_counts = render.get("page_counts")
+    if not isinstance(raw_pdf_files, dict) or set(raw_pdf_files) != set(expected_names):
+        raise RuntimeError("render must retain exactly one current PDF for every Lesson DOCX")
+    if not isinstance(page_counts, dict) or set(page_counts) != set(expected_names):
+        raise RuntimeError("render page counts must map exactly to every Lesson DOCX")
+    if (
+        type(render.get("files_checked")) is not int
+        or render.get("files_checked") != len(expected_names)
+        or any(type(page_counts[name]) is not int or page_counts[name] <= 0 for name in expected_names)
+        or type(render.get("page_count")) is not int
+        or render.get("page_count") != sum(page_counts.values())
+    ):
+        raise RuntimeError("render page-count evidence is incomplete or inconsistent")
+
+    pdf_dir = candidate.resolve() / "render" / "pdf"
+    if not expected_names:
+        if render.get("files_checked") != 0 or render.get("page_count") != 0:
+            raise RuntimeError("a render with no theory Lessons must have zero files and pages")
+        render["pdf_artifacts"] = []
+        render.pop("pdf_files", None)
+        report["render"] = render
+        return []
+    if (candidate / "render").is_symlink() or pdf_dir.is_symlink() or not pdf_dir.is_dir():
+        raise RuntimeError("retained PDF directory is missing or is a symbolic link")
+    actual_pdfs = [path for path in pdf_dir.iterdir() if path.suffix.lower() == ".pdf"]
+    expected_pdf_names = {Path(name).stem + ".pdf" for name in expected_names}
+    if (
+        len(actual_pdfs) != len(expected_names)
+        or {path.name for path in actual_pdfs} != expected_pdf_names
+        or any(path.is_symlink() or not path.is_file() for path in actual_pdfs)
+    ):
+        raise RuntimeError("retained PDF inventory must match the Lesson DOCX inventory exactly")
+
     artifacts: list[dict[str, Any]] = []
     final_page_counts: dict[str, int] = {}
-    for docx_name in sorted(raw_pdf_files):
+    resolved_pdf_dir = pdf_dir.resolve(strict=True)
+    for docx_name in expected_names:
         raw_pdf = raw_pdf_files.get(docx_name)
-        pdf_path = Path(raw_pdf).resolve() if raw_pdf else None
-        if pdf_path is None or not pdf_path.is_file():
-            continue
+        if not isinstance(raw_pdf, str) or not raw_pdf.strip():
+            raise RuntimeError(f"{docx_name}: render did not declare its retained PDF")
+        declared_path = Path(raw_pdf).expanduser()
+        if not declared_path.is_absolute() or declared_path.is_symlink():
+            raise RuntimeError(f"{docx_name}: retained PDF path is not a regular absolute path")
+        try:
+            pdf_path = declared_path.resolve(strict=True)
+        except OSError as exc:
+            raise RuntimeError(f"{docx_name}: retained PDF is missing") from exc
+        if pdf_path.parent != resolved_pdf_dir or pdf_path.name != Path(docx_name).stem + ".pdf":
+            raise RuntimeError(f"{docx_name}: retained PDF does not match the expected artifact path")
+        if not pdf_path.is_file() or pdf_path.stat().st_size <= 0:
+            raise RuntimeError(f"{docx_name}: retained PDF is unreadable or empty")
         actual_page_count = pdf_page_count(pdf_path)
-        if actual_page_count <= 0:
-            continue
+        if actual_page_count <= 0 or actual_page_count != page_counts[docx_name]:
+            raise RuntimeError(f"{docx_name}: retained PDF page count does not match render QA")
         final_page_counts[docx_name] = actual_page_count
         artifacts.append(
             {
@@ -511,16 +575,30 @@ def _build_artifact_manifest(
 def _artifact_relative_path(root: Path, value: Any) -> Path | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    candidate = (root / Path(value)).resolve()
+    raw_path = Path(value)
+    if any(part == ".." for part in raw_path.parts):
+        return None
+    root_resolved = root.resolve()
+    lexical_path = raw_path if raw_path.is_absolute() else root_resolved / raw_path
     try:
-        candidate.relative_to(root.resolve())
+        relative = lexical_path.relative_to(root_resolved)
+    except ValueError:
+        return None
+    cursor = root_resolved
+    for part in relative.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            return None
+    candidate = lexical_path.resolve()
+    try:
+        candidate.relative_to(root_resolved)
     except ValueError:
         return None
     return candidate
 
 
-def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> None:
-    """Rehash final disk artifacts and fail closed before and after commit."""
+def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> str | None:
+    """Verify manifest provenance and return the artifact-level production state."""
 
     required = {
         "run_id",
@@ -536,7 +614,6 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         "actual_pdf_page_count",
         "qa_status",
         "render_status",
-        "content_contract_version",
         "created_at",
     }
     missing = sorted(field for field in required if field not in manifest)
@@ -546,6 +623,29 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         raise RuntimeError("artifact manifest source_json_path does not match the source JSON")
     if str(manifest["source_json_sha256"]).upper() != _file_sha256(source_path):
         raise RuntimeError("artifact manifest source_json_sha256 does not match the source JSON")
+    try:
+        source_data = json.loads(source_path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"source JSON could not be read for artifact verification: {exc}") from exc
+    source_contract_version = source_data.get("content_contract_version")
+    if "content_contract_version" in manifest and manifest.get("content_contract_version") != source_contract_version:
+        raise RuntimeError("artifact manifest content_contract_version does not match the source JSON")
+    if manifest.get("manifest_version") != "2.0":
+        raise RuntimeError("artifact manifest manifest_version must be 2.0")
+    is_v22 = source_contract_version == "2.2"
+    if manifest.get("course_name") != source_data.get("course_name") or manifest.get("major") != source_data.get("major"):
+        raise RuntimeError("artifact manifest course identity does not match the source JSON")
+    source_lessons = source_data.get("lessons") if isinstance(source_data.get("lessons"), list) else []
+    source_lesson_hours = sum(
+        (float(lesson.get("hours", 0)) for lesson in source_lessons if isinstance(lesson, dict)),
+        0.0,
+    )
+    try:
+        manifest_lesson_hours = float(manifest.get("lesson_hours"))
+    except (TypeError, ValueError):
+        manifest_lesson_hours = -1.0
+    if manifest_lesson_hours != source_lesson_hours:
+        raise RuntimeError("artifact manifest lesson_hours do not match the source JSON")
     reference_evidence = _artifact_relative_path(root, manifest.get("reference_evidence_path"))
     if reference_evidence is None or not reference_evidence.is_file():
         raise RuntimeError("reference-evidence.json is missing from the final artifact directory")
@@ -554,61 +654,131 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
     records = manifest.get("artifacts")
     if not isinstance(records, list):
         raise RuntimeError("artifact manifest artifacts must be a list")
-    if manifest.get("content_contract_version") == "2.2":
-        expected_production_status = production_status_for_qa(
-            {
-                "content_contract_version": "2.2",
-                "lessons": records,
-            },
-            {
-                "status": manifest.get("qa_status"),
-                "render": {
-                    "status": manifest.get("render_status"),
-                    "renderer": "retained-pdf-artifacts" if records else None,
-                    "files_checked": len(records),
-                    "page_count": manifest.get("actual_pdf_page_count"),
-                },
-            },
-        )
-        if manifest.get("production_status") != expected_production_status:
-            raise RuntimeError(
-                "artifact manifest production_status is inconsistent with QA/render status: "
-                f"declared={manifest.get('production_status')!r}, expected={expected_production_status!r}"
-            )
-        if expected_production_status == "failed":
-            raise RuntimeError("Content Contract 2.2 artifact manifest is not eligible for publication")
-    require_retained_pdf = manifest.get("render_status") == "passed"
-    if not records:
-        if manifest.get("actual_pdf_page_count") != 0:
-            raise RuntimeError("artifact manifest without Lesson DOCX records must have zero PDF pages")
-        digest = manifest.get("reviewed_content_digest")
-        if isinstance(digest, dict) and "match" in digest and not digest.get("match"):
-            raise RuntimeError("packaged final content digest does not match authoring provenance")
-        return
+    if len(records) != len(source_lessons):
+        raise RuntimeError("artifact manifest must contain exactly one record for every source Lesson")
+    qa_path = _artifact_relative_path(root, manifest.get("qa_report_path"))
+    if qa_path is None or not qa_path.is_file():
+        raise RuntimeError("qa-report.json is missing from the final artifact directory")
+    try:
+        qa_report = json.loads(qa_path.read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"qa-report.json could not be read for artifact verification: {exc}") from exc
+    if not isinstance(qa_report, dict):
+        raise RuntimeError("qa-report.json must contain an object")
+    if manifest.get("qa_status") != qa_report.get("status"):
+        raise RuntimeError("artifact manifest qa_status does not match the QA report")
+    if is_v22 and qa_report.get("status") != "passed":
+        raise RuntimeError("Content Contract 2.2 artifact publication requires qa status=passed")
+    render = qa_report.get("render") if isinstance(qa_report.get("render"), dict) else {}
+    render_status = render.get("status")
+    if manifest.get("render_status") != render_status or (is_v22 and render_status not in {"passed", "not_executed"}):
+        raise RuntimeError("artifact manifest render_status does not match eligible QA render evidence")
+    if qa_report.get("artifact_manifest") not in (None, "artifact-manifest.json"):
+        raise RuntimeError("QA report artifact_manifest must point to artifact-manifest.json")
+    is_final_qa_report = qa_report.get("artifact_manifest") == "artifact-manifest.json" and "production_status" in qa_report
+
+    require_retained_pdf = render_status == "passed"
+    expected_docx_names = [
+        lesson_filename(index, str(lesson.get("unit", "")), str(lesson.get("task", "")))
+        for index, lesson in enumerate(source_lessons, start=1)
+        if isinstance(lesson, dict)
+    ]
+    if len(expected_docx_names) != len(source_lessons):
+        raise RuntimeError("source Lesson entries must be objects")
+    actual_docx_paths = list(root.glob("*.docx"))
+    if (
+        len(actual_docx_paths) != len(expected_docx_names)
+        or {path.name for path in actual_docx_paths} != set(expected_docx_names)
+        or any(path.is_symlink() or not path.is_file() for path in actual_docx_paths)
+    ):
+        raise RuntimeError("final DOCX inventory does not match source Lesson count")
+    qa_page_counts = render.get("page_counts") if isinstance(render.get("page_counts"), dict) else {}
+    qa_page_total = render.get("page_count")
+    if require_retained_pdf:
+        if render.get("files_checked") != len(expected_docx_names) or set(qa_page_counts) != set(expected_docx_names):
+            raise RuntimeError("QA render must account for exactly one page count per Lesson DOCX")
+        if any(type(qa_page_counts[name]) is not int or qa_page_counts[name] <= 0 for name in expected_docx_names):
+            raise RuntimeError("QA render page counts must be positive integers")
+        if type(qa_page_total) is not int or qa_page_total != sum(qa_page_counts.values()):
+            raise RuntimeError("QA render total page count is inconsistent")
+    else:
+        if render.get("requested") is True:
+            raise RuntimeError("a requested render that was not executed is not eligible for publication")
+        if qa_page_counts or qa_page_total not in (None, 0):
+            raise RuntimeError("unrendered QA must not claim rendered page counts")
+
     page_total = 0
+    seen_docx_paths: set[str] = set()
+    seen_pdf_paths: set[str] = set()
+    expected_pdf_names = {f"{Path(name).stem}.pdf" for name in expected_docx_names}
     for index, record in enumerate(records):
         if not isinstance(record, dict):
             raise RuntimeError(f"artifact manifest artifacts[{index}] is not an object")
         docx_path = _artifact_relative_path(root, record.get("final_docx_path"))
         pdf_path = _artifact_relative_path(root, record.get("final_pdf_path"))
-        if docx_path is None or not docx_path.is_file():
+        expected_docx_name = expected_docx_names[index]
+        if record.get("lesson_id") != source_lessons[index].get("lesson_id"):
+            raise RuntimeError(f"artifact manifest artifacts[{index}] lesson_id does not match source Lesson")
+        if (
+            docx_path is None
+            or docx_path.is_symlink()
+            or not docx_path.is_file()
+            or docx_path.parent != root.resolve()
+            or docx_path.name != expected_docx_name
+        ):
             raise RuntimeError(f"artifact manifest artifacts[{index}] final DOCX is missing")
+        try:
+            record_hours = float(record.get("lesson_hours"))
+            source_hours = float(source_lessons[index].get("hours"))
+        except (TypeError, ValueError):
+            raise RuntimeError(f"artifact manifest artifacts[{index}] lesson_hours are invalid") from None
+        if record_hours != source_hours:
+            raise RuntimeError(f"artifact manifest artifacts[{index}] lesson_hours do not match the source Lesson")
+        docx_rel = _relative_posix(docx_path, root)
+        if docx_rel in seen_docx_paths:
+            raise RuntimeError("artifact manifest maps more than one Lesson to the same DOCX")
+        seen_docx_paths.add(docx_rel)
         if _file_sha256(docx_path) != str(record.get("final_docx_sha256", "")).upper():
             raise RuntimeError(f"artifact manifest artifacts[{index}] final DOCX SHA-256 mismatch")
-        if not require_retained_pdf and (pdf_path is None or not pdf_path.is_file()):
+        if not require_retained_pdf:
+            if record.get("final_pdf_path") is not None or record.get("final_pdf_sha256") is not None or record.get("actual_pdf_page_count") is not None:
+                raise RuntimeError("unrendered artifact records must not claim retained PDF evidence")
             continue
-        if pdf_path is None or not pdf_path.is_file():
+        if pdf_path is None or pdf_path.is_symlink() or not pdf_path.is_file():
             raise RuntimeError(f"artifact manifest artifacts[{index}] final PDF is missing")
+        if pdf_path.parent != (root / "render" / "pdf").resolve():
+            raise RuntimeError(f"artifact manifest artifacts[{index}] PDF is outside render/pdf")
+        if pdf_path.name != f"{Path(expected_docx_name).stem}.pdf":
+            raise RuntimeError(f"artifact manifest artifacts[{index}] PDF name does not match its DOCX")
+        pdf_rel = _relative_posix(pdf_path, root)
+        if pdf_rel in seen_pdf_paths:
+            raise RuntimeError("artifact manifest maps more than one Lesson to the same PDF")
+        seen_pdf_paths.add(pdf_rel)
         if _file_sha256(pdf_path) != str(record.get("final_pdf_sha256", "")).upper():
             raise RuntimeError(f"artifact manifest artifacts[{index}] final PDF SHA-256 mismatch")
         actual_pages = pdf_page_count(pdf_path)
         declared_pages = record.get("actual_pdf_page_count")
-        if not isinstance(declared_pages, int) or declared_pages <= 0 or actual_pages != declared_pages:
+        if type(declared_pages) is not int or declared_pages <= 0 or actual_pages != declared_pages:
             raise RuntimeError(
                 f"artifact manifest artifacts[{index}] PDF page count mismatch: declared={declared_pages}, actual={actual_pages}"
             )
+        if qa_page_counts.get(expected_docx_name) != actual_pages:
+            raise RuntimeError(f"artifact manifest artifacts[{index}] page count does not match QA render evidence")
         page_total += actual_pages
-    if manifest.get("actual_pdf_page_count") != page_total:
+    if require_retained_pdf and expected_docx_names:
+        pdf_dir = root / "render" / "pdf"
+        if pdf_dir.is_symlink() or not pdf_dir.is_dir():
+            raise RuntimeError("retained render/pdf directory is missing or is a symbolic link")
+        actual_pdf_paths = [path for path in pdf_dir.iterdir() if path.suffix.lower() == ".pdf"]
+        if (
+            len(actual_pdf_paths) != len(expected_pdf_names)
+            or {path.name for path in actual_pdf_paths} != expected_pdf_names
+            or any(path.is_symlink() or not path.is_file() for path in actual_pdf_paths)
+        ):
+            raise RuntimeError("retained PDF inventory does not match source Lesson count")
+    elif manifest.get("actual_pdf_page_count") != 0:
+        raise RuntimeError("unrendered artifact manifest must have zero retained PDF pages")
+    if type(manifest.get("actual_pdf_page_count")) is not int or manifest.get("actual_pdf_page_count") != page_total:
         raise RuntimeError("artifact manifest actual_pdf_page_count does not equal retained PDF page-count sum")
     if len(records) == 1:
         record = records[0]
@@ -618,9 +788,44 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         ):
             if manifest.get(path_field) != record.get(path_field) or manifest.get(sha_field) != record.get(sha_field):
                 raise RuntimeError(f"artifact manifest top-level {path_field}/{sha_field} does not match its record")
+    elif any(
+        manifest.get(field) is not None
+        for field in ("final_docx_path", "final_docx_sha256", "final_pdf_path", "final_pdf_sha256")
+    ):
+        raise RuntimeError("multi-Lesson artifact manifests must not claim a singular top-level artifact")
+    if is_v22 and is_final_qa_report:
+        if "pdf_files" in render:
+            raise RuntimeError("final QA report must not retain transient absolute pdf_files paths")
+        qa_artifacts = render.get("pdf_artifacts")
+        expected_qa_artifact_count = len(records) if require_retained_pdf else 0
+        if not isinstance(qa_artifacts, list) or len(qa_artifacts) != expected_qa_artifact_count:
+            raise RuntimeError("final QA report pdf_artifacts count does not match retained render evidence")
+        for index, (qa_artifact, record) in enumerate(zip(qa_artifacts, records)):
+            if not isinstance(qa_artifact, dict):
+                raise RuntimeError(f"final QA report pdf_artifacts[{index}] is not an object")
+            if qa_artifact.get("docx_path") != record.get("final_docx_path"):
+                raise RuntimeError(f"final QA report pdf_artifacts[{index}] DOCX path does not match the manifest")
+            if qa_artifact.get("final_pdf_path") != record.get("final_pdf_path"):
+                raise RuntimeError(f"final QA report pdf_artifacts[{index}] PDF path does not match the manifest")
+            if qa_artifact.get("actual_pdf_page_count") != record.get("actual_pdf_page_count"):
+                raise RuntimeError(f"final QA report pdf_artifacts[{index}] page count does not match the manifest")
     digest = manifest.get("reviewed_content_digest")
     if isinstance(digest, dict) and "match" in digest and not digest.get("match"):
         raise RuntimeError("packaged final content digest does not match authoring provenance")
+    production_status = None
+    if is_v22:
+        production_status = "production_pass" if require_retained_pdf and expected_docx_names else "structural_pass"
+        if manifest.get("production_status") not in (None, production_status):
+            raise RuntimeError(
+                "artifact manifest production_status is inconsistent with verified artifact evidence: "
+                f"declared={manifest.get('production_status')!r}, expected={production_status!r}"
+            )
+        qa_production_status = qa_report.get("production_status")
+        if qa_production_status not in (None, "structural_pass", production_status):
+            raise RuntimeError("QA report production_status is invalid or inconsistent with verified artifact evidence")
+        if qa_report.get("artifact_manifest") == "artifact-manifest.json" and qa_production_status not in (None, production_status):
+            raise RuntimeError("final QA report production_status does not match verified artifact evidence")
+    return production_status
 
 
 def _unique_backup_path(out_dir: Path) -> Path:
@@ -939,7 +1144,7 @@ def main() -> None:
             )
         if meta.get("content_contract_version") == "2.2" and report.get("production_status") == "failed":
             raise RuntimeError("Content Contract 2.2 output did not pass production readiness checks")
-        _stable_render_artifacts(report, candidate)
+        _stable_render_artifacts(report, candidate, generated_filenames)
         created_at = datetime.now(timezone.utc).isoformat()
         reference_evidence_path = candidate / "reference-evidence.json"
         reference_evidence_path.write_text(
@@ -955,12 +1160,20 @@ def main() -> None:
             source_path,
             created_at,
         )
+        # Production readiness is derived only after this tentative manifest's
+        # files, hashes, and final page counts have all been verified.
+        manifest_data.pop("production_status", None)
         artifact_manifest_path = candidate / "artifact-manifest.json"
         artifact_manifest_path.write_text(
             json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        _verify_artifact_manifest(candidate, manifest_data, source_path)
+        verified_production_status = _verify_artifact_manifest(candidate, manifest_data, source_path)
+        if meta.get("content_contract_version") == "2.2":
+            if verified_production_status not in {"production_pass", "structural_pass"}:
+                raise RuntimeError("verified Content Contract 2.2 artifacts did not produce a valid production state")
+            report["production_status"] = verified_production_status
+            manifest_data["production_status"] = verified_production_status
         final_qa = requested_qa or internal_qa
         report["output_dir"] = str(out_dir)
         report["qa_report"] = str(final_qa)
@@ -969,6 +1182,11 @@ def main() -> None:
         report["reference_evidence"] = "reference-evidence.json"
         report_text = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
         candidate_qa.write_text(report_text, encoding="utf-8")
+        artifact_manifest_path.write_text(
+            json.dumps(manifest_data, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        _verify_artifact_manifest(candidate, manifest_data, source_path)
         if external_qa is not None:
             if not external_qa.parent.exists():
                 external_qa.parent.mkdir(parents=True, exist_ok=True)

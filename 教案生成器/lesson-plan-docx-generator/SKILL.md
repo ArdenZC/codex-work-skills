@@ -90,9 +90,9 @@ Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账�
 
 正式生产的 authoring mode 必须是 `agent` 且状态为 `completed`。Agent 失败、缺失或未完成 review 时 fail closed；`synthetic_fixture` 只能由测试代码调用显式的 fixture validator/开关，不能生成正式 DOCX。Python 只保留结构骨架、确定性字段、合同校验、文件交换和渲染，不得为学情、教学内容、目标、重难点、活动、设计意图、评价备注、反思或 reference content 写 fallback 句子。
 
-每次带 `--render` 的 smoke 都必须在唯一 `run_id` 下保留 DOCX 和 PDF，并写出同目录 `artifact-manifest.json`，记录课程、专业、学时、DOCX/PDF SHA-256、实际页数、QA status 和 render status。验收报告只从该 manifest 读取 artifact path、页数与指纹，不手写或猜测页数。
+正式生成命令 `generate_lesson_plans.py --render` 必须在唯一 `run_id` 下保留 DOCX 和 PDF，并写出同目录 `artifact-manifest.json`，记录课程、专业、学时、DOCX/PDF SHA-256、实际页数、QA status 和 render status。standalone `validate_output.py --render` 只执行临时诊断 render，不保留 PDF，也不能产生 `production_pass`。验收报告只从 generator manifest 读取 artifact path、页数与指纹，不手写或猜测页数。
 
-默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。Content 2.2 不请求 render 时可报告 `qa_status=passed`、`production_status=structural_pass`，不得称为生产通过。只有真实 render 成功且每课 PDF 已保留并完成 SHA-256/页数校验时才是 `production_status=production_pass`；缺少渲染后端或 render 失败须 fail-closed。`--render` 只代表 smoke，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
+默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。Content 2.2 不请求 render 时可报告 `qa_status=passed`、`production_status=structural_pass`，不得称为生产通过。含理论 Lesson 的课程只有在真实 render 成功、每课 PDF 均已保留且 SHA-256/页数校验通过后才是 `production_status=production_pass`；无 Lesson 产物时保持 `structural_pass`。缺少渲染后端或 render 失败须 fail-closed。`--render` 只代表 smoke，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
 
 生产命令：
 

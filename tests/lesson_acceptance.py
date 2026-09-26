@@ -705,8 +705,22 @@ def _load_artifact_manifest(output_dir: Path) -> dict[str, Any] | None:
 def _manifest_artifact_path(output_dir: Path, relative_path: Any) -> Path | None:
     if not isinstance(relative_path, str) or not relative_path.strip():
         return None
-    candidate = (output_dir / Path(relative_path)).resolve()
-    return candidate if _is_within(candidate, output_dir) else None
+    raw_path = Path(relative_path)
+    if any(part == ".." for part in raw_path.parts):
+        return None
+    root = output_dir.resolve()
+    lexical_path = raw_path if raw_path.is_absolute() else root / raw_path
+    try:
+        relative = lexical_path.relative_to(root)
+    except ValueError:
+        return None
+    cursor = root
+    for part in relative.parts:
+        cursor = cursor / part
+        if cursor.is_symlink():
+            return None
+    candidate = lexical_path.resolve()
+    return candidate if _is_within(candidate, root) else None
 
 
 def _retained_pdf_page_count(path: Path) -> int:
@@ -746,7 +760,6 @@ def _artifact_manifest_gate(
         "actual_pdf_page_count",
         "qa_status",
         "render_status",
-        "content_contract_version",
         "created_at",
     }
     if isinstance(manifest, Mapping):
@@ -774,16 +787,8 @@ def _artifact_manifest_gate(
         if manifest.get("render_status") != render.get("status"):
             errors.append("manifest render_status does not match QA report")
         if str(data.get("content_contract_version")) == "2.2":
-            if manifest.get("content_contract_version") != "2.2":
-                errors.append("manifest content_contract_version does not match Content Contract 2.2")
-            if manifest.get("production_status") != qa_report.get("production_status"):
-                errors.append("manifest production_status does not match QA report")
-            required_production_status = "production_pass" if lessons else "structural_pass"
-            if manifest.get("production_status") != required_production_status:
-                errors.append(
-                    "Content Contract 2.2 acceptance requires "
-                    f"production_status={required_production_status} for {len(lessons)} theory Lessons"
-                )
+            if "content_contract_version" in manifest and manifest.get("content_contract_version") != data.get("content_contract_version"):
+                errors.append("manifest content_contract_version does not match the source JSON")
         if qa_report.get("artifact_manifest") != "artifact-manifest.json":
             errors.append("QA report does not point to artifact-manifest.json")
         reference_evidence_path = _manifest_artifact_path(output_dir, manifest.get("reference_evidence_path"))
@@ -806,48 +811,112 @@ def _artifact_manifest_gate(
         errors.append(f"manifest artifacts must contain exactly {len(lessons)} lesson records")
         records = records if isinstance(records, list) else []
     qa_page_counts = render.get("page_counts") if isinstance(render.get("page_counts"), Mapping) else {}
+    rendered = render.get("status") == "passed"
+    qa_counts_by_name = {Path(str(name)).name: count for name, count in qa_page_counts.items()}
+    expected_docx_names = {
+        Path(str(record.get("final_docx_path", ""))).name
+        for record in records
+        if isinstance(record, Mapping) and record.get("final_docx_path")
+    }
+    manifest_docx_paths: set[str] = set()
+    for record in records:
+        if isinstance(record, Mapping):
+            docx_path = _manifest_artifact_path(output_dir, record.get("final_docx_path"))
+            if docx_path is not None:
+                manifest_docx_paths.add(docx_path.relative_to(output_dir.resolve()).as_posix())
+    inventory_docx_paths = set(output_inventory.get("docx_files", [])) if isinstance(output_inventory.get("docx_files"), list) else set()
+    if inventory_docx_paths != manifest_docx_paths or _number(output_inventory.get("docx_count")) != len(lessons):
+        errors.append("output DOCX inventory does not match the manifest Lesson records")
+    if rendered:
+        if qa_report.get("status") != "passed":
+            errors.append("rendered production evidence requires qa status=passed")
+        if set(qa_counts_by_name) != expected_docx_names or len(qa_counts_by_name) != len(lessons):
+            errors.append("QA page counts must map exactly to every Lesson DOCX")
+        if any(type(count) is not int or count <= 0 for count in qa_counts_by_name.values()):
+            errors.append("QA render page counts must be positive")
+        qa_total = _number(render.get("page_count"))
+        if type(render.get("page_count")) is not int or qa_total is None or not math.isclose(qa_total, sum(_number(value) or 0 for value in qa_counts_by_name.values()), abs_tol=0.01):
+            errors.append("QA render page_count does not equal its page-count map")
+        if type(render.get("files_checked")) is not int or render.get("files_checked") != len(lessons):
+            errors.append("QA render files_checked does not match Lesson count")
+    elif render.get("status") != "not_executed":
+        errors.append("Content 2.2 artifact evidence requires render status passed or not_executed")
     manifest_page_total = 0
+    seen_docx_paths: set[str] = set()
+    seen_pdf_paths: set[str] = set()
     for index, record in enumerate(records):
         if not isinstance(record, Mapping):
             errors.append(f"manifest artifacts[{index}] is not an object")
             continue
+        if index < len(lessons):
+            lesson = lessons[index] if isinstance(lessons[index], Mapping) else {}
+            if record.get("lesson_id") != lesson.get("lesson_id"):
+                errors.append(f"manifest artifacts[{index}] lesson_id does not match source Lesson")
+            if _number(record.get("lesson_hours")) != _number(lesson.get("hours")):
+                errors.append(f"manifest artifacts[{index}] lesson_hours do not match source Lesson")
         docx_path = _manifest_artifact_path(output_dir, record.get("final_docx_path"))
         pdf_path = _manifest_artifact_path(output_dir, record.get("final_pdf_path"))
-        if docx_path is None or not docx_path.is_file():
+        if docx_path is None or docx_path.is_symlink() or not docx_path.is_file():
             errors.append(f"manifest artifacts[{index}] final_docx_path is not an accessible file")
-        elif _sha256_file(docx_path) != str(record.get("final_docx_sha256", "")).upper():
-            errors.append(f"manifest artifacts[{index}] final_docx_sha256 mismatch")
-        page_count = _number(record.get("actual_pdf_page_count"))
-        if page_count is None or page_count < 1:
-            errors.append(f"manifest artifacts[{index}] actual_pdf_page_count is not positive")
         else:
-            manifest_page_total += int(page_count)
-        if pdf_path is None or not pdf_path.is_file():
-            errors.append(f"manifest artifacts[{index}] final_pdf_path is not an accessible file")
-        else:
-            if _sha256_file(pdf_path) != str(record.get("final_pdf_sha256", "")).upper():
-                errors.append(f"manifest artifacts[{index}] final_pdf_sha256 mismatch")
-            try:
-                actual_page_count = _retained_pdf_page_count(pdf_path)
-            except OSError as exc:
-                errors.append(f"manifest artifacts[{index}] retained PDF could not be read: {exc}")
+            if docx_path.parent != output_dir.resolve():
+                errors.append(f"manifest artifacts[{index}] DOCX is not directly inside the output directory")
+            docx_relative = docx_path.relative_to(output_dir.resolve()).as_posix()
+            if docx_relative in seen_docx_paths:
+                errors.append(f"manifest artifacts[{index}] reuses a DOCX path")
+            seen_docx_paths.add(docx_relative)
+            if _sha256_file(docx_path) != str(record.get("final_docx_sha256", "")).upper():
+                errors.append(f"manifest artifacts[{index}] final_docx_sha256 mismatch")
+        raw_page_count = record.get("actual_pdf_page_count")
+        page_count = _number(raw_page_count)
+        if rendered:
+            if type(raw_page_count) is not int or page_count is None or page_count < 1:
+                errors.append(f"manifest artifacts[{index}] actual_pdf_page_count is not positive")
             else:
-                if page_count is not None and actual_page_count != int(page_count):
-                    errors.append(
-                        f"manifest artifacts[{index}] actual PDF page count mismatch: declared={int(page_count)}, actual={actual_page_count}"
-                    )
-        docx_name = str(record.get("final_docx_path", ""))
-        qa_count = qa_page_counts.get(docx_name) if isinstance(qa_page_counts, Mapping) else None
-        if qa_count is None and docx_path is not None:
-            qa_count = qa_page_counts.get(docx_path.name) if isinstance(qa_page_counts, Mapping) else None
-        if page_count is not None and _number(qa_count) is None:
-            errors.append(f"manifest artifacts[{index}] page count is absent from QA report")
-        elif page_count is not None and not math.isclose(page_count, _number(qa_count) or 0, abs_tol=0.01):
-            errors.append(f"manifest artifacts[{index}] page count disagrees with QA report")
+                manifest_page_total += int(page_count)
+            if pdf_path is None or pdf_path.is_symlink() or not pdf_path.is_file():
+                errors.append(f"manifest artifacts[{index}] final_pdf_path is not an accessible file")
+            else:
+                pdf_relative = pdf_path.relative_to(output_dir.resolve()).as_posix()
+                if pdf_relative in seen_pdf_paths:
+                    errors.append(f"manifest artifacts[{index}] reuses a PDF path")
+                seen_pdf_paths.add(pdf_relative)
+                if pdf_path.parent != (output_dir / "render" / "pdf").resolve():
+                    errors.append(f"manifest artifacts[{index}] final PDF is outside render/pdf")
+                if _sha256_file(pdf_path) != str(record.get("final_pdf_sha256", "")).upper():
+                    errors.append(f"manifest artifacts[{index}] final_pdf_sha256 mismatch")
+                try:
+                    actual_page_count = _retained_pdf_page_count(pdf_path)
+                except OSError as exc:
+                    errors.append(f"manifest artifacts[{index}] retained PDF could not be read: {exc}")
+                else:
+                    if page_count is not None and actual_page_count != int(page_count):
+                        errors.append(
+                            f"manifest artifacts[{index}] actual PDF page count mismatch: declared={int(page_count)}, actual={actual_page_count}"
+                        )
+            docx_name = str(record.get("final_docx_path", ""))
+            qa_count = qa_counts_by_name.get(Path(docx_name).name)
+            if page_count is not None and _number(qa_count) is None:
+                errors.append(f"manifest artifacts[{index}] page count is absent from QA report")
+            elif page_count is not None and not math.isclose(page_count, _number(qa_count) or 0, abs_tol=0.01):
+                errors.append(f"manifest artifacts[{index}] page count disagrees with QA report")
+        elif record.get("final_pdf_path") is not None or record.get("final_pdf_sha256") is not None or page_count is not None:
+            errors.append(f"manifest artifacts[{index}] unrendered evidence must not claim PDF artifacts")
     if isinstance(manifest, Mapping):
         manifest_total = _number(manifest.get("actual_pdf_page_count"))
-        if manifest_total is None or not math.isclose(manifest_total, manifest_page_total, abs_tol=0.01):
+        if type(manifest.get("actual_pdf_page_count")) is not int or manifest_total is None or not math.isclose(manifest_total, manifest_page_total, abs_tol=0.01):
             errors.append("manifest actual_pdf_page_count does not equal artifact page-count sum")
+        if rendered:
+            pdf_dir = output_dir / "render" / "pdf"
+            actual_pdf_files = [path for path in pdf_dir.glob("*.pdf")] if pdf_dir.is_dir() and not pdf_dir.is_symlink() else []
+            if len(actual_pdf_files) != len(lessons) or {path.name for path in actual_pdf_files} != {Path(name).stem + ".pdf" for name in expected_docx_names}:
+                errors.append("retained PDF inventory does not match Lesson count")
+            if any(path.is_symlink() or not path.is_file() for path in actual_pdf_files):
+                errors.append("retained PDF inventory contains a symbolic link or non-file")
+        else:
+            pdf_dir = output_dir / "render" / "pdf"
+            if pdf_dir.exists() and any(path.suffix.lower() == ".pdf" for path in pdf_dir.iterdir()):
+                errors.append("unrendered manifest output contains unclaimed retained PDFs")
         if len(records) == 1 and isinstance(records[0], Mapping):
             record = records[0]
             for path_field, sha_field in (
@@ -861,6 +930,34 @@ def _artifact_manifest_gate(
         digest = manifest.get("reviewed_content_digest")
         if isinstance(digest, Mapping) and digest.get("match") is not True:
             errors.append("manifest reviewed_content_digest.match is not true")
+    if "production_status" in qa_report:
+        qa_artifacts = render.get("pdf_artifacts")
+        expected_qa_artifact_count = len(records) if rendered else 0
+        if not isinstance(qa_artifacts, list) or len(qa_artifacts) != expected_qa_artifact_count:
+            errors.append("QA pdf_artifacts count does not match retained render evidence")
+        else:
+            for index, (qa_artifact, record) in enumerate(zip(qa_artifacts, records)):
+                if not isinstance(qa_artifact, Mapping) or not isinstance(record, Mapping):
+                    errors.append(f"QA pdf_artifacts[{index}] is not mapped to a manifest record")
+                    continue
+                if qa_artifact.get("docx_path") != record.get("final_docx_path"):
+                    errors.append(f"QA pdf_artifacts[{index}] DOCX path does not match manifest")
+                if qa_artifact.get("final_pdf_path") != record.get("final_pdf_path"):
+                    errors.append(f"QA pdf_artifacts[{index}] PDF path does not match manifest")
+                if qa_artifact.get("actual_pdf_page_count") != record.get("actual_pdf_page_count"):
+                    errors.append(f"QA pdf_artifacts[{index}] page count does not match manifest")
+    production_status = "not_applicable"
+    if str(data.get("content_contract_version")) == "2.2":
+        if qa_report.get("status") == "passed" and (not rendered or not lessons):
+            production_status = "structural_pass"
+        elif qa_report.get("status") == "passed" and rendered and not errors:
+            production_status = "production_pass"
+        else:
+            production_status = "failed"
+        if isinstance(manifest, Mapping) and "production_status" in manifest and manifest.get("production_status") != production_status:
+            errors.append(f"manifest production_status does not match inferred evidence: {production_status}")
+        if "production_status" in qa_report and qa_report.get("production_status") != production_status:
+            errors.append("QA production_status does not match inferred artifact evidence")
     return _gate(
         "artifact_manifest",
         not errors,
@@ -869,6 +966,7 @@ def _artifact_manifest_gate(
             "run_id": manifest.get("run_id") if isinstance(manifest, Mapping) else None,
             "records": len(records),
             "page_count": manifest.get("actual_pdf_page_count") if isinstance(manifest, Mapping) else None,
+            "production_status": production_status,
             "errors": errors,
         },
         "Manifest must map source and final DOCX/PDF hashes, retained-PDF page counts, and matching QA/render/production status.",
@@ -1442,7 +1540,6 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
         "qa_report_sha256",
         "output_inventory_fingerprint",
         "render_status",
-        "production_status",
         "visual_status",
     }
     errors = [f"missing top-level key: {key}" for key in sorted(required_top - set(report))]
@@ -1453,6 +1550,13 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
         errors.extend(f"missing metadata key: {key}" for key in sorted(required_metadata - set(metadata)))
         if metadata.get("source_type") not in SOURCE_TYPES:
             errors.append("metadata.source_type is not a supported source type")
+        if "production_status" in metadata and metadata.get("production_status") not in {
+            "production_pass",
+            "structural_pass",
+            "failed",
+            "not_applicable",
+        }:
+            errors.append("metadata.production_status is not a supported production status")
     if report.get("acceptance_schema_version") != ACCEPTANCE_SCHEMA_VERSION:
         errors.append("acceptance_schema_version is not 2.0")
     if report.get("final_status") not in FINAL_STATUSES:
@@ -1555,6 +1659,11 @@ def build_acceptance_report(
         artifact_manifest=artifact_manifest,
         source_json_path=input_json,
     )
+    manifest_gate_evidence = next(
+        (gate for gate in structural.get("gates", []) if isinstance(gate, Mapping) and gate.get("name") == "artifact_manifest"),
+        {},
+    )
+    manifest_gate_data = manifest_gate_evidence.get("observed") if isinstance(manifest_gate_evidence.get("observed"), Mapping) else {}
     contract_version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     delivery = delivery_metrics(data)
     references = reference_metrics(data, qa_report)
@@ -1576,11 +1685,7 @@ def build_acceptance_report(
         "qa_report_sha256": _sha256_file(qa_report_path),
         "output_inventory_fingerprint": inventory.get("fingerprint"),
         "render_status": render.get("status", "not_executed"),
-        "production_status": (
-            qa_report.get("production_status", "failed")
-            if contract_version == "2.2"
-            else "not_applicable"
-        ),
+        "production_status": manifest_gate_data.get("production_status", "failed") if contract_version == "2.2" else "not_applicable",
         "visual_status": visual_status,
         "delivery_mode": (data.get("delivery_plan") or {}).get("mode") if isinstance(data.get("delivery_plan"), Mapping) else None,
         "theory_hours": _number((data.get("delivery_plan") or {}).get("theory_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
@@ -1688,7 +1793,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
         f"- Lessons/hours: {metadata.get('lesson_count')} / {metadata.get('total_hours')}",
         f"- Source: `{metadata.get('source_type')}`; master: `{metadata.get('master_commit')}`",
         f"- Content Contract: `{metadata.get('content_contract_version')}`; template: `{metadata.get('template_version')}`",
-        f"- QA/render/production: `{metadata.get('render_status')}` / `{metadata.get('production_status')}`",
+        f"- Render/production: `{metadata.get('render_status')}` / `{metadata.get('production_status')}`",
         f"- Delivery: `{(report.get('delivery_metrics') or {}).get('status')}`; reference gates: `{(report.get('reference_metrics') or {}).get('status')}`; practice handoff: `{(report.get('practice_handoff_metrics') or {}).get('status')}`",
         f"- Input SHA256: `{metadata.get('input_sha256')}`",
         f"- QA SHA256: `{metadata.get('qa_report_sha256')}`",

@@ -36,7 +36,6 @@
         "qa_report_sha256",
         "output_inventory_fingerprint",
         "render_status",
-        "production_status",
         "visual_status"
       ],
       "properties": {
