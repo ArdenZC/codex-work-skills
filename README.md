@@ -35,7 +35,7 @@
 
 | Skill | 当前版本 / 合同 | 主要产物 | 状态 |
 | --- | --- | --- | --- |
-| [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | Skill 2.3.0 · Lesson Content 2.2 · Template 1.1.2 | 理论课教案 `.docx` | 🟡 RC / Qualification pending |
+| [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | Skill 2.3.0 · Lesson Content 2.2 · Template 1.1.2 | 理论课教案 `.docx` | ✅ Stable |
 | [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.2.0 / Phase 2.2** · Practice Task **1.1** · WorkOrder Content **1.1** | 学生实践工单 `.docx` | ✅ Stable |
 | [🖥️ HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** · Courseware Contract **1.1** | `student.html` + `teacher.html` | ✅ Stable |
 | [🧪 实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.2.0** · Practice Class Contract **1.1** | student / teacher 离线 HTML 包 | ✅ Stable |
@@ -45,7 +45,7 @@
 
 **Lesson Skill 2.3.0 · Lesson Content 2.2 · Template 1.1.2**
 
-> 🟡 **RC / Qualification pending** — Lesson Skill 2.3.0 的代码闭环与本地回归已完成；最终 Windows/macOS exact-SHA hosted CI 和 Owner 的真实 Teaching Exemplar pilot 尚待完成。功能代码已完成，尚待最终 qualification。
+> ✅ **Stable** — Lesson Skill 2.3.0 已完成代码闭环、本地回归、最终 SHA 的 Windows/macOS hosted CI，以及 Owner 的真实来源 Teaching Exemplar pilot。该 pilot 为 single-context，因此 Benchmark 结论按合同记为 PARTIAL；它用于确认产品价值，不冒充 blind holdout 的最终教学验收。
 
 - 一次性确认课程名称、专业、授课对象和课时结构，再进行整门课程规划；
 - Lesson DOCX 只承载理论课时；课前固定 **10 分钟**、课中按 **`hours × 45`**、课后固定 **15 分钟**；

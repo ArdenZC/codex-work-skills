@@ -4,9 +4,9 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
-## Lesson Skill 2.3.0 RC — Teaching Exemplar Benchmark System Closure — 2026-09-27
+## Lesson Skill 2.3.0 — Teaching Exemplar Benchmark System Closure — 2026-09-27
 
-> Release candidate; not merged/released. Final Windows/macOS exact-SHA hosted CI and the Owner's real Teaching Exemplar pilot are pending.
+> Release qualification complete on the PR head: Windows/macOS exact-SHA hosted CI passed, and the Owner completed a real-source Teaching Exemplar pilot. The pilot used single-context execution, so its Benchmark result is PARTIAL by contract and does not replace blind holdout or teacher acceptance.
 
 - 在 Content Contract 2.2 外完成 Teaching Exemplar Benchmark sidecar 闭环；Content schema、Lesson Template 1.1.2 binary、既有课程结构、WorkOrder 合同和原有正文设计边界保持不变。
 - 新增来源安全、课程上下文与资格策略指纹、稳定 group split、物理 A/B Pack、独立逐课 Review 分片与课程汇总，显式记录 evidence basis、insufficient evidence、no-relevant 和 context 模式状态。
