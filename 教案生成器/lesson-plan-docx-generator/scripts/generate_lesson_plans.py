@@ -12,7 +12,7 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from docx import Document
 from docx.enum.table import WD_CELL_VERTICAL_ALIGNMENT
@@ -647,8 +647,12 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
     if manifest_lesson_hours != source_lesson_hours:
         raise RuntimeError("artifact manifest lesson_hours do not match the source JSON")
     reference_evidence = _artifact_relative_path(root, manifest.get("reference_evidence_path"))
-    if reference_evidence is None or not reference_evidence.is_file():
+    if reference_evidence is None or reference_evidence.is_symlink() or not reference_evidence.is_file():
         raise RuntimeError("reference-evidence.json is missing from the final artifact directory")
+    if is_v22 and not isinstance(manifest.get("reference_evidence_sha256"), str):
+        raise RuntimeError("artifact manifest reference_evidence_sha256 is required")
+    if is_v22 and not re.fullmatch(r"[0-9a-fA-F]{64}", manifest["reference_evidence_sha256"]):
+        raise RuntimeError("artifact manifest reference_evidence_sha256 must be 64 hex characters")
     if manifest.get("reference_evidence_sha256") and str(manifest["reference_evidence_sha256"]).upper() != _file_sha256(reference_evidence):
         raise RuntimeError("artifact manifest reference-evidence SHA-256 mismatch")
     records = manifest.get("artifacts")
@@ -675,7 +679,7 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         raise RuntimeError("artifact manifest render_status does not match eligible QA render evidence")
     if qa_report.get("artifact_manifest") not in (None, "artifact-manifest.json"):
         raise RuntimeError("QA report artifact_manifest must point to artifact-manifest.json")
-    is_final_qa_report = qa_report.get("artifact_manifest") == "artifact-manifest.json" and "production_status" in qa_report
+    is_final_qa_report = qa_report.get("artifact_manifest") == "artifact-manifest.json"
 
     require_retained_pdf = render_status == "passed"
     expected_docx_names = [
@@ -810,6 +814,14 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
             if qa_artifact.get("actual_pdf_page_count") != record.get("actual_pdf_page_count"):
                 raise RuntimeError(f"final QA report pdf_artifacts[{index}] page count does not match the manifest")
     digest = manifest.get("reviewed_content_digest")
+    if is_v22:
+        if not isinstance(digest, dict):
+            raise RuntimeError("artifact manifest reviewed_content_digest is required")
+        for field in ("source_final_content_sha256", "packaged_final_content_sha256"):
+            if not isinstance(digest.get(field), str) or not re.fullmatch(r"[0-9a-fA-F]{64}", digest[field]):
+                raise RuntimeError(f"reviewed_content_digest.{field} must be 64 hex characters")
+        if digest.get("match") is not True or digest["source_final_content_sha256"].upper() != digest["packaged_final_content_sha256"].upper():
+            raise RuntimeError("reviewed_content_digest must match source and packaged final content")
     if isinstance(digest, dict) and "match" in digest and not digest.get("match"):
         raise RuntimeError("packaged final content digest does not match authoring provenance")
     production_status = None
@@ -863,33 +875,12 @@ def _cleanup_empty_directory(path: Path, label: str) -> str | None:
     return None
 
 
-def atomic_commit_candidate(candidate: Path, out_dir: Path, backup_existing: bool) -> Path | None:
-    """Swap a fully validated candidate into place and restore on commit failure."""
-
-    displaced: Path | None = None
-    try:
-        if out_dir.exists():
-            if not out_dir.is_dir():
-                raise FileExistsError(f"Output path is not a directory: {out_dir}")
-            if any(out_dir.iterdir()) and not backup_existing:
-                raise FileExistsError(f"Output directory is not empty: {out_dir}")
-            backup_path = _unique_backup_path(out_dir)
-            os.replace(str(out_dir), str(backup_path))
-            displaced = backup_path
-        os.replace(str(candidate), str(out_dir))
-        if displaced is not None and not backup_existing:
-            _remove_path(displaced)
-            displaced = None
-        return displaced
-    except Exception:
-        if displaced is not None and out_dir.exists():
-            _remove_path(out_dir)
-        if displaced is not None and displaced.exists() and not out_dir.exists():
-            try:
-                os.replace(str(displaced), str(out_dir))
-            except Exception as restore_error:  # pragma: no cover - only reachable on a second filesystem failure
-                raise RuntimeError(f"Output commit failed and rollback failed: {restore_error}") from restore_error
-        raise
+def atomic_commit_candidate(
+    candidate: Path, out_dir: Path, backup_existing: bool,
+    post_commit_validate: Callable[[Path], None] | None = None,
+) -> Path | None:
+    """Publish through the shared transaction, including final validation."""
+    return _commit_candidate_transaction(candidate, out_dir, backup_existing, post_commit_validate)
 
 
 def _unique_file_backup_path(path: Path) -> Path:
@@ -918,8 +909,20 @@ def atomic_commit_candidate_with_external_qa(
     external_candidate: Path,
     external_qa: Path,
     backup_existing: bool,
+    post_commit_validate: Callable[[Path], None] | None = None,
 ) -> Path | None:
     """Commit output and an external QA report, restoring both on any failure."""
+    return _commit_candidate_transaction(
+        candidate, out_dir, backup_existing, post_commit_validate, external_candidate, external_qa,
+    )
+
+
+def _commit_candidate_transaction(
+    candidate: Path, out_dir: Path, backup_existing: bool,
+    post_commit_validate: Callable[[Path], None] | None,
+    external_candidate: Path | None = None, external_qa: Path | None = None,
+) -> Path | None:
+    """Keep displaced paths recoverable until post-publication validation succeeds."""
 
     displaced_output: Path | None = None
     displaced_qa: Path | None = None
@@ -936,34 +939,19 @@ def atomic_commit_candidate_with_external_qa(
         os.replace(str(candidate), str(out_dir))
         output_swapped = True
 
-        if external_qa.exists() or external_qa.is_symlink():
+        if external_qa is not None and (external_qa.exists() or external_qa.is_symlink()):
             if external_qa.is_dir():
                 raise FileExistsError(f"External QA report path must be a file, not a directory: {external_qa}")
             displaced_qa = _unique_file_backup_path(external_qa)
             os.replace(str(external_qa), str(displaced_qa))
-        os.replace(str(external_candidate), str(external_qa))
-        qa_swapped = True
+        if external_qa is not None:
+            os.replace(str(external_candidate), str(external_qa))
+            qa_swapped = True
 
-        # Publication is complete once both new paths are in place.  Cleanup
-        # is intentionally outside rollback: a filesystem failure while
-        # deleting an old backup must leave the new output and QA available.
-        cleanup_diagnostics = []
-        if displaced_output is not None and not backup_existing:
-            cleanup_error = _best_effort_post_commit_cleanup(displaced_output, "old output backup")
-            if cleanup_error:
-                cleanup_diagnostics.append(cleanup_error)
-            else:
-                displaced_output = None
-        if displaced_qa is not None:
-            cleanup_error = _best_effort_post_commit_cleanup(displaced_qa, "old external QA backup")
-            if cleanup_error:
-                cleanup_diagnostics.append(cleanup_error)
-            else:
-                displaced_qa = None
-        for diagnostic in cleanup_diagnostics:
-            print(f"WARNING: {diagnostic}", file=sys.stderr)
-        return displaced_output
-    except Exception as commit_error:
+        if post_commit_validate is not None:
+            post_commit_validate(out_dir)
+
+    except BaseException as commit_error:
         rollback_errors: list[str] = []
 
         def rollback(action: str, callback) -> None:
@@ -990,6 +978,26 @@ def atomic_commit_candidate_with_external_qa(
         raise
 
 
+    # Publication is complete only after final validation succeeds. Cleanup
+    # is intentionally outside rollback: a filesystem failure while
+    # deleting an old backup must leave the new output and QA available.
+    cleanup_diagnostics = []
+    if displaced_output is not None and not backup_existing:
+        cleanup_error = _best_effort_post_commit_cleanup(displaced_output, "old output backup")
+        if cleanup_error:
+            cleanup_diagnostics.append(cleanup_error)
+        else:
+            displaced_output = None
+    if displaced_qa is not None:
+        cleanup_error = _best_effort_post_commit_cleanup(displaced_qa, "old external QA backup")
+        if cleanup_error:
+            cleanup_diagnostics.append(cleanup_error)
+        else:
+            displaced_qa = None
+    for diagnostic in cleanup_diagnostics:
+        print(f"WARNING: {diagnostic}", file=sys.stderr)
+    return displaced_output
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate template-matched Chinese lesson plan DOCX files.")
     parser.add_argument("--template", default="")
@@ -1000,7 +1008,7 @@ def main() -> None:
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
-    parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
+    parser.add_argument("--render", action="store_true", help="Render validated DOCX files and retain verified PDFs for artifact publication / production verification")
     parser.add_argument(
         "--run-id",
         default="",
@@ -1187,6 +1195,13 @@ def main() -> None:
             encoding="utf-8",
         )
         _verify_artifact_manifest(candidate, manifest_data, source_path)
+
+        def post_commit_validate(published: Path) -> None:
+            committed_manifest = json.loads((published / "artifact-manifest.json").read_text(encoding="utf-8"))
+            _verify_artifact_manifest(published, committed_manifest, source_path)
+            if external_qa is not None and _file_sha256(external_qa) != _file_sha256(published / "qa-report.json"):
+                raise RuntimeError("published external QA does not match the final output QA report")
+
         if external_qa is not None:
             if not external_qa.parent.exists():
                 external_qa.parent.mkdir(parents=True, exist_ok=True)
@@ -1205,11 +1220,10 @@ def main() -> None:
                 external_candidate,
                 external_qa,
                 args.backup_existing,
+                post_commit_validate=post_commit_validate,
             )
         else:
-            backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing)
-        committed_manifest = json.loads((out_dir / "artifact-manifest.json").read_text(encoding="utf-8"))
-        _verify_artifact_manifest(out_dir, committed_manifest, source_path)
+            backup = atomic_commit_candidate(candidate, out_dir, args.backup_existing, post_commit_validate=post_commit_validate)
         for filename in generated_filenames:
             print(out_dir / filename)
         if backup is not None:

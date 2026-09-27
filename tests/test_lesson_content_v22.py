@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -1293,6 +1296,194 @@ class LessonContentV22Tests(unittest.TestCase):
                 self.assertIn("数据结构（C语言版·第2版）", references)
                 self.assertIn("Python Documentation: Data Structures", references)
                 self.assertNotIn("投影仪", references)
+
+
+class LessonFinalPublicationClosureTests(unittest.TestCase):
+    """Real rendered evidence plus failures injected after publication swaps."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.workspace = tempfile.TemporaryDirectory(prefix="lesson-final-closure-")
+        cls.addClassCleanup(cls.workspace.cleanup)
+        cls.root = Path(cls.workspace.name)
+        cls.source = cls.root / "content.json"
+        cls.source.write_text(json.dumps(make_v22_payload(theory_hours=6, lesson_count=3, specs=DB_SPECS), ensure_ascii=False), encoding="utf-8")
+        cls.baseline = cls.root / "rendered"
+        result = run_script(LESSON / "scripts/generate_lesson_plans.py", "--tasks-json", str(cls.source), "--output-dir", str(cls.baseline), "--render")
+        if result.returncode:
+            raise AssertionError(result.stderr + result.stdout)
+        cls.manifest = json.loads((cls.baseline / "artifact-manifest.json").read_text(encoding="utf-8"))
+        cls.qa = json.loads((cls.baseline / "qa-report.json").read_text(encoding="utf-8"))
+
+    def setUp(self) -> None:
+        self.case = tempfile.TemporaryDirectory(prefix="lesson-final-case-")
+        self.addCleanup(self.case.cleanup)
+        self.output = Path(self.case.name) / "output"
+        shutil.copytree(self.baseline, self.output)
+
+    def verify_evidence(self, manifest=None, qa=None, *, passes=False):
+        manifest = copy.deepcopy(self.manifest if manifest is None else manifest)
+        qa = copy.deepcopy(self.qa if qa is None else qa)
+        (self.output / "artifact-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (self.output / "qa-report.json").write_text(json.dumps(qa), encoding="utf-8")
+        if passes:
+            self.assertEqual(lesson_generator._verify_artifact_manifest(self.output, manifest, self.source), "production_pass")
+        else:
+            with self.assertRaises(RuntimeError):
+                lesson_generator._verify_artifact_manifest(self.output, manifest, self.source)
+        report = lesson_acceptance.build_acceptance_report(self.source, self.output, self.output / "qa-report.json", source_type="synthetic_fixture", template_version="v1.1.2")
+        gate = next(g for g in report["structural_hard_gates"]["gates"] if g["name"] == "artifact_manifest")
+        self.assertEqual(gate["status"], "PASS" if passes else "FAIL", gate)
+        self.assertEqual(report["metadata"]["production_status"], "production_pass" if passes else "failed", report)
+        if not passes:
+            self.assertEqual(report["final_status"], "FAILED")
+        return gate
+
+    def assert_post_commit_rollback(self, *, old_output, external=False):
+        root = Path(self.case.name)
+        shutil.rmtree(self.output)
+        expected = {"old.bin": b"\x00old-output\xff", "nested/state.txt": b"old-state"}
+        if old_output:
+            for name, data in expected.items():
+                path = self.output / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+        qa_path = root / "external-qa.json"
+        if external:
+            qa_path.write_bytes(b"old-external-qa\x00")
+        real_verify = lesson_generator._verify_artifact_manifest
+        post_calls = []
+
+        def fail_after_swap(path, manifest, source):
+            if path.resolve() == self.output.resolve():
+                self.assertTrue(list(path.glob("*.docx")))
+                self.assertFalse((path / "old.bin").exists())
+                if external:
+                    self.assertNotEqual(qa_path.read_bytes(), b"old-external-qa\x00")
+                post_calls.append(path)
+                raise RuntimeError("injected post-commit verifier failure")
+            return real_verify(path, manifest, source)
+
+        argv = ["generate_lesson_plans.py", "--tasks-json", str(self.source), "--output-dir", str(self.output), "--allow-test-fixture-authoring"]
+        if old_output:
+            argv.append("--backup-existing")
+        if external:
+            argv.extend(["--qa-report", str(qa_path)])
+        with patch.dict(os.environ, {"LESSON_ALLOW_TEST_FIXTURE_AUTHORING": "1"}), patch.object(sys, "argv", argv), patch.object(lesson_generator, "_verify_artifact_manifest", side_effect=fail_after_swap):
+            with self.assertRaisesRegex(RuntimeError, "injected post-commit verifier failure"):
+                lesson_generator.main()
+        self.assertEqual(len(post_calls), 1)
+        if old_output:
+            self.assertEqual({p.relative_to(self.output).as_posix(): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}, expected)
+        else:
+            self.assertFalse(self.output.exists())
+        if external:
+            self.assertEqual(qa_path.read_bytes(), b"old-external-qa\x00")
+        self.assertEqual(list(root.rglob("*candidate*")), [])
+        self.assertEqual(list(root.rglob("*_backup_*")), [])
+
+    def test_post_commit_failure_restores_existing_output(self):
+        self.assert_post_commit_rollback(old_output=True)
+
+    def test_post_commit_failure_leaves_initially_absent_target_absent(self):
+        self.assert_post_commit_rollback(old_output=False)
+
+    def test_post_commit_failure_restores_output_and_external_qa(self):
+        self.assert_post_commit_rollback(old_output=True, external=True)
+
+    def historical_evidence(self):
+        manifest, qa = copy.deepcopy(self.manifest), copy.deepcopy(self.qa)
+        manifest.pop("production_status")
+        manifest.pop("content_contract_version")
+        qa.pop("production_status")
+        return manifest, qa
+
+    def test_old_final_qa_without_production_status_passes(self):
+        self.verify_evidence(*self.historical_evidence(), passes=True)
+
+    def test_old_final_qa_missing_pdf_artifacts_fails(self):
+        manifest, qa = self.historical_evidence()
+        qa["render"].pop("pdf_artifacts")
+        self.verify_evidence(manifest, qa)
+
+    def test_old_final_qa_pdf_artifact_map_tampering_fails(self):
+        for field, value in (("final_pdf_path", "render/pdf/wrong.pdf"), ("docx_path", "wrong.docx"), ("actual_pdf_page_count", 999)):
+            with self.subTest(field=field):
+                manifest, qa = self.historical_evidence()
+                qa["render"]["pdf_artifacts"][0][field] = value
+                self.verify_evidence(manifest, qa)
+
+    def test_old_final_qa_rejects_transient_paths_and_invalid_artifact_lists(self):
+        for mode in ("transient", "wrong-type", "wrong-count"):
+            with self.subTest(mode=mode):
+                manifest, qa = self.historical_evidence()
+                if mode == "transient":
+                    qa["render"]["pdf_files"] = ["/temporary/diagnostic.pdf"]
+                else:
+                    qa["render"]["pdf_artifacts"] = {} if mode == "wrong-type" else []
+                self.verify_evidence(manifest, qa)
+
+    def test_missing_reviewed_content_digest_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest.pop("reviewed_content_digest")
+        self.verify_evidence(manifest)
+
+    def test_reviewed_digest_mismatch_and_invalid_fields_fail(self):
+        for mode in ("match-false", "mismatch", "missing-source", "invalid-packaged", "not-object"):
+            with self.subTest(mode=mode):
+                manifest = copy.deepcopy(self.manifest)
+                digest = manifest["reviewed_content_digest"]
+                if mode == "match-false":
+                    digest["match"] = False
+                elif mode == "mismatch":
+                    digest["packaged_final_content_sha256"] = "0" * 64
+                elif mode == "missing-source":
+                    digest.pop("source_final_content_sha256")
+                elif mode == "invalid-packaged":
+                    digest["packaged_final_content_sha256"] = "not-a-sha"
+                else:
+                    manifest["reviewed_content_digest"] = []
+                self.verify_evidence(manifest)
+
+    def test_missing_reference_evidence_sha_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest.pop("reference_evidence_sha256")
+        self.verify_evidence(manifest)
+
+    def test_reference_evidence_sha_tamper_and_invalid_hex_fail(self):
+        for value in ("0" * 64, "z" * 64, ""):
+            with self.subTest(value=value):
+                manifest = copy.deepcopy(self.manifest)
+                manifest["reference_evidence_sha256"] = value
+                self.verify_evidence(manifest)
+
+    def test_reference_evidence_file_mutation_fails(self):
+        (self.output / "reference-evidence.json").write_bytes(b"{}\n")
+        self.verify_evidence()
+
+    def test_manifest_production_mismatch_reports_effective_failed(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["production_status"] = "structural_pass"
+        gate = self.verify_evidence(manifest)
+        self.assertEqual(gate["observed"]["inferred_production_status"], "production_pass")
+
+    def test_qa_production_mismatch_reports_effective_failed(self):
+        qa = copy.deepcopy(self.qa)
+        qa["production_status"] = "structural_pass"
+        gate = self.verify_evidence(qa=qa)
+        self.assertEqual(gate["observed"]["inferred_production_status"], "production_pass")
+
+    def test_generator_help_describes_retained_publication_pdfs(self):
+        result = run_script(LESSON / "scripts/generate_lesson_plans.py", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("disposable", result.stdout.lower())
+        self.assertIn("retain verified PDFs", result.stdout)
+
+    def test_standalone_help_remains_disposable_diagnostic(self):
+        result = run_script(LESSON / "scripts/validate_output.py", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("disposable", result.stdout.lower())
+        self.assertIn("diagnostic", result.stdout.lower())
 
 
 if __name__ == "__main__":

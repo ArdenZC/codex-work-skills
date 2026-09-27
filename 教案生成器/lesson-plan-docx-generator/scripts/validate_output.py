@@ -1352,7 +1352,7 @@ def main() -> int:
         "--render",
         action="store_true",
         help=(
-            "Render validated DOCX files to disposable PDFs when a renderer is available; "
+            "Render validated DOCX files to disposable diagnostic PDFs when a renderer is available; "
             "standalone render smoke does not establish production readiness, which requires "
             "generator artifact verification"
         ),

@@ -84,7 +84,8 @@ Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账�
 读取资料 → 一次性 Intake 确认 → 全课程 outline
 → Content Contract 2.2 / Practice Task Contract 1.1（如明确需要）
 → Input/Content QA → candidate DOCX → Output QA
-→ 请求时真实 Render Smoke → atomic commit
+→ 请求时真实 Render Smoke → atomic swap → post-commit artifact verification
+→ 成功后 finalize（失败恢复原 output 与 external QA）
 → 如需工单则调用 WorkOrder Skill Agent → 统一交付与人工验收
 ```
 

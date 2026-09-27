@@ -11,6 +11,8 @@
 - 对齐可复用教学方法、资源与真实引用的跨课复用策略；保留叙事复制检测和来源绑定约束。
 - 明确学生证据继续表达在现有 `student_actions` 与必要时 `objective` 中；独立字段、review sidecar 与课次级引用相关性留待 2.3。
 - 增加可验证的 Content 2.2 canonical example；未声明的 70% 国内来源阈值仅保留为描述性指标。
+- 最终文件交换后的 artifact verification 纳入同一发布事务；验证失败恢复原 output 与 external QA，原目标不存在时移除失败的新发布。
+- 按 canonical final-QA marker 校验 PDF map，兼容旧 2.2.3 缺少 additive production status；强制核验既有 reviewed-content digest 与 reference-evidence SHA，artifact gate 失败时 Acceptance production status 为 failed。
 
 ## Dual Teaching Skills Generalization 1.0 — 2026-09-09
 

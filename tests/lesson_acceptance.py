@@ -792,7 +792,12 @@ def _artifact_manifest_gate(
         if qa_report.get("artifact_manifest") != "artifact-manifest.json":
             errors.append("QA report does not point to artifact-manifest.json")
         reference_evidence_path = _manifest_artifact_path(output_dir, manifest.get("reference_evidence_path"))
-        if reference_evidence_path is None or not reference_evidence_path.is_file():
+        reference_sha = manifest.get("reference_evidence_sha256")
+        if str(data.get("content_contract_version")) == "2.2" and (
+            not isinstance(reference_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", reference_sha)
+        ):
+            errors.append("manifest reference_evidence_sha256 must be 64 hex characters")
+        if reference_evidence_path is None or reference_evidence_path.is_symlink() or not reference_evidence_path.is_file():
             errors.append("manifest reference_evidence_path is not an accessible retained file")
         elif manifest.get("reference_evidence_sha256") and _sha256_file(reference_evidence_path) != str(manifest.get("reference_evidence_sha256")).upper():
             errors.append("manifest reference_evidence_sha256 mismatch")
@@ -928,9 +933,21 @@ def _artifact_manifest_gate(
                 if manifest.get(sha_field) != record.get(sha_field):
                     errors.append(f"manifest {sha_field} does not match its artifact record")
         digest = manifest.get("reviewed_content_digest")
+        if str(data.get("content_contract_version")) == "2.2":
+            if not isinstance(digest, Mapping):
+                errors.append("manifest reviewed_content_digest is required")
+            else:
+                for field in ("source_final_content_sha256", "packaged_final_content_sha256"):
+                    value = digest.get(field)
+                    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
+                        errors.append(f"manifest reviewed_content_digest.{field} must be 64 hex characters")
+                if str(digest.get("source_final_content_sha256", "")).upper() != str(digest.get("packaged_final_content_sha256", "")).upper():
+                    errors.append("manifest reviewed_content_digest source/packaged mismatch")
         if isinstance(digest, Mapping) and digest.get("match") is not True:
             errors.append("manifest reviewed_content_digest.match is not true")
-    if "production_status" in qa_report:
+    if qa_report.get("artifact_manifest") == "artifact-manifest.json":
+        if "pdf_files" in render:
+            errors.append("final QA report must not retain transient pdf_files paths")
         qa_artifacts = render.get("pdf_artifacts")
         expected_qa_artifact_count = len(records) if rendered else 0
         if not isinstance(qa_artifacts, list) or len(qa_artifacts) != expected_qa_artifact_count:
@@ -958,6 +975,9 @@ def _artifact_manifest_gate(
             errors.append(f"manifest production_status does not match inferred evidence: {production_status}")
         if "production_status" in qa_report and qa_report.get("production_status") != production_status:
             errors.append("QA production_status does not match inferred artifact evidence")
+    inferred_production_status = production_status
+    if errors and str(data.get("content_contract_version")) == "2.2":
+        production_status = "failed"
     return _gate(
         "artifact_manifest",
         not errors,
@@ -967,6 +987,7 @@ def _artifact_manifest_gate(
             "records": len(records),
             "page_count": manifest.get("actual_pdf_page_count") if isinstance(manifest, Mapping) else None,
             "production_status": production_status,
+            "inferred_production_status": inferred_production_status,
             "errors": errors,
         },
         "Manifest must map source and final DOCX/PDF hashes, retained-PDF page counts, and matching QA/render/production status.",
