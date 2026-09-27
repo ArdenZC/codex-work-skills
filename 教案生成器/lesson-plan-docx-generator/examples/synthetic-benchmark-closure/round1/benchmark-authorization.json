@@ -1,0 +1,21 @@
+{
+  "benchmark_authorization_version": "1.0",
+  "skill_version": "2.3.0",
+  "content_contract_version": "2.2",
+  "benchmark_run_id": "synthetic-benchmark-run",
+  "review_round": 1,
+  "benchmark_status": "BENCHMARK_GAPS_FOUND",
+  "benchmark_decision": "REVISION_REQUIRED",
+  "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
+  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
+  "authoring_pack_fingerprint": "bff67b2601c4eb6c7138936762c052d7c82bbfc06878eefae4717081b7303ab1",
+  "authoring_selection_sha256": "aa7433f606aa32b12db66f42a797c997d4148200902e6b2d75c8e601c2eba0aa",
+  "holdout_pack_fingerprint": "906253cc1422dfe38f41ba4bfc47df1961c3b3bc93cd86ab3086fc8bdc1510fa",
+  "holdout_selection_sha256": "3d2e32a91fa3ca1dd44cebc6ed115e7b99e6c588c389b183a23fe48309d92675",
+  "benchmark_review_sha256": "2da9469c9b3b3afc5ff8ccc4736518063cb0bd556f02a8061a39d9392bace797",
+  "source_lesson_content_sha256": "c1c70ada5603415545fcbb30b4178a445d580fe37dcc8d6eceba0d509092591e",
+  "source_final_content_sha256": "CE1A1AA74BFBBED920F8338553C76BFAC174AFD97B3261091C536B42E16A8047",
+  "context_mode": "separate_contexts",
+  "created_at": "2026-09-27T07:43:22.185217+00:00",
+  "authorization_fingerprint": "e67b80f183180f9484bea7e8666a2d87f9968161b8d495ba603883ef484c9fd8"
+}

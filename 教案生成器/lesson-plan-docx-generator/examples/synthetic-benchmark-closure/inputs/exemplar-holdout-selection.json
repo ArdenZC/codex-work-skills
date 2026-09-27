@@ -1,0 +1,36 @@
+{
+  "selection_contract_version": "1.0",
+  "selection_role": "holdout",
+  "catalog_id": "synthetic-catalog",
+  "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
+  "split_id": "split-81fd27ce3f79b9ff158f",
+  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
+  "pack_fingerprint": "906253cc1422dfe38f41ba4bfc47df1961c3b3bc93cd86ab3086fc8bdc1510fa",
+  "source_lesson_content_sha256": "c1c70ada5603415545fcbb30b4178a445d580fe37dcc8d6eceba0d509092591e",
+  "lessons": [
+    {
+      "lesson_id": "L01",
+      "status": "SELECTED",
+      "exemplar_ids": [
+        "EX-02"
+      ],
+      "rationale": "Synthetic fixture only; not a relevance judgment."
+    },
+    {
+      "lesson_id": "L02",
+      "status": "SELECTED",
+      "exemplar_ids": [
+        "EX-02"
+      ],
+      "rationale": "Synthetic fixture only; not a relevance judgment."
+    },
+    {
+      "lesson_id": "L03",
+      "status": "SELECTED",
+      "exemplar_ids": [
+        "EX-02"
+      ],
+      "rationale": "Synthetic fixture only; not a relevance judgment."
+    }
+  ]
+}

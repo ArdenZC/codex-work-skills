@@ -1,0 +1,65 @@
+{
+  "pack_contract_version": "1.0",
+  "role": "holdout",
+  "catalog_id": "synthetic-catalog",
+  "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
+  "split_id": "split-81fd27ce3f79b9ff158f",
+  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
+  "exemplar_ids": [
+    "EX-02"
+  ],
+  "exemplars": [
+    {
+      "exemplar_id": "EX-02",
+      "group_id": "GR-01",
+      "source": {
+        "title": "SYNTHETIC TEST CARD 2",
+        "institution": "synthetic_fixture",
+        "author_or_team": "test fixture only",
+        "canonical_url": "https://example.invalid/synthetic/2",
+        "provided_source_id": null,
+        "source_label": null,
+        "source_type": "official_platform",
+        "authority_tier": "A",
+        "authority_basis": "official_award",
+        "recognition": "synthetic benchmark evidence only",
+        "recognition_evidence": [
+          "SYNTHETIC; NON-TEACHING-QUALITY-EVIDENCE"
+        ],
+        "retrieved_at": "2026-09-27T00:00:00Z",
+        "visibility": "public",
+        "source_identity_sha256": "8a4fe51883ed552213cf87c1571b468ce62928e0a8cfe3c574854f63f14955ea"
+      },
+      "scope": {
+        "education_level": "synthetic test fixture",
+        "vocational_level": "synthetic test fixture",
+        "domain": "synthetic test fixture",
+        "course": "synthetic test fixture",
+        "scope_mode": "course_specific",
+        "topic": "synthetic test fixture",
+        "learner_profile": "synthetic test fixture",
+        "duration_minutes": 45,
+        "teaching_context": "synthetic test fixture only"
+      },
+      "qualification": {
+        "status": "QUALIFIED",
+        "rationale": "Synthetic fixture for deterministic contract testing; no real teaching-quality claim."
+      },
+      "design_patterns": [
+        "Synthetic abstract design pattern."
+      ],
+      "difficulty_breakthrough_patterns": [],
+      "student_activity_patterns": [],
+      "learning_evidence_patterns": [],
+      "assessment_patterns": [],
+      "differentiation_patterns": [],
+      "reflection_patterns": [],
+      "transferable_principles": [],
+      "non_transferable_context": [],
+      "do_not_copy": [
+        "Synthetic test data; not source content."
+      ]
+    }
+  ],
+  "pack_fingerprint": "906253cc1422dfe38f41ba4bfc47df1961c3b3bc93cd86ab3086fc8bdc1510fa"
+}

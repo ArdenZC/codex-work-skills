@@ -1,0 +1,36 @@
+{
+  "selection_contract_version": "1.0",
+  "selection_role": "authoring",
+  "catalog_id": "synthetic-catalog",
+  "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
+  "split_id": "split-81fd27ce3f79b9ff158f",
+  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
+  "pack_fingerprint": "bff67b2601c4eb6c7138936762c052d7c82bbfc06878eefae4717081b7303ab1",
+  "source_outline_sha256": "668268179B3959E23D7370CDC2612A6D6DC625D7025E9BA6C423F91A804F2A20",
+  "lessons": [
+    {
+      "lesson_id": "L01",
+      "status": "SELECTED",
+      "exemplar_ids": [
+        "EX-01"
+      ],
+      "rationale": "Synthetic fixture only; not a relevance judgment."
+    },
+    {
+      "lesson_id": "L02",
+      "status": "SELECTED",
+      "exemplar_ids": [
+        "EX-01"
+      ],
+      "rationale": "Synthetic fixture only; not a relevance judgment."
+    },
+    {
+      "lesson_id": "L03",
+      "status": "SELECTED",
+      "exemplar_ids": [
+        "EX-01"
+      ],
+      "rationale": "Synthetic fixture only; not a relevance judgment."
+    }
+  ]
+}

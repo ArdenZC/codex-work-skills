@@ -7,11 +7,11 @@
   "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
   "holdout_pack_fingerprint": "906253cc1422dfe38f41ba4bfc47df1961c3b3bc93cd86ab3086fc8bdc1510fa",
   "benchmark_availability": "PARTIAL",
-  "source_lesson_content_sha256": "c1c70ada5603415545fcbb30b4178a445d580fe37dcc8d6eceba0d509092591e",
+  "source_lesson_content_sha256": "ac72e42fd37bdc886a64ea9c27cb152047ed47ebda588068f13fadb0dbb2cb08",
   "holdout_selection_sha256": "3d2e32a91fa3ca1dd44cebc6ed115e7b99e6c588c389b183a23fe48309d92675",
   "rubric_version": "lesson-teaching-benchmark-v1",
-  "review_round": 1,
-  "status": "BENCHMARK_GAPS_FOUND",
+  "review_round": 2,
+  "status": "BENCHMARK_PARTIAL",
   "isolation": {
     "context_mode": "separate_contexts",
     "authoring_exemplars_visible": false,
@@ -22,19 +22,19 @@
   "lesson_reviews": [
     {
       "lesson_id": "L01",
-      "review_sha256": "b194de4b2741c2bae2e47a8309f84dc6adf5457dbdabec68070eecb8e56e8053"
+      "review_sha256": "a7cf5ffa5f6299d486caa98a7fbbf8310b596ddfdf2ad168c2cd3d2cdc8c54fa"
     },
     {
       "lesson_id": "L02",
-      "review_sha256": "4bfbc7557782d028b5d250de4023a9bf24dbadc6ff364832b25cf3d40e4a956f"
+      "review_sha256": "2a64f8cb37ceef0f15b96707b610a91356467356f5d4bad6a5d7d633b1a9d71c"
     },
     {
       "lesson_id": "L03",
-      "review_sha256": "52a5070c2592648858503043148908cb52795aeaf8261cb4e973c8c530438ba0"
+      "review_sha256": "1b1c4d8f432aa1983045c10f8fe3ad674522cdd03a25aaae8b1e3ad0fa6fb4db"
     }
   ],
   "course_summary": {
-    "major_gap_count": 1,
+    "major_gap_count": 0,
     "minor_gap_count": 0,
     "insufficient_evidence_count": 0,
     "lessons_reviewed": 3,
@@ -43,7 +43,11 @@
     "context_mode": "separate_contexts",
     "authoring_availability": "AVAILABLE",
     "holdout_availability": "PARTIAL",
-    "decision": "REVISION_REQUIRED",
-    "status": "BENCHMARK_GAPS_FOUND"
-  }
+    "decision": "BENCHMARK_PARTIAL",
+    "status": "BENCHMARK_PARTIAL"
+  },
+  "prior_review_sha256": "2da9469c9b3b3afc5ff8ccc4736518063cb0bd556f02a8061a39d9392bace797",
+  "prior_source_lesson_content_sha256": "c1c70ada5603415545fcbb30b4178a445d580fe37dcc8d6eceba0d509092591e",
+  "prior_final_content_sha256": "CE1A1AA74BFBBED920F8338553C76BFAC174AFD97B3261091C536B42E16A8047",
+  "current_final_content_sha256": "C460272A02E96474D6952AF81D2C587A0219E8777643F6B713A2054CFDFD9ED9"
 }
