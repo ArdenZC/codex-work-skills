@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teaching-exemplar-holdout-selection.schema.json",
+  "title": "Teaching Exemplar Holdout Selection Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["selection_contract_version", "selection_role", "catalog_id", "catalog_fingerprint", "split_id", "split_fingerprint", "pack_fingerprint", "source_lesson_content_sha256", "lessons"],
+  "properties": {
+    "selection_contract_version": { "const": "1.0" },
+    "selection_role": { "const": "holdout" },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "split_id": { "type": "string", "minLength": 1 },
+    "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "pack_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "lessons": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["lesson_id", "status", "exemplar_ids", "rationale"],
+        "properties": {
+          "lesson_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "status": { "enum": ["SELECTED", "NO_RELEVANT_EXEMPLAR", "UNAVAILABLE"] },
+          "exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        }
+      }
+    }
+  }
+}

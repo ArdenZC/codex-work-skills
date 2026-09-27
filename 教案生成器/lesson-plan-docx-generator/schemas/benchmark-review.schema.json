@@ -4,13 +4,20 @@
   "title": "Lesson Teaching Exemplar Benchmark Review Contract 1.0",
   "type": "object",
   "additionalProperties": false,
-  "required": ["benchmark_contract_version", "benchmark_run_id", "catalog_id", "split_id", "split_fingerprint", "benchmark_availability", "source_lesson_content_sha256", "holdout_selection_sha256", "rubric_version", "review_round", "status", "isolation", "lessons", "course_summary"],
+  "required": [
+    "benchmark_contract_version", "benchmark_run_id", "catalog_id", "catalog_fingerprint",
+    "split_id", "split_fingerprint", "holdout_pack_fingerprint", "benchmark_availability",
+    "source_lesson_content_sha256", "holdout_selection_sha256", "rubric_version",
+    "review_round", "status", "isolation", "lessons", "course_summary"
+  ],
   "properties": {
     "benchmark_contract_version": { "const": "1.0" },
     "benchmark_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
     "catalog_id": { "type": "string", "minLength": 1 },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
     "split_id": { "type": "string", "minLength": 1 },
     "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "holdout_pack_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
     "benchmark_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
     "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
     "holdout_selection_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
@@ -32,17 +39,9 @@
       "type": "array",
       "items": {
         "type": "object", "additionalProperties": false,
-        "required": ["lesson_id", "holdout_selection", "dimensions"],
+        "required": ["lesson_id", "dimensions"],
         "properties": {
           "lesson_id": { "type": "string", "minLength": 1 },
-          "holdout_selection": {
-            "type": "object", "additionalProperties": false,
-            "required": ["status", "exemplar_ids"],
-            "properties": {
-              "status": { "enum": ["SELECTED", "NO_RELEVANT_EXEMPLAR", "UNAVAILABLE"] },
-              "exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
-            }
-          },
           "dimensions": {
             "type": "array", "maxItems": 15,
             "items": { "$ref": "#/$defs/dimensionReview" }
@@ -93,7 +92,32 @@
         "gap": { "type": "string", "maxLength": 1000 },
         "recommended_direction": { "type": "string", "maxLength": 1000 },
         "holdout_exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "enum": ["MEETS", "PARTIAL", "GAP", "INSUFFICIENT_EVIDENCE"] } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "current_evidence": { "minLength": 1 },
+              "benchmark_pattern": { "minLength": 1 },
+              "holdout_exemplar_ids": { "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["PARTIAL", "GAP", "INSUFFICIENT_EVIDENCE"] } }, "required": ["status"] },
+          "then": {
+            "properties": {
+              "gap": { "minLength": 1 },
+              "recommended_direction": { "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "NOT_APPLICABLE" } }, "required": ["status"] },
+          "then": { "properties": { "current_evidence": { "minLength": 1 } } }
+        }
+      ]
     }
   }
 }

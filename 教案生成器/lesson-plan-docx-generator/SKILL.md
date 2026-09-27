@@ -22,32 +22,32 @@ Teaching Exemplar Benchmark 使用 Lesson Content Contract 2.2 之外的独立 s
 固定工作流：
 
 ```text
-Intake
-→ Source Truth
-→ Exemplar Discovery/Card
-→ Catalog
-→ Split
-→ Outline
-→ Lesson Authoring using A
+Intake + Source Truth + whole-course outline
+→ Curator: Exemplar Discovery/Card → Catalog → deterministic Split → physical A/B Packs
+→ Author receives only Source Truth + outline + Authoring Pack A
+→ Authoring Selection (bound to the existing outline digest)
+→ Lesson Content 2.2 authoring
 → existing pedagogical_review
-→ Benchmark Review using B
-→ bounded revision (at most two review rounds)
+→ Reviewer receives final reviewed content + Source Truth summary + Holdout Pack B + rubric
+→ Holdout Selection (bound to exact Round 1 Lesson Content bytes)
+→ full-linkage Benchmark Review validation
+→ bounded revision (at most two review rounds, same frozen Holdout Pack/Selection)
 → final Content 2.2 validation
 → DOCX generation
 → render
 → production publication
-→ Acceptance
+→ Acceptance with full Benchmark provenance linkage when a Review is supplied
 ```
 
-Benchmark Review 必须在正式 production DOCX publication 前完成；不能等 render 后再返工 DOCX。Phase 1 只有 `QUALIFIED` 进入 Split：Tier A/B 可以 QUALIFIED，Tier C 不可；Tier PRIVATE 只能使用 `private_session`。`CONDITIONAL`、`DISCOVERY_ONLY` 和 `REJECTED` 不进入 Split。Python 只检验结构和明示组合，不判断案例教学质量。0 个 exemplar 合法，Split/Review 应如实标为 UNAVAILABLE，不得为了可用状态塞入无关案例。
+Benchmark Review 必须在 DOCX generation、render 和正式 production publication 前完成；不能等 render 后再返工 DOCX。Catalog 与 Split 属于 Curator-only provenance，不进入 Author 或 Reviewer 上下文。Author 只能接收 Authoring Pack A；Reviewer 只能接收 Holdout Pack B 和 Holdout Selection，不得接收 A、完整 Catalog/Split、Author hidden reasoning 或 prompt transcript。物理分开的 Pack 必须由 Split CLI 确定性生成并逐项验证，不能由调用者从 Catalog 手工过滤。Phase 1 只有 `QUALIFIED` 进入 Split：Tier A/B 可以 QUALIFIED，Tier C 不可；Tier PRIVATE 只能使用 `private_session`，`discovery_source` 不能 QUALIFIED。`CONDITIONAL`、`DISCOVERY_ONLY` 和 `REJECTED` 不进入 Split。QUALIFIED Card 必须有至少一个非空教学模式数组和至少一项 `do_not_copy`。Python 只检验结构和明示组合，不判断案例教学质量。0 个 exemplar 合法，Split/Review 应如实标为 UNAVAILABLE，不得为了可用状态塞入无关案例。
 
-Agent 负责案例发现、资格判断、Card 抽象、lesson relevance、Authoring selection、Benchmark gap 判断和 bounded revision。Python 负责 Schema、hash、group isolation、A/B membership、sidecar linkage、review round、status/count consistency 和 provenance。Python 不判断案例是否优秀或相关，也不判断 Lesson 的教学质量。Card 只保留抽象设计模式，不存原教案正文；不得复制原任务原文、原学生数据、原案例叙事、原教师话术、原图表或独特创新命名。Phase 1 不做文本相似度，不实现网络 crawler/downloader/scraper、人工 override 或 Development Gold runner。
+Curator 负责案例发现结果结构化、资格判断、Card 抽象和 group identity；Curator 不创作 Lesson 正文。Author 负责每课 Authoring Selection 和 Lesson 正文，且只能看到 A Pack。Reviewer 负责每课 Holdout Selection、Benchmark gap 判断和 bounded revision 建议，且只能看到 B Pack。Python 负责 Schema、hash、group isolation、确定性 Pack membership、sidecar linkage、review round、status/count consistency 和 provenance。Python 不判断案例是否优秀或相关，也不判断 Lesson 的教学质量。Authoring Selection 必须完整覆盖 outline 的 `lesson_id`，并绑定现有 `authoring_provenance.source_snapshot.whole_course_outline_sha256`；Holdout Selection 必须完整覆盖全部 Lesson IDs，并绑定精确 Lesson Content JSON bytes。Card 只保留抽象设计模式，不存原教案正文；不得复制原任务原文、原学生数据、原案例叙事、原教师话术、原图表或独特创新命名。Phase 1 不做文本相似度，不实现网络 crawler/downloader/scraper、人工 override 或 Development Gold runner。
 
 Reviewer 只能接收 final reviewed Lesson content、确认的 course context/Source Truth 摘要、选定 Holdout Cards 和 Benchmark Rubric。不得提供 Author hidden reasoning、Authoring Set Cards 或 Author prompt transcript。Review 必须 attests `authoring_exemplars_visible=false`、`author_reasoning_visible=false`、`holdout_only=true`；Python 检查 attestation 和 sidecar，不声称能证明模型 prompt isolation。
 
-每课 Authoring 最多选 5 张，Holdout 最多选 4 张；目标用量分别为 3 张和 2–3 张，但不是 quota，0 张只要状态匹配就合法。CLI 的 size report 描述 Catalog 总字节数和逐课选中 Card 字节数，不设语义阈值。`private_session` Exemplars 可用于运行期 Catalog/A/B，但不得用于 development holdout、提交到仓库的 Gold 或 shared catalog。
+Authoring Selection 和 Holdout Selection 是两个独立 sidecar，禁止合并或互相包含。Authoring 每课最多选 5 张，Holdout 每课最多选 4 张；目标用量分别为 3 张和 2–3 张，但不是 quota，0 张只要状态匹配就合法。CLI 的 size report 描述 Catalog 总字节数和逐课选中 Card 字节数，不设语义阈值。`private_session` Exemplars 可用于运行期 Catalog/A/B，但不得用于 development holdout、提交到仓库的 Gold 或 shared catalog。
 
-Benchmark 最多 review 两轮。Round 2 必须引用 Round 1 且 Lesson content digest 必须变化。Round 2 仍有 major GAP 时必须 `HUMAN_REVIEW_REQUIRED`；禁止 Round 3。Benchmark 永远不能自动令 Acceptance 成为 PASSED；`REVISION_REQUIRED` 或 `HUMAN_REVIEW_REQUIRED` 最多为 `PENDING_MANUAL_REVIEW`，FAILED 仍需用户明确的人工失败结论。Acceptance 2.0 可通过 `--benchmark-review <path>` 接收可选 Review；不传参数时保持原行为。Benchmark unavailable 不阻止 Lesson 生成或 production_pass，也不替代现有教师/视觉/Teaching Design 人工层。
+Benchmark 最多 review 两轮。Round 2 必须引用 Round 1 且 Lesson content digest 必须变化；同时必须提供并 full-validate Round 1 Review 与 Lesson snapshot，继续使用完全相同的 Holdout Pack 和 Holdout Selection。Round 2 仍有 major GAP 时必须 `HUMAN_REVIEW_REQUIRED`；禁止 Round 3。Benchmark 永远不能自动令 Acceptance 成为 PASSED；`REVISION_REQUIRED` 或 `HUMAN_REVIEW_REQUIRED` 最多为 `PENDING_MANUAL_REVIEW`，FAILED 仍需用户明确的人工失败结论。Acceptance 2.0 可通过 `--benchmark-review <path>` 接收可选 Review；提供 Review 时必须同时提供 `--benchmark-catalog`、`--benchmark-split`、`--benchmark-holdout-pack`、`--benchmark-holdout-selection`，Round 2 还必须提供 `--benchmark-previous-review` 和 `--benchmark-previous-content`，并执行 full-linkage validation。`--review-only` 仅供 schema/debug inspection，不能作为 Acceptance 或 production evidence。不提供 Benchmark 时旧行为保持不变。Benchmark unavailable 不阻止 Lesson 生成或 `production_pass`；production_pass 只表示 artifact production 技术链通过，不代表 Benchmark complete，也不替代现有教师/视觉/Teaching Design 人工层。
 
 ## Content Contract 2.2
 

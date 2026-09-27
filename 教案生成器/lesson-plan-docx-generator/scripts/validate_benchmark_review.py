@@ -1,9 +1,10 @@
-"""Validate Teaching Exemplar Benchmark Review Contract 1.0 sidecars."""
+"""Validate fully linked Teaching Exemplar Benchmark Review Contract 1.0 evidence."""
 
 from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -13,11 +14,13 @@ from exemplar_contract import (
     HEX_SHA256,
     holdout_selection_sha256,
     load_json,
-    review_holdout_selection_sha256,
+    load_json_bytes,
     schema_errors,
     sha256_file,
+    validate_catalog_course_context,
     validate_catalog_payload,
-    validate_selection_payload,
+    validate_holdout_selection_payload,
+    validate_pack_payload,
 )
 from exemplar_split import validate_split_payload
 
@@ -48,8 +51,22 @@ DIMENSION_SEVERITY = {
 }
 
 
+def _source_lesson_ids(lesson_content: Mapping[str, Any]) -> list[str]:
+    lessons = lesson_content.get("lessons")
+    if not isinstance(lessons, list):
+        return []
+    return [
+        row.get("lesson_id", row.get("id"))
+        for row in lessons
+        if isinstance(row, Mapping)
+        and isinstance(row.get("lesson_id", row.get("id")), str)
+        and row.get("lesson_id", row.get("id"))
+    ]
+
+
 def review_summary_for(
     lessons: list[Mapping[str, Any]],
+    selection_by_lesson: Mapping[str, Mapping[str, Any]],
     *,
     review_round: int,
     benchmark_availability: str,
@@ -61,9 +78,10 @@ def review_summary_for(
     without_holdout = 0
     has_gap = False
     for lesson in lessons:
-        holdout = lesson.get("holdout_selection", {})
-        selected = holdout.get("exemplar_ids", []) if isinstance(holdout, Mapping) else []
-        if selected:
+        lesson_id = lesson.get("lesson_id")
+        selected_row = selection_by_lesson.get(str(lesson_id), {})
+        has_holdout = selected_row.get("status") == "SELECTED" and bool(selected_row.get("exemplar_ids"))
+        if has_holdout:
             reviewed += 1
         else:
             without_holdout += 1
@@ -113,20 +131,42 @@ def review_summary_for(
     }
 
 
+def _nonempty(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _exact_ids(label: str, rows: list[Mapping[str, Any]], expected_ids: list[str], errors: list[str]) -> dict[str, Mapping[str, Any]]:
+    ids = [row.get("lesson_id") for row in rows]
+    if not all(isinstance(value, str) and value for value in ids):
+        errors.append(f"{label} must contain non-empty lesson_id values")
+    if len(ids) != len(set(ids)):
+        errors.append(f"{label} lesson_id values must be unique")
+    if set(ids) != set(expected_ids) or len(ids) != len(expected_ids):
+        errors.append(f"{label} lesson IDs must exactly match Lesson Content lesson IDs")
+    return {
+        str(row.get("lesson_id")): row
+        for row in rows
+        if isinstance(row.get("lesson_id"), str) and row.get("lesson_id")
+    }
+
+
 def validate_benchmark_review_payload(
     review: Mapping[str, Any],
     *,
-    catalog: Mapping[str, Any] | None = None,
-    split: Mapping[str, Any] | None = None,
-    selection: Mapping[str, Any] | None = None,
-    lesson_content_sha256: str | None = None,
+    catalog: Mapping[str, Any],
+    split: Mapping[str, Any],
+    holdout_pack: Mapping[str, Any],
+    holdout_selection: Mapping[str, Any],
+    lesson_content: Mapping[str, Any],
+    lesson_content_sha256: str,
+    holdout_selection_source_sha256: str,
     previous_review: Mapping[str, Any] | None = None,
     previous_review_sha256: str | None = None,
+    previous_content_sha256: str | None = None,
 ) -> list[str]:
     errors = schema_errors(review, "benchmark-review.schema.json")
     if errors:
         return errors
-
     if review["rubric_version"] != RUBRIC_VERSION:
         errors.append(f"rubric_version must be {RUBRIC_VERSION}")
     if not all(review["isolation"].get(key) is value for key, value in (
@@ -137,145 +177,142 @@ def validate_benchmark_review_payload(
         errors.append("isolation attestation must be authoring_exemplars_visible=false, author_reasoning_visible=false, holdout_only=true")
     if not HEX_SHA256.fullmatch(review["source_lesson_content_sha256"]):
         errors.append("source_lesson_content_sha256 must be a SHA-256 digest")
-    if lesson_content_sha256 is not None and review["source_lesson_content_sha256"].casefold() != lesson_content_sha256.casefold():
-        errors.append("source_lesson_content_sha256 does not match supplied Lesson content")
+    if review["source_lesson_content_sha256"].casefold() != lesson_content_sha256.casefold():
+        errors.append("source_lesson_content_sha256 does not match exact supplied Lesson Content bytes")
 
-    round_number = review["review_round"]
-    if round_number == 1:
-        if "prior_review_sha256" in review or "prior_source_lesson_content_sha256" in review:
-            errors.append("round 1 must not contain prior review provenance")
-    else:
-        if "prior_review_sha256" not in review or "prior_source_lesson_content_sha256" not in review:
-            errors.append("round 2 requires prior_review_sha256 and prior_source_lesson_content_sha256")
-        if review.get("prior_source_lesson_content_sha256", "").casefold() == review["source_lesson_content_sha256"].casefold():
-            errors.append("round 2 source_lesson_content_sha256 must differ from round 1")
-        if previous_review_sha256 is not None and review.get("prior_review_sha256", "").casefold() != previous_review_sha256.casefold():
-            errors.append("prior_review_sha256 does not match supplied round 1 review file")
-        if previous_review is not None:
-            previous_schema_errors = schema_errors(previous_review, "benchmark-review.schema.json")
-            errors.extend(f"previous review: {error}" for error in previous_schema_errors)
-            if previous_review.get("review_round") != 1:
-                errors.append("previous review must have review_round=1")
-            previous_summary = previous_review.get("course_summary")
-            if not isinstance(previous_summary, Mapping) or previous_summary.get("decision") != "REVISION_REQUIRED":
-                errors.append("round 2 is only valid after a round 1 REVISION_REQUIRED decision")
-            if review.get("prior_source_lesson_content_sha256", "").casefold() != str(previous_review.get("source_lesson_content_sha256", "")).casefold():
-                errors.append("prior_source_lesson_content_sha256 does not match round 1")
-            for field in ("catalog_id", "split_id", "split_fingerprint", "holdout_selection_sha256", "rubric_version"):
-                if review.get(field) != previous_review.get(field):
-                    errors.append(f"round 2 {field} must match round 1")
-            if review["source_lesson_content_sha256"].casefold() == str(previous_review.get("source_lesson_content_sha256", "")).casefold():
-                errors.append("round 2 digest must differ from round 1")
+    catalog_errors = validate_catalog_payload(catalog)
+    errors.extend(f"catalog: {error}" for error in catalog_errors)
+    if catalog_errors:
+        return errors
+    split_errors = validate_split_payload(dict(split), dict(catalog))
+    errors.extend(f"split: {error}" for error in split_errors)
+    if split_errors:
+        return errors
+    pack_errors = validate_pack_payload(holdout_pack, catalog, split, expected_role="holdout")
+    errors.extend(f"holdout Pack: {error}" for error in pack_errors)
+    if pack_errors:
+        return errors
+    errors.extend(validate_catalog_course_context(catalog, lesson_content))
 
-    if catalog is not None:
-        catalog_errors = validate_catalog_payload(catalog)
-        errors.extend(f"catalog: {error}" for error in catalog_errors)
-        if catalog_errors:
-            return errors
-        if review["catalog_id"] != catalog.get("catalog_id"):
-            errors.append("review.catalog_id does not match catalog")
-            return errors
-    if split is not None:
-        if catalog is None:
-            errors.append("catalog is required when split is supplied")
-            return errors
+    selection_errors = validate_holdout_selection_payload(
+        holdout_selection,
+        catalog,
+        split,
+        holdout_pack,
+        lesson_content,
+        lesson_content_sha256=holdout_selection_source_sha256,
+    )
+    errors.extend(f"holdout Selection: {error}" for error in selection_errors)
+    if selection_errors:
+        return errors
+
+    linked_values = (
+        ("catalog_id", catalog["catalog_id"]),
+        ("catalog_fingerprint", catalog["catalog_fingerprint"]),
+        ("split_id", split["split_id"]),
+        ("split_fingerprint", split["split_fingerprint"]),
+        ("holdout_pack_fingerprint", holdout_pack["pack_fingerprint"]),
+        ("benchmark_availability", split["benchmark_availability"]),
+    )
+    for field, expected in linked_values:
+        actual = review[field]
+        if isinstance(expected, str) and isinstance(actual, str):
+            matches = actual.casefold() == expected.casefold()
         else:
-            split_errors = validate_split_payload(dict(split), dict(catalog))
-            errors.extend(f"split: {error}" for error in split_errors)
-            if split_errors:
-                return errors
-        if review["split_id"] != split.get("split_id"):
-            errors.append("review.split_id does not match split")
-            return errors
-        if review["split_fingerprint"].casefold() != str(split.get("split_fingerprint", "")).casefold():
-            errors.append("review.split_fingerprint does not match split")
-            return errors
-        if review["benchmark_availability"] != split.get("benchmark_availability"):
-            errors.append("review.benchmark_availability does not match split")
-            return errors
-    if selection is not None:
-        if catalog is None or split is None:
-            errors.append("catalog and split are required when selection is supplied")
-            return errors
-        else:
-            selection_errors = validate_selection_payload(dict(selection), dict(catalog), dict(split))
-            errors.extend(f"selection: {error}" for error in selection_errors)
-            if selection_errors:
-                return errors
-        if selection.get("catalog_id") != review["catalog_id"] or selection.get("split_id") != review["split_id"]:
-            errors.append("selection catalog_id/split_id do not match review")
-        if holdout_selection_sha256(selection).casefold() != review["holdout_selection_sha256"].casefold():
-            errors.append("holdout_selection_sha256 does not match selection sidecar")
+            matches = actual == expected
+        if not matches:
+            errors.append(f"review.{field} does not match supplied evidence")
+    expected_selection_digest = holdout_selection_sha256(holdout_selection)
+    if review["holdout_selection_sha256"].casefold() != expected_selection_digest.casefold():
+        errors.append("holdout_selection_sha256 does not match canonical Holdout Selection payload")
 
-    if review_holdout_selection_sha256(review["lessons"], review["catalog_id"], review["split_id"]).casefold() != review["holdout_selection_sha256"].casefold():
-        errors.append("holdout_selection_sha256 does not match review lesson selections")
+    lesson_ids = _source_lesson_ids(lesson_content)
+    if len(lesson_ids) != len(lesson_content.get("lessons", [])):
+        errors.append("Lesson Content must have a non-empty lesson_id on every Lesson")
+    selection_rows = holdout_selection["lessons"]
+    review_rows = review["lessons"]
+    selection_by_id = _exact_ids("Holdout Selection", selection_rows, lesson_ids, errors)
+    review_by_id = _exact_ids("Review", review_rows, lesson_ids, errors)
+    holdout_pack_ids = set(holdout_pack["exemplar_ids"])
 
-    selection_by_lesson: dict[str, Mapping[str, Any]] = {}
-    if selection is not None:
-        selection_by_lesson = {item["lesson_id"]: item for item in selection["lessons"]}
-        if set(selection_by_lesson) != {item["lesson_id"] for item in review["lessons"]}:
-            errors.append("review lessons must match selection lesson IDs")
+    for lesson_id in sorted(set(lesson_ids) & set(review_by_id)):
+        selection_row = selection_by_id.get(lesson_id)
+        review_row = review_by_id[lesson_id]
+        if selection_row is None:
+            continue
+        selected_ids = set(selection_row["exemplar_ids"])
+        dimensions = review_row["dimensions"]
+        if selected_ids:
+            observed = [dimension["dimension"] for dimension in dimensions]
+            if len(observed) != len(DIMENSION_IDS) or set(observed) != set(DIMENSION_IDS):
+                missing = sorted(set(DIMENSION_IDS) - set(observed))
+                unknown = sorted(set(observed) - set(DIMENSION_IDS))
+                errors.append(f"Lesson {lesson_id} requires each of the 15 rubric dimensions exactly once; missing={missing}, unknown={unknown}")
+        elif dimensions:
+            errors.append(f"Lesson {lesson_id} has no Holdout exemplars and must not contain Review dimensions")
 
-    holdout_ids_by_lesson: dict[str, set[str]] = {}
-    if selection is not None:
-        holdout_ids_by_lesson = {
-            item["lesson_id"]: set(item["holdout"]["exemplar_ids"])
-            for item in selection["lessons"]
-        }
-    elif split is not None:
-        holdout_ids_by_lesson = {item["lesson_id"]: set(split["holdout_exemplar_ids"]) for item in review["lessons"]}
-    cards_by_id = {card["exemplar_id"]: card for card in catalog["exemplars"]} if catalog is not None else {}
-    split_holdout_ids = set(split["holdout_exemplar_ids"]) if split is not None else None
-
-    lesson_ids: set[str] = set()
-    for lesson_index, lesson in enumerate(review["lessons"]):
-        lesson_id = lesson["lesson_id"]
-        if lesson_id in lesson_ids:
-            errors.append(f"duplicate review lesson_id: {lesson_id}")
-        lesson_ids.add(lesson_id)
-        holdout_selection = lesson["holdout_selection"]
-        selected_ids = set(holdout_selection["exemplar_ids"])
-        if holdout_selection["status"] == "SELECTED" and not selected_ids:
-            errors.append(f"lessons[{lesson_index}] SELECTED holdout requires exemplar_ids")
-        if holdout_selection["status"] != "SELECTED" and selected_ids:
-            errors.append(f"lessons[{lesson_index}] non-SELECTED holdout requires empty exemplar_ids")
-        if selection is not None:
-            selected = selection_by_lesson.get(lesson_id)
-            if selected is not None and (
-                holdout_selection["status"] != selected["holdout"]["status"]
-                or holdout_selection["exemplar_ids"] != selected["holdout"]["exemplar_ids"]
-            ):
-                errors.append(f"lessons[{lesson_index}].holdout_selection does not match selection sidecar")
-        allowed_ids = holdout_ids_by_lesson.get(lesson_id, selected_ids)
-        if not selected_ids and lesson["dimensions"]:
-            errors.append(f"lessons[{lesson_index}] without selected Holdout cards must have no dimensions")
-        if selected_ids and len(lesson["dimensions"]) != len(DIMENSION_IDS):
-            errors.append(f"lessons[{lesson_index}] with selected Holdout cards requires all 15 dimensions")
         observed_dimensions: list[str] = []
-        for dimension_index, dimension in enumerate(lesson["dimensions"]):
+        for dimension in dimensions:
             dimension_id = dimension["dimension"]
             observed_dimensions.append(dimension_id)
             if dimension["severity"] not in DIMENSION_SEVERITY[dimension["status"]]:
-                errors.append(
-                    f"lessons[{lesson_index}].dimensions[{dimension_index}] has invalid status/severity combination"
-                )
-            for exemplar_id in dimension["holdout_exemplar_ids"]:
-                if exemplar_id not in allowed_ids:
-                    errors.append(f"dimension {dimension_id} cites unselected Holdout exemplar {exemplar_id}")
-                if split_holdout_ids is not None and exemplar_id not in split_holdout_ids:
-                    errors.append(f"dimension {dimension_id} cites exemplar {exemplar_id} outside Holdout side B")
-                card = cards_by_id.get(exemplar_id)
-                if card is not None and card["qualification"]["status"] != "QUALIFIED":
-                    errors.append(f"dimension {dimension_id} cites non-QUALIFIED exemplar {exemplar_id}")
-        if selected_ids and set(observed_dimensions) != set(DIMENSION_IDS):
-            missing = sorted(set(DIMENSION_IDS) - set(observed_dimensions))
-            unknown = sorted(set(observed_dimensions) - set(DIMENSION_IDS))
-            errors.append(f"lessons[{lesson_index}] dimensions must contain each rubric dimension exactly once; missing={missing}, unknown={unknown}")
+                errors.append(f"Lesson {lesson_id} dimension {dimension_id} has severity inconsistent with status")
+            status = dimension["status"]
+            if status in {"MEETS", "PARTIAL", "GAP", "INSUFFICIENT_EVIDENCE"}:
+                for field in ("current_evidence", "benchmark_pattern"):
+                    if not _nonempty(dimension[field]):
+                        errors.append(f"Lesson {lesson_id} dimension {dimension_id} {field} must be non-empty for {status}")
+                if not dimension["holdout_exemplar_ids"]:
+                    errors.append(f"Lesson {lesson_id} dimension {dimension_id} {status} requires at least one Holdout citation")
+            elif status == "NOT_APPLICABLE" and not _nonempty(dimension["current_evidence"]):
+                errors.append(f"Lesson {lesson_id} dimension {dimension_id} NOT_APPLICABLE requires a non-empty explanation")
+            if status in {"PARTIAL", "GAP", "INSUFFICIENT_EVIDENCE"}:
+                for field in ("gap", "recommended_direction"):
+                    if not _nonempty(dimension[field]):
+                        errors.append(f"Lesson {lesson_id} dimension {dimension_id} {status} requires non-empty {field}")
+            citations = set(dimension["holdout_exemplar_ids"])
+            if not citations <= holdout_pack_ids:
+                errors.append(f"Lesson {lesson_id} dimension {dimension_id} cites exemplar outside Holdout Pack")
+            if not citations <= selected_ids:
+                errors.append(f"Lesson {lesson_id} dimension {dimension_id} cites exemplar outside this Lesson's Holdout Selection")
         if len(observed_dimensions) != len(set(observed_dimensions)):
-            errors.append(f"lessons[{lesson_index}] dimension IDs must be unique")
+            errors.append(f"Lesson {lesson_id} Review dimension IDs must be unique")
+
+    round_number = review["review_round"]
+    if round_number == 1:
+        if previous_review is not None or previous_review_sha256 is not None or previous_content_sha256 is not None:
+            errors.append("round 1 must not supply prior review or Lesson Content")
+        if holdout_selection["source_lesson_content_sha256"].casefold() != lesson_content_sha256.casefold():
+            errors.append("round 1 Holdout Selection must bind the current Lesson Content bytes")
+    else:
+        if previous_review is None or previous_review_sha256 is None or previous_content_sha256 is None:
+            errors.append("round 2 requires a fully validated previous Review and previous Lesson Content")
+        else:
+            if review["prior_review_sha256"].casefold() != previous_review_sha256.casefold():
+                errors.append("prior_review_sha256 does not match the supplied Round 1 Review file")
+            if review["prior_source_lesson_content_sha256"].casefold() != previous_content_sha256.casefold():
+                errors.append("prior_source_lesson_content_sha256 does not match supplied Round 1 Lesson Content bytes")
+            if holdout_selection["source_lesson_content_sha256"].casefold() != previous_content_sha256.casefold():
+                errors.append("Round 2 must retain the Holdout Selection bound to Round 1 Lesson Content")
+            if review["source_lesson_content_sha256"].casefold() == previous_content_sha256.casefold():
+                errors.append("Round 2 current Lesson Content digest must differ from Round 1")
+            if previous_review.get("review_round") != 1:
+                errors.append("previous Review must have review_round=1")
+            previous_summary = previous_review.get("course_summary")
+            if not isinstance(previous_summary, Mapping) or previous_summary.get("decision") != "REVISION_REQUIRED":
+                errors.append("Round 2 is only valid after a Round 1 REVISION_REQUIRED decision")
+            if previous_review.get("source_lesson_content_sha256", "").casefold() != previous_content_sha256.casefold():
+                errors.append("Round 1 Review source digest does not match the supplied Round 1 Lesson Content")
+            for field in (
+                "catalog_id", "catalog_fingerprint", "split_id", "split_fingerprint",
+                "holdout_pack_fingerprint", "benchmark_availability", "holdout_selection_sha256", "rubric_version",
+            ):
+                if review[field] != previous_review.get(field):
+                    errors.append(f"Round 2 {field} must remain fixed from Round 1")
 
     summary = review_summary_for(
         review["lessons"],
+        selection_by_id,
         review_round=round_number,
         benchmark_availability=review["benchmark_availability"],
     )
@@ -299,35 +336,74 @@ def validate_benchmark_review_file(
     *,
     catalog_path: Path | None = None,
     split_path: Path | None = None,
-    selection_path: Path | None = None,
+    holdout_pack_path: Path | None = None,
+    holdout_selection_path: Path | None = None,
     lesson_content_path: Path | None = None,
     previous_review_path: Path | None = None,
-    require_full_linkage: bool = False,
+    previous_lesson_content_path: Path | None = None,
+    require_full_linkage: bool = True,
 ) -> tuple[dict[str, Any], list[str]]:
     review = load_json(review_path, "benchmark review")
-    catalog = load_json(catalog_path, "catalog") if catalog_path else None
-    split = load_json(split_path, "split") if split_path else None
-    selection = load_json(selection_path, "selection") if selection_path else None
-    previous_review = load_json(previous_review_path, "previous benchmark review") if previous_review_path else None
-    linkage_errors: list[str] = []
-    if require_full_linkage:
-        if catalog is None or split is None or selection is None or lesson_content_path is None:
-            linkage_errors.append("full validation requires --catalog, --split, --selection, and --lesson-content")
-        if review.get("review_round") == 2 and previous_review_path is None:
-            linkage_errors.append("round 2 validation requires --previous-review")
-    digest = None
-    if lesson_content_path is not None:
-        digest = sha256_file(lesson_content_path)
-    previous_digest = sha256_file(previous_review_path) if previous_review_path is not None else None
-    errors = linkage_errors + validate_benchmark_review_payload(
+    if not require_full_linkage:
+        return review, schema_errors(review, "benchmark-review.schema.json")
+
+    required = {
+        "catalog": catalog_path,
+        "split": split_path,
+        "holdout Pack": holdout_pack_path,
+        "holdout Selection": holdout_selection_path,
+        "Lesson Content": lesson_content_path,
+    }
+    missing = [f"--{label.lower().replace(' ', '-')}" for label, path in required.items() if path is None]
+    if missing:
+        return review, ["full validation requires " + ", ".join(missing)]
+    catalog = load_json(catalog_path, "catalog")
+    split = load_json(split_path, "split")
+    holdout_pack = load_json(holdout_pack_path, "holdout Pack")
+    holdout_selection = load_json(holdout_selection_path, "holdout Selection")
+    lesson_content, lesson_bytes = load_json_bytes(lesson_content_path, "Lesson Content")
+    lesson_digest = hashlib.sha256(lesson_bytes).hexdigest()
+
+    previous_review: dict[str, Any] | None = None
+    previous_content: dict[str, Any] | None = None
+    previous_digest: str | None = None
+    previous_review_digest: str | None = None
+    if review.get("review_round") == 2:
+        if previous_review_path is None or previous_lesson_content_path is None:
+            return review, ["Round 2 full validation requires --previous-review and --previous-lesson-content"]
+        previous_review = load_json(previous_review_path, "previous Review")
+        previous_content, previous_bytes = load_json_bytes(previous_lesson_content_path, "previous Lesson Content")
+        previous_digest = hashlib.sha256(previous_bytes).hexdigest()
+        previous_review_digest = sha256_file(previous_review_path)
+    elif previous_review_path is not None or previous_lesson_content_path is not None:
+        return review, ["Round 1 must not supply --previous-review or --previous-lesson-content"]
+
+    selection_source_digest = previous_digest if review.get("review_round") == 2 else lesson_digest
+    errors = validate_benchmark_review_payload(
         review,
         catalog=catalog,
         split=split,
-        selection=selection,
-        lesson_content_sha256=digest,
+        holdout_pack=holdout_pack,
+        holdout_selection=holdout_selection,
+        lesson_content=lesson_content,
+        lesson_content_sha256=lesson_digest,
+        holdout_selection_source_sha256=selection_source_digest or "",
         previous_review=previous_review,
-        previous_review_sha256=previous_digest,
+        previous_review_sha256=previous_review_digest,
+        previous_content_sha256=previous_digest,
     )
+    if previous_review is not None and previous_content is not None and previous_digest is not None:
+        previous_errors = validate_benchmark_review_payload(
+            previous_review,
+            catalog=catalog,
+            split=split,
+            holdout_pack=holdout_pack,
+            holdout_selection=holdout_selection,
+            lesson_content=previous_content,
+            lesson_content_sha256=previous_digest,
+            holdout_selection_source_sha256=previous_digest,
+        )
+        errors.extend(f"Round 1 full validation: {error}" for error in previous_errors)
     return review, errors
 
 
@@ -336,20 +412,34 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--review", required=True, type=Path)
     parser.add_argument("--catalog", type=Path)
     parser.add_argument("--split", type=Path)
-    parser.add_argument("--selection", type=Path)
+    parser.add_argument("--holdout-pack", type=Path)
+    parser.add_argument("--holdout-selection", type=Path)
     parser.add_argument("--lesson-content", type=Path)
     parser.add_argument("--previous-review", type=Path)
+    parser.add_argument("--previous-lesson-content", type=Path)
     parser.add_argument("--report", type=Path)
-    parser.add_argument("--review-only", action="store_true", help="validate only the Review sidecar itself; no Catalog/Split/Selection linkage is checked")
+    parser.add_argument(
+        "--review-only",
+        action="store_true",
+        help="schema/debug inspection only; not production acceptance evidence",
+    )
     args = parser.parse_args(argv)
     try:
+        full_args = (
+            args.catalog, args.split, args.holdout_pack, args.holdout_selection,
+            args.lesson_content, args.previous_review, args.previous_lesson_content,
+        )
+        if args.review_only and any(value is not None for value in full_args):
+            raise ContractError("--review-only cannot be combined with provenance inputs")
         review, errors = validate_benchmark_review_file(
             args.review,
             catalog_path=args.catalog,
             split_path=args.split,
-            selection_path=args.selection,
+            holdout_pack_path=args.holdout_pack,
+            holdout_selection_path=args.holdout_selection,
             lesson_content_path=args.lesson_content,
             previous_review_path=args.previous_review,
+            previous_lesson_content_path=args.previous_lesson_content,
             require_full_linkage=not args.review_only,
         )
         if errors:
@@ -363,6 +453,11 @@ def main(argv: list[str] | None = None) -> int:
             "major_gap_count": review["course_summary"]["major_gap_count"],
             "minor_gap_count": review["course_summary"]["minor_gap_count"],
             "insufficient_evidence_count": review["course_summary"]["insufficient_evidence_count"],
+            "catalog_fingerprint": review.get("catalog_fingerprint"),
+            "split_fingerprint": review.get("split_fingerprint"),
+            "holdout_pack_fingerprint": review.get("holdout_pack_fingerprint"),
+            "holdout_selection_sha256": review.get("holdout_selection_sha256"),
+            "source_lesson_content_sha256": review.get("source_lesson_content_sha256"),
         }
         if args.report:
             args.report.parent.mkdir(parents=True, exist_ok=True)

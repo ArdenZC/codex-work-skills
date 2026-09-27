@@ -68,7 +68,11 @@
     },
     "benchmark_review": {
       "type": "object",
-      "required": ["status", "decision", "review_round", "major_gap_count", "minor_gap_count", "benchmark_run_id", "source_sha256"],
+      "required": [
+        "status", "decision", "review_round", "major_gap_count", "minor_gap_count",
+        "benchmark_run_id", "source_sha256", "catalog_fingerprint", "split_fingerprint",
+        "holdout_pack_fingerprint", "holdout_selection_sha256", "review_sha256"
+      ],
       "properties": {
         "status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },
         "decision": { "enum": ["NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] },
@@ -76,7 +80,12 @@
         "major_gap_count": { "type": "integer", "minimum": 0 },
         "minor_gap_count": { "type": "integer", "minimum": 0 },
         "benchmark_run_id": { "type": "string", "minLength": 1 },
-        "source_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+        "source_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "catalog_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "split_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "holdout_pack_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "holdout_selection_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "review_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
       },
       "additionalProperties": false
     },

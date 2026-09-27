@@ -11,10 +11,12 @@ from typing import Any
 
 from exemplar_contract import (
     ContractError,
+    build_exemplar_pack,
     canonical_json_bytes,
     load_json,
     schema_errors,
     validate_catalog_payload,
+    validate_pack_payload,
 )
 
 
@@ -141,21 +143,56 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--authoring-pack", type=Path)
+    parser.add_argument("--holdout-pack", type=Path)
     parser.add_argument("--validate", action="store_true", help="validate an existing split at --output")
     args = parser.parse_args(argv)
     try:
         catalog = load_json(args.catalog, "catalog")
+        if bool(args.authoring_pack) != bool(args.holdout_pack):
+            raise ContractError("--authoring-pack and --holdout-pack must be supplied together")
         if args.validate:
             split = load_json(args.output, "split")
             errors = validate_split_payload(split, catalog)
             if errors:
                 raise ContractError("split validation failed: " + "; ".join(errors))
-            print(json.dumps({"status": "PASS", "split_id": split["split_id"], "split_fingerprint": split["split_fingerprint"]}, ensure_ascii=False, indent=2))
+            if args.authoring_pack:
+                authoring_pack = load_json(args.authoring_pack, "authoring Pack")
+                holdout_pack = load_json(args.holdout_pack, "holdout Pack")
+                errors.extend(validate_pack_payload(authoring_pack, catalog, split, expected_role="authoring"))
+                errors.extend(validate_pack_payload(holdout_pack, catalog, split, expected_role="holdout"))
+                if errors:
+                    raise ContractError("split/Pack validation failed: " + "; ".join(errors))
+            print(json.dumps({
+                "status": "PASS",
+                "split_id": split["split_id"],
+                "split_fingerprint": split["split_fingerprint"],
+                "authoring_pack_fingerprint": authoring_pack["pack_fingerprint"] if args.authoring_pack else None,
+                "holdout_pack_fingerprint": holdout_pack["pack_fingerprint"] if args.holdout_pack else None,
+            }, ensure_ascii=False, indent=2))
         else:
+            if not args.authoring_pack:
+                raise ContractError("split generation requires both --authoring-pack and --holdout-pack")
             split = build_split(catalog)
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(json.dumps(split, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            print(json.dumps({"status": "PASS", "output": str(args.output), "split_id": split["split_id"], "benchmark_availability": split["benchmark_availability"]}, ensure_ascii=False, indent=2))
+            authoring_pack = build_exemplar_pack(catalog, split, "authoring")
+            holdout_pack = build_exemplar_pack(catalog, split, "holdout")
+            destinations = (args.output, args.authoring_pack, args.holdout_pack)
+            if len({path.resolve() for path in destinations}) != len(destinations):
+                raise ContractError("split and Pack outputs must use distinct paths")
+            payloads = (split, authoring_pack, holdout_pack)
+            for path, payload in zip(destinations, payloads, strict=True):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            print(json.dumps({
+                "status": "PASS",
+                "split": str(args.output),
+                "authoring_pack": str(args.authoring_pack),
+                "holdout_pack": str(args.holdout_pack),
+                "split_id": split["split_id"],
+                "benchmark_availability": split["benchmark_availability"],
+                "authoring_pack_fingerprint": authoring_pack["pack_fingerprint"],
+                "holdout_pack_fingerprint": holdout_pack["pack_fingerprint"],
+            }, ensure_ascii=False, indent=2))
         return 0
     except (ContractError, OSError, ValueError, TypeError, KeyError) as exc:
         parser.error(str(exc))

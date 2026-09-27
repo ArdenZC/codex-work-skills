@@ -7,6 +7,6 @@
 - `course_materials.textbook`、lesson `resources`、`reference_pool` 三者分离。教材、PPT、课件、案例/数据、内部资源、任务单、设备和环境不是 references；可用的 references 需保留真实责任者与出处，书籍年份可选但不得写“年份未知”。
 - 只有用户明确选择 `practice_work_orders=true` 才生成 Practice Task Contract 1.1 与 handoff；每个任务固定 2 学时，任务数和 WorkOrder 数均为实践学时除以 2，理论 Lesson 的 `practice_task_ids` 保持空数组。明确 false 时不生成实践侧文件。
 - Lesson→WorkOrder 是单向 handoff。需要工单时，Lesson Agent 在 Lesson QA/DOCX 完成后调用 WorkOrder Skill Agent；不得由 Lesson Python subprocess 调用 WorkOrder Python，也不得伪造工单 DOCX。WorkOrder 不可用时必须原样提示：`实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`
-- Lesson Skill 2.3.0 的 Teaching Exemplar Benchmark 使用 Content 2.2 之外的独立 Catalog/Split/Selection/Review sidecar；遵守 `SKILL.md` 中的 A/B 隔离、reviewer isolation 和最多两轮 revision，不向 Lesson JSON 增加 Benchmark 字段。
+- Lesson Skill 2.3.0 的 Teaching Exemplar Benchmark 使用 Content 2.2 之外的 Curator-only Catalog/Split、物理隔离的 Authoring A / Holdout B Packs、独立 Authoring/Holdout Selection 与 full-linkage Review sidecar；遵守 `SKILL.md` 的角色边界和最多两轮 revision，不向 Lesson JSON 增加 Benchmark 字段。
 - 正文、实施阶段、评价备注和反思由 Agent 提供；Python 只做 schema、硬事实、结构、格式、模板映射、输出与渲染门禁，不用动作词、专业词、IT/护理 marker、字符/n-gram 相似度判断自然度或教学充分性。自然度、相关性、容量与阶段语义由统一 Agent review 负责；有问题必须由 Agent 重写后再生成。
 - 生产命令禁止跳过模板/输出校验；真实 render 未通过或未执行时不得标记 Production PASS。旧版本只可通过显式 legacy/兼容入口读取。

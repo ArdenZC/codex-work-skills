@@ -1607,9 +1607,17 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
                     errors.append(f"benchmark_review.{count_name} must be a non-negative integer")
             if not isinstance(benchmark.get("benchmark_run_id"), str) or not benchmark["benchmark_run_id"]:
                 errors.append("benchmark_review.benchmark_run_id must be a non-empty string")
-            source_sha = benchmark.get("source_sha256")
-            if not isinstance(source_sha, str) or not re.fullmatch(r"[A-Fa-f0-9]{64}", source_sha):
-                errors.append("benchmark_review.source_sha256 must be a SHA-256 digest")
+            for digest_name in (
+                "source_sha256",
+                "catalog_fingerprint",
+                "split_fingerprint",
+                "holdout_pack_fingerprint",
+                "holdout_selection_sha256",
+                "review_sha256",
+            ):
+                digest = benchmark.get(digest_name)
+                if not isinstance(digest, str) or not re.fullmatch(r"[A-Fa-f0-9]{64}", digest):
+                    errors.append(f"benchmark_review.{digest_name} must be a SHA-256 digest")
     return errors
 
 
@@ -1656,6 +1664,12 @@ def build_acceptance_report(
     negative_controls_path: Path | None = None,
     historical_baseline_path: Path | None = None,
     benchmark_review_path: Path | None = None,
+    benchmark_catalog_path: Path | None = None,
+    benchmark_split_path: Path | None = None,
+    benchmark_holdout_pack_path: Path | None = None,
+    benchmark_holdout_selection_path: Path | None = None,
+    benchmark_previous_review_path: Path | None = None,
+    benchmark_previous_content_path: Path | None = None,
 ) -> dict[str, Any]:
     if source_type not in SOURCE_TYPES:
         raise ValueError(f"source_type must be one of {SOURCE_TYPES}")
@@ -1667,8 +1681,35 @@ def build_acceptance_report(
         if _is_within(report_dir, output_dir) or _is_within(output_dir, report_dir):
             raise ValueError("report_dir must not overlap output_dir; acceptance must not mutate generated content")
     benchmark_payload: dict[str, Any] | None = None
+    benchmark_auxiliary_paths = (
+        benchmark_catalog_path,
+        benchmark_split_path,
+        benchmark_holdout_pack_path,
+        benchmark_holdout_selection_path,
+        benchmark_previous_review_path,
+        benchmark_previous_content_path,
+    )
+    if benchmark_review_path is None and any(path is not None for path in benchmark_auxiliary_paths):
+        raise ValueError("benchmark provenance inputs require --benchmark-review")
     if benchmark_review_path is not None:
         benchmark_review_path = benchmark_review_path.expanduser().resolve()
+        required_benchmark_paths = {
+            "--benchmark-catalog": benchmark_catalog_path,
+            "--benchmark-split": benchmark_split_path,
+            "--benchmark-holdout-pack": benchmark_holdout_pack_path,
+            "--benchmark-holdout-selection": benchmark_holdout_selection_path,
+        }
+        missing = [name for name, path in required_benchmark_paths.items() if path is None]
+        if missing:
+            raise ValueError("--benchmark-review requires " + ", ".join(missing))
+        benchmark_catalog_path = benchmark_catalog_path.expanduser().resolve()
+        benchmark_split_path = benchmark_split_path.expanduser().resolve()
+        benchmark_holdout_pack_path = benchmark_holdout_pack_path.expanduser().resolve()
+        benchmark_holdout_selection_path = benchmark_holdout_selection_path.expanduser().resolve()
+        if benchmark_previous_review_path is not None:
+            benchmark_previous_review_path = benchmark_previous_review_path.expanduser().resolve()
+        if benchmark_previous_content_path is not None:
+            benchmark_previous_content_path = benchmark_previous_content_path.expanduser().resolve()
         lesson_scripts = Path(__file__).resolve().parent.parent / "教案生成器" / "lesson-plan-docx-generator" / "scripts"
         if str(lesson_scripts) not in sys.path:
             sys.path.insert(0, str(lesson_scripts))
@@ -1678,7 +1719,14 @@ def build_acceptance_report(
             raise ValueError(f"benchmark review validator is unavailable: {exc}") from exc
         benchmark_payload, benchmark_errors = validate_benchmark_review_file(
             benchmark_review_path,
+            catalog_path=benchmark_catalog_path,
+            split_path=benchmark_split_path,
+            holdout_pack_path=benchmark_holdout_pack_path,
+            holdout_selection_path=benchmark_holdout_selection_path,
             lesson_content_path=input_json,
+            previous_review_path=benchmark_previous_review_path,
+            previous_lesson_content_path=benchmark_previous_content_path,
+            require_full_linkage=True,
         )
         if benchmark_errors:
             raise ValueError("benchmark review validation failed: " + "; ".join(benchmark_errors))
@@ -1848,6 +1896,11 @@ def build_acceptance_report(
             "minor_gap_count": summary["minor_gap_count"],
             "benchmark_run_id": benchmark_payload["benchmark_run_id"],
             "source_sha256": benchmark_payload["source_lesson_content_sha256"],
+            "catalog_fingerprint": benchmark_payload["catalog_fingerprint"],
+            "split_fingerprint": benchmark_payload["split_fingerprint"],
+            "holdout_pack_fingerprint": benchmark_payload["holdout_pack_fingerprint"],
+            "holdout_selection_sha256": benchmark_payload["holdout_selection_sha256"],
+            "review_sha256": hashlib.sha256(benchmark_review_path.read_bytes()).hexdigest(),
         }
     schema_errors = validate_report_schema(report)
     if schema_errors:
@@ -1982,6 +2035,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--negative-controls", type=Path)
     parser.add_argument("--historical-baseline", type=Path)
     parser.add_argument("--benchmark-review", type=Path)
+    parser.add_argument("--benchmark-catalog", type=Path)
+    parser.add_argument("--benchmark-split", type=Path)
+    parser.add_argument("--benchmark-holdout-pack", type=Path)
+    parser.add_argument("--benchmark-holdout-selection", type=Path)
+    parser.add_argument("--benchmark-previous-review", type=Path)
+    parser.add_argument("--benchmark-previous-content", type=Path)
     args = parser.parse_args(argv)
     try:
         report = build_acceptance_report(
@@ -2001,6 +2060,12 @@ def main(argv: list[str] | None = None) -> int:
             negative_controls_path=args.negative_controls,
             historical_baseline_path=args.historical_baseline,
             benchmark_review_path=args.benchmark_review,
+            benchmark_catalog_path=args.benchmark_catalog,
+            benchmark_split_path=args.benchmark_split,
+            benchmark_holdout_pack_path=args.benchmark_holdout_pack,
+            benchmark_holdout_selection_path=args.benchmark_holdout_selection,
+            benchmark_previous_review_path=args.benchmark_previous_review,
+            benchmark_previous_content_path=args.benchmark_previous_content,
         )
         json_path, markdown_path = write_acceptance_report(report, args.report_dir)
     except (OSError, ValueError, TypeError) as exc:

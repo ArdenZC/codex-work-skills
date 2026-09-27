@@ -48,7 +48,7 @@
 - 一次性确认课程名称、专业、授课对象和课时结构，再进行整门课程规划；
 - Lesson DOCX 只承载理论课时；课前固定 **10 分钟**、课中按 **`hours × 45`**、课后固定 **15 分钟**；
 - Agent 负责真实教学内容与 pedagogical review，Python 只处理结构、学时、模板、reference provenance、渲染和其他确定性事实；
-- Teaching Exemplar Benchmark 1.0 使用独立 Catalog/Split/Selection/Review sidecar，并在生产 DOCX 发布前完成，保持 Lesson Content 2.2 输入不变；
+- Teaching Exemplar Benchmark 1.0 使用 Curator-only Catalog/Split、物理隔离的 A/B Packs、独立 Authoring/Holdout Selection 与 full-linkage Review sidecar，并在生产 DOCX 发布前完成，保持 Lesson Content 2.2 输入不变；
 - 教材、教学资源和参考文献分离；有外部来源时要求可核验，无法核实时宁可留空也不虚构；
 - 默认使用受保护的 `lesson-plan v1.1.2` Word 模板。
 

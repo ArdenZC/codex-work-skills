@@ -17,13 +17,13 @@
       "type": "object", "additionalProperties": false,
       "required": ["title", "institution", "author_or_team", "canonical_url", "source_type", "authority_tier", "recognition", "retrieved_at", "visibility", "source_identity_sha256"],
       "properties": {
-        "title": { "type": "string", "maxLength": 500 },
-        "institution": { "type": "string", "maxLength": 500 },
-        "author_or_team": { "type": "string", "maxLength": 500 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "institution": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "author_or_team": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
         "canonical_url": { "type": "string", "minLength": 1, "maxLength": 2048 },
         "source_type": { "enum": ["official_platform", "award_case", "national_course", "professional_resource_repository", "institution_case", "peer_reviewed_research", "private_user_provided", "discovery_source"] },
         "authority_tier": { "enum": ["A", "B", "C", "PRIVATE"] },
-        "recognition": { "type": "string", "maxLength": 500 },
+        "recognition": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
         "retrieved_at": { "type": "string", "format": "date-time" },
         "visibility": { "enum": ["public", "private_session"] },
         "source_identity_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
