@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/benchmark-authorization.schema.json",
+  "title": "Lesson 2.3 Benchmark Authorization Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "benchmark_authorization_version", "skill_version", "content_contract_version",
+    "benchmark_run_id", "review_round", "benchmark_status", "benchmark_decision",
+    "catalog_fingerprint", "split_fingerprint", "authoring_pack_fingerprint",
+    "authoring_selection_sha256", "holdout_pack_fingerprint", "holdout_selection_sha256",
+    "benchmark_review_sha256", "source_lesson_content_sha256", "source_final_content_sha256",
+    "context_mode", "created_at", "authorization_fingerprint"
+  ],
+  "properties": {
+    "benchmark_authorization_version": { "const": "1.0" },
+    "skill_version": { "const": "2.3.0" },
+    "content_contract_version": { "const": "2.2" },
+    "benchmark_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "review_round": { "enum": [1, 2] },
+    "benchmark_status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },
+    "benchmark_decision": { "enum": ["NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "authoring_pack_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "authoring_selection_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "holdout_pack_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "holdout_selection_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "benchmark_review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "source_final_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "context_mode": { "enum": ["separate_contexts", "single_context"] },
+    "created_at": { "type": "string", "minLength": 1 },
+    "authorization_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  }
+}

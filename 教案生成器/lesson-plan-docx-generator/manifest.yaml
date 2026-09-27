@@ -6,6 +6,7 @@ skill:
   content_contract: "2.2"
   teaching_exemplar_contract: "1.0"
   benchmark_review_contract: "1.0"
+  benchmark_authorization_contract: "1.0"
   compatibility:
     - "2.0"
     - "2.1"

@@ -70,6 +70,8 @@
       "type": "object",
       "required": [
         "status", "decision", "review_round", "major_gap_count", "minor_gap_count",
+        "insufficient_evidence_count", "lessons_reviewed", "lessons_without_holdout",
+        "context_mode", "authoring_availability", "holdout_availability",
         "benchmark_run_id", "source_sha256", "catalog_fingerprint", "split_fingerprint",
         "holdout_pack_fingerprint", "holdout_selection_sha256", "review_sha256"
       ],
@@ -79,6 +81,12 @@
         "review_round": { "enum": [1, 2] },
         "major_gap_count": { "type": "integer", "minimum": 0 },
         "minor_gap_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_count": { "type": "integer", "minimum": 0 },
+        "lessons_reviewed": { "type": "integer", "minimum": 0 },
+        "lessons_without_holdout": { "type": "integer", "minimum": 0 },
+        "context_mode": { "enum": ["separate_contexts", "single_context"] },
+        "authoring_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+        "holdout_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
         "benchmark_run_id": { "type": "string", "minLength": 1 },
         "source_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
         "catalog_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
