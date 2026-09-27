@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
+import copy
 import importlib
 import importlib.util
 import io
@@ -179,7 +180,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertIn("hours_conflict", contract["user_visible_errors"])
         self.assertIn("课程基本信息尚未确认", contract["user_visible_errors"]["intake_pending"])
         self.assertEqual(
-            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.3"),
+            (LESSON / "manifest.yaml").read_text(encoding="utf-8").count("version: 2.2.4"),
             1,
         )
 
@@ -343,12 +344,34 @@ class LessonSkillHardeningTests(unittest.TestCase):
             self.assertEqual(list(Draft202012Validator(schema).iter_errors(report)), [])
             self.assertEqual(report["metadata"]["content_contract_version"], "2.0")
             self.assertEqual(report["metadata"]["template_version"], "v1.1.2")
+            self.assertEqual(report["metadata"]["production_status"], "not_applicable")
             self.assertEqual(report["metadata"]["lesson_count"], 3)
             self.assertEqual(report["structural_hard_gates"]["status"], "PASS")
             self.assertEqual(report["final_status"], "PENDING_MANUAL_REVIEW")
             self.assertEqual(report["visual_review"]["status"], "not_executed")
             self.assertTrue(report["metadata"]["output_inventory_fingerprint"])
             self.assertEqual({path: path.read_bytes() for path in output.iterdir()}, before)
+
+            markdown_report = copy.deepcopy(report)
+            markdown_report["artifact_manifest"] = {"data": {}}
+            markdown = lesson_acceptance.acceptance_markdown(markdown_report)
+            self.assertIn(
+                f"- Render/production: `{report['metadata']['render_status']}` / `not_applicable`",
+                markdown,
+            )
+            self.assertNotIn("QA/render/production:", markdown)
+
+            old_report = copy.deepcopy(report)
+            old_report["metadata"].pop("production_status")
+            self.assertEqual(lesson_acceptance.validate_report_schema(old_report), [])
+            self.assertEqual(list(Draft202012Validator(schema).iter_errors(old_report)), [])
+
+            invalid_report = copy.deepcopy(report)
+            invalid_report["metadata"]["production_status"] = "banana"
+            self.assertTrue(
+                any("metadata.production_status" in error for error in lesson_acceptance.validate_report_schema(invalid_report))
+            )
+            self.assertTrue(list(Draft202012Validator(schema).iter_errors(invalid_report)))
 
             with self.assertRaisesRegex(ValueError, "must not overlap"):
                 lesson_acceptance.build_acceptance_report(

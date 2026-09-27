@@ -3034,7 +3034,7 @@ def _v22_exact_duplicate_report(
     locations: dict[tuple[str, str], list[str]] = {}
     for lesson_id, lesson in zip(lesson_ids, lessons):
         for field, values in _item_values(lesson, {}).items():
-            if field.startswith("evaluation.") or field.startswith("references"):
+            if reuse_policy(field) != REUSE_NARRATIVE_STRICT:
                 continue
             for value in values:
                 normalized = _normalize_item(value)
@@ -3121,15 +3121,13 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
     source_regions = references.get("catalog_source_regions", {})
     domestic_source_count = int(source_regions.get("domestic", 0))
     foreign_source_count = int(source_regions.get("foreign", 0))
-    catalog_source_count = domestic_source_count + foreign_source_count + int(source_regions.get("unknown", 0))
+    known_source_count = domestic_source_count + foreign_source_count
     domestic_share = (
-        domestic_source_count / catalog_source_count
-        if catalog_source_count
+        domestic_source_count / known_source_count
+        if known_source_count
         else None
     )
     warnings: list[str] = []
-    if domestic_share is not None and domestic_share < 0.70:
-        warnings.append("domestic reference share is below 70%; review local curriculum alignment")
     for item in references.get("missing_evidence", []):
         errors.append(f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence")
     for item in references.get("invalid_generic", []):
@@ -3719,20 +3717,6 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
 
     reference_provenance = _reference_provenance_report(lessons, lesson_ids, data)
     practice_handoff = _practice_handoff_report(data)
-    if data.get("content_contract_version") == "2.2":
-        for lesson_id in reference_provenance.get("empty_reference_lessons", []):
-            errors.append(f"{lesson_id}.reference_ids must contain at least one citable reference")
-        regions = reference_provenance.get("catalog_source_regions", {})
-        known_region_count = int(regions.get("domestic", 0)) + int(regions.get("foreign", 0))
-        if known_region_count:
-            domestic_share = int(regions.get("domestic", 0)) / known_region_count
-            if domestic_share < 0.7:
-                warnings.append(
-                    f"reference catalog domestic share is below 70%: {domestic_share:.1%}; "
-                    "review foreign-source use and domestic availability"
-                )
-        elif lessons:
-            warnings.append("reference catalog has no domestic/foreign source-region signal")
     for item in reference_provenance["missing_evidence"]:
         errors.append(
             f"{item['lesson']}.references[{item['reference']}].{item['source_kind']} requires evidence"

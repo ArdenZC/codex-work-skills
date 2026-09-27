@@ -174,8 +174,16 @@
         "modality": {"type": "string", "minLength": 1, "maxLength": 32},
         "content": {"$ref": "#/$defs/textList"},
         "teacher_actions": {"$ref": "#/$defs/textList"},
-        "student_actions": {"$ref": "#/$defs/textList"},
-        "objective": {"type": "string", "minLength": 6, "maxLength": 220}
+        "student_actions": {
+          "$ref": "#/$defs/textList",
+          "description": "Content Contract 2.2 places observable student evidence and outputs in this existing field; there is no separate student_evidence field."
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 220,
+          "description": "State the design intent and, when needed, how the student evidence or output in student_actions demonstrates the objective."
+        }
       }
     },
     "evaluation": {

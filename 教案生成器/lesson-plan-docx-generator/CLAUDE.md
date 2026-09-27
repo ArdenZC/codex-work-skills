@@ -1,4 +1,4 @@
-# Claude Code 入口（Lesson Skill 2.2.3）
+# Claude Code 入口（Lesson Skill 2.2.4）
 
 开始前读取 `SKILL.md` 与 `通用提示词.md`。先一次性完成中文 intake，确认后冻结课程事实并先做全课程 outline；随后按 Content Contract 2.2 生成理论 Lesson、QA 和 DOCX。
 

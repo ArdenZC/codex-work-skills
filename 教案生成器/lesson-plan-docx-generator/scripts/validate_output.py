@@ -683,6 +683,7 @@ def _base_qa_report(
         },
         "render": {
             "status": "not_executed",
+            "requested": False,
             "reason": "render was not requested",
             "scope": "smoke",
             "renderer": None,
@@ -726,6 +727,24 @@ def _write_qa_report(report: dict[str, Any]) -> dict[str, Any]:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
+
+
+def production_status_for_qa(
+    data: dict[str, Any],
+    report: dict[str, Any],
+) -> str | None:
+    """Report only QA-level state; final artifact verification owns production readiness."""
+
+    if data.get("content_contract_version") != "2.2":
+        return None
+    if report.get("status") != "passed":
+        return "failed"
+    render = report.get("render") if isinstance(report.get("render"), dict) else {}
+    if render.get("status") == "not_executed":
+        return "failed" if render.get("requested") is True else "structural_pass"
+    if render.get("status") != "passed":
+        return "failed"
+    return "structural_pass"
 
 
 def write_skipped_report(
@@ -820,15 +839,20 @@ def write_skipped_report(
     if render:
         report["render"] = {
             "status": "not_executed",
+            "requested": True,
             "reason": "render is unavailable when output validation is skipped",
             "scope": "smoke",
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
             "page_counts": {},
+            "pdf_files": {},
             "page_count_method": "pdf_page_object_regex",
             "errors": [],
         }
+    production_status = production_status_for_qa(data, report)
+    if production_status is not None:
+        report["production_status"] = production_status
     _write_qa_report(report)
     if report["errors"]:
         raise RuntimeError("Content quality validation failed: " + "; ".join(report["errors"][:8]))
@@ -1272,6 +1296,7 @@ def validate_output_dir(
         if not files:
             render_report = {
                 "status": "passed",
+                "requested": True,
                 "reason": "no theory Lesson DOCX is expected for this artifact plan",
                 "scope": "smoke",
                 "renderer": None,
@@ -1283,6 +1308,7 @@ def validate_output_dir(
             }
         else:
             render_report = render_docx_directory(out_dir, pdf_output_dir=render_pdf_dir)
+            render_report["requested"] = True
         report["render"] = render_report
         if render_report["status"] != "passed":
             render_errors = render_report.get("errors") or [
@@ -1292,6 +1318,18 @@ def validate_output_dir(
     if not errors:
         report["status"] = "skipped" if report["validation_skipped"] else "passed"
 
+    production_status = production_status_for_qa(data, report)
+    if (
+        data.get("content_contract_version") == "2.2"
+        and render
+        and production_status == "failed"
+        and report.get("status") == "passed"
+    ):
+        errors.append("production render QA requires one retained, readable PDF per theory Lesson")
+        report["status"] = "failed"
+        production_status = "failed"
+    if production_status is not None:
+        report["production_status"] = production_status
     _write_qa_report(report)
     if errors:
         raise RuntimeError("Output validation failed: " + "; ".join(errors[:8]))
@@ -1310,7 +1348,15 @@ def main() -> int:
     parser.add_argument("--engine", default="")
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-validation", action="store_true")
-    parser.add_argument("--render", action="store_true", help="Render validated DOCX files to disposable PDFs when a renderer is available")
+    parser.add_argument(
+        "--render",
+        action="store_true",
+        help=(
+            "Render validated DOCX files to disposable diagnostic PDFs when a renderer is available; "
+            "standalone render smoke does not establish production readiness, which requires "
+            "generator artifact verification"
+        ),
+    )
     parser.add_argument(
         "--allow-test-fixture-authoring",
         action="store_true",
@@ -1391,8 +1437,17 @@ def main() -> int:
         return 1
     for warning in report.get("warnings", []):
         print(f"WARNING: {warning}")
-    action = "skipped validation" if report["status"] == "skipped" else "validated"
-    print(f"{action} files={report['checks']['file_count']['actual']} qa={report['qa_report']}")
+    if data.get("content_contract_version") == "2.2":
+        print(
+            "Content Contract 2.2 "
+            f"production_status={report['production_status']} "
+            f"qa_status={report['status']} "
+            f"render_status={report['render']['status']} "
+            f"files={report['checks']['file_count']['actual']} qa={report['qa_report']}"
+        )
+    else:
+        action = "skipped validation" if report["status"] == "skipped" else "validated"
+        print(f"{action} files={report['checks']['file_count']['actual']} qa={report['qa_report']}")
     return 0
 
 

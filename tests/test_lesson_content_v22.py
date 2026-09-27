@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import DEFAULT, patch
 
 from docx import Document
 
@@ -19,6 +23,8 @@ from tests.test_lesson_content_v2 import (
     lesson_generator,
     lesson_package_common,
     lesson_content_contract,
+    lesson_content_quality,
+    lesson_output,
     load_manifest,
     run_script,
 )
@@ -424,6 +430,84 @@ def make_v22_payload(
     return payload
 
 
+def _refresh_review_digests(payload: dict[str, object]) -> None:
+    """Keep the fixture's review chain bound after test-only content edits."""
+
+    lessons = payload["lessons"]
+    draft_digests: list[str] = []
+    final_digests: list[str] = []
+    for lesson in lessons:
+        content = lesson_package_common.lesson_agent_content(lesson)
+        digest = lesson_package_common.canonical_json_sha256(content)
+        review = lesson["pedagogical_review"]
+        review["draft_content"] = copy.deepcopy(content)
+        review["revised_content"] = copy.deepcopy(content)
+        review["review_history"] = [
+            {
+                "round": 1,
+                "issues": [],
+                "decision": "approved",
+                "content_sha256": digest,
+            }
+        ]
+        draft_digests.append(digest)
+        final_digests.append(digest)
+    provenance = payload["authoring_provenance"]
+    provenance["draft_content_sha256"] = lesson_package_common.content_digest_rollup(draft_digests)
+    provenance["final_content_sha256"] = lesson_package_common.content_digest_rollup(final_digests)
+
+
+def _scaled_context_payload(source: dict[str, object], lesson_count: int) -> dict[str, object]:
+    """Scale a complete reviewed Content 2.2 payload for byte-size analysis only."""
+
+    payload = copy.deepcopy(source)
+    examples = source["lessons"]
+    lessons = []
+    for index in range(lesson_count):
+        lesson = copy.deepcopy(examples[index % len(examples)])
+        lesson_id = f"L{index + 1:02d}"
+        lesson["lesson_id"] = lesson_id
+        lesson["progression"]["prior_lesson_id"] = None if index == 0 else f"L{index:02d}"
+        lessons.append(lesson)
+    total_hours = lesson_count * 2
+    payload["total_hours"] = total_hours
+    payload["confirmed_course_info"].update(
+        {"total_hours": total_hours, "theory_hours": total_hours, "practice_hours": 0}
+    )
+    payload["delivery_plan"].update(
+        {"total_hours": total_hours, "theory_hours": total_hours, "practice_hours": 0}
+    )
+    payload["outline"] = [
+        {
+            "lesson_id": lesson["lesson_id"],
+            "unit": lesson["unit"],
+            "task": lesson["task"],
+            "lesson_type": "theory",
+            "hours": 2,
+            "theory_hours": 2,
+            "practice_hours": 0,
+            "prior_learning": lesson["progression"]["prior_learning"],
+            "capability_stage": lesson["progression"]["capability_stage"],
+            "deliverable": lesson["progression"]["deliverable"],
+            "next_bridge": lesson["progression"]["next_bridge"],
+            "practice_task_ids": [],
+        }
+        for lesson in lessons
+    ]
+    payload["lessons"] = lessons
+    _refresh_review_digests(payload)
+    payload["authoring_provenance"]["authoring_id"] = f"context-sizing-agent-{lesson_count:02d}"
+    payload["authoring_provenance"]["source_snapshot"] = {
+        "confirmed_course_profile_sha256": lesson_package_common.canonical_json_sha256(
+            payload["confirmed_course_info"]
+        ),
+        "whole_course_outline_sha256": lesson_package_common.canonical_json_sha256(payload["outline"]),
+        "reference_pool_sha256": lesson_package_common.canonical_json_sha256(payload["reference_pool"]),
+    }
+    lesson_generator.validate_content_v2_input(payload)
+    return payload
+
+
 class LessonContentV22Tests(unittest.TestCase):
     def assert_rejected(self, payload: dict[str, object], pattern: str) -> None:
         with self.assertRaisesRegex(ValueError, pattern):
@@ -438,6 +522,12 @@ class LessonContentV22Tests(unittest.TestCase):
     def test_production_validator_rejects_synthetic_authoring_without_explicit_test_path(self) -> None:
         payload = make_v22_payload(theory_hours=2, lesson_count=1, specs=DB_SPECS)
         with self.assertRaisesRegex(ValueError, r"mode must be 'agent'.*synthetic fixtures"):
+            lesson_generator.validate_content_v2_input(payload)
+
+    def test_malformed_review_digest_is_rejected_for_agent_example(self) -> None:
+        payload = json.loads((LESSON / "examples" / "tasks-v22.example.json").read_text(encoding="utf-8"))
+        payload["lessons"][0]["pedagogical_review"]["review_history"][0]["content_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "review_history final round must approve"):
             lesson_generator.validate_content_v2_input(payload)
 
     def test_production_consumes_reviewed_content_not_the_draft(self) -> None:
@@ -611,6 +701,22 @@ class LessonContentV22Tests(unittest.TestCase):
                                 finding.get("allowed"),
                                 {"detector": detector, "finding": finding},
                             )
+        one_provided = make_v22_payload(
+            theory_hours=12,
+            lesson_count=6,
+            references=[_pool()[0]],
+            specs=DB_SPECS,
+        )
+        one_provided["reference_research"] = {
+            "status": "no_verified_external_source",
+            "note": "只有课程提供的正式教材来源",
+            "queries": [],
+            "sources": [],
+        }
+        report = self.assert_valid_and_qa(one_provided)
+        self.assertEqual(report["reference_provenance"]["cross_lesson_reuse"], "allowed")
+        self.assertEqual(report["coverage"]["reference_metrics"]["reuse_frequency"]["REF-DOMESTIC"], 6)
+
         generic_payload = make_v22_payload(
             theory_hours=12,
             lesson_count=6,
@@ -669,6 +775,49 @@ class LessonContentV22Tests(unittest.TestCase):
         empty["lessons"][0]["reference_ids"] = []
         self.assert_rejected(empty, "may be empty only when reference_research.status=no_verified_external_source")
 
+    def test_no_verified_external_source_allows_only_provided_formal_references(self) -> None:
+        standard = {
+            "reference_id": "STD-GB-T-1-1-2020",
+            "reference_type": "standard",
+            "title": "GB/T 1.1—2020 标准化工作导则 第1部分：标准化文件的结构和起草规则",
+            "authors": ["国家市场监督管理总局", "国家标准化管理委员会"],
+            "publisher": "中国标准出版社",
+            "year": 2020,
+            "source_identifier": "GB/T 1.1-2020",
+            "source_kind": "provided",
+            "source_region": "domestic",
+            "evidence": "课程组提供的标准文本：GB/T 1.1—2020.pdf",
+        }
+        payload = make_v22_payload(references=[standard])
+        payload["reference_research"] = {
+            "status": "no_verified_external_source",
+            "note": "没有核实到公开网络来源；课程组提供了正式标准文本",
+            "queries": [],
+            "sources": [],
+        }
+        self.assert_valid_and_qa(payload)
+        self.assertEqual(payload["lessons"][0]["reference_ids"], [standard["reference_id"]])
+
+        empty_pool = make_v22_payload(references=[])
+        empty_pool["reference_research"] = {
+            "status": "no_verified_external_source",
+            "note": "没有可用来源",
+            "queries": [],
+            "sources": [],
+        }
+        self.assert_valid_and_qa(empty_pool)
+
+        fake_verified = copy.deepcopy(payload)
+        fake_verified["reference_pool"][0]["source_kind"] = "verified_public"
+        fake_verified["reference_pool"][0]["source_url"] = "https://example.invalid/standard"
+        fake_verified["reference_pool"][0]["authoritative_source"] = "示例标准机构"
+        fake_verified["reference_pool"][0]["evidence"] = "https://example.invalid/standard"
+        self.assert_rejected(fake_verified, "only source_kind=provided")
+
+        unbound_verified = make_v22_payload(references=_pool())
+        unbound_verified["reference_research"]["sources"] = []
+        self.assert_rejected(unbound_verified, "missing evidence for verified reference")
+
     def test_verified_public_research_is_bound_to_exact_bibliographic_identity(self) -> None:
         references = _pool()
         references[1].update(
@@ -710,7 +859,7 @@ class LessonContentV22Tests(unittest.TestCase):
         references[0].pop("year")
         self.assert_valid_and_qa(make_v22_payload(references=references))
 
-    def test_real_manual_and_domestic_majority_are_quality_passes(self) -> None:
+    def test_real_manual_and_reference_region_shares_are_descriptive(self) -> None:
         manual = [
             {
                 "reference_id": "REF-MANUAL",
@@ -731,12 +880,314 @@ class LessonContentV22Tests(unittest.TestCase):
         self.assertEqual(report["coverage"]["reference_metrics"]["domestic_source_count"], 1)
         self.assertEqual(report["coverage"]["reference_metrics"]["foreign_source_count"], 2)
         self.assertEqual(report["coverage"]["reference_metrics"]["domestic_share"], 1 / 3)
-        self.assertTrue(any("below 70%" in warning for warning in report["warnings"]))
+        self.assertFalse(any("70%" in warning for warning in report["warnings"]))
+
+    def test_domestic_share_excludes_unknown_regions_in_content_qa_and_acceptance(self) -> None:
+        for regions, expected_share in ((["domestic", "foreign"] + ["unknown"] * 8, 0.5), (["unknown"] * 4, None)):
+            with self.subTest(regions=regions):
+                references = []
+                for index, region in enumerate(regions, start=1):
+                    reference = copy.deepcopy(_pool()[0])
+                    reference.update(
+                        {
+                            "reference_id": f"REF-METRIC-{index:02d}",
+                            "title": f"课程测试资料 {index:02d}",
+                            "source_region": region,
+                        }
+                    )
+                    references.append(reference)
+                payload = make_v22_payload(references=references)
+                payload["reference_research"] = {
+                    "status": "no_verified_external_source",
+                    "note": "metric fixture",
+                    "queries": [],
+                    "sources": [],
+                }
+                content_report = self.assert_valid_and_qa(payload)
+                content_metrics = content_report["coverage"]["reference_metrics"]
+                acceptance_metrics = lesson_acceptance.reference_metrics(
+                    payload,
+                    {"content_quality": content_report},
+                )
+                self.assertEqual(content_metrics["domestic_share"], expected_share)
+                self.assertEqual(acceptance_metrics["domestic_share"], expected_share)
+                self.assertEqual(content_metrics["unknown_source_count"], regions.count("unknown"))
+                self.assertEqual(acceptance_metrics["unknown_source_count"], regions.count("unknown"))
+
+    def test_v22_duplicate_audit_uses_reuse_policy_for_methods_and_resources(self) -> None:
+        payload = make_v22_payload(theory_hours=6, lesson_count=3, specs=DB_SPECS[:3])
+        for lesson in payload["lessons"]:
+            lesson["teaching_methods"] = ["讲授法", "案例分析"]
+            lesson["resources"] = ["投影仪", "课程任务单"]
+        _refresh_review_digests(payload)
+        report = assess_content_quality(payload)
+        self.assertEqual(report["status"], "passed", report["errors"])
+        self.assertEqual(report["exact_duplicates"], [])
+
+    def test_three_lesson_teacher_action_copy_remains_a_hard_failure(self) -> None:
+        payload = make_v22_payload(theory_hours=6, lesson_count=3, specs=DB_SPECS[:3])
+        for lesson in payload["lessons"]:
+            lesson["implementation"][1]["teacher_actions"] = [
+                "教师逐项追问判断依据并记录可复查的证据"
+            ]
+        _refresh_review_digests(payload)
+        report = assess_content_quality(payload)
+        self.assertNotEqual(report["status"], "passed")
+        self.assertTrue(
+            any(
+                item["field"] == "implementation.task_introduction.teacher_actions"
+                and len(item["lessons"]) == 3
+                for item in report["exact_duplicates"]
+            ),
+            report["exact_duplicates"],
+        )
+
+    def test_v22_quality_does_not_call_legacy_similarity_detectors(self) -> None:
+        payload = json.loads((LESSON / "examples" / "tasks-v22.example.json").read_text(encoding="utf-8"))
+        legacy_detectors = (
+            "_similarity",
+            "_character_ngrams",
+            "_structural_item_pairs",
+            "_pairwise_similarity",
+            "_similarity_record",
+            "_similarity_exceeds",
+            "_progression_gates",
+        )
+        with patch.multiple(
+            lesson_content_quality,
+            **{name: DEFAULT for name in legacy_detectors},
+        ) as mocks:
+            for name, mocked in mocks.items():
+                mocked.side_effect = AssertionError(f"legacy detector called: {name}")
+            report = assess_content_quality(payload)
+        self.assertEqual(report["status"], "passed", report["errors"])
+
+    def test_complete_v22_review_context_size_at_4_20_32_lessons(self) -> None:
+        example = json.loads((LESSON / "examples" / "tasks-v22.example.json").read_text(encoding="utf-8"))
+        measurements = []
+        for lesson_count in (4, 20, 32):
+            payload = _scaled_context_payload(example, lesson_count)
+            serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            draft_bytes = sum(
+                len(json.dumps(lesson["pedagogical_review"]["draft_content"], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+                for lesson in payload["lessons"]
+            )
+            revised_bytes = sum(
+                len(json.dumps(lesson["pedagogical_review"]["revised_content"], ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+                for lesson in payload["lessons"]
+            )
+            share = (draft_bytes + revised_bytes) / len(serialized)
+            measurements.append((lesson_count, len(serialized), draft_bytes, revised_bytes, share))
+            self.assertEqual(len(payload["lessons"]), lesson_count)
+            self.assertEqual(draft_bytes, revised_bytes)
+        print("Complete Content 2.2 context size (UTF-8 bytes): lessons | payload | draft | revised | draft+revised/payload")
+        for lesson_count, payload_bytes, draft_bytes, revised_bytes, share in measurements:
+            print(f"{lesson_count:>7} | {payload_bytes:>7} | {draft_bytes:>7} | {revised_bytes:>7} | {share:.1%}")
+
+    def test_canonical_example_generation_reports_structural_not_production_pass(self) -> None:
+        source = LESSON / "examples" / "tasks-v22.example.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        self.assertEqual(payload["authoring_provenance"]["mode"], "agent")
+        self.assertEqual(len(payload["lessons"]), 3)
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-structural-") as temp_name:
+            output = Path(temp_name) / "output"
+            result = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(qa["status"], "passed")
+            self.assertEqual(qa["render"]["status"], "not_executed")
+            self.assertFalse(qa["render"]["requested"])
+            self.assertEqual(qa["production_status"], "structural_pass")
+            self.assertEqual(manifest["production_status"], qa["production_status"])
+            self.assertEqual(manifest["render_status"], qa["render"]["status"])
+            self.assertIn("production_status=structural_pass", result.stdout)
+
+            manifest["production_status"] = "production_pass"
+            with self.assertRaisesRegex(RuntimeError, "production_status is inconsistent"):
+                lesson_generator._verify_artifact_manifest(output, manifest, source)
+
+            historical_qa = copy.deepcopy(qa)
+            historical_qa.pop("production_status")
+            historical_manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
+            historical_manifest.pop("production_status")
+            historical_manifest.pop("content_contract_version")
+            (output / "qa-report.json").write_text(json.dumps(historical_qa, ensure_ascii=False, indent=2), encoding="utf-8")
+            (output / "artifact-manifest.json").write_text(json.dumps(historical_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            acceptance = lesson_acceptance.build_acceptance_report(
+                source,
+                output,
+                output / "qa-report.json",
+                source_type="synthetic_fixture",
+                template_version="v1.1.2",
+            )
+            gate_by_name = {gate["name"]: gate for gate in acceptance["structural_hard_gates"]["gates"]}
+            self.assertEqual(acceptance["metadata"]["production_status"], "structural_pass")
+            self.assertEqual(gate_by_name["artifact_manifest"]["status"], "PASS")
+            self.assertEqual(gate_by_name["artifact_manifest"]["observed"]["production_status"], "structural_pass")
+            self.assertEqual(gate_by_name["render_smoke"]["status"], "FAIL")
+
+    def test_generator_render_fails_closed_when_one_retained_pdf_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-missing-retained-pdf-") as temp_name:
+            candidate = Path(temp_name) / "candidate"
+            pdf_dir = candidate / "render" / "pdf"
+            pdf_dir.mkdir(parents=True)
+            expected_names = [f"Lesson {index}.docx" for index in range(1, 4)]
+            page_counts = {name: 1 for name in expected_names}
+            pdf_files = {}
+            for name in expected_names[:2]:
+                pdf = pdf_dir / f"{Path(name).stem}.pdf"
+                pdf.write_bytes(b"%PDF-1.4\n1 0 obj<</Type /Page>>endobj\n%%EOF\n")
+                pdf_files[name] = str(pdf.resolve())
+            report = {
+                "render": {
+                    "status": "passed",
+                    "files_checked": 3,
+                    "page_count": 3,
+                    "page_counts": page_counts,
+                    "pdf_files": pdf_files,
+                }
+            }
+            with self.assertRaisesRegex(RuntimeError, "retain exactly one current PDF"):
+                lesson_generator._stable_render_artifacts(report, candidate, expected_names)
+
+    def test_direct_validator_without_render_reports_structural_pass(self) -> None:
+        source = LESSON / "examples" / "tasks-v22.example.json"
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-direct-no-render-") as temp_name:
+            output = Path(temp_name) / "output"
+            generated = run_script(LESSON / "scripts" / "generate_lesson_plans.py", "--tasks-json", str(source), "--output-dir", str(output))
+            self.assertEqual(generated.returncode, 0, generated.stderr + generated.stdout)
+            validated = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json", str(source), "--output-dir", str(output),
+            )
+            self.assertEqual(validated.returncode, 0, validated.stderr + validated.stdout)
+            qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            self.assertEqual(qa["status"], "passed")
+            self.assertEqual(qa["render"]["status"], "not_executed")
+            self.assertEqual(qa["production_status"], "structural_pass")
+            self.assertIn("production_status=structural_pass", validated.stdout)
+
+    def test_standalone_validator_render_smoke_never_claims_production_pass(self) -> None:
+        source = LESSON / "examples" / "tasks-v22.example.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-direct-render-") as temp_name:
+            output = Path(temp_name) / "output"
+            generated = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr + generated.stdout)
+            validated = run_script(
+                LESSON / "scripts" / "validate_output.py",
+                "--input-json",
+                str(source),
+                "--output-dir",
+                str(output),
+                "--render",
+            )
+            self.assertEqual(validated.returncode, 0, validated.stderr + validated.stdout)
+            qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+            render = qa["render"]
+            expected_docx_names = [
+                lesson_content_contract.lesson_filename(index, lesson.get("unit", ""), lesson.get("task", ""))
+                for index, lesson in enumerate(payload["lessons"], start=1)
+            ]
+            self.assertEqual(qa["status"], "passed", qa)
+            self.assertEqual(render["status"], "passed", render)
+            self.assertTrue(render["requested"])
+            self.assertEqual(qa["production_status"], "structural_pass", qa)
+            self.assertEqual(len(payload["lessons"]), len(expected_docx_names))
+            self.assertEqual(render["pdf_files"], {})
+            self.assertEqual(render["files_checked"], len(payload["lessons"]))
+            self.assertEqual(set(render["page_counts"]), set(expected_docx_names))
+            self.assertGreater(render["page_count"], 0)
+            print(
+                "Direct validator Content 2.2 render E2E: "
+                f"lessons={len(payload['lessons'])} transient_render_pages={render['page_count']} "
+                f"pages={render['page_count']} production_status={qa['production_status']}"
+            )
+            self.assertIn("production_status=structural_pass", validated.stdout)
+
+    def test_failed_render_status_never_counts_as_production_pass(self) -> None:
+        payload = {"content_contract_version": "2.2", "lessons": [{"lesson_id": "L01"}]}
+        for render_status in ("failed", "not_executed", "unknown"):
+            status = lesson_output.production_status_for_qa(
+                payload,
+                {
+                    "status": "failed" if render_status == "failed" else "passed",
+                    "render": {
+                        "status": render_status,
+                        "renderer": None,
+                        "files_checked": 0,
+                        "page_count": 0,
+                    },
+                },
+            )
+            self.assertNotEqual(status, "production_pass")
+
+    def test_renderer_failure_and_missing_renderer_are_fail_closed(self) -> None:
+        source = LESSON / "examples" / "tasks-v22.example.json"
+        payload = json.loads(source.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory(prefix="lesson-v224-render-failure-") as temp_name:
+            output = Path(temp_name) / "output"
+            generated = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json",
+                str(source),
+                "--output-dir",
+                str(output),
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr + generated.stdout)
+            render_outcomes = (
+                {
+                    "status": "failed",
+                    "reason": "injected renderer failure",
+                    "renderer": "injected",
+                    "files_checked": len(payload["lessons"]),
+                    "page_count": 0,
+                    "page_counts": {},
+                    "errors": ["lesson document did not render"],
+                },
+                {
+                    "status": "not_executed",
+                    "reason": "LibreOffice was not found",
+                    "renderer": None,
+                    "files_checked": 0,
+                    "page_count": 0,
+                    "page_counts": {},
+                    "errors": [],
+                },
+            )
+            for render_outcome in render_outcomes:
+                with self.subTest(render_status=render_outcome["status"]):
+                    with patch.object(lesson_output, "render_docx_directory", return_value=render_outcome):
+                        with self.assertRaisesRegex(RuntimeError, "render QA"):
+                            lesson_output.validate_output_dir(
+                                output,
+                                payload,
+                                load_manifest(V112_MANIFEST),
+                                output / "qa-report.json",
+                                LESSON / "schemas" / "lesson-plan-input.schema.json",
+                                template_path=LESSON / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx",
+                                render=True,
+                            )
+                    report = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
+                    self.assertEqual(report["status"], "failed")
+                    self.assertEqual(report["production_status"], "failed")
 
     def test_reference_reuse_does_not_exempt_same_lesson_or_narrative_duplicates(self) -> None:
         payload = make_v22_payload(theory_hours=12, lesson_count=6, specs=DB_SPECS)
         payload["lessons"][0]["teaching_content"][0] = payload["lessons"][1]["teaching_content"][0]
-        payload["lessons"][0]["teacher_actions"] = payload["lessons"][1].get("teacher_actions", [])
         report = assess_content_quality(payload)
         self.assertNotEqual(report["status"], "passed")
         self.assertTrue(report["item_duplicates"] or report["exact_duplicates"] or report["field_similarity_pairs"])
@@ -759,8 +1210,83 @@ class LessonContentV22Tests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             self.assertEqual(qa["status"], "passed", qa)
+            self.assertEqual(qa["production_status"], "production_pass", qa)
+            self.assertEqual(qa["render"]["status"], "passed", qa["render"])
             self.assertEqual(qa["checks"]["total_hours"]["actual"], 6)
             self.assertEqual(qa["checks"]["course_hours"]["actual"], 8)
+            artifact_manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(artifact_manifest["production_status"], "production_pass")
+            self.assertEqual(artifact_manifest["render_status"], "passed")
+            self.assertEqual(artifact_manifest["manifest_version"], "2.0")
+            self.assertEqual(len(artifact_manifest["artifacts"]), 3)
+            self.assertTrue(all(item["final_docx_sha256"] and item["final_pdf_sha256"] and item["actual_pdf_page_count"] > 0 for item in artifact_manifest["artifacts"]))
+            retained_artifacts = qa["render"]["pdf_artifacts"]
+            self.assertEqual(len(retained_artifacts), 3)
+            for artifact in retained_artifacts:
+                retained_pdf = output / artifact["final_pdf_path"]
+                self.assertTrue(retained_pdf.is_file(), retained_pdf)
+                self.assertEqual(lesson_generator.pdf_page_count(retained_pdf), artifact["actual_pdf_page_count"])
+            self.assertEqual(
+                lesson_generator._verify_artifact_manifest(output, artifact_manifest, source),
+                "production_pass",
+            )
+
+            wrong_production = copy.deepcopy(artifact_manifest)
+            wrong_production["production_status"] = "structural_pass"
+            with self.assertRaisesRegex(RuntimeError, "production_status is inconsistent"):
+                lesson_generator._verify_artifact_manifest(output, wrong_production, source)
+            wrong_contract = copy.deepcopy(artifact_manifest)
+            wrong_contract["content_contract_version"] = "2.1"
+            with self.assertRaisesRegex(RuntimeError, "content_contract_version does not match"):
+                lesson_generator._verify_artifact_manifest(output, wrong_contract, source)
+            wrong_manifest_version = copy.deepcopy(artifact_manifest)
+            wrong_manifest_version["manifest_version"] = "2.1"
+            with self.assertRaisesRegex(RuntimeError, "manifest_version must be 2.0"):
+                lesson_generator._verify_artifact_manifest(output, wrong_manifest_version, source)
+
+            tampered_sha = copy.deepcopy(artifact_manifest)
+            tampered_sha["artifacts"][0]["final_pdf_sha256"] = "0" * 64
+            with self.assertRaisesRegex(RuntimeError, "final PDF SHA-256 mismatch"):
+                lesson_generator._verify_artifact_manifest(output, tampered_sha, source)
+            tampered_pages = copy.deepcopy(artifact_manifest)
+            tampered_pages["artifacts"][0]["actual_pdf_page_count"] += 1
+            with self.assertRaisesRegex(RuntimeError, "PDF page count mismatch"):
+                lesson_generator._verify_artifact_manifest(output, tampered_pages, source)
+
+            missing_pdf = output / artifact_manifest["artifacts"][0]["final_pdf_path"]
+            retained_pdf_bytes = missing_pdf.read_bytes()
+            missing_pdf.unlink()
+            try:
+                with self.assertRaisesRegex(RuntimeError, "final PDF is missing"):
+                    lesson_generator._verify_artifact_manifest(output, artifact_manifest, source)
+            finally:
+                missing_pdf.write_bytes(retained_pdf_bytes)
+
+            legacy_qa = copy.deepcopy(qa)
+            legacy_qa.pop("production_status")
+            legacy_manifest = copy.deepcopy(artifact_manifest)
+            legacy_manifest.pop("production_status")
+            legacy_manifest.pop("content_contract_version")
+            (output / "qa-report.json").write_text(json.dumps(legacy_qa, ensure_ascii=False, indent=2), encoding="utf-8")
+            (output / "artifact-manifest.json").write_text(json.dumps(legacy_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            self.assertEqual(
+                lesson_generator._verify_artifact_manifest(output, legacy_manifest, source),
+                "production_pass",
+            )
+            acceptance = lesson_acceptance.build_acceptance_report(
+                source,
+                output,
+                output / "qa-report.json",
+                source_type="synthetic_fixture",
+                template_version="v1.1.2",
+            )
+            artifact_gate = next(
+                gate for gate in acceptance["structural_hard_gates"]["gates"]
+                if gate["name"] == "artifact_manifest"
+            )
+            self.assertEqual(artifact_gate["status"], "PASS", artifact_gate)
+            self.assertEqual(artifact_gate["observed"]["production_status"], "production_pass")
+            self.assertEqual(acceptance["metadata"]["production_status"], "production_pass")
             manifest = load_manifest(V112_MANIFEST)
             files = sorted(output.glob("*.docx"))
             self.assertEqual(len(files), 3)
@@ -770,6 +1296,194 @@ class LessonContentV22Tests(unittest.TestCase):
                 self.assertIn("数据结构（C语言版·第2版）", references)
                 self.assertIn("Python Documentation: Data Structures", references)
                 self.assertNotIn("投影仪", references)
+
+
+class LessonFinalPublicationClosureTests(unittest.TestCase):
+    """Real rendered evidence plus failures injected after publication swaps."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.workspace = tempfile.TemporaryDirectory(prefix="lesson-final-closure-")
+        cls.addClassCleanup(cls.workspace.cleanup)
+        cls.root = Path(cls.workspace.name)
+        cls.source = cls.root / "content.json"
+        cls.source.write_text(json.dumps(make_v22_payload(theory_hours=6, lesson_count=3, specs=DB_SPECS), ensure_ascii=False), encoding="utf-8")
+        cls.baseline = cls.root / "rendered"
+        result = run_script(LESSON / "scripts/generate_lesson_plans.py", "--tasks-json", str(cls.source), "--output-dir", str(cls.baseline), "--render")
+        if result.returncode:
+            raise AssertionError(result.stderr + result.stdout)
+        cls.manifest = json.loads((cls.baseline / "artifact-manifest.json").read_text(encoding="utf-8"))
+        cls.qa = json.loads((cls.baseline / "qa-report.json").read_text(encoding="utf-8"))
+
+    def setUp(self) -> None:
+        self.case = tempfile.TemporaryDirectory(prefix="lesson-final-case-")
+        self.addCleanup(self.case.cleanup)
+        self.output = Path(self.case.name) / "output"
+        shutil.copytree(self.baseline, self.output)
+
+    def verify_evidence(self, manifest=None, qa=None, *, passes=False):
+        manifest = copy.deepcopy(self.manifest if manifest is None else manifest)
+        qa = copy.deepcopy(self.qa if qa is None else qa)
+        (self.output / "artifact-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (self.output / "qa-report.json").write_text(json.dumps(qa), encoding="utf-8")
+        if passes:
+            self.assertEqual(lesson_generator._verify_artifact_manifest(self.output, manifest, self.source), "production_pass")
+        else:
+            with self.assertRaises(RuntimeError):
+                lesson_generator._verify_artifact_manifest(self.output, manifest, self.source)
+        report = lesson_acceptance.build_acceptance_report(self.source, self.output, self.output / "qa-report.json", source_type="synthetic_fixture", template_version="v1.1.2")
+        gate = next(g for g in report["structural_hard_gates"]["gates"] if g["name"] == "artifact_manifest")
+        self.assertEqual(gate["status"], "PASS" if passes else "FAIL", gate)
+        self.assertEqual(report["metadata"]["production_status"], "production_pass" if passes else "failed", report)
+        if not passes:
+            self.assertEqual(report["final_status"], "FAILED")
+        return gate
+
+    def assert_post_commit_rollback(self, *, old_output, external=False):
+        root = Path(self.case.name)
+        shutil.rmtree(self.output)
+        expected = {"old.bin": b"\x00old-output\xff", "nested/state.txt": b"old-state"}
+        if old_output:
+            for name, data in expected.items():
+                path = self.output / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+        qa_path = root / "external-qa.json"
+        if external:
+            qa_path.write_bytes(b"old-external-qa\x00")
+        real_verify = lesson_generator._verify_artifact_manifest
+        post_calls = []
+
+        def fail_after_swap(path, manifest, source):
+            if path.resolve() == self.output.resolve():
+                self.assertTrue(list(path.glob("*.docx")))
+                self.assertFalse((path / "old.bin").exists())
+                if external:
+                    self.assertNotEqual(qa_path.read_bytes(), b"old-external-qa\x00")
+                post_calls.append(path)
+                raise RuntimeError("injected post-commit verifier failure")
+            return real_verify(path, manifest, source)
+
+        argv = ["generate_lesson_plans.py", "--tasks-json", str(self.source), "--output-dir", str(self.output), "--allow-test-fixture-authoring"]
+        if old_output:
+            argv.append("--backup-existing")
+        if external:
+            argv.extend(["--qa-report", str(qa_path)])
+        with patch.dict(os.environ, {"LESSON_ALLOW_TEST_FIXTURE_AUTHORING": "1"}), patch.object(sys, "argv", argv), patch.object(lesson_generator, "_verify_artifact_manifest", side_effect=fail_after_swap):
+            with self.assertRaisesRegex(RuntimeError, "injected post-commit verifier failure"):
+                lesson_generator.main()
+        self.assertEqual(len(post_calls), 1)
+        if old_output:
+            self.assertEqual({p.relative_to(self.output).as_posix(): p.read_bytes() for p in self.output.rglob("*") if p.is_file()}, expected)
+        else:
+            self.assertFalse(self.output.exists())
+        if external:
+            self.assertEqual(qa_path.read_bytes(), b"old-external-qa\x00")
+        self.assertEqual(list(root.rglob("*candidate*")), [])
+        self.assertEqual(list(root.rglob("*_backup_*")), [])
+
+    def test_post_commit_failure_restores_existing_output(self):
+        self.assert_post_commit_rollback(old_output=True)
+
+    def test_post_commit_failure_leaves_initially_absent_target_absent(self):
+        self.assert_post_commit_rollback(old_output=False)
+
+    def test_post_commit_failure_restores_output_and_external_qa(self):
+        self.assert_post_commit_rollback(old_output=True, external=True)
+
+    def historical_evidence(self):
+        manifest, qa = copy.deepcopy(self.manifest), copy.deepcopy(self.qa)
+        manifest.pop("production_status")
+        manifest.pop("content_contract_version")
+        qa.pop("production_status")
+        return manifest, qa
+
+    def test_old_final_qa_without_production_status_passes(self):
+        self.verify_evidence(*self.historical_evidence(), passes=True)
+
+    def test_old_final_qa_missing_pdf_artifacts_fails(self):
+        manifest, qa = self.historical_evidence()
+        qa["render"].pop("pdf_artifacts")
+        self.verify_evidence(manifest, qa)
+
+    def test_old_final_qa_pdf_artifact_map_tampering_fails(self):
+        for field, value in (("final_pdf_path", "render/pdf/wrong.pdf"), ("docx_path", "wrong.docx"), ("actual_pdf_page_count", 999)):
+            with self.subTest(field=field):
+                manifest, qa = self.historical_evidence()
+                qa["render"]["pdf_artifacts"][0][field] = value
+                self.verify_evidence(manifest, qa)
+
+    def test_old_final_qa_rejects_transient_paths_and_invalid_artifact_lists(self):
+        for mode in ("transient", "wrong-type", "wrong-count"):
+            with self.subTest(mode=mode):
+                manifest, qa = self.historical_evidence()
+                if mode == "transient":
+                    qa["render"]["pdf_files"] = ["/temporary/diagnostic.pdf"]
+                else:
+                    qa["render"]["pdf_artifacts"] = {} if mode == "wrong-type" else []
+                self.verify_evidence(manifest, qa)
+
+    def test_missing_reviewed_content_digest_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest.pop("reviewed_content_digest")
+        self.verify_evidence(manifest)
+
+    def test_reviewed_digest_mismatch_and_invalid_fields_fail(self):
+        for mode in ("match-false", "mismatch", "missing-source", "invalid-packaged", "not-object"):
+            with self.subTest(mode=mode):
+                manifest = copy.deepcopy(self.manifest)
+                digest = manifest["reviewed_content_digest"]
+                if mode == "match-false":
+                    digest["match"] = False
+                elif mode == "mismatch":
+                    digest["packaged_final_content_sha256"] = "0" * 64
+                elif mode == "missing-source":
+                    digest.pop("source_final_content_sha256")
+                elif mode == "invalid-packaged":
+                    digest["packaged_final_content_sha256"] = "not-a-sha"
+                else:
+                    manifest["reviewed_content_digest"] = []
+                self.verify_evidence(manifest)
+
+    def test_missing_reference_evidence_sha_fails(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest.pop("reference_evidence_sha256")
+        self.verify_evidence(manifest)
+
+    def test_reference_evidence_sha_tamper_and_invalid_hex_fail(self):
+        for value in ("0" * 64, "z" * 64, ""):
+            with self.subTest(value=value):
+                manifest = copy.deepcopy(self.manifest)
+                manifest["reference_evidence_sha256"] = value
+                self.verify_evidence(manifest)
+
+    def test_reference_evidence_file_mutation_fails(self):
+        (self.output / "reference-evidence.json").write_bytes(b"{}\n")
+        self.verify_evidence()
+
+    def test_manifest_production_mismatch_reports_effective_failed(self):
+        manifest = copy.deepcopy(self.manifest)
+        manifest["production_status"] = "structural_pass"
+        gate = self.verify_evidence(manifest)
+        self.assertEqual(gate["observed"]["inferred_production_status"], "production_pass")
+
+    def test_qa_production_mismatch_reports_effective_failed(self):
+        qa = copy.deepcopy(self.qa)
+        qa["production_status"] = "structural_pass"
+        gate = self.verify_evidence(qa=qa)
+        self.assertEqual(gate["observed"]["inferred_production_status"], "production_pass")
+
+    def test_generator_help_describes_retained_publication_pdfs(self):
+        result = run_script(LESSON / "scripts/generate_lesson_plans.py", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("disposable", result.stdout.lower())
+        self.assertIn("retain verified PDFs", result.stdout)
+
+    def test_standalone_help_remains_disposable_diagnostic(self):
+        result = run_script(LESSON / "scripts/validate_output.py", "--help")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("disposable", result.stdout.lower())
+        self.assertIn("diagnostic", result.stdout.lower())
 
 
 if __name__ == "__main__":
