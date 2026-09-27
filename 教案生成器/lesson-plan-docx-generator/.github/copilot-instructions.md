@@ -1,5 +1,7 @@
 # GitHub Copilot 教案规则
 
-若明确 `practice_work_orders=true`，由 Lesson Agent 检测并调用 WorkOrder Skill Agent；每个 Practice Task 和 WorkOrder 固定对应 2 学时，实践学时必须为偶数且数量等于实践学时除以 2；不可用时交付 Lesson 与 handoff 并明确 `WorkOrder Skill unavailable; handoff generated.`，不得由 Lesson Python subprocess 或伪造工单 DOCX。若明确 false，实践学时只进入课程总账，不生成 contract、handoff、WorkOrder 或实践侧额外文件。
+开始前阅读 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`。当前为 Lesson Skill 2.3.0 / Content Contract 2.2；先做一次课程 Intake、冻结课程基本盘并完成全课程 outline。正文与教学判断由 Agent 负责，Python 只执行 schema、硬事实、格式、模板、事务和渲染门禁。课程资料、教材、resources 与 references 分开管理，不补造来源信息。
 
-开始前读取同目录 `SKILL.md` 和 `通用提示词.md`。遵循 Content Contract V2：先课程级规划，所有逐课正文、实施阶段、评价 remarks 和反思直接进入 JSON；Python 只做校验、格式化、模板映射和 candidate 原子提交。运行真实 Content/Template/Output QA，支持 Windows/macOS，不接受 sparse input、旧套话、IT 默认污染或静默截断。
+Teaching Exemplar Benchmark 使用 Content 2.2 以外的 sidecar。Curator 管理完整 Catalog/Split；Author/Reviewer 仅取得当前 Lesson 已选的 A/B Cards。完整验证 A/B Packs、Selections、逐课 Review shards 和课程汇总后，创建 Benchmark Authorization；正式生成 DOCX 时必须使用 `generate_lesson_plans.py --benchmark-mode required --benchmark-authorization <file>`。Round 2 固定 run、Holdout Pack 和 Selection，必须有 Agent-owned 语义内容修订并刷新 Content 2.2 `pedagogical_review` history/provenance。Acceptance 要校验 A/B 两侧和每课 Review。Benchmark 不是教学质量结论。
+
+只有用户明确要求实践工单时才创建 Practice Task Contract 1.1/handoff，并由 Lesson Agent 调用 WorkOrder Skill Agent；Lesson Python 不可跨调用 WorkOrder Python，也不可伪造工单 DOCX。WorkOrder Skill 不可用时，交付 handoff 并使用 `SKILL.md` 规定的中文提示。

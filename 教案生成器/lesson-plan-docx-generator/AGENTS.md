@@ -10,3 +10,5 @@
 - Lesson Skill 2.3.0 的 Teaching Exemplar Benchmark 使用 Content 2.2 之外的 Curator-only Catalog/Split、物理隔离的 Authoring A / Holdout B Packs、独立 Authoring/Holdout Selection 与 full-linkage Review sidecar；遵守 `SKILL.md` 的角色边界和最多两轮 revision，不向 Lesson JSON 增加 Benchmark 字段。
 - 正文、实施阶段、评价备注和反思由 Agent 提供；Python 只做 schema、硬事实、结构、格式、模板映射、输出与渲染门禁，不用动作词、专业词、IT/护理 marker、字符/n-gram 相似度判断自然度或教学充分性。自然度、相关性、容量与阶段语义由统一 Agent review 负责；有问题必须由 Agent 重写后再生成。
 - 生产命令禁止跳过模板/输出校验；真实 render 未通过或未执行时不得标记 Production PASS。旧版本只可通过显式 legacy/兼容入口读取。
+- 2.3 benchmark 正式生产必须先完成 Catalog/Split/A-B Packs/A-B Selections、逐 Lesson Review 分片和课程汇总的 full-linkage validation，再生成 Benchmark Authorization；DOCX 生产使用 `--benchmark-mode required --benchmark-authorization <file>`。Acceptance 必须同时链接 A、B、Selection、课程 Review 与逐课 Review；Round 2 另须完整 Round 1 快照。
+- Agent runtime 只加载每课选中的 Cards，不把完整 Pack/Catalog/Split 暴露给 Author 或 Reviewer。Round 2 必须是语义内容修订并更新 Content 2.2 pedagogical review history/provenance；Benchmark 状态不是教学质量结论。

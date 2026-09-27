@@ -4,6 +4,15 @@
 
 从 **2026-09-01** 起，教案生成器使用独立的 Skill 版本号；Skill 版本、Content Contract 版本和 Word 模板版本分别管理。
 
+## Lesson Skill 2.3.0 Benchmark System Closure — 2026-09-27
+
+- 在 Content Contract 2.2 外完成 Teaching Exemplar Benchmark sidecar 闭环；Content schema、Lesson Template 1.1.2 binary、既有课程结构、WorkOrder 合同和原有正文设计边界保持不变。
+- 新增来源安全、课程上下文与资格策略指纹、稳定 group split、物理 A/B Pack、独立逐课 Review 分片与课程汇总，显式记录 evidence basis、insufficient evidence、no-relevant 和 context 模式状态。
+- 新增 Round 2 语义内容 digest 以及 Content 2.2 pedagogical review/provenance 复验；仅改 JSON 字节格式不能构成内容修订。
+- 新增完整 Benchmark Authorization；正式 2.3 DOCX production 使用 generator `--benchmark-mode required`，生成器 manifest 和 Acceptance 均复核 A/B 来源链接与授权哈希。
+- 新增合成三组 Catalog 与 Round 1/2 闭环示例、20/32 Lesson 分片规模回归，并将 `lesson-benchmark` 纳入 Windows/macOS Lesson CI。示例及自动化通过只证明合同/实现行为，不是实际教学质量或真实课程试点结论。
+- 默认 Word 模板仍为 Lesson Template 1.1.2，binary 和 SHA-256 不变。
+
 ## Lesson Skill 2.2.4 Correctness Closure — 2026-09-26
 
 - 保持 Lesson Content Contract 2.2、`lesson-plan v1.1.2`、理论/实践边界、九阶段、时间和评价合同不变。

@@ -1,163 +1,86 @@
-# Teaching Exemplar Benchmark Phase 1
+# Lesson Teaching Exemplar Benchmark 1.0
 
-This implementation is Lesson Skill **2.3.0** with Lesson Content **2.2**, Lesson Template **1.1.2**, Acceptance Schema **2.0**, Exemplar Contract **1.0**, and Benchmark Review **1.0**. The Word template binary is unchanged.
+适用于 Lesson Skill **2.3.0**、Lesson Content Contract **2.2**、Lesson Template **1.1.2**、Exemplar Contract **1.0**、Benchmark Review **1.0** 和 Acceptance Schema **2.0**。Benchmark 只写独立 sidecar；Content 2.2 schema、九阶段、现有 Word 模板与 WorkOrder 合同均不变。
 
-## Fixed boundary and workflow
+本合同验证来源、选择、隔离声明、Review 和生产输入之间的完整链接。它不计算教学质量分数，也不能证明 Agent 实际收到的上下文符合声明。样例目录 `examples/synthetic-benchmark-closure/` 含 3 个合成来源组、Round 1/2 完整 sidecar 与授权，所有内容都标记为合成数据，不是教学质量证据。
 
-Benchmark evidence lives in sidecar JSON files. It does not add `student_evidence`, `success_criteria`, `analysis_basis`, `reflection_mode`, `exemplar_pool`, or `benchmark_review` to Lesson Content 2.2. The fixed nine-stage Lesson format, projectized positioning, theory/practice split, 10 / hours×45 / 15 timing, 85–96 half-point scores, Practice Task and WorkOrder boundaries, Word template, production transaction, and existing `reference_pool` meaning stay unchanged.
-
-The workflow and role visibility are fixed:
+## Production state flow
 
 ```text
-Intake + Source Truth + whole-course outline
-→ Curator-only discovery/Cards/Catalog/Split
-→ deterministic physical Authoring Pack A and Holdout Pack B
-→ Author receives only Source Truth + outline + Pack A
-→ Authoring Selection bound to the existing outline digest
-→ Lesson Content 2.2 authoring + existing pedagogical_review
-→ Reviewer receives final reviewed Content + Source Truth summary + Pack B + rubric
-→ Holdout Selection bound to exact Round 1 Content bytes
-→ full-linkage Benchmark Review validation
-→ bounded revision (at most two rounds, same frozen Pack B/Selection)
-→ final Content 2.2 validation
-→ DOCX generation → render → production publication → Acceptance full linkage
+freeze Intake, Source Truth and whole-course outline
+→ Curator creates Cards and validates Catalog
+→ Split CLI creates Split and physical Authoring A / Holdout B Packs atomically
+→ Author sees only per-Lesson selected A Cards and records Authoring Selection
+→ author and review all Lesson Content 2.2 through pedagogical_review
+→ Reviewer sees final reviewed Lesson Content, Source Truth summary and selected B Cards
+→ freeze Holdout Selection; create one Review JSON per Lesson
+→ aggregate course summary and validate all provenance links
+→ build immutable Benchmark Authorization
+→ generate DOCX with --benchmark-mode required --benchmark-authorization <file>
+→ retain render artifacts, validate manifest and complete Acceptance linkage
 ```
 
-Benchmark Review validation must finish before DOCX generation, render, and production publication. It must not trigger a post-render DOCX rewrite.
+If a bounded revision is required, preserve Round 1 Content, course Review and every Lesson Review. Revise Agent-owned Lesson content, refresh Content 2.2 pedagogical review history and provenance, then run Round 2 with the same benchmark run, B Pack and Holdout Selection. Revalidate Round 1 and Round 2 before building a new authorization. Round 3 is invalid.
 
-Three logical roles have separate contexts:
+The generator defaults to `--benchmark-mode none` for existing 2.2 callers. `optional` allows an absent or valid authorization. `required` demands a valid authorization and is the required production mode for 2.3. `none` rejects an authorization file. Any supplied authorization is checked against the source Content bytes and semantic final-content digest; authorization bytes are copied to the output and bound by the artifact manifest.
 
-- **Curator Agent** may see Source Truth summary, external case materials, the complete Catalog, and deterministic Split. It structures discovery results, qualifies and abstracts Cards, and assigns `group_id`. It does not author Lesson content.
-- **Author Agent** may see Source Truth, the whole-course outline, Authoring Pack A, and Authoring Selection. It must not receive the full Catalog, Split B IDs, Holdout Pack, Holdout Selection, or Reviewer output.
-- **Reviewer Agent** may see final pedagogically reviewed Lesson Content, Source Truth summary, Holdout Pack B, Holdout Selection, and the Benchmark Rubric. It must not receive Pack A, Author hidden reasoning, or Author prompt transcript.
+## Catalog and source provenance
 
-Catalog and Split are Curator-only provenance, not Author or Reviewer prompt inputs. Separate runtime contexts enforce role visibility. Python validates artifacts and attestations; it cannot prove the actual prompt isolation.
+Each Card conforms to `schemas/teaching-exemplar-card.schema.json`; the Catalog applies its contract version once at the root. Cards allow only enumerated source, scope, qualification, and abstract-pattern fields. Raw source text, arbitrary fields and over-size Cards are rejected. Each Card is limited to 12 KiB of canonical UTF-8 JSON. Retrieval and Catalog creation timestamps must include a timezone.
 
-## Exemplar Card and Catalog
+`source_identity_sha256` hashes canonical normalized source identity fields. `catalog_fingerprint` hashes the Exemplar Contract version, qualification-policy version, normalized course context, and all Cards sorted by `exemplar_id`; `created_at` is excluded. A source identity or normalized canonical URL cannot map to multiple `group_id` values. Public sources must pass URL safety checks; private user-provided material must be labeled private and cannot masquerade as a public URL. Do not invent missing source fields or retrieve real source Cards as part of synthetic examples.
 
-Each Card follows `schemas/teaching-exemplar-card.schema.json`. The Catalog declares `exemplar_contract_version: "1.0"` once at its root; Cards do not repeat it. The schema only permits enumerated source, scope, qualification, and abstract-pattern fields, not arbitrary blobs or raw-source text.
+Qualification is structural and explicit. Only `QUALIFIED` Cards with eligible A/B authority enter Split. Tier C, discovery-only sources, and `CONDITIONAL`, `DISCOVERY_ONLY`, or `REJECTED` Cards remain out of both Packs. A qualified Card needs at least one non-empty abstract teaching-pattern field and one `do_not_copy` entry. These checks do not judge source relevance or teaching quality.
 
-`source_identity_sha256` is SHA-256 over canonical JSON containing `canonical_url`, `title`, `institution`, `author_or_team`, and `recognition`. Values use Unicode NFKC normalization, trimming, and collapsed internal whitespace. Canonical JSON uses UTF-8, sorted keys, no insignificant spaces, and unescaped Unicode. This digest supports provenance and deduplication, not teaching similarity. Core provenance strings cannot be empty; the tool does not invent missing source facts.
+## Stable group split and physical packs
 
-`catalog_fingerprint` is SHA-256 over the canonical JSON array of Cards sorted by `exemplar_id`. A Catalog with zero Cards is valid; availability is decided by Split.
+The Split partitions whole `group_id` clusters, including editions, sessions, mirrors, reproductions, and direct derivatives. A group's side is derived from the split-policy version, canonical course-context digest, and group ID. It does not depend on Catalog fingerprint, mutable prose, retrieval time, or insertion of an unrelated group. Context, policy, or group identity changes can alter side assignment. All side memberships and Split fingerprints are revalidated.
 
-`group_id` identifies one original work and its direct derivatives: editions or sessions of a competition work, PDF/PPT/web copies, course mirrors, press reproductions, and direct revisions by the same team. Catalog validation rejects a `source_identity_sha256` mapped to multiple group IDs and a normalized canonical URL mapped to multiple groups. Multiple Cards from one source are allowed when they share the same `group_id`. Python cannot infer semantic source identity.
+Availability is calculated separately for Authoring and Holdout: zero groups is `UNAVAILABLE`, one is `PARTIAL`, and two or more is `AVAILABLE`. Benchmark availability follows Holdout availability. Do not add unrelated exemplars to raise availability. Run `exemplar_split.py` once to create Split plus both Pack files; callers cannot hand-filter Catalog into Packs. The operation stages and atomically replaces all three outputs, restoring all originals if a replacement fails.
 
-## Qualification, visibility, and Split
+The complete Catalog and Split are Curator/orchestrator provenance. Runtime agent context contains only the Cards selected for the current Lesson. Author receives A selections only; Reviewer receives B selections only. Full Packs remain available to validators and the orchestrator for membership and hash verification, not as an agent prompt payload.
 
-`authority_tier` is `A`, `B`, `C`, or `PRIVATE`; `visibility` is `public` or `private_session`; qualification is `QUALIFIED`, `CONDITIONAL`, `DISCOVERY_ONLY`, or `REJECTED`. Tier A/B may be QUALIFIED; Tier C may not. PRIVATE must use `private_session`. `private_user_provided` also requires PRIVATE and `private_session`. A `discovery_source` cannot be QUALIFIED regardless of tier. Only QUALIFIED Cards enter Split.
+## Per-Lesson selections and Review shards
 
-A QUALIFIED Card must contain at least one item across the eight permitted teaching-pattern arrays and at least one `do_not_copy` item. This is a structural evidence floor, not a quality judgment. CONDITIONAL, DISCOVERY_ONLY, and REJECTED Cards remain in Catalog but never enter A or B.
+Authoring and Holdout selections are separate files and cannot be combined. Authoring Selection must cover every outline Lesson and bind the pre-existing `authoring_provenance.source_snapshot.whole_course_outline_sha256`. Holdout Selection must cover every Lesson and bind exact Round 1 Content JSON bytes. Each Lesson row is `SELECTED`, `NO_RELEVANT_EXEMPLAR`, or `UNAVAILABLE`, with matching IDs and a rationale. Authoring allows at most five Cards; Holdout allows at most four. Targets are guidance, not quotas.
 
-Private exemplars may be used in a runtime Catalog, Authoring Pack, or Holdout Pack. They must not enter development holdouts, committed Development Gold, or a shared Catalog.
+Write each Lesson's assessment to its own `lesson_id.json` using `schemas/benchmark-lesson-review.schema.json`. The course summary in `schemas/benchmark-review.schema.json` holds the per-Lesson Review file hashes and deterministic totals, not every dimension's prose. It must exactly cover the Content Lesson IDs and match each shard's run ID, round, content hash, selection, and IDs.
 
-Split partitions `group_id`, never individual Cards. For each unique QUALIFIED group, compute:
+Each reviewed Lesson has the fixed 15 dimensions. `evidence_basis` is one of `SOURCE_TRUTH`, `HOLDOUT_EXEMPLAR`, `SOURCE_TRUTH_AND_HOLDOUT`, or `LESSON_INTERNAL`. Source Truth alignment must use Source Truth evidence and cannot cite an exemplar; the other dimensions cannot use Source Truth alone. A Holdout citation must be both in Pack B and selected for that Lesson. Evidence text fields are limited to 600 characters. `NOT_APPLICABLE` is limited to `authentic_vocational_context` and `differentiation_scaffold`, with an explanation and no exemplar citation. `INSUFFICIENT_EVIDENCE` requires an explanation, the current evidence, a gap and a recommended direction, and it forces human review.
 
-```text
-SHA256(catalog_fingerprint + "\n" + group_id)
-```
+Decision rules are gates over explicit evidence states, not scores. Round 1 major GAP requests revision; Round 2 major GAP requires human review. Minor/advisory findings do not become a score. If the B Pack is non-empty but every Lesson says `NO_RELEVANT_EXEMPLAR`, report a partial benchmark requiring human explanation, not `UNAVAILABLE`. `separate_contexts` attests no A Card or author reasoning was visible and that only B exemplars were used. `single_context` must state that A and author reasoning were visible, `holdout_only=false`, and is downgraded to partial. Attestations are validated but cannot prove actual prompt isolation.
 
-Sort groups by lowercase hexadecimal digest, ascending. Assign the fixed repeated pattern `A, B, B, A, B, B, ...`; all Cards in a group follow the same side. No random function, topic score, or semantic ranking changes the side.
+## Round 2 semantic revision
 
-Availability is `UNAVAILABLE` for zero or one qualified groups, `PARTIAL` for two, and `AVAILABLE` for three or more. A Split is frozen before per-Lesson selection. Its fingerprint covers deterministic Split fields and excludes `created_at`, so regenerating from the same Catalog gives identical membership, `split_id`, and `split_fingerprint`.
+Round 2 requires the original Content JSON, summary Review and per-Lesson Review shards. Validation reruns the complete Round 1 chain with the same Catalog, Split, Packs and Holdout Selection, then binds Round 2 to the same `benchmark_run_id` and frozen B inputs. Round 2 Content must differ by exact byte hash and by the semantic digest of Agent-owned lesson content. Formatting-only or JSON key-order changes are not revision evidence. A substantive change must pass Content Contract 2.2 validation and update the relevant `pedagogical_review.review_history`, `draft_content`, `revised_content`, decision and `authoring_provenance` digests. A prior review status alone cannot establish a valid revision.
 
-## Deterministic physical Packs
+## Authorization, generation and Acceptance
 
-`build_exemplar_pack(catalog, split, role)` creates a role-scoped Pack. Authoring Pack contains exactly `split.authoring_exemplar_ids`; Holdout Pack contains exactly `split.holdout_exemplar_ids`. Pack fingerprints cover role, Catalog and Split IDs/fingerprints, sorted exemplar IDs, and sorted Card payloads using canonical JSON. Validation recomputes the fingerprint and requires exact membership; missing, extra, substituted, or reordered Cards cannot alter the result.
+`build_benchmark_authorization.py` accepts only a full valid chain: Content 2.2, Catalog, Split, A and B Packs, both Selections, course Review, all per-Lesson Reviews and (for Round 2) all Round 1 snapshots. It writes a content-addressed `benchmark-authorization.json` containing source-byte and semantic digests, package and selection fingerprints, Review hash, run/round, status, decision, context mode, version and creation time. Its fingerprint covers all authorization fields except itself.
 
-Generate the Split and both physically separate Packs with one `exemplar_split.py` invocation. Callers must not filter the complete Catalog themselves. Author runtime loads only the Authoring Pack; Reviewer runtime loads only the Holdout Pack.
-
-## Separate per-Lesson Selections
-
-`exemplar-authoring-selection.json` and `exemplar-holdout-selection.json` are distinct sidecars; neither combines both roles.
-
-- Authoring Selection IDs must belong to Pack A. Its Lesson ID set must exactly equal `outline[].lesson_id`, and `source_outline_sha256` must equal the existing `authoring_provenance.source_snapshot.whole_course_outline_sha256`. It binds the already-defined outline digest, not a new hash or final Lesson digest.
-- Holdout Selection IDs must belong to Pack B. Its Lesson ID set must exactly cover every Lesson Content lesson ID. `source_lesson_content_sha256` is SHA-256 of the exact Lesson Content JSON bytes used to freeze Round 1 selection.
-
-Each row has `SELECTED`, `NO_RELEVANT_EXEMPLAR`, or `UNAVAILABLE` status, a rationale, and zero or more IDs. SELECTED requires IDs; the other statuses require none; an empty side must be UNAVAILABLE. Per Lesson caps are five Authoring and four Holdout Cards. Targets of three Authoring and two or three Holdout Cards are guidance, not quotas; zero is allowed when status matches.
-
-Selection validation reports descriptive Catalog/Pack and per-Lesson selected Card byte counts. Counts are canonical UTF-8 JSON sizes; there is no semantic context threshold.
-
-## Reviewer isolation and Review evidence
-
-The Review attests:
-
-```json
-{
-  "authoring_exemplars_visible": false,
-  "author_reasoning_visible": false,
-  "holdout_only": true
-}
-```
-
-Python rejects a false attestation but cannot prove what a prompt actually contained. The Review `lessons` rows contain only `lesson_id` and `dimensions`; selection rows stay in the Holdout Selection sidecar. Full validation requires Review IDs, Holdout Selection IDs, and Lesson Content IDs to match exactly, with no missing, extra, or duplicate Lesson.
-
-A Lesson with selected Holdout Cards must have exactly one review for each of the 15 fixed dimensions. A Lesson without selected Holdout Cards has zero dimensions and contributes to `lessons_without_holdout`. For `MEETS`, `PARTIAL`, `GAP`, and `INSUFFICIENT_EVIDENCE`, `current_evidence`, `benchmark_pattern`, and at least one Holdout citation are required. `PARTIAL`, `GAP`, and `INSUFFICIENT_EVIDENCE` also require non-empty `gap` and `recommended_direction`. `NOT_APPLICABLE` requires an explanation in `current_evidence`; other evidence and citations may be empty. Every citation must belong to Pack B and that Lesson's Holdout Selection.
-
-Dimension statuses and allowed severity are:
-
-| Status | Allowed severity |
-| --- | --- |
-| `MEETS` | `none`, `advisory` |
-| `PARTIAL` | `minor`, `advisory` |
-| `GAP` | `major`, `minor` |
-| `NOT_APPLICABLE` | `none` |
-| `INSUFFICIENT_EVIDENCE` | `major`, `minor`, `advisory` |
-
-The 15 dimension IDs are fixed in `schemas/benchmark-review.schema.json`. No score, total, rating, percentage, rank, or similarity field is allowed. Python reports explicit major/minor GAP and insufficient-evidence counts; it does not calculate a pedagogy score.
-
-`source_lesson_content_sha256` hashes exact Lesson Content bytes. `holdout_selection_sha256` hashes the entire canonical Holdout Selection payload; Authoring Selection is never included. `rubric_version` is `lesson-teaching-benchmark-v1`.
-
-Decision rules are deterministic over Agent-authored statuses:
-
-- Any major GAP in Round 1 means `REVISION_REQUIRED`.
-- Any major GAP in Round 2 means `HUMAN_REVIEW_REQUIRED`.
-- Any insufficient-evidence dimension means `HUMAN_REVIEW_REQUIRED`.
-- With no major or insufficient-evidence dimensions, a minor/advisory-only review can be `NO_REVISION_REQUIRED`.
-- Incomplete Holdout coverage is `BENCHMARK_PARTIAL` unless a stronger gap decision applies. With no Lesson Holdout evidence, it is `BENCHMARK_UNAVAILABLE`.
-
-These are gates over evidence counts, not a quality score. Benchmark decisions cannot declare a whole course failed.
-
-## Round 2 provenance
-
-At most two review rounds are allowed. Round 2 must provide `--previous-review` and `--previous-lesson-content` and fully revalidate Round 1 against the same Catalog, Split, Holdout Pack, Holdout Selection, Lesson coverage, dimensions, citations, counts, decision, isolation, and status.
-
-The validator proves:
-
-```text
-SHA256(previous Lesson Content)
-== Round 1.source_lesson_content_sha256
-== Round 2.prior_source_lesson_content_sha256
-== Holdout Selection.source_lesson_content_sha256
-
-SHA256(current Round 2 Lesson Content)
-== Round 2.source_lesson_content_sha256
-!= prior_source_lesson_content_sha256
-```
-
-Holdout Pack and Holdout Selection stay frozen; do not reselect easier examples. Preserve `benchmark-round1-lesson-content.json` and `benchmark-round1-review.json` as provenance outside production Lesson Content.
-
-## Acceptance and unavailable cases
-
-Acceptance Schema remains 2.0, with an optional `benchmark_review` object. Without Benchmark input, the existing report and status behavior is unchanged. If `--benchmark-review` is supplied, Acceptance requires `--benchmark-catalog`, `--benchmark-split`, `--benchmark-holdout-pack`, and `--benchmark-holdout-selection` and performs full-linkage validation. Round 2 additionally requires `--benchmark-previous-review` and `--benchmark-previous-content`. Missing provenance fails closed. The report records validated Catalog, Split, Pack, Holdout Selection, and Review digests. The validator's `--review-only` mode is schema/debug inspection only, not production Acceptance evidence.
-
-If the decision is `REVISION_REQUIRED` or `HUMAN_REVIEW_REQUIRED`, an otherwise passing result is capped at `PENDING_MANUAL_REVIEW`. Existing teacher, visual, and Teaching Design manual layers remain required. Only an explicit human failure decision can set `FAILED`.
-
-`BENCHMARK_UNAVAILABLE` is not a structural error. Lesson validation, DOCX generation, rendering, and production status continue under existing gates. `production_pass` means the artifact production technical chain passed; it does not mean Benchmark is complete. Never add unrelated Cards to turn the Benchmark available.
-
-## Phase 2 exclusions
-
-This Phase 1 implementation reserves schemas, split semantics, and fingerprints only. Development Gold execution/scoring, automatic web discovery, `student_evidence` as a Content field, `analysis_basis`, `reflection_mode`, Template upgrade, and Content Contract upgrade are deferred to a separate phase. Do not browse, download, or create real-source Cards as part of this implementation; synthetic test evidence is not a teaching-quality claim.
-
-## Local sidecar commands
+The production command includes:
 
 ```powershell
-python scripts/exemplar_contract.py catalog examples/exemplar-catalog.example.json
-python scripts/exemplar_split.py --catalog examples/exemplar-catalog.example.json --output exemplar-split.json --authoring-pack exemplar-authoring-pack.json --holdout-pack exemplar-holdout-pack.json
-python scripts/exemplar_contract.py pack --catalog examples/exemplar-catalog.example.json --split exemplar-split.json --pack exemplar-authoring-pack.json
-python scripts/exemplar_contract.py authoring-selection --catalog <catalog.json> --split <split.json> --pack <authoring-pack.json> --selection <authoring-selection.json> --lesson-content <lesson-content.json>
-python scripts/exemplar_contract.py holdout-selection --catalog <catalog.json> --split <split.json> --pack <holdout-pack.json> --selection <holdout-selection.json> --lesson-content <lesson-content.json>
-python scripts/validate_benchmark_review.py --review examples/benchmark-review.example.json --review-only
+python scripts/generate_lesson_plans.py `
+  --tasks-json lesson-content.json `
+  --benchmark-mode required `
+  --benchmark-authorization benchmark-authorization.json `
+  --output-dir output `
+  --render
 ```
 
-The example review is schema/debug-only and explicitly unavailable; it has no teaching-quality judgment. A production Review validation command must provide full provenance and finish before invoking `generate_lesson_plans.py --render`. E2E synthetic evidence is test scaffolding only.
+The artifact manifest records the source label and digest, local-only source-path diagnostic policy, capability mode, authorization hash, and matching benchmark provenance. The generator re-reads and validates the authorization sidecar when checking the manifest. `validate_output.py --render` is diagnostic only; production requires the generator's retained DOCX/PDF artifacts, successful SHA/page checks, output QA and transaction verification. `production_pass` means the artifact production chain passed, not that the Benchmark or human teaching review passed.
+
+Acceptance Schema 2.0 takes `--benchmark-review`, `--benchmark-catalog`, `--benchmark-split`, `--benchmark-authoring-pack`, `--benchmark-authoring-selection`, `--benchmark-holdout-pack`, `--benchmark-holdout-selection`, and `--benchmark-lesson-reviews-dir`. Round 2 additionally takes the Round 1 course Review, Lesson Content and Lesson Review directory. All inputs and report destinations are checked for path alias/overlap before writing. Missing linkage fails closed. Benchmark does not automatically turn Acceptance into `PASSED`; teacher, visual, teaching-design and human failure decisions remain with their existing owners.
+
+## Synthetic closure bundle and local validators
+
+`examples/synthetic-benchmark-closure/` is a closed, synthetic example with three qualified groups, frozen A/B inputs, three per-Lesson Review shards in each round, two full authorization files and an explicitly revised Content 2.2 Round 2 payload. `SYNTHETIC-README.md` states the evidence limits and gives the validation command. The example is not a teaching-quality claim and is not a real-source benchmark.
+
+Run the end-to-end tests on Windows and macOS with:
+
+```powershell
+python .github/scripts/run_test_shards.py --suite lesson-benchmark --verbose
+```
+
+The tests cover real rendered synthetic outputs, full A/B Acceptance linkage, Round 2 Content 2.2 review history, tamper and path-alias rejection, the checked-in canonical bundle and the 20/32 Lesson Review shard sizes. Authorization outputs created during the canonical-bundle test go to a temporary directory.
