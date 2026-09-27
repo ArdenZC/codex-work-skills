@@ -9,6 +9,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+# macOS exposes its temporary directory through /var, a symlink to /private/var.
+# The benchmark CLIs intentionally reject paths that traverse symlink components,
+# so keep test fixtures rooted at the canonical temporary directory.
+if sys.platform == "darwin":
+    tempfile.tempdir = str(Path(tempfile.gettempdir()).resolve())
+
 ROOT = Path(__file__).resolve().parents[1]
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 SCRIPTS = LESSON / "scripts"
