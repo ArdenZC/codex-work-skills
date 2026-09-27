@@ -1,0 +1,237 @@
+{
+  "benchmark_contract_version": "1.0",
+  "benchmark_run_id": "synthetic-benchmark-run",
+  "review_round": 2,
+  "lesson_id": "L01",
+  "source_lesson_content_sha256": "ac72e42fd37bdc886a64ea9c27cb152047ed47ebda588068f13fadb0dbb2cb08",
+  "selected_holdout_exemplar_ids": [
+    "EX-03"
+  ],
+  "dimensions": [
+    {
+      "dimension": "source_truth_alignment",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "SOURCE_TRUTH",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [
+        "SYNTHETIC source truth fixture"
+      ],
+      "holdout_exemplar_ids": []
+    },
+    {
+      "dimension": "learner_analysis",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "objective_quality",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "content_selection",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "key_difficult_point_resolution",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "teacher_action_quality",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "student_cognitive_activity",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "learning_evidence",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "objective_activity_evidence_assessment_alignment",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "authentic_vocational_context",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "differentiation_scaffold",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "interaction_deep_learning",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "assessment_quality",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "progression_capacity",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    },
+    {
+      "dimension": "teacher_usability",
+      "status": "MEETS",
+      "severity": "none",
+      "evidence_basis": "HOLDOUT_EXEMPLAR",
+      "current_evidence": "Synthetic benchmark evidence only; controlled test fixture.",
+      "benchmark_pattern": "Synthetic abstract pattern; no real teaching quality is asserted.",
+      "gap": "",
+      "recommended_direction": "",
+      "insufficiency_reason": "",
+      "source_truth_evidence": [],
+      "holdout_exemplar_ids": [
+        "EX-03"
+      ]
+    }
+  ]
+}

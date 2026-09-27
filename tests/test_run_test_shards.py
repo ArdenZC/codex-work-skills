@@ -60,6 +60,15 @@ class TestShardManifest(unittest.TestCase):
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_skill_hardening").countTestCases(),
         )
 
+    def test_lesson_benchmark_suite_is_in_full_manifest(self) -> None:
+        specs = run_test_shards._suite_specs()
+        self.assertIn("lesson-benchmark", specs)
+        self.assertIn("lesson-benchmark", run_test_shards._expand_suites(("full",), specs))
+        self.assertEqual(
+            specs["lesson-benchmark"].count,
+            unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_exemplar_benchmark").countTestCases(),
+        )
+
     def test_list_json_reports_parallel_safety_and_counts(self) -> None:
         result = subprocess.run(
             [sys.executable, str(SCRIPTS / "run_test_shards.py"), "--list", "--json"],
@@ -79,6 +88,7 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(payload["suites"]["gradebook"]["resource_group"], "repository-validator")
         self.assertEqual(payload["suites"]["tooling"]["resource_group"], "repository-validator")
         self.assertEqual(payload["suites"]["release"]["resource_group"], "repository-validator")
+        self.assertTrue(payload["suites"]["lesson-benchmark"]["parallel_safe"])
 
     def test_isolated_environment_redirects_temp_and_preserves_host_office_profile(self) -> None:
         root = ROOT / "_test-shard-root"

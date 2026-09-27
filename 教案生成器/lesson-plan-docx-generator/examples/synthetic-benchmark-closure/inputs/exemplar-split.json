@@ -1,0 +1,28 @@
+{
+  "split_contract_version": "1.0",
+  "split_policy_version": "lesson-exemplar-split-v1",
+  "catalog_id": "synthetic-catalog",
+  "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
+  "split_id": "split-81fd27ce3f79b9ff158f",
+  "created_at": "2026-09-27T07:43:20Z",
+  "authoring_group_count": 2,
+  "holdout_group_count": 1,
+  "authoring_availability": "AVAILABLE",
+  "holdout_availability": "PARTIAL",
+  "benchmark_availability": "PARTIAL",
+  "authoring_group_ids": [
+    "GR-00",
+    "GR-01"
+  ],
+  "holdout_group_ids": [
+    "GR-02"
+  ],
+  "authoring_exemplar_ids": [
+    "EX-01",
+    "EX-02"
+  ],
+  "holdout_exemplar_ids": [
+    "EX-03"
+  ],
+  "split_fingerprint": "aac7e29bb84c8de91b51775bd7bc42b06af446a95fa944451f5dc903819a704b"
+}

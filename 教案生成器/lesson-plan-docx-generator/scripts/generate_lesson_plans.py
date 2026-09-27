@@ -497,6 +497,9 @@ def _build_artifact_manifest(
     run_id: str,
     source_path: Path,
     created_at: str,
+    *,
+    benchmark_authorization: dict[str, Any] | None = None,
+    benchmark_authorization_sha256: str | None = None,
 ) -> dict[str, Any]:
     render_artifacts = {
         item["docx_path"]: item
@@ -536,6 +539,7 @@ def _build_artifact_manifest(
     reference_evidence_path = candidate / "reference-evidence.json"
     manifest = {
         "manifest_version": "2.0",
+        "skill_version": "2.3.0",
         "content_contract_version": meta.get("content_contract_version"),
         "run_id": run_id,
         "course_name": meta.get("course_name"),
@@ -543,6 +547,9 @@ def _build_artifact_manifest(
         "lesson_hours": lesson_hours,
         "source_json_path": str(source_path.resolve()),
         "source_json_sha256": _file_sha256(source_path),
+        "source_json_path_privacy": "local_diagnostic",
+        "source_label": source_path.name,
+        "source_sha256": _file_sha256(source_path),
         "final_docx_path": records[0]["final_docx_path"] if len(records) == 1 else None,
         "final_docx_sha256": records[0]["final_docx_sha256"] if len(records) == 1 else None,
         "final_pdf_path": records[0]["final_pdf_path"] if len(records) == 1 else None,
@@ -567,6 +574,19 @@ def _build_artifact_manifest(
         "created_at": created_at,
         "artifacts": records,
     }
+    if benchmark_authorization is None:
+        manifest["lesson_skill_capability"] = "2.2-compatible"
+        manifest["teaching_exemplar_benchmark"] = {"status": "not_provided"}
+    else:
+        if not isinstance(benchmark_authorization_sha256, str):
+            raise RuntimeError("Benchmark Authorization bytes are required to build artifact provenance")
+        from benchmark_authorization import authorization_manifest_block
+
+        manifest["lesson_skill_capability"] = "2.3-benchmark-linked"
+        manifest["benchmark_authorization_path"] = "benchmark-authorization.json"
+        manifest["teaching_exemplar_benchmark"] = authorization_manifest_block(
+            benchmark_authorization, benchmark_authorization_sha256
+        )
     if is_v22:
         manifest["production_status"] = report.get("production_status")
     return manifest
@@ -632,6 +652,56 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         raise RuntimeError("artifact manifest content_contract_version does not match the source JSON")
     if manifest.get("manifest_version") != "2.0":
         raise RuntimeError("artifact manifest manifest_version must be 2.0")
+    if "skill_version" in manifest:
+        if manifest.get("skill_version") != "2.3.0":
+            raise RuntimeError("artifact manifest skill_version must be 2.3.0")
+        if manifest.get("source_json_path_privacy") != "local_diagnostic":
+            raise RuntimeError("artifact manifest source_json_path must be marked local_diagnostic")
+        if manifest.get("source_label") != source_path.name:
+            raise RuntimeError("artifact manifest source_label does not match the source JSON filename")
+        if str(manifest.get("source_sha256", "")).upper() != _file_sha256(source_path):
+            raise RuntimeError("artifact manifest source_sha256 does not match the source JSON")
+        benchmark = manifest.get("teaching_exemplar_benchmark")
+        if not isinstance(benchmark, dict):
+            raise RuntimeError("artifact manifest teaching_exemplar_benchmark must be an object")
+        if benchmark.get("status") == "not_provided":
+            if benchmark != {"status": "not_provided"} or manifest.get("lesson_skill_capability") != "2.2-compatible":
+                raise RuntimeError("missing Benchmark Authorization must use the 2.2-compatible capability block")
+            if manifest.get("benchmark_authorization_path") is not None or (root / "benchmark-authorization.json").exists():
+                raise RuntimeError("artifact contains Benchmark Authorization data but declares not_provided")
+        else:
+            if manifest.get("lesson_skill_capability") != "2.3-benchmark-linked":
+                raise RuntimeError("Benchmark Authorization requires lesson_skill_capability=2.3-benchmark-linked")
+            authorization_path = _artifact_relative_path(root, manifest.get("benchmark_authorization_path"))
+            if (
+                authorization_path is None
+                or authorization_path != (root / "benchmark-authorization.json").resolve()
+                or authorization_path.is_symlink()
+                or not authorization_path.is_file()
+            ):
+                raise RuntimeError("benchmark-authorization.json is missing or outside the final artifact directory")
+            authorization_sha256 = _file_sha256(authorization_path)
+            if str(benchmark.get("benchmark_authorization_sha256", "")).upper() != authorization_sha256:
+                raise RuntimeError("artifact manifest Benchmark Authorization SHA-256 mismatch")
+            try:
+                authorization = json.loads(authorization_path.read_text(encoding="utf-8-sig"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RuntimeError(f"Benchmark Authorization could not be read: {exc}") from exc
+            from benchmark_authorization import validate_authorization_payload
+
+            source_final_digest = str((source_data.get("authoring_provenance") or {}).get("final_content_sha256", ""))
+            authorization_errors = validate_authorization_payload(
+                authorization,
+                source_lesson_content_sha256=_file_sha256(source_path),
+                source_final_content_sha256=source_final_digest,
+            )
+            if authorization_errors:
+                raise RuntimeError("Benchmark Authorization validation failed: " + "; ".join(authorization_errors))
+            from benchmark_authorization import validate_manifest_benchmark_binding
+
+            binding_errors = validate_manifest_benchmark_binding(manifest, authorization, authorization_sha256)
+            if binding_errors:
+                raise RuntimeError("; ".join(binding_errors))
     is_v22 = source_contract_version == "2.2"
     if manifest.get("course_name") != source_data.get("course_name") or manifest.get("major") != source_data.get("major"):
         raise RuntimeError("artifact manifest course identity does not match the source JSON")
@@ -1006,6 +1076,24 @@ def main() -> None:
     parser.add_argument("--backup-existing", action="store_true")
     parser.add_argument("--manifest", default="")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
+    parser.add_argument("--benchmark-authorization", type=Path)
+    parser.add_argument("--benchmark-catalog", type=Path)
+    parser.add_argument("--benchmark-split", type=Path)
+    parser.add_argument("--benchmark-authoring-pack", type=Path)
+    parser.add_argument("--benchmark-authoring-selection", type=Path)
+    parser.add_argument("--benchmark-holdout-pack", type=Path)
+    parser.add_argument("--benchmark-holdout-selection", type=Path)
+    parser.add_argument("--benchmark-review", type=Path)
+    parser.add_argument("--benchmark-lesson-reviews-dir", type=Path)
+    parser.add_argument("--benchmark-previous-review", type=Path)
+    parser.add_argument("--benchmark-previous-lesson-reviews-dir", type=Path)
+    parser.add_argument("--benchmark-previous-content", type=Path)
+    parser.add_argument(
+        "--benchmark-mode",
+        choices=("none", "optional", "required"),
+        default="none",
+        help="Require and record full-linkage Benchmark Authorization for 2.3 production provenance",
+    )
     parser.add_argument("--skip-template-validation", action="store_true")
     parser.add_argument("--skip-output-validation", action="store_true")
     parser.add_argument("--render", action="store_true", help="Render validated DOCX files and retain verified PDFs for artifact publication / production verification")
@@ -1042,6 +1130,60 @@ def main() -> None:
     out_dir = Path(args.output_dir).expanduser().absolute()
     source_path = Path(args.tasks_json).expanduser().resolve()
     schema_path = Path(args.schema).expanduser().resolve()
+    benchmark_authorization_path = (
+        Path(args.benchmark_authorization).expanduser().absolute()
+        if args.benchmark_authorization is not None
+        else None
+    )
+    benchmark_evidence_arguments = {
+        "--benchmark-catalog": args.benchmark_catalog,
+        "--benchmark-split": args.benchmark_split,
+        "--benchmark-authoring-pack": args.benchmark_authoring_pack,
+        "--benchmark-authoring-selection": args.benchmark_authoring_selection,
+        "--benchmark-holdout-pack": args.benchmark_holdout_pack,
+        "--benchmark-holdout-selection": args.benchmark_holdout_selection,
+        "--benchmark-review": args.benchmark_review,
+        "--benchmark-lesson-reviews-dir": args.benchmark_lesson_reviews_dir,
+        "--benchmark-previous-review": args.benchmark_previous_review,
+        "--benchmark-previous-lesson-reviews-dir": args.benchmark_previous_lesson_reviews_dir,
+        "--benchmark-previous-content": args.benchmark_previous_content,
+    }
+    any_benchmark_evidence = any(value is not None for value in benchmark_evidence_arguments.values())
+    if args.benchmark_mode == "required" and benchmark_authorization_path is None:
+        raise ValueError("--benchmark-mode required needs --benchmark-authorization")
+    if args.benchmark_mode == "none" and benchmark_authorization_path is not None:
+        raise ValueError("--benchmark-authorization requires --benchmark-mode optional or required")
+    if benchmark_authorization_path is None and any_benchmark_evidence:
+        raise ValueError("Benchmark evidence paths require --benchmark-authorization")
+    if benchmark_authorization_path is not None:
+        required_evidence_arguments = {
+            name: benchmark_evidence_arguments[name]
+            for name in (
+                "--benchmark-catalog", "--benchmark-split", "--benchmark-authoring-pack",
+                "--benchmark-authoring-selection", "--benchmark-holdout-pack",
+                "--benchmark-holdout-selection", "--benchmark-review",
+                "--benchmark-lesson-reviews-dir",
+            )
+        }
+        missing_evidence = [name for name, value in required_evidence_arguments.items() if value is None]
+        if missing_evidence:
+            raise ValueError("Benchmark Authorization requires full evidence: " + ", ".join(missing_evidence))
+    if benchmark_authorization_path is not None:
+        from exemplar_contract import assert_distinct_file_paths
+
+        benchmark_distinct_paths: dict[str, Path] = {
+            "Lesson Content": source_path,
+            "schema": schema_path,
+            "Benchmark Authorization": benchmark_authorization_path,
+            "Output directory": out_dir,
+        }
+        benchmark_distinct_paths.update(
+            {name: value.expanduser().resolve() for name, value in benchmark_evidence_arguments.items() if value is not None}
+        )
+        assert_distinct_file_paths(
+            benchmark_distinct_paths,
+            outputs={"Benchmark Authorization", "Output directory"},
+        )
     with source_path.open("r", encoding="utf-8") as f:
         meta = json.load(f)
     if meta.get("content_contract_version") != "2.2" and not args.legacy:
@@ -1056,6 +1198,41 @@ def main() -> None:
     )
     if meta.get("content_contract_version") == "2.2":
         meta = apply_reviewed_lesson_content(meta)
+    benchmark_authorization: dict[str, Any] | None = None
+    benchmark_authorization_bytes: bytes | None = None
+    benchmark_authorization_sha256: str | None = None
+    if benchmark_authorization_path is not None:
+        if meta.get("content_contract_version") != "2.2":
+            raise ValueError("Benchmark Authorization is supported only with Lesson Content Contract 2.2")
+        try:
+            benchmark_authorization_bytes = benchmark_authorization_path.read_bytes()
+            benchmark_authorization = json.loads(benchmark_authorization_bytes.decode("utf-8-sig"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Benchmark Authorization could not be read: {exc}") from exc
+        if not isinstance(benchmark_authorization, dict):
+            raise ValueError("Benchmark Authorization must be a JSON object")
+        benchmark_authorization_sha256 = hashlib.sha256(benchmark_authorization_bytes).hexdigest()
+        from benchmark_authorization import derive_benchmark_authorization_claims, validate_authorization_matches_claims
+
+        derived_claims = derive_benchmark_authorization_claims(
+            lesson_content_path=source_path,
+            catalog_path=args.benchmark_catalog.expanduser().resolve(),
+            split_path=args.benchmark_split.expanduser().resolve(),
+            authoring_pack_path=args.benchmark_authoring_pack.expanduser().resolve(),
+            authoring_selection_path=args.benchmark_authoring_selection.expanduser().resolve(),
+            holdout_pack_path=args.benchmark_holdout_pack.expanduser().resolve(),
+            holdout_selection_path=args.benchmark_holdout_selection.expanduser().resolve(),
+            benchmark_review_path=args.benchmark_review.expanduser().resolve(),
+            lesson_reviews_dir=args.benchmark_lesson_reviews_dir.expanduser().resolve(),
+            schema_path=schema_path,
+            previous_lesson_content_path=args.benchmark_previous_content.expanduser().resolve() if args.benchmark_previous_content else None,
+            previous_review_path=args.benchmark_previous_review.expanduser().resolve() if args.benchmark_previous_review else None,
+            previous_lesson_reviews_dir=args.benchmark_previous_lesson_reviews_dir.expanduser().resolve() if args.benchmark_previous_lesson_reviews_dir else None,
+            allow_test_fixture=allow_test_fixture_authoring,
+        )
+        authorization_errors = validate_authorization_matches_claims(benchmark_authorization, derived_claims)
+        if authorization_errors:
+            raise ValueError("Benchmark Authorization validation failed: " + "; ".join(authorization_errors))
     lessons = meta["lessons"]
     run_id = str(
         args.run_id
@@ -1076,6 +1253,8 @@ def main() -> None:
         manifest=manifest_path,
         package_roots=package_roots,
     )
+    if benchmark_authorization_path is not None:
+        protected_paths.append(benchmark_authorization_path)
     assert_output_path_safe(out_dir, protected_paths)
     requested_qa = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
     internal_qa = out_dir / "qa-report.json"
@@ -1118,6 +1297,8 @@ def main() -> None:
         generated_filenames: list[str] = []
         for seq, item in enumerate(lessons, 1):
             generated_filenames.append(build_lesson(template, candidate, meta, item, seq, manifest).name)
+        if benchmark_authorization_bytes is not None:
+            (candidate / "benchmark-authorization.json").write_bytes(benchmark_authorization_bytes)
         candidate_qa = candidate / "qa-report.json"
         if not args.skip_output_validation:
             report = validate_outputs(
@@ -1167,6 +1348,8 @@ def main() -> None:
             run_id,
             source_path,
             created_at,
+            benchmark_authorization=benchmark_authorization,
+            benchmark_authorization_sha256=benchmark_authorization_sha256,
         )
         # Production readiness is derived only after this tentative manifest's
         # files, hashes, and final page counts have all been verified.

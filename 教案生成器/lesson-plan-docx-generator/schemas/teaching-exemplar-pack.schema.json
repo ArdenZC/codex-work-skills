@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teaching-exemplar-pack.schema.json",
+  "title": "Role-scoped Teaching Exemplar Pack Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pack_contract_version", "role", "catalog_id", "catalog_fingerprint", "split_id", "split_fingerprint", "exemplar_ids", "exemplars", "pack_fingerprint"],
+  "properties": {
+    "pack_contract_version": { "const": "1.0" },
+    "role": { "enum": ["authoring", "holdout"] },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "split_id": { "type": "string", "minLength": 1 },
+    "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "exemplar_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "exemplars": { "type": "array", "items": { "$ref": "teaching-exemplar-card.schema.json" } },
+    "pack_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  }
+}

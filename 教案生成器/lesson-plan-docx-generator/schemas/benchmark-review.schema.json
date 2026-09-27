@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/benchmark-review.schema.json",
+  "title": "Lesson Teaching Exemplar Benchmark Course Summary Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "benchmark_contract_version", "benchmark_run_id", "catalog_id", "catalog_fingerprint",
+    "split_id", "split_fingerprint", "holdout_pack_fingerprint", "benchmark_availability",
+    "source_lesson_content_sha256", "holdout_selection_sha256", "rubric_version", "review_round",
+    "status", "isolation", "lesson_review_count", "lesson_reviews", "course_summary"
+  ],
+  "properties": {
+    "benchmark_contract_version": { "const": "1.0" },
+    "benchmark_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "split_id": { "type": "string", "minLength": 1 },
+    "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "holdout_pack_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "benchmark_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+    "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "holdout_selection_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "rubric_version": { "const": "lesson-teaching-benchmark-v1" },
+    "review_round": { "enum": [1, 2] },
+    "prior_review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "prior_source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "prior_final_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "current_final_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },
+    "isolation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["context_mode", "authoring_exemplars_visible", "author_reasoning_visible", "holdout_only"],
+      "properties": {
+        "context_mode": { "enum": ["separate_contexts", "single_context"] },
+        "authoring_exemplars_visible": { "type": "boolean" },
+        "author_reasoning_visible": { "type": "boolean" },
+        "holdout_only": { "type": "boolean" }
+      }
+    },
+    "lesson_review_count": { "type": "integer", "minimum": 0 },
+    "lesson_reviews": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["lesson_id", "review_sha256"],
+        "properties": {
+          "lesson_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+        }
+      }
+    },
+    "course_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "major_gap_count", "minor_gap_count", "insufficient_evidence_count", "lessons_reviewed",
+        "lessons_without_holdout", "no_relevant_holdout_lesson_count", "context_mode",
+        "authoring_availability", "holdout_availability", "decision", "status"
+      ],
+      "properties": {
+        "major_gap_count": { "type": "integer", "minimum": 0 },
+        "minor_gap_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_count": { "type": "integer", "minimum": 0 },
+        "lessons_reviewed": { "type": "integer", "minimum": 0 },
+        "lessons_without_holdout": { "type": "integer", "minimum": 0 },
+        "no_relevant_holdout_lesson_count": { "type": "integer", "minimum": 0 },
+        "context_mode": { "enum": ["separate_contexts", "single_context"] },
+        "authoring_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+        "holdout_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+        "decision": { "enum": ["NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] },
+        "status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "review_round": { "const": 2 } }, "required": ["review_round"] },
+      "then": { "required": ["prior_review_sha256", "prior_source_lesson_content_sha256", "prior_final_content_sha256", "current_final_content_sha256"] }
+    },
+    {
+      "if": { "properties": { "review_round": { "const": 1 } }, "required": ["review_round"] },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["prior_review_sha256"] },
+            { "required": ["prior_source_lesson_content_sha256"] },
+            { "required": ["prior_final_content_sha256"] },
+            { "required": ["current_final_content_sha256"] }
+          ]
+        }
+      }
+    },
+    {
+      "if": { "properties": { "isolation": { "properties": { "context_mode": { "const": "separate_contexts" } } } }, "required": ["isolation"] },
+      "then": {
+        "properties": {
+          "isolation": {
+            "properties": {
+              "authoring_exemplars_visible": { "const": false },
+              "author_reasoning_visible": { "const": false },
+              "holdout_only": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "isolation": { "properties": { "context_mode": { "const": "single_context" } } } }, "required": ["isolation"] },
+      "then": {
+        "properties": {
+          "isolation": {
+            "properties": {
+              "authoring_exemplars_visible": { "const": true },
+              "author_reasoning_visible": { "const": true },
+              "holdout_only": { "const": false }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/benchmark-lesson-review.schema.json",
+  "title": "Lesson Teaching Exemplar Benchmark Per-Lesson Review Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["benchmark_contract_version", "benchmark_run_id", "review_round", "lesson_id", "source_lesson_content_sha256", "selected_holdout_exemplar_ids", "dimensions"],
+  "properties": {
+    "benchmark_contract_version": { "const": "1.0" },
+    "benchmark_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "review_round": { "enum": [1, 2] },
+    "lesson_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "selected_holdout_exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "dimensions": {
+      "type": "array", "maxItems": 15,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["dimension", "status", "severity", "evidence_basis", "current_evidence", "benchmark_pattern", "gap", "recommended_direction", "insufficiency_reason", "source_truth_evidence", "holdout_exemplar_ids"],
+        "properties": {
+          "dimension": { "enum": ["source_truth_alignment", "learner_analysis", "objective_quality", "content_selection", "key_difficult_point_resolution", "teacher_action_quality", "student_cognitive_activity", "learning_evidence", "objective_activity_evidence_assessment_alignment", "authentic_vocational_context", "differentiation_scaffold", "interaction_deep_learning", "assessment_quality", "progression_capacity", "teacher_usability"] },
+          "status": { "enum": ["MEETS", "PARTIAL", "GAP", "NOT_APPLICABLE", "INSUFFICIENT_EVIDENCE"] },
+          "severity": { "enum": ["major", "minor", "advisory", "none"] },
+          "evidence_basis": { "enum": ["SOURCE_TRUTH", "HOLDOUT_EXEMPLAR", "SOURCE_TRUTH_AND_HOLDOUT", "LESSON_INTERNAL"] },
+          "current_evidence": { "type": "string", "maxLength": 600 },
+          "benchmark_pattern": { "type": "string", "maxLength": 600 },
+          "gap": { "type": "string", "maxLength": 600 },
+          "recommended_direction": { "type": "string", "maxLength": 600 },
+          "insufficiency_reason": { "type": "string", "maxLength": 600 },
+          "source_truth_evidence": { "type": "array", "maxItems": 8, "items": { "type": "string", "minLength": 1, "maxLength": 600 } },
+          "holdout_exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "dimension": { "const": "source_truth_alignment" } }, "required": ["dimension"] },
+            "then": {
+              "properties": {
+                "evidence_basis": { "const": "SOURCE_TRUTH" },
+                "source_truth_evidence": { "minItems": 1 },
+                "benchmark_pattern": { "maxLength": 600 },
+                "holdout_exemplar_ids": { "maxItems": 4 }
+              }
+            },
+            "else": {
+              "properties": {
+                "evidence_basis": { "enum": ["HOLDOUT_EXEMPLAR", "SOURCE_TRUTH_AND_HOLDOUT", "LESSON_INTERNAL"] }
+              },
+              "allOf": [
+                {
+                  "if": { "properties": { "evidence_basis": { "const": "SOURCE_TRUTH_AND_HOLDOUT" } }, "required": ["evidence_basis"] },
+                  "then": { "properties": { "source_truth_evidence": { "minItems": 1 } } },
+                  "else": { "properties": { "source_truth_evidence": { "maxItems": 0 } } }
+                }
+              ]
+            }
+          },
+          {
+            "if": { "properties": { "status": { "enum": ["MEETS", "PARTIAL", "GAP"] } }, "required": ["status"] },
+            "then": { "properties": { "current_evidence": { "minLength": 1 } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "INSUFFICIENT_EVIDENCE" } }, "required": ["status"] },
+            "then": { "properties": { "current_evidence": { "minLength": 1 }, "gap": { "minLength": 1 }, "recommended_direction": { "minLength": 1 }, "insufficiency_reason": { "minLength": 1 } } }
+          },
+          {
+            "if": { "properties": { "status": { "const": "NOT_APPLICABLE" } }, "required": ["status"] },
+            "then": { "properties": { "current_evidence": { "minLength": 1 }, "evidence_basis": { "const": "LESSON_INTERNAL" } } }
+          }
+        ]
+      }
+    }
+  }
+}

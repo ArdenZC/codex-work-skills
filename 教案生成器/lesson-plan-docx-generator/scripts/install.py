@@ -14,7 +14,7 @@ from path_safety import paths_overlap
 
 
 SKILL_NAME = "lesson-plan-docx-generator"
-SKILL_VERSION = "2.2.4"
+SKILL_VERSION = "2.3.0"
 CONTENT_CONTRACT_VERSION = "2.2"
 TEMPLATE_VERSION = "1.1.2"
 INSTALL_MANIFEST = Path("install-manifest.json")
@@ -26,6 +26,7 @@ REQUIRED_RELATIVE_FILES = (
     Path("agents/openai.yaml"),
     Path("manifest.yaml"),
     Path("docs/intake-contract-v2.1.1.json"),
+    Path("docs/teaching-exemplar-benchmark-v1.md"),
     Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
     Path("scripts/content_contract.py"),
@@ -40,8 +41,44 @@ REQUIRED_RELATIVE_FILES = (
     Path("scripts/check_dependencies.py"),
     Path("scripts/install.py"),
     Path("scripts/install_adapters.py"),
+    Path("scripts/exemplar_contract.py"),
+    Path("scripts/exemplar_split.py"),
+    Path("scripts/aggregate_benchmark_reviews.py"),
+    Path("scripts/benchmark_authorization.py"),
+    Path("scripts/build_benchmark_authorization.py"),
+    Path("scripts/lesson_acceptance.py"),
+    Path("scripts/validate_benchmark_review.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("schemas/practice-task-contract.schema.json"),
+    Path("schemas/teaching-exemplar-card.schema.json"),
+    Path("schemas/teaching-exemplar-catalog.schema.json"),
+    Path("schemas/teaching-exemplar-split.schema.json"),
+    Path("schemas/teaching-exemplar-pack.schema.json"),
+    Path("schemas/teaching-exemplar-authoring-selection.schema.json"),
+    Path("schemas/teaching-exemplar-holdout-selection.schema.json"),
+    Path("schemas/benchmark-review.schema.json"),
+    Path("schemas/benchmark-lesson-review.schema.json"),
+    Path("schemas/benchmark-authorization.schema.json"),
+    Path("examples/exemplar-catalog.example.json"),
+    Path("examples/benchmark-review.example.json"),
+    Path("examples/synthetic-benchmark-closure/SYNTHETIC-README.md"),
+    Path("examples/synthetic-benchmark-closure/inputs/exemplar-catalog.json"),
+    Path("examples/synthetic-benchmark-closure/inputs/exemplar-split.json"),
+    Path("examples/synthetic-benchmark-closure/inputs/exemplar-authoring-pack.json"),
+    Path("examples/synthetic-benchmark-closure/inputs/exemplar-authoring-selection.json"),
+    Path("examples/synthetic-benchmark-closure/inputs/exemplar-holdout-pack.json"),
+    Path("examples/synthetic-benchmark-closure/inputs/exemplar-holdout-selection.json"),
+    Path("examples/synthetic-benchmark-closure/round1/lesson-content.json"),
+    Path("examples/synthetic-benchmark-closure/round1/course-review.json"),
+    Path("examples/synthetic-benchmark-closure/round1/lesson-reviews/L01.json"),
+    Path("examples/synthetic-benchmark-closure/round1/lesson-reviews/L02.json"),
+    Path("examples/synthetic-benchmark-closure/round1/lesson-reviews/L03.json"),
+    Path("examples/synthetic-benchmark-closure/round2/lesson-content.json"),
+    Path("examples/synthetic-benchmark-closure/round2/course-review.json"),
+    Path("examples/synthetic-benchmark-closure/round2/lesson-reviews/L01.json"),
+    Path("examples/synthetic-benchmark-closure/round2/lesson-reviews/L02.json"),
+    Path("examples/synthetic-benchmark-closure/round2/lesson-reviews/L03.json"),
+    Path("examples/synthetic-benchmark-closure/round2/benchmark-authorization.json"),
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
 )

@@ -1,6 +1,8 @@
 ---
-description: 生成项目化中文教案 DOCX 的统一入口
+description: Lesson Skill 2.3.0 production and benchmark workflow
 alwaysApply: true
 ---
 
-先读取 `SKILL.md` 和 `通用提示词.md`。它们定义 Lesson Skill 2.2.1 / Content Contract V2、课程级 outline、一次性资料核对、Content QA、模板/输出保真 QA、路径保护和 candidate 原子提交。所有教学正文、实施活动、评价 remarks 和反思来自 JSON；明确需要实践工单时 Practice Task 与 WorkOrder 一一对应且每个为 2 学时，明确不需要时不创建 handoff；禁止 sparse input、旧生成函数、IT 默认污染和静默删减。
+开始前阅读 `SKILL.md`、`AGENTS.md` 与 `通用提示词.md`。当前规范为 Lesson Skill 2.3.0 / Content Contract 2.2；先确认并冻结课程事实、完成全课程 outline，再由 Agent 创作逐课正文。Lesson DOCX 只承载理论课时，严格遵循现有 10 / `hours × 45` / 15 分钟合同与受保护模板。
+
+Teaching Exemplar Benchmark 使用独立 sidecar，不扩展 Content 2.2。Curator 保管 Catalog/Split；Author/Reviewer 只接收每课选定 Cards。正式生产先完整校验 A/B Packs、A/B Selections、逐课 Review shards 和课程 Review，再生成 Authorization；调用 `generate_lesson_plans.py` 必须带 `--benchmark-mode required --benchmark-authorization <file>`。Round 2 必须是 Agent 内容的语义修改，更新 Content 2.2 pedagogical review history/provenance，并复验 Round 1 的完整快照。Acceptance 必须完成 A/B 两侧 full linkage。Python 不判断教学质量，也不创建正文。

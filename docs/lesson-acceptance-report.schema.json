@@ -66,6 +66,43 @@
       },
       "additionalProperties": true
     },
+    "benchmark_review": {
+      "type": "object",
+      "required": [
+        "status", "decision", "review_round", "major_gap_count", "minor_gap_count",
+        "insufficient_evidence_count", "lessons_reviewed", "lessons_without_holdout",
+        "context_mode", "authoring_availability", "holdout_availability",
+        "benchmark_run_id", "source_sha256", "catalog_fingerprint", "split_fingerprint",
+        "authoring_pack_fingerprint", "authoring_selection_sha256",
+        "holdout_pack_fingerprint", "holdout_selection_sha256",
+        "benchmark_authorization_sha256", "no_relevant_holdout_lesson_count", "review_sha256"
+      ],
+      "properties": {
+        "status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },
+        "decision": { "enum": ["NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] },
+        "review_round": { "enum": [1, 2] },
+        "major_gap_count": { "type": "integer", "minimum": 0 },
+        "minor_gap_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_count": { "type": "integer", "minimum": 0 },
+        "lessons_reviewed": { "type": "integer", "minimum": 0 },
+        "lessons_without_holdout": { "type": "integer", "minimum": 0 },
+        "context_mode": { "enum": ["separate_contexts", "single_context"] },
+        "authoring_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+        "holdout_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+        "benchmark_run_id": { "type": "string", "minLength": 1 },
+        "source_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "catalog_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "split_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "authoring_pack_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "authoring_selection_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "holdout_pack_fingerprint": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "holdout_selection_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "benchmark_authorization_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "no_relevant_holdout_lesson_count": { "type": "integer", "minimum": 0 },
+        "review_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
     "delivery_metrics": { "type": "object", "additionalProperties": true },
     "reference_metrics": { "type": "object", "additionalProperties": true },
     "practice_handoff_metrics": { "type": "object", "additionalProperties": true },

@@ -3,4 +3,6 @@ description: 生成项目化中文教案 DOCX 的统一入口
 alwaysApply: true
 ---
 
-先读取同目录 `SKILL.md` 和 `通用提示词.md`。遵循 Lesson Skill 2.2.1 / Content Contract V2 和唯一 QA/事务流程：课程级规划先行，所有正文由 JSON 提供，Python 只校验、格式化、映射和原子写入模板。仅在明确需要实践工单时使用固定 2 学时 Practice Task Contract 并按实践学时除以 2 生成 WorkOrder；否则不产生 handoff 或实践侧文件。不要使用 sparse input、旧套话、IT 默认内容或静默截断；平台按 Windows/macOS 说明执行。
+先读取 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`。当前规范为 Lesson Skill 2.3.0、Content Contract 2.2 与 Template 1.1.2；完成一次课程 Intake、冻结课程基本盘和全课程 outline，再由 Agent 创作正文并运行现有 QA/事务流程。
+
+Lesson 2.3 Benchmark 只使用独立 sidecar。Curator 独占 Catalog/Split；Author 和 Reviewer 每次只接收本课所选 Cards。完整校验 A/B Packs、Selections、逐课 Review shards 和课程汇总后生成 Authorization。正式 DOCX 必须使用 `--benchmark-mode required --benchmark-authorization <file>`。Round 2 固定 run/B 输入，要求语义内容修订、更新 Content 2.2 pedagogical review history/provenance 并复验 Round 1 全部快照。Acceptance 链接 A/B 两侧及所有 Review 文件。教学语义仍由 Agent 负责，脚本不产出正文或质量分。

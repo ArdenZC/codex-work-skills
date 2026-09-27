@@ -1,5 +1,7 @@
-# Claude Code 入口（Lesson Skill 2.2.4）
+# Claude Code 入口（Lesson Skill 2.3.0）
 
 开始前读取 `SKILL.md` 与 `通用提示词.md`。先一次性完成中文 intake，确认后冻结课程事实并先做全课程 outline；随后按 Content Contract 2.2 生成理论 Lesson、QA 和 DOCX。
 
 Lesson DOCX 只承载理论。每课课前 10 分钟、七个课中阶段合计 `hours × 45` 分钟、课后 15 分钟；1 学时内容必须实质少于 2 学时。教材、resources、references 分离，references 保留真实责任者信息，书籍年份可选且不写未知年份。只有明确需要实践工单时才生成 Practice Task Contract 1.1/handoff，并在 Lesson QA/DOCX 后调用 WorkOrder Skill Agent；不得由 Lesson Python 跨调用或伪造 WorkOrder DOCX。工单不可用时使用 SKILL.md 规定的原样提示。
+
+2.3 Benchmark 只通过 sidecar 工作。Author/Reviewer 上下文只含本课已选 Cards；Authorization claims 由共享 deterministic helper 从完整 Content、A/B、Selection、Review shards 和课程汇总派生，`REVISION_REQUIRED` 不得签出最终授权。generator required mode，以及 optional 带 Authorization 时，都必须重验完整 evidence；Round 2 还传 Round 1 Content、Review 与 shards。Acceptance 比较 evidence claims、Artifact Authorization 和 manifest Benchmark block。`2.3-benchmark-linked` 表示证据链绑定，不是教学质量结论。

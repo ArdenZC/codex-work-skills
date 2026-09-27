@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teaching-exemplar-card.schema.json",
+  "title": "Teaching Exemplar Card Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "exemplar_id", "group_id", "source", "scope", "qualification",
+    "design_patterns", "difficulty_breakthrough_patterns", "student_activity_patterns",
+    "learning_evidence_patterns", "assessment_patterns", "differentiation_patterns",
+    "reflection_patterns", "transferable_principles", "non_transferable_context", "do_not_copy"
+  ],
+  "properties": {
+    "exemplar_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "group_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["title", "institution", "author_or_team", "canonical_url", "provided_source_id", "source_label", "source_type", "authority_tier", "authority_basis", "recognition", "recognition_evidence", "retrieved_at", "visibility", "source_identity_sha256"],
+      "properties": {
+        "title": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "institution": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "author_or_team": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "canonical_url": { "type": ["string", "null"], "minLength": 1, "maxLength": 2048 },
+        "provided_source_id": { "type": ["string", "null"], "maxLength": 300 },
+        "source_label": { "type": ["string", "null"], "maxLength": 500 },
+        "source_type": { "enum": ["official_platform", "award_case", "national_course", "professional_resource_repository", "institution_case", "peer_reviewed_research", "private_user_provided", "discovery_source"] },
+        "authority_tier": { "enum": ["A", "B", "C", "PRIVATE"] },
+        "authority_basis": { "enum": ["official_award", "national_course", "official_repository", "peer_reviewed", "institution_publication", "private_user"] },
+        "recognition": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "recognition_evidence": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "retrieved_at": { "type": "string", "format": "date-time" },
+        "visibility": { "enum": ["public", "private_session"] },
+        "source_identity_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+      }
+    },
+    "scope": {
+      "type": "object", "additionalProperties": false,
+      "required": ["education_level", "vocational_level", "domain", "course", "scope_mode", "topic", "learner_profile", "duration_minutes", "teaching_context"],
+      "properties": {
+        "education_level": { "type": "string", "maxLength": 200 },
+        "vocational_level": { "type": "string", "maxLength": 200 },
+        "domain": { "type": "string", "maxLength": 300 },
+        "course": { "type": "string", "maxLength": 300 },
+        "scope_mode": { "enum": ["course_specific", "generic_pattern"] },
+        "topic": { "type": "string", "maxLength": 500 },
+        "learner_profile": { "type": "string", "maxLength": 1000 },
+        "duration_minutes": { "type": ["integer", "null"], "minimum": 1 },
+        "teaching_context": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "qualification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "rationale"],
+      "properties": {
+        "status": { "enum": ["QUALIFIED", "CONDITIONAL", "DISCOVERY_ONLY", "REJECTED"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "design_patterns": { "$ref": "#/$defs/patterns" },
+    "difficulty_breakthrough_patterns": { "$ref": "#/$defs/patterns" },
+    "student_activity_patterns": { "$ref": "#/$defs/patterns" },
+    "learning_evidence_patterns": { "$ref": "#/$defs/patterns" },
+    "assessment_patterns": { "$ref": "#/$defs/patterns" },
+    "differentiation_patterns": { "$ref": "#/$defs/patterns" },
+    "reflection_patterns": { "$ref": "#/$defs/patterns" },
+    "transferable_principles": { "$ref": "#/$defs/patterns" },
+    "non_transferable_context": { "$ref": "#/$defs/patterns" },
+    "do_not_copy": { "$ref": "#/$defs/patterns" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "source": { "properties": { "source_type": { "const": "private_user_provided" } }, "required": ["source_type"] } }, "required": ["source"] },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "canonical_url": { "type": "null" }
+            },
+            "anyOf": [
+              { "properties": { "provided_source_id": { "type": "string", "minLength": 1, "pattern": "\\S" } }, "required": ["provided_source_id"] },
+              { "properties": { "source_label": { "type": "string", "minLength": 1, "pattern": "\\S" } }, "required": ["source_label"] }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source": {
+            "properties": { "canonical_url": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "patterns": {
+      "type": "array", "maxItems": 20,
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 }
+    }
+  }
+}

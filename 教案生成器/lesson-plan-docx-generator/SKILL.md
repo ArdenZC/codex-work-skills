@@ -3,9 +3,9 @@ name: lesson-plan-docx-generator
 description: Generate projectized Chinese vocational-course lesson plan DOCX files from Lesson Content Contract 2.2, using the protected Word template, deterministic QA, and optional render smoke.
 ---
 
-# 教案生成器 Skill 2.2.4
+# 教案生成器 Skill 2.3.0
 
-本文件是 Lesson 的唯一人类行为合同。当前 Content Contract 仍为 2.2，默认 Word 模板为 `lesson-plan v1.1.2`，模板 binary 和模板版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
+本文件是 Lesson 的唯一人类行为合同。当前版本为 Lesson Skill 2.3.0、Lesson Content Contract 2.2、Lesson Template 1.1.2、Acceptance Schema 2.0、Exemplar Contract 1.0 和 Benchmark Review 1.0。默认 Word 模板 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
 
 ## 任务入口与一次性确认
 
@@ -14,6 +14,42 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 用户确认后进入 `INTAKE_CONFIRMED`，把课程名称、专业、授课对象、总课时、理论课时、实践课时和组织方式冻结到 `confirmed_course_info`，正文 Agent 不得改名或重写。确认后不再询问 outline、项目/任务、评分、模板、输出目录或“是否开始生成 DOCX”；只有新冲突、覆盖安全或用户主动改变要求才暂停。用户界面使用中文标签，不把内部字段名作为提问内容；具体状态合同见 `docs/intake-contract-v2.1.1.json`。`default_hours=2` 只表示默认单课 2 学时，教材为 recommended, not required。
 
 没有任务资料时也必须先形成整门课程 outline，再写逐课内容。Outline 至少给出目标、模块/项目、课次、学时、先决知识、能力阶段、课次产出、相邻课次衔接和案例策略；每项需包含 `lesson_id`、`unit`、`task`、`lesson_type`、`hours`、`theory_hours`、`practice_hours`、`prior_learning`、`capability_stage`、`deliverable`、`next_bridge`、`practice_task_ids`。outline 是全课程骨架，不能只根据单课临时拼接。
+
+## Teaching Exemplar Benchmark 2.3
+
+Benchmark 是与 Lesson Content 2.2 分离的 sidecar 闭环，不增加 Lesson 字段，也不改变九阶段、课程结构、时间/评分规则、WorkOrder、现有 production transaction 或 Lesson Template 1.1.2。Skill 2.3.0 新增生产授权：旧调用默认 `--benchmark-mode none`，保持 2.2 兼容；`optional` 可不提供授权，但只要提供授权就必须同时提供完整 Benchmark evidence；正式 2.3 流程必须在生成器中使用 `--benchmark-mode required --benchmark-authorization <authorization.json>` 与 Catalog、Split、A/B Packs、A/B Selections、课程 Review、逐课 Review shards。Round 2 还须提供 `--benchmark-previous-review`、`--benchmark-previous-lesson-reviews-dir` 和 `--benchmark-previous-content`。生成器与 Acceptance 都调用同一个 deterministic claims helper 重验全链，并比较 Authorization、artifact manifest 和 sidecar provenance。required 缺授权/证据、claims 不匹配或 sidecar 篡改都必须失败关闭。`2.3-benchmark-linked` 仅表示 Benchmark evidence chain 已绑定，不表示教学结论通过。Benchmark 不能证明课程或教学质量。
+
+固定状态流：
+
+```text
+Intake / Source Truth / whole-course outline freeze
+→ Curator Catalog → stable group Split → separate physical A and B Packs
+→ Author sees only selected Cards from A and writes per-Lesson A Selection
+→ Content 2.2 authoring and its existing pedagogical_review
+→ Reviewer sees final reviewed Lesson Content, Source Truth summary, selected B Cards and rubric
+→ Holdout Selection + one Review JSON per Lesson + aggregated course summary
+→ shared deterministic full-linkage claims + immutable Benchmark Authorization
+→ at most one bounded revision round; refresh Content 2.2 pedagogical review/provenance
+→ Round 2 using the same run, B Pack and Holdout Selection; revalidate Round 1 snapshots
+→ final Content 2.2 validation → generator required mode → render/production verification
+→ Acceptance with A and B Packs, both Selections, Review summary and per-Lesson shards
+```
+
+完整 Catalog 与 Split 仅供 Curator/orchestrator 校验，不能传给 Author 或 Reviewer。运行上下文只接收本课选择的 Cards；Pack 保留完整分组来源，仅供 orchestrator 校验。Author 每课最多选 5 张 A Card；Reviewer 每课最多选 4 张 B Card；配额不是质量目标。Card 只能保留抽象模式，不能复制原教案正文、独特案例叙事、原学生数据或教师话术。
+
+Catalog fingerprint 覆盖 Exemplar Contract 版本、资格策略版本、课程上下文与按 ID 排序的完整 Cards，不含 `created_at`。来源可为公开或私有会话；公开 URL 必须通过 URL 安全校验，私有来源不能伪装成公开网页；来源时间须含时区，每张 Card UTF-8 JSON 不超过 12 KiB。`QUALIFIED` 仅允许合格的 A/B 来源；Tier C、`discovery_source`、`CONDITIONAL`、`DISCOVERY_ONLY` 和 `REJECTED` 不进入 Split。Qualified Card 至少有一个非空模式字段及 `do_not_copy`。
+
+Split 按完整 `group_id` 隔离同一作品及其衍生版本。侧别由 split policy 版本、规范化课程身份和 group ID 的稳定哈希决定；`course_name`、`major`、`audience` 先执行 NFKC、去首尾空白、折叠连续空白和 casefold，因此等价的空白、Unicode 兼容字符和英文大小写不会重洗 A/B。课程身份字段的实质变化可以改变侧别。A/B Packs 必须由同一 Split CLI 原子生成并核验全量成员。Authoring/Holdout availability 分别报告；两侧不足时保留真实 PARTIAL/UNAVAILABLE，不人为添加案例。
+
+Authoring Selection 必须覆盖整个 outline，并绑定已有 `whole_course_outline_sha256`。Holdout Selection 必须覆盖所有 Lesson，Round 1 绑定精确 Content JSON 字节。Reviewer 为每个 Lesson 输出独立 JSON，课程汇总只保存每课 Review SHA、计数和状态。每课 Review 的 `evidence_basis` 区分 `SOURCE_TRUTH`、`HOLDOUT_EXEMPLAR`、`SOURCE_TRUTH_AND_HOLDOUT` 与 `LESSON_INTERNAL`；Source Truth alignment 只能由 Source Truth 支持，不能引用 exemplar。Evidence prose 单字段最多 600 字符。`NOT_APPLICABLE` 仅允许 `authentic_vocational_context`、`differentiation_scaffold`，且要写明理由。`INSUFFICIENT_EVIDENCE` 必须解释不足原因、现有证据和补证方向，并升级到人工审阅。
+
+`NO_RELEVANT_EXEMPLAR` 与数据不可用不同：若 B Pack 非空而所有 Lesson 均无相关 Holdout 选择，则要求人工说明，状态为部分/人工审阅，不得伪报 UNAVAILABLE。`separate_contexts` 要 attests Author 卡片/推理不可见且 Review 仅使用 B；`single_context` 必须如实声明暴露情况并将决策降为 partial。代码只能校验 sidecar、散列、引用和 attestation，无法证明模型实际看到的 prompt。
+
+Review 最多两轮。Round 2 固定同一 `benchmark_run_id`、B Pack 和 Holdout Selection；要求完整 Round 1 Content、课程总结、逐课 Review 快照并复验。除了 JSON 字节哈希，还要求 Agent-owned Content 发生语义变化，Round 2 必须重新合法更新 Content 2.2 的 `pedagogical_review.review_history` 与 provenance；只改空白或 JSON 排序不算修订。Round 2 major GAP 或任一轮证据不足均要求人工审阅，不允许 Round 3。
+
+Authorization 由 `build_benchmark_authorization.py` 在完整验证 Content、Catalog、Split、A/B Packs、A/B Selections、汇总 Review 与每课 Review 后生成，绑定原始 Content 字节 SHA、最终 Agent 内容 digest、所有包/选择/Review 指纹、决策和上下文模式。生成器将授权副本、哈希和 benchmark 状态写入 artifact manifest；manifest 检查同时重新散列授权并核对原始/最终内容。正式生产应先得到有效授权再调用 generator。`validate_output.py --render` 是临时诊断；只有正式 generator `--render` 保留 PDF 并完成页数、哈希、QA 与事务核验后，才可能得到 `production_pass`。
+
+Acceptance 2.0 在提供 Review 时必须执行 A 与 B 两侧的 full-linkage 校验，并读取每课 Review 分片；Round 2 还需 Round 1 Review、分片与 Lesson snapshot。缺失或别名重叠的路径必须失败。benchmark `NO_REVISION_REQUIRED` 不会自动把 Acceptance 置为 PASSED；其他需要关注的状态会阻止自动通过并保留人工层。0 个合格来源是合法 UNAVAILABLE，可继续 Lesson production，但 `production_pass` 不代表 Benchmark 完成。
 
 ## Content Contract 2.2
 
