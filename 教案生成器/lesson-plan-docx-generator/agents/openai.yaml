@@ -3,3 +3,4 @@ interface:
   short_description: "按 Content 2.3 与确认的 delivery mode 生成项目化教案"
   default_prompt: >-
     使用教案生成器 Skill 2.3.1。先读取技能说明、规则、通用提示词和用户资料，一次性确认并冻结课程事实，完成全课程纲要，再按 Content Contract 2.3 生成教案正文、教学审查、质量检查、DOCX 和用户要求的真实渲染。课程学时按组织方式核对：纯理论、理实一体和混合组织的逐课教案覆盖课程总学时；理论实践分开安排时，逐课教案覆盖理论学时；纯实践课保持零份逐课教案。理实一体课程若总计 64 学时、理论 32 学时、实践 32 学时，默认每课 2 学时，应有 32 份教案。关闭实践工单时仍保留完整实践学时且不生成工单；开启时再配套 16 份、每份 2 学时的实践任务与工单，课程总学时不增加。Content 2.2 保持历史语义。Template 1.1.2、固定九阶段、评价体系与 Benchmark sidecar 架构不变。Python 只负责确定性校验、排版与输出，不创作正文或教学判断。
+    Agent 只创作 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review。最终 Lesson DOCX 只允许由 canonical generate_lesson_plans.py 基于 Template 1.1.2 生成并通过 Output QA、所需 retained render、artifact manifest verification 与 Acceptance；任一 generator/template validation/Output QA/manifest verification 失败即 BLOCKED，禁止手工创建、修改、修补或绕过。完整禁令见 SKILL.md「最终 Lesson DOCX 的不可绕过生产边界」。

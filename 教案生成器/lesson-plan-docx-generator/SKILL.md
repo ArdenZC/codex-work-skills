@@ -122,6 +122,24 @@ Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账�
 
 为防止机械注入，formatter 只删除独立的主题元话术尾缀，如 `聚焦/聚焦于/围绕/针对/对应主题/核心主题/本节主题/任务主题/本节关联：...`；正常专业句子不改写，例如“比较两种结构的空间代价，对应不同数据规模。” 最终 DOCX 的这类 meta suffix 计数必须为 0，不能把防御性清理当作根层教学质量判断。
 
+## 最终 Lesson DOCX 的不可绕过生产边界
+
+Agent 只能创作和修订 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review。Agent 不得直接创建或修改最终 Lesson DOCX，不得修补 generator 已输出的 DOCX；不得使用 `python-docx` 手工重写模板单元格，也不得通过 Word、LibreOffice 或 API 对最终 DOCX 二次写入内容。Agent 不得为压缩页数自行调整字号、字体、行距或模板布局，不得删除、移动或重建 Template 1.1.2 semantic bookmarks，也不得在 generator、template validation 或 Output QA 失败后另造“相似模板”DOCX。生产时不得绕过 canonical generator、template validation、output validation、artifact manifest verification 或 Acceptance。
+
+正式 Lesson DOCX 唯一生产路径为：
+
+```text
+validated Lesson Content
+→ generate_lesson_plans.py
+→ canonical Template 1.1.2
+→ Output QA
+→ retained render when required
+→ artifact manifest verification
+→ Acceptance
+```
+
+Canonical generator、template fidelity 或 Output QA 任一环节失败，必须报告 `BLOCKED`；不得手工修改 DOCX 使其“能交付”。
+
 ## 生成与生产门禁
 
 ```text

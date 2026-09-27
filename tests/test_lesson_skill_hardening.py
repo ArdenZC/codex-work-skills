@@ -89,6 +89,58 @@ lesson_acceptance = load_module(ROOT / "tests" / "lesson_acceptance.py", "lesson
 
 
 class LessonSkillHardeningTests(unittest.TestCase):
+    def test_final_docx_production_contract_is_generator_only_across_agent_facades(self) -> None:
+        skill = (LESSON / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("## 最终 Lesson DOCX 的不可绕过生产边界", skill)
+        boundary = skill.split("## 最终 Lesson DOCX 的不可绕过生产边界", 1)[1].split("\n## ", 1)[0]
+        for invariant in (
+            "Agent 只能创作和修订 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review",
+            "不得直接创建或修改最终 Lesson DOCX",
+            "不得修补 generator 已输出的 DOCX",
+            "`python-docx` 手工重写模板单元格",
+            "Word、LibreOffice 或 API 对最终 DOCX 二次写入内容",
+            "自行调整字号、字体、行距或模板布局",
+            "删除、移动或重建 Template 1.1.2 semantic bookmarks",
+            "另造“相似模板”DOCX",
+            "不得绕过 canonical generator",
+            "validated Lesson Content",
+            "generate_lesson_plans.py",
+            "canonical Template 1.1.2",
+            "Output QA",
+            "retained render when required",
+            "artifact manifest verification",
+            "Acceptance",
+            "必须报告 `BLOCKED`",
+        ):
+            with self.subTest(invariant=invariant):
+                self.assertIn(invariant, boundary)
+
+        compact_invariant = (
+            "Agent 只创作 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review。"
+            "最终 Lesson DOCX 只允许由 canonical generate_lesson_plans.py 基于 Template 1.1.2 生成并通过 Output QA、"
+            "所需 retained render、artifact manifest verification 与 Acceptance；任一 generator/template validation/"
+            "Output QA/manifest verification 失败即 BLOCKED，禁止手工创建、修改、修补或绕过。完整禁令见 "
+            "SKILL.md「最终 Lesson DOCX 的不可绕过生产边界」。"
+        )
+        facades = (
+            "AGENTS.md",
+            "通用提示词.md",
+            "agents/openai.yaml",
+            "GEMINI.md",
+            "CLAUDE.md",
+            "CONVENTIONS.md",
+            "多Agent兼容说明.md",
+            ".github/copilot-instructions.md",
+            ".cursor/rules/lesson-plan-generator.mdc",
+            ".clinerules/lesson-plan-generator.md",
+            ".continue/rules/lesson-plan-generator.md",
+            ".windsurf/rules/lesson-plan-generator.md",
+        )
+        for relative in facades:
+            with self.subTest(facade=relative):
+                text = (LESSON / relative).read_text(encoding="utf-8")
+                self.assertIn(compact_invariant, text)
+
     def test_lesson_intake_and_reference_instruction_contract(self) -> None:
         skill = (LESSON / "SKILL.md").read_text(encoding="utf-8")
         prompt = (LESSON / "通用提示词.md").read_text(encoding="utf-8")

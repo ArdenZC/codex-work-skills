@@ -11,3 +11,4 @@
 - Lesson Skill 2.3.1 的 Teaching Exemplar Benchmark 继续使用独立 sidecar 与现有 Catalog/Split/A-B/Review/Authorization 信任边界；Authorization 1.0 兼容 Content 2.2/2.3 并记录实际输入版本。不新增 Lesson benchmark 字段。
 - Template 1.1.2、固定九阶段、评价体系和 Practice Task Contract 1.1 保持不变。教材、resources 与 references 分开；不得伪造来源。
 - 生产生成必须通过 schema、内容、模板、输出、事务和所请求的真实 render 校验。未执行或失败的 render 不得标记 `production_pass`。
+Agent 只创作 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review。最终 Lesson DOCX 只允许由 canonical generate_lesson_plans.py 基于 Template 1.1.2 生成并通过 Output QA、所需 retained render、artifact manifest verification 与 Acceptance；任一 generator/template validation/Output QA/manifest verification 失败即 BLOCKED，禁止手工创建、修改、修补或绕过。完整禁令见 SKILL.md「最终 Lesson DOCX 的不可绕过生产边界」。

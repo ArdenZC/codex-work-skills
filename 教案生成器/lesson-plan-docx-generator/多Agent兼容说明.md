@@ -9,3 +9,4 @@ Content 2.3 的 Lesson coverage 取决于 delivery mode：`theory_only`、`integ
 `schemas/shared/practice-task-contract.schema.json` 是跨 Skill 的唯一 Practice Task schema。Template 1.1.2、九阶段、评价体系不变。来源真实可核验；Content 2.3 保留 Content 2.2 的 reference/source-truth 和 Agent review/provenance 规则。
 
 Teaching Exemplar Benchmark 继续独立 sidecar：Curator 管理 Catalog/Split，Author/Reviewer 每课只看所选 Cards，保持 A/B Packs、Selections、逐课 Review shards、课程汇总和 Authorization 的现有边界。Authorization 1.0 同时支持 Content 2.2/2.3，并记录实际输入版本；不改变 benchmark 架构或向 Lesson JSON 加字段。
+Agent 只创作 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review。最终 Lesson DOCX 只允许由 canonical generate_lesson_plans.py 基于 Template 1.1.2 生成并通过 Output QA、所需 retained render、artifact manifest verification 与 Acceptance；任一 generator/template validation/Output QA/manifest verification 失败即 BLOCKED，禁止手工创建、修改、修补或绕过。完整禁令见 SKILL.md「最终 Lesson DOCX 的不可绕过生产边界」。

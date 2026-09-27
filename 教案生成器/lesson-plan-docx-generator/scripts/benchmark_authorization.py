@@ -15,6 +15,10 @@ SKILL_VERSION = "2.3.1"
 CONTENT_CONTRACT_VERSION = "2.3"
 COMPATIBLE_CONTENT_CONTRACT_VERSIONS = {"2.2", "2.3"}
 AUTHORIZATION_CONTRACT_VERSION = "1.0"
+# Keep in lockstep with the explicit provenance enum in
+# schemas/benchmark-authorization.schema.json. Authorization 1.0 accepts only
+# the released 2.3.0 and 2.3.1 skill versions.
+SUPPORTED_AUTHORIZATION_SKILL_VERSIONS = frozenset({"2.3.0", "2.3.1"})
 _SHA256 = re.compile(r"^[a-fA-F0-9]{64}$")
 _STATUS_DECISIONS = {
     "BENCHMARK_REVIEW_COMPLETE": {"NO_REVISION_REQUIRED"},
@@ -169,13 +173,17 @@ def validate_authorization_matches_claims(
         source_lesson_content_sha256=str(claims.get("source_lesson_content_sha256", "")),
         source_final_content_sha256=str(claims.get("source_final_content_sha256", "")),
     )
+    if payload.get("skill_version") not in SUPPORTED_AUTHORIZATION_SKILL_VERSIONS:
+        errors.append("skill_version is not a supported Authorization 1.0 provenance version")
+    ignored_claims = {"created_at", "authorization_fingerprint", "skill_version"}
     actual_claims = {
         key: value for key, value in payload.items()
-        if key not in {"created_at", "authorization_fingerprint"}
+        if key not in ignored_claims
     }
-    if actual_claims != dict(claims):
-        mismatched = sorted(set(actual_claims) | set(claims))
-        mismatched = [key for key in mismatched if actual_claims.get(key) != claims.get(key)]
+    expected_claims = {key: value for key, value in claims.items() if key not in ignored_claims}
+    if actual_claims != expected_claims:
+        mismatched = sorted(set(actual_claims) | set(expected_claims))
+        mismatched = [key for key in mismatched if actual_claims.get(key) != expected_claims.get(key)]
         errors.append(
             "Benchmark Authorization claims do not match full evidence"
             + (": " + ", ".join(mismatched) if mismatched else "")
