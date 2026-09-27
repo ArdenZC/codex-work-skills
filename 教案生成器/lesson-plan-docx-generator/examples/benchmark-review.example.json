@@ -1,0 +1,36 @@
+{
+  "benchmark_contract_version": "1.0",
+  "benchmark_run_id": "example-unavailable-run",
+  "catalog_id": "example-unavailable",
+  "split_id": "split-4f53cda18c2baa0c0354",
+  "split_fingerprint": "4577e1a14ece2365be78fb41c3296dd9b2206892da658756b30a7c9ef6a67309",
+  "benchmark_availability": "UNAVAILABLE",
+  "source_lesson_content_sha256": "accc46bc9c7e7a204a4c097e756d381972135b727be7c2428159cc1d82cbf30a",
+  "holdout_selection_sha256": "31d64418206a36facdbe64ed05e01331fcea090e589485c6088c6f571e6905af",
+  "rubric_version": "lesson-teaching-benchmark-v1",
+  "review_round": 1,
+  "status": "BENCHMARK_UNAVAILABLE",
+  "isolation": {
+    "authoring_exemplars_visible": false,
+    "author_reasoning_visible": false,
+    "holdout_only": true
+  },
+  "lessons": [
+    {
+      "lesson_id": "L01",
+      "holdout_selection": {
+        "status": "UNAVAILABLE",
+        "exemplar_ids": []
+      },
+      "dimensions": []
+    }
+  ],
+  "course_summary": {
+    "major_gap_count": 0,
+    "minor_gap_count": 0,
+    "insufficient_evidence_count": 0,
+    "lessons_reviewed": 0,
+    "lessons_without_holdout": 1,
+    "decision": "BENCHMARK_UNAVAILABLE"
+  }
+}

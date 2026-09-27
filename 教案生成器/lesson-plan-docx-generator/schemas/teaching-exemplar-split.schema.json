@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teaching-exemplar-split.schema.json",
+  "title": "Teaching Exemplar Split Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["split_contract_version", "catalog_id", "catalog_fingerprint", "split_id", "created_at", "benchmark_availability", "authoring_group_ids", "holdout_group_ids", "authoring_exemplar_ids", "holdout_exemplar_ids", "split_fingerprint"],
+  "properties": {
+    "split_contract_version": { "const": "1.0" },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "split_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "benchmark_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+    "authoring_group_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "holdout_group_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "authoring_exemplar_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "holdout_exemplar_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  }
+}

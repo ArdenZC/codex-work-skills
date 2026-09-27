@@ -1585,6 +1585,31 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
     structural = report.get("structural_hard_gates")
     if not isinstance(structural, Mapping) or structural.get("status") not in {"PASS", "FAIL"}:
         errors.append("structural_hard_gates.status must be PASS or FAIL")
+    benchmark = report.get("benchmark_review")
+    if benchmark is not None:
+        if not isinstance(benchmark, Mapping):
+            errors.append("benchmark_review must be an object when supplied")
+        else:
+            if benchmark.get("status") not in {
+                "BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL",
+                "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED",
+            }:
+                errors.append("benchmark_review.status is not supported")
+            if benchmark.get("decision") not in {
+                "NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED",
+                "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE",
+            }:
+                errors.append("benchmark_review.decision is not supported")
+            if benchmark.get("review_round") not in {1, 2}:
+                errors.append("benchmark_review.review_round must be 1 or 2")
+            for count_name in ("major_gap_count", "minor_gap_count"):
+                if not isinstance(benchmark.get(count_name), int) or benchmark[count_name] < 0:
+                    errors.append(f"benchmark_review.{count_name} must be a non-negative integer")
+            if not isinstance(benchmark.get("benchmark_run_id"), str) or not benchmark["benchmark_run_id"]:
+                errors.append("benchmark_review.benchmark_run_id must be a non-empty string")
+            source_sha = benchmark.get("source_sha256")
+            if not isinstance(source_sha, str) or not re.fullmatch(r"[A-Fa-f0-9]{64}", source_sha):
+                errors.append("benchmark_review.source_sha256 must be a SHA-256 digest")
     return errors
 
 
@@ -1630,6 +1655,7 @@ def build_acceptance_report(
     visual_review_path: Path | None = None,
     negative_controls_path: Path | None = None,
     historical_baseline_path: Path | None = None,
+    benchmark_review_path: Path | None = None,
 ) -> dict[str, Any]:
     if source_type not in SOURCE_TYPES:
         raise ValueError(f"source_type must be one of {SOURCE_TYPES}")
@@ -1640,6 +1666,22 @@ def build_acceptance_report(
         report_dir = report_dir.expanduser().resolve()
         if _is_within(report_dir, output_dir) or _is_within(output_dir, report_dir):
             raise ValueError("report_dir must not overlap output_dir; acceptance must not mutate generated content")
+    benchmark_payload: dict[str, Any] | None = None
+    if benchmark_review_path is not None:
+        benchmark_review_path = benchmark_review_path.expanduser().resolve()
+        lesson_scripts = Path(__file__).resolve().parent.parent / "教案生成器" / "lesson-plan-docx-generator" / "scripts"
+        if str(lesson_scripts) not in sys.path:
+            sys.path.insert(0, str(lesson_scripts))
+        try:
+            from validate_benchmark_review import validate_benchmark_review_file
+        except ImportError as exc:
+            raise ValueError(f"benchmark review validator is unavailable: {exc}") from exc
+        benchmark_payload, benchmark_errors = validate_benchmark_review_file(
+            benchmark_review_path,
+            lesson_content_path=input_json,
+        )
+        if benchmark_errors:
+            raise ValueError("benchmark review validation failed: " + "; ".join(benchmark_errors))
     data = _read_json(input_json, "input JSON")
     qa_report = _read_json(qa_report_path, "QA report")
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
@@ -1715,6 +1757,10 @@ def build_acceptance_report(
         "artifact_manifest_sha256": _sha256_file(output_dir / "artifact-manifest.json") if (output_dir / "artifact-manifest.json").is_file() else None,
     }
     final_status = _final_status(structural, visual, design, teacher, negative)
+    if benchmark_payload is not None and benchmark_payload["course_summary"]["decision"] in {
+        "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED",
+    } and final_status in {"PASSED", "PASSED_WITH_TEACHER_ADJUSTMENTS"}:
+        final_status = PENDING_STATUS
     report_expected_profile = {
         field_name: data.get(field_name)
         for field_name in ("course_name", "major", "audience")
@@ -1792,6 +1838,17 @@ def build_acceptance_report(
             if str(value.get("status", "")).lower() == "not_executed"
         ],
     }
+    if benchmark_payload is not None:
+        summary = benchmark_payload["course_summary"]
+        report["benchmark_review"] = {
+            "status": benchmark_payload["status"],
+            "decision": summary["decision"],
+            "review_round": benchmark_payload["review_round"],
+            "major_gap_count": summary["major_gap_count"],
+            "minor_gap_count": summary["minor_gap_count"],
+            "benchmark_run_id": benchmark_payload["benchmark_run_id"],
+            "source_sha256": benchmark_payload["source_lesson_content_sha256"],
+        }
     schema_errors = validate_report_schema(report)
     if schema_errors:
         raise ValueError("acceptance report schema failed: " + "; ".join(schema_errors))
@@ -1806,6 +1863,7 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
     artifact_data = artifact_manifest.get("data", {}) if isinstance(artifact_manifest, Mapping) else {}
     sequence = report.get("sequence_review", {})
     quality = report.get("content_quality_evidence", {})
+    benchmark = report.get("benchmark_review")
     lines = [
         "# Lesson Acceptance V2 Report",
         "",
@@ -1826,6 +1884,11 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
         f"Overall: **{structural.get('status')}**",
         "",
     ]
+    if isinstance(benchmark, Mapping):
+        lines.insert(
+            8,
+            f"- Teaching Exemplar Benchmark: `{benchmark.get('status')}` / `{benchmark.get('decision')}`; round `{benchmark.get('review_round')}`; major/minor gaps `{benchmark.get('major_gap_count')}/{benchmark.get('minor_gap_count')}`",
+        )
     for gate in structural.get("gates", []):
         lines.append(f"- `{gate.get('status')}` {gate.get('name')}: {gate.get('details')}")
     lines.extend(
@@ -1918,6 +1981,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--visual-review", type=Path)
     parser.add_argument("--negative-controls", type=Path)
     parser.add_argument("--historical-baseline", type=Path)
+    parser.add_argument("--benchmark-review", type=Path)
     args = parser.parse_args(argv)
     try:
         report = build_acceptance_report(
@@ -1936,6 +2000,7 @@ def main(argv: list[str] | None = None) -> int:
             visual_review_path=args.visual_review,
             negative_controls_path=args.negative_controls,
             historical_baseline_path=args.historical_baseline,
+            benchmark_review_path=args.benchmark_review,
         )
         json_path, markdown_path = write_acceptance_report(report, args.report_dir)
     except (OSError, ValueError, TypeError) as exc:

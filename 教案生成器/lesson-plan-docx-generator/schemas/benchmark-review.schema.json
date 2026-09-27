@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/benchmark-review.schema.json",
+  "title": "Lesson Teaching Exemplar Benchmark Review Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["benchmark_contract_version", "benchmark_run_id", "catalog_id", "split_id", "split_fingerprint", "benchmark_availability", "source_lesson_content_sha256", "holdout_selection_sha256", "rubric_version", "review_round", "status", "isolation", "lessons", "course_summary"],
+  "properties": {
+    "benchmark_contract_version": { "const": "1.0" },
+    "benchmark_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "split_id": { "type": "string", "minLength": 1 },
+    "split_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "benchmark_availability": { "enum": ["AVAILABLE", "PARTIAL", "UNAVAILABLE"] },
+    "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "holdout_selection_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "rubric_version": { "const": "lesson-teaching-benchmark-v1" },
+    "review_round": { "enum": [1, 2] },
+    "prior_review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "prior_source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },
+    "isolation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["authoring_exemplars_visible", "author_reasoning_visible", "holdout_only"],
+      "properties": {
+        "authoring_exemplars_visible": { "const": false },
+        "author_reasoning_visible": { "const": false },
+        "holdout_only": { "const": true }
+      }
+    },
+    "lessons": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["lesson_id", "holdout_selection", "dimensions"],
+        "properties": {
+          "lesson_id": { "type": "string", "minLength": 1 },
+          "holdout_selection": {
+            "type": "object", "additionalProperties": false,
+            "required": ["status", "exemplar_ids"],
+            "properties": {
+              "status": { "enum": ["SELECTED", "NO_RELEVANT_EXEMPLAR", "UNAVAILABLE"] },
+              "exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+            }
+          },
+          "dimensions": {
+            "type": "array", "maxItems": 15,
+            "items": { "$ref": "#/$defs/dimensionReview" }
+          }
+        }
+      }
+    },
+    "course_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["major_gap_count", "minor_gap_count", "insufficient_evidence_count", "lessons_reviewed", "lessons_without_holdout", "decision"],
+      "properties": {
+        "major_gap_count": { "type": "integer", "minimum": 0 },
+        "minor_gap_count": { "type": "integer", "minimum": 0 },
+        "insufficient_evidence_count": { "type": "integer", "minimum": 0 },
+        "lessons_reviewed": { "type": "integer", "minimum": 0 },
+        "lessons_without_holdout": { "type": "integer", "minimum": 0 },
+        "decision": { "enum": ["NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "review_round": { "const": 2 } }, "required": ["review_round"] },
+      "then": { "required": ["prior_review_sha256", "prior_source_lesson_content_sha256"] }
+    },
+    {
+      "if": { "properties": { "review_round": { "const": 1 } }, "required": ["review_round"] },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["prior_review_sha256"] },
+            { "required": ["prior_source_lesson_content_sha256"] }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "dimensionReview": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dimension", "status", "severity", "current_evidence", "benchmark_pattern", "gap", "recommended_direction", "holdout_exemplar_ids"],
+      "properties": {
+        "dimension": { "enum": ["source_truth_alignment", "learner_analysis", "objective_quality", "content_selection", "key_difficult_point_resolution", "teacher_action_quality", "student_cognitive_activity", "learning_evidence", "objective_activity_evidence_assessment_alignment", "authentic_vocational_context", "differentiation_scaffold", "interaction_deep_learning", "assessment_quality", "progression_capacity", "teacher_usability"] },
+        "status": { "enum": ["MEETS", "PARTIAL", "GAP", "NOT_APPLICABLE", "INSUFFICIENT_EVIDENCE"] },
+        "severity": { "enum": ["major", "minor", "advisory", "none"] },
+        "current_evidence": { "type": "string", "maxLength": 1000 },
+        "benchmark_pattern": { "type": "string", "maxLength": 1000 },
+        "gap": { "type": "string", "maxLength": 1000 },
+        "recommended_direction": { "type": "string", "maxLength": 1000 },
+        "holdout_exemplar_ids": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}

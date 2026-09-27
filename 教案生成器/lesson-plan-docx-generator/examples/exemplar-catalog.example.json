@@ -1,0 +1,12 @@
+{
+  "exemplar_contract_version": "1.0",
+  "catalog_id": "example-unavailable",
+  "created_at": "2026-09-27T00:00:00Z",
+  "course_context": {
+    "course_name": "示例课程",
+    "major": "示例专业",
+    "audience": "示例授课对象"
+  },
+  "catalog_fingerprint": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "exemplars": []
+}

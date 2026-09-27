@@ -3,9 +3,9 @@ name: lesson-plan-docx-generator
 description: Generate projectized Chinese vocational-course lesson plan DOCX files from Lesson Content Contract 2.2, using the protected Word template, deterministic QA, and optional render smoke.
 ---
 
-# 教案生成器 Skill 2.2.4
+# 教案生成器 Skill 2.3.0
 
-本文件是 Lesson 的唯一人类行为合同。当前 Content Contract 仍为 2.2，默认 Word 模板为 `lesson-plan v1.1.2`，模板 binary 和模板版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
+本文件是 Lesson 的唯一人类行为合同。当前版本为 Lesson Skill 2.3.0、Lesson Content Contract 2.2、Lesson Template 1.1.2、Acceptance Schema 2.0、Exemplar Contract 1.0 和 Benchmark Review 1.0。默认 Word 模板 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
 
 ## 任务入口与一次性确认
 
@@ -14,6 +14,40 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 用户确认后进入 `INTAKE_CONFIRMED`，把课程名称、专业、授课对象、总课时、理论课时、实践课时和组织方式冻结到 `confirmed_course_info`，正文 Agent 不得改名或重写。确认后不再询问 outline、项目/任务、评分、模板、输出目录或“是否开始生成 DOCX”；只有新冲突、覆盖安全或用户主动改变要求才暂停。用户界面使用中文标签，不把内部字段名作为提问内容；具体状态合同见 `docs/intake-contract-v2.1.1.json`。`default_hours=2` 只表示默认单课 2 学时，教材为 recommended, not required。
 
 没有任务资料时也必须先形成整门课程 outline，再写逐课内容。Outline 至少给出目标、模块/项目、课次、学时、先决知识、能力阶段、课次产出、相邻课次衔接和案例策略；每项需包含 `lesson_id`、`unit`、`task`、`lesson_type`、`hours`、`theory_hours`、`practice_hours`、`prior_learning`、`capability_stage`、`deliverable`、`next_bridge`、`practice_task_ids`。outline 是全课程骨架，不能只根据单课临时拼接。
+
+## Teaching Exemplar Benchmark Phase 1
+
+Teaching Exemplar Benchmark 使用 Lesson Content Contract 2.2 之外的独立 sidecar。禁止向 Lesson JSON 添加 `student_evidence`、`success_criteria`、`analysis_basis`、`reflection_mode`、`exemplar_pool` 或 `benchmark_review`。固定九阶段、项目化定位、theory/practice split、10 / hours×45 / 15 时间、85–96 / 0.5 评分、Practice Task、WorkOrder、Word template、现有 production transaction 和 `reference_pool` 语义保持不变。
+
+固定工作流：
+
+```text
+Intake
+→ Source Truth
+→ Exemplar Discovery/Card
+→ Catalog
+→ Split
+→ Outline
+→ Lesson Authoring using A
+→ existing pedagogical_review
+→ Benchmark Review using B
+→ bounded revision (at most two review rounds)
+→ final Content 2.2 validation
+→ DOCX generation
+→ render
+→ production publication
+→ Acceptance
+```
+
+Benchmark Review 必须在正式 production DOCX publication 前完成；不能等 render 后再返工 DOCX。Phase 1 只有 `QUALIFIED` 进入 Split：Tier A/B 可以 QUALIFIED，Tier C 不可；Tier PRIVATE 只能使用 `private_session`。`CONDITIONAL`、`DISCOVERY_ONLY` 和 `REJECTED` 不进入 Split。Python 只检验结构和明示组合，不判断案例教学质量。0 个 exemplar 合法，Split/Review 应如实标为 UNAVAILABLE，不得为了可用状态塞入无关案例。
+
+Agent 负责案例发现、资格判断、Card 抽象、lesson relevance、Authoring selection、Benchmark gap 判断和 bounded revision。Python 负责 Schema、hash、group isolation、A/B membership、sidecar linkage、review round、status/count consistency 和 provenance。Python 不判断案例是否优秀或相关，也不判断 Lesson 的教学质量。Card 只保留抽象设计模式，不存原教案正文；不得复制原任务原文、原学生数据、原案例叙事、原教师话术、原图表或独特创新命名。Phase 1 不做文本相似度，不实现网络 crawler/downloader/scraper、人工 override 或 Development Gold runner。
+
+Reviewer 只能接收 final reviewed Lesson content、确认的 course context/Source Truth 摘要、选定 Holdout Cards 和 Benchmark Rubric。不得提供 Author hidden reasoning、Authoring Set Cards 或 Author prompt transcript。Review 必须 attests `authoring_exemplars_visible=false`、`author_reasoning_visible=false`、`holdout_only=true`；Python 检查 attestation 和 sidecar，不声称能证明模型 prompt isolation。
+
+每课 Authoring 最多选 5 张，Holdout 最多选 4 张；目标用量分别为 3 张和 2–3 张，但不是 quota，0 张只要状态匹配就合法。CLI 的 size report 描述 Catalog 总字节数和逐课选中 Card 字节数，不设语义阈值。`private_session` Exemplars 可用于运行期 Catalog/A/B，但不得用于 development holdout、提交到仓库的 Gold 或 shared catalog。
+
+Benchmark 最多 review 两轮。Round 2 必须引用 Round 1 且 Lesson content digest 必须变化。Round 2 仍有 major GAP 时必须 `HUMAN_REVIEW_REQUIRED`；禁止 Round 3。Benchmark 永远不能自动令 Acceptance 成为 PASSED；`REVISION_REQUIRED` 或 `HUMAN_REVIEW_REQUIRED` 最多为 `PENDING_MANUAL_REVIEW`，FAILED 仍需用户明确的人工失败结论。Acceptance 2.0 可通过 `--benchmark-review <path>` 接收可选 Review；不传参数时保持原行为。Benchmark unavailable 不阻止 Lesson 生成或 production_pass，也不替代现有教师/视觉/Teaching Design 人工层。
 
 ## Content Contract 2.2
 

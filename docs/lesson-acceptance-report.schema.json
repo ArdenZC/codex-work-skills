@@ -66,6 +66,20 @@
       },
       "additionalProperties": true
     },
+    "benchmark_review": {
+      "type": "object",
+      "required": ["status", "decision", "review_round", "major_gap_count", "minor_gap_count", "benchmark_run_id", "source_sha256"],
+      "properties": {
+        "status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },
+        "decision": { "enum": ["NO_REVISION_REQUIRED", "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] },
+        "review_round": { "enum": [1, 2] },
+        "major_gap_count": { "type": "integer", "minimum": 0 },
+        "minor_gap_count": { "type": "integer", "minimum": 0 },
+        "benchmark_run_id": { "type": "string", "minLength": 1 },
+        "source_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+      },
+      "additionalProperties": false
+    },
     "delivery_metrics": { "type": "object", "additionalProperties": true },
     "reference_metrics": { "type": "object", "additionalProperties": true },
     "practice_handoff_metrics": { "type": "object", "additionalProperties": true },

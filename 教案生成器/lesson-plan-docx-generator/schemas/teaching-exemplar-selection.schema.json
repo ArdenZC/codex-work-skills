@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teaching-exemplar-selection.schema.json",
+  "title": "Teaching Exemplar Selection Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["selection_contract_version", "catalog_id", "split_id", "source_lesson_content_sha256", "lessons"],
+  "properties": {
+    "selection_contract_version": { "const": "1.0" },
+    "catalog_id": { "type": "string", "minLength": 1 },
+    "split_id": { "type": "string", "minLength": 1 },
+    "source_lesson_content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "lessons": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["lesson_id", "authoring", "holdout"],
+        "properties": {
+          "lesson_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "authoring": {
+            "allOf": [
+              { "$ref": "#/$defs/sideSelection" },
+              { "properties": { "exemplar_ids": { "maxItems": 5 } } }
+            ]
+          },
+          "holdout": {
+            "allOf": [
+              { "$ref": "#/$defs/sideSelection" },
+              { "properties": { "exemplar_ids": { "maxItems": 4 } } }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sideSelection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "exemplar_ids", "rationale"],
+      "properties": {
+        "status": { "enum": ["SELECTED", "NO_RELEVANT_EXEMPLAR", "UNAVAILABLE"] },
+        "exemplar_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    }
+  }
+}

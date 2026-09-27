@@ -19,7 +19,7 @@ from path_safety import paths_overlap
 ENGINE_NAME = ".lesson-plan-docx-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
-SKILL_VERSION = "2.2.4"
+SKILL_VERSION = "2.3.0"
 CONTENT_CONTRACT_VERSION = "2.2"
 TEMPLATE_VERSION = "1.1.2"
 SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")
@@ -36,6 +36,7 @@ MINIMAL_ENGINE_FILES = (
 FULL_ENGINE_RUNTIME_FILES = (
     Path("manifest.yaml"),
     Path("docs/intake-contract-v2.1.1.json"),
+    Path("docs/teaching-exemplar-benchmark-v1.md"),
     Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
     Path("scripts/content_contract.py"),
@@ -50,8 +51,18 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("scripts/check_dependencies.py"),
     Path("scripts/install.py"),
     Path("scripts/install_adapters.py"),
+    Path("scripts/exemplar_contract.py"),
+    Path("scripts/exemplar_split.py"),
+    Path("scripts/validate_benchmark_review.py"),
     Path("schemas/lesson-plan-input.schema.json"),
     Path("schemas/practice-task-contract.schema.json"),
+    Path("schemas/teaching-exemplar-card.schema.json"),
+    Path("schemas/teaching-exemplar-catalog.schema.json"),
+    Path("schemas/teaching-exemplar-split.schema.json"),
+    Path("schemas/teaching-exemplar-selection.schema.json"),
+    Path("schemas/benchmark-review.schema.json"),
+    Path("examples/exemplar-catalog.example.json"),
+    Path("examples/benchmark-review.example.json"),
     SHARED_SCHEMA,
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),

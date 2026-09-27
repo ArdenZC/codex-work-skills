@@ -1,4 +1,4 @@
-# Aider 约定（Lesson Skill 2.2.4）
+# Aider 约定（Lesson Skill 2.3.0）
 
 先读取 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`，不要在 Aider 配置中复制 Content Contract 字段。工作顺序是一次中文 intake、冻结课程事实、课程 outline、Content 2.2 JSON、确定性 QA、受保护模板写入和真实渲染。
 

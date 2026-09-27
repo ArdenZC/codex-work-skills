@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teaching-exemplar-catalog.schema.json",
+  "title": "Teaching Exemplar Catalog Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exemplar_contract_version", "catalog_id", "created_at", "course_context", "catalog_fingerprint", "exemplars"],
+  "properties": {
+    "exemplar_contract_version": { "const": "1.0" },
+    "catalog_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "course_context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["course_name", "major", "audience"],
+      "properties": {
+        "course_name": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "major": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "catalog_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "exemplars": {
+      "type": "array",
+      "items": { "$ref": "teaching-exemplar-card.schema.json" }
+    }
+  }
+}
