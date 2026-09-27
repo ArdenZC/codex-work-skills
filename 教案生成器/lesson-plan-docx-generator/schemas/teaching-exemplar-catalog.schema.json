@@ -4,9 +4,10 @@
   "title": "Teaching Exemplar Catalog Contract 1.0",
   "type": "object",
   "additionalProperties": false,
-  "required": ["exemplar_contract_version", "catalog_id", "created_at", "course_context", "catalog_fingerprint", "exemplars"],
+  "required": ["exemplar_contract_version", "qualification_policy_version", "catalog_id", "created_at", "course_context", "catalog_fingerprint", "exemplars"],
   "properties": {
     "exemplar_contract_version": { "const": "1.0" },
+    "qualification_policy_version": { "const": "teaching-exemplar-qualification-v1" },
     "catalog_id": { "type": "string", "minLength": 1, "maxLength": 128 },
     "created_at": { "type": "string", "format": "date-time" },
     "course_context": {

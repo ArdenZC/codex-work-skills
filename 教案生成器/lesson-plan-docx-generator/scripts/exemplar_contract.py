@@ -8,18 +8,30 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Mapping
+from datetime import datetime
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
+import tempfile
 import unicodedata
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+from path_safety import paths_equal, paths_overlap
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = SKILL_DIR / "schemas"
 HEX_SHA256 = re.compile(r"^[a-fA-F0-9]{64}$")
-IDENTITY_FIELDS = ("canonical_url", "title", "institution", "author_or_team", "recognition")
+QUALIFICATION_POLICY_VERSION = "teaching-exemplar-qualification-v1"
+SPLIT_POLICY_VERSION = "lesson-exemplar-split-v1"
+MAX_CARD_BYTES = 12 * 1024
+MAX_REVIEW_PROSE_CHARS = 600
+IDENTITY_FIELDS = (
+    "canonical_url", "provided_source_id", "source_label", "title", "institution", "author_or_team", "recognition"
+)
+SECRET_QUERY_KEYS = {"token", "access_token", "auth", "apikey", "api_key", "signature", "sig"}
 PATTERN_FIELDS = (
     "design_patterns",
     "difficulty_breakthrough_patterns",
@@ -64,11 +76,16 @@ def normalize_canonical_url(value: str) -> str:
         host = hostname.encode("idna").decode("ascii").lower()
         if ":" in host and not host.startswith("["):
             host = f"[{host}]"
-        userinfo = f"{parts.netloc.rpartition('@')[0]}@" if "@" in parts.netloc else ""
+        if parts.username is not None or parts.password is not None:
+            return normalized
         port = parts.port
         if port is not None and not ((scheme == "http" and port == 80) or (scheme == "https" and port == 443)):
             host = f"{host}:{port}"
-        return urlunsplit((scheme, userinfo + host, parts.path, parts.query, parts.fragment))
+        query = urlencode(
+            [(key, item) for key, item in parse_qsl(parts.query, keep_blank_values=True)
+             if not key.casefold().startswith("utm_")]
+        )
+        return urlunsplit((scheme, host, parts.path, query, ""))
     except (UnicodeError, ValueError):
         return normalized
 
@@ -81,9 +98,12 @@ def canonical_source_identity(card: Mapping[str, Any]) -> dict[str, str]:
     identity: dict[str, str] = {}
     for field in IDENTITY_FIELDS:
         value = source.get(field)
-        if not isinstance(value, str):
-            raise ContractError(f"card.source.{field} must be a string")
-        identity[field] = normalize_canonical_url(value) if field == "canonical_url" else normalize_identity_text(value)
+        if value is None and field in {"canonical_url", "provided_source_id", "source_label"}:
+            identity[field] = ""
+        elif not isinstance(value, str):
+            raise ContractError(f"card.source.{field} must be a string or null when optional")
+        else:
+            identity[field] = normalize_canonical_url(value) if field == "canonical_url" else normalize_identity_text(value)
     return identity
 
 
@@ -91,9 +111,85 @@ def source_identity_sha256(card: Mapping[str, Any]) -> str:
     return sha256_json(canonical_source_identity(card))
 
 
-def catalog_fingerprint(exemplars: list[Mapping[str, Any]]) -> str:
+def catalog_fingerprint(
+    exemplars: list[Mapping[str, Any]],
+    *,
+    qualification_policy_version: str = QUALIFICATION_POLICY_VERSION,
+    course_context: Mapping[str, Any] | None = None,
+    exemplar_contract_version: str = "1.0",
+) -> str:
     ordered = sorted(exemplars, key=lambda card: str(card.get("exemplar_id", "")))
-    return sha256_json(ordered)
+    return sha256_json({
+        "exemplar_contract_version": exemplar_contract_version,
+        "qualification_policy_version": qualification_policy_version,
+        "course_context": dict(course_context or {}),
+        "exemplars": ordered,
+    })
+
+
+def _timestamp_error(value: Any) -> bool:
+    if not isinstance(value, str):
+        return True
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
+    except ValueError:
+        return True
+    return parsed.tzinfo is None or parsed.utcoffset() is None
+
+
+def _has_symlink_component(path: Path) -> bool:
+    absolute = Path(os.path.abspath(os.path.expanduser(str(path))))
+    cursor = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        cursor = cursor / part
+        try:
+            if cursor.is_symlink():
+                return True
+        except OSError:
+            return True
+    return False
+
+
+def assert_distinct_file_paths(
+    paths: Mapping[str, Path],
+    *,
+    outputs: set[str] | None = None,
+) -> None:
+    """Fail closed on aliases, overlap, and symlinked path components."""
+    output_names = outputs if outputs is not None else set(paths)
+    rows = list(paths.items())
+    for label, path in rows:
+        if label in output_names and _has_symlink_component(path):
+            raise ContractError(f"{label} path must not traverse a symbolic link: {path}")
+    for index, (left_name, left) in enumerate(rows):
+        for right_name, right in rows[index + 1:]:
+            if left_name in output_names or right_name in output_names:
+                if paths_equal(left, right) or paths_overlap(left, right):
+                    raise ContractError(f"{left_name} and {right_name} paths must not overlap")
+
+
+def write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    """Atomically replace one JSON file after checking its path aliases."""
+    destination = Path(path).expanduser().absolute()
+    if _has_symlink_component(destination):
+        raise ContractError(f"output path must not traverse a symbolic link: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    try:
+        fd, name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=str(destination.parent))
+        temp_path = Path(name)
+        with os.fdopen(fd, "wb") as stream:
+            stream.write((json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp_path, destination)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
 
 
 def load_json(path: Path, label: str) -> dict[str, Any]:
@@ -161,6 +257,43 @@ def validate_card_payload(card: Mapping[str, Any]) -> list[str]:
     visibility = source["visibility"]
     status = card["qualification"]["status"]
     source_type = source["source_type"]
+    canonical_url = source["canonical_url"]
+    if source_type == "private_user_provided":
+        if canonical_url is not None:
+            errors.append("private_user_provided must use canonical_url=null")
+        if not any(normalize_identity_text(str(source.get(field) or "")) for field in ("provided_source_id", "source_label")):
+            errors.append("private_user_provided requires provided_source_id or source_label")
+        if tier != "PRIVATE" or visibility != "private_session":
+            errors.append("private_user_provided requires authority_tier PRIVATE and visibility private_session")
+    else:
+        if not isinstance(canonical_url, str):
+            errors.append("public source requires canonical_url")
+        else:
+            try:
+                parts = urlsplit(canonical_url)
+                if parts.scheme.lower() not in {"http", "https"} or not parts.hostname or not parts.netloc:
+                    errors.append("public canonical_url must use http or https")
+                if parts.username is not None or parts.password is not None or "@" in parts.netloc:
+                    errors.append("public canonical_url must not contain userinfo")
+                if any(key.casefold() in SECRET_QUERY_KEYS for key, _value in parse_qsl(parts.query, keep_blank_values=True)):
+                    errors.append("public canonical_url must not contain credential or token query parameters")
+                if normalize_canonical_url(canonical_url) != canonical_url:
+                    errors.append("public canonical_url must omit fragments and utm_* tracking parameters and be canonicalized")
+            except ValueError:
+                errors.append("public canonical_url is invalid")
+    if status == "QUALIFIED":
+        scope = card["scope"]
+        for field in ("education_level", "domain", "topic", "learner_profile", "teaching_context"):
+            if not normalize_identity_text(str(scope.get(field, ""))):
+                errors.append(f"QUALIFIED Card scope.{field} must be non-empty")
+        if scope["scope_mode"] == "course_specific" and not normalize_identity_text(scope["course"]):
+            errors.append("QUALIFIED course_specific Card requires scope.course")
+        if source["authority_basis"] == "private_user" and source_type != "private_user_provided":
+            errors.append("authority_basis private_user requires source_type private_user_provided")
+        if source_type != "private_user_provided" and not any(
+            normalize_identity_text(item) for item in source["recognition_evidence"]
+        ):
+            errors.append("public QUALIFIED Card requires non-empty recognition_evidence")
     if tier == "C" and status == "QUALIFIED":
         errors.append("authority_tier C cannot have qualification.status QUALIFIED")
     if tier == "PRIVATE" and visibility != "private_session":
@@ -174,6 +307,10 @@ def validate_card_payload(card: Mapping[str, Any]) -> list[str]:
             errors.append("QUALIFIED Card requires at least one non-empty benchmark pattern")
         if not any(normalize_identity_text(item) for item in card["do_not_copy"]):
             errors.append("QUALIFIED Card requires at least one do_not_copy item")
+    if _timestamp_error(source.get("retrieved_at")):
+        errors.append("source.retrieved_at must be a valid timezone-aware timestamp")
+    if len(canonical_json_bytes(card)) > MAX_CARD_BYTES:
+        errors.append(f"Card exceeds the {MAX_CARD_BYTES}-byte UTF-8 structural ceiling")
     return errors
 
 
@@ -181,6 +318,8 @@ def validate_catalog_payload(catalog: Mapping[str, Any]) -> list[str]:
     errors = schema_errors(catalog, "teaching-exemplar-catalog.schema.json")
     if errors:
         return errors
+    if _timestamp_error(catalog.get("created_at")):
+        errors.append("created_at must be a valid timezone-aware timestamp")
     exemplars = catalog["exemplars"]
     seen: set[str] = set()
     source_groups: dict[str, set[str]] = {}
@@ -203,14 +342,21 @@ def validate_catalog_payload(catalog: Mapping[str, Any]) -> list[str]:
             continue
         source = card["source"]
         source_groups.setdefault(source["source_identity_sha256"].casefold(), set()).add(group_id)
-        url_groups.setdefault(normalize_canonical_url(source["canonical_url"]), set()).add(group_id)
+        canonical_url = source.get("canonical_url")
+        if isinstance(canonical_url, str):
+            url_groups.setdefault(normalize_canonical_url(canonical_url), set()).add(group_id)
     for identity, groups in sorted(source_groups.items()):
         if len(groups) > 1:
             errors.append(f"source_identity_sha256 {identity} maps to multiple group_id values")
     for canonical_url, groups in sorted(url_groups.items()):
         if len(groups) > 1:
             errors.append(f"normalized canonical_url {canonical_url} maps to multiple group_id values")
-    expected = catalog_fingerprint(exemplars)
+    expected = catalog_fingerprint(
+        exemplars,
+        qualification_policy_version=catalog["qualification_policy_version"],
+        course_context=catalog["course_context"],
+        exemplar_contract_version=catalog["exemplar_contract_version"],
+    )
     if expected.casefold() != catalog["catalog_fingerprint"].casefold():
         errors.append("catalog_fingerprint does not match canonical exemplars sorted by exemplar_id")
     return errors

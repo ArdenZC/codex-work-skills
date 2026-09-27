@@ -15,28 +15,46 @@
     "group_id": { "type": "string", "minLength": 1, "maxLength": 128 },
     "source": {
       "type": "object", "additionalProperties": false,
-      "required": ["title", "institution", "author_or_team", "canonical_url", "source_type", "authority_tier", "recognition", "retrieved_at", "visibility", "source_identity_sha256"],
+      "required": ["title", "institution", "author_or_team", "canonical_url", "provided_source_id", "source_label", "source_type", "authority_tier", "authority_basis", "recognition", "recognition_evidence", "retrieved_at", "visibility", "source_identity_sha256"],
       "properties": {
         "title": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
         "institution": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
         "author_or_team": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
-        "canonical_url": { "type": "string", "minLength": 1, "maxLength": 2048 },
+        "canonical_url": { "type": ["string", "null"], "minLength": 1, "maxLength": 2048 },
+        "provided_source_id": { "type": ["string", "null"], "maxLength": 300 },
+        "source_label": { "type": ["string", "null"], "maxLength": 500 },
         "source_type": { "enum": ["official_platform", "award_case", "national_course", "professional_resource_repository", "institution_case", "peer_reviewed_research", "private_user_provided", "discovery_source"] },
         "authority_tier": { "enum": ["A", "B", "C", "PRIVATE"] },
+        "authority_basis": { "enum": ["official_award", "national_course", "official_repository", "peer_reviewed", "institution_publication", "private_user"] },
         "recognition": { "type": "string", "minLength": 1, "maxLength": 500, "pattern": "\\S" },
+        "recognition_evidence": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
         "retrieved_at": { "type": "string", "format": "date-time" },
         "visibility": { "enum": ["public", "private_session"] },
         "source_identity_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
       }
     },
+    "allOf": [
+      {
+        "if": { "properties": { "source_type": { "const": "private_user_provided" } }, "required": ["source_type"] },
+        "then": {
+          "properties": { "canonical_url": { "type": "null" } },
+          "anyOf": [
+            { "properties": { "provided_source_id": { "type": "string", "minLength": 1, "pattern": "\\S" } } },
+            { "properties": { "source_label": { "type": "string", "minLength": 1, "pattern": "\\S" } } }
+          ]
+        },
+        "else": { "properties": { "canonical_url": { "type": "string", "minLength": 1 } } }
+      }
+    ],
     "scope": {
       "type": "object", "additionalProperties": false,
-      "required": ["education_level", "vocational_level", "domain", "course", "topic", "learner_profile", "duration_minutes", "teaching_context"],
+      "required": ["education_level", "vocational_level", "domain", "course", "scope_mode", "topic", "learner_profile", "duration_minutes", "teaching_context"],
       "properties": {
         "education_level": { "type": "string", "maxLength": 200 },
         "vocational_level": { "type": "string", "maxLength": 200 },
         "domain": { "type": "string", "maxLength": 300 },
         "course": { "type": "string", "maxLength": 300 },
+        "scope_mode": { "enum": ["course_specific", "generic_pattern"] },
         "topic": { "type": "string", "maxLength": 500 },
         "learner_profile": { "type": "string", "maxLength": 1000 },
         "duration_minutes": { "type": ["integer", "null"], "minimum": 1 },
