@@ -17,7 +17,7 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 ## Teaching Exemplar Benchmark 2.3
 
-Benchmark 是与 Lesson Content 2.2 分离的 sidecar 闭环，不增加 Lesson 字段，也不改变九阶段、课程结构、时间/评分规则、WorkOrder、现有 production transaction 或 Lesson Template 1.1.2。Skill 2.3.0 新增生产授权：旧调用默认 `--benchmark-mode none`，保持 2.2 兼容；`optional` 接受有或没有授权；正式 2.3 流程必须在生成器中使用 `--benchmark-mode required --benchmark-authorization <authorization.json>`。required 缺授权、授权不匹配或 sidecar 篡改都必须失败关闭。Benchmark 只能约束产物来源与证据状态，不能证明课程或教学质量。
+Benchmark 是与 Lesson Content 2.2 分离的 sidecar 闭环，不增加 Lesson 字段，也不改变九阶段、课程结构、时间/评分规则、WorkOrder、现有 production transaction 或 Lesson Template 1.1.2。Skill 2.3.0 新增生产授权：旧调用默认 `--benchmark-mode none`，保持 2.2 兼容；`optional` 可不提供授权，但只要提供授权就必须同时提供完整 Benchmark evidence；正式 2.3 流程必须在生成器中使用 `--benchmark-mode required --benchmark-authorization <authorization.json>` 与 Catalog、Split、A/B Packs、A/B Selections、课程 Review、逐课 Review shards。Round 2 还须提供 `--benchmark-previous-review`、`--benchmark-previous-lesson-reviews-dir` 和 `--benchmark-previous-content`。生成器与 Acceptance 都调用同一个 deterministic claims helper 重验全链，并比较 Authorization、artifact manifest 和 sidecar provenance。required 缺授权/证据、claims 不匹配或 sidecar 篡改都必须失败关闭。`2.3-benchmark-linked` 仅表示 Benchmark evidence chain 已绑定，不表示教学结论通过。Benchmark 不能证明课程或教学质量。
 
 固定状态流：
 
@@ -28,7 +28,7 @@ Intake / Source Truth / whole-course outline freeze
 → Content 2.2 authoring and its existing pedagogical_review
 → Reviewer sees final reviewed Lesson Content, Source Truth summary, selected B Cards and rubric
 → Holdout Selection + one Review JSON per Lesson + aggregated course summary
-→ full-linkage validation + immutable Benchmark Authorization
+→ shared deterministic full-linkage claims + immutable Benchmark Authorization
 → at most one bounded revision round; refresh Content 2.2 pedagogical review/provenance
 → Round 2 using the same run, B Pack and Holdout Selection; revalidate Round 1 snapshots
 → final Content 2.2 validation → generator required mode → render/production verification
@@ -39,7 +39,7 @@ Intake / Source Truth / whole-course outline freeze
 
 Catalog fingerprint 覆盖 Exemplar Contract 版本、资格策略版本、课程上下文与按 ID 排序的完整 Cards，不含 `created_at`。来源可为公开或私有会话；公开 URL 必须通过 URL 安全校验，私有来源不能伪装成公开网页；来源时间须含时区，每张 Card UTF-8 JSON 不超过 12 KiB。`QUALIFIED` 仅允许合格的 A/B 来源；Tier C、`discovery_source`、`CONDITIONAL`、`DISCOVERY_ONLY` 和 `REJECTED` 不进入 Split。Qualified Card 至少有一个非空模式字段及 `do_not_copy`。
 
-Split 按完整 `group_id` 隔离同一作品及其衍生版本。侧别由 split policy 版本、课程领域身份和 group ID 的稳定哈希决定，不随新增无关 Card、卡片措辞或检索时间改变；课程上下文、资格策略或 group identity 变化会使 Catalog/Split 指纹变化。A/B Packs 必须由同一 Split CLI 原子生成并核验全量成员。Authoring/Holdout availability 分别报告；两侧不足时保留真实 PARTIAL/UNAVAILABLE，不人为添加案例。
+Split 按完整 `group_id` 隔离同一作品及其衍生版本。侧别由 split policy 版本、规范化课程身份和 group ID 的稳定哈希决定；`course_name`、`major`、`audience` 先执行 NFKC、去首尾空白、折叠连续空白和 casefold，因此等价的空白、Unicode 兼容字符和英文大小写不会重洗 A/B。课程身份字段的实质变化可以改变侧别。A/B Packs 必须由同一 Split CLI 原子生成并核验全量成员。Authoring/Holdout availability 分别报告；两侧不足时保留真实 PARTIAL/UNAVAILABLE，不人为添加案例。
 
 Authoring Selection 必须覆盖整个 outline，并绑定已有 `whole_course_outline_sha256`。Holdout Selection 必须覆盖所有 Lesson，Round 1 绑定精确 Content JSON 字节。Reviewer 为每个 Lesson 输出独立 JSON，课程汇总只保存每课 Review SHA、计数和状态。每课 Review 的 `evidence_basis` 区分 `SOURCE_TRUTH`、`HOLDOUT_EXEMPLAR`、`SOURCE_TRUTH_AND_HOLDOUT` 与 `LESSON_INTERNAL`；Source Truth alignment 只能由 Source Truth 支持，不能引用 exemplar。Evidence prose 单字段最多 600 字符。`NOT_APPLICABLE` 仅允许 `authentic_vocational_context`、`differentiation_scaffold`，且要写明理由。`INSUFFICIENT_EVIDENCE` 必须解释不足原因、现有证据和补证方向，并升级到人工审阅。
 

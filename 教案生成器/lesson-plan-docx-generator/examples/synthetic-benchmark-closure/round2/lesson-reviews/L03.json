@@ -5,7 +5,7 @@
   "lesson_id": "L03",
   "source_lesson_content_sha256": "ac72e42fd37bdc886a64ea9c27cb152047ed47ebda588068f13fadb0dbb2cb08",
   "selected_holdout_exemplar_ids": [
-    "EX-02"
+    "EX-03"
   ],
   "dimensions": [
     {
@@ -35,7 +35,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -50,7 +50,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -65,7 +65,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -80,7 +80,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -95,7 +95,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -110,7 +110,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -125,7 +125,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -140,7 +140,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -155,7 +155,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -170,7 +170,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -185,7 +185,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -200,7 +200,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -215,7 +215,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     },
     {
@@ -230,7 +230,7 @@
       "insufficiency_reason": "",
       "source_truth_evidence": [],
       "holdout_exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ]
     }
   ]

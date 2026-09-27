@@ -129,8 +129,15 @@ def _validate_dimension(dimension: Mapping[str, Any], lesson_id: str, selected_i
         for field in ("current_evidence", "gap", "recommended_direction", "insufficiency_reason"):
             if not _nonempty(dimension.get(field)):
                 errors.append(f"{prefix} INSUFFICIENT_EVIDENCE requires non-empty {field}")
-        if basis == "HOLDOUT_EXEMPLAR" and (dimension.get("benchmark_pattern") or citations):
-            errors.append(f"{prefix} may omit benchmark_pattern and citations when evidence is insufficient")
+        has_pattern = _nonempty(dimension.get("benchmark_pattern"))
+        if basis == "HOLDOUT_EXEMPLAR" and bool(citations) != has_pattern:
+            errors.append(f"{prefix} HOLDOUT_EXEMPLAR insufficiency requires both a selected citation and benchmark_pattern, or neither")
+        if basis == "SOURCE_TRUTH_AND_HOLDOUT" and citations and not has_pattern:
+            errors.append(f"{prefix} HOLDOUT citation requires a non-empty benchmark_pattern")
+        if basis == "LESSON_INTERNAL" and (
+            citations or has_pattern or dimension.get("source_truth_evidence")
+        ):
+            errors.append(f"{prefix} LESSON_INTERNAL insufficiency must not include Holdout or source-truth evidence")
         return errors
 
     if status not in {"MEETS", "PARTIAL", "GAP"}:

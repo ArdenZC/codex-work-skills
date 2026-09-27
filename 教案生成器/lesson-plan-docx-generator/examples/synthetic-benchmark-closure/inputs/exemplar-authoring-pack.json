@@ -4,10 +4,10 @@
   "catalog_id": "synthetic-catalog",
   "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
   "split_id": "split-81fd27ce3f79b9ff158f",
-  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
+  "split_fingerprint": "aac7e29bb84c8de91b51775bd7bc42b06af446a95fa944451f5dc903819a704b",
   "exemplar_ids": [
     "EX-01",
-    "EX-03"
+    "EX-02"
   ],
   "exemplars": [
     {
@@ -62,13 +62,13 @@
       ]
     },
     {
-      "exemplar_id": "EX-03",
-      "group_id": "GR-02",
+      "exemplar_id": "EX-02",
+      "group_id": "GR-01",
       "source": {
-        "title": "SYNTHETIC TEST CARD 3",
+        "title": "SYNTHETIC TEST CARD 2",
         "institution": "synthetic_fixture",
         "author_or_team": "test fixture only",
-        "canonical_url": "https://example.invalid/synthetic/3",
+        "canonical_url": "https://example.invalid/synthetic/2",
         "provided_source_id": null,
         "source_label": null,
         "source_type": "official_platform",
@@ -80,7 +80,7 @@
         ],
         "retrieved_at": "2026-09-27T00:00:00Z",
         "visibility": "public",
-        "source_identity_sha256": "27110b97597d4f3c5dc19529912c986f54154225177a1aff50b28513cdbee1cc"
+        "source_identity_sha256": "8a4fe51883ed552213cf87c1571b468ce62928e0a8cfe3c574854f63f14955ea"
       },
       "scope": {
         "education_level": "synthetic test fixture",
@@ -113,5 +113,5 @@
       ]
     }
   ],
-  "pack_fingerprint": "bff67b2601c4eb6c7138936762c052d7c82bbfc06878eefae4717081b7303ab1"
+  "pack_fingerprint": "22422d7b73d6c698b5a3a8e3d67e954033a87617c5900ad580cdcbd6f1c20d48"
 }

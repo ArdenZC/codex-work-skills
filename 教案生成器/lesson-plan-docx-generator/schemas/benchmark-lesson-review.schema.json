@@ -43,9 +43,15 @@
             },
             "else": {
               "properties": {
-                "evidence_basis": { "enum": ["HOLDOUT_EXEMPLAR", "SOURCE_TRUTH_AND_HOLDOUT", "LESSON_INTERNAL"] },
-                "source_truth_evidence": { "maxItems": 0 }
-              }
+                "evidence_basis": { "enum": ["HOLDOUT_EXEMPLAR", "SOURCE_TRUTH_AND_HOLDOUT", "LESSON_INTERNAL"] }
+              },
+              "allOf": [
+                {
+                  "if": { "properties": { "evidence_basis": { "const": "SOURCE_TRUTH_AND_HOLDOUT" } }, "required": ["evidence_basis"] },
+                  "then": { "properties": { "source_truth_evidence": { "minItems": 1 } } },
+                  "else": { "properties": { "source_truth_evidence": { "maxItems": 0 } } }
+                }
+              ]
             }
           },
           {

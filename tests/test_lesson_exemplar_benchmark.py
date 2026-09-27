@@ -8,6 +8,9 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from typing import Any
+
+from jsonschema import Draft202012Validator
 
 # macOS exposes its temporary directory through /var, a symlink to /private/var.
 # The benchmark CLIs intentionally reject paths that traverse symlink components,
@@ -37,7 +40,7 @@ from exemplar_contract import (  # noqa: E402
     validate_pack_payload,
 )
 import exemplar_split as exemplar_split_module  # noqa: E402
-from exemplar_split import build_split, expected_split, validate_split_payload  # noqa: E402
+from exemplar_split import build_split, canonical_course_identity, expected_split, validate_split_payload  # noqa: E402
 from validate_benchmark_review import (  # noqa: E402
     DIMENSION_IDS,
     review_summary_for,
@@ -495,7 +498,7 @@ def make_bundle_files(folder: Path, source: Path, *, group_count: int = 5, major
 
 
 def acceptance_kwargs(paths: dict[str, Path]) -> dict[str, Path]:
-    return {
+    result = {
         "benchmark_review_path": paths["review"],
         "benchmark_catalog_path": paths["catalog"],
         "benchmark_split_path": paths["split"],
@@ -505,9 +508,111 @@ def acceptance_kwargs(paths: dict[str, Path]) -> dict[str, Path]:
         "benchmark_authoring_selection_path": paths["authoring_selection"],
         "benchmark_lesson_reviews_dir": paths["lesson_reviews_dir"],
     }
+    for key, argument in (
+        ("previous_review", "benchmark_previous_review_path"),
+        ("previous_lesson_reviews_dir", "benchmark_previous_lesson_reviews_dir"),
+        ("previous_content", "benchmark_previous_content_path"),
+    ):
+        if key in paths:
+            result[argument] = paths[key]
+    return result
+
+
+def benchmark_generator_args(paths: dict[str, Path]) -> list[str]:
+    pairs = [
+        ("--benchmark-catalog", "catalog"),
+        ("--benchmark-split", "split"),
+        ("--benchmark-authoring-pack", "authoring_pack"),
+        ("--benchmark-authoring-selection", "authoring_selection"),
+        ("--benchmark-holdout-pack", "holdout_pack"),
+        ("--benchmark-holdout-selection", "holdout_selection"),
+        ("--benchmark-review", "review"),
+        ("--benchmark-lesson-reviews-dir", "lesson_reviews_dir"),
+    ]
+    args = [item for flag, key in pairs for item in (flag, str(paths[key]))]
+    previous_pairs = (
+        ("--benchmark-previous-content", "previous_content"),
+        ("--benchmark-previous-review", "previous_review"),
+        ("--benchmark-previous-lesson-reviews-dir", "previous_lesson_reviews_dir"),
+    )
+    args.extend(item for flag, key in previous_pairs if key in paths for item in (flag, str(paths[key])))
+    return args
+
+
+def build_benchmark_authorization(source: Path, paths: dict[str, Path], output: Path) -> dict[str, Any]:
+    args = [
+        "--lesson-content", str(source),
+        "--catalog", str(paths["catalog"]),
+        "--split", str(paths["split"]),
+        "--authoring-pack", str(paths["authoring_pack"]),
+        "--authoring-selection", str(paths["authoring_selection"]),
+        "--holdout-pack", str(paths["holdout_pack"]),
+        "--holdout-selection", str(paths["holdout_selection"]),
+        "--benchmark-review", str(paths["review"]),
+        "--lesson-reviews-dir", str(paths["lesson_reviews_dir"]),
+        "--output", str(output),
+        "--allow-test-fixture-authoring",
+    ]
+    for flag, key in (
+        ("--previous-lesson-content", "previous_content"),
+        ("--previous-review", "previous_review"),
+        ("--previous-lesson-reviews-dir", "previous_lesson_reviews_dir"),
+    ):
+        if key in paths:
+            args.extend((flag, str(paths[key])))
+    result = run_script(SCRIPTS / "build_benchmark_authorization.py", *args)
+    if result.returncode != 0:
+        raise AssertionError(result.stderr + result.stdout)
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
+def generate_benchmark_artifact(source: Path, paths: dict[str, Path], output: Path) -> tuple[Path, dict[str, Any]]:
+    authorization_path = output.parent / (output.name + "-benchmark-authorization.json")
+    authorization = build_benchmark_authorization(source, paths, authorization_path)
+    generated = run_script(
+        SCRIPTS / "generate_lesson_plans.py",
+        "--tasks-json", str(source),
+        "--output-dir", str(output),
+        "--benchmark-mode", "required",
+        "--benchmark-authorization", str(authorization_path),
+        *benchmark_generator_args(paths),
+        "--allow-test-fixture-authoring",
+        "--render",
+    )
+    if generated.returncode != 0:
+        raise AssertionError(generated.stderr + generated.stdout)
+    return authorization_path, authorization
 
 
 class ExemplarCatalogTests(unittest.TestCase):
+    def test_card_schema_root_conditionals_enforce_source_visibility_contract(self) -> None:
+        schema = json.loads((LESSON / "schemas" / "teaching-exemplar-card.schema.json").read_text(encoding="utf-8"))
+        self.assertIn("allOf", schema)
+        self.assertNotIn("allOf", schema["properties"])
+        validator = Draft202012Validator(schema)
+
+        private_url = make_card(
+            1,
+            authority_tier="PRIVATE",
+            visibility="private_session",
+            source_type="private_user_provided",
+        )
+        self.assertTrue(list(validator.iter_errors(private_url)))
+
+        public_without_url = make_card(2)
+        public_without_url["source"]["canonical_url"] = None
+        self.assertTrue(list(validator.iter_errors(public_without_url)))
+
+        private_labeled = make_card(
+            3,
+            authority_tier="PRIVATE",
+            visibility="private_session",
+            source_type="private_user_provided",
+        )
+        private_labeled["source"]["canonical_url"] = None
+        private_labeled["source"]["source_label"] = "Teacher-provided private material"
+        self.assertEqual(list(validator.iter_errors(private_labeled)), [])
+
     def test_valid_catalog_and_normalized_source_identity(self) -> None:
         card = make_card(1)
         card["source"]["title"] = "  Ａ　 test\tcase  "
@@ -670,6 +775,45 @@ class ExemplarCatalogTests(unittest.TestCase):
 
 
 class ExemplarSplitAndPackTests(unittest.TestCase):
+    def test_split_seed_uses_normalized_course_identity(self) -> None:
+        base = make_catalog(12, course_name="Database Technology", major="Software Engineering", audience="First Year Learners")
+        variants = copy.deepcopy(base)
+        variants["course_context"] = {
+            "course_name": "  Database   Technology  ",
+            "major": "Software Engineering",
+            "audience": "First Year Learners",
+        }
+        nfkc_case = copy.deepcopy(base)
+        nfkc_case["course_context"] = {
+            "course_name": "ＤＡＴＡＢＡＳＥ　ＴＥＣＨＮＯＬＯＧＹ",
+            "major": " ＳＯＦＴＷＡＲＥ　ＥＮＧＩＮＥＥＲＩＮＧ ",
+            "audience": "first YEAR　learners",
+        }
+        base_sides = expected_split(base)
+        expected_side_map = {
+            group_id: side
+            for side, group_ids in (
+                ("authoring", base_sides["authoring_group_ids"]),
+                ("holdout", base_sides["holdout_group_ids"]),
+            )
+            for group_id in group_ids
+        }
+        for candidate in (variants, nfkc_case):
+            split = expected_split(candidate)
+            candidate_side_map = {
+                group_id: side
+                for side, group_ids in (
+                    ("authoring", split["authoring_group_ids"]),
+                    ("holdout", split["holdout_group_ids"]),
+                )
+                for group_id in group_ids
+            }
+            self.assertEqual(candidate_side_map, expected_side_map)
+        self.assertNotEqual(
+            canonical_course_identity(base["course_context"]),
+            canonical_course_identity({**base["course_context"], "course_name": "Database Systems"}),
+        )
+
     def test_zero_one_two_three_and_six_group_splits_and_role_pack_projection(self) -> None:
         for count in (0, 1, 2, 3, 6):
             with self.subTest(groups=count):
@@ -1039,6 +1183,57 @@ class BenchmarkReviewTests(unittest.TestCase):
         summary = self._rebuild(insufficient)
         self.assertEqual(self.validate(summary, lesson_reviews=insufficient, lesson_review_sha256=hashes), [])
 
+        partial_holdout = copy.deepcopy(self.lesson_reviews)
+        partial_dimension = partial_holdout[0]["dimensions"][1]
+        partial_dimension.update({
+            "status": "INSUFFICIENT_EVIDENCE", "severity": "advisory",
+            "current_evidence": "A selected synthetic example provides only partial evidence.",
+            "benchmark_pattern": "A partial synthetic pattern.",
+            "gap": "The available pattern does not resolve this dimension.",
+            "recommended_direction": "Request further review.",
+            "insufficiency_reason": "The selected exemplar coverage is incomplete.",
+        })
+        hashes = {row["lesson_id"]: _sha256_bytes(_json_bytes(row)) for row in partial_holdout}
+        partial_summary = self._rebuild(partial_holdout)
+        self.assertEqual(self.validate(partial_summary, lesson_reviews=partial_holdout, lesson_review_sha256=hashes), [])
+
+        source_and_holdout = copy.deepcopy(self.lesson_reviews)
+        combined_dimension = source_and_holdout[0]["dimensions"][1]
+        combined_dimension.update({
+            "status": "INSUFFICIENT_EVIDENCE", "severity": "advisory",
+            "evidence_basis": "SOURCE_TRUTH_AND_HOLDOUT",
+            "current_evidence": "Synthetic source evidence is incomplete.",
+            "benchmark_pattern": "",
+            "gap": "Available evidence does not resolve this dimension.",
+            "recommended_direction": "Request further review.",
+            "insufficiency_reason": "No selected Card supplies enough evidence.",
+            "source_truth_evidence": ["Synthetic source truth fixture."],
+            "holdout_exemplar_ids": [],
+        })
+        hashes = {row["lesson_id"]: _sha256_bytes(_json_bytes(row)) for row in source_and_holdout}
+        combined_summary = self._rebuild(source_and_holdout)
+        self.assertEqual(self.validate(combined_summary, lesson_reviews=source_and_holdout, lesson_review_sha256=hashes), [])
+
+        internal = copy.deepcopy(self.lesson_reviews)
+        internal_dimension = internal[0]["dimensions"][1]
+        internal_dimension.update({
+            "status": "INSUFFICIENT_EVIDENCE", "severity": "advisory",
+            "evidence_basis": "LESSON_INTERNAL", "benchmark_pattern": "",
+            "current_evidence": "Synthetic internal evidence is incomplete.",
+            "gap": "Available lesson evidence does not resolve this dimension.",
+            "recommended_direction": "Request further review.",
+            "insufficiency_reason": "Evidence is incomplete.",
+            "source_truth_evidence": [], "holdout_exemplar_ids": [],
+        })
+        hashes = {row["lesson_id"]: _sha256_bytes(_json_bytes(row)) for row in internal}
+        internal_summary = self._rebuild(internal)
+        self.assertEqual(self.validate(internal_summary, lesson_reviews=internal, lesson_review_sha256=hashes), [])
+        internal[0]["dimensions"][1]["holdout_exemplar_ids"] = self.selection["lessons"][0]["exemplar_ids"]
+        hashes = {row["lesson_id"]: _sha256_bytes(_json_bytes(row)) for row in internal}
+        self.assertTrue(any("LESSON_INTERNAL insufficiency" in error for error in self.validate(
+            internal_summary, lesson_reviews=internal, lesson_review_sha256=hashes
+        )))
+
         missing_reason = copy.deepcopy(insufficient)
         missing_reason[0]["dimensions"][1]["insufficiency_reason"] = ""
         hashes = {row["lesson_id"]: _sha256_bytes(_json_bytes(row)) for row in missing_reason}
@@ -1199,7 +1394,9 @@ class BenchmarkReviewTests(unittest.TestCase):
         revised = refresh_pedagogical_review(revise_content=True)
         revised_bytes = _json_bytes(revised)
         revised_digest = _sha256_bytes(revised_bytes)
-        current_rows = make_lesson_reviews(selection, revised_digest, review_round=2)
+        current_rows = make_lesson_reviews(
+            selection, revised_digest, review_round=2, gap=("L01", DIMENSION_IDS[1])
+        )
         current_review = make_review(
             self.catalog, self.split, self.holdout_pack, selection, revised_digest,
             review_round=2, prior_review=prior_review, prior_review_sha256=prior_sha,
@@ -1271,6 +1468,41 @@ class BenchmarkReviewTests(unittest.TestCase):
             self.assertEqual(authorization["review_round"], 2)
             self.assertEqual(authorization["benchmark_run_id"], current_review["benchmark_run_id"])
             self.assertEqual(authorization["source_final_content_sha256"], revised["authoring_provenance"]["final_content_sha256"])
+            self.assertEqual(authorization["benchmark_decision"], "HUMAN_REVIEW_REQUIRED")
+
+            round2_paths = {
+                "catalog": paths["catalog"],
+                "split": paths["split"],
+                "authoring_pack": paths["authoring_pack"],
+                "authoring_selection": paths["authoring_selection"],
+                "holdout_pack": paths["holdout_pack"],
+                "holdout_selection": paths["holdout_selection"],
+                "review": paths["current_review"],
+                "lesson_reviews_dir": paths["current_reviews_dir"],
+                "previous_content": paths["prior_content"],
+                "previous_review": paths["prior_review"],
+                "previous_lesson_reviews_dir": paths["prior_reviews_dir"],
+            }
+            round2_output = folder / "round2-production"
+            _round2_auth_path, round2_auth = generate_benchmark_artifact(
+                paths["current_content"], round2_paths, round2_output
+            )
+            self.assertEqual(round2_auth["benchmark_decision"], "HUMAN_REVIEW_REQUIRED")
+            self.assertEqual(
+                json.loads((round2_output / "artifact-manifest.json").read_text(encoding="utf-8"))["lesson_skill_capability"],
+                "2.3-benchmark-linked",
+            )
+            report = lesson_acceptance.build_acceptance_report(
+                paths["current_content"],
+                round2_output,
+                round2_output / "qa-report.json",
+                source_type="synthetic_fixture",
+                **acceptance_kwargs(round2_paths),
+            )
+            self.assertEqual(report["benchmark_review"]["decision"], "HUMAN_REVIEW_REQUIRED")
+            failed_gates = [gate for gate in report["structural_hard_gates"]["gates"] if gate.get("status") == "FAIL"]
+            self.assertEqual(report["final_status"], "PENDING_MANUAL_REVIEW", failed_gates)
+            self.assertIn("benchmark_review", report["manual_completion_required"])
 
         changed_run = copy.deepcopy(current_review)
         changed_run["benchmark_run_id"] = "different-benchmark-run"
@@ -1372,6 +1604,8 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
             SCRIPTS / "generate_lesson_plans.py",
             "--tasks-json", str(source),
             "--output-dir", str(output),
+            "--benchmark-mode", "none",
+            "--render",
         )
         if generated.returncode != 0:
             raise AssertionError(generated.stderr + generated.stdout)
@@ -1392,10 +1626,16 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
             self.assertEqual(legacy_manifest["teaching_exemplar_benchmark"], {"status": "not_provided"})
 
             paths = make_bundle_files(folder, source)
+            with self.assertRaisesRegex(ValueError, "artifact was not published with Benchmark Authorization"):
+                lesson_acceptance.build_acceptance_report(
+                    source, output, qa, source_type="synthetic_fixture", **acceptance_kwargs(paths)
+                )
+            linked_output = folder / "generated-linked"
+            authorization_path, authorization = generate_benchmark_artifact(source, paths, linked_output)
             updated = lesson_acceptance.build_acceptance_report(
                 source,
-                output,
-                qa,
+                linked_output,
+                linked_output / "qa-report.json",
                 source_type="synthetic_fixture",
                 report_dir=folder / "report-new",
                 **acceptance_kwargs(paths),
@@ -1408,6 +1648,10 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
             self.assertEqual(benchmark["holdout_selection_sha256"], holdout_selection_sha256(
                 json.loads(paths["holdout_selection"].read_text(encoding="utf-8"))
             ))
+            self.assertEqual(benchmark["authoring_pack_fingerprint"], authorization["authoring_pack_fingerprint"])
+            self.assertEqual(benchmark["authoring_selection_sha256"], authorization["authoring_selection_sha256"])
+            self.assertEqual(benchmark["benchmark_authorization_sha256"], _sha256_bytes(authorization_path.read_bytes()))
+            self.assertEqual(benchmark["no_relevant_holdout_lesson_count"], 0)
             from jsonschema import Draft202012Validator
 
             schema = json.loads((ROOT / "docs" / "lesson-acceptance-report.schema.json").read_text(encoding="utf-8"))
@@ -1418,14 +1662,16 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
             folder = Path(temp_name)
             source, output, qa = self._acceptance_fixture(folder)
             paths = make_bundle_files(folder, source)
+            linked_output = folder / "generated-linked"
+            generate_benchmark_artifact(source, paths, linked_output)
             with self.assertRaisesRegex(ValueError, "requires --benchmark-catalog"):
                 lesson_acceptance.build_acceptance_report(
-                    source, output, qa, source_type="synthetic_fixture",
+                    source, linked_output, linked_output / "qa-report.json", source_type="synthetic_fixture",
                     benchmark_review_path=paths["review"],
                 )
             with self.assertRaisesRegex(ValueError, "requires --benchmark-authoring-pack"):
                 lesson_acceptance.build_acceptance_report(
-                    source, output, qa, source_type="synthetic_fixture",
+                    source, linked_output, linked_output / "qa-report.json", source_type="synthetic_fixture",
                     benchmark_review_path=paths["review"],
                     benchmark_catalog_path=paths["catalog"],
                     benchmark_split_path=paths["split"],
@@ -1434,9 +1680,9 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
             forged = json.loads(paths["review"].read_text(encoding="utf-8"))
             forged["split_fingerprint"] = "0" * 64
             _write_json(paths["review"], forged)
-            with self.assertRaisesRegex(ValueError, "benchmark review validation failed"):
+            with self.assertRaisesRegex(ValueError, "Benchmark Review full-linkage validation failed"):
                 lesson_acceptance.build_acceptance_report(
-                    source, output, qa, source_type="synthetic_fixture",
+                    source, linked_output, linked_output / "qa-report.json", source_type="synthetic_fixture",
                     **acceptance_kwargs(paths),
                 )
 
@@ -1448,18 +1694,14 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
                 source, output, qa, source_type="synthetic_fixture", report_dir=folder / "baseline"
             )
             major_paths = make_bundle_files(folder / "major", source, major_gap=True)
-            with patch.object(lesson_acceptance._runtime, "_final_status", return_value="PASSED"):
-                major = lesson_acceptance.build_acceptance_report(
-                    source, output, qa, source_type="synthetic_fixture",
-                    report_dir=folder / "report-major", **acceptance_kwargs(major_paths),
-                )
-            self.assertEqual(major["benchmark_review"]["decision"], "REVISION_REQUIRED")
-            self.assertEqual(major["final_status"], "PENDING_MANUAL_REVIEW")
-            self.assertEqual(major["metadata"]["production_status"], baseline["metadata"]["production_status"])
+            with self.assertRaisesRegex(AssertionError, "Benchmark requires revision before final production authorization"):
+                generate_benchmark_artifact(source, major_paths, folder / "generated-major")
 
             unavailable_paths = make_bundle_files(folder / "unavailable", source, group_count=0)
+            unavailable_output = folder / "generated-unavailable"
+            generate_benchmark_artifact(source, unavailable_paths, unavailable_output)
             unavailable = lesson_acceptance.build_acceptance_report(
-                source, output, qa, source_type="synthetic_fixture",
+                source, unavailable_output, unavailable_output / "qa-report.json", source_type="synthetic_fixture",
                 report_dir=folder / "report-unavailable", **acceptance_kwargs(unavailable_paths),
             )
             self.assertEqual(unavailable["benchmark_review"]["decision"], "BENCHMARK_UNAVAILABLE")
@@ -1534,6 +1776,15 @@ class CanonicalSyntheticExampleTests(unittest.TestCase):
                         "--previous-lesson-reviews-dir", str(previous / "lesson-reviews"),
                     ])
                 result = run_script(SCRIPTS / "build_benchmark_authorization.py", *auth_args)
+                if round_number == 1:
+                    self.assertEqual(
+                        json.loads((round_dir / "course-review.json").read_text(encoding="utf-8"))["course_summary"]["decision"],
+                        "REVISION_REQUIRED",
+                    )
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Benchmark requires revision before final production authorization", result.stderr)
+                    self.assertFalse((round_dir / "benchmark-authorization.json").exists())
+                    continue
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
                 stored = json.loads((round_dir / "benchmark-authorization.json").read_text(encoding="utf-8"))
                 self.assertEqual(stored["review_round"], round_number)
@@ -1662,7 +1913,7 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
             content_digest = _sha256_bytes(source.read_bytes())
 
             catalog = make_catalog(
-                5,
+                8,
                 course_name=content["course_name"],
                 major=content["major"],
                 audience=content["audience"],
@@ -1787,6 +2038,53 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
             )
             self.assertNotEqual(bypass.returncode, 0)
             self.assertIn("needs --benchmark-authorization", bypass.stderr)
+            missing_evidence = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json", str(source),
+                "--output-dir", str(folder / "missing-evidence-output"),
+                "--benchmark-authorization", str(authorization_path),
+                "--benchmark-mode", "required",
+            )
+            self.assertNotEqual(missing_evidence.returncode, 0)
+            self.assertIn("--benchmark-catalog", missing_evidence.stderr)
+            optional_without_evidence = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json", str(source),
+                "--output-dir", str(folder / "optional-missing-evidence-output"),
+                "--benchmark-authorization", str(authorization_path),
+                "--benchmark-mode", "optional",
+            )
+            self.assertNotEqual(optional_without_evidence.returncode, 0)
+            self.assertIn("--benchmark-catalog", optional_without_evidence.stderr)
+
+            missing_selection_args = benchmark_generator_args(paths)
+            selection_flag_index = missing_selection_args.index("--benchmark-authoring-selection")
+            del missing_selection_args[selection_flag_index : selection_flag_index + 2]
+            missing_selection_run = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json", str(source),
+                "--output-dir", str(folder / "missing-selection-output"),
+                "--benchmark-authorization", str(authorization_path),
+                "--benchmark-mode", "required",
+                *missing_selection_args,
+            )
+            self.assertNotEqual(missing_selection_run.returncode, 0)
+            self.assertIn("--benchmark-authoring-selection", missing_selection_run.stderr)
+
+            missing_shard_args = benchmark_generator_args(paths)
+            shard_flag_index = missing_shard_args.index("--benchmark-lesson-reviews-dir")
+            del missing_shard_args[shard_flag_index : shard_flag_index + 2]
+            missing_shard_run = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json", str(source),
+                "--output-dir", str(folder / "missing-shard-output"),
+                "--benchmark-authorization", str(authorization_path),
+                "--benchmark-mode", "required",
+                *missing_shard_args,
+            )
+            self.assertNotEqual(missing_shard_run.returncode, 0)
+            self.assertIn("--benchmark-lesson-reviews-dir", missing_shard_run.stderr)
+
             tampered_auth = copy.deepcopy(auth_payload)
             tampered_auth["split_fingerprint"] = "0" * 64
             tampered_auth_path = folder / "benchmark-authorization-tampered.json"
@@ -1797,9 +2095,28 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
                 "--output-dir", str(folder / "tampered-output"),
                 "--benchmark-authorization", str(tampered_auth_path),
                 "--benchmark-mode", "required",
+                *benchmark_generator_args(paths),
             )
             self.assertNotEqual(tampered_run.returncode, 0)
             self.assertIn("authorization_fingerprint", tampered_run.stderr)
+
+            from benchmark_authorization import authorization_fingerprint
+
+            forged_auth = copy.deepcopy(auth_payload)
+            forged_auth["catalog_fingerprint"] = "f" * 64
+            forged_auth["authorization_fingerprint"] = authorization_fingerprint(forged_auth)
+            forged_auth_path = folder / "benchmark-authorization-forged-valid-self-hash.json"
+            _write_json(forged_auth_path, forged_auth)
+            forged_run = run_script(
+                LESSON / "scripts" / "generate_lesson_plans.py",
+                "--tasks-json", str(source),
+                "--output-dir", str(folder / "forged-output"),
+                "--benchmark-authorization", str(forged_auth_path),
+                "--benchmark-mode", "required",
+                *benchmark_generator_args(paths),
+            )
+            self.assertNotEqual(forged_run.returncode, 0)
+            self.assertIn("claims do not match full evidence", forged_run.stderr)
 
             output = folder / "production"
             generated = run_script(
@@ -1808,6 +2125,7 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
                 "--output-dir", str(output),
                 "--benchmark-authorization", str(authorization_path),
                 "--benchmark-mode", "required",
+                *benchmark_generator_args(paths),
                 "--render",
             )
             events.append("generator")
@@ -1819,7 +2137,7 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
             self.assertEqual(qa["production_status"], "production_pass")
             manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(lesson_generator._verify_artifact_manifest(output, manifest, source), "production_pass")
-            self.assertEqual(manifest["lesson_skill_capability"], "2.3-benchmark-complete")
+            self.assertEqual(manifest["lesson_skill_capability"], "2.3-benchmark-linked")
             self.assertEqual(manifest["teaching_exemplar_benchmark"]["benchmark_authorization_sha256"], _sha256_bytes(authorization_path.read_bytes()))
             self.assertEqual(manifest["teaching_exemplar_benchmark"]["authoring_selection_sha256"], auth_payload["authoring_selection_sha256"])
             self.assertEqual(manifest["source_label"], source.name)
@@ -1828,6 +2146,14 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
             altered_manifest["teaching_exemplar_benchmark"]["catalog_fingerprint"] = "0" * 64
             with self.assertRaisesRegex(RuntimeError, "Benchmark block does not match"):
                 lesson_generator._verify_artifact_manifest(output, altered_manifest, source)
+            auth_file = output / "benchmark-authorization.json"
+            valid_auth_bytes = auth_file.read_bytes()
+            changed_auth = json.loads(valid_auth_bytes.decode("utf-8"))
+            changed_auth["benchmark_run_id"] = "tampered-after-publication"
+            _write_json(auth_file, changed_auth)
+            with self.assertRaisesRegex(RuntimeError, "Authorization SHA-256 mismatch"):
+                lesson_generator._verify_artifact_manifest(output, manifest, source)
+            auth_file.write_bytes(valid_auth_bytes)
             self.assertEqual(len(manifest["artifacts"]), 3)
             self.assertTrue(all(item["actual_pdf_page_count"] > 0 for item in manifest["artifacts"]))
             self.assertTrue(all((output / item["final_pdf_path"]).is_file() for item in manifest["artifacts"]))
@@ -1849,6 +2175,13 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
                 "--benchmark-holdout-selection", str(paths["holdout_selection"]),
                 "--benchmark-lesson-reviews-dir", str(paths["lesson_reviews_dir"]),
             )
+            with self.assertRaisesRegex(ValueError, "Benchmark-linked artifact requires Benchmark provenance inputs"):
+                lesson_acceptance.build_acceptance_report(
+                    source,
+                    output,
+                    output / "qa-report.json",
+                    source_type="synthetic_fixture",
+                )
             self.assertEqual(acceptance.returncode, 0, acceptance.stderr + acceptance.stdout)
             report = json.loads((report_dir / "lesson-acceptance-report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["acceptance_schema_version"], "2.0")
@@ -1858,6 +2191,10 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
             self.assertEqual(report["benchmark_review"]["source_sha256"], content_digest)
             self.assertEqual(report["benchmark_review"]["review_sha256"], _sha256_bytes(paths["review"].read_bytes()))
             self.assertEqual(report["benchmark_review"]["holdout_selection_sha256"], holdout_selection_sha256(holdout_selection))
+            self.assertEqual(report["benchmark_review"]["authoring_pack_fingerprint"], auth_payload["authoring_pack_fingerprint"])
+            self.assertEqual(report["benchmark_review"]["authoring_selection_sha256"], auth_payload["authoring_selection_sha256"])
+            self.assertEqual(report["benchmark_review"]["benchmark_authorization_sha256"], _sha256_bytes(authorization_path.read_bytes()))
+            self.assertEqual(report["benchmark_review"]["no_relevant_holdout_lesson_count"], 0)
             first_review = json.loads((paths["lesson_reviews_dir"] / "L01.json").read_text(encoding="utf-8"))
             pattern_dimension = next(
                 item for item in first_review["dimensions"] if item["dimension"] != "source_truth_alignment"
@@ -1865,12 +2202,14 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
             self.assertIn("Synthetic abstract pattern", pattern_dimension["benchmark_pattern"])
 
             unavailable_paths = make_bundle_files(folder / "unavailable", source, group_count=0)
+            unavailable_output = folder / "production-unavailable"
+            generate_benchmark_artifact(source, unavailable_paths, unavailable_output)
             unavailable_report_dir = folder / "acceptance-unavailable"
             unavailable_acceptance = run_script(
                 ROOT / "tests" / "lesson_acceptance.py",
                 "--input-json", str(source),
-                "--output-dir", str(output),
-                "--qa-report", str(output / "qa-report.json"),
+                "--output-dir", str(unavailable_output),
+                "--qa-report", str(unavailable_output / "qa-report.json"),
                 "--report-dir", str(unavailable_report_dir),
                 "--source-type", "synthetic_fixture",
                 "--benchmark-review", str(unavailable_paths["review"]),

@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import tempfile
 from typing import Any
+import unicodedata
 
 from exemplar_contract import (
     ContractError,
@@ -54,12 +55,22 @@ def _availability(group_count: int) -> str:
     return "AVAILABLE"
 
 
+def canonical_course_identity(course_context: dict[str, Any]) -> dict[str, str]:
+    """Normalize course identity fields before they seed deterministic A/B assignment."""
+
+    return {
+        field: " ".join(unicodedata.normalize("NFKC", str(course_context[field])).split()).casefold()
+        for field in ("course_name", "major", "audience")
+    }
+
+
 def expected_split(catalog: dict[str, Any], *, created_at: str | None = None) -> dict[str, Any]:
     qualified = [card for card in catalog["exemplars"] if card["qualification"]["status"] == "QUALIFIED"]
     group_ids = sorted({card["group_id"] for card in qualified})
     authoring_groups: list[str] = []
     holdout_groups: list[str] = []
-    course_domain_key = hashlib.sha256(canonical_json_bytes(catalog["course_context"])).hexdigest()
+    identity = canonical_course_identity(catalog["course_context"])
+    course_domain_key = hashlib.sha256(canonical_json_bytes(identity)).hexdigest()
     for group_id in sorted(group_ids):
         assignment = hashlib.sha256(
             f"{SPLIT_POLICY_VERSION}\n{course_domain_key}\n{group_id}".encode("utf-8")

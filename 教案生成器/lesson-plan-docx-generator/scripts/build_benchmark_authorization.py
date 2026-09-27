@@ -4,28 +4,24 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-import hashlib
 import json
 import os
 from pathlib import Path
 import sys
 from typing import Any
 
-from benchmark_authorization import authorization_fingerprint, validate_authorization_payload
+from benchmark_authorization import (
+    authorization_fingerprint,
+    derive_benchmark_authorization_claims,
+    publication_eligibility_errors,
+    validate_authorization_payload,
+)
 from exemplar_contract import (
     ContractError,
     assert_distinct_file_paths,
-    load_json,
-    load_json_bytes,
-    sha256_json,
-    validate_authoring_selection_payload,
-    validate_catalog_payload,
-    validate_pack_payload,
     write_json_atomic,
 )
-from exemplar_split import validate_split_payload
-from package_common import DEFAULT_SCHEMA, apply_reviewed_lesson_content, validate_content_v2_input
-from validate_benchmark_review import validate_benchmark_review_file
+from package_common import DEFAULT_SCHEMA
 
 TEST_FIXTURE_AUTHORING_ENV = "LESSON_ALLOW_TEST_FIXTURE_AUTHORING"
 
@@ -47,81 +43,34 @@ def build_authorization(
     previous_lesson_reviews_dir: Path | None = None,
     allow_test_fixture: bool = False,
 ) -> dict[str, Any]:
-    lesson_content, lesson_content_bytes = load_json_bytes(lesson_content_path, "Lesson Content")
-    if lesson_content.get("content_contract_version") != "2.2":
-        raise ContractError("Benchmark authorization requires Lesson Content Contract 2.2")
-    validate_content_v2_input(lesson_content, schema_path, allow_test_fixture=allow_test_fixture)
-    # This enforces the reviewed-content overlay contract before provenance is issued.
-    reviewed_content = apply_reviewed_lesson_content(lesson_content)
-    semantic_digest = str((lesson_content.get("authoring_provenance") or {}).get("final_content_sha256", ""))
-
-    catalog = load_json(catalog_path, "Catalog")
-    split = load_json(split_path, "Split")
-    authoring_pack = load_json(authoring_pack_path, "Authoring Pack")
-    authoring_selection = load_json(authoring_selection_path, "Authoring Selection")
-    holdout_pack = load_json(holdout_pack_path, "Holdout Pack")
-    holdout_selection = load_json(holdout_selection_path, "Holdout Selection")
-    catalog_errors = validate_catalog_payload(catalog)
-    if catalog_errors:
-        raise ContractError("Catalog validation failed: " + "; ".join(catalog_errors))
-    split_errors = validate_split_payload(split, catalog)
-    if split_errors:
-        raise ContractError("Split validation failed: " + "; ".join(split_errors))
-    authoring_pack_errors = validate_pack_payload(authoring_pack, catalog, split, expected_role="authoring")
-    if authoring_pack_errors:
-        raise ContractError("Authoring Pack validation failed: " + "; ".join(authoring_pack_errors))
-    authoring_errors = validate_authoring_selection_payload(
-        authoring_selection, catalog, split, authoring_pack, reviewed_content
-    )
-    if authoring_errors:
-        raise ContractError("Authoring Selection validation failed: " + "; ".join(authoring_errors))
-    if not isinstance(semantic_digest, str) or len(semantic_digest) != 64:
-        raise ContractError("authoring_provenance.final_content_sha256 is missing or invalid")
-
-    review, review_errors = validate_benchmark_review_file(
-        benchmark_review_path,
+    claims = derive_benchmark_authorization_claims(
+        lesson_content_path=lesson_content_path,
         catalog_path=catalog_path,
         split_path=split_path,
         authoring_pack_path=authoring_pack_path,
         authoring_selection_path=authoring_selection_path,
         holdout_pack_path=holdout_pack_path,
         holdout_selection_path=holdout_selection_path,
-        lesson_content_path=lesson_content_path,
+        benchmark_review_path=benchmark_review_path,
         lesson_reviews_dir=lesson_reviews_dir,
+        schema_path=schema_path,
+        previous_lesson_content_path=previous_lesson_content_path,
         previous_review_path=previous_review_path,
         previous_lesson_reviews_dir=previous_lesson_reviews_dir,
-        previous_lesson_content_path=previous_lesson_content_path,
-        require_full_linkage=True,
+        allow_test_fixture=allow_test_fixture,
     )
-    if review_errors:
-        raise ContractError("Benchmark Review full-linkage validation failed: " + "; ".join(review_errors))
-
-    summary = review["course_summary"]
+    eligibility_errors = publication_eligibility_errors(claims)
+    if eligibility_errors:
+        raise ContractError(" ".join(eligibility_errors))
     payload: dict[str, Any] = {
-        "benchmark_authorization_version": "1.0",
-        "skill_version": "2.3.0",
-        "content_contract_version": "2.2",
-        "benchmark_run_id": review["benchmark_run_id"],
-        "review_round": review["review_round"],
-        "benchmark_status": review["status"],
-        "benchmark_decision": summary["decision"],
-        "catalog_fingerprint": catalog["catalog_fingerprint"],
-        "split_fingerprint": split["split_fingerprint"],
-        "authoring_pack_fingerprint": authoring_pack["pack_fingerprint"],
-        "authoring_selection_sha256": sha256_json(authoring_selection),
-        "holdout_pack_fingerprint": holdout_pack["pack_fingerprint"],
-        "holdout_selection_sha256": review["holdout_selection_sha256"],
-        "benchmark_review_sha256": hashlib.sha256(benchmark_review_path.read_bytes()).hexdigest(),
-        "source_lesson_content_sha256": hashlib.sha256(lesson_content_bytes).hexdigest(),
-        "source_final_content_sha256": semantic_digest,
-        "context_mode": summary["context_mode"],
+        **claims,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     payload["authorization_fingerprint"] = authorization_fingerprint(payload)
     errors = validate_authorization_payload(
         payload,
-        source_lesson_content_sha256=hashlib.sha256(lesson_content_bytes).hexdigest(),
-        source_final_content_sha256=semantic_digest,
+        source_lesson_content_sha256=claims["source_lesson_content_sha256"],
+        source_final_content_sha256=claims["source_final_content_sha256"],
     )
     if errors:
         raise ContractError("generated Benchmark Authorization failed schema validation: " + "; ".join(errors))

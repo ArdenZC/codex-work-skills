@@ -33,19 +33,6 @@
         "source_identity_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
       }
     },
-    "allOf": [
-      {
-        "if": { "properties": { "source_type": { "const": "private_user_provided" } }, "required": ["source_type"] },
-        "then": {
-          "properties": { "canonical_url": { "type": "null" } },
-          "anyOf": [
-            { "properties": { "provided_source_id": { "type": "string", "minLength": 1, "pattern": "\\S" } } },
-            { "properties": { "source_label": { "type": "string", "minLength": 1, "pattern": "\\S" } } }
-          ]
-        },
-        "else": { "properties": { "canonical_url": { "type": "string", "minLength": 1 } } }
-      }
-    ],
     "scope": {
       "type": "object", "additionalProperties": false,
       "required": ["education_level", "vocational_level", "domain", "course", "scope_mode", "topic", "learner_profile", "duration_minutes", "teaching_context"],
@@ -80,6 +67,31 @@
     "non_transferable_context": { "$ref": "#/$defs/patterns" },
     "do_not_copy": { "$ref": "#/$defs/patterns" }
   },
+  "allOf": [
+    {
+      "if": { "properties": { "source": { "properties": { "source_type": { "const": "private_user_provided" } }, "required": ["source_type"] } }, "required": ["source"] },
+      "then": {
+        "properties": {
+          "source": {
+            "properties": {
+              "canonical_url": { "type": "null" }
+            },
+            "anyOf": [
+              { "properties": { "provided_source_id": { "type": "string", "minLength": 1, "pattern": "\\S" } }, "required": ["provided_source_id"] },
+              { "properties": { "source_label": { "type": "string", "minLength": 1, "pattern": "\\S" } }, "required": ["source_label"] }
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "source": {
+            "properties": { "canonical_url": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    }
+  ],
   "$defs": {
     "patterns": {
       "type": "array", "maxItems": 20,

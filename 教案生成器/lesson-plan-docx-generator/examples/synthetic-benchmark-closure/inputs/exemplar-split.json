@@ -12,17 +12,17 @@
   "benchmark_availability": "PARTIAL",
   "authoring_group_ids": [
     "GR-00",
-    "GR-02"
+    "GR-01"
   ],
   "holdout_group_ids": [
-    "GR-01"
+    "GR-02"
   ],
   "authoring_exemplar_ids": [
     "EX-01",
-    "EX-03"
-  ],
-  "holdout_exemplar_ids": [
     "EX-02"
   ],
-  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6"
+  "holdout_exemplar_ids": [
+    "EX-03"
+  ],
+  "split_fingerprint": "aac7e29bb84c8de91b51775bd7bc42b06af446a95fa944451f5dc903819a704b"
 }

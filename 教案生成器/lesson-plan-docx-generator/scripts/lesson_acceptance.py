@@ -1604,7 +1604,7 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
                 errors.append("benchmark_review.review_round must be 1 or 2")
             for count_name in (
                 "major_gap_count", "minor_gap_count", "insufficient_evidence_count",
-                "lessons_reviewed", "lessons_without_holdout",
+                "lessons_reviewed", "lessons_without_holdout", "no_relevant_holdout_lesson_count",
             ):
                 if not isinstance(benchmark.get(count_name), int) or benchmark[count_name] < 0:
                     errors.append(f"benchmark_review.{count_name} must be a non-negative integer")
@@ -1619,8 +1619,11 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
                 "source_sha256",
                 "catalog_fingerprint",
                 "split_fingerprint",
+                "authoring_pack_fingerprint",
+                "authoring_selection_sha256",
                 "holdout_pack_fingerprint",
                 "holdout_selection_sha256",
+                "benchmark_authorization_sha256",
                 "review_sha256",
             ):
                 digest = benchmark.get(digest_name)
@@ -1692,7 +1695,10 @@ def build_acceptance_report(
         report_dir = report_dir.expanduser().resolve()
         if _is_within(report_dir, output_dir) or _is_within(output_dir, report_dir):
             raise ValueError("report_dir must not overlap output_dir; acceptance must not mutate generated content")
+    artifact_manifest = _load_artifact_manifest(output_dir)
     benchmark_payload: dict[str, Any] | None = None
+    benchmark_authorization: dict[str, Any] | None = None
+    benchmark_authorization_sha256: str | None = None
     benchmark_auxiliary_paths = (
         benchmark_catalog_path,
         benchmark_split_path,
@@ -1707,8 +1713,46 @@ def build_acceptance_report(
     )
     if benchmark_review_path is None and any(path is not None for path in benchmark_auxiliary_paths):
         raise ValueError("benchmark provenance inputs require --benchmark-review")
+    manifest_benchmark = (
+        artifact_manifest.get("teaching_exemplar_benchmark")
+        if isinstance(artifact_manifest, Mapping)
+        else None
+    )
+    if benchmark_review_path is None:
+        if (
+            isinstance(artifact_manifest, Mapping)
+            and artifact_manifest.get("lesson_skill_capability") == "2.3-benchmark-linked"
+        ) or (
+            isinstance(manifest_benchmark, Mapping)
+            and manifest_benchmark.get("status") not in {None, "not_provided"}
+        ):
+            raise ValueError("Benchmark-linked artifact requires Benchmark provenance inputs for Acceptance")
     if benchmark_review_path is not None:
         benchmark_review_path = benchmark_review_path.expanduser().resolve()
+        if not isinstance(artifact_manifest, Mapping):
+            raise ValueError("artifact was not published with Benchmark Authorization")
+        if (
+            artifact_manifest.get("lesson_skill_capability") != "2.3-benchmark-linked"
+            or not isinstance(manifest_benchmark, Mapping)
+            or manifest_benchmark.get("status") in {None, "not_provided"}
+        ):
+            raise ValueError("artifact was not published with Benchmark Authorization")
+        authorization_path = _manifest_artifact_path(output_dir, artifact_manifest.get("benchmark_authorization_path"))
+        expected_authorization_path = (output_dir / "benchmark-authorization.json").resolve()
+        if (
+            authorization_path is None
+            or authorization_path != expected_authorization_path
+            or authorization_path.is_symlink()
+            or not authorization_path.is_file()
+        ):
+            raise ValueError("benchmark-authorization.json is missing from the final artifact directory")
+        benchmark_authorization_sha256 = _sha256_file(authorization_path).lower()
+        if str(manifest_benchmark.get("benchmark_authorization_sha256", "")).casefold() != benchmark_authorization_sha256:
+            raise ValueError("artifact manifest Benchmark Authorization SHA-256 mismatch")
+        benchmark_authorization_value = _read_json(authorization_path, "Benchmark Authorization")
+        if not isinstance(benchmark_authorization_value, dict):
+            raise ValueError("Benchmark Authorization must be an object")
+        benchmark_authorization = benchmark_authorization_value
         required_benchmark_paths = {
             "--benchmark-catalog": benchmark_catalog_path,
             "--benchmark-split": benchmark_split_path,
@@ -1760,31 +1804,45 @@ def build_acceptance_report(
         if str(lesson_scripts) not in sys.path:
             sys.path.insert(0, str(lesson_scripts))
         try:
-            from validate_benchmark_review import validate_benchmark_review_file
+            from benchmark_authorization import (
+                derive_benchmark_authorization_claims,
+                validate_authorization_matches_claims,
+                validate_manifest_benchmark_binding,
+            )
+            from package_common import DEFAULT_SCHEMA
         except ImportError as exc:
-            raise ValueError(f"benchmark review validator is unavailable: {exc}") from exc
-        benchmark_payload, benchmark_errors = validate_benchmark_review_file(
-            benchmark_review_path,
+            raise ValueError(f"Benchmark authorization validator is unavailable: {exc}") from exc
+        derived_claims = derive_benchmark_authorization_claims(
+            lesson_content_path=input_json,
             catalog_path=benchmark_catalog_path,
             split_path=benchmark_split_path,
             authoring_pack_path=benchmark_authoring_pack_path,
             authoring_selection_path=benchmark_authoring_selection_path,
             holdout_pack_path=benchmark_holdout_pack_path,
             holdout_selection_path=benchmark_holdout_selection_path,
-            lesson_content_path=input_json,
+            benchmark_review_path=benchmark_review_path,
             lesson_reviews_dir=benchmark_lesson_reviews_dir,
+            schema_path=DEFAULT_SCHEMA,
             previous_review_path=benchmark_previous_review_path,
             previous_lesson_reviews_dir=benchmark_previous_lesson_reviews_dir,
             previous_lesson_content_path=benchmark_previous_content_path,
-            require_full_linkage=True,
+            allow_test_fixture=source_type == "synthetic_fixture",
         )
-        if benchmark_errors:
-            raise ValueError("benchmark review validation failed: " + "; ".join(benchmark_errors))
+        authorization_errors = validate_authorization_matches_claims(benchmark_authorization, derived_claims)
+        if authorization_errors:
+            raise ValueError("Benchmark Authorization validation failed: " + "; ".join(authorization_errors))
+        binding_errors = validate_manifest_benchmark_binding(
+            artifact_manifest,
+            benchmark_authorization,
+            benchmark_authorization_sha256,
+        )
+        if binding_errors:
+            raise ValueError("; ".join(binding_errors))
+        benchmark_payload = _read_json(benchmark_review_path, "Benchmark Review")
     data = _read_json(input_json, "input JSON")
     qa_report = _read_json(qa_report_path, "QA report")
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     inventory = output_inventory(output_dir)
-    artifact_manifest = _load_artifact_manifest(output_dir)
     render = qa_report.get("render") if isinstance(qa_report.get("render"), Mapping) else {}
     visual_payload = _load_optional_json(visual_review_path, "visual review JSON")
     scope_payload = _load_optional_json(scope_review_path, "scope review JSON")
@@ -1957,8 +2015,12 @@ def build_acceptance_report(
             "source_sha256": benchmark_payload["source_lesson_content_sha256"],
             "catalog_fingerprint": benchmark_payload["catalog_fingerprint"],
             "split_fingerprint": benchmark_payload["split_fingerprint"],
+            "authoring_pack_fingerprint": benchmark_authorization["authoring_pack_fingerprint"],
+            "authoring_selection_sha256": benchmark_authorization["authoring_selection_sha256"],
             "holdout_pack_fingerprint": benchmark_payload["holdout_pack_fingerprint"],
             "holdout_selection_sha256": benchmark_payload["holdout_selection_sha256"],
+            "benchmark_authorization_sha256": benchmark_authorization_sha256,
+            "no_relevant_holdout_lesson_count": summary["no_relevant_holdout_lesson_count"],
             "review_sha256": hashlib.sha256(benchmark_review_path.read_bytes()).hexdigest(),
         }
         if (

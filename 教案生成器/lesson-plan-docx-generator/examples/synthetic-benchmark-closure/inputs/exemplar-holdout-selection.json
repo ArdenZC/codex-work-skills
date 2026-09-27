@@ -4,15 +4,15 @@
   "catalog_id": "synthetic-catalog",
   "catalog_fingerprint": "81fd27ce3f79b9ff158f4364d24bfe48965101fdfec8b586179342f1ffd2020d",
   "split_id": "split-81fd27ce3f79b9ff158f",
-  "split_fingerprint": "0c29d058bcec7864d52eb80e70b973fb7402afdc212e5ba68d3bdf951c9342e6",
-  "pack_fingerprint": "906253cc1422dfe38f41ba4bfc47df1961c3b3bc93cd86ab3086fc8bdc1510fa",
+  "split_fingerprint": "aac7e29bb84c8de91b51775bd7bc42b06af446a95fa944451f5dc903819a704b",
+  "pack_fingerprint": "c12319c040a2d1f5cc833ba74aee3624dbf563272e481b32d83a747bc9290608",
   "source_lesson_content_sha256": "c1c70ada5603415545fcbb30b4178a445d580fe37dcc8d6eceba0d509092591e",
   "lessons": [
     {
       "lesson_id": "L01",
       "status": "SELECTED",
       "exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ],
       "rationale": "Synthetic fixture only; not a relevance judgment."
     },
@@ -20,7 +20,7 @@
       "lesson_id": "L02",
       "status": "SELECTED",
       "exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ],
       "rationale": "Synthetic fixture only; not a relevance judgment."
     },
@@ -28,7 +28,7 @@
       "lesson_id": "L03",
       "status": "SELECTED",
       "exemplar_ids": [
-        "EX-02"
+        "EX-03"
       ],
       "rationale": "Synthetic fixture only; not a relevance judgment."
     }

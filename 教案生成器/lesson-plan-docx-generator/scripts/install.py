@@ -73,7 +73,6 @@ REQUIRED_RELATIVE_FILES = (
     Path("examples/synthetic-benchmark-closure/round1/lesson-reviews/L01.json"),
     Path("examples/synthetic-benchmark-closure/round1/lesson-reviews/L02.json"),
     Path("examples/synthetic-benchmark-closure/round1/lesson-reviews/L03.json"),
-    Path("examples/synthetic-benchmark-closure/round1/benchmark-authorization.json"),
     Path("examples/synthetic-benchmark-closure/round2/lesson-content.json"),
     Path("examples/synthetic-benchmark-closure/round2/course-review.json"),
     Path("examples/synthetic-benchmark-closure/round2/lesson-reviews/L01.json"),
