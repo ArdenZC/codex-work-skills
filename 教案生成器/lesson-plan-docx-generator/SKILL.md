@@ -110,7 +110,7 @@ after_class_improvement
 
 实践学时必须为正偶数；任务数为 `practice_hours / 2`，每个 Practice Task 固定 2 学时。任务必须保留 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。`project_id` 只作上层分组，不改变一任务一工单粒度。
 
-Lesson Agent 先完成全课程 outline、当前 delivery mode 所需 Lesson、Content QA 和 Practice Task Contract，再通过 Agent orchestration 调用 WorkOrder Skill Agent；Lesson Python 不得 subprocess 调用 WorkOrder Python。Content 2.2 的 handoff 继续单向指向 theory Lesson；Content 2.3 的 integrated/practice Lesson 与其承载的 Practice Task 双向链接。WorkOrder Agent 必须独立创作 WorkOrder Content 1.1，完成来源快照、Cross-Artifact QA、Output QA 和真实渲染。若 WorkOrder Skill 不可用，只交付 Lesson 与 handoff，并明确：`实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`；不得伪造工单 DOCX。
+Lesson Agent 先完成全课程 outline、当前 delivery mode 所需 Lesson、Content QA 和 Practice Task Contract，再通过 Agent orchestration 调用 WorkOrder Skill Agent；Lesson Python 不得 subprocess 调用 WorkOrder Python。Content 2.2 的 handoff 继续单向指向 theory Lesson；Content 2.3 的 integrated/practice Lesson 与其承载的 Practice Task 双向链接。WorkOrder Agent 必须独立创作 WorkOrder Content 1.1，完成来源快照、Cross-Artifact QA、Output QA 和真实渲染。若 WorkOrder Skill 不可用，只交付 Lesson 与 handoff，并明确：`实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`；不伪造工单 DOCX。
 
 若用户明确选择 `practice_work_orders=false`，禁止 practice contract、handoff、WorkOrder 和实践侧额外文件。Content 2.3 的 integrated/hybrid Lesson 仍完整保留实践构成和全部 Lesson coverage；所有 `practice_task_ids` 为空。Content 2.2 与 split_lessons 仍按各自合同将实践独立计账。
 
