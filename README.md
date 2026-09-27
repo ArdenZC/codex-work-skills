@@ -35,7 +35,7 @@
 
 | Skill | 当前版本 / 合同 | 主要产物 | 状态 |
 | --- | --- | --- | --- |
-| [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | Skill 2.3.1 · Lesson Content 2.3 · Template 1.1.2 | 按课程组织方式生成 Lesson `.docx` | Draft PR review |
+| [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | Skill 2.3.1 · Lesson Content 2.3 · Template 1.1.2 | 按课程组织方式生成 Lesson `.docx` | ✅ Stable · release-qualified |
 | [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.2.0 / Phase 2.2** · Practice Task **1.1** · WorkOrder Content **1.1** | 学生实践工单 `.docx` | ✅ Stable |
 | [🖥️ HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** · Courseware Contract **1.1** | `student.html` + `teacher.html` | ✅ Stable |
 | [🧪 实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.2.0** · Practice Class Contract **1.1** | student / teacher 离线 HTML 包 | ✅ Stable |
@@ -45,7 +45,7 @@
 
 **Lesson Skill 2.3.1 · Lesson Content 2.3 · Template 1.1.2**
 
-> 本次 2.3.1 修正处于 Draft PR review；此前 2.3.0 的发布资格和 Benchmark pilot 结论保持原样。Pilot 为 single-context，Benchmark 结论按合同记为 PARTIAL，不替代 blind holdout 或教师最终教学验收。
+> Lesson Skill 2.3.1 已通过 Owner Review，并在 reviewed implementation HEAD `6d65596849d2395ef965c029e92badf2cd9d8708` 完成 exact-SHA GitHub Actions release qualification；状态为 Stable / release-qualified。Owner 的真实来源 Teaching Exemplar pilot 仍为 single-context，Benchmark 结论按合同记为 PARTIAL，不替代 blind holdout 或教师最终教学验收。
 
 - 一次性确认课程名称、专业、授课对象和课时结构，再进行整门课程规划；
 - Content 2.3 的 `theory_only`、`integrated_lessons`、`hybrid` Lesson 覆盖总学时；`split_lessons` 继续覆盖理论学时；`practice_only` 保持零 Lesson；Content 2.2 保持历史语义；
