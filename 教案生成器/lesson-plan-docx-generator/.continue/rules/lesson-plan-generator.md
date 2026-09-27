@@ -3,6 +3,8 @@ description: 生成项目化中文教案 DOCX 的统一入口
 alwaysApply: true
 ---
 
-先读取 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`。当前规范为 Lesson Skill 2.3.0、Content Contract 2.2 与 Template 1.1.2；完成一次课程 Intake、冻结课程基本盘和全课程 outline，再由 Agent 创作正文并运行现有 QA/事务流程。
+先读取 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`。Lesson Skill 2.3.1 默认 Content 2.3，Content 2.2 保持历史行为。确认课程事实、冻结课程基本盘并完成全课程 outline，再由 Agent 创作正文和 review。
 
-Lesson 2.3 Benchmark 只使用独立 sidecar。Curator 独占 Catalog/Split；Author 和 Reviewer 每次只接收本课所选 Cards。完整校验 A/B Packs、Selections、逐课 Review shards 和课程汇总后生成 Authorization。正式 DOCX 必须使用 `--benchmark-mode required --benchmark-authorization <file>`。Round 2 固定 run/B 输入，要求语义内容修订、更新 Content 2.2 pedagogical review history/provenance 并复验 Round 1 全部快照。Acceptance 链接 A/B 两侧及所有 Review 文件。教学语义仍由 Agent 负责，脚本不产出正文或质量分。
+Content 2.3 中，theory_only/integrated_lessons/hybrid 的 Lesson 覆盖 total_hours；split_lessons 仅覆盖 theory_hours；practice_only 维持零 Lesson。64/32/32 integrated 且默认每课 2 学时生成 32 Lesson。工单关闭仍保留所有实践课时；工单开启可另有 16 个 2 学时实践任务/工单，工单不增加总学时。Hybrid 的 Lesson 类型可混合但理论/实践/总账必须精确相等。
+
+Content 2.2 兼容语义、Template 1.1.2、九阶段、评价体系和 Benchmark sidecar trust boundary 均保持不变。教学语义由 Agent 判断；Python 只做确定性校验和输出。

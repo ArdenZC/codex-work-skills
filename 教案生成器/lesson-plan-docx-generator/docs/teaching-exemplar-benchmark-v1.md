@@ -1,6 +1,6 @@
 # Lesson Teaching Exemplar Benchmark 1.0
 
-适用于 Lesson Skill **2.3.0**、Lesson Content Contract **2.2**、Lesson Template **1.1.2**、Exemplar Contract **1.0**、Benchmark Review **1.0** 和 Acceptance Schema **2.0**。Benchmark 只写独立 sidecar；Content 2.2 schema、九阶段、现有 Word 模板与 WorkOrder 合同均不变。
+适用于 Lesson Skill **2.3.1**、Lesson Content Contract **2.2/2.3**、Lesson Template **1.1.2**、Exemplar Contract **1.0**、Benchmark Review **1.0**、Authorization **1.0** 和 Acceptance Schema **2.0**。Benchmark 只写独立 sidecar；不改变 Catalog/Split/Cards/Selections/Review shards/Authorization 架构、九阶段、现有 Word 模板或 WorkOrder 合同。
 
 本合同验证来源、选择、隔离声明、Review 和生产输入之间的完整链接。它不计算教学质量分数，也不能证明 Agent 实际收到的上下文符合声明。样例目录 `examples/synthetic-benchmark-closure/` 含 3 个合成来源组、Round 1/2 完整 Review sidecar 和仅 Round 2 的 Authorization；Round 1 `REVISION_REQUIRED` 不得签出最终授权。所有内容都标记为合成数据，不是教学质量证据。
 
@@ -52,11 +52,11 @@ Decision rules are gates over explicit evidence states, not scores. Round 1 majo
 
 ## Round 2 semantic revision
 
-Round 2 requires the original Content JSON, summary Review and per-Lesson Review shards. Validation reruns the complete Round 1 chain with the same Catalog, Split, Packs and Holdout Selection, then binds Round 2 to the same `benchmark_run_id` and frozen B inputs. Round 2 Content must differ by exact byte hash and by the semantic digest of Agent-owned lesson content. Formatting-only or JSON key-order changes are not revision evidence. A substantive change must pass Content Contract 2.2 validation and update the relevant `pedagogical_review.review_history`, `draft_content`, `revised_content`, decision and `authoring_provenance` digests. A prior review status alone cannot establish a valid revision.
+Round 2 requires the original Content JSON, summary Review and per-Lesson Review shards. Validation reruns the complete Round 1 chain with the same Catalog, Split, Packs and Holdout Selection, then binds Round 2 to the same `benchmark_run_id` and frozen B inputs. Round 2 Content must differ by exact byte hash and by the semantic digest of Agent-owned lesson content. Formatting-only or JSON key-order changes are not revision evidence. A substantive change must pass the source Content Contract 2.2 or 2.3 validation and update the relevant `pedagogical_review.review_history`, `draft_content`, `revised_content`, decision and `authoring_provenance` digests. A prior review status alone cannot establish a valid revision.
 
 ## Authorization, generation and Acceptance
 
-`build_benchmark_authorization.py` accepts only a full valid chain: Content 2.2, Catalog, Split, A and B Packs, both Selections, course Review, all per-Lesson Reviews and (for Round 2) all Round 1 snapshots. It calls the production `derive_benchmark_authorization_claims(...)` helper, rejects `REVISION_REQUIRED`, and writes a content-addressed `benchmark-authorization.json` containing source-byte and semantic digests, package and selection fingerprints, Review hash, run/round, status, decision, context mode, version and creation time. It permits `HUMAN_REVIEW_REQUIRED`, `BENCHMARK_PARTIAL`, and `BENCHMARK_UNAVAILABLE` so technical artifacts can be prepared for teacher review; these states do not pass teaching acceptance. The fingerprint covers all authorization fields except itself.
+`build_benchmark_authorization.py` accepts only a full valid chain: Content 2.2 or 2.3, Catalog, Split, A and B Packs, both Selections, course Review, all per-Lesson Reviews and (for Round 2) all Round 1 snapshots. It calls the production `derive_benchmark_authorization_claims(...)` helper, rejects `REVISION_REQUIRED`, and writes a content-addressed `benchmark-authorization.json` containing source-byte and semantic digests, package and selection fingerprints, Review hash, run/round, status, decision, context mode, version and creation time. It permits `HUMAN_REVIEW_REQUIRED`, `BENCHMARK_PARTIAL`, and `BENCHMARK_UNAVAILABLE` so technical artifacts can be prepared for teacher review; these states do not pass teaching acceptance. The fingerprint covers all authorization fields except itself.
 
 The production command includes:
 

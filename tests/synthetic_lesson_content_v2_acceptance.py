@@ -70,7 +70,9 @@ def _lesson(
     previous_artifact: str | None,
     score: float,
 ) -> dict:
-    lesson_marker = SYNTHETIC_LESSON_MARKERS[index - 1]
+    lesson_marker = SYNTHETIC_LESSON_MARKERS[(index - 1) % len(SYNTHETIC_LESSON_MARKERS)]
+    if index > len(SYNTHETIC_LESSON_MARKERS):
+        lesson_marker = f"{lesson_marker}，第{index}组实践记录"
     prior_learning = (
         f"课程开始前完成需求情境梳理，明确本课将围绕{focus}建立工作入口"
         if previous_artifact is None
@@ -126,7 +128,7 @@ def _lesson(
         "用对照结果说明验收问题的修订依据",
         "按答辩追问逐项补齐最终交付证据",
     )
-    assessment_signal = assessment_signals[index - 1]
+    assessment_signal = assessment_signals[(index - 1) % len(assessment_signals)]
     remarks = {
         key: f"在{focus}任务中{suffix}；{assessment_signal}"
         for key, suffix in {
@@ -353,15 +355,23 @@ def _lesson(
         "整理对照结果和判断标准的关系",
         "形成下一步改进动作清单",
     )
-    quality_principle = quality_principles[index - 1]
-    difficulty_strategy = difficulty_strategies[index - 1]
-    ability_pattern = ability_patterns[index - 1].format(focus=focus)
-    delivery_pattern = delivery_patterns[index - 1].format(artifact=artifact)
-    key_content_pattern = key_content_patterns[index - 1]
-    key_strategy_pattern = key_strategy_patterns[index - 1]
-    difficulty_content_pattern = difficulty_content_patterns[index - 1]
-    knowledge_pattern = knowledge_patterns[index - 1]
-    knowledge_artifact_pattern = knowledge_artifact_patterns[index - 1]
+    quality_principle = quality_principles[(index - 1) % len(quality_principles)]
+    difficulty_strategy = difficulty_strategies[(index - 1) % len(difficulty_strategies)]
+    ability_pattern = ability_patterns[(index - 1) % len(ability_patterns)].format(focus=focus)
+    delivery_pattern = delivery_patterns[(index - 1) % len(delivery_patterns)].format(artifact=artifact)
+    key_content_pattern = key_content_patterns[(index - 1) % len(key_content_patterns)]
+    key_strategy_pattern = key_strategy_patterns[(index - 1) % len(key_strategy_patterns)]
+    difficulty_content_pattern = difficulty_content_patterns[(index - 1) % len(difficulty_content_patterns)]
+    knowledge_pattern = knowledge_patterns[(index - 1) % len(knowledge_patterns)]
+    knowledge_artifact_pattern = knowledge_artifact_patterns[(index - 1) % len(knowledge_artifact_patterns)]
+    if index > len(SYNTHETIC_LESSON_MARKERS):
+        scale_context = f"（第{index}组{focus}）"
+        quality_principle += scale_context
+        difficulty_strategy += scale_context
+        key_content_pattern += scale_context
+        key_strategy_pattern += scale_context
+        knowledge_pattern += scale_context
+        knowledge_artifact_pattern += scale_context
     return {
         "lesson_id": f"L{index:02d}",
         "unit": unit,

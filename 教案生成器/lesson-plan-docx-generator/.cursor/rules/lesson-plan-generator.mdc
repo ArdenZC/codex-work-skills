@@ -1,8 +1,10 @@
 ---
-description: Lesson Skill 2.3.0 production and benchmark workflow
+description: Lesson Skill 2.3.1 production and benchmark workflow
 alwaysApply: true
 ---
 
-开始前阅读 `SKILL.md`、`AGENTS.md` 与 `通用提示词.md`。当前规范为 Lesson Skill 2.3.0 / Content Contract 2.2；先确认并冻结课程事实、完成全课程 outline，再由 Agent 创作逐课正文。Lesson DOCX 只承载理论课时，严格遵循现有 10 / `hours × 45` / 15 分钟合同与受保护模板。
+开始前读取 `SKILL.md`、`AGENTS.md` 与 `通用提示词.md`。默认 Content Contract 2.3；Content 2.2 保持原规则。先冻结课程事实、完成全课程 outline，再由 Agent 创作和审阅逐课正文。
 
-Teaching Exemplar Benchmark 使用独立 sidecar，不扩展 Content 2.2。Curator 保管 Catalog/Split；Author/Reviewer 只接收每课选定 Cards。正式生产先完整校验 A/B Packs、A/B Selections、逐课 Review shards 和课程 Review，再生成 Authorization；调用 `generate_lesson_plans.py` 必须带 `--benchmark-mode required --benchmark-authorization <file>`。Round 2 必须是 Agent 内容的语义修改，更新 Content 2.2 pedagogical review history/provenance，并复验 Round 1 的完整快照。Acceptance 必须完成 A/B 两侧 full linkage。Python 不判断教学质量，也不创建正文。
+Content 2.3 按 delivery mode 覆盖 Lesson：theory_only/integrated_lessons/hybrid 使用 total_hours，split_lessons 使用 theory_hours，practice_only 继续无 Lesson。理实一体 64/32/32、每课 2 学时必须生成 32 Lesson；工单 false 不得删掉实践 Lesson，true 时可配套 16 个 2 学时任务/工单，工单不增加总学时。Content 2.2 历史语义、Template 1.1.2、九阶段和评价体系不变。
+
+Teaching Exemplar Benchmark 保持独立 sidecar。Curator 保管 Catalog/Split，Author/Reviewer 每课只看所选 Cards；保留现有 A/B evidence、Review、Authorization 信任边界。Authorization 1.0 兼容 Content 2.2/2.3，并记录实际版本。正文与教学判断由 Agent 负责，Python 不写 prose。

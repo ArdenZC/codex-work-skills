@@ -20,6 +20,7 @@ from lxml import etree
 
 from bookmark_utils import bookmark_boundary_locations, bookmark_location, bookmark_parent_cell, bookmark_parent_paragraph, find_bookmark, validate_bookmark_inventory
 from content_contract import format_evaluation_values, format_implementation, format_reflection, lesson_content_field_values, lesson_filename, lesson_header_values, format_title
+from content_contract import expected_lesson_coverage_hours
 from content_quality import assess_content_quality, detect_non_it_contamination
 from package_common import (
     DEFAULT_MANIFEST,
@@ -106,6 +107,28 @@ def practice_output_hours(data: dict[str, Any]) -> float:
             if isinstance(task, dict)
         )
     return declared
+
+
+def expected_lesson_hours(data: dict[str, Any]) -> float:
+    version = data.get("content_contract_version")
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
+    if version == "2.2":
+        return parse_number(plan.get("theory_hours"), "delivery_plan.theory_hours")
+    if version == "2.3":
+        return float(expected_lesson_coverage_hours(plan))
+    return parse_number(data.get("total_hours"), "total_hours")
+
+
+def accounted_course_hours(data: dict[str, Any], lesson_hours: float, practice_hours: float) -> float:
+    version = data.get("content_contract_version")
+    if version == "2.2":
+        return lesson_hours + practice_hours
+    if version == "2.3":
+        plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
+        total = parse_number(plan.get("total_hours"), "delivery_plan.total_hours")
+        coverage = float(expected_lesson_coverage_hours(plan))
+        return lesson_hours if math.isclose(coverage, total, abs_tol=0.01) else lesson_hours + practice_hours
+    return lesson_hours
 
 
 def parse_decimal(value: Any, label: str) -> Decimal:
@@ -735,7 +758,7 @@ def production_status_for_qa(
 ) -> str | None:
     """Report only QA-level state; final artifact verification owns production readiness."""
 
-    if data.get("content_contract_version") != "2.2":
+    if data.get("content_contract_version") not in {"2.2", "2.3"}:
         return None
     if report.get("status") != "passed":
         return "failed"
@@ -766,7 +789,7 @@ def write_skipped_report(
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_content_v2_input(data, schema_path, allow_test_fixture=allow_test_fixture_authoring)
-    if data.get("content_contract_version") == "2.2":
+    if data.get("content_contract_version") in {"2.2", "2.3"}:
         data = apply_reviewed_lesson_content(data)
     assert_output_path_safe(
         out_dir,
@@ -814,23 +837,19 @@ def write_skipped_report(
     report["status"] = "skipped"
     if report["errors"]:
         report["status"] = "failed"
-    is_v22 = data.get("content_contract_version") == "2.2"
+    is_current_contract = data.get("content_contract_version") in {"2.2", "2.3"}
     lesson_hours = sum(float(lesson["hours"]) for lesson in data["lessons"])
-    expected_lesson_hours = (
-        (data.get("delivery_plan") or {}).get("theory_hours")
-        if is_v22
-        else data.get("total_hours")
-    )
-    practice_hours = practice_output_hours(data) if is_v22 else 0.0
+    expected_hours = expected_lesson_hours(data)
+    practice_hours = practice_output_hours(data) if is_current_contract else 0.0
     report["checks"]["file_count"] = {"expected": len(data["lessons"]), "actual": len(list(out_dir.glob("*.docx")))}
     report["checks"]["total_hours"] = {
-        "expected": expected_lesson_hours,
+        "expected": expected_hours,
         "actual": lesson_hours,
     }
-    if is_v22:
+    if is_current_contract:
         report["checks"]["course_hours"] = {
             "expected": data.get("total_hours"),
-            "actual": lesson_hours + practice_hours,
+            "actual": accounted_course_hours(data, lesson_hours, practice_hours),
             "lesson_hours": lesson_hours,
             "practice_hours": practice_hours,
         }
@@ -879,7 +898,7 @@ def validate_output_dir(
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
     validate_content_v2_input(data, schema_path, allow_test_fixture=allow_test_fixture_authoring)
-    if data.get("content_contract_version") == "2.2":
+    if data.get("content_contract_version") in {"2.2", "2.3"}:
         data = apply_reviewed_lesson_content(data)
     assert_output_path_safe(
         out_dir,
@@ -930,12 +949,8 @@ def validate_output_dir(
             for message in content_quality["errors"]
         )
 
-    is_v22 = data.get("content_contract_version") == "2.2"
-    expected_lesson_hours = (
-        (data.get("delivery_plan") or {}).get("theory_hours")
-        if is_v22
-        else data.get("total_hours")
-    )
+    is_current_contract = data.get("content_contract_version") in {"2.2", "2.3"}
+    expected_hours = expected_lesson_hours(data)
     if not files and lessons:
         errors.append(f"No DOCX files generated in {out_dir}")
     if len(files) != len(lessons):
@@ -1078,14 +1093,14 @@ def validate_output_dir(
                 item_errors.append(f"semantic bookmark protection failed for {name}: {exc}")
             if actual != expected:
                 item_errors.append(f"{name} content mismatch")
-            if name == "references" and is_v22 and item.get("reference_ids") and not actual.strip():
+            if name == "references" and is_current_contract and item.get("reference_ids") and not actual.strip():
                 item_errors.append("references must be visible in the rendered DOCX")
         try:
             hours = parse_number(field_values["hours"], "hours")
-            expected_hours = parse_number(expected_headers["hours"], "input hours")
+            expected_lesson_item_hours = parse_number(expected_headers["hours"], "input hours")
             total_hours += hours
-            if not math.isclose(hours, expected_hours, abs_tol=0.01):
-                item_errors.append(f"hours mismatch: expected {expected_hours}, got {hours}")
+            if not math.isclose(hours, expected_lesson_item_hours, abs_tol=0.01):
+                item_errors.append(f"hours mismatch: expected {expected_lesson_item_hours}, got {hours}")
         except ValueError as exc:
             item_errors.append(str(exc))
         if not field_values["unit"].startswith("项目"):
@@ -1187,7 +1202,7 @@ def validate_output_dir(
             item_errors.append(f"evaluation table validation failed: {exc}")
 
         all_text = _document_text(document, table)
-        contamination = [] if is_v22 else detect_non_it_contamination(course_metadata, item, all_text)
+        contamination = [] if is_current_contract else detect_non_it_contamination(course_metadata, item, all_text)
         if contamination:
             contamination_terms.update(contamination)
             item_errors.extend(
@@ -1252,8 +1267,8 @@ def validate_output_dir(
         }
 
     expected_total = data.get("total_hours")
-    practice_hours = practice_output_hours(data) if is_v22 else 0.0
-    course_actual_hours = total_hours + practice_hours if is_v22 else total_hours
+    practice_hours = practice_output_hours(data) if is_current_contract else 0.0
+    course_actual_hours = accounted_course_hours(data, total_hours, practice_hours)
     if expected_total is not None:
         try:
             if not math.isclose(course_actual_hours, parse_number(expected_total, "total_hours"), abs_tol=0.01):
@@ -1261,8 +1276,8 @@ def validate_output_dir(
         except ValueError as exc:
             errors.append(str(exc))
     checks["file_count"] = {"expected": len(lessons), "actual": len(files)}
-    checks["total_hours"] = {"expected": expected_lesson_hours, "actual": total_hours}
-    if is_v22:
+    checks["total_hours"] = {"expected": expected_hours, "actual": total_hours}
+    if is_current_contract:
         checks["course_hours"] = {
             "expected": expected_total,
             "actual": course_actual_hours,
@@ -1320,12 +1335,12 @@ def validate_output_dir(
 
     production_status = production_status_for_qa(data, report)
     if (
-        data.get("content_contract_version") == "2.2"
+        data.get("content_contract_version") in {"2.2", "2.3"}
         and render
         and production_status == "failed"
         and report.get("status") == "passed"
     ):
-        errors.append("production render QA requires one retained, readable PDF per theory Lesson")
+        errors.append("production render QA requires one retained, readable PDF per Lesson")
         report["status"] = "failed"
         production_status = "failed"
     if production_status is not None:
@@ -1393,9 +1408,9 @@ def main() -> int:
         assert_output_path_safe(Path(args.output_dir), protected_paths)
         if args.qa_report and not _same_lexical_path(args.qa_report, Path(args.output_dir) / "qa-report.json"):
             assert_external_qa_path_safe(args.qa_report, args.output_dir, protected_paths)
-        if data.get("content_contract_version") != "2.2" and not args.legacy:
+        if data.get("content_contract_version") not in {"2.2", "2.3"} and not args.legacy:
             raise ValueError(
-                "Lesson Content Contract 2.2 is required for production output validation; "
+                "Lesson Content Contract 2.2 or 2.3 is required for production output validation; "
                 "legacy 2.0/2.1 input requires the explicit --legacy flag."
             )
         validate_content_v2_input(
@@ -1437,9 +1452,9 @@ def main() -> int:
         return 1
     for warning in report.get("warnings", []):
         print(f"WARNING: {warning}")
-    if data.get("content_contract_version") == "2.2":
+    if data.get("content_contract_version") in {"2.2", "2.3"}:
         print(
-            "Content Contract 2.2 "
+            f"Content Contract {data.get('content_contract_version')} "
             f"production_status={report['production_status']} "
             f"qa_status={report['status']} "
             f"render_status={report['render']['status']} "

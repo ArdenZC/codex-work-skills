@@ -1,7 +1,7 @@
-# Gemini CLI 入口（Lesson Skill 2.3.0）
+# Gemini CLI 入口（Lesson Skill 2.3.1）
 
-先读取 `SKILL.md` 与 `通用提示词.md`，按一次 intake、课程 outline、Content Contract 2.2、QA、模板写入和真实 render 的顺序工作。确认后的课程事实不可被正文改写；Lesson DOCX 只承载理论，课前/课中/课后时间合同必须精确执行，1 学时必须有实质性较小的内容和证据负荷。
+先读取 `SKILL.md`、`AGENTS.md` 与 `通用提示词.md`。新任务默认生成 Content Contract 2.3，Content 2.2 保持历史兼容。一次性确认并冻结课程事实，完成全课程 outline 后由 Agent 创作正文、来源证据和 pedagogical review。
 
-仅在用户明确需要实践工单时创建 Practice Task Contract 1.1 与单向 handoff，并由 Lesson Agent 在自身 QA/DOCX 完成后调用 WorkOrder Skill Agent。不得由 Lesson Python 调用工单 Python 或伪造工单。教材、教学资源、参考文献分离；references 不得由设备、PPT、课件、案例或内部资源冒充。
+课时覆盖按 mode：`theory_only`、`integrated_lessons`、`hybrid` 使用总学时；`split_lessons` 使用理论学时；`practice_only` 不生成 Lesson。64/32/32 integrated、每课 2 学时必须是 32 Lesson；无工单仍保留全部实践课时，有工单时另有 16 个配套任务/工单且不增加课程总时数。Split 与纯实践行为保持原边界。
 
-Lesson 2.3 Benchmark 必须按 `SKILL.md` 用共享 deterministic helper 重验逐课 Review shards、课程汇总和完整 A/B evidence。generator required mode，以及 optional 模式中任何提供 Authorization 的调用，都必须重验完整 evidence；Round 2 还要传入 Round 1 Content、Review 与 shards。Acceptance 比较 evidence 派生 claims、产物 Authorization 和 manifest Benchmark block。`2.3-benchmark-linked` 只说明证据链已绑定，不表示教学结论通过。
+Template 1.1.2、九阶段、时间合同、评价体系和 Benchmark sidecar 边界不变。仅用户明确需要工单时才通过 WorkOrder Skill Agent 生成 Practice Task/WorkOrder；不得由 Lesson Python 调用或伪造工单。

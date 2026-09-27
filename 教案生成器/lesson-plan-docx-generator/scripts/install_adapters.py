@@ -19,8 +19,8 @@ from path_safety import paths_overlap
 ENGINE_NAME = ".lesson-plan-docx-generator"
 ENGINE_STATE_FILE = Path(".engine-state.json")
 ENGINE_STATE_SCHEMA_VERSION = 1
-SKILL_VERSION = "2.3.0"
-CONTENT_CONTRACT_VERSION = "2.2"
+SKILL_VERSION = "2.3.1"
+CONTENT_CONTRACT_VERSION = "2.3"
 TEMPLATE_VERSION = "1.1.2"
 SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")
 MARKER_ID = "lesson-plan-docx-generator"
@@ -37,6 +37,7 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("manifest.yaml"),
     Path("docs/intake-contract-v2.1.1.json"),
     Path("docs/teaching-exemplar-benchmark-v1.md"),
+    Path("docs/content-contract-v2.3.md"),
     Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
     Path("scripts/content_contract.py"),

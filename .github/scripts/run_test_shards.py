@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TEST_MODULE = "tests.test_template_packages"
 LESSON_V21_TEST_MODULE = "tests.test_lesson_content_v21"
 LESSON_V22_TEST_MODULE = "tests.test_lesson_content_v22"
+LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
 LESSON_CONTRACT_HARDENING_TEST_MODULE = "tests.test_lesson_22_contract_hardening"
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
@@ -103,6 +104,7 @@ def _lesson_content_ids() -> tuple[str, ...]:
                 *legacy_ids,
                 *_module_test_ids(LESSON_V21_TEST_MODULE),
                 *_module_test_ids(LESSON_V22_TEST_MODULE),
+                *_module_test_ids(LESSON_V23_TEST_MODULE),
                 *_module_test_ids(LESSON_CONTRACT_HARDENING_TEST_MODULE),
             )
         )

@@ -44,6 +44,7 @@ from content_contract import (
     IMPLEMENTATION_STAGE_IDS,
     IN_CLASS_STAGE_IDS,
     confirmed_course_info_errors,
+    expected_lesson_coverage_hours,
     format_reference,
     lesson_references,
     reference_identity,
@@ -227,7 +228,7 @@ def _validate_agent_authoring_provenance(data: dict[str, Any], *, allow_test_fix
     provenance = data.get("authoring_provenance")
     if not isinstance(provenance, dict):
         raise ValueError(
-            "authoring_provenance is required for Content Contract 2.2 production generation; "
+            "authoring_provenance is required for Content Contract 2.2/2.3 production generation; "
             "Agent authoring failure or absence is fail-closed"
         )
     mode = provenance.get("mode")
@@ -373,7 +374,7 @@ def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
 def validate_agent_owned_content(data: dict[str, Any], *, allow_test_fixture: bool = False) -> None:
     """Production boundary for Agent authoring, revision, and final consumption."""
 
-    if data.get("content_contract_version") != "2.2":
+    if data.get("content_contract_version") not in {"2.2", "2.3"}:
         return
     _validate_agent_authoring_provenance(data, allow_test_fixture=allow_test_fixture)
     _validate_pedagogical_review_contract(data)
@@ -1057,8 +1058,13 @@ def _validate_materials_v21(data: dict[str, Any]) -> None:
             raise ValueError(f"{prefix}.theory lessons must have practice_task_ids=[]")
 
 
-def _validate_materials_v22(data: dict[str, Any]) -> None:
-    """Validate the 2.2 course reference catalog and theory Lesson boundary."""
+def _validate_materials_contract(
+    data: dict[str, Any],
+    *,
+    contract_version: str,
+    theory_only: bool,
+) -> None:
+    """Validate versioned course reference rules and optional theory boundary."""
 
     materials = data["course_materials"]
     textbook = materials.get("textbook") if isinstance(materials, dict) else None
@@ -1198,7 +1204,7 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
     textbook_identity = reference_identity(textbook) if textbook is not None else ""
     if data.get("allow_textbook_as_reference", False):
         raise ValueError(
-            "allow_textbook_as_reference is not supported in Content Contract 2.2; "
+            f"allow_textbook_as_reference is not supported in Content Contract {contract_version}; "
             "course_materials.textbook and reference_pool are separate"
         )
     if textbook_identity:
@@ -1210,7 +1216,7 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
 
     for index, lesson in enumerate(data["lessons"]):
         prefix = f"lessons[{index}]"
-        if lesson["lesson_type"] != "theory":
+        if theory_only and lesson["lesson_type"] != "theory":
             raise ValueError(f"{prefix}.lesson_type must be theory; practice belongs to Practice Task/WorkOrder artifacts")
         ids = [str(value) for value in lesson.get("reference_ids", [])]
         if not ids and research_status != "no_verified_external_source":
@@ -1233,8 +1239,16 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
                 )
             if normalized_text:
                 seen_reference_content[normalized_text] = reference_id
-        if lesson.get("practice_task_ids") != []:
+        if theory_only and lesson.get("practice_task_ids") != []:
             raise ValueError(f"{prefix}.practice_task_ids must remain [] in Content Contract 2.2")
+
+
+def _validate_materials_v22(data: dict[str, Any]) -> None:
+    _validate_materials_contract(data, contract_version="2.2", theory_only=True)
+
+
+def _validate_materials_v23(data: dict[str, Any]) -> None:
+    _validate_materials_contract(data, contract_version="2.3", theory_only=False)
 
 
 def _validate_implementation_stage_invariants(
@@ -1656,6 +1670,277 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
     # carry reverse task IDs, so there is no reverse-link reconciliation here.
 
 
+def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
+    """Enforce full Lesson coverage and internal practice accounting for Content 2.3."""
+
+    plan = data["delivery_plan"]
+    total = _decimal_hours(plan["total_hours"], "delivery_plan.total_hours")
+    theory = _decimal_hours(plan["theory_hours"], "delivery_plan.theory_hours", allow_zero=True)
+    practice = _decimal_hours(plan["practice_hours"], "delivery_plan.practice_hours", allow_zero=True)
+    declared_total = _decimal_hours(data["total_hours"], "total_hours")
+    if theory + practice != total or total != declared_total:
+        raise ValueError(
+            "delivery_plan.total_hours, theory_hours, practice_hours and total_hours must reconcile"
+        )
+
+    mode = str(plan["mode"])
+    coverage = expected_lesson_coverage_hours(plan)
+    lessons = data["lessons"]
+    if coverage == 0 and lessons:
+        raise ValueError("practice_only Content 2.3 requires zero Lesson DOCX lessons")
+    if coverage > 0 and not lessons:
+        raise ValueError("positive Lesson coverage requires Lesson DOCX lessons")
+    default_hours = _decimal_hours(data["default_hours"], "default_hours")
+    expected_lesson_count = int(coverage // default_hours) + (1 if coverage % default_hours else 0)
+    if len(lessons) != expected_lesson_count:
+        raise ValueError(
+            "Lesson count must equal ceil(expected_lesson_coverage_hours / default_hours): "
+            f"expected {expected_lesson_count}, got {len(lessons)}"
+        )
+
+    lesson_by_id: dict[str, dict[str, Any]] = {}
+    actual_lesson_hours = Decimal("0")
+    actual_theory = Decimal("0")
+    actual_practice = Decimal("0")
+    lesson_task_ids: dict[str, list[str]] = {}
+    lesson_types: set[str] = set()
+    for index, lesson in enumerate(lessons):
+        prefix = f"lessons[{index}]"
+        lesson_id = str(lesson["lesson_id"])
+        if lesson_id in lesson_by_id:
+            raise ValueError(f"{prefix}.lesson_id must be unique; duplicate {lesson_id!r}")
+        lesson_by_id[lesson_id] = lesson
+        lesson_type = str(lesson["lesson_type"])
+        lesson_types.add(lesson_type)
+        hours = _decimal_hours(lesson["hours"], f"{prefix}.hours")
+        expected_item_hours = (
+            default_hours
+            if index < len(lessons) - 1
+            else coverage - default_hours * (len(lessons) - 1)
+        )
+        if hours != expected_item_hours:
+            raise ValueError(
+                f"{prefix}.hours must preserve the default Lesson size and final remainder: "
+                f"expected {expected_item_hours}, got {hours}"
+            )
+        lesson_theory = _decimal_hours(lesson["theory_hours"], f"{prefix}.theory_hours", allow_zero=True)
+        lesson_practice = _decimal_hours(lesson["practice_hours"], f"{prefix}.practice_hours", allow_zero=True)
+        if lesson_theory + lesson_practice != hours:
+            raise ValueError(f"{prefix}.theory_hours + practice_hours must equal hours")
+        if lesson_type == "theory" and (lesson_theory != hours or lesson_practice != 0):
+            raise ValueError(f"{prefix}.theory must have theory_hours=hours and practice_hours=0")
+        if lesson_type == "practice" and (lesson_practice != hours or lesson_theory != 0):
+            raise ValueError(f"{prefix}.practice must have theory_hours=0 and practice_hours=hours")
+        if lesson_type == "integrated" and (lesson_theory <= 0 or lesson_practice <= 0):
+            raise ValueError(f"{prefix}.integrated must contain positive theory_hours and practice_hours")
+        actual_lesson_hours += hours
+        actual_theory += lesson_theory
+        actual_practice += lesson_practice
+        ids = [str(value) for value in lesson.get("practice_task_ids", [])]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{prefix}.practice_task_ids must not contain duplicate IDs")
+        lesson_task_ids[lesson_id] = ids
+
+    if actual_lesson_hours != coverage:
+        raise ValueError(
+            "Lesson hours must equal expected Lesson coverage: "
+            f"expected {coverage}, got {actual_lesson_hours}"
+        )
+    if mode in {"theory_only", "integrated_lessons", "hybrid"}:
+        if actual_theory != theory or actual_practice != practice:
+            raise ValueError(
+                "Lesson theory/practice hour sums must equal delivery_plan: "
+                f"expected {theory}/{practice}, got {actual_theory}/{actual_practice}"
+            )
+    elif mode == "split_lessons":
+        if actual_theory != theory or actual_practice != 0:
+            raise ValueError(
+                "split_lessons must keep practice hours outside Lesson accounting: "
+                f"expected lesson theory/practice={theory}/0, got {actual_theory}/{actual_practice}"
+            )
+    elif mode == "practice_only" and (actual_theory != 0 or actual_practice != 0):
+        raise ValueError("practice_only must preserve the Content 2.2 zero-Lesson behavior")
+
+    if mode == "theory_only":
+        if practice != 0 or lesson_types - {"theory"}:
+            raise ValueError("theory_only requires theory Lessons and practice_hours=0")
+    elif mode == "practice_only":
+        if theory != 0 or lessons:
+            raise ValueError("practice_only requires theory_hours=0 and no Lesson DOCX lessons")
+    elif mode == "split_lessons":
+        if lesson_types - {"theory"}:
+            raise ValueError("split_lessons must preserve the Content 2.2 theory-only Lesson boundary")
+    elif mode == "integrated_lessons":
+        if theory <= 0 or practice <= 0 or lesson_types - {"integrated"}:
+            raise ValueError("integrated_lessons requires positive theory/practice hours and only integrated Lessons")
+
+    artifact_plan = data["artifact_plan"]
+    expected_lesson_artifact = coverage > 0
+    if bool(artifact_plan.get("lesson_plans")) != expected_lesson_artifact:
+        raise ValueError(
+            "artifact_plan.lesson_plans must be true exactly when expected Lesson coverage is positive"
+        )
+
+    outline = data.get("outline", [])
+    if len(outline) != len(lessons):
+        raise ValueError("outline must contain exactly one entry for each Lesson")
+    for index, (item, lesson) in enumerate(zip(outline, lessons)):
+        expected_outline = {
+            "lesson_id": lesson.get("lesson_id"),
+            "unit": lesson.get("unit"),
+            "task": lesson.get("task"),
+            "lesson_type": lesson.get("lesson_type"),
+            "hours": lesson.get("hours"),
+            "theory_hours": lesson.get("theory_hours"),
+            "practice_hours": lesson.get("practice_hours"),
+            "prior_learning": lesson["progression"].get("prior_learning"),
+            "capability_stage": lesson["progression"].get("capability_stage"),
+            "deliverable": lesson["progression"].get("deliverable"),
+            "next_bridge": lesson["progression"].get("next_bridge"),
+            "practice_task_ids": lesson.get("practice_task_ids", []),
+        }
+        for field_name, expected in expected_outline.items():
+            if item.get(field_name) != expected:
+                raise ValueError(f"outline[{index}].{field_name} must match lessons[{index}]")
+
+    _validate_implementation_stage_invariants(lessons, exact_out_of_class=True)
+
+    workorders_requested = bool(artifact_plan.get("practice_work_orders"))
+    practice_contract = data.get("practice_task_contract")
+    if not workorders_requested:
+        if practice_contract is not None:
+            raise ValueError(
+                "practice_task_contract is forbidden when artifact_plan.practice_work_orders=false"
+            )
+        if any(lesson_task_ids.values()):
+            raise ValueError("lessons.practice_task_ids must be [] when practice_work_orders=false")
+        return
+
+    if practice <= 0:
+        raise ValueError("practice_work_orders=true requires positive practice_hours")
+    if practice % Decimal("2"):
+        raise ValueError(
+            "practice_hours must be divisible by 2 when practice_work_orders=true; "
+            f"got {practice}"
+        )
+    if not isinstance(practice_contract, dict):
+        raise ValueError("practice_task_contract is required when practice_work_orders=true")
+    if practice_contract.get("contract_version") != "1.1":
+        raise ValueError("practice_task_contract.contract_version must be 1.1 for the Practice Task handoff")
+
+    expected_profile = {
+        "course_name": data["course_name"],
+        "major": data["major"],
+        "audience": data["audience"],
+        "total_hours": data["total_hours"],
+        "theory_hours": plan["theory_hours"],
+        "practice_hours": plan["practice_hours"],
+        "delivery_mode": mode,
+        "default_lesson_hours": data["default_hours"],
+    }
+    actual_profile = practice_contract.get("course_profile")
+    if not isinstance(actual_profile, dict) or set(actual_profile) != set(expected_profile):
+        raise ValueError("practice_task_contract.course_profile must contain exactly the confirmed course profile fields")
+    for field_name, expected in expected_profile.items():
+        if field_name in {"total_hours", "theory_hours", "practice_hours", "default_lesson_hours"}:
+            actual = _decimal_hours(
+                actual_profile[field_name],
+                f"practice_task_contract.course_profile.{field_name}",
+                allow_zero=field_name in {"theory_hours", "practice_hours"},
+            )
+            expected_value = _decimal_hours(
+                expected,
+                f"course_profile.{field_name}",
+                allow_zero=field_name in {"theory_hours", "practice_hours"},
+            )
+            if actual != expected_value:
+                raise ValueError(f"practice_task_contract.course_profile.{field_name} must equal confirmed course information")
+        elif actual_profile.get(field_name) != expected:
+            raise ValueError(f"practice_task_contract.course_profile.{field_name} must equal confirmed course information")
+    if practice_contract.get("granularity") != "per_task":
+        raise ValueError("practice_task_contract.granularity must be per_task when practice_work_orders=true")
+    contract_hours = _decimal_hours(practice_contract["practice_hours"], "practice_task_contract.practice_hours", allow_zero=True)
+    if contract_hours != practice:
+        raise ValueError("practice_task_contract.practice_hours must equal delivery_plan.practice_hours")
+
+    expected_task_count = int(practice // Decimal("2"))
+    tasks = practice_contract.get("tasks", [])
+    if len(tasks) != expected_task_count:
+        raise ValueError(
+            "practice_task_contract.tasks count must equal practice_hours / 2: "
+            f"expected {expected_task_count}, got {len(tasks)}"
+        )
+    task_by_id: dict[str, dict[str, Any]] = {}
+    task_hours = Decimal("0")
+    task_lesson_ids: dict[str, list[str]] = {}
+    for index, task in enumerate(tasks):
+        prefix = f"practice_task_contract.tasks[{index}]"
+        task_id = str(task["task_id"])
+        if task_id in task_by_id:
+            raise ValueError(f"{prefix}.task_id must be unique; duplicate {task_id!r}")
+        task_by_id[task_id] = task
+        item_hours = _decimal_hours(task["practice_hours"], f"{prefix}.practice_hours")
+        if item_hours != Decimal("2"):
+            raise ValueError(f"{prefix}.practice_hours must equal 2 for one 2-hour WorkOrder; got {item_hours}")
+        task_hours += item_hours
+        linked_ids = [str(value) for value in task.get("lesson_ids", [])]
+        if len(linked_ids) != len(set(linked_ids)):
+            raise ValueError(f"{prefix}.lesson_ids must not contain duplicate Lesson IDs")
+        task_lesson_ids[task_id] = linked_ids
+        requires_practice_link = mode in {"integrated_lessons", "hybrid"}
+        if requires_practice_link and not linked_ids:
+            raise ValueError(f"{prefix}.lesson_ids must identify a Lesson that carries practice hours")
+        if mode == "split_lessons" and theory > 0 and not linked_ids:
+            raise ValueError(f"{prefix}.lesson_ids must identify related theory Lessons")
+        if mode == "practice_only" and linked_ids:
+            raise ValueError(f"{prefix}.lesson_ids must be empty for a practice_only course")
+        for lesson_id in linked_ids:
+            linked = lesson_by_id.get(lesson_id)
+            if linked is None:
+                raise ValueError(f"{prefix}.lesson_ids contains unknown Lesson {lesson_id!r}")
+            if requires_practice_link:
+                linked_practice = _decimal_hours(
+                    linked["practice_hours"],
+                    f"lessons[{lesson_id}].practice_hours",
+                    allow_zero=True,
+                )
+                if linked["lesson_type"] not in {"practice", "integrated"} or linked_practice <= 0:
+                    raise ValueError(f"{prefix}.lesson_ids cannot point to a theory Lesson: {lesson_id}")
+                if task_id not in lesson_task_ids.get(lesson_id, []):
+                    raise ValueError(f"{prefix}.lesson_ids linkage must be mirrored by lessons[{lesson_id}].practice_task_ids")
+            elif mode == "split_lessons" and linked["lesson_type"] != "theory":
+                raise ValueError(f"{prefix}.lesson_ids must point to theory Lessons for split_lessons")
+
+    if task_hours != practice:
+        raise ValueError(
+            "practice task hours must equal delivery_plan.practice_hours: "
+            f"expected {practice}, got {task_hours}"
+        )
+    task_ids = set(task_by_id)
+    if mode in {"integrated_lessons", "hybrid"}:
+        for lesson_id, lesson in lesson_by_id.items():
+            ids = lesson_task_ids[lesson_id]
+            if lesson["lesson_type"] == "theory":
+                if ids:
+                    raise ValueError(f"lessons[{lesson_id}].practice_task_ids must be [] for theory Lessons")
+                continue
+            unresolved = sorted(set(ids) - task_ids)
+            if unresolved:
+                raise ValueError(f"lessons[{lesson_id}].practice_task_ids contains unresolved task IDs: {', '.join(unresolved)}")
+            lesson_practice = _decimal_hours(lesson["practice_hours"], f"lessons[{lesson_id}].practice_hours", allow_zero=True)
+            if lesson_practice > 0 and not ids:
+                raise ValueError(f"{lesson_id} practice-bearing Lesson must declare practice_task_ids")
+            for task_id in ids:
+                if lesson_id not in task_lesson_ids.get(task_id, []):
+                    raise ValueError(f"lessons[{lesson_id}].practice_task_ids linkage must be mirrored by task {task_id}")
+        unlinked_task_ids = sorted(task_ids - {task_id for task_id, linked in task_lesson_ids.items() if linked})
+        if unlinked_task_ids:
+            raise ValueError("every practice task must link to a practice-bearing Lesson: " + ", ".join(unlinked_task_ids))
+    elif mode == "split_lessons":
+        if any(lesson_task_ids.values()):
+            raise ValueError("split_lessons must preserve the Content 2.2 empty Lesson practice_task_ids boundary")
+
+
 def _validate_meaningful_contract(data: dict[str, Any]) -> None:
     """Apply semantic text rules that JSON Schema cannot express for whitespace."""
 
@@ -1710,7 +1995,7 @@ def _validate_meaningful_contract(data: dict[str, Any]) -> None:
                 f"{prefix}.evaluation.remarks.{criterion}",
                 4,
             )
-        if data.get("content_contract_version") not in {"2.1", "2.2"}:
+        if data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
             for reference_index, reference in enumerate(lesson["references"], 1):
                 reference_prefix = f"{prefix}.references[{reference_index}]"
                 reference_text = require_meaningful_text(reference["text"], f"{reference_prefix}.text")
@@ -1755,7 +2040,7 @@ def _validate_content_v2(
     if version not in COMPATIBLE_CONTENT_CONTRACT_VERSIONS:
         raise ValueError(
             "Legacy sparse lesson content is no longer accepted for production generation. "
-            "Regenerate tasks JSON using the Lesson Content V2 Skill workflow. Content V2.2 is the current contract."
+            "Regenerate tasks JSON using the current Lesson Skill workflow. Content Contract 2.3 is the current contract."
         )
     if version == "2.1":
         _schema_errors(data, schema_path)
@@ -1771,6 +2056,16 @@ def _validate_content_v2(
             raise ValueError("confirmed course information mismatch: " + "; ".join(confirmed_errors))
         _validate_materials_v22(data)
         _validate_practice_contract_v22(data)
+        validate_agent_owned_content(data, allow_test_fixture=allow_test_fixture)
+        return
+    if version == "2.3":
+        _schema_errors(data, schema_path)
+        _validate_meaningful_contract(data)
+        confirmed_errors = confirmed_course_info_errors(data)
+        if confirmed_errors:
+            raise ValueError("confirmed course information mismatch: " + "; ".join(confirmed_errors))
+        _validate_materials_v23(data)
+        _validate_practice_contract_v23(data)
         validate_agent_owned_content(data, allow_test_fixture=allow_test_fixture)
         return
     for field_name in ("default_hours", "total_hours"):

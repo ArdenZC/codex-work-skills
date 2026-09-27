@@ -1,10 +1,10 @@
 # Lesson Content Contract 2.2
 
-Lesson Skill 2.3.0 的生产输入仍是完整的 Lesson Content Contract 2.2。2.1/2.0 只作为显式兼容输入；命令行必须明确传入 `--legacy`，兼容输入不会被静默改写为 2.2。Lesson 模板仍为 v1.1.2，二进制和 SHA-256 不变。Teaching Exemplar Benchmark 1.0 在 Content 2.2 之外使用独立 sidecar。
+本文件仅定义 Content Contract 2.2 的历史输入与行为。Lesson Skill 2.3.1 默认生成 Content 2.3，但仍按本文件兼容读取 2.2；不会静默把 2.2 改写成 2.3。2.1/2.0 只作显式 `--legacy` 兼容输入。Lesson 模板仍为 v1.1.2，二进制和 SHA-256 不变。Teaching Exemplar Benchmark 1.0 在 Content 2.2 之外使用独立 sidecar。
 
 ## 课程边界
 
-课程先完成一次中文 intake 和整门 outline，再生成逐课内容。确认后的课程名称、专业、授课对象、总课时、理论/实践课时和组织方式冻结在课程快照中，正文 Agent 不得改写。Lesson DOCX 只承载理论课时：
+Content 2.2 历史行为：课程先完成一次中文 intake 和整门 outline，再生成逐课内容。确认后的课程名称、专业、授课对象、总课时、理论/实践课时和组织方式冻结在课程快照中，正文 Agent 不得改写。仅对 Content 2.2，Lesson DOCX 只承载理论课时：
 
 ```text
 sum(lesson.hours) == delivery_plan.theory_hours

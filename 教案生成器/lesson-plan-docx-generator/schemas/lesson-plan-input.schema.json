@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.2.json",
-  "title": "Lesson Content V2/V2.1/V2.2 input",
+  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.3.json",
+  "title": "Lesson Content V2/V2.1/V2.2/V2.3 input",
   "type": "object",
   "additionalProperties": false,
   "required": ["content_contract_version", "course_name", "major", "audience", "default_hours", "total_hours", "lessons"],
   "properties": {
-    "content_contract_version": {"enum": ["2.0", "2.1", "2.2"]},
+    "content_contract_version": {"enum": ["2.0", "2.1", "2.2", "2.3"]},
     "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
     "major": {"type": "string", "minLength": 1, "maxLength": 32},
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
@@ -67,6 +67,20 @@
               ]
             }
           }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"content_contract_version": {"const": "2.3"}}, "required": ["content_contract_version"]},
+      "then": {
+        "required": ["confirmed_course_info", "authoring_provenance", "delivery_plan", "course_materials", "reference_pool", "reference_research", "artifact_plan", "outline"],
+        "properties": {
+          "reference_pool": {"items": {"$ref": "#/$defs/referencePoolItemV22"}},
+          "practice_task_contract": {
+            "$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.1.json"
+          },
+          "lessons": {"minItems": 0, "items": {"$ref": "#/$defs/lessonV23"}},
+          "outline": {"items": {"$ref": "#/$defs/outlineItem"}}
         }
       }
     }
@@ -176,7 +190,7 @@
         "teacher_actions": {"$ref": "#/$defs/textList"},
         "student_actions": {
           "$ref": "#/$defs/textList",
-          "description": "Content Contract 2.2 places observable student evidence and outputs in this existing field; there is no separate student_evidence field."
+          "description": "Content Contracts 2.2 and 2.3 place observable student evidence and outputs in this existing field; there is no separate student_evidence field."
         },
         "objective": {
           "type": "string",
@@ -497,6 +511,28 @@
               "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}
             },
             "practice_task_ids": {"const": []},
+            "pedagogical_review": {"$ref": "#/$defs/pedagogicalReview"}
+          }
+        }
+      ]
+    },
+    "lessonV23": {
+      "allOf": [
+        {"$ref": "#/$defs/lessonV21"},
+        {
+          "type": "object",
+          "required": ["reference_ids", "pedagogical_review"],
+          "properties": {
+            "reference_ids": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 8,
+              "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}
+            },
+            "practice_task_ids": {
+              "type": "array",
+              "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"}
+            },
             "pedagogical_review": {"$ref": "#/$defs/pedagogicalReview"}
           }
         }

@@ -1,15 +1,16 @@
 skill:
   id: lesson-plan-docx-generator
   name: 教案生成器
-  version: 2.3.0
+  version: 2.3.1
   phase: stable
-  content_contract: "2.2"
+  content_contract: "2.3"
   teaching_exemplar_contract: "1.0"
   benchmark_review_contract: "1.0"
   benchmark_authorization_contract: "1.0"
   compatibility:
     - "2.0"
     - "2.1"
+    - "2.2"
 template:
   id: lesson-plan
   version: 1.1.2
