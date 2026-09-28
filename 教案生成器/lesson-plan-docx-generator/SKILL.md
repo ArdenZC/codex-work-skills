@@ -45,7 +45,7 @@ Authoring Selection 必须覆盖整个 outline，并绑定已有 `whole_course_o
 
 `NO_RELEVANT_EXEMPLAR` 与数据不可用不同：若 B Pack 非空而所有 Lesson 均无相关 Holdout 选择，则要求人工说明，状态为部分/人工审阅，不得伪报 UNAVAILABLE。`separate_contexts` 要 attests Author 卡片/推理不可见且 Review 仅使用 B；`single_context` 必须如实声明暴露情况并将决策降为 partial。代码只能校验 sidecar、散列、引用和 attestation，无法证明模型实际看到的 prompt。
 
-Review 最多两轮。Round 2 固定同一 `benchmark_run_id`、B Pack 和 Holdout Selection；要求完整 Round 1 Content、课程总结、逐课 Review 快照并复验。除了 JSON 字节哈希，还要求 Agent-owned Content 发生语义变化，Round 2 必须重新合法更新 Content 2.2 的 `pedagogical_review.review_history` 与 provenance；只改空白或 JSON 排序不算修订。Round 2 major GAP 或任一轮证据不足均要求人工审阅，不允许 Round 3。
+Review 最多两轮。Round 2 固定同一 `benchmark_run_id`、B Pack 和 Holdout Selection；要求完整 Round 1 Content、课程总结、逐课 Review 快照并复验。除了 JSON 字节哈希，还要求 Agent-owned Content 发生语义变化，Round 2 必须按输入合同版本重新合法更新 Content 2.2/2.3 的 `pedagogical_review.review_history` 与 provenance；只改空白或 JSON 排序不算修订。Round 2 major GAP 或任一轮证据不足均要求人工审阅，不允许 Round 3。
 
 Authorization 由 `build_benchmark_authorization.py` 在完整验证 Content、Catalog、Split、A/B Packs、A/B Selections、汇总 Review 与每课 Review 后生成，绑定原始 Content 字节 SHA、最终 Agent 内容 digest、所有包/选择/Review 指纹、决策和上下文模式。生成器将授权副本、哈希和 benchmark 状态写入 artifact manifest；manifest 检查同时重新散列授权并核对原始/最终内容。正式生产应先得到有效授权再调用 generator。`validate_output.py --render` 是临时诊断；只有正式 generator `--render` 保留 PDF 并完成页数、哈希、QA 与事务核验后，才可能得到 `production_pass`。
 
@@ -108,7 +108,7 @@ after_class_improvement
 
 只有用户明确选择 `practice_work_orders=true` 时才生成 handoff。Practice Task Contract 1.1 使用仓库唯一 canonical schema `schemas/shared/practice-task-contract.schema.json`，顶层必须有 `contract_version`、`course_profile`、`practice_hours`、`granularity`、`tasks`。课程基本盘必须逐字段继承已确认 Lesson：课程名称、专业、对象、总课时、理论课时、实践课时、组织方式、默认单课学时；不能在实践侧推断或改写。
 
-实践学时必须为正偶数；任务数为 `practice_hours / 2`，每个 Practice Task 固定 2 学时。任务必须保留 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。`project_id` 只作上层分组，不改变一任务一工单粒度。
+实践学时必须为正偶数；任务数为 `practice_hours / 2`，每个 Practice Task 固定 2 学时。任务必须保留 `task_id`、`project_id`、`title`、`lesson_ids`、`practice_hours`、`scenario`、`objectives`、`required_inputs`、`tools_or_materials`、`steps`、`deliverables`、`acceptance_criteria`、`safety_or_compliance`。`project_id` 只作上层分组，不改变一任务一工单粒度。Content 2.3 的 `integrated_lessons`/`hybrid` 中，`lesson_ids` 表示该工单实际分配到的 Lesson 实践学时：每个任务链接的 Lesson `practice_hours` 合计必须恰为 2；每个有实践学时的 Lesson 必须且只能分配给一个任务，全部分配不得重叠或遗漏。Content 2.2 和 `split_lessons` 保留各自原有链接语义。
 
 Lesson Agent 先完成全课程 outline、当前 delivery mode 所需 Lesson、Content QA 和 Practice Task Contract，再通过 Agent orchestration 调用 WorkOrder Skill Agent；Lesson Python 不得 subprocess 调用 WorkOrder Python。Content 2.2 的 handoff 继续单向指向 theory Lesson；Content 2.3 的 integrated/practice Lesson 与其承载的 Practice Task 双向链接。WorkOrder Agent 必须独立创作 WorkOrder Content 1.1，完成来源快照、Cross-Artifact QA、Output QA 和真实渲染。若 WorkOrder Skill 不可用，只交付 Lesson 与 handoff，并明确：`实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`；不伪造工单 DOCX。
 

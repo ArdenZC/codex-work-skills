@@ -153,6 +153,13 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "package-contracts": SuiteSpec("package-contracts", True, "ids", len(workflow)),
         "tooling": SuiteSpec("tooling", True, "module", _module_count("tests.test_template_package_tooling"), "repository-validator"),
         "release": SuiteSpec("release", False, "module", _module_count("tests.test_template_package_release"), "repository-validator"),
+        "lesson-release-scale": SuiteSpec(
+            "lesson-release-scale",
+            False,
+            "module",
+            _module_count("tests.test_lesson_release_scale_e2e"),
+            "lesson-render",
+        ),
         "classifier": SuiteSpec("classifier", True, "module", _module_count("tests.test_ci_change_classifier")),
         "runner": SuiteSpec("runner", True, "module", _module_count("tests.test_run_test_shards")),
         "hardening": SuiteSpec("hardening", True, "module", _module_count("tests.test_lesson_skill_hardening")),
@@ -202,6 +209,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return ("tests.test_template_package_tooling",)
     if name == "release":
         return ("tests.test_template_package_release",)
+    if name == "lesson-release-scale":
+        return ("tests.test_lesson_release_scale_e2e",)
     if name == "classifier":
         return ("tests.test_ci_change_classifier",)
     if name == "runner":

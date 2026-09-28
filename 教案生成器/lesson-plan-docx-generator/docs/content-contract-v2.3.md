@@ -18,7 +18,7 @@ Lesson Skill 2.3.1 默认生成 Content Contract 2.3。Content 2.2 仍按原合�
 
 对于 `integrated_lessons`，每课必须为 `lesson_type=integrated`，且 `theory_hours > 0`、`practice_hours > 0`。`hybrid` 可按实际课程安排使用 `theory`、`practice` 和 `integrated` Lesson。每课都必须满足 `hours = theory_hours + practice_hours`；课程汇总必须分别等于已确认的理论、实践和总学时。不要为了均分而伪造每课构成；无法全部表示成 integrated Lesson 时使用 hybrid。
 
-`split_lessons` 继续只用 theory Lesson 覆盖理论学时，实践另由 Practice Task/WorkOrder 承载。`practice_only` 保留 Content 2.2 的零 Lesson 行为。`practice_task_ids` 规则只改变于 Content 2.3：理论 Lesson 始终为空；`practice_work_orders=false` 时所有 Lesson 为空；请求工单时，integrated/practice Lesson 与实际承载的 Practice Task 双向链接。Split 课程继续使用单向 task→theory Lesson 链接。
+`split_lessons` 继续只用 theory Lesson 覆盖理论学时，实践另由 Practice Task/WorkOrder 承载。`practice_only` 保留 Content 2.2 的零 Lesson 行为。`practice_task_ids` 规则只改变于 Content 2.3：理论 Lesson 始终为空；`practice_work_orders=false` 时所有 Lesson 为空；请求工单时，integrated/practice Lesson 与实际承载的 Practice Task 双向链接。对于 `integrated_lessons`/`hybrid`，`task.lesson_ids` 表示实际分配到该 2 学时工单的 Lesson 实践学时：每个任务链接的 Lesson `practice_hours` 合计必须恰为 2；每个有实践学时的 Lesson 必须且只能分配给一个任务，全部实践学时形成无重叠、无遗漏的分配。Split 课程继续使用单向 task→theory Lesson 链接。
 
 ## 64-hour integrated example
 

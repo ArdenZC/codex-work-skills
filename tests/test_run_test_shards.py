@@ -23,8 +23,9 @@ class TestShardManifest(unittest.TestCase):
         specs = run_test_shards._suite_specs()
         full = run_test_shards._expand_suites(("full",), specs)
         manifest_count = sum(run_test_shards._suite_count(name, specs) for name in full)
+        release_scale_count = run_test_shards._suite_count("lesson-release-scale", specs)
         discovered_count = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py").countTestCases()
-        self.assertEqual(manifest_count, discovered_count)
+        self.assertEqual(manifest_count + release_scale_count, discovered_count)
 
     def test_lesson_content_and_package_are_an_exact_partition(self) -> None:
         content = set(run_test_shards._lesson_content_ids())
@@ -70,6 +71,22 @@ class TestShardManifest(unittest.TestCase):
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_exemplar_benchmark").countTestCases(),
         )
 
+    def test_lesson_release_scale_suite_is_separate_and_serialized(self) -> None:
+        specs = run_test_shards._suite_specs()
+        full = run_test_shards._expand_suites(("full",), specs)
+        regular_lesson = ("lesson-content", "lesson-package", "lesson-benchmark", "hardening")
+        self.assertIn("lesson-release-scale", specs)
+        self.assertNotIn("lesson-release-scale", full)
+        self.assertTrue(
+            all("lesson-release-scale" not in run_test_shards._expand_suites((name,), specs) for name in regular_lesson)
+        )
+        self.assertFalse(specs["lesson-release-scale"].parallel_safe)
+        self.assertEqual(specs["lesson-release-scale"].resource_group, "lesson-render")
+        self.assertEqual(
+            specs["lesson-release-scale"].count,
+            unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_release_scale_e2e").countTestCases(),
+        )
+
     def test_list_json_reports_parallel_safety_and_counts(self) -> None:
         result = subprocess.run(
             [sys.executable, str(SCRIPTS / "run_test_shards.py"), "--list", "--json"],
@@ -82,7 +99,8 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         discovered_count = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py").countTestCases()
-        self.assertEqual(payload["aliases"]["full"]["tests"], discovered_count)
+        release_scale_count = payload["suites"]["lesson-release-scale"]["tests"]
+        self.assertEqual(payload["aliases"]["full"]["tests"] + release_scale_count, discovered_count)
         self.assertTrue(payload["suites"]["lesson-content"]["parallel_safe"])
         self.assertTrue(payload["suites"]["lesson-package"]["parallel_safe"])
         self.assertFalse(payload["suites"]["gradebook"]["parallel_safe"])

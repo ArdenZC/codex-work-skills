@@ -1670,6 +1670,78 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
     # carry reverse task IDs, so there is no reverse-link reconciliation here.
 
 
+def practice_hour_allocation_errors_v23(data: dict[str, Any]) -> list[str]:
+    """Return Content 2.3 integrated/hybrid WorkOrder allocation violations.
+
+    In these modes, task.lesson_ids names the Lesson practice-hours allocated
+    to that 2-hour task.  The links therefore form a disjoint, complete
+    partition of practice-bearing Lesson hours.
+    """
+
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
+    artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), dict) else {}
+    mode = str(plan.get("mode", ""))
+    if mode not in {"integrated_lessons", "hybrid"} or not artifact_plan.get("practice_work_orders"):
+        return []
+
+    lessons = [item for item in data.get("lessons", []) if isinstance(item, dict)]
+    tasks_value = data.get("practice_task_contract")
+    tasks = tasks_value.get("tasks", []) if isinstance(tasks_value, dict) else []
+    if not isinstance(tasks, list):
+        tasks = []
+    lesson_by_id = {str(item.get("lesson_id")): item for item in lessons}
+    task_owners: dict[str, set[str]] = {}
+    errors: list[str] = []
+
+    def hours(value: Any) -> Decimal | None:
+        try:
+            parsed = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return None
+        return parsed if parsed.is_finite() else None
+
+    for index, task in enumerate(tasks):
+        if not isinstance(task, dict):
+            continue
+        task_id = str(task.get("task_id"))
+        prefix = f"practice_task_contract.tasks[{index}].lesson_ids"
+        linked_ids = [str(value) for value in task.get("lesson_ids", [])]
+        if len(linked_ids) != len(set(linked_ids)):
+            errors.append(f"{prefix} must not duplicate a Lesson allocation")
+        allocated = Decimal("0")
+        for lesson_id in dict.fromkeys(linked_ids):
+            lesson = lesson_by_id.get(lesson_id)
+            if lesson is None:
+                continue
+            lesson_hours = hours(lesson.get("practice_hours"))
+            if lesson_hours is None:
+                continue
+            allocated += lesson_hours
+            task_owners.setdefault(lesson_id, set()).add(task_id)
+        if allocated != Decimal("2"):
+            errors.append(
+                f"{prefix} must allocate exactly 2 practice hours; got {allocated}"
+            )
+
+    for lesson_id, lesson in lesson_by_id.items():
+        lesson_hours = hours(lesson.get("practice_hours"))
+        if lesson_hours is None or lesson_hours <= 0:
+            continue
+        owners = task_owners.get(lesson_id, set())
+        declared_ids = [str(value) for value in lesson.get("practice_task_ids", [])]
+        if len(owners) > 1:
+            errors.append(
+                f"lessons[{lesson_id}].practice_hours allocation overlaps Practice Tasks: "
+                + ", ".join(sorted(owners))
+            )
+        if len(owners) != 1 or len(declared_ids) != 1 or owners != set(declared_ids):
+            errors.append(
+                f"lessons[{lesson_id}].practice_hours must be completely allocated to exactly one linked Practice Task"
+            )
+
+    return errors
+
+
 def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
     """Enforce full Lesson coverage and internal practice accounting for Content 2.3."""
 
@@ -1939,6 +2011,10 @@ def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
     elif mode == "split_lessons":
         if any(lesson_task_ids.values()):
             raise ValueError("split_lessons must preserve the Content 2.2 empty Lesson practice_task_ids boundary")
+
+    allocation_errors = practice_hour_allocation_errors_v23(data)
+    if allocation_errors:
+        raise ValueError("; ".join(allocation_errors))
 
 
 def _validate_meaningful_contract(data: dict[str, Any]) -> None:

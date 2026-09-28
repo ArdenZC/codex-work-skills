@@ -70,9 +70,9 @@ FULL_ENGINE_RUNTIME_FILES = (
     Path("assets/templates/lesson-plan/v1.1.2/manifest.yaml"),
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
 )
-# Kept as a compatibility name for callers that inspected the old sentinel
-# tuple; it now represents the complete health inventory rather than three
-# representative files.
+# Keep the legacy required-file floor for source preflight and compatibility.
+# Runtime fingerprints are built dynamically from every file copied by
+# ``_source_files(..., copy_engine=True)``.
 FULL_ENGINE_SENTINELS = FULL_ENGINE_RUNTIME_FILES
 FULL_ENGINE_INVENTORY_FILES = tuple(dict.fromkeys((*MINIMAL_ENGINE_FILES, *FULL_ENGINE_RUNTIME_FILES)))
 REFERENCE_TEXT_SUFFIXES = {".md", ".mdc", ".yml", ".yaml"}
@@ -174,10 +174,10 @@ def _sha256_file(path: Path) -> str:
 
 
 def _runtime_inventory_from_source(source_root: Path) -> dict[str, str]:
-    """Hash the bytes that a full installed engine actually receives."""
+    """Hash every regular file that a full installed engine actually receives."""
 
     inventory: dict[str, str] = {}
-    for relative in FULL_ENGINE_INVENTORY_FILES:
+    for relative in _source_files(source_root, copy_engine=True):
         candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
         source = next((candidate for candidate in candidates if candidate.is_file() and not candidate.is_symlink()), None) if relative == SHARED_SCHEMA else source_root / relative
         if source is None:
@@ -223,10 +223,23 @@ def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) 
     if not isinstance(inventory, dict):
         return False
     expected_keys = {relative.as_posix() for relative in FULL_ENGINE_INVENTORY_FILES}
-    if set(inventory) != expected_keys:
+    if not expected_keys.issubset(inventory):
         return False
     if any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in inventory.values()):
         return False
+    for relative_name in inventory:
+        if not isinstance(relative_name, str):
+            return False
+        relative = Path(relative_name)
+        if (
+            not relative_name
+            or relative.is_absolute()
+            or relative.as_posix() != relative_name
+            or ".." in relative.parts
+            or relative == ENGINE_STATE_FILE
+            or bool(ignore_patterns("", [relative.name]))
+        ):
+            return False
     if state.get("schema_version") != ENGINE_STATE_SCHEMA_VERSION:
         return False
     if state.get("skill") != "lesson-plan-docx-generator":
@@ -238,6 +251,19 @@ def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) 
     if state.get("template_version") != TEMPLATE_VERSION:
         return False
     if state.get("runtime_fingerprint") != _runtime_fingerprint(inventory):
+        return False
+    actual_keys: set[str] = set()
+    for path in engine_target.rglob("*"):
+        if path.is_symlink():
+            return False
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            return False
+        if path == engine_target / ENGINE_STATE_FILE or ignore_patterns("", [path.name]):
+            continue
+        actual_keys.add(path.relative_to(engine_target).as_posix())
+    if actual_keys != set(inventory):
         return False
     for relative_name, expected_hash in inventory.items():
         relative = Path(relative_name)
@@ -330,7 +356,7 @@ def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
                 for path in source_root.rglob("*")
                 if path.is_file()
                 and not path.is_symlink()
-                and path.name != ENGINE_STATE_FILE.name
+                and path.relative_to(source_root) != ENGINE_STATE_FILE
                 and not ignore_patterns("", [path.name])
             ),
             key=lambda path: path.as_posix(),

@@ -40,6 +40,7 @@ from package_common import (
     AGENT_OWNED_LESSON_FIELDS,
     canonical_json_sha256,
     lesson_agent_content,
+    practice_hour_allocation_errors_v23,
 )
 
 
@@ -3128,6 +3129,8 @@ def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     invalid_links: list[dict[str, Any]] = []
     unresolved: list[dict[str, Any]] = []
     linked_task_ids: set[str] = set()
+    allocation_errors = practice_hour_allocation_errors_v23(data)
+    errors.extend(allocation_errors)
     if not requested:
         forbidden_links = any(lesson_task_ids.values())
         if contract is not None or forbidden_links:
@@ -3250,9 +3253,10 @@ def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
         "unresolved_task_ids": unresolved,
         "unlinked_task_ids": sorted(set(task_by_id) - linked_task_ids) if full_lesson_links else [],
         "invalid_practice_lesson_links": invalid_links,
+        "practice_hour_allocation_errors": allocation_errors,
         "invalid_task_hours": invalid_task_hours,
-        "hour_consistent": not any("practice" in error.lower() or "task count" in error.lower() for error in errors),
-        "lesson_task_linkage_complete": not invalid_links and not unresolved,
+        "hour_consistent": not allocation_errors and not any("practice" in error.lower() or "task count" in error.lower() for error in errors),
+        "lesson_task_linkage_complete": not allocation_errors and not invalid_links and not unresolved,
         "one_way_lesson_links": mode == "split_lessons",
         "workorders_requested": True,
         "contract_required": True,
