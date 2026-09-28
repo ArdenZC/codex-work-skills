@@ -11,11 +11,11 @@ import hashlib
 import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 
-CONTENT_CONTRACT_VERSION = "2.2"
-COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2")
+CONTENT_CONTRACT_VERSION = "2.3"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2", "2.3")
 LEGACY_CONTENT_CONTRACT_VERSION = "2.0"
 EVALUATION_SCORE_MIN = Decimal("85")
 EVALUATION_SCORE_MAX = Decimal("96")
@@ -29,6 +29,33 @@ DELIVERY_MODES = (
     "integrated_lessons",
     "hybrid",
 )
+
+
+def expected_lesson_coverage_hours(delivery_plan: Mapping[str, Any]) -> Decimal:
+    """Return the Lesson-hour ledger required by a delivery mode.
+
+    Content 2.3 expands Lesson coverage for integrated and hybrid delivery while
+    retaining the Content 2.2 boundaries for split and practice-only courses.
+    """
+
+    if not isinstance(delivery_plan, Mapping):
+        raise ValueError("delivery_plan must be an object")
+    mode = delivery_plan.get("mode")
+    if mode in {"theory_only", "integrated_lessons", "hybrid"}:
+        value = delivery_plan.get("total_hours")
+    elif mode == "split_lessons":
+        value = delivery_plan.get("theory_hours")
+    elif mode == "practice_only":
+        return Decimal("0")
+    else:
+        raise ValueError(f"unsupported delivery_plan.mode for Lesson coverage: {mode!r}")
+    try:
+        hours = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        raise ValueError(f"delivery_plan hours are invalid for mode {mode!r}") from None
+    if not hours.is_finite() or hours < 0:
+        raise ValueError(f"delivery_plan hours are invalid for mode {mode!r}")
+    return hours
 REFERENCE_TYPES = (
     "book",
     "standard",
@@ -560,7 +587,7 @@ def reference_metadata_errors(reference: dict[str, Any], prefix: str = "referenc
 def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> list[dict[str, Any]]:
     """Resolve a lesson's renderable references for either contract version."""
 
-    if not data or data.get("content_contract_version") not in {"2.1", "2.2"}:
+    if not data or data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
         return list(lesson.get("references", []))
     pool = {
         str(reference.get("reference_id")): reference

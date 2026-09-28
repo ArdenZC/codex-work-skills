@@ -533,13 +533,13 @@ def _build_artifact_manifest(
     )
     if lesson_hours.is_integer():
         lesson_hours = int(lesson_hours)
-    is_v22 = meta.get("content_contract_version") == "2.2"
+    is_current_contract = meta.get("content_contract_version") in {"2.2", "2.3"}
     source_final_content_sha256 = str((meta.get("authoring_provenance") or {}).get("final_content_sha256", "")).upper()
-    packaged_content_sha256 = _reviewed_content_digest(meta) if is_v22 else None
+    packaged_content_sha256 = _reviewed_content_digest(meta) if is_current_contract else None
     reference_evidence_path = candidate / "reference-evidence.json"
     manifest = {
         "manifest_version": "2.0",
-        "skill_version": "2.3.0",
+        "skill_version": "2.3.1",
         "content_contract_version": meta.get("content_contract_version"),
         "run_id": run_id,
         "course_name": meta.get("course_name"),
@@ -568,14 +568,16 @@ def _build_artifact_manifest(
                 "packaged_final_content_sha256": packaged_content_sha256,
                 "match": bool(source_final_content_sha256) and source_final_content_sha256 == packaged_content_sha256,
             }
-            if is_v22
+            if is_current_contract
             else {"status": "not_applicable"}
         ),
         "created_at": created_at,
         "artifacts": records,
     }
     if benchmark_authorization is None:
-        manifest["lesson_skill_capability"] = "2.2-compatible"
+        manifest["lesson_skill_capability"] = (
+            "2.3-compatible" if meta.get("content_contract_version") == "2.3" else "2.2-compatible"
+        )
         manifest["teaching_exemplar_benchmark"] = {"status": "not_provided"}
     else:
         if not isinstance(benchmark_authorization_sha256, str):
@@ -587,7 +589,7 @@ def _build_artifact_manifest(
         manifest["teaching_exemplar_benchmark"] = authorization_manifest_block(
             benchmark_authorization, benchmark_authorization_sha256
         )
-    if is_v22:
+    if is_current_contract:
         manifest["production_status"] = report.get("production_status")
     return manifest
 
@@ -653,8 +655,8 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
     if manifest.get("manifest_version") != "2.0":
         raise RuntimeError("artifact manifest manifest_version must be 2.0")
     if "skill_version" in manifest:
-        if manifest.get("skill_version") != "2.3.0":
-            raise RuntimeError("artifact manifest skill_version must be 2.3.0")
+        if manifest.get("skill_version") != "2.3.1":
+            raise RuntimeError("artifact manifest skill_version must be 2.3.1")
         if manifest.get("source_json_path_privacy") != "local_diagnostic":
             raise RuntimeError("artifact manifest source_json_path must be marked local_diagnostic")
         if manifest.get("source_label") != source_path.name:
@@ -665,8 +667,9 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         if not isinstance(benchmark, dict):
             raise RuntimeError("artifact manifest teaching_exemplar_benchmark must be an object")
         if benchmark.get("status") == "not_provided":
-            if benchmark != {"status": "not_provided"} or manifest.get("lesson_skill_capability") != "2.2-compatible":
-                raise RuntimeError("missing Benchmark Authorization must use the 2.2-compatible capability block")
+            expected_capability = "2.3-compatible" if source_contract_version == "2.3" else "2.2-compatible"
+            if benchmark != {"status": "not_provided"} or manifest.get("lesson_skill_capability") != expected_capability:
+                raise RuntimeError("missing Benchmark Authorization must use the source contract compatibility block")
             if manifest.get("benchmark_authorization_path") is not None or (root / "benchmark-authorization.json").exists():
                 raise RuntimeError("artifact contains Benchmark Authorization data but declares not_provided")
         else:
@@ -702,7 +705,7 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
             binding_errors = validate_manifest_benchmark_binding(manifest, authorization, authorization_sha256)
             if binding_errors:
                 raise RuntimeError("; ".join(binding_errors))
-    is_v22 = source_contract_version == "2.2"
+    is_current_contract = source_contract_version in {"2.2", "2.3"}
     if manifest.get("course_name") != source_data.get("course_name") or manifest.get("major") != source_data.get("major"):
         raise RuntimeError("artifact manifest course identity does not match the source JSON")
     source_lessons = source_data.get("lessons") if isinstance(source_data.get("lessons"), list) else []
@@ -719,9 +722,9 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
     reference_evidence = _artifact_relative_path(root, manifest.get("reference_evidence_path"))
     if reference_evidence is None or reference_evidence.is_symlink() or not reference_evidence.is_file():
         raise RuntimeError("reference-evidence.json is missing from the final artifact directory")
-    if is_v22 and not isinstance(manifest.get("reference_evidence_sha256"), str):
+    if is_current_contract and not isinstance(manifest.get("reference_evidence_sha256"), str):
         raise RuntimeError("artifact manifest reference_evidence_sha256 is required")
-    if is_v22 and not re.fullmatch(r"[0-9a-fA-F]{64}", manifest["reference_evidence_sha256"]):
+    if is_current_contract and not re.fullmatch(r"[0-9a-fA-F]{64}", manifest["reference_evidence_sha256"]):
         raise RuntimeError("artifact manifest reference_evidence_sha256 must be 64 hex characters")
     if manifest.get("reference_evidence_sha256") and str(manifest["reference_evidence_sha256"]).upper() != _file_sha256(reference_evidence):
         raise RuntimeError("artifact manifest reference-evidence SHA-256 mismatch")
@@ -741,11 +744,11 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         raise RuntimeError("qa-report.json must contain an object")
     if manifest.get("qa_status") != qa_report.get("status"):
         raise RuntimeError("artifact manifest qa_status does not match the QA report")
-    if is_v22 and qa_report.get("status") != "passed":
-        raise RuntimeError("Content Contract 2.2 artifact publication requires qa status=passed")
+    if is_current_contract and qa_report.get("status") != "passed":
+        raise RuntimeError("Content Contract 2.2/2.3 artifact publication requires qa status=passed")
     render = qa_report.get("render") if isinstance(qa_report.get("render"), dict) else {}
     render_status = render.get("status")
-    if manifest.get("render_status") != render_status or (is_v22 and render_status not in {"passed", "not_executed"}):
+    if manifest.get("render_status") != render_status or (is_current_contract and render_status not in {"passed", "not_executed"}):
         raise RuntimeError("artifact manifest render_status does not match eligible QA render evidence")
     if qa_report.get("artifact_manifest") not in (None, "artifact-manifest.json"):
         raise RuntimeError("QA report artifact_manifest must point to artifact-manifest.json")
@@ -867,7 +870,7 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         for field in ("final_docx_path", "final_docx_sha256", "final_pdf_path", "final_pdf_sha256")
     ):
         raise RuntimeError("multi-Lesson artifact manifests must not claim a singular top-level artifact")
-    if is_v22 and is_final_qa_report:
+    if is_current_contract and is_final_qa_report:
         if "pdf_files" in render:
             raise RuntimeError("final QA report must not retain transient absolute pdf_files paths")
         qa_artifacts = render.get("pdf_artifacts")
@@ -884,7 +887,7 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
             if qa_artifact.get("actual_pdf_page_count") != record.get("actual_pdf_page_count"):
                 raise RuntimeError(f"final QA report pdf_artifacts[{index}] page count does not match the manifest")
     digest = manifest.get("reviewed_content_digest")
-    if is_v22:
+    if is_current_contract:
         if not isinstance(digest, dict):
             raise RuntimeError("artifact manifest reviewed_content_digest is required")
         for field in ("source_final_content_sha256", "packaged_final_content_sha256"):
@@ -895,7 +898,7 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
     if isinstance(digest, dict) and "match" in digest and not digest.get("match"):
         raise RuntimeError("packaged final content digest does not match authoring provenance")
     production_status = None
-    if is_v22:
+    if is_current_contract:
         production_status = "production_pass" if require_retained_pdf and expected_docx_names else "structural_pass"
         if manifest.get("production_status") not in (None, production_status):
             raise RuntimeError(
@@ -1186,9 +1189,9 @@ def main() -> None:
         )
     with source_path.open("r", encoding="utf-8") as f:
         meta = json.load(f)
-    if meta.get("content_contract_version") != "2.2" and not args.legacy:
+    if meta.get("content_contract_version") not in {"2.2", "2.3"} and not args.legacy:
         raise ValueError(
-            "Lesson Content Contract 2.2 is required for production generation; "
+            "Lesson Content Contract 2.2 or 2.3 is required for production generation; "
             "legacy 2.0/2.1 input requires the explicit --legacy flag."
         )
     validate_content_v2_input(
@@ -1196,14 +1199,14 @@ def main() -> None:
         schema_path,
         allow_test_fixture=allow_test_fixture_authoring,
     )
-    if meta.get("content_contract_version") == "2.2":
+    if meta.get("content_contract_version") in {"2.2", "2.3"}:
         meta = apply_reviewed_lesson_content(meta)
     benchmark_authorization: dict[str, Any] | None = None
     benchmark_authorization_bytes: bytes | None = None
     benchmark_authorization_sha256: str | None = None
     if benchmark_authorization_path is not None:
-        if meta.get("content_contract_version") != "2.2":
-            raise ValueError("Benchmark Authorization is supported only with Lesson Content Contract 2.2")
+        if meta.get("content_contract_version") not in {"2.2", "2.3"}:
+            raise ValueError("Benchmark Authorization is supported with Lesson Content Contract 2.2 or 2.3")
         try:
             benchmark_authorization_bytes = benchmark_authorization_path.read_bytes()
             benchmark_authorization = json.loads(benchmark_authorization_bytes.decode("utf-8-sig"))
@@ -1285,10 +1288,10 @@ def main() -> None:
         content_quality = validate_content_quality(meta, manifest)
         practice_contract = meta.get("practice_task_contract")
         artifact_plan = meta.get("artifact_plan") or {}
-        writes_practice_handoff = (
-            meta.get("content_contract_version") != "2.2"
-            or bool(artifact_plan.get("practice_work_orders"))
-        )
+        if meta.get("content_contract_version") in {"2.2", "2.3"}:
+            writes_practice_handoff = bool(artifact_plan.get("practice_work_orders"))
+        else:
+            writes_practice_handoff = True
         if writes_practice_handoff and isinstance(practice_contract, dict):
             (candidate / "practice-task-contract.json").write_text(
                 json.dumps(practice_contract, ensure_ascii=False, indent=2) + "\n",
@@ -1331,8 +1334,8 @@ def main() -> None:
                 render_pdf_dir=(candidate / "render" / "pdf") if args.render else None,
                 allow_test_fixture_authoring=allow_test_fixture_authoring,
             )
-        if meta.get("content_contract_version") == "2.2" and report.get("production_status") == "failed":
-            raise RuntimeError("Content Contract 2.2 output did not pass production readiness checks")
+        if meta.get("content_contract_version") in {"2.2", "2.3"} and report.get("production_status") == "failed":
+            raise RuntimeError("Content Contract 2.2/2.3 output did not pass production readiness checks")
         _stable_render_artifacts(report, candidate, generated_filenames)
         created_at = datetime.now(timezone.utc).isoformat()
         reference_evidence_path = candidate / "reference-evidence.json"
@@ -1360,9 +1363,9 @@ def main() -> None:
             encoding="utf-8",
         )
         verified_production_status = _verify_artifact_manifest(candidate, manifest_data, source_path)
-        if meta.get("content_contract_version") == "2.2":
+        if meta.get("content_contract_version") in {"2.2", "2.3"}:
             if verified_production_status not in {"production_pass", "structural_pass"}:
-                raise RuntimeError("verified Content Contract 2.2 artifacts did not produce a valid production state")
+                raise RuntimeError("verified Content Contract 2.2/2.3 artifacts did not produce a valid production state")
             report["production_status"] = verified_production_status
             manifest_data["production_status"] = verified_production_status
         final_qa = requested_qa or internal_qa
@@ -1411,9 +1414,9 @@ def main() -> None:
             print(out_dir / filename)
         if backup is not None:
             print(f"backup={backup}")
-        if meta.get("content_contract_version") == "2.2":
+        if meta.get("content_contract_version") in {"2.2", "2.3"}:
             print(
-                "Content Contract 2.2 "
+                f"Content Contract {meta.get('content_contract_version')} "
                 f"production_status={report['production_status']} "
                 f"qa_status={report['status']} "
                 f"render_status={report['render']['status']} "

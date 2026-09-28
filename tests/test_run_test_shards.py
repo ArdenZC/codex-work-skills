@@ -32,7 +32,8 @@ class TestShardManifest(unittest.TestCase):
         lesson = set(run_test_shards._class_test_ids("LessonTemplatePackageTests")) | set(
             run_test_shards._module_test_ids(run_test_shards.LESSON_V21_TEST_MODULE)
         ) | set(run_test_shards._module_test_ids(run_test_shards.LESSON_V22_TEST_MODULE)) | set(
-            run_test_shards._module_test_ids(run_test_shards.LESSON_CONTRACT_HARDENING_TEST_MODULE)
+            run_test_shards._module_test_ids(run_test_shards.LESSON_V23_TEST_MODULE)
+        ) | set(run_test_shards._module_test_ids(run_test_shards.LESSON_CONTRACT_HARDENING_TEST_MODULE)
         )
         self.assertEqual(content & package, set())
         self.assertEqual(content | package, lesson)

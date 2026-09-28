@@ -1,4 +1,4 @@
-"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0/2.1/2.2.
+"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0/2.1/2.2/2.3.
 
 The production Lesson Content QA remains the authority for structural,
 similarity, progression, and implementation checks.  This module only reads
@@ -25,10 +25,12 @@ import subprocess
 import sys
 from typing import Any
 
+from content_contract import expected_lesson_coverage_hours
+
 
 ACCEPTANCE_SCHEMA_VERSION = "2.0"
-CONTENT_CONTRACT_VERSION = "2.2"
-COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2")
+CONTENT_CONTRACT_VERSION = "2.3"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2", "2.3")
 DEFAULT_TEMPLATE_ID = "lesson-plan"
 DEFAULT_TEMPLATE_VERSION = "v1.1.2"
 SOURCE_TYPES = ("real_agent", "synthetic_fixture", "human_authored", "mixed")
@@ -435,7 +437,7 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
 
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     version = data.get("content_contract_version")
-    if version not in {"2.1", "2.2"}:
+    if version not in {"2.1", "2.2", "2.3"}:
         return {
             "status": "not_applicable",
             "contract_version": version,
@@ -459,6 +461,86 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
         lesson_type: sum(1 for lesson in lessons if isinstance(lesson, Mapping) and lesson.get("lesson_type") == lesson_type)
         for lesson_type in ("theory", "practice", "integrated")
     }
+    if version == "2.3":
+        artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
+        workorders_requested = bool(artifact_plan.get("practice_work_orders"))
+        contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
+        tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []
+        task_hours = sum((_number(task.get("practice_hours")) or 0) for task in tasks if isinstance(task, Mapping))
+        lesson_hours = sum((_number(lesson.get("hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
+        lesson_theory_hours = sum((_number(lesson.get("theory_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
+        lesson_practice_hours = sum((_number(lesson.get("practice_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
+        coverage_hours = _number(expected_lesson_coverage_hours(plan)) or 0
+        total_hours = expected["total_hours"] or 0
+        default_hours = _number(data.get("default_hours")) or 0
+        expected_lesson_count = math.ceil(coverage_hours / default_hours) if default_hours > 0 else None
+        declared_practice_hours = expected["practice_hours"] or 0
+        expected_task_count = (
+            int(declared_practice_hours / 2)
+            if workorders_requested and declared_practice_hours > 0
+            and declared_practice_hours.is_integer() and int(declared_practice_hours) % 2 == 0
+            else 0 if not workorders_requested else None
+        )
+        practice_task_hours = task_hours if workorders_requested else declared_practice_hours
+        practice_is_in_lesson = math.isclose(coverage_hours, total_hours, abs_tol=0.01)
+        accounted_practice_hours = lesson_practice_hours if practice_is_in_lesson else practice_task_hours
+        accounted_total_hours = lesson_hours if practice_is_in_lesson else lesson_hours + practice_task_hours
+        lesson_type_counts = {
+            lesson_type: sum(1 for lesson in lessons if isinstance(lesson, Mapping) and lesson.get("lesson_type") == lesson_type)
+            for lesson_type in ("theory", "practice", "integrated")
+        }
+        actual = {
+            "total_hours": accounted_total_hours,
+            "theory_hours": lesson_theory_hours,
+            "practice_hours": accounted_practice_hours,
+            "lesson_coverage_hours": lesson_hours,
+            "lesson_hours": lesson_hours,
+            "lesson_theory_hours": lesson_theory_hours,
+            "lesson_practice_hours": lesson_practice_hours,
+            "practice_task_hours": task_hours,
+            "practice_work_orders_requested": workorders_requested,
+            "practice_task_count": len(tasks),
+            "workorder_count": len(tasks) if workorders_requested else 0,
+            "lesson_count": len(lessons),
+            "lesson_type_counts": lesson_type_counts,
+        }
+        mismatches = [
+            key for key in ("total_hours", "theory_hours", "practice_hours")
+            if expected[key] is None or not math.isclose(expected[key], actual[key], abs_tol=0.01)
+        ]
+        if expected_lesson_count is None or len(lessons) != expected_lesson_count:
+            mismatches.append("lesson_count")
+        if not math.isclose(coverage_hours, lesson_hours, abs_tol=0.01):
+            mismatches.append("lesson_coverage_hours")
+        if expected_task_count is not None and len(tasks) != expected_task_count:
+            mismatches.append("practice_task_count")
+        if expected_task_count is None and workorders_requested:
+            mismatches.append("practice_hours_unit")
+        if workorders_requested and (
+            not math.isclose(task_hours, declared_practice_hours, abs_tol=0.01)
+            or not math.isclose(_number(contract.get("practice_hours")) or 0, declared_practice_hours, abs_tol=0.01)
+        ):
+            mismatches.append("practice_task_hours")
+        if not workorders_requested and (contract or any(
+            lesson.get("practice_task_ids") for lesson in lessons if isinstance(lesson, Mapping)
+        )):
+            mismatches.append("practice_work_orders_disabled")
+        return {
+            "status": "PASS" if not mismatches else "FAIL",
+            "contract_version": "2.3",
+            "mode": plan.get("mode"),
+            "expected": {**expected, "lesson_coverage_hours": coverage_hours},
+            "actual": actual,
+            "lesson_counts": lesson_type_counts,
+            "lesson_count": len(lessons),
+            "lesson_type_counts": lesson_type_counts,
+            "lesson_coverage_hours": coverage_hours,
+            "expected_lesson_count": expected_lesson_count,
+            "expected_practice_task_count": expected_task_count,
+            "expected_workorder_count": expected_task_count if workorders_requested else 0,
+            "mismatches": mismatches,
+            "consistency": not mismatches,
+        }
     if version == "2.2":
         artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
         workorders_requested = bool(artifact_plan.get("practice_work_orders"))
@@ -540,7 +622,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     quality = qa_report.get("content_quality", {}) if isinstance(qa_report, Mapping) else {}
     provenance = quality.get("reference_provenance", {}) if isinstance(quality, Mapping) else {}
     version = data.get("content_contract_version")
-    if version not in {"2.1", "2.2"}:
+    if version not in {"2.1", "2.2", "2.3"}:
         return {
             "status": "not_applicable",
             "textbook_present": False,
@@ -572,7 +654,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     empty_count = len(provenance.get("empty_reference_lessons", [])) if isinstance(provenance, Mapping) else 0
     research = data.get("reference_research") if isinstance(data.get("reference_research"), Mapping) else {}
     no_verified_external_source = (
-        version == "2.2" and research.get("status") == "no_verified_external_source"
+        version in {"2.2", "2.3"} and research.get("status") == "no_verified_external_source"
     )
     empty_reference_failures = 0 if no_verified_external_source else empty_count
     domestic = int(provenance.get("catalog_source_regions", {}).get("domestic", 0)) if isinstance(provenance, Mapping) else 0
@@ -582,10 +664,10 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     domestic_share = domestic / known if known else None
     textbook_overlap_failure = 0 if data.get("allow_textbook_as_reference", False) else overlap_count
     failures = placeholder_count + textbook_overlap_failure + duplicate_count + unresolved_count + resource_only_count + invalid_generic_count + empty_reference_failures
-    if version == "2.2":
+    if version in {"2.2", "2.3"}:
         return {
             "status": "PASS" if failures == 0 else "FAIL",
-            "contract_version": "2.2",
+            "contract_version": version,
             "textbook_present": textbook is not None,
             "textbook_excluded": overlap_count == 0 or bool(data.get("allow_textbook_as_reference", False)),
             "pool_size": len(data.get("reference_pool", [])) if isinstance(data.get("reference_pool"), list) else 0,
@@ -635,8 +717,122 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
     existing = quality.get("practice_handoff") if isinstance(quality, Mapping) else None
     if isinstance(existing, Mapping) and existing:
         return _json_safe(existing)
-    if data.get("content_contract_version") not in {"2.1", "2.2"}:
+    if data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
         return {"status": "not_applicable", "task_count": 0, "hour_consistent": True}
+    if data.get("content_contract_version") == "2.3":
+        artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
+        requested = bool(artifact_plan.get("practice_work_orders"))
+        plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
+        mode = str(plan.get("mode", ""))
+        expected = _number(plan.get("practice_hours")) or 0
+        contract_value = data.get("practice_task_contract")
+        contract = contract_value if isinstance(contract_value, Mapping) else {}
+        tasks = contract.get("tasks") if isinstance(contract.get("tasks"), list) else []
+        lessons = [item for item in data.get("lessons", []) if isinstance(item, Mapping)]
+        lesson_map = {str(item.get("lesson_id")): item for item in lessons}
+        task_ids = {str(item.get("task_id")) for item in tasks if isinstance(item, Mapping)}
+        task_hours = sum((_number(item.get("practice_hours")) or 0) for item in tasks if isinstance(item, Mapping))
+        lesson_task_ids = {
+            str(item.get("lesson_id")): [str(value) for value in item.get("practice_task_ids", [])]
+            for item in lessons
+        }
+        invalid_links: list[dict[str, Any]] = []
+        unresolved: list[dict[str, Any]] = []
+        linked_tasks: set[str] = set()
+        full_links = mode in {"integrated_lessons", "hybrid"}
+        if not requested:
+            invalid_disabled = contract_value is not None or any(lesson_task_ids.values())
+            return {
+                "status": "FAIL" if invalid_disabled else "not_applicable",
+                "workorders_requested": False,
+                "contract_required": False,
+                "task_count": len(tasks),
+                "expected_task_count": 0,
+                "expected_workorder_count": 0,
+                "expected_practice_hours": expected,
+                "actual_practice_hours": _number(contract.get("practice_hours")) if contract else None,
+                "sum_task_practice_hours": task_hours,
+                "hour_consistent": not invalid_disabled,
+                "lesson_task_linkage_complete": not invalid_disabled,
+                "contract_errors": ["practice handoff is forbidden when work orders are disabled"] if invalid_disabled else [],
+            }
+        even = expected > 0 and expected.is_integer() and int(expected) % 2 == 0
+        expected_task_count = int(expected / 2) if even else None
+        errors: list[str] = []
+        if contract_value is None or contract.get("contract_version") != "1.1" or contract.get("granularity") != "per_task":
+            errors.append("Practice Task Contract 1.1 with per_task granularity is required")
+        if not even or expected_task_count is None:
+            errors.append("practice_hours must be a positive even number when work orders are requested")
+        if expected_task_count is not None and len(tasks) != expected_task_count:
+            errors.append("practice task count does not equal practice_hours / 2")
+        if not math.isclose(task_hours, expected, abs_tol=0.01) or not math.isclose(_number(contract.get("practice_hours")) or 0, expected, abs_tol=0.01):
+            errors.append("practice task hours do not match delivery_plan.practice_hours")
+        for task in tasks:
+            if not isinstance(task, Mapping):
+                continue
+            task_id = str(task.get("task_id"))
+            if not math.isclose(_number(task.get("practice_hours")) or 0, 2, abs_tol=0.01):
+                errors.append(f"practice task {task_id} does not use exactly 2 hours")
+            linked_ids = [str(value) for value in task.get("lesson_ids", [])]
+            if full_links and not linked_ids:
+                invalid_links.append({"task_id": task_id, "lesson_id": None})
+            if mode == "split_lessons" and _number(plan.get("theory_hours")) and not linked_ids:
+                invalid_links.append({"task_id": task_id, "lesson_id": None})
+            if mode == "practice_only" and linked_ids:
+                invalid_links.extend({"task_id": task_id, "lesson_id": value} for value in linked_ids)
+            for lesson_id in linked_ids:
+                linked = lesson_map.get(lesson_id)
+                if linked is None:
+                    invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+                    continue
+                if full_links:
+                    if linked.get("lesson_type") not in {"practice", "integrated"} or (_number(linked.get("practice_hours")) or 0) <= 0:
+                        invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+                    if task_id not in lesson_task_ids.get(lesson_id, []):
+                        invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+                elif mode == "split_lessons" and linked.get("lesson_type") != "theory":
+                    invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+                linked_tasks.add(task_id)
+        if full_links:
+            for lesson_id, lesson in lesson_map.items():
+                ids = lesson_task_ids.get(lesson_id, [])
+                if lesson.get("lesson_type") == "theory" and ids:
+                    invalid_links.extend({"task_id": task_id, "lesson_id": lesson_id} for task_id in ids)
+                if (_number(lesson.get("practice_hours")) or 0) > 0 and not ids:
+                    invalid_links.append({"task_id": None, "lesson_id": lesson_id})
+                for task_id in ids:
+                    if task_id not in task_ids:
+                        unresolved.append({"lesson_id": lesson_id, "task_id": task_id})
+                    elif lesson_id not in [str(value) for value in next((item.get("lesson_ids", []) for item in tasks if isinstance(item, Mapping) and str(item.get("task_id")) == task_id), [])]:
+                        invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+            if task_ids - linked_tasks:
+                errors.append("some Practice Tasks are not linked to a practice-bearing Lesson")
+        elif any(lesson_task_ids.values()):
+            unresolved.extend(
+                {"lesson_id": lesson_id, "task_id": task_id}
+                for lesson_id, values in lesson_task_ids.items()
+                for task_id in values
+            )
+        if invalid_links or unresolved:
+            errors.append("Practice Task lesson links do not match the delivery mode")
+        return {
+            "status": "PASS" if not errors else "FAIL",
+            "workorders_requested": True,
+            "contract_required": True,
+            "task_count": len(tasks),
+            "expected_task_count": expected_task_count,
+            "expected_workorder_count": expected_task_count,
+            "expected_practice_hours": expected,
+            "actual_practice_hours": _number(contract.get("practice_hours")) if contract else None,
+            "sum_task_practice_hours": task_hours,
+            "invalid_practice_lesson_links": invalid_links,
+            "unresolved_task_ids": unresolved,
+            "unlinked_task_ids": sorted(task_ids - linked_tasks) if full_links else [],
+            "hour_consistent": not any("hour" in item.lower() or "practice_hours" in item for item in errors),
+            "lesson_task_linkage_complete": not invalid_links and not unresolved,
+            "one_way_lesson_links": mode == "split_lessons",
+            "contract_errors": errors,
+        }
     if data.get("content_contract_version") == "2.2":
         artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
         workorders_requested = bool(artifact_plan.get("practice_work_orders"))
@@ -773,7 +969,14 @@ def _artifact_manifest_gate(
         if not str(manifest.get("created_at", "")).strip():
             errors.append("manifest created_at is missing")
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
-    expected_hours = _number(plan.get("theory_hours")) if str(data.get("content_contract_version")) == "2.2" else _number(data.get("total_hours"))
+    contract_version = str(data.get("content_contract_version"))
+    expected_hours = (
+        _number(plan.get("theory_hours"))
+        if contract_version == "2.2"
+        else _number(expected_lesson_coverage_hours(plan))
+        if contract_version == "2.3"
+        else _number(data.get("total_hours"))
+    )
     if isinstance(manifest, Mapping):
         if manifest.get("course_name") != data.get("course_name"):
             errors.append("manifest course_name does not match input")
@@ -781,19 +984,19 @@ def _artifact_manifest_gate(
             errors.append("manifest major does not match input")
         manifest_hours = _number(manifest.get("lesson_hours"))
         if manifest_hours is None or expected_hours is None or not math.isclose(manifest_hours, expected_hours, abs_tol=0.01):
-            errors.append("manifest lesson_hours do not match input theory hours")
+            errors.append("manifest lesson_hours do not match expected Lesson coverage hours")
         if manifest.get("qa_status") != qa_report.get("status"):
             errors.append("manifest qa_status does not match QA report")
         if manifest.get("render_status") != render.get("status"):
             errors.append("manifest render_status does not match QA report")
-        if str(data.get("content_contract_version")) == "2.2":
+        if contract_version in {"2.2", "2.3"}:
             if "content_contract_version" in manifest and manifest.get("content_contract_version") != data.get("content_contract_version"):
                 errors.append("manifest content_contract_version does not match the source JSON")
         if qa_report.get("artifact_manifest") != "artifact-manifest.json":
             errors.append("QA report does not point to artifact-manifest.json")
         reference_evidence_path = _manifest_artifact_path(output_dir, manifest.get("reference_evidence_path"))
         reference_sha = manifest.get("reference_evidence_sha256")
-        if str(data.get("content_contract_version")) == "2.2" and (
+        if contract_version in {"2.2", "2.3"} and (
             not isinstance(reference_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", reference_sha)
         ):
             errors.append("manifest reference_evidence_sha256 must be 64 hex characters")
@@ -845,7 +1048,7 @@ def _artifact_manifest_gate(
         if type(render.get("files_checked")) is not int or render.get("files_checked") != len(lessons):
             errors.append("QA render files_checked does not match Lesson count")
     elif render.get("status") != "not_executed":
-        errors.append("Content 2.2 artifact evidence requires render status passed or not_executed")
+        errors.append("Content 2.2/2.3 artifact evidence requires render status passed or not_executed")
     manifest_page_total = 0
     seen_docx_paths: set[str] = set()
     seen_pdf_paths: set[str] = set()
@@ -933,7 +1136,7 @@ def _artifact_manifest_gate(
                 if manifest.get(sha_field) != record.get(sha_field):
                     errors.append(f"manifest {sha_field} does not match its artifact record")
         digest = manifest.get("reviewed_content_digest")
-        if str(data.get("content_contract_version")) == "2.2":
+        if contract_version in {"2.2", "2.3"}:
             if not isinstance(digest, Mapping):
                 errors.append("manifest reviewed_content_digest is required")
             else:
@@ -964,7 +1167,7 @@ def _artifact_manifest_gate(
                 if qa_artifact.get("actual_pdf_page_count") != record.get("actual_pdf_page_count"):
                     errors.append(f"QA pdf_artifacts[{index}] page count does not match manifest")
     production_status = "not_applicable"
-    if str(data.get("content_contract_version")) == "2.2":
+    if contract_version in {"2.2", "2.3"}:
         if qa_report.get("status") == "passed" and (not rendered or not lessons):
             production_status = "structural_pass"
         elif qa_report.get("status") == "passed" and rendered and not errors:
@@ -976,7 +1179,7 @@ def _artifact_manifest_gate(
         if "production_status" in qa_report and qa_report.get("production_status") != production_status:
             errors.append("QA production_status does not match inferred artifact evidence")
     inferred_production_status = production_status
-    if errors and str(data.get("content_contract_version")) == "2.2":
+    if errors and contract_version in {"2.2", "2.3"}:
         production_status = "failed"
     return _gate(
         "artifact_manifest",
@@ -1010,12 +1213,19 @@ def structural_hard_gates(
     version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
     declared_course_hours = _number(data.get("total_hours"))
-    declared_lesson_hours = _number(plan.get("theory_hours")) if version == "2.2" else declared_course_hours
+    is_current_contract = version in {"2.2", "2.3"}
+    declared_lesson_hours = (
+        _number(plan.get("theory_hours"))
+        if version == "2.2"
+        else _number(expected_lesson_coverage_hours(plan))
+        if version == "2.3"
+        else declared_course_hours
+    )
     qa_checks = qa_report.get("checks") if isinstance(qa_report.get("checks"), Mapping) else {}
     total_hours_check = qa_checks.get("total_hours") if isinstance(qa_checks.get("total_hours"), Mapping) else {}
     actual_hours = _number(total_hours_check.get("actual"))
     course_hours_check = qa_checks.get("course_hours") if isinstance(qa_checks.get("course_hours"), Mapping) else {}
-    actual_course_hours = _number(course_hours_check.get("actual")) if version == "2.2" else actual_hours
+    actual_course_hours = _number(course_hours_check.get("actual")) if is_current_contract else actual_hours
     contract = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     file_count = qa_checks.get("file_count") if isinstance(qa_checks.get("file_count"), Mapping) else {}
     lesson_checks = qa_checks.get("lessons") if isinstance(qa_checks.get("lessons"), list) else []
@@ -1068,11 +1278,11 @@ def structural_hard_gates(
             artifact_manifest,
             source_json_path,
         )
-        if version == "2.2"
+        if is_current_contract
         else _not_applicable_gate(
             "artifact_manifest",
             {"content_contract_version": version},
-            "Artifact manifests are required for Content Contract 2.2 smoke/final reports.",
+            "Artifact manifests are required for Content Contract 2.2/2.3 smoke/final reports.",
         )
     )
     expected_profile = {
@@ -1111,11 +1321,11 @@ def structural_hard_gates(
             },
             "The final DOCX must independently reproduce the confirmed course, major, and audience profile.",
         )
-        if version == "2.2"
+        if is_current_contract
         else _not_applicable_gate(
             "course_profile",
             {"content_contract_version": version},
-            "Independent confirmed-course-profile evidence is required for Content Contract 2.2.",
+            "Independent confirmed-course-profile evidence is required for Content Contract 2.2/2.3.",
         )
     )
     gates = [
@@ -1138,7 +1348,7 @@ def structural_hard_gates(
                 and actual_hours is not None
                 and math.isclose(declared_lesson_hours, actual_hours, abs_tol=0.01)
                 and (
-                    version != "2.2"
+                    not is_current_contract
                     or (
                         declared_course_hours is not None
                         and actual_course_hours is not None
@@ -1147,25 +1357,25 @@ def structural_hard_gates(
                 )
             ),
             {
-                "expected": declared_lesson_hours if version == "2.2" else declared_course_hours,
+                "expected": declared_lesson_hours if is_current_contract else declared_course_hours,
                 "actual": actual_hours,
-                "course_expected": declared_course_hours if version == "2.2" else None,
-                "course_actual": actual_course_hours if version == "2.2" else None,
+                "course_expected": declared_course_hours if is_current_contract else None,
+                "course_actual": actual_course_hours if is_current_contract else None,
             },
-            "Declared Lesson theory hours and, for Content 2.2, course hours must agree with QA evidence.",
+            "Declared Lesson coverage and current-contract course hours must agree with QA evidence.",
         ),
         _gate(
             "content_contract",
             contract in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and qa_report.get("content_contract_version") in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and contract == qa_report.get("content_contract_version"),
             {"input": contract, "qa": qa_report.get("content_contract_version"), "current": CONTENT_CONTRACT_VERSION},
-            "Acceptance V2 reads Content Contract 2.0/2.1 compatibility and current Content Contract 2.2; it does not author content.",
+            "Acceptance 2.0 reads Content Contract 2.0/2.1/2.2/2.3; it does not author content.",
         ),
         course_profile_gate,
         _gate(
             "delivery_consistency",
             delivery.get("status") in {"PASS", "not_applicable"},
             delivery,
-            "Content 2.1/2.2 delivery hours and lesson/artifact accounting must reconcile.",
+            "Content 2.1/2.2/2.3 delivery hours and lesson/artifact accounting must reconcile.",
         ),
         _gate(
             "reference_hard_gates",
@@ -1904,11 +2114,13 @@ def build_acceptance_report(
         "qa_report_sha256": _sha256_file(qa_report_path),
         "output_inventory_fingerprint": inventory.get("fingerprint"),
         "render_status": render.get("status", "not_executed"),
-        "production_status": manifest_gate_data.get("production_status", "failed") if contract_version == "2.2" else "not_applicable",
+        "production_status": manifest_gate_data.get("production_status", "failed") if contract_version in {"2.2", "2.3"} else "not_applicable",
         "visual_status": visual_status,
         "delivery_mode": (data.get("delivery_plan") or {}).get("mode") if isinstance(data.get("delivery_plan"), Mapping) else None,
         "theory_hours": _number((data.get("delivery_plan") or {}).get("theory_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
         "practice_hours": _number((data.get("delivery_plan") or {}).get("practice_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
+        "lesson_coverage_hours": delivery.get("lesson_coverage_hours"),
+        "lesson_type_counts": delivery.get("lesson_type_counts", {}),
         "run_id": artifact_manifest.get("run_id") if isinstance(artifact_manifest, Mapping) else None,
         "artifact_manifest_sha256": _sha256_file(output_dir / "artifact-manifest.json") if (output_dir / "artifact-manifest.json").is_file() else None,
     }

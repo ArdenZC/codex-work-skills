@@ -14,8 +14,8 @@
   ],
   "properties": {
     "benchmark_authorization_version": { "const": "1.0" },
-    "skill_version": { "const": "2.3.0" },
-    "content_contract_version": { "const": "2.2" },
+    "skill_version": { "enum": ["2.3.0", "2.3.1"] },
+    "content_contract_version": { "enum": ["2.2", "2.3"] },
     "benchmark_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
     "review_round": { "enum": [1, 2] },
     "benchmark_status": { "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_GAPS_FOUND", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "HUMAN_REVIEW_REQUIRED"] },

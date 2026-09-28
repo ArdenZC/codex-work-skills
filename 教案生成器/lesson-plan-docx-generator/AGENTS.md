@@ -1,14 +1,14 @@
-# 教案生成器工作规则 2.3.0
+# 教案生成器工作规则 2.3.1
 
-这是 Lesson Skill 的轻量入口。开始任务前必须读取同目录 `SKILL.md` 与 `通用提示词.md`；课程合同、QA、模板和事务规则以 `SKILL.md`、schema 与脚本为准，不在 adapter 中复制字段规则。
+这是 Lesson Skill 的轻量入口。开始前阅读同目录 `SKILL.md`、`通用提示词.md` 和当前输入对应的合同文档；字段与 QA 以 schema/脚本为准。新任务默认 Lesson Content Contract 2.3，Content 2.2 只按原历史合同兼容读取，不得静默改写。
 
-- 先进入 `INTAKE_PENDING`，只做一次全中文课程信息确认；确认后冻结课程事实，先做整门课程 outline，再生成完整 Content Contract 2.2 JSON 和 DOCX。
-- 2.3.0 的 Lesson DOCX 只承载理论课时；课前 10 分钟、七个课中阶段合计 `hours × 45`、课后 15 分钟。1 学时的内容、步骤、证据和任务复杂度必须实质少于 2 学时。
-- `course_materials.textbook`、lesson `resources`、`reference_pool` 三者分离。教材、PPT、课件、案例/数据、内部资源、任务单、设备和环境不是 references；可用的 references 需保留真实责任者与出处，书籍年份可选但不得写“年份未知”。
-- 只有用户明确选择 `practice_work_orders=true` 才生成 Practice Task Contract 1.1 与 handoff；每个任务固定 2 学时，任务数和 WorkOrder 数均为实践学时除以 2，理论 Lesson 的 `practice_task_ids` 保持空数组。明确 false 时不生成实践侧文件。
-- Lesson→WorkOrder 是单向 handoff。需要工单时，Lesson Agent 在 Lesson QA/DOCX 完成后调用 WorkOrder Skill Agent；不得由 Lesson Python subprocess 调用 WorkOrder Python，也不得伪造工单 DOCX。WorkOrder 不可用时必须原样提示：`实践任务工单生成器当前不可用，已保存实践任务数据文件，可在工单生成器可用后继续生成。`
-- Lesson Skill 2.3.0 的 Teaching Exemplar Benchmark 使用 Content 2.2 之外的 Curator-only Catalog/Split、物理隔离的 Authoring A / Holdout B Packs、独立 Authoring/Holdout Selection 与 full-linkage Review sidecar；遵守 `SKILL.md` 的角色边界和最多两轮 revision，不向 Lesson JSON 增加 Benchmark 字段。
-- 正文、实施阶段、评价备注和反思由 Agent 提供；Python 只做 schema、硬事实、结构、格式、模板映射、输出与渲染门禁，不用动作词、专业词、IT/护理 marker、字符/n-gram 相似度判断自然度或教学充分性。自然度、相关性、容量与阶段语义由统一 Agent review 负责；有问题必须由 Agent 重写后再生成。
-- 生产命令禁止跳过模板/输出校验；真实 render 未通过或未执行时不得标记 Production PASS。旧版本只可通过显式 legacy/兼容入口读取。
-- 2.3 benchmark 正式生产必须先完成 Content 2.2、Catalog/Split/A-B Packs/A-B Selections、逐 Lesson Review 分片和课程汇总的 full-linkage validation，再生成 Benchmark Authorization；generator required/optional 带授权时都必须重收完整 evidence 并重导 deterministic claims。Round 2 还须通过 `--benchmark-previous-review`、`--benchmark-previous-lesson-reviews-dir`、`--benchmark-previous-content` 提供完整 Round 1 快照。Acceptance 必须比较产物 Authorization、manifest Benchmark block 与同一 helper 从 evidence 派生的 claims；旧 `2.2-compatible/not_provided` 产物不得事后补链。`2.3-benchmark-linked` 表示证据链绑定，不代表教学结论通过。
-- Agent runtime 只加载每课选中的 Cards，不把完整 Pack/Catalog/Split 暴露给 Author 或 Reviewer。Round 2 必须是语义内容修订并更新 Content 2.2 pedagogical review history/provenance；Benchmark 状态不是教学质量结论。
+- 先完成一次中文课程信息确认并冻结课程基本盘，再规划整门课程 outline，再由 Agent 创作逐课正文、pedagogical review 与 provenance。正文、阶段活动、评价和反思不由 Python 生成。
+- Content 2.3 coverage：`theory_only`、`integrated_lessons`、`hybrid` 使用 `total_hours`；`split_lessons` 使用 `theory_hours`；`practice_only` 保持零 Lesson。所有课次数量按 coverage / `default_hours` 向上取整，尾课保留真实余数。
+- `integrated_lessons` 只能使用 integrated Lesson；`hybrid` 可混合 theory/practice/integrated。逐课及课程理论/实践/总时数必须精确守恒，不得机械平均伪造构成。
+- 64/32/32 integrated、默认每课 2 学时必须是 32 个 Lesson、覆盖 64 学时。工单 false 时仍生成 32 个 Lesson 和 0 个 Practice Task/WorkOrder；true 时仍为 32 个 Lesson，并提供 16 个 2 学时 Practice Task/WorkOrder。工单是 Lesson 实践环节材料，不增加课程总时数。
+- Content 2.2 继续使用旧理论课边界：64/32/32 保持 16 个理论 Lesson。`split_lessons` 在 Content 2.3 也保留这一边界；`practice_only` 保持原有无 Lesson 行为。
+- Content 2.3 的 `practice_task_ids`：工单关闭时所有 Lesson 为空；工单开启时 theory Lesson 为空，integrated/practice Lesson 与所承载任务双向链接。split 仍只允许 task→theory 的单向 handoff。
+- Lesson Skill 2.3.1 的 Teaching Exemplar Benchmark 继续使用独立 sidecar 与现有 Catalog/Split/A-B/Review/Authorization 信任边界；Authorization 1.0 兼容 Content 2.2/2.3 并记录实际输入版本。不新增 Lesson benchmark 字段。
+- Template 1.1.2、固定九阶段、评价体系和 Practice Task Contract 1.1 保持不变。教材、resources 与 references 分开；不得伪造来源。
+- 生产生成必须通过 schema、内容、模板、输出、事务和所请求的真实 render 校验。未执行或失败的 render 不得标记 `production_pass`。
+Agent 只创作 Lesson Content JSON、Practice Task handoff data、Benchmark sidecars/evidence 与 pedagogical review。最终 Lesson DOCX 只允许由 canonical generate_lesson_plans.py 基于 Template 1.1.2 生成并通过 Output QA、所需 retained render、artifact manifest verification 与 Acceptance；任一 generator/template validation/Output QA/manifest verification 失败即 BLOCKED，禁止手工创建、修改、修补或绕过。完整禁令见 SKILL.md「最终 Lesson DOCX 的不可绕过生产边界」。

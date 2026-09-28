@@ -2531,9 +2531,9 @@ def _reference_provenance_report(
     provenance_binding_errors: list[dict[str, Any]] = []
     source_evidence: list[dict[str, Any]] = []
     is_reference_pool_contract = bool(
-        data and data.get("content_contract_version") in {"2.1", "2.2"}
+        data and data.get("content_contract_version") in {"2.1", "2.2", "2.3"}
     )
-    is_v22 = bool(data and data.get("content_contract_version") == "2.2")
+    is_current_contract = bool(data and data.get("content_contract_version") in {"2.2", "2.3"})
     pool = {
         str(reference.get("reference_id")): reference
         for reference in (data or {}).get("reference_pool", [])
@@ -2545,7 +2545,7 @@ def _reference_provenance_report(
     catalog_source_regions = {"domestic": 0, "foreign": 0, "unknown": 0}
     for reference in pool.values():
         catalog_source_regions[_reference_region(reference)] += 1
-    if is_v22:
+    if is_current_contract:
         research = (data or {}).get("reference_research") or {}
         research_sources = research.get("sources", []) if isinstance(research, dict) else []
         source_by_id = {
@@ -2616,7 +2616,7 @@ def _reference_provenance_report(
         seen_references: dict[str, int] = {}
         raw_ids = [str(value) for value in lesson.get("reference_ids", [])] if is_reference_pool_contract else []
         references = lesson_references(data, lesson)
-        if is_v22 and not references:
+        if is_current_contract and not references:
             empty_reference_lessons.append(lesson_id)
         for index, reference in enumerate(references, 1):
             reference_id = raw_ids[index - 1] if is_reference_pool_contract and index <= len(raw_ids) else None
@@ -2691,7 +2691,7 @@ def _reference_provenance_report(
         "by_lesson": by_lesson,
         "validation_scope": (
             "contract_locator_and_exact_source_binding"
-            if is_v22
+            if is_current_contract
             else "contract_and_locator_only"
         ),
         "reuse_policy": REUSE_REFERENCE,
@@ -2709,7 +2709,7 @@ def _reference_provenance_report(
         "placeholder_items": placeholder_items,
         "empty_reference_lessons": empty_reference_lessons,
         "textbook_overlap": textbook_overlap,
-        "textbook_overlap_allowed": bool((data or {}).get("allow_textbook_as_reference", False)) and not is_v22,
+        "textbook_overlap_allowed": bool((data or {}).get("allow_textbook_as_reference", False)) and not is_current_contract,
         "catalog_source_regions": catalog_source_regions,
         "reuse_frequency": dict(sorted(reuse_frequency.items())),
     }
@@ -3106,6 +3106,162 @@ def _v22_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
+    """Summarize supplementary WorkOrders and the Content 2.3 Lesson/task links."""
+
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
+    artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), dict) else {}
+    requested = bool(artifact_plan.get("practice_work_orders"))
+    mode = str(plan.get("mode", ""))
+    expected_hours = float(plan.get("practice_hours", 0) or 0)
+    contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), dict) else None
+    tasks = contract.get("tasks", []) if isinstance(contract, dict) else []
+    lessons = [lesson for lesson in data.get("lessons", []) if isinstance(lesson, dict)]
+    lesson_by_id = {str(lesson.get("lesson_id")): lesson for lesson in lessons}
+    task_by_id = {str(task.get("task_id")): task for task in tasks if isinstance(task, dict)}
+    task_hours = sum(float(task.get("practice_hours", 0)) for task in tasks if isinstance(task, dict))
+    lesson_task_ids = {
+        str(lesson.get("lesson_id")): [str(value) for value in lesson.get("practice_task_ids", [])]
+        for lesson in lessons
+    }
+    errors: list[str] = []
+    invalid_links: list[dict[str, Any]] = []
+    unresolved: list[dict[str, Any]] = []
+    linked_task_ids: set[str] = set()
+    if not requested:
+        forbidden_links = any(lesson_task_ids.values())
+        if contract is not None or forbidden_links:
+            errors.append("practice task contract and Lesson practice_task_ids are forbidden when work orders are disabled")
+        return {
+            "status": "failed" if errors else "not_applicable",
+            "contract_version": contract.get("contract_version") if contract else None,
+            "task_count": len(tasks),
+            "expected_task_count": 0,
+            "expected_workorder_count": 0,
+            "actual_workorder_count": 0,
+            "expected_practice_hours": expected_hours,
+            "actual_practice_hours": contract.get("practice_hours") if contract else None,
+            "lesson_practice_hours": sum(float(lesson.get("practice_hours", 0)) for lesson in lessons),
+            "sum_task_practice_hours": task_hours,
+            "unresolved_task_ids": [],
+            "unlinked_task_ids": [],
+            "invalid_practice_lesson_links": [],
+            "invalid_task_hours": [],
+            "hour_consistent": not errors,
+            "lesson_task_linkage_complete": not errors,
+            "one_way_lesson_links": mode == "split_lessons",
+            "workorders_requested": False,
+            "contract_required": False,
+            "contract_not_allowed": bool(errors),
+            "contract_errors": errors,
+            "artifact_plan": artifact_plan,
+        }
+
+    expected_task_count = (
+        int(expected_hours / 2)
+        if expected_hours > 0 and expected_hours.is_integer() and int(expected_hours) % 2 == 0
+        else None
+    )
+    if contract is None:
+        errors.append("practice_task_contract is required when practice_work_orders=true")
+    elif contract.get("contract_version") != "1.1" or contract.get("granularity") != "per_task":
+        errors.append("practice_task_contract must use version 1.1 and per_task granularity")
+    if expected_task_count is None:
+        errors.append("practice_hours must be a positive even number when practice_work_orders=true")
+    if expected_task_count is not None and len(tasks) != expected_task_count:
+        errors.append(f"practice task count must equal practice_hours / 2: expected {expected_task_count}, got {len(tasks)}")
+    if contract is not None and not math.isclose(float(contract.get("practice_hours", -1)), expected_hours, abs_tol=1e-9):
+        errors.append("practice_task_contract.practice_hours must equal delivery_plan.practice_hours")
+
+    invalid_task_hours = [
+        {"task_id": str(task.get("task_id")), "actual_hours": task.get("practice_hours"), "expected_hours": 2}
+        for task in tasks
+        if isinstance(task, dict) and not math.isclose(float(task.get("practice_hours", 0)), 2.0, abs_tol=1e-9)
+    ]
+    if invalid_task_hours:
+        errors.append("every practice task must contain exactly 2 practice hours")
+    if not math.isclose(task_hours, expected_hours, abs_tol=1e-9):
+        errors.append("practice task hours do not match delivery_plan.practice_hours")
+
+    full_lesson_links = mode in {"integrated_lessons", "hybrid"}
+    for task_id, task in task_by_id.items():
+        linked_ids = [str(value) for value in task.get("lesson_ids", [])]
+        if full_lesson_links and not linked_ids:
+            invalid_links.append({"task_id": task_id, "lesson_id": None})
+        if mode == "split_lessons" and expected_hours > 0 and not linked_ids:
+            invalid_links.append({"task_id": task_id, "lesson_id": None})
+        if mode == "practice_only" and linked_ids:
+            invalid_links.extend({"task_id": task_id, "lesson_id": lesson_id} for lesson_id in linked_ids)
+        for lesson_id in linked_ids:
+            lesson = lesson_by_id.get(lesson_id)
+            if lesson is None:
+                invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+                continue
+            if full_lesson_links:
+                carries_practice = (
+                    lesson.get("lesson_type") in {"practice", "integrated"}
+                    and float(lesson.get("practice_hours", 0) or 0) > 0
+                )
+                if not carries_practice:
+                    invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+                if task_id not in lesson_task_ids.get(lesson_id, []):
+                    invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+            elif mode == "split_lessons" and lesson.get("lesson_type") != "theory":
+                invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+            linked_task_ids.add(task_id)
+
+    if full_lesson_links:
+        for lesson_id, lesson in lesson_by_id.items():
+            task_ids = lesson_task_ids.get(lesson_id, [])
+            for task_id in task_ids:
+                if task_id not in task_by_id:
+                    unresolved.append({"lesson_id": lesson_id, "task_id": task_id})
+                elif lesson_id not in [str(value) for value in task_by_id[task_id].get("lesson_ids", [])]:
+                    invalid_links.append({"task_id": task_id, "lesson_id": lesson_id})
+            if lesson.get("lesson_type") == "theory" and task_ids:
+                invalid_links.extend({"task_id": task_id, "lesson_id": lesson_id} for task_id in task_ids)
+            if float(lesson.get("practice_hours", 0) or 0) > 0 and not task_ids:
+                invalid_links.append({"task_id": None, "lesson_id": lesson_id})
+        if set(task_by_id) - linked_task_ids:
+            errors.append("every Practice Task must be linked to a practice-bearing Lesson")
+    elif any(lesson_task_ids.values()):
+        unresolved.extend(
+            {"lesson_id": lesson_id, "task_id": task_id}
+            for lesson_id, task_ids in lesson_task_ids.items()
+            for task_id in task_ids
+        )
+
+    if invalid_links:
+        errors.append("Practice Task lesson links do not match the delivery mode")
+    if unresolved:
+        errors.append("Lesson practice_task_ids contains unknown task IDs")
+    lesson_practice_hours = sum(float(lesson.get("practice_hours", 0) or 0) for lesson in lessons)
+    return {
+        "status": "failed" if errors else "passed",
+        "contract_version": contract.get("contract_version") if contract else None,
+        "task_count": len(tasks),
+        "expected_task_count": expected_task_count,
+        "expected_workorder_count": expected_task_count,
+        "actual_workorder_count": len(tasks),
+        "expected_practice_hours": expected_hours,
+        "actual_practice_hours": contract.get("practice_hours") if contract else None,
+        "lesson_practice_hours": lesson_practice_hours,
+        "sum_task_practice_hours": task_hours,
+        "unresolved_task_ids": unresolved,
+        "unlinked_task_ids": sorted(set(task_by_id) - linked_task_ids) if full_lesson_links else [],
+        "invalid_practice_lesson_links": invalid_links,
+        "invalid_task_hours": invalid_task_hours,
+        "hour_consistent": not any("practice" in error.lower() or "task count" in error.lower() for error in errors),
+        "lesson_task_linkage_complete": not invalid_links and not unresolved,
+        "one_way_lesson_links": mode == "split_lessons",
+        "workorders_requested": True,
+        "contract_required": True,
+        "contract_not_allowed": False,
+        "contract_errors": errors,
+        "artifact_plan": artifact_plan,
+    }
+
+
 def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
     """Content 2.2 quality boundary: facts are deterministic, pedagogy is Agent-reviewed."""
 
@@ -3152,7 +3308,11 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
     for item in references.get("textbook_overlap", []):
         errors.append(f"{item['lesson']}.reference_ids[{item['index']}] overlaps the textbook")
 
-    practice_handoff = _v22_practice_handoff_report(data)
+    practice_handoff = (
+        _v23_practice_handoff_report(data)
+        if data.get("content_contract_version") == "2.3"
+        else _v22_practice_handoff_report(data)
+    )
     if practice_handoff["status"] == "failed":
         errors.append("practice handoff: task hours and WorkOrder count do not reconcile")
 
@@ -3200,7 +3360,7 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
     )
     return {
         "status": "passed" if not errors else "failed",
-        "content_contract_version": "2.2",
+        "content_contract_version": data.get("content_contract_version", "2.2"),
         "diagnostic_content_policy": {"mode": "agent_review_and_exact_facts", "hash": "sha256"},
         "errors": errors,
         "warnings": warnings,
@@ -3275,7 +3435,7 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
 def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
     """Run deterministic course-level checks, including item and skeleton repetition."""
 
-    if data.get("content_contract_version") == "2.2":
+    if data.get("content_contract_version") in {"2.2", "2.3"}:
         return _assess_content_quality_v22(data, manifest)
 
     lessons = data.get("lessons", [])
@@ -3284,9 +3444,9 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     errors: list[str] = []
     warnings: list[str] = []
     errors.extend(f"confirmed course information: {message}" for message in confirmed_course_info_errors(data))
-    if data.get("content_contract_version") == "2.2" and data.get("allow_textbook_as_reference", False):
+    if data.get("content_contract_version") in {"2.2", "2.3"} and data.get("allow_textbook_as_reference", False):
         errors.append(
-            "allow_textbook_as_reference is not supported in Content Contract 2.2; "
+            f"allow_textbook_as_reference is not supported in Content Contract {data.get('content_contract_version')}; "
             "course_materials.textbook and reference_pool are separate"
         )
     course_terms = _course_terms(lessons)
@@ -3803,8 +3963,8 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "capability_stage_vocabulary": list(CAPABILITY_STAGES),
         "completeness": completeness,
         "reference_metrics": {
-            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") in {"2.1", "2.2"} else False),
-            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") in {"2.1", "2.2"} else None,
+            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") in {"2.1", "2.2", "2.3"} else False),
+            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") in {"2.1", "2.2", "2.3"} else None,
             "lessons_with_references": sum(1 for lesson in lessons if lesson_references(data, lesson)),
             "lessons_without_references": sum(1 for lesson in lessons if not lesson_references(data, lesson)),
             "reuse_frequency": reference_provenance.get("reuse_frequency", {}),

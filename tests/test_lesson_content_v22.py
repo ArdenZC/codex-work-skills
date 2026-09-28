@@ -231,7 +231,7 @@ def make_v22_payload(
             next_focus=next_focus,
             next_task=(specs[index][1] if index < len(specs) else f"复盘{course}"),
             previous_artifact=previous_artifact,
-            score=SYNTHETIC_SCORES[index - 1],
+            score=SYNTHETIC_SCORES[(index - 1) % len(SYNTHETIC_SCORES)],
         )
         lesson["lesson_id"] = f"L{index:02d}"
         lesson["lesson_type"] = "theory"

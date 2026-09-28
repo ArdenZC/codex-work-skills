@@ -40,6 +40,7 @@ from exemplar_contract import (  # noqa: E402
     validate_pack_payload,
 )
 import exemplar_split as exemplar_split_module  # noqa: E402
+import benchmark_authorization as benchmark_authorization_module  # noqa: E402
 from exemplar_split import build_split, canonical_course_identity, expected_split, validate_split_payload  # noqa: E402
 from validate_benchmark_review import (  # noqa: E402
     DIMENSION_IDS,
@@ -1656,6 +1657,111 @@ class AcceptanceBenchmarkIntegrationTests(unittest.TestCase):
 
             schema = json.loads((ROOT / "docs" / "lesson-acceptance-report.schema.json").read_text(encoding="utf-8"))
             self.assertEqual(list(Draft202012Validator(schema).iter_errors(updated)), [])
+
+    def test_historical_authorization_230_passes_full_linkage_and_keeps_every_evidence_claim_strict(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-benchmark-authorization-230-") as temp_name:
+            folder = Path(temp_name)
+            source, _, _ = self._acceptance_fixture(folder)
+            paths = make_bundle_files(folder, source)
+            authorization_path = folder / "benchmark-authorization-230.json"
+            authorization = build_benchmark_authorization(source, paths, authorization_path)
+            authorization["skill_version"] = "2.3.0"
+            authorization["authorization_fingerprint"] = benchmark_authorization_module.authorization_fingerprint(
+                authorization
+            )
+            _write_json(authorization_path, authorization)
+
+            output = folder / "generated-historical-authorization"
+            generated = run_script(
+                SCRIPTS / "generate_lesson_plans.py",
+                "--tasks-json", str(source),
+                "--output-dir", str(output),
+                "--benchmark-mode", "required",
+                "--benchmark-authorization", str(authorization_path),
+                *benchmark_generator_args(paths),
+                "--allow-test-fixture-authoring",
+                "--render",
+            )
+            self.assertEqual(generated.returncode, 0, generated.stderr + generated.stdout)
+
+            acceptance = lesson_acceptance.build_acceptance_report(
+                source,
+                output,
+                output / "qa-report.json",
+                source_type="synthetic_fixture",
+                report_dir=folder / "acceptance-historical",
+                **acceptance_kwargs(paths),
+            )
+            self.assertEqual(acceptance["structural_hard_gates"]["status"], "PASS")
+            self.assertEqual(acceptance["benchmark_review"]["decision"], "NO_REVISION_REQUIRED")
+            self.assertEqual(acceptance["acceptance_schema_version"], "2.0")
+
+            claims = benchmark_authorization_module.derive_benchmark_authorization_claims(
+                lesson_content_path=source,
+                catalog_path=paths["catalog"],
+                split_path=paths["split"],
+                authoring_pack_path=paths["authoring_pack"],
+                authoring_selection_path=paths["authoring_selection"],
+                holdout_pack_path=paths["holdout_pack"],
+                holdout_selection_path=paths["holdout_selection"],
+                benchmark_review_path=paths["review"],
+                lesson_reviews_dir=paths["lesson_reviews_dir"],
+                schema_path=LESSON / "schemas" / "lesson-plan-input.schema.json",
+                allow_test_fixture=True,
+            )
+
+            unsupported = copy.deepcopy(authorization)
+            unsupported["skill_version"] = "9.9.9"
+            unsupported["authorization_fingerprint"] = benchmark_authorization_module.authorization_fingerprint(
+                unsupported
+            )
+            self.assertTrue(
+                benchmark_authorization_module.validate_authorization_matches_claims(unsupported, claims),
+                "unknown skill provenance must fail even when its fingerprint is recomputed",
+            )
+
+            sha_claims = (
+                "source_lesson_content_sha256",
+                "source_final_content_sha256",
+                "catalog_fingerprint",
+                "split_fingerprint",
+                "authoring_pack_fingerprint",
+                "authoring_selection_sha256",
+                "holdout_pack_fingerprint",
+                "holdout_selection_sha256",
+                "benchmark_review_sha256",
+            )
+            for field in sha_claims:
+                with self.subTest(tampered_claim=field):
+                    tampered = copy.deepcopy(authorization)
+                    tampered[field] = "0" * 64 if tampered[field] != "0" * 64 else "1" * 64
+                    tampered["authorization_fingerprint"] = benchmark_authorization_module.authorization_fingerprint(
+                        tampered
+                    )
+                    self.assertTrue(
+                        benchmark_authorization_module.validate_authorization_matches_claims(tampered, claims),
+                        f"tampered {field} must fail full evidence linkage",
+                    )
+
+            strict_claim_mutations = {
+                "benchmark_run_id": "forged-benchmark-run",
+                "review_round": 2,
+                "context_mode": "single_context",
+                "benchmark_status": "BENCHMARK_UNAVAILABLE",
+                "benchmark_decision": "REVISION_REQUIRED",
+                "content_contract_version": "2.3",
+            }
+            for field, value in strict_claim_mutations.items():
+                with self.subTest(tampered_claim=field):
+                    tampered = copy.deepcopy(authorization)
+                    tampered[field] = value
+                    tampered["authorization_fingerprint"] = benchmark_authorization_module.authorization_fingerprint(
+                        tampered
+                    )
+                    self.assertTrue(
+                        benchmark_authorization_module.validate_authorization_matches_claims(tampered, claims),
+                        f"tampered {field} must fail full evidence linkage",
+                    )
 
     def test_acceptance_requires_every_linkage_input_and_rejects_forged_review(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-benchmark-acceptance-forged-") as temp_name:

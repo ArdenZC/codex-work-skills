@@ -176,7 +176,7 @@ def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
                     )
                 except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
                     source_version = "2.2"
-                if source_version != "2.2":
+                if source_version not in {"2.2", "2.3"}:
                     # The legacy test fixtures opt into the compatibility adapter explicitly.
                     command_args.append("--legacy")
                 else:
@@ -191,6 +191,7 @@ def run_script(script: Path, *args: str) -> "subprocess.CompletedProcess[str]":
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     if "--allow-test-fixture-authoring" in command_args:
         env["LESSON_ALLOW_TEST_FIXTURE_AUTHORING"] = "1"
     if "--skip-template-validation" in args or "--skip-output-validation" in args:
@@ -320,7 +321,7 @@ class LessonContentV2Mixin:
                 "Legacy sparse lesson content is no longer accepted for production generation.",
                 result.stderr,
             )
-            self.assertIn("Regenerate tasks JSON using the Lesson Content V2 Skill workflow.", result.stderr)
+            self.assertIn("Regenerate tasks JSON using the current Lesson Skill workflow.", result.stderr)
             self.assertFalse(output.exists())
 
     def test_schema_and_classroom_time_contracts_fail_through_real_generator(self) -> None:
