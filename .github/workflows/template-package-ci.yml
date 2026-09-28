@@ -884,7 +884,7 @@ jobs:
       (needs.classify-changes.outputs.force_full == 'true' ||
       needs.classify-changes.outputs.run_release == 'true')
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 30
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
