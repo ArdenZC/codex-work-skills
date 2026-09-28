@@ -85,6 +85,18 @@ def _is_package_risk(path: str) -> bool:
     )
 
 
+def _is_lesson_release_scale_path(path: str) -> bool:
+    """Return whether a Lesson production input/code path needs rendered E2E."""
+
+    if not _under(path, LESSON_ROOT):
+        return False
+    relative = path[len(LESSON_ROOT) + 1 :]
+    return (
+        relative.startswith(("scripts/", "schemas/", "assets/templates/"))
+        or relative in {"manifest.yaml", "requirements.txt"}
+    )
+
+
 def _base_result(paths: Iterable[str]) -> dict[str, object]:
     return {
         "docs_only": False,
@@ -174,9 +186,14 @@ def classify(
             _mark(result, "run_lesson", "run_package_contracts")
             labels.add("lesson")
             reasons.append("lesson package")
+            if _is_lesson_release_scale_path(path):
+                _mark(result, "run_release")
+                labels.add("release")
+                reasons.append("Lesson production path requires release-scale render")
             if _is_package_risk(path):
                 _mark(result, "run_tooling", "run_release")
-                labels.update({"tooling", "release"})
+                labels.add("tooling")
+                labels.add("release")
                 reasons.append("lesson package contract")
             continue
 
