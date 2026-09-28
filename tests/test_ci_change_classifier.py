@@ -31,12 +31,64 @@ class ChangeClassifierTests(unittest.TestCase):
             result = classify([path], event_name="pull_request")
             self.assert_flags(result, docs_only=False, force_full=True)
 
-    def test_lesson_business_change_runs_only_lesson_and_contracts(self) -> None:
+    def test_lesson_business_change_runs_lesson_and_release_scale_e2e(self) -> None:
         result = classify(
             ["教案生成器/lesson-plan-docx-generator/scripts/generate_lesson_plans.py"],
             event_name="pull_request",
         )
-        self.assert_flags(result, run_lesson=True, run_package_contracts=True, run_gradebook=False, run_tooling=False, run_release=False, force_full=False)
+        self.assert_flags(
+            result,
+            run_lesson=True,
+            run_package_contracts=True,
+            run_gradebook=False,
+            run_tooling=False,
+            run_release=True,
+            force_full=False,
+        )
+        self.assertEqual(result["classification"], "lesson+release")
+
+    def test_lesson_production_paths_require_release_scale_but_docs_do_not(self) -> None:
+        production_paths = (
+            "教案生成器/lesson-plan-docx-generator/scripts/content_contract.py",
+            "教案生成器/lesson-plan-docx-generator/scripts/content_quality.py",
+            "教案生成器/lesson-plan-docx-generator/scripts/lesson_acceptance.py",
+            "教案生成器/lesson-plan-docx-generator/scripts/install_adapters.py",
+            "教案生成器/lesson-plan-docx-generator/scripts/validate_output.py",
+            "教案生成器/lesson-plan-docx-generator/schemas/practice-task-contract.schema.json",
+            "教案生成器/lesson-plan-docx-generator/schemas/benchmark-authorization.schema.json",
+            "教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.2/manifest.yaml",
+            "教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.2/template.docx",
+            "教案生成器/lesson-plan-docx-generator/manifest.yaml",
+        )
+        for path in production_paths:
+            with self.subTest(path=path):
+                result = classify([path], event_name="pull_request")
+                self.assert_flags(
+                    result,
+                    run_lesson=True,
+                    run_release=True,
+                    run_package_contracts=True,
+                    force_full=False,
+                )
+
+        for path in ("README.md", "docs/ci.md"):
+            with self.subTest(path=path):
+                result = classify([path], event_name="pull_request")
+                self.assert_flags(
+                    result,
+                    docs_only=True,
+                    run_docs=True,
+                    run_lesson=False,
+                    run_release=False,
+                    run_tooling=False,
+                    force_full=False,
+                )
+
+        shared_practice_schema = classify(
+            ["schemas/shared/practice-task-contract.schema.json"],
+            event_name="pull_request",
+        )
+        self.assert_flags(shared_practice_schema, force_full=True, run_release=True, run_lesson=True)
 
     def test_lesson_template_change_adds_tooling_and_release(self) -> None:
         result = classify(

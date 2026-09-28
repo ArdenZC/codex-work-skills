@@ -26,6 +26,7 @@ import sys
 from typing import Any
 
 from content_contract import expected_lesson_coverage_hours
+from package_common import practice_hour_allocation_errors_v23
 
 
 ACCEPTANCE_SCHEMA_VERSION = "2.0"
@@ -715,7 +716,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
 def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | None = None) -> dict[str, Any]:
     quality = qa_report.get("content_quality", {}) if isinstance(qa_report, Mapping) else {}
     existing = quality.get("practice_handoff") if isinstance(quality, Mapping) else None
-    if isinstance(existing, Mapping) and existing:
+    if isinstance(existing, Mapping) and existing and data.get("content_contract_version") != "2.3":
         return _json_safe(existing)
     if data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
         return {"status": "not_applicable", "task_count": 0, "hour_consistent": True}
@@ -767,6 +768,8 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
             errors.append("practice task count does not equal practice_hours / 2")
         if not math.isclose(task_hours, expected, abs_tol=0.01) or not math.isclose(_number(contract.get("practice_hours")) or 0, expected, abs_tol=0.01):
             errors.append("practice task hours do not match delivery_plan.practice_hours")
+        allocation_errors = practice_hour_allocation_errors_v23(data)
+        errors.extend(allocation_errors)
         for task in tasks:
             if not isinstance(task, Mapping):
                 continue
@@ -828,8 +831,9 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
             "invalid_practice_lesson_links": invalid_links,
             "unresolved_task_ids": unresolved,
             "unlinked_task_ids": sorted(task_ids - linked_tasks) if full_links else [],
-            "hour_consistent": not any("hour" in item.lower() or "practice_hours" in item for item in errors),
-            "lesson_task_linkage_complete": not invalid_links and not unresolved,
+            "hour_consistent": not allocation_errors and not any("hour" in item.lower() or "practice_hours" in item for item in errors),
+            "lesson_task_linkage_complete": not allocation_errors and not invalid_links and not unresolved,
+            "practice_hour_allocation_errors": allocation_errors,
             "one_way_lesson_links": mode == "split_lessons",
             "contract_errors": errors,
         }

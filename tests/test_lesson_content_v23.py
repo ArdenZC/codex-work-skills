@@ -259,6 +259,91 @@ class LessonContentV23Tests(unittest.TestCase):
         self.assertEqual(metrics["lesson_count"], 32)
         self.assertEqual(metrics["lesson_type_counts"], {"theory": 0, "practice": 0, "integrated": 32})
         self.assertEqual(metrics["actual"]["workorder_count"], 16)
+        self.assertEqual(handoff["practice_hour_allocation_errors"], [])
+
+    def test_hybrid_workorders_partition_all_practice_hours(self) -> None:
+        payload = _hybrid_8()
+        _bind_v23(
+            payload,
+            mode="hybrid",
+            theory_hours=4,
+            practice_hours=4,
+            workorders=True,
+            task_links=[["L02", "L04"], ["L03"]],
+        )
+        _validate_v23(payload)
+        quality = lesson_content_quality.assess_content_quality(payload)
+        handoff = lesson_acceptance.practice_handoff_metrics(payload, quality)
+        self.assertEqual(handoff["status"], "PASS", handoff)
+        self.assertEqual(handoff["practice_hour_allocation_errors"], [])
+        self.assertEqual(
+            [task["lesson_ids"] for task in payload["practice_task_contract"]["tasks"]],
+            [["L02", "L04"], ["L03"]],
+        )
+
+    def test_integrated_and_hybrid_reject_partial_or_overlapping_allocations(self) -> None:
+        all_lessons = [f"L{index:02d}" for index in range(1, 33)]
+        all_to_all = _integrated_64(workorders=False)
+        _bind_v23(
+            all_to_all,
+            mode="integrated_lessons",
+            theory_hours=32,
+            practice_hours=32,
+            workorders=True,
+            task_links=[all_lessons[:] for _ in range(16)],
+        )
+
+        partial = _integrated_64(workorders=False)
+        _bind_v23(
+            partial,
+            mode="integrated_lessons",
+            theory_hours=32,
+            practice_hours=32,
+            workorders=True,
+            task_links=[["L01"]]
+            + [[f"L{index:02d}", f"L{index + 1:02d}"] for index in range(3, 33, 2)],
+        )
+
+        overlap = _hybrid_8()
+        _bind_v23(
+            overlap,
+            mode="hybrid",
+            theory_hours=4,
+            practice_hours=4,
+            workorders=True,
+            task_links=[["L02", "L04"], ["L02", "L03"]],
+        )
+
+        for label, payload in (("all-to-all", all_to_all), ("partial", partial), ("hybrid-overlap", overlap)):
+            with self.subTest(allocation=label):
+                allocation_errors = lesson_package_common.practice_hour_allocation_errors_v23(payload)
+                self.assertTrue(allocation_errors)
+                qa_handoff = lesson_content_quality._v23_practice_handoff_report(payload)
+                self.assertEqual(qa_handoff["status"], "failed", qa_handoff)
+                acceptance_handoff = lesson_acceptance.practice_handoff_metrics(
+                    payload,
+                    {
+                        "content_quality": {
+                            "practice_handoff": {
+                                "status": "PASS",
+                                "hour_consistent": True,
+                                "lesson_task_linkage_complete": True,
+                            }
+                        }
+                    },
+                )
+                self.assertEqual(acceptance_handoff["status"], "FAIL", acceptance_handoff)
+                self.assertTrue(acceptance_handoff["practice_hour_allocation_errors"])
+
+        with self.assertRaisesRegex(ValueError, "allocate exactly 2 practice hours"):
+            _validate_v23(all_to_all)
+        with self.assertRaisesRegex(
+            ValueError,
+            "allocate exactly 2 practice hours|completely allocated|practice-bearing Lesson must declare",
+        ):
+            _validate_v23(partial)
+        with self.assertRaisesRegex(ValueError, "allocate exactly 2 practice hours|overlaps"):
+            _validate_v23(overlap)
 
     def test_integrated_16_lesson_undercoverage_is_rejected(self) -> None:
         payload = _integrated_64(workorders=False)
@@ -437,7 +522,21 @@ class LessonContentV23Tests(unittest.TestCase):
             manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
             actual_docx = sorted(output.glob("*.docx"))
             self.assertEqual(len(actual_docx), 32)
+            self.assertEqual(len({path.name for path in actual_docx}), 32)
+            self.assertEqual(
+                [path.name.startswith(f"教案{index:02d}_") for index, path in enumerate(actual_docx, 1)],
+                [True] * 32,
+            )
             self.assertEqual(len(manifest["artifacts"]), 32)
+            self.assertEqual(
+                [record["lesson_id"] for record in manifest["artifacts"]],
+                [f"L{index:02d}" for index in range(1, 33)],
+            )
+            self.assertEqual(
+                [record["final_docx_path"] for record in manifest["artifacts"]],
+                [path.name for path in actual_docx],
+            )
+            self.assertTrue(all("candidate" not in record["final_docx_path"] for record in manifest["artifacts"]))
             self.assertEqual(qa["checks"]["file_count"], {"expected": 32, "actual": 32})
             self.assertEqual(qa["checks"]["total_hours"]["expected"], 64)
             self.assertEqual(qa["checks"]["total_hours"]["actual"], 64)
@@ -457,6 +556,7 @@ class LessonContentV23Tests(unittest.TestCase):
             )
             self.assertEqual(acceptance_gate["status"], "PASS", acceptance_gate)
             self.assertEqual(acceptance_gate["observed"]["records"], 32)
+            self.assertEqual(list(root.glob(f".{output.name}.candidate-*")), [])
 
     def test_integrated_8h_generation_retains_four_docx_and_pdfs(self) -> None:
         payload = _base_payload(theory_hours=8, lesson_count=4)

@@ -3947,6 +3947,14 @@ esac
             self.assertIn(output, jobs[heavy_job]["if"])
             self.assertIn("force_full", jobs[heavy_job]["if"])
 
+        release_scale_step = next(
+            step
+            for step in jobs["template-release"]["steps"]
+            if step.get("name") == "Run Lesson release-scale rendered production E2E"
+        )
+        self.assertIn("--suite lesson-release-scale", release_scale_step.get("run", ""))
+        self.assertEqual(release_scale_step.get("env", {}).get("LESSON_RELEASE_RENDER_REQUIRED"), "1")
+
         self.assertIn("validate_package_contracts.py", "\n".join(step.get("run", "") for step in jobs["package-contracts"]["steps"]))
         for heavy_job in ("template-tooling", "template-gradebook", "template-release"):
             heavy_steps = "\n".join(step.get("run", "") for step in jobs[heavy_job]["steps"])

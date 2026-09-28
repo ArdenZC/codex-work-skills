@@ -11,7 +11,7 @@ freeze Intake, Source Truth and whole-course outline
 → Curator creates Cards and validates Catalog
 → Split CLI creates Split and physical Authoring A / Holdout B Packs atomically
 → Author sees only per-Lesson selected A Cards and records Authoring Selection
-→ author and review all Lesson Content 2.2 through pedagogical_review
+→ author and review all Lesson Content 2.2 or 2.3 through the matching pedagogical_review contract
 → Reviewer sees final reviewed Lesson Content, Source Truth summary and selected B Cards
 → freeze Holdout Selection; create one Review JSON per Lesson
 → aggregate course summary and validate all provenance links
@@ -20,9 +20,9 @@ freeze Intake, Source Truth and whole-course outline
 → retain render artifacts, validate manifest and complete Acceptance linkage
 ```
 
-If a bounded revision is required, preserve Round 1 Content, course Review and every Lesson Review. Revise Agent-owned Lesson content, refresh Content 2.2 pedagogical review history and provenance, then run Round 2 with the same benchmark run, B Pack and Holdout Selection. Revalidate Round 1 and Round 2 before building a new authorization. Round 3 is invalid.
+If a bounded revision is required, preserve Round 1 Content, course Review and every Lesson Review. Revise Agent-owned Lesson content, refresh the matching Content 2.2/2.3 pedagogical review history and provenance, then run Round 2 with the same benchmark run, B Pack and Holdout Selection. Revalidate Round 1 and Round 2 before building a new authorization. Round 3 is invalid.
 
-The generator defaults to `--benchmark-mode none` for existing 2.2 callers. `optional` allows no Authorization; if an Authorization is supplied, it also requires and revalidates the complete evidence. `required` demands both the Authorization and complete evidence and is the production mode for 2.3. `none` rejects Authorization and Benchmark evidence arguments. Required evidence flags are `--benchmark-catalog`, `--benchmark-split`, `--benchmark-authoring-pack`, `--benchmark-authoring-selection`, `--benchmark-holdout-pack`, `--benchmark-holdout-selection`, `--benchmark-review`, and `--benchmark-lesson-reviews-dir`. Round 2 also requires `--benchmark-previous-review`, `--benchmark-previous-lesson-reviews-dir`, and `--benchmark-previous-content`. A shared deterministic helper validates Content 2.2 and pedagogical-review provenance, both Packs and Selections, per-Lesson shards, the course Review and Round 1 evidence, then derives timestamp-free claims. Builder adds `created_at` and the self-fingerprint only after derivation; the generator re-derives claims before DOCX production. A self-fingerprint alone is not an authorization.
+The generator defaults to `--benchmark-mode none` for existing 2.2 callers. `optional` allows no Authorization; if an Authorization is supplied, it also requires and revalidates the complete evidence. `required` demands both the Authorization and complete evidence and is the production mode for 2.3. `none` rejects Authorization and Benchmark evidence arguments. Required evidence flags are `--benchmark-catalog`, `--benchmark-split`, `--benchmark-authoring-pack`, `--benchmark-authoring-selection`, `--benchmark-holdout-pack`, `--benchmark-holdout-selection`, `--benchmark-review`, and `--benchmark-lesson-reviews-dir`. Round 2 also requires `--benchmark-previous-review`, `--benchmark-previous-lesson-reviews-dir`, and `--benchmark-previous-content`. A shared deterministic helper validates Content 2.2 or 2.3 and its matching pedagogical-review provenance, both Packs and Selections, per-Lesson shards, the course Review and Round 1 evidence, then derives timestamp-free claims. Builder adds `created_at` and the self-fingerprint only after derivation; the generator re-derives claims before DOCX production. A self-fingerprint alone is not an authorization.
 
 ## Catalog and source provenance
 

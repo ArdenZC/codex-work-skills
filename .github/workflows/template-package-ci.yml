@@ -944,6 +944,14 @@ jobs:
           -r 平时成绩记分册生成器/course-gradebook-generator/requirements.txt
           -r 实践任务工单生成器/practice-task-workorder-generator/requirements.txt
 
+      - name: Run Lesson release-scale rendered production E2E
+        env:
+          LESSON_RELEASE_RENDER_REQUIRED: "1"
+        run: >-
+          python .github/scripts/run_test_shards.py
+          --suite lesson-release-scale
+          -v
+
       - name: Validate template package release lifecycle
         run: >-
           python .github/scripts/run_timed.py

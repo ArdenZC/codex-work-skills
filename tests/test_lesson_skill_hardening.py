@@ -999,6 +999,119 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 install_adapters.install(LESSON, incomplete_full, adapters=["agents"])
             self.assertEqual(tree_snapshot(incomplete_full), before)
 
+    def test_lesson_adapter_fingerprints_the_complete_copied_package(self) -> None:
+        changed_files = (
+            Path("scripts/lesson_acceptance.py"),
+            Path("scripts/benchmark_authorization.py"),
+            Path("schemas/lesson-plan-input.schema.json"),
+        )
+        with tempfile.TemporaryDirectory(prefix="lesson-adapter-full-inventory-") as temp_name:
+            root = Path(temp_name)
+            target = root / "project"
+            install_adapters.install(LESSON, target, adapters=["all"], copy_engine=True)
+            engine = target / install_adapters.ENGINE_NAME
+
+            for index, relative in enumerate(changed_files, start=1):
+                with self.subTest(relative=relative.as_posix()):
+                    source = root / f"source-{index}"
+                    shutil.copytree(LESSON, source)
+                    changed_source = source / relative
+                    changed_source.write_bytes(changed_source.read_bytes() + b"\n# inventory regression probe\n")
+                    self.assertEqual(install_adapters._detect_existing_engine_mode(engine, source), "full-stale")
+                    with self.assertRaisesRegex(ValueError, "full Lesson engine is installed but is older/different"):
+                        install_adapters.install(source, target, adapters=["agents"])
+                    install_adapters.install(
+                        source,
+                        target,
+                        adapters=["all"],
+                        copy_engine=True,
+                        replace=True,
+                    )
+                    self.assertEqual(install_adapters._detect_existing_engine_mode(engine, source), "full-current")
+
+            source_cache = source / "scripts" / "__pycache__"
+            installed_cache = engine / "scripts" / "__pycache__"
+            source_cache.mkdir(exist_ok=True)
+            installed_cache.mkdir(exist_ok=True)
+            (source_cache / "ignored.pyc").write_bytes(b"source cache")
+            (installed_cache / "ignored.pyc").write_bytes(b"installed cache")
+            (engine / "scripts" / "ignored.pyc").write_bytes(b"loose cache")
+            self.assertEqual(install_adapters._detect_existing_engine_mode(engine, source), "full-current")
+
+            deleted = engine / "scripts" / "lesson_acceptance.py"
+            deleted.unlink()
+            self.assertEqual(install_adapters._detect_existing_engine_mode(engine, source), "inconsistent")
+            install_adapters.install(LESSON, target, adapters=["all"], copy_engine=True, replace=True)
+            self.assertTrue(deleted.is_file())
+            self.assertEqual(install_adapters._detect_existing_engine_mode(engine, LESSON), "full-current")
+
+    def test_lesson_full_engine_source_floor_fails_before_any_target_mutation(self) -> None:
+        missing_critical_files = (
+            Path("scripts/benchmark_authorization.py"),
+            Path("scripts/lesson_acceptance.py"),
+            Path("schemas/benchmark-authorization.schema.json"),
+        )
+
+        def file_snapshot(root: Path) -> dict[str, bytes]:
+            return {
+                path.relative_to(root).as_posix(): path.read_bytes()
+                for path in root.rglob("*")
+                if path.is_file() and not path.is_symlink()
+            }
+
+        self.assertFalse(
+            any(
+                relative.parts[0] in {"examples", "tests"}
+                for relative in install_adapters.CRITICAL_PRODUCTION_SOURCE_FILES
+            )
+        )
+        for index, relative in enumerate(missing_critical_files, start=1):
+            with self.subTest(relative=relative.as_posix()):
+                self.assertIn(relative, install_adapters.CRITICAL_PRODUCTION_SOURCE_FILES)
+                with tempfile.TemporaryDirectory(prefix=f"lesson-source-floor-{index}-") as temp_name:
+                    root = Path(temp_name)
+                    source = root / "source"
+                    shutil.copytree(LESSON, source)
+                    (source / relative).unlink()
+
+                    target = root / "project"
+                    target.mkdir()
+                    (target / "AGENTS.md").write_bytes(b"pre-existing project adapter\n")
+                    before = file_snapshot(target)
+
+                    with self.assertRaises(FileNotFoundError) as raised:
+                        install_adapters.install(
+                            source,
+                            target,
+                            adapters=["all"],
+                            copy_engine=True,
+                        )
+
+                    self.assertIn(relative.as_posix(), str(raised.exception).replace("\\", "/"))
+                    self.assertEqual(file_snapshot(target), before)
+                    self.assertFalse((target / install_adapters.ENGINE_NAME).exists())
+                    self.assertEqual(list(target.glob(".lesson-adapters.stage-*")), [])
+
+    def test_lesson_full_engine_source_inventory_ignores_removed_cache_files(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-source-cache-inventory-") as temp_name:
+            root = Path(temp_name)
+            source = root / "source"
+            shutil.copytree(LESSON, source)
+            cache = source / "scripts" / "__pycache__" / "ignored.pyc"
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            cache.write_bytes(b"non-critical cache")
+            before = install_adapters._runtime_inventory_from_source(source)
+
+            target = root / "project"
+            install_adapters.install(source, target, adapters=["all"], copy_engine=True)
+            engine = target / install_adapters.ENGINE_NAME
+            self.assertEqual(install_adapters._detect_existing_engine_mode(engine, source), "full-current")
+
+            cache.unlink()
+            after = install_adapters._runtime_inventory_from_source(source)
+            self.assertEqual(after, before)
+            self.assertEqual(install_adapters._detect_existing_engine_mode(engine, source), "full-current")
+
     def test_adapter_namespace_markers_and_aider_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="lesson-adapter-hardening-") as temp_name:
             target = Path(temp_name) / "project"
