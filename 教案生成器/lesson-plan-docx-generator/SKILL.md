@@ -49,7 +49,7 @@ Review 最多两轮。Round 2 固定同一 `benchmark_run_id`、B Pack 和 Holdo
 
 Authorization 由 `build_benchmark_authorization.py` 在完整验证 Content、Catalog、Split、A/B Packs、A/B Selections、汇总 Review 与每课 Review 后生成，绑定原始 Content 字节 SHA、最终 Agent 内容 digest、所有包/选择/Review 指纹、决策和上下文模式。生成器将授权副本、哈希和 benchmark 状态写入 artifact manifest；manifest 检查同时重新散列授权并核对原始/最终内容。正式生产应先得到有效授权再调用 generator。`validate_output.py --render` 是临时诊断；只有正式 generator `--render` 保留 PDF 并完成页数、哈希、QA 与事务核验后，才可能得到 `production_pass`。
 
-Acceptance 2.0 在提供 Review 时必须执行 A 与 B 两侧的 full-linkage 校验，并读取每课 Review 分片；Round 2 还需 Round 1 Review、分片与 Lesson snapshot。缺失或别名重叠的路径必须失败。benchmark `NO_REVISION_REQUIRED` 不会自动把 Acceptance 置为 PASSED；其他需要关注的状态会阻止自动通过并保留人工层。0 个合格来源是合法 UNAVAILABLE，可继续 Lesson production，但 `production_pass` 不代表 Benchmark 完成。
+Acceptance 2.0 在提供 Review 时必须执行 A 与 B 两侧的 full-linkage 校验，并读取每课 Review 分片；Round 2 还需 Round 1 Review、分片与 Lesson snapshot。缺失或别名重叠的路径必须失败。`PASSED` 与 `PASSED_WITH_TEACHER_ADJUSTMENTS` 还要求 visual evidence、全部 teaching-design 维度、完整 teacher usability、每个 course-scope 项目和所有 provenance flags 均已处置；Benchmark 存在时必须是 `BENCHMARK_REVIEW_COMPLETE` / `NO_REVISION_REQUIRED`。未提供 Benchmark 继续兼容当前行为。Negative Controls 显式失败仍为 FAILED，但 per-course completion 不因默认 `not_executed` 阻塞通过；Negative Controls per-course completion intentionally deferred to Acceptance 3.0 lifecycle remediation。0 个合格来源是合法 UNAVAILABLE，可继续 Lesson production，但 `production_pass` 不代表 Benchmark 完成。
 
 ## Content Contract 2.3 (current default)
 
