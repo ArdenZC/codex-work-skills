@@ -103,6 +103,27 @@ _MANUAL_REVIEW_DIMENSIONS = (
     "evaluation",
     "reflection",
 )
+_TEACHER_REVIEW_RATING_DIMENSIONS = (
+    "directly_teachable",
+    "task_executable",
+    "steps_operable",
+    "evaluation_observable",
+    "reflection_improvable",
+)
+_FAILED_REVIEW_STATUSES = {"failed", "fail", "rejected", "error", "blocking", "blocked"}
+_COMPLETED_REVIEW_STATUSES = {"passed", "pass", "completed", "complete"}
+_PENDING_REVIEW_STATUSES = {
+    "pending", "not_executed", "missing", "review", "review_required",
+    "needs_review", "not_reviewed", "unresolved", "incomplete",
+}
+_MANUAL_GATE_NAMES = (
+    "visual_review",
+    "teaching_design_review",
+    "teacher_usability",
+    "course_scope_review",
+    "hallucination_review",
+    "benchmark_review",
+)
 _NEGATIVE_CONTROL_CATALOG = (
     {
         "id": "nursing_sql_contamination",
@@ -1507,6 +1528,83 @@ def _load_optional_json(path: Path | None, label: str) -> dict[str, Any] | None:
     return _read_json(path, label) if path else None
 
 
+def _review_status(value: Any) -> str:
+    if isinstance(value, Mapping):
+        value = value.get("status", "not_executed")
+    return str(value or "not_executed").strip().casefold()
+
+
+def _review_completeness(status: str, issues: Iterable[str] = ()) -> dict[str, Any]:
+    return {"status": status, "issues": list(issues)}
+
+
+def _scope_review_completeness(
+    review: Mapping[str, Any], expected_projects: list[str]
+) -> dict[str, Any]:
+    top_status = _review_status(review)
+    if top_status in _FAILED_REVIEW_STATUSES:
+        return _review_completeness("failed", [f"course scope review status is {top_status}"])
+
+    issues: list[str] = []
+    if top_status not in _COMPLETED_REVIEW_STATUSES:
+        issues.append("course scope review is not explicitly completed")
+    projects = review.get("projects")
+    if not isinstance(projects, list):
+        projects = []
+        issues.append("course scope review projects must be a list")
+
+    by_name: dict[str, Mapping[str, Any]] = {}
+    for index, item in enumerate(projects):
+        if not isinstance(item, Mapping):
+            issues.append(f"course scope project {index + 1} is not an object")
+            continue
+        name = str(item.get("project", "")).strip()
+        if not name:
+            issues.append(f"course scope project {index + 1} has no project name")
+            continue
+        if name in by_name:
+            issues.append(f"course scope project {name!r} is duplicated")
+            continue
+        by_name[name] = item
+
+    expected = set(expected_projects)
+    observed = set(by_name)
+    for name in sorted(expected - observed):
+        issues.append(f"course scope project {name!r} has no classification")
+    for name in sorted(observed - expected):
+        issues.append(f"course scope project {name!r} is not present in Lesson Content")
+
+    explicit_failure = False
+    for name in sorted(expected & observed):
+        item = by_name[name]
+        item_status = _review_status(item)
+        classification = str(item.get("classification", "")).strip().upper()
+        disposition = item.get("reviewer_disposition", item.get("disposition"))
+        disposition_status = str(disposition or "").strip().casefold()
+        if (
+            item_status in _FAILED_REVIEW_STATUSES
+            or classification.casefold() in _FAILED_REVIEW_STATUSES
+            or disposition_status in _FAILED_REVIEW_STATUSES
+        ):
+            explicit_failure = True
+            issues.append(f"course scope project {name!r} has an explicit failure")
+            continue
+        if "status" in item and item_status not in _COMPLETED_REVIEW_STATUSES:
+            issues.append(f"course scope project {name!r} review status is incomplete")
+        if classification not in {"CORE", "EXTENSION", "POSSIBLE_SCOPE_DRIFT"}:
+            issues.append(f"course scope project {name!r} is still unclassified")
+            continue
+        if classification == "POSSIBLE_SCOPE_DRIFT":
+            if not isinstance(disposition, str) or not disposition.strip() or disposition_status in _PENDING_REVIEW_STATUSES:
+                issues.append(f"course scope project {name!r} has unresolved POSSIBLE_SCOPE_DRIFT")
+            if not isinstance(item.get("notes"), str) or not item["notes"].strip():
+                issues.append(f"course scope project {name!r} needs reviewer notes to resolve POSSIBLE_SCOPE_DRIFT")
+
+    if explicit_failure:
+        return _review_completeness("failed", issues)
+    return _review_completeness("complete" if not issues else "pending", issues)
+
+
 def course_scope_review(data: Mapping[str, Any], payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     projects: list[str] = []
@@ -1526,7 +1624,41 @@ def course_scope_review(data: Mapping[str, Any], payload: Mapping[str, Any] | No
     }
     if payload:
         result.update(_json_safe(payload))
+    result["review_completeness"] = _scope_review_completeness(result, projects)
     return result
+
+
+def _teaching_design_completeness(review: Mapping[str, Any]) -> dict[str, Any]:
+    top_status = _review_status(review)
+    if top_status in _FAILED_REVIEW_STATUSES:
+        return _review_completeness("failed", [f"teaching design review status is {top_status}"])
+
+    issues: list[str] = []
+    if top_status not in _COMPLETED_REVIEW_STATUSES:
+        issues.append("teaching design review is not explicitly completed")
+    dimensions = review.get("dimensions")
+    if not isinstance(dimensions, Mapping):
+        dimensions = {}
+        issues.append("teaching design review dimensions must be an object")
+
+    explicit_failure = False
+    for dimension in _MANUAL_REVIEW_DIMENSIONS:
+        result = dimensions.get(dimension)
+        if not isinstance(result, Mapping):
+            issues.append(f"teaching design dimension {dimension!r} has no explicit result")
+            continue
+        status = _review_status(result)
+        if status in _FAILED_REVIEW_STATUSES:
+            explicit_failure = True
+            issues.append(f"teaching design dimension {dimension!r} failed")
+        elif status not in _COMPLETED_REVIEW_STATUSES and status != "not_applicable":
+            issues.append(f"teaching design dimension {dimension!r} is incomplete")
+        elif status == "not_applicable" and not str(result.get("notes", "")).strip():
+            issues.append(f"teaching design dimension {dimension!r} needs notes when not applicable")
+
+    if explicit_failure:
+        return _review_completeness("failed", issues)
+    return _review_completeness("complete" if not issues else "pending", issues)
 
 
 def teaching_design_review(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -1538,6 +1670,94 @@ def teaching_design_review(payload: Mapping[str, Any] | None = None) -> dict[str
     }
     if payload:
         result.update(_json_safe(payload))
+    result["review_completeness"] = _teaching_design_completeness(result)
+    return result
+
+
+def _teacher_usability_completeness(
+    review: Mapping[str, Any], expected_lesson_ids: list[str]
+) -> dict[str, Any]:
+    top_status = _review_status(review)
+    if top_status in _FAILED_REVIEW_STATUSES:
+        return _review_completeness("failed", [f"teacher usability status is {top_status}"])
+
+    issues: list[str] = []
+    if top_status not in _COMPLETED_REVIEW_STATUSES | {"passed_with_teacher_adjustments", "adjustments"}:
+        issues.append("teacher usability review is not explicitly completed")
+
+    assessments = review.get("lesson_assessments")
+    if not isinstance(assessments, list):
+        assessments = []
+        issues.append("teacher usability lesson_assessments must be a list")
+    expected_count = len(expected_lesson_ids)
+    minimum_count = expected_count if expected_count < 4 else 4
+    maximum_count = min(6, expected_count)
+    if expected_count == 0:
+        issues.append("teacher usability cannot be completed when there are no Lesson artifacts")
+    if len(assessments) < minimum_count or len(assessments) > maximum_count:
+        issues.append(
+            f"teacher usability requires {minimum_count}-{maximum_count} lesson assessments"
+        )
+
+    assessed_ids: set[str] = set()
+    expected_ids = set(expected_lesson_ids)
+    for index, assessment in enumerate(assessments):
+        if not isinstance(assessment, Mapping):
+            issues.append(f"teacher usability assessment {index + 1} is not an object")
+            continue
+        lesson_id = str(assessment.get("lesson_id", "")).strip()
+        if not lesson_id:
+            issues.append(f"teacher usability assessment {index + 1} has no lesson_id")
+        elif lesson_id not in expected_ids:
+            issues.append(f"teacher usability assessment references unknown lesson {lesson_id!r}")
+        elif lesson_id in assessed_ids:
+            issues.append(f"teacher usability lesson {lesson_id!r} is assessed more than once")
+        else:
+            assessed_ids.add(lesson_id)
+        ratings = assessment.get("ratings")
+        if not isinstance(ratings, Mapping) or set(ratings) != set(_TEACHER_REVIEW_RATING_DIMENSIONS):
+            issues.append(f"teacher usability assessment {lesson_id or index + 1} must record all five ratings")
+        elif any(type(ratings[name]) is not int or not 1 <= ratings[name] <= 5 for name in _TEACHER_REVIEW_RATING_DIMENSIONS):
+            issues.append(f"teacher usability assessment {lesson_id or index + 1} ratings must be integers from 1 to 5")
+        if not isinstance(assessment.get("notes"), str) or not assessment["notes"].strip():
+            issues.append(f"teacher usability assessment {lesson_id or index + 1} needs qualitative notes")
+
+    usable_count = review.get("usable_count")
+    tweak_count = review.get("tweak_count")
+    if type(usable_count) is not int or usable_count < 0 or usable_count > len(assessments):
+        issues.append("teacher usability usable_count must be an integer within the assessed sample")
+    if type(tweak_count) is not int or tweak_count < 0:
+        issues.append("teacher usability tweak_count must be a non-negative integer")
+    if top_status in {"passed_with_teacher_adjustments", "adjustments"} and type(tweak_count) is int and tweak_count == 0:
+        issues.append("teacher adjustment status requires a positive tweak_count")
+
+    if not issues and isinstance(usable_count, int) and usable_count <= 2:
+        return _review_completeness("failed", ["teacher usability has 2 or fewer usable lessons"])
+    return _review_completeness("complete" if not issues else "pending", issues)
+
+
+def teacher_usability_review(
+    payload: Mapping[str, Any] | None,
+    sample: Mapping[str, Any],
+    lessons: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    lesson_list = list(lessons)
+    result: dict[str, Any] = {
+        "status": "not_executed",
+        "hard_gate": False,
+        "selected_lessons": sample.get("sample", []),
+        "rubric_scale": "1-5",
+        "usable_threshold": ">=4 usable lessons",
+        "tweak_threshold": "3 teacher tweaks are adjustment evidence",
+        "acceptance_issue_threshold": "<=2 usable lessons",
+        "usable_count": None,
+        "tweak_count": None,
+        "notes": "Read 4-6 representative lessons in full, including L01, a boundary before/after, a complex lesson, and L32 when present.",
+    }
+    if payload:
+        result.update(_json_safe(payload))
+    expected_ids = [_lesson_id(item, index + 1) for index, item in enumerate(lesson_list)]
+    result["review_completeness"] = _teacher_usability_completeness(result, expected_ids)
     return result
 
 
@@ -1626,7 +1846,23 @@ def visual_sample_selection(
     }
 
 
-def visual_review(payload: Mapping[str, Any] | None, sample: Mapping[str, Any]) -> dict[str, Any]:
+def _visual_review_completeness(review: Mapping[str, Any]) -> dict[str, Any]:
+    status = _review_status(review)
+    if status in _FAILED_REVIEW_STATUSES:
+        return _review_completeness("failed", [f"visual review status is {status}"])
+    if status not in _COMPLETED_REVIEW_STATUSES:
+        return _review_completeness("pending", ["visual review is not explicitly completed"])
+    validation = review.get("evidence_validation")
+    if not isinstance(validation, Mapping) or validation.get("status") != "passed":
+        return _review_completeness("pending", ["visual review evidence did not pass the formal validator"])
+    return _review_completeness("complete")
+
+
+def visual_review(
+    payload: Mapping[str, Any] | None,
+    sample: Mapping[str, Any],
+    evidence_validation: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
         "status": "not_executed",
         "hard_gate": False,
@@ -1636,6 +1872,8 @@ def visual_review(payload: Mapping[str, Any] | None, sample: Mapping[str, Any]) 
     }
     if payload:
         result.update(_json_safe(payload))
+    result["evidence_validation"] = _json_safe(evidence_validation or {"status": "not_provided"})
+    result["review_completeness"] = _visual_review_completeness(result)
     return result
 
 
@@ -1670,7 +1908,10 @@ def _walk_values(value: Any, path: str = "") -> Iterable[tuple[str, Any, str]]:
             yield from _walk_values(item, f"{path}[{index}]")
 
 
-def hallucination_review(data: Mapping[str, Any]) -> dict[str, Any]:
+def hallucination_review(
+    data: Mapping[str, Any],
+    disposition_payload: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     flags: list[dict[str, Any]] = []
     for path, value, key in _walk_values(data):
         if key in _HALLUCINATION_KEYS and value not in (None, "", [], {}):
@@ -1700,11 +1941,77 @@ def hallucination_review(data: Mapping[str, Any]) -> dict[str, Any]:
                         "status": "REVIEW",
                     }
                 )
-    return {
+    result: dict[str, Any] = {
         "status": "REVIEW_REQUIRED" if flags else "no_flags",
         "flags": flags,
         "notes": "Flags are review prompts, not automatic claims that user-provided identities are false.",
     }
+    payload_status = _review_status(disposition_payload) if disposition_payload is not None else "not_executed"
+    if payload_status in _FAILED_REVIEW_STATUSES:
+        result["status"] = "FAILED"
+        result["review_completeness"] = _review_completeness(
+            "failed", [f"hallucination review status is {payload_status}"]
+        )
+        return result
+    if not flags:
+        result["review_completeness"] = _review_completeness("complete")
+        return result
+
+    dispositions = disposition_payload.get("dispositions") if isinstance(disposition_payload, Mapping) else None
+    issues: list[str] = []
+    if not isinstance(dispositions, list):
+        dispositions = []
+        issues.append("hallucination review requires one disposition per detected flag")
+    by_identity: dict[tuple[str, str], Mapping[str, Any]] = {}
+    explicit_failure = False
+    for index, item in enumerate(dispositions):
+        if not isinstance(item, Mapping):
+            issues.append(f"hallucination disposition {index + 1} is not an object")
+            continue
+        identity = (str(item.get("kind", "")), str(item.get("path", "")))
+        if identity in by_identity:
+            issues.append(f"hallucination disposition for {identity[1]!r} is duplicated")
+            continue
+        by_identity[identity] = item
+
+    flag_identities = {(str(flag["kind"]), str(flag["path"])) for flag in flags}
+    for identity in sorted(set(by_identity) - flag_identities):
+        issues.append(f"hallucination disposition references unknown flag {identity[1]!r}")
+    for flag in flags:
+        identity = (str(flag["kind"]), str(flag["path"]))
+        item = by_identity.get(identity)
+        if item is None:
+            issues.append(f"hallucination flag {flag['path']!r} has no reviewer disposition")
+            continue
+        disposition = item.get("disposition")
+        notes = item.get("notes")
+        if not isinstance(disposition, str) or not disposition.strip():
+            issues.append(f"hallucination flag {flag['path']!r} has no explicit disposition")
+            continue
+        if not isinstance(notes, str) or not notes.strip():
+            issues.append(f"hallucination flag {flag['path']!r} has no reviewer notes")
+            continue
+        disposition_status = disposition.strip().casefold()
+        if disposition_status in _FAILED_REVIEW_STATUSES:
+            explicit_failure = True
+            flag["status"] = "FAILED"
+        elif disposition_status in _PENDING_REVIEW_STATUSES:
+            issues.append(f"hallucination flag {flag['path']!r} remains unresolved")
+        else:
+            flag["status"] = "RESOLVED"
+            flag["disposition"] = disposition.strip()
+            flag["reviewer_notes"] = notes.strip()
+
+    if explicit_failure:
+        result["status"] = "FAILED"
+        result["review_completeness"] = _review_completeness("failed", issues)
+    elif issues:
+        result["status"] = "REVIEW_REQUIRED"
+        result["review_completeness"] = _review_completeness("pending", issues)
+    else:
+        result["status"] = "resolved"
+        result["review_completeness"] = _review_completeness("complete")
+    return result
 
 
 def _git_head(repo_root: Path | None) -> str:
@@ -1796,6 +2103,16 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
         errors.append("acceptance_schema_version is not 2.0")
     if report.get("final_status") not in FINAL_STATUSES:
         errors.append("final_status is not a supported acceptance status")
+    if "manual_completion_required" in report:
+        required_manual = report.get("manual_completion_required")
+        if not isinstance(required_manual, list) or any(item not in _MANUAL_GATE_NAMES for item in required_manual):
+            errors.append("manual_completion_required must list supported manual gates")
+        elif len(required_manual) != len(set(required_manual)):
+            errors.append("manual_completion_required must not contain duplicates")
+        elif report.get("final_status") == "PENDING_MANUAL_REVIEW" and not required_manual:
+            errors.append("PENDING_MANUAL_REVIEW requires at least one outstanding manual gate")
+        elif report.get("final_status") in {"PASSED", "PASSED_WITH_TEACHER_ADJUSTMENTS"} and required_manual:
+            errors.append("passed acceptance status cannot retain outstanding manual gates")
     structural = report.get("structural_hard_gates")
     if not isinstance(structural, Mapping) or structural.get("status") not in {"PASS", "FAIL"}:
         errors.append("structural_hard_gates.status must be PASS or FAIL")
@@ -1846,29 +2163,83 @@ def validate_report_schema(report: Mapping[str, Any]) -> list[str]:
     return errors
 
 
+def _gate_is_failed(review: Mapping[str, Any] | None) -> bool:
+    if review is None:
+        return False
+    if _review_status(review) in _FAILED_REVIEW_STATUSES:
+        return True
+    completeness = review.get("review_completeness")
+    return isinstance(completeness, Mapping) and completeness.get("status") == "failed"
+
+
+def _gate_is_complete(review: Mapping[str, Any] | None) -> bool:
+    if review is None:
+        return False
+    completeness = review.get("review_completeness")
+    return isinstance(completeness, Mapping) and completeness.get("status") == "complete"
+
+
 def _final_status(
     structural: Mapping[str, Any],
     visual: Mapping[str, Any],
     design: Mapping[str, Any],
     teacher: Mapping[str, Any],
     negative: Mapping[str, Any],
+    scope: Mapping[str, Any] | None = None,
+    hallucination: Mapping[str, Any] | None = None,
+    benchmark: Mapping[str, Any] | None = None,
 ) -> str:
     if structural.get("status") == "FAIL":
         return "FAILED"
-    if any(str(item.get("status", "")).lower() in {"failed", "fail", "rejected"} for item in (visual, design, teacher, negative)):
+    manual_reviews = (visual, design, teacher, scope, hallucination)
+    if any(_gate_is_failed(item) for item in manual_reviews):
         return "FAILED"
-    teacher_status = str(teacher.get("status", "not_executed")).lower()
-    if teacher_status in {"passed", "pass", "completed"}:
-        usable = _number(teacher.get("usable_count"))
-        tweaks = _number(teacher.get("tweak_count"))
-        if usable is not None and usable <= 2:
+    if _review_status(negative) in _FAILED_REVIEW_STATUSES:
+        return "FAILED"
+    if benchmark is not None:
+        decision = str(benchmark.get("decision", "")).strip().upper()
+        if decision == "REVISION_REQUIRED" or _gate_is_failed(benchmark):
             return "FAILED"
-        if tweaks is not None and tweaks > 0:
-            return "PASSED_WITH_TEACHER_ADJUSTMENTS"
-        return "PASSED"
-    if teacher_status in {"passed_with_teacher_adjustments", "adjustments"}:
+
+    if any(not _gate_is_complete(item) for item in manual_reviews):
+        return PENDING_STATUS
+    if benchmark is not None and not _gate_is_complete(benchmark):
+        return PENDING_STATUS
+
+    teacher_status = str(teacher.get("status", "not_executed")).lower()
+    tweaks = _number(teacher.get("tweak_count"))
+    if teacher_status in {"passed_with_teacher_adjustments", "adjustments"} or (tweaks is not None and tweaks > 0):
         return "PASSED_WITH_TEACHER_ADJUSTMENTS"
-    return PENDING_STATUS
+    return "PASSED"
+
+
+def _manual_completion_required(
+    visual: Mapping[str, Any],
+    design: Mapping[str, Any],
+    teacher: Mapping[str, Any],
+    scope: Mapping[str, Any],
+    hallucination: Mapping[str, Any],
+    benchmark: Mapping[str, Any] | None,
+) -> list[str]:
+    reviews = (
+        ("visual_review", visual),
+        ("teaching_design_review", design),
+        ("teacher_usability", teacher),
+        ("course_scope_review", scope),
+        ("hallucination_review", hallucination),
+        ("benchmark_review", benchmark),
+    )
+    return [name for name, review in reviews if review is not None and not _gate_is_failed(review) and not _gate_is_complete(review)]
+
+
+def acceptance_exit_code(final_status: str, allow_pending_exit_zero: bool = False) -> int:
+    if final_status == "FAILED":
+        return 1
+    if final_status == PENDING_STATUS:
+        return 0 if allow_pending_exit_zero else 3
+    if final_status in {"PASSED", "PASSED_WITH_TEACHER_ADJUSTMENTS"}:
+        return 0
+    return 2
 
 
 def build_acceptance_report(
@@ -1887,6 +2258,7 @@ def build_acceptance_report(
     teacher_review_path: Path | None = None,
     visual_review_path: Path | None = None,
     negative_controls_path: Path | None = None,
+    hallucination_review_path: Path | None = None,
     historical_baseline_path: Path | None = None,
     benchmark_review_path: Path | None = None,
     benchmark_catalog_path: Path | None = None,
@@ -2063,25 +2435,24 @@ def build_acceptance_report(
     design_payload = _load_optional_json(design_review_path, "teaching design review JSON")
     teacher_payload = _load_optional_json(teacher_review_path, "teacher review JSON")
     negative_payload = _load_optional_json(negative_controls_path, "negative controls JSON")
+    hallucination_payload = _load_optional_json(hallucination_review_path, "hallucination review JSON")
     baseline_payload = _load_optional_json(historical_baseline_path, "historical baseline JSON")
     sample = visual_sample_selection(data, qa_report, inventory, artifact_manifest)
-    visual = visual_review(visual_payload, sample)
+    visual_validation: dict[str, Any] = {"status": "not_provided"}
+    if visual_payload is not None and _review_status(visual_payload) in _COMPLETED_REVIEW_STATUSES:
+        try:
+            from validate_visual_inspection import validate_visual_inspection
+
+            validate_visual_inspection(output_dir, qa_report_path, visual_review_path)
+            visual_validation = {"status": "passed", "validator": "validate_visual_inspection.py"}
+        except (ImportError, OSError, TypeError, ValueError) as exc:
+            visual_validation = {"status": "invalid", "error": str(exc)}
+    visual = visual_review(visual_payload, sample, visual_validation)
     design = teaching_design_review(design_payload)
-    teacher = {
-        "status": "not_executed",
-        "hard_gate": False,
-        "selected_lessons": sample.get("sample", []),
-        "rubric_scale": "1-5",
-        "usable_threshold": ">=4 usable lessons",
-        "tweak_threshold": "3 teacher tweaks are adjustment evidence",
-        "acceptance_issue_threshold": "<=2 usable lessons",
-        "usable_count": None,
-        "tweak_count": None,
-        "notes": "Read 4-6 representative lessons in full, including L01, a boundary before/after, a complex lesson, and L32 when present.",
-    }
-    if teacher_payload:
-        teacher.update(_json_safe(teacher_payload))
+    teacher = teacher_usability_review(teacher_payload, sample, lessons)
     negative = negative_controls(negative_payload)
+    scope = course_scope_review(data, scope_payload)
+    hallucination = hallucination_review(data, hallucination_payload)
     structural = structural_hard_gates(
         data,
         qa_report,
@@ -2128,14 +2499,60 @@ def build_acceptance_report(
         "run_id": artifact_manifest.get("run_id") if isinstance(artifact_manifest, Mapping) else None,
         "artifact_manifest_sha256": _sha256_file(output_dir / "artifact-manifest.json") if (output_dir / "artifact-manifest.json").is_file() else None,
     }
-    final_status = _final_status(structural, visual, design, teacher, negative)
-    if benchmark_payload is not None and (
-        benchmark_payload["course_summary"]["decision"] in {
-            "REVISION_REQUIRED", "HUMAN_REVIEW_REQUIRED", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE",
+    benchmark_report: dict[str, Any] | None = None
+    if benchmark_payload is not None:
+        summary = benchmark_payload["course_summary"]
+        benchmark_report = {
+            "status": benchmark_payload["status"],
+            "decision": summary["decision"],
+            "review_round": benchmark_payload["review_round"],
+            "major_gap_count": summary["major_gap_count"],
+            "minor_gap_count": summary["minor_gap_count"],
+            "insufficient_evidence_count": summary["insufficient_evidence_count"],
+            "lessons_reviewed": summary["lessons_reviewed"],
+            "lessons_without_holdout": summary["lessons_without_holdout"],
+            "context_mode": summary["context_mode"],
+            "authoring_availability": summary["authoring_availability"],
+            "holdout_availability": summary["holdout_availability"],
+            "benchmark_run_id": benchmark_payload["benchmark_run_id"],
+            "source_sha256": benchmark_payload["source_lesson_content_sha256"],
+            "catalog_fingerprint": benchmark_payload["catalog_fingerprint"],
+            "split_fingerprint": benchmark_payload["split_fingerprint"],
+            "authoring_pack_fingerprint": benchmark_authorization["authoring_pack_fingerprint"],
+            "authoring_selection_sha256": benchmark_authorization["authoring_selection_sha256"],
+            "holdout_pack_fingerprint": benchmark_payload["holdout_pack_fingerprint"],
+            "holdout_selection_sha256": benchmark_payload["holdout_selection_sha256"],
+            "benchmark_authorization_sha256": benchmark_authorization_sha256,
+            "no_relevant_holdout_lesson_count": summary["no_relevant_holdout_lesson_count"],
+            "review_sha256": hashlib.sha256(benchmark_review_path.read_bytes()).hexdigest(),
         }
-        or benchmark_payload["status"] != "BENCHMARK_REVIEW_COMPLETE"
-    ) and final_status in {"PASSED", "PASSED_WITH_TEACHER_ADJUSTMENTS"}:
-        final_status = PENDING_STATUS
+        if benchmark_report["decision"] == "REVISION_REQUIRED":
+            benchmark_report["review_completeness"] = _review_completeness(
+                "failed", ["deterministic Benchmark review requires revision"]
+            )
+        elif (
+            benchmark_report["status"] == "BENCHMARK_REVIEW_COMPLETE"
+            and benchmark_report["decision"] == "NO_REVISION_REQUIRED"
+        ):
+            benchmark_report["review_completeness"] = _review_completeness("complete")
+        else:
+            benchmark_report["review_completeness"] = _review_completeness(
+                "pending", ["Benchmark review requires human disposition or is not complete"]
+            )
+
+    final_status = _final_status(
+        structural,
+        visual,
+        design,
+        teacher,
+        negative,
+        scope,
+        hallucination,
+        benchmark_report,
+    )
+    manual_completion_required = _manual_completion_required(
+        visual, design, teacher, scope, hallucination, benchmark_report
+    )
     report_expected_profile = {
         field_name: data.get(field_name)
         for field_name in ("course_name", "major", "audience")
@@ -2185,11 +2602,11 @@ def build_acceptance_report(
         "structural_hard_gates": structural,
         "content_quality_evidence": content_quality_evidence(qa_report),
         "sequence_review": sequence_review(data, qa_report),
-        "course_scope_review": course_scope_review(data, scope_payload),
+        "course_scope_review": scope,
         "content_length": content_length_report(lessons),
         "visual_review": visual,
         "negative_controls": negative,
-        "hallucination_review": hallucination_review(data),
+        "hallucination_review": hallucination,
         "teaching_design_review": design,
         "teacher_usability": teacher,
         "delivery_metrics": delivery,
@@ -2202,48 +2619,10 @@ def build_acceptance_report(
             "notes": "Historical baseline is comparative context only; it creates no acceptance threshold.",
         },
         "final_status": final_status,
-        "manual_completion_required": [
-            name
-            for name, value in (
-                ("visual_review", visual),
-                ("teaching_design_review", design),
-                ("teacher_usability", teacher),
-                ("negative_controls", negative),
-            )
-            if str(value.get("status", "")).lower() == "not_executed"
-        ],
+        "manual_completion_required": manual_completion_required,
     }
-    if benchmark_payload is not None:
-        summary = benchmark_payload["course_summary"]
-        report["benchmark_review"] = {
-            "status": benchmark_payload["status"],
-            "decision": summary["decision"],
-            "review_round": benchmark_payload["review_round"],
-            "major_gap_count": summary["major_gap_count"],
-            "minor_gap_count": summary["minor_gap_count"],
-            "insufficient_evidence_count": summary["insufficient_evidence_count"],
-            "lessons_reviewed": summary["lessons_reviewed"],
-            "lessons_without_holdout": summary["lessons_without_holdout"],
-            "context_mode": summary["context_mode"],
-            "authoring_availability": summary["authoring_availability"],
-            "holdout_availability": summary["holdout_availability"],
-            "benchmark_run_id": benchmark_payload["benchmark_run_id"],
-            "source_sha256": benchmark_payload["source_lesson_content_sha256"],
-            "catalog_fingerprint": benchmark_payload["catalog_fingerprint"],
-            "split_fingerprint": benchmark_payload["split_fingerprint"],
-            "authoring_pack_fingerprint": benchmark_authorization["authoring_pack_fingerprint"],
-            "authoring_selection_sha256": benchmark_authorization["authoring_selection_sha256"],
-            "holdout_pack_fingerprint": benchmark_payload["holdout_pack_fingerprint"],
-            "holdout_selection_sha256": benchmark_payload["holdout_selection_sha256"],
-            "benchmark_authorization_sha256": benchmark_authorization_sha256,
-            "no_relevant_holdout_lesson_count": summary["no_relevant_holdout_lesson_count"],
-            "review_sha256": hashlib.sha256(benchmark_review_path.read_bytes()).hexdigest(),
-        }
-        if (
-            benchmark_payload["status"] != "BENCHMARK_REVIEW_COMPLETE"
-            or summary["decision"] != "NO_REVISION_REQUIRED"
-        ):
-            report["manual_completion_required"].append("benchmark_review")
+    if benchmark_report is not None:
+        report["benchmark_review"] = benchmark_report
     schema_errors = validate_report_schema(report)
     if schema_errors:
         raise ValueError("acceptance report schema failed: " + "; ".join(schema_errors))
@@ -2255,7 +2634,9 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
     structural = report.get("structural_hard_gates", {})
     course_profile = report.get("course_profile", {})
     artifact_manifest = report.get("artifact_manifest", {})
-    artifact_data = artifact_manifest.get("data", {}) if isinstance(artifact_manifest, Mapping) else {}
+    artifact_data = artifact_manifest.get("data") if isinstance(artifact_manifest, Mapping) else {}
+    if not isinstance(artifact_data, Mapping):
+        artifact_data = {}
     sequence = report.get("sequence_review", {})
     quality = report.get("content_quality_evidence", {})
     benchmark = report.get("benchmark_review")
@@ -2322,28 +2703,34 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
             f"- Visual: `{(report.get('visual_review') or {}).get('status')}`",
             f"- Teaching design: `{(report.get('teaching_design_review') or {}).get('status')}`",
             f"- Teacher usability: `{(report.get('teacher_usability') or {}).get('status')}`",
+            f"- Course scope: `{(report.get('course_scope_review') or {}).get('status')}`",
+            f"- Hallucination/provenance: `{(report.get('hallucination_review') or {}).get('status')}`",
+            f"- Manual completion required: `{json.dumps(report.get('manual_completion_required', []), ensure_ascii=False)}`",
             "- Read 4-6 representative lessons in full: L01, a boundary before/after, a complex/high-density lesson, and L32 when present.",
-            "- Teacher rubric is 1-5. At least 4 usable lessons is the pass signal; 3 teacher tweaks means PASSED_WITH_TEACHER_ADJUSTMENTS; 2 or fewer is an acceptance issue.",
+            "- Teacher rubric is 1-5 across all five documented criteria; the report requires complete per-Lesson assessments, usable_count, and tweak_count.",
             "",
             "## Scope and length",
             "",
-            "- Course scope is a manual review for each project using CORE / EXTENSION / POSSIBLE_SCOPE_DRIFT. It is not a Python hard gate.",
+            "- Course scope must classify every project as CORE / EXTENSION / POSSIBLE_SCOPE_DRIFT; each POSSIBLE_SCOPE_DRIFT needs reviewer disposition and notes.",
             "- Length values are descriptive distributions only. There is no must-differ rule.",
             "",
             "## Negative controls",
             "",
-            "- Run the six catalogued mutations through the real generator with a sentinel old output; verify reject, candidate cleanup, and old-output preservation.",
+            "- Negative Controls remain a release/qualification concern; their default not_executed state does not block a per-course Acceptance 2.0 pass.",
+            "- Any supplied Negative Controls payload with failed/fail/rejected status still makes Acceptance FAILED.",
             f"- Current negative-control status: `{(report.get('negative_controls') or {}).get('status')}`",
             "",
             "## Provenance and hallucination review",
             "",
             "- Real Agent A/B generation is local-only evidence and is not a CI test.",
-            "- School, teacher, textbook, ISBN, schedule, and generic detailed bibliography fields are review flags; user-provided evidence must be distinguished from unverified claims.",
+            "- School, teacher, textbook, ISBN, schedule, and generic detailed bibliography fields are review flags, not automatic falsehoods; every detected flag must have an explicit disposition and notes before a pass.",
+            "- The optional `--hallucination-review` JSON accepts a `dispositions` list keyed by each flag's `kind` and `path`.",
             "- Historical baselines are comparison-only and do not create thresholds.",
             "",
             "## Interpretation",
             "",
-            "- `PENDING_MANUAL_REVIEW` is not a pass claim. Only after visual, teaching-design, negative-control, and teacher-usability evidence is recorded should the final status become PASSED, PASSED_WITH_TEACHER_ADJUSTMENTS, or FAILED.",
+            "- `PENDING_MANUAL_REVIEW` is not a pass claim. Visual, teaching-design, teacher-usability, course-scope, and hallucination/provenance gates must close before PASSED or PASSED_WITH_TEACHER_ADJUSTMENTS.",
+            "- CLI exits are 0 for either passed status, 1 for FAILED, 3 for PENDING_MANUAL_REVIEW, and 2 for report errors. `--allow-pending-exit-zero` restores the legacy pending exit code for compatible callers.",
         ]
     )
     return "\n".join(lines) + "\n"
@@ -2375,6 +2762,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--teacher-review", type=Path)
     parser.add_argument("--visual-review", type=Path)
     parser.add_argument("--negative-controls", type=Path)
+    parser.add_argument("--hallucination-review", type=Path)
+    parser.add_argument(
+        "--allow-pending-exit-zero",
+        action="store_true",
+        help="compatibility mode for callers that historically treated a pending report as exit 0",
+    )
     parser.add_argument("--historical-baseline", type=Path)
     parser.add_argument("--benchmark-review", type=Path)
     parser.add_argument("--benchmark-catalog", type=Path)
@@ -2404,6 +2797,7 @@ def main(argv: list[str] | None = None) -> int:
             teacher_review_path=args.teacher_review,
             visual_review_path=args.visual_review,
             negative_controls_path=args.negative_controls,
+            hallucination_review_path=args.hallucination_review,
             historical_baseline_path=args.historical_baseline,
             benchmark_review_path=args.benchmark_review,
             benchmark_catalog_path=args.benchmark_catalog,
@@ -2422,7 +2816,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Acceptance V2 failed: {exc}", file=sys.stderr)
         return 2
     print(json.dumps({"status": report["final_status"], "json": str(json_path), "markdown": str(markdown_path)}, ensure_ascii=False, indent=2))
-    return 1 if report["final_status"] == "FAILED" else 0
+    return acceptance_exit_code(report["final_status"], args.allow_pending_exit_zero)
 
 
 if __name__ == "__main__":

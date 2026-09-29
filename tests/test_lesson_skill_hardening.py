@@ -549,6 +549,291 @@ class LessonSkillHardeningTests(unittest.TestCase):
             "negative_controls": {"status": "not_executed"},
         }))
 
+    def _complete_acceptance_reviews(self, tweak_count: int = 0) -> tuple[dict, dict, dict, dict, dict]:
+        complete = {"status": "complete", "issues": []}
+        teacher = {
+            "status": "passed",
+            "usable_count": 4,
+            "tweak_count": tweak_count,
+            "review_completeness": copy.deepcopy(complete),
+        }
+        visual = {"status": "passed", "review_completeness": copy.deepcopy(complete)}
+        design = {"status": "passed", "review_completeness": copy.deepcopy(complete)}
+        scope = {"status": "passed", "review_completeness": copy.deepcopy(complete)}
+        hallucination = {"status": "no_flags", "review_completeness": copy.deepcopy(complete)}
+        return visual, design, teacher, scope, hallucination
+
+    def test_acceptance_final_status_fail_closed_regression_matrix(self) -> None:
+        passed = {"status": "PASS"}
+        negative = {"status": "not_executed"}
+        visual, design, teacher, scope, hallucination = self._complete_acceptance_reviews()
+        cases = [
+            ("structural fail", {"status": "FAIL"}, visual, design, teacher, scope, hallucination, None, "FAILED"),
+            ("visual missing", passed, {"status": "not_executed"}, design, teacher, scope, hallucination, None, "PENDING_MANUAL_REVIEW"),
+            ("design missing", passed, visual, {"status": "not_executed"}, teacher, scope, hallucination, None, "PENDING_MANUAL_REVIEW"),
+            ("scope missing", passed, visual, design, teacher, {"status": "not_executed"}, hallucination, None, "PENDING_MANUAL_REVIEW"),
+            ("scope status passed with projects unclassified", passed, visual, design, teacher,
+             lesson_acceptance.course_scope_review(
+                 {"lessons": [{"unit": "P1"}]}, {"status": "passed"}
+             ), hallucination, None, "PENDING_MANUAL_REVIEW"),
+            ("scope drift unresolved", passed, visual, design, teacher,
+             lesson_acceptance.course_scope_review(
+                 {"lessons": [{"unit": "P1"}]},
+                 {"status": "passed", "projects": [{"project": "P1", "classification": "POSSIBLE_SCOPE_DRIFT"}]},
+             ), hallucination, None, "PENDING_MANUAL_REVIEW"),
+            ("hallucination unresolved", passed, visual, design, teacher, scope,
+             lesson_acceptance.hallucination_review({"school_name": "Example School"}), None, "PENDING_MANUAL_REVIEW"),
+            ("hallucination explicit failure", passed, visual, design, teacher, scope,
+             lesson_acceptance.hallucination_review({}, {"status": "rejected"}), None, "FAILED"),
+            ("all manual gates complete", passed, visual, design, teacher, scope, hallucination, None, "PASSED"),
+            ("tweaks with visual missing", passed, {"status": "not_executed"}, design,
+             {**teacher, "tweak_count": 2}, scope, hallucination, None, "PENDING_MANUAL_REVIEW"),
+            ("tweaks with all gates complete", passed, visual, design,
+             {**teacher, "tweak_count": 2}, scope, hallucination, None, "PASSED_WITH_TEACHER_ADJUSTMENTS"),
+            ("visual fail", passed, {"status": "failed"}, design, teacher, scope, hallucination, None, "FAILED"),
+            ("design fail", passed, visual, {"status": "rejected"}, teacher, scope, hallucination, None, "FAILED"),
+            ("teacher fail", passed, visual, design, {"status": "fail"}, scope, hallucination, None, "FAILED"),
+            ("benchmark revision required", passed, visual, design, teacher, scope, hallucination,
+             {"status": "BENCHMARK_REVIEW_COMPLETE", "decision": "REVISION_REQUIRED",
+              "review_completeness": {"status": "failed", "issues": []}}, "FAILED"),
+            ("benchmark human review required", passed, visual, design, teacher, scope, hallucination,
+             {"status": "HUMAN_REVIEW_REQUIRED", "decision": "HUMAN_REVIEW_REQUIRED",
+              "review_completeness": {"status": "pending", "issues": ["human review"]}}, "PENDING_MANUAL_REVIEW"),
+            ("benchmark partial", passed, visual, design, teacher, scope, hallucination,
+             {"status": "BENCHMARK_PARTIAL", "decision": "BENCHMARK_PARTIAL",
+              "review_completeness": {"status": "pending", "issues": ["partial"]}}, "PENDING_MANUAL_REVIEW"),
+            ("benchmark unavailable", passed, visual, design, teacher, scope, hallucination,
+             {"status": "BENCHMARK_UNAVAILABLE", "decision": "BENCHMARK_UNAVAILABLE",
+              "review_completeness": {"status": "pending", "issues": ["unavailable"]}}, "PENDING_MANUAL_REVIEW"),
+            ("benchmark non-complete status", passed, visual, design, teacher, scope, hallucination,
+             {"status": "BENCHMARK_GAPS_FOUND", "decision": "NO_REVISION_REQUIRED",
+              "review_completeness": {"status": "pending", "issues": ["not complete"]}}, "PENDING_MANUAL_REVIEW"),
+            ("benchmark omitted keeps legacy path", passed, visual, design, teacher, scope, hallucination, None, "PASSED"),
+        ]
+        for name, structural, visual_gate, design_gate, teacher_gate, scope_gate, hallucination_gate, benchmark_gate, expected in cases:
+            with self.subTest(name=name):
+                self.assertEqual(
+                    lesson_acceptance._final_status(
+                        structural,
+                        visual_gate,
+                        design_gate,
+                        teacher_gate,
+                        negative,
+                        scope_gate,
+                        hallucination_gate,
+                        benchmark_gate,
+                    ),
+                    expected,
+                )
+
+        self.assertEqual(
+            lesson_acceptance._final_status(
+                passed, visual, design, teacher, {"status": "failed"}, scope, hallucination,
+            ),
+            "FAILED",
+        )
+        resolved_scope = lesson_acceptance.course_scope_review(
+            {"lessons": [{"unit": "P1"}, {"unit": "P2"}]},
+            {"status": "passed", "projects": [
+                {"project": "P1", "classification": "CORE"},
+                {"project": "P2", "classification": "POSSIBLE_SCOPE_DRIFT",
+                 "reviewer_disposition": "approved extension", "notes": "与课程目标一致。"},
+            ]},
+        )
+        self.assertEqual(resolved_scope["review_completeness"]["status"], "complete")
+
+    def test_acceptance_thin_reviews_and_hallucination_dispositions_fail_closed(self) -> None:
+        thin_design = lesson_acceptance.teaching_design_review({"status": "passed"})
+        thin_visual = lesson_acceptance.visual_review(
+            {"status": "passed"}, {"sample": []}, {"status": "invalid", "error": "missing evidence"}
+        )
+        lessons = [{"id": "L01"}, {"id": "L02"}, {"id": "L03"}]
+        thin_teacher = lesson_acceptance.teacher_usability_review(
+            {"status": "passed", "usable_count": 3, "tweak_count": 0}, {"sample": []}, lessons
+        )
+        visual, design, teacher, scope, hallucination = self._complete_acceptance_reviews()
+        for label, review in (("design", thin_design), ("visual", thin_visual), ("teacher", thin_teacher)):
+            with self.subTest(review=label):
+                self.assertEqual(review["review_completeness"]["status"], "pending")
+                gates = {"visual": visual, "design": design, "teacher": teacher}
+                gates[label] = review
+                self.assertEqual(
+                    lesson_acceptance._final_status(
+                        {"status": "PASS"}, gates["visual"], gates["design"], gates["teacher"],
+                        {"status": "not_executed"}, scope, hallucination,
+                    ),
+                    "PENDING_MANUAL_REVIEW",
+                )
+
+        flagged_data = {"school_name": "Example School"}
+        flag = lesson_acceptance.hallucination_review(flagged_data)["flags"][0]
+        resolved = lesson_acceptance.hallucination_review(
+            flagged_data,
+            {"dispositions": [{
+                "kind": flag["kind"],
+                "path": flag["path"],
+                "disposition": "verified_user_provided",
+                "notes": "核对课程资料中的学校名称。",
+            }]},
+        )
+        self.assertEqual(resolved["status"], "resolved")
+        self.assertEqual(resolved["review_completeness"]["status"], "complete")
+        failed = lesson_acceptance.hallucination_review(
+            flagged_data,
+            {"dispositions": [{
+                "kind": flag["kind"], "path": flag["path"], "disposition": "rejected", "notes": "证据不成立。"
+            }]},
+        )
+        self.assertEqual(failed["review_completeness"]["status"], "failed")
+
+    def test_acceptance_report_manual_completion_matches_final_status(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-acceptance-fail-closed-") as temp_name:
+            folder = Path(temp_name)
+            input_path, output, qa_path, data = self._acceptance_fixture(folder)
+            data["school_name"] = "Example School"
+            input_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            scope_path = folder / "scope.json"
+            design_path = folder / "design.json"
+            teacher_path = folder / "teacher.json"
+            visual_path = folder / "visual.json"
+            hallucination_path = folder / "hallucination.json"
+            scope_path.write_text(json.dumps({"status": "passed", "projects": [
+                {"project": "项目1", "classification": "CORE"},
+            ]}, ensure_ascii=False), encoding="utf-8")
+            design_path.write_text('{"status":"passed"}', encoding="utf-8")
+            teacher_path.write_text('{"status":"passed","usable_count":3,"tweak_count":0}', encoding="utf-8")
+            visual_path.write_text('{"status":"passed"}', encoding="utf-8")
+            hallucination_path.write_text('{"status":"passed"}', encoding="utf-8")
+            report = lesson_acceptance.build_acceptance_report(
+                input_path,
+                output,
+                qa_path,
+                source_type="synthetic_fixture",
+                report_dir=folder / "report",
+                scope_review_path=scope_path,
+                design_review_path=design_path,
+                teacher_review_path=teacher_path,
+                visual_review_path=visual_path,
+                hallucination_review_path=hallucination_path,
+            )
+            self.assertEqual(report["final_status"], "PENDING_MANUAL_REVIEW")
+            self.assertEqual(set(report["manual_completion_required"]), {
+                "visual_review", "teaching_design_review", "teacher_usability",
+                "course_scope_review", "hallucination_review",
+            })
+            self.assertNotIn("negative_controls", report["manual_completion_required"])
+            self.assertEqual(lesson_acceptance.validate_report_schema(report), [])
+
+            invalid = copy.deepcopy(report)
+            invalid["manual_completion_required"] = []
+            self.assertTrue(any("requires at least one outstanding manual gate" in issue
+                                for issue in lesson_acceptance.validate_report_schema(invalid)))
+            invalid["final_status"] = "PASSED"
+            invalid["manual_completion_required"] = ["visual_review"]
+            self.assertTrue(any("cannot retain outstanding manual gates" in issue
+                                for issue in lesson_acceptance.validate_report_schema(invalid)))
+
+    def test_acceptance_complete_report_passes_without_per_course_negative_controls(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-acceptance-complete-") as temp_name:
+            folder = Path(temp_name)
+            input_path, output, qa_path, data = self._acceptance_fixture(folder)
+            dimension_review = {name: {"status": "passed"} for name in lesson_acceptance._MANUAL_REVIEW_DIMENSIONS}
+            design_path = folder / "design.json"
+            design_path.write_text(json.dumps({"status": "passed", "dimensions": dimension_review}), encoding="utf-8")
+            scope_path = folder / "scope.json"
+            scope_projects = []
+            for project in dict.fromkeys(lesson["unit"] for lesson in data["lessons"]):
+                scope_projects.append({"project": project, "classification": "CORE"})
+            scope_path.write_text(json.dumps({"status": "passed", "projects": scope_projects}), encoding="utf-8")
+            teacher_path = folder / "teacher.json"
+            ratings = {
+                "directly_teachable": 4,
+                "task_executable": 4,
+                "steps_operable": 4,
+                "evaluation_observable": 4,
+                "reflection_improvable": 4,
+            }
+            teacher_path.write_text(json.dumps({
+                "status": "passed",
+                "lesson_assessments": [
+                    {"lesson_id": lesson["id"], "ratings": ratings, "notes": f"已审阅{lesson['id']}。"}
+                    for lesson in data["lessons"]
+                ],
+                "usable_count": 3,
+                "tweak_count": 0,
+            }, ensure_ascii=False), encoding="utf-8")
+            visual_path = folder / "visual.json"
+            write_visual_inspection_evidence(
+                output_dir=output,
+                qa_report=qa_path,
+                destination=visual_path,
+                status="passed",
+                inspected_pages={"L01.docx": [1]},
+                checks={name: "passed" for name in CHECK_NAMES},
+                notes="Representative pages reviewed.",
+            )
+
+            report = lesson_acceptance.build_acceptance_report(
+                input_path,
+                output,
+                qa_path,
+                source_type="synthetic_fixture",
+                report_dir=folder / "report",
+                scope_review_path=scope_path,
+                design_review_path=design_path,
+                teacher_review_path=teacher_path,
+                visual_review_path=visual_path,
+            )
+            self.assertEqual(report["final_status"], "PASSED")
+            self.assertEqual(report["manual_completion_required"], [])
+            self.assertEqual(report["negative_controls"]["status"], "not_executed")
+            self.assertEqual(lesson_acceptance.validate_report_schema(report), [])
+
+    def test_acceptance_cli_pending_exit_and_legacy_compatibility_flag(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="lesson-acceptance-cli-") as temp_name:
+            folder = Path(temp_name)
+            input_path, output, qa_path, data = self._acceptance_fixture(folder)
+            data["school_name"] = "Example School"
+            input_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            hallucination_path = folder / "hallucination-review.json"
+            hallucination_path.write_text('{"status":"passed"}', encoding="utf-8")
+            wrapper = ROOT / "tests" / "lesson_acceptance.py"
+            base_args = [
+                sys.executable, str(wrapper),
+                "--input-json", str(input_path),
+                "--output-dir", str(output),
+                "--qa-report", str(qa_path),
+                "--source-type", "synthetic_fixture",
+                "--hallucination-review", str(hallucination_path),
+            ]
+            pending = subprocess.run(
+                [*base_args, "--report-dir", str(folder / "pending")],
+                capture_output=True, text=True, check=False,
+            )
+            compatible = subprocess.run(
+                [*base_args, "--report-dir", str(folder / "compatible"), "--allow-pending-exit-zero"],
+                capture_output=True, text=True, check=False,
+            )
+            failed_qa_path = folder / "qa-failed.json"
+            failed_qa = json.loads(qa_path.read_text(encoding="utf-8"))
+            failed_qa["status"] = "failed"
+            failed_qa_path.write_text(json.dumps(failed_qa, ensure_ascii=False), encoding="utf-8")
+            failed_args = list(base_args)
+            qa_index = failed_args.index("--qa-report")
+            failed_args[qa_index + 1] = str(failed_qa_path)
+            failed = subprocess.run(
+                [*failed_args, "--report-dir", str(folder / "failed")],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(pending.returncode, 3, pending.stderr + pending.stdout)
+            self.assertEqual(compatible.returncode, 0, compatible.stderr + compatible.stdout)
+            self.assertEqual(failed.returncode, 1, failed.stderr + failed.stdout)
+            pending_report = json.loads((folder / "pending" / "lesson-acceptance-report.json").read_text(encoding="utf-8"))
+            self.assertIn("hallucination_review", pending_report["manual_completion_required"])
+            self.assertEqual(lesson_acceptance.acceptance_exit_code("FAILED"), 1)
+            self.assertEqual(lesson_acceptance.acceptance_exit_code("PASSED"), 0)
+            self.assertEqual(lesson_acceptance.acceptance_exit_code("PASSED_WITH_TEACHER_ADJUSTMENTS"), 0)
+
     def test_hardening_import_loader_restores_process_global_state(self) -> None:
         original_path = sys.path[:]
         original_modules = {name: sys.modules.get(name, _MISSING) for name in _LESSON_MODULE_NAMES}

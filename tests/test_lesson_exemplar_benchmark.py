@@ -2288,11 +2288,14 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
                     output / "qa-report.json",
                     source_type="synthetic_fixture",
                 )
-            self.assertEqual(acceptance.returncode, 0, acceptance.stderr + acceptance.stdout)
+            self.assertEqual(acceptance.returncode, 3, acceptance.stderr + acceptance.stdout)
             report = json.loads((report_dir / "lesson-acceptance-report.json").read_text(encoding="utf-8"))
             self.assertEqual(report["acceptance_schema_version"], "2.0")
             self.assertEqual(report["benchmark_review"]["decision"], "NO_REVISION_REQUIRED")
             self.assertEqual(report["structural_hard_gates"]["status"], "PASS")
+            self.assertEqual(report["final_status"], "PENDING_MANUAL_REVIEW")
+            self.assertIn("visual_review", report["manual_completion_required"])
+            self.assertNotIn("benchmark_review", report["manual_completion_required"])
             self.assertEqual(report["metadata"]["production_status"], "production_pass")
             self.assertEqual(report["benchmark_review"]["source_sha256"], content_digest)
             self.assertEqual(report["benchmark_review"]["review_sha256"], _sha256_bytes(paths["review"].read_bytes()))
@@ -2327,13 +2330,14 @@ class TeachingExemplarBenchmarkE2ETests(unittest.TestCase):
                 "--benchmark-holdout-selection", str(unavailable_paths["holdout_selection"]),
                 "--benchmark-lesson-reviews-dir", str(unavailable_paths["lesson_reviews_dir"]),
             )
-            self.assertEqual(unavailable_acceptance.returncode, 0, unavailable_acceptance.stderr + unavailable_acceptance.stdout)
+            self.assertEqual(unavailable_acceptance.returncode, 3, unavailable_acceptance.stderr + unavailable_acceptance.stdout)
             unavailable_report = json.loads(
                 (unavailable_report_dir / "lesson-acceptance-report.json").read_text(encoding="utf-8")
             )
             self.assertEqual(unavailable_report["metadata"]["production_status"], "production_pass")
             self.assertEqual(unavailable_report["benchmark_review"]["decision"], "BENCHMARK_UNAVAILABLE")
             self.assertEqual(unavailable_report["structural_hard_gates"]["status"], "PASS")
+            self.assertEqual(unavailable_report["final_status"], "PENDING_MANUAL_REVIEW")
 
 
 if __name__ == "__main__":

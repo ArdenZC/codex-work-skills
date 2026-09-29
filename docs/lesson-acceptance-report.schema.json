@@ -101,13 +101,36 @@
         "holdout_selection_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
         "benchmark_authorization_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
         "no_relevant_holdout_lesson_count": { "type": "integer", "minimum": 0 },
-        "review_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+        "review_sha256": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+        "review_completeness": {
+          "type": "object",
+          "required": ["status", "issues"],
+          "properties": {
+            "status": { "enum": ["complete", "pending", "failed"] },
+            "issues": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
       },
       "additionalProperties": false
     },
     "delivery_metrics": { "type": "object", "additionalProperties": true },
     "reference_metrics": { "type": "object", "additionalProperties": true },
     "practice_handoff_metrics": { "type": "object", "additionalProperties": true },
+    "manual_completion_required": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "visual_review",
+          "teaching_design_review",
+          "teacher_usability",
+          "course_scope_review",
+          "hallucination_review",
+          "benchmark_review"
+        ]
+      }
+    },
     "final_status": {
       "enum": [
         "PENDING_MANUAL_REVIEW",
