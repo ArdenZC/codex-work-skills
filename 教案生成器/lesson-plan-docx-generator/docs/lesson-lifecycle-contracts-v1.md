@@ -79,6 +79,13 @@ Benchmark disposition is a sidecar value and accepts only
 `BENCHMARK_REVIEW_COMPLETE`, `BENCHMARK_PARTIAL`, `BENCHMARK_UNAVAILABLE`, or
 `BENCHMARK_WAIVED_BY_USER`. A complete disposition requires the exact
 Benchmark Authorization and Review file SHA values and corresponding files.
+When `require_approved=True`, the Teacher Review authority check also uses the
+shared completed-Benchmark validator for both sidecar schemas, fingerprints,
+publication eligibility, Content/run/round/context/status/decision links, and
+actual bytes. `REVISION_REQUIRED` therefore cannot satisfy either approved
+Teacher Review decision. Ordinary Teacher Review validation without an
+approval-authority request retains the byte-link check without claiming
+Benchmark authority.
 Partial or unavailable dispositions require a byte-verified evidence file. A
 user waiver requires both a non-empty waiver reference and byte-verified
 evidence. `BENCHMARK_NOT_EXECUTED` is not an authorization disposition.
@@ -101,13 +108,19 @@ test-fixture bypass disabled. A completed Benchmark disposition also requires
 the official Benchmark Authorization and Review validators, publication
 eligibility, and exact cross-links to the current Content and each other.
 
-When the Skill is at its canonical path in a Git checkout with a determinable
-HEAD, `source_repo_commit` is required and must equal that HEAD. An installed
-copy without Git metadata still requires its installed tree fingerprint;
-`source_repo_commit` may be null or a valid historical 40-hex commit recorded
-by the installer. That historical value is provenance, not a locally verified
-HEAD. Production Authorization requires offline byte verification of every
-Source Truth source; an HTTPS source can be recorded structurally but cannot authorize production.
+When the Skill is at its canonical path in a Git checkout, `source_repo_commit`
+must equal HEAD only when every file in the Skill fingerprint inventory is
+represented by that commit, after the repository's normal clean filters. A
+modified/deleted tracked file or any relevant untracked or ignored ordinary
+file makes the current tree differ from HEAD and requires a null
+`source_repo_commit`; `__pycache__` does not affect this decision. The
+installed tree fingerprint continues to bind
+the actual current files. An installed copy without Git metadata still
+requires its installed tree fingerprint; `source_repo_commit` may be null or a
+valid historical 40-hex commit recorded by the installer. That historical
+value is provenance, not a locally verified HEAD. Production Authorization
+requires offline byte verification of every Source Truth source; an HTTPS
+source can be recorded structurally but cannot authorize production.
 A changed Source Truth, Content, review,
 Skill tree, template manifest, or template binary invalidates the matching
 authorization evidence. `REVISION_REQUIRED` cannot authorize production;

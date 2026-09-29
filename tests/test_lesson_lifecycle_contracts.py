@@ -245,6 +245,8 @@ def _complete_benchmark_files(
 ) -> tuple[Path, Path, dict[str, Any]]:
     import benchmark_authorization
 
+    if decision == "REVISION_REQUIRED" and status == "BENCHMARK_REVIEW_COMPLETE":
+        status = "BENCHMARK_GAPS_FOUND"
     directory.mkdir(parents=True, exist_ok=True)
     context_flags = (
         {"authoring_exemplars_visible": False, "author_reasoning_visible": False, "holdout_only": True}
@@ -668,6 +670,213 @@ class TeacherReviewContractTests(unittest.TestCase):
         errors = validate_teacher_review_payload(invalid, require_benchmark_bytes=False)
         self.assertTrue(errors)
 
+    def test_completed_benchmark_decision_gates_teacher_approval_authority(self) -> None:
+        def create_files(
+            directory: Path,
+            *,
+            benchmark_decision: str,
+            teacher_decision: str = "APPROVED",
+        ) -> tuple[Path, Path, Path, Path, Path]:
+            builder = ProductionAuthorizationTests()
+            source, content_path, teacher_path, _evidence, _production_auth, _authorization = builder._valid_files(
+                directory,
+                benchmark_disposition="BENCHMARK_REVIEW_COMPLETE",
+                benchmark_decision=benchmark_decision,
+            )
+            benchmark_auth, benchmark_review = builder._last_benchmark_paths
+            review = json.loads(teacher_path.read_text(encoding="utf-8"))
+            review["decision"] = teacher_decision
+            review["review_fingerprint"] = teacher_review_fingerprint(review)
+            _write_json(teacher_path, review)
+            return source, content_path, teacher_path, benchmark_auth, benchmark_review
+
+        with tempfile.TemporaryDirectory() as temp:
+            files = create_files(
+                Path(temp), benchmark_decision="NO_REVISION_REQUIRED", teacher_decision="APPROVED",
+            )
+            source, content, teacher, benchmark_auth, benchmark_review = files
+            _loaded, _raw, errors = validate_teacher_review_files(
+                teacher,
+                source_truth_path=source,
+                content_path=content,
+                benchmark_authorization_path=benchmark_auth,
+                benchmark_review_path=benchmark_review,
+                require_approved=True,
+            )
+            self.assertEqual(errors, [])
+
+        for teacher_decision in ("APPROVED", "APPROVED_WITH_NOTES"):
+            with self.subTest(teacher_decision=teacher_decision), tempfile.TemporaryDirectory() as temp:
+                files = create_files(
+                    Path(temp), benchmark_decision="REVISION_REQUIRED", teacher_decision=teacher_decision,
+                )
+                source, content, teacher, benchmark_auth, benchmark_review = files
+                _loaded, _raw, errors = validate_teacher_review_files(
+                    teacher,
+                    source_truth_path=source,
+                    content_path=content,
+                    benchmark_authorization_path=benchmark_auth,
+                    benchmark_review_path=benchmark_review,
+                    require_approved=True,
+                )
+                self.assertTrue(any("requires revision before final production authorization" in item for item in errors), errors)
+
+        # A revision decision remains a valid Teacher Review artifact; it only
+        # fails when callers ask this validator to establish approval authority.
+        with tempfile.TemporaryDirectory() as temp:
+            source, content, teacher, benchmark_auth, benchmark_review = create_files(
+                Path(temp), benchmark_decision="REVISION_REQUIRED", teacher_decision="REVISION_REQUIRED",
+            )
+            self.assertEqual(
+                validate_teacher_review_files(
+                    teacher,
+                    source_truth_path=source,
+                    content_path=content,
+                    benchmark_authorization_path=benchmark_auth,
+                    benchmark_review_path=benchmark_review,
+                    require_approved=False,
+                )[2],
+                [],
+            )
+            review, _raw = read_json_object(teacher, "teacher_review")
+            self.assertEqual(validate_teacher_review_payload(review, require_benchmark_bytes=False), [])
+
+    def test_completed_benchmark_semantics_run_only_for_approval_authority(self) -> None:
+        builder = ProductionAuthorizationTests()
+        with tempfile.TemporaryDirectory() as temp:
+            source, content, teacher, _evidence, _production_auth, _authorization = builder._valid_files(
+                Path(temp), benchmark_disposition="BENCHMARK_REVIEW_COMPLETE",
+            )
+            benchmark_auth, benchmark_review = builder._last_benchmark_paths
+            benchmark_auth.write_bytes(b'{"malformed":')
+            review = json.loads(teacher.read_text(encoding="utf-8"))
+            review["benchmark"]["authorization_sha256"] = sha256_file(benchmark_auth)
+            review["review_fingerprint"] = teacher_review_fingerprint(review)
+            _write_json(teacher, review)
+
+            # Ordinary structural/byte validation does not turn every Teacher
+            # Review CLI invocation into a Benchmark authority decision.
+            _loaded, _raw, errors = validate_teacher_review_files(
+                teacher,
+                source_truth_path=source,
+                content_path=content,
+                benchmark_authorization_path=benchmark_auth,
+                benchmark_review_path=benchmark_review,
+                require_approved=False,
+            )
+            self.assertEqual(errors, [])
+
+            _loaded, _raw, errors = validate_teacher_review_files(
+                teacher,
+                source_truth_path=source,
+                content_path=content,
+                benchmark_authorization_path=benchmark_auth,
+                benchmark_review_path=benchmark_review,
+                require_approved=True,
+            )
+            self.assertTrue(any("cannot load Benchmark Authorization/Review evidence" in item for item in errors), errors)
+
+    def test_completed_benchmark_requires_current_content_final_semantic_digest(self) -> None:
+        import benchmark_authorization
+        from lifecycle_benchmark import validate_completed_benchmark_evidence
+
+        builder = ProductionAuthorizationTests()
+        with tempfile.TemporaryDirectory() as temp:
+            source, content_path, teacher, _evidence, _production_auth, _authorization = builder._valid_files(
+                Path(temp), benchmark_disposition="BENCHMARK_REVIEW_COMPLETE",
+            )
+            benchmark_auth_path, benchmark_review_path = builder._last_benchmark_paths
+
+            content = json.loads(content_path.read_text(encoding="utf-8"))
+            content["authoring_provenance"].pop("final_content_sha256")
+            content_raw = _write_json(content_path, content)
+
+            review = json.loads(benchmark_review_path.read_text(encoding="utf-8"))
+            review["source_lesson_content_sha256"] = sha256_bytes(content_raw)
+            review_raw = _write_json(benchmark_review_path, review)
+
+            authorization = json.loads(benchmark_auth_path.read_text(encoding="utf-8"))
+            authorization["source_lesson_content_sha256"] = sha256_bytes(content_raw)
+            authorization["benchmark_review_sha256"] = sha256_bytes(review_raw)
+            authorization["authorization_fingerprint"] = benchmark_authorization.authorization_fingerprint(authorization)
+            authorization_raw = _write_json(benchmark_auth_path, authorization)
+
+            teacher_review = json.loads(teacher.read_text(encoding="utf-8"))
+            benchmark = teacher_review["benchmark"]
+            benchmark["authorization_sha256"] = sha256_bytes(authorization_raw)
+            benchmark["review_sha256"] = sha256_bytes(review_raw)
+            errors = validate_completed_benchmark_evidence(
+                benchmark,
+                benchmark_authorization_path=benchmark_auth_path,
+                benchmark_review_path=benchmark_review_path,
+                content=content,
+                content_raw=content_raw,
+            )
+            self.assertTrue(any("authoring_provenance.final_content_sha256 is required" in item for item in errors), errors)
+
+    def test_completed_benchmark_crosslink_failures_block_teacher_approval(self) -> None:
+        import benchmark_authorization
+
+        builder = ProductionAuthorizationTests()
+
+        def bind_outer_review(teacher: Path, authorization: Path, review: Path) -> None:
+            payload = json.loads(teacher.read_text(encoding="utf-8"))
+            payload["benchmark"]["authorization_sha256"] = sha256_file(authorization)
+            payload["benchmark"]["review_sha256"] = sha256_file(review)
+            payload["review_fingerprint"] = teacher_review_fingerprint(payload)
+            _write_json(teacher, payload)
+
+        def invalidate_review_schema(authorization_path: Path, review_path: Path, _teacher: Path) -> None:
+            review_payload = json.loads(review_path.read_text(encoding="utf-8"))
+            review_payload.pop("catalog_id")
+            _write_json(review_path, review_payload)
+            authorization = json.loads(authorization_path.read_text(encoding="utf-8"))
+            authorization["benchmark_review_sha256"] = sha256_file(review_path)
+            authorization["authorization_fingerprint"] = benchmark_authorization.authorization_fingerprint(authorization)
+            _write_json(authorization_path, authorization)
+
+        def mutate_authorization_field(field: str, value: Any):
+            def mutate(authorization_path: Path, _review_path: Path, _teacher: Path) -> None:
+                authorization = json.loads(authorization_path.read_text(encoding="utf-8"))
+                authorization[field] = value
+                authorization["authorization_fingerprint"] = benchmark_authorization.authorization_fingerprint(authorization)
+                _write_json(authorization_path, authorization)
+
+            return mutate
+
+        def corrupt_lifecycle_sha(_authorization: Path, _review: Path, teacher: Path) -> None:
+            payload = json.loads(teacher.read_text(encoding="utf-8"))
+            payload["benchmark"]["authorization_sha256"] = "0" * 64
+            payload["review_fingerprint"] = teacher_review_fingerprint(payload)
+            _write_json(teacher, payload)
+
+        cases = (
+            ("Review schema", invalidate_review_schema, "Benchmark Review:"),
+            ("run mismatch", mutate_authorization_field("benchmark_run_id", "BENCH-RUN-OTHER"), "benchmark_run_id do not match"),
+            ("round mismatch", mutate_authorization_field("review_round", 2), "review_round do not match"),
+            ("context mismatch", mutate_authorization_field("context_mode", "single_context"), "context_mode does not match"),
+            ("Lifecycle SHA mismatch", corrupt_lifecycle_sha, "does not match benchmark authorization file bytes"),
+        )
+
+        for label, mutate, expected in cases:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as temp:
+                source, content, teacher, _evidence, _production_auth, _authorization = builder._valid_files(
+                    Path(temp), benchmark_disposition="BENCHMARK_REVIEW_COMPLETE",
+                )
+                benchmark_auth, benchmark_review = builder._last_benchmark_paths
+                mutate(benchmark_auth, benchmark_review, teacher)
+                if label != "Lifecycle SHA mismatch":
+                    bind_outer_review(teacher, benchmark_auth, benchmark_review)
+                _loaded, _raw, errors = validate_teacher_review_files(
+                    teacher,
+                    source_truth_path=source,
+                    content_path=content,
+                    benchmark_authorization_path=benchmark_auth,
+                    benchmark_review_path=benchmark_review,
+                    require_approved=True,
+                )
+                self.assertTrue(any(expected in item for item in errors), errors)
+
 
 class ProductionAuthorizationTests(unittest.TestCase):
     def _rebind_content(
@@ -696,6 +905,7 @@ class ProductionAuthorizationTests(unittest.TestCase):
         *,
         content_version: str = "2.3",
         benchmark_disposition: str = "BENCHMARK_UNAVAILABLE",
+        benchmark_decision: str = "NO_REVISION_REQUIRED",
     ) -> tuple[Path, Path, Path, Path, Path, dict[str, Any]]:
         _source, source_path = _source_truth(directory / "run")
         source_raw = source_path.read_bytes()
@@ -706,7 +916,7 @@ class ProductionAuthorizationTests(unittest.TestCase):
         evidence_raw = _write_json(evidence_path, {"reason": "no verified benchmark fixture supplied"})
         if benchmark_disposition == "BENCHMARK_REVIEW_COMPLETE":
             benchmark_authorization_path, benchmark_review_path, benchmark = _complete_benchmark_files(
-                directory / "run" / "benchmark", content, content_raw,
+                directory / "run" / "benchmark", content, content_raw, decision=benchmark_decision,
             )
         else:
             benchmark = _benchmark(benchmark_disposition, sha256_bytes(evidence_raw))
@@ -943,27 +1153,39 @@ class ProductionAuthorizationTests(unittest.TestCase):
             self.assertEqual(validate_production_authorization_files(auth_path, **args)[2], [])
 
             tracked = skill / "SKILL.md"
-            tracked.write_bytes(tracked.read_bytes() + b"\nmodified after HEAD\n")
-            self.assertEqual(_current_repo_commit(skill), head)
+            tracked_bytes = tracked.read_bytes()
+            tracked.write_bytes(tracked_bytes + b"\nmodified after HEAD\n")
+            self.assertIsNone(_current_repo_commit(skill))
             authorization["lesson_skill"]["installed_skill_fingerprint"] = skill_tree_fingerprint(skill)
-            authorization["authorization_fingerprint"] = production_authorization_fingerprint(authorization)
-            _write_json(auth_path, authorization)
-            self.assertEqual(validate_production_authorization_files(auth_path, **args)[2], [])
-            authorization["lesson_skill"]["source_repo_commit"] = "0" * 40
+            authorization["lesson_skill"]["source_repo_commit"] = head
             authorization["authorization_fingerprint"] = production_authorization_fingerprint(authorization)
             _write_json(auth_path, authorization)
             errors = validate_production_authorization_files(auth_path, **args)[2]
-            self.assertTrue(any("source_repo_commit must match" in error for error in errors))
+            self.assertTrue(any("source_repo_commit must be null" in error for error in errors), errors)
+
+            authorization["lesson_skill"]["source_repo_commit"] = None
+            authorization["authorization_fingerprint"] = production_authorization_fingerprint(authorization)
+            _write_json(auth_path, authorization)
+            self.assertEqual(validate_production_authorization_files(auth_path, **args)[2], [])
+
+            tracked.write_bytes(tracked_bytes)
+            self.assertEqual(_current_repo_commit(skill), head)
+            authorization["lesson_skill"]["installed_skill_fingerprint"] = skill_tree_fingerprint(skill)
             authorization["lesson_skill"]["source_repo_commit"] = None
             authorization["authorization_fingerprint"] = production_authorization_fingerprint(authorization)
             _write_json(auth_path, authorization)
             errors = validate_production_authorization_files(auth_path, **args)[2]
-            self.assertTrue(any("source_repo_commit must match" in error for error in errors))
+            self.assertTrue(any("source_repo_commit must match" in error for error in errors), errors)
+            authorization["lesson_skill"]["source_repo_commit"] = "0" * 40
+            authorization["authorization_fingerprint"] = production_authorization_fingerprint(authorization)
+            _write_json(auth_path, authorization)
+            errors = validate_production_authorization_files(auth_path, **args)[2]
+            self.assertTrue(any("source_repo_commit must match" in error for error in errors), errors)
+            authorization["lesson_skill"]["source_repo_commit"] = head
+            authorization["authorization_fingerprint"] = production_authorization_fingerprint(authorization)
+            _write_json(auth_path, authorization)
+            self.assertEqual(validate_production_authorization_files(auth_path, **args)[2], [])
 
-            tracked.write_bytes(subprocess.run(
-                ["git", "-C", str(skill.parents[1]), "show", f"{head}:教案生成器/lesson-plan-docx-generator/SKILL.md"],
-                check=True, capture_output=True,
-            ).stdout)
             installed = directory / "installed-skill"
             shutil.copytree(skill, installed, ignore=shutil.ignore_patterns("__pycache__", ".git"))
             self.assertIsNone(_current_repo_commit(installed))
@@ -984,6 +1206,51 @@ class ProductionAuthorizationTests(unittest.TestCase):
             _write_json(auth_path, authorization)
             errors = validate_production_authorization_files(auth_path, **installed_args)[2]
             self.assertTrue(any("source_repo_commit" in error for error in errors))
+            self.assertEqual(_current_repo_commit(skill), head)
+
+    def test_current_repo_commit_tracks_skill_inventory_and_cache_exclusions(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            skill, head = _temporary_skill_repo(Path(temp))
+            repo = skill.parents[1]
+            self.assertEqual(_current_repo_commit(skill), head)
+
+            tracked = skill / "SKILL.md"
+            original = tracked.read_bytes()
+            tracked.write_bytes(original + b"\nlocal edit\n")
+            self.assertIsNone(_current_repo_commit(skill))
+            tracked.write_bytes(original)
+            self.assertEqual(_current_repo_commit(skill), head)
+
+            deleted = skill / "AGENTS.md"
+            deleted_bytes = deleted.read_bytes()
+            deleted.unlink()
+            self.assertIsNone(_current_repo_commit(skill))
+            deleted.write_bytes(deleted_bytes)
+            self.assertEqual(_current_repo_commit(skill), head)
+
+            untracked = skill / "lifecycle-untracked-probe.txt"
+            untracked.write_text("untracked ordinary file", encoding="utf-8")
+            self.assertIsNone(_current_repo_commit(skill))
+            untracked.unlink()
+
+            ignored_name = "lifecycle-ignored-probe.txt"
+            exclude_file = repo / ".git" / "info" / "exclude"
+            previous_excludes = exclude_file.read_text(encoding="utf-8")
+            exclude_file.write_text(previous_excludes + f"\n{ignored_name}\n", encoding="utf-8")
+            ignored = skill / ignored_name
+            ignored.write_text("ignored ordinary file", encoding="utf-8")
+            ignored_status = subprocess.run(
+                ["git", "-C", str(repo), "check-ignore", "--quiet", str(ignored)],
+                check=False,
+            )
+            self.assertEqual(ignored_status.returncode, 0)
+            self.assertIsNone(_current_repo_commit(skill))
+            ignored.unlink()
+            exclude_file.write_text(previous_excludes, encoding="utf-8")
+
+            cache_file = skill / "scripts" / "__pycache__" / "generated-cache.pyc"
+            cache_file.parent.mkdir(exist_ok=True)
+            cache_file.write_bytes(b"cache-only change")
             self.assertEqual(_current_repo_commit(skill), head)
 
     def test_unverified_https_source_cannot_authorize_until_materialized_locally(self) -> None:
@@ -1615,6 +1882,55 @@ class PipelineStateTests(unittest.TestCase):
                 artifact_paths={"preproduction_qa_sha256": preproduction_qa_path},
             )
             self.assertTrue(any("requires Source Truth, Content, Teacher Review and Authorization files" in item for item in errors))
+
+    def test_revision_required_benchmark_blocks_pipeline_teacher_approval_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            builder = ProductionAuthorizationTests()
+            source, content, teacher, _evidence, _production_auth, _authorization = builder._valid_files(
+                directory,
+                benchmark_disposition="BENCHMARK_REVIEW_COMPLETE",
+                benchmark_decision="REVISION_REQUIRED",
+            )
+            benchmark_auth, benchmark_review = builder._last_benchmark_paths
+            preproduction_qa = source.parent / "preproduction-qa.json"
+            preproduction_bytes = _write_json(preproduction_qa, {"result": "passed"})
+            benchmark_disposition = source.parent / "benchmark-disposition.json"
+            disposition_bytes = _write_json(benchmark_disposition, {"disposition": "BENCHMARK_REVIEW_COMPLETE"})
+
+            state = initial_pipeline_state("RUN-001")
+            for index, (next_state, field, evidence) in enumerate((
+                ("SOURCE_TRUTH_FROZEN", "source_truth_manifest_sha256", source.read_bytes()),
+                ("AUTHORING_COMPLETE", "content_sha256", content.read_bytes()),
+                ("PREPRODUCTION_QA_PASSED", "preproduction_qa_sha256", preproduction_bytes),
+                ("BENCHMARK_REVIEW_COMPLETE", "benchmark_disposition_sha256", disposition_bytes),
+                ("READY_FOR_TEACHER_REVIEW", None, None),
+                ("TEACHER_REVIEW_APPROVED", "teacher_review_sha256", teacher.read_bytes()),
+            )):
+                updates = {field: sha256_bytes(evidence)} if field is not None and evidence is not None else None
+                state = advance_pipeline_state(
+                    state,
+                    next_state,
+                    recorded_at=f"2026-09-29T10:{index:02d}:00Z",
+                    artifact_sha256_updates=updates,
+                )
+
+            self.assertEqual(validate_pipeline_state_payload(state), [])
+            state_path = source.parent / "pipeline-state.json"
+            _write_json(state_path, state)
+            _loaded, _raw, errors = pipeline_state_module.validate_pipeline_state_files(
+                state_path,
+                source_truth_path=source,
+                content_path=content,
+                teacher_review_path=teacher,
+                benchmark_authorization_path=benchmark_auth,
+                benchmark_review_path=benchmark_review,
+                artifact_paths={
+                    "preproduction_qa_sha256": preproduction_qa,
+                    "benchmark_disposition_sha256": benchmark_disposition,
+                },
+            )
+            self.assertTrue(any("requires revision before final production authorization" in item for item in errors), errors)
 
     def test_production_authorized_state_binds_valid_authorization_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

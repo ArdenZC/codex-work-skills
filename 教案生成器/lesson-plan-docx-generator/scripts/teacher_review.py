@@ -20,6 +20,7 @@ from lifecycle_digest import (
     timezone_aware_timestamp,
     validation_status,
 )
+from lifecycle_benchmark import validate_completed_benchmark_evidence
 
 
 FINGERPRINT_EXCLUDED_FIELDS = {"reviewed_at", "review_fingerprint"}
@@ -188,6 +189,19 @@ def validate_teacher_review_files(
         benchmark_evidence_path=benchmark_evidence_path,
         require_benchmark_bytes=True,
     )
+    benchmark = review.get("benchmark")
+    if (
+        require_approved
+        and isinstance(benchmark, Mapping)
+        and benchmark.get("disposition") == "BENCHMARK_REVIEW_COMPLETE"
+    ):
+        errors.extend(validate_completed_benchmark_evidence(
+            benchmark,
+            benchmark_authorization_path=benchmark_authorization_path,
+            benchmark_review_path=benchmark_review_path,
+            content=content,
+            content_raw=content_raw,
+        ))
     if require_approved and review.get("decision") not in {"APPROVED", "APPROVED_WITH_NOTES"}:
         errors.append("only APPROVED or APPROVED_WITH_NOTES can satisfy an approval authority check")
     return review, review_raw, errors

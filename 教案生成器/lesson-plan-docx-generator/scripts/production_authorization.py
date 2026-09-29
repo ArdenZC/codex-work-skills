@@ -20,10 +20,12 @@ from lifecycle_digest import (
     semantic_fingerprint,
     sha256_bytes,
     sha256_file,
+    skill_tree_inventory,
     skill_tree_fingerprint,
     timezone_aware_timestamp,
     validation_status,
 )
+from lifecycle_benchmark import validate_completed_benchmark_evidence
 from source_truth import source_truth_content_verified, source_truth_local_file_paths, validate_source_truth_payload
 from teacher_review import validate_teacher_review_files
 
@@ -37,9 +39,8 @@ def production_authorization_fingerprint(payload: Mapping[str, Any]) -> str:
     return semantic_fingerprint(payload, excluded_fields=FINGERPRINT_EXCLUDED_FIELDS)
 
 
-def _current_repo_commit(root: Path) -> str | None:
-    """Return HEAD when root is the canonical Skill path in a Git checkout."""
-
+def _canonical_skill_repository(root: Path) -> tuple[Path, str] | None:
+    """Return the repository and relative Skill path for the canonical checkout."""
     try:
         root_path = root.expanduser().resolve(strict=True)
         top_result = subprocess.run(
@@ -55,15 +56,95 @@ def _current_repo_commit(root: Path) -> str | None:
         relative_skill = root_path.relative_to(repository_root).as_posix()
         if relative_skill != "教案生成器/lesson-plan-docx-generator":
             return None
-        result = subprocess.run(
+        return repository_root, relative_skill
+    except (OSError, ValueError, UnicodeError, subprocess.TimeoutExpired):
+        return None
+
+
+def _current_repo_commit(root: Path) -> str | None:
+    """Return HEAD only when it represents the fingerprinted canonical Skill files."""
+
+    repository = _canonical_skill_repository(root)
+    if repository is None:
+        return None
+    repository_root, relative_skill = repository
+    try:
+        root_path = root.expanduser().resolve(strict=True)
+        current_inventory = skill_tree_inventory(root_path)
+        tree_result = subprocess.run(
+            [
+                "git", "-C", str(repository_root), "ls-tree", "-r", "-z", "--full-tree",
+                "HEAD", "--", relative_skill,
+            ],
+            check=False,
+            capture_output=True,
+            timeout=15,
+        )
+        if tree_result.returncode != 0:
+            return None
+
+        prefix = relative_skill + "/"
+        head_paths: set[str] = set()
+        for entry in tree_result.stdout.split(b"\0"):
+            if not entry:
+                continue
+            try:
+                metadata, path_bytes = entry.split(b"\t", 1)
+                mode, object_type, _object_id = metadata.decode("ascii").split()
+                path = path_bytes.decode("utf-8", errors="surrogateescape")
+            except (UnicodeError, ValueError):
+                return None
+            if not path.startswith(prefix):
+                return None
+            skill_path = path[len(prefix):]
+            path_parts = skill_path.split("/")
+            if "__pycache__" in path_parts[:-1]:
+                continue
+            if mode not in {"100644", "100755"} or object_type != "blob":
+                return None
+            head_paths.add(skill_path)
+
+        if set(current_inventory) != head_paths:
+            return None
+
+        # Git's raw diff applies the repository's clean filters (including
+        # core.autocrlf) and compares current bytes to HEAD. The cache pathspec
+        # matches the inventory's __pycache__ exclusion. Blob IDs let us ignore
+        # executable-bit-only changes, which the Skill fingerprint does not bind.
+        cache_exclusion = f":(exclude,glob){relative_skill}/**/__pycache__/**"
+        diff_result = subprocess.run(
+            [
+                "git", "-C", str(repository_root), "diff", "--raw", "-z", "--no-renames",
+                "--no-ext-diff", "--no-textconv", "HEAD", "--", relative_skill, cache_exclusion,
+            ],
+            check=False,
+            capture_output=True,
+            timeout=15,
+        )
+        if diff_result.returncode != 0:
+            return None
+        records = diff_result.stdout.split(b"\0")
+        for index in range(0, len(records) - 1, 2):
+            metadata = records[index]
+            path = records[index + 1]
+            if not metadata or not path:
+                return None
+            try:
+                columns = metadata.decode("ascii").split()
+                if len(columns) != 5 or columns[3] != columns[4]:
+                    return None
+            except UnicodeError:
+                return None
+
+        head_result = subprocess.run(
             ["git", "-C", str(repository_root), "rev-parse", "--verify", "HEAD"],
             check=False,
             capture_output=True,
             text=True,
             timeout=10,
         )
-        commit = result.stdout.strip().lower()
-        if result.returncode != 0 or len(commit) != 40:
+        commit = head_result.stdout.strip().lower()
+        if head_result.returncode != 0 or len(commit) != 40:
             return None
     except (OSError, ValueError, UnicodeError, LifecycleContractError, subprocess.TimeoutExpired):
         return None
@@ -260,7 +341,7 @@ def validate_production_authorization_files(
 
     benchmark = authorization.get("benchmark", {})
     if benchmark.get("disposition") == "BENCHMARK_REVIEW_COMPLETE":
-        errors.extend(_validate_completed_benchmark_evidence(
+        errors.extend(validate_completed_benchmark_evidence(
             benchmark,
             benchmark_authorization_path=benchmark_authorization_path,
             benchmark_review_path=benchmark_review_path,
@@ -303,10 +384,14 @@ def validate_production_authorization_files(
         errors.append(f"cannot verify installed Skill tree fingerprint: {exc}")
     current_commit = _current_repo_commit(Path(skill_root).expanduser())
     recorded_commit = expected_skill.get("source_repo_commit")
-    if current_commit is not None and (
-        not isinstance(recorded_commit, str) or recorded_commit.casefold() != current_commit
-    ):
-        errors.append("lesson_skill.source_repo_commit must match the repository commit containing this Skill")
+    is_canonical_checkout = _canonical_skill_repository(Path(skill_root).expanduser()) is not None
+    if is_canonical_checkout:
+        if current_commit is None and recorded_commit is not None:
+            errors.append("lesson_skill.source_repo_commit must be null when the canonical Skill tree differs from HEAD")
+        elif current_commit is not None and (
+            not isinstance(recorded_commit, str) or recorded_commit.casefold() != current_commit
+        ):
+            errors.append("lesson_skill.source_repo_commit must match the repository commit containing this Skill")
 
     errors.extend(_runtime_errors(authorization.get("runtime", {}), verify_environment=verify_runtime_environment))
     errors.extend(_template_errors(
@@ -317,79 +402,6 @@ def validate_production_authorization_files(
         other_paths=input_paths,
     ))
     return authorization, authorization_raw, errors
-
-
-def _validate_completed_benchmark_evidence(
-    benchmark: Mapping[str, Any],
-    *,
-    benchmark_authorization_path: str | Path | None,
-    benchmark_review_path: str | Path | None,
-    content: Mapping[str, Any],
-    content_raw: bytes,
-) -> list[str]:
-    """Validate Lifecycle's bounded Benchmark sidecar bindings with owner validators."""
-
-    errors: list[str] = []
-    if benchmark_authorization_path is None or benchmark_review_path is None:
-        return ["BENCHMARK_REVIEW_COMPLETE requires Benchmark Authorization and Review files for semantic validation"]
-
-    try:
-        import benchmark_authorization as benchmark_authorization_module
-        from validate_benchmark_review import validate_benchmark_review_file
-
-        benchmark_authorization, authorization_raw = read_json_object(
-            benchmark_authorization_path, "benchmark_authorization"
-        )
-        review_path = Path(benchmark_review_path)
-        review, review_errors = validate_benchmark_review_file(
-            review_path,
-            require_full_linkage=False,
-        )
-        review_raw = review_path.read_bytes()
-    except (ImportError, LifecycleContractError, OSError, ValueError) as exc:
-        return [f"cannot load Benchmark Authorization/Review evidence: {exc}"]
-
-    content_sha = sha256_bytes(content_raw)
-    provenance = content.get("authoring_provenance")
-    final_content_sha = provenance.get("final_content_sha256") if isinstance(provenance, Mapping) else None
-    errors.extend(benchmark_authorization_module.validate_authorization_payload(
-        benchmark_authorization,
-        source_lesson_content_sha256=content_sha,
-        source_final_content_sha256=final_content_sha if isinstance(final_content_sha, str) else None,
-    ))
-    errors.extend(benchmark_authorization_module.publication_eligibility_errors(benchmark_authorization))
-    errors.extend(f"Benchmark Review: {item}" for item in review_errors)
-
-    authorization_sha = sha256_bytes(authorization_raw)
-    review_sha = sha256_bytes(review_raw)
-    if str(benchmark.get("authorization_sha256", "")).casefold() != authorization_sha:
-        errors.append("lifecycle benchmark.authorization_sha256 does not match Benchmark Authorization bytes")
-    if str(benchmark.get("review_sha256", "")).casefold() != review_sha:
-        errors.append("lifecycle benchmark.review_sha256 does not match Benchmark Review bytes")
-    if str(benchmark_authorization.get("benchmark_review_sha256", "")).casefold() != review_sha:
-        errors.append("Benchmark Authorization benchmark_review_sha256 does not match Benchmark Review bytes")
-    if benchmark_authorization.get("content_contract_version") != content.get("content_contract_version"):
-        errors.append("Benchmark Authorization content_contract_version does not match Lesson Content")
-    if str(review.get("source_lesson_content_sha256", "")).casefold() != content_sha:
-        errors.append("Benchmark Review source_lesson_content_sha256 does not match Lesson Content bytes")
-
-    summary = review.get("course_summary", {})
-    isolation = review.get("isolation", {})
-    if benchmark_authorization.get("benchmark_run_id") != review.get("benchmark_run_id"):
-        errors.append("Benchmark Authorization and Review benchmark_run_id do not match")
-    if benchmark_authorization.get("review_round") != review.get("review_round"):
-        errors.append("Benchmark Authorization and Review review_round do not match")
-    if benchmark_authorization.get("context_mode") != isolation.get("context_mode"):
-        errors.append("Benchmark Authorization context_mode does not match Benchmark Review isolation")
-    if benchmark_authorization.get("context_mode") != summary.get("context_mode"):
-        errors.append("Benchmark Authorization context_mode does not match Benchmark Review course summary")
-    if benchmark_authorization.get("benchmark_status") != review.get("status"):
-        errors.append("Benchmark Authorization benchmark_status does not match Benchmark Review status")
-    if benchmark_authorization.get("benchmark_status") != summary.get("status"):
-        errors.append("Benchmark Authorization benchmark_status does not match Benchmark Review course summary")
-    if benchmark_authorization.get("benchmark_decision") != summary.get("decision"):
-        errors.append("Benchmark Authorization benchmark_decision does not match Benchmark Review course summary")
-    return errors
 
 
 def _main(argv: list[str] | None = None) -> int:
