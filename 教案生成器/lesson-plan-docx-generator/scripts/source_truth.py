@@ -41,6 +41,17 @@ def source_truth_fingerprint(payload: Mapping[str, Any]) -> str:
     )
 
 
+def source_truth_content_verified(payload: Mapping[str, Any], *, verify_source_bytes: bool) -> bool:
+    """True only when every source can be byte-checked by this offline validator."""
+
+    return verify_source_bytes and all(
+        isinstance(source, Mapping)
+        and isinstance(source.get("locator"), str)
+        and "://" not in source["locator"]
+        for source in payload.get("sources", [])
+    )
+
+
 def _canonical_https_locator(value: str) -> str:
     if value != value.strip() or any(character.isspace() for character in value):
         raise LifecycleContractError("source URL locators must not contain whitespace")
@@ -235,7 +246,7 @@ def _main(argv: list[str] | None = None) -> int:
         for error in errors:
             print(f"ERROR: {error}")
         return 1
-    if args.skip_source_bytes:
+    if not source_truth_content_verified(payload, verify_source_bytes=not args.skip_source_bytes):
         print(f"STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED source_truth_manifest_sha256={sha256_bytes(raw)}")
     else:
         print(f"VALID source_truth_manifest_sha256={sha256_bytes(raw)}")

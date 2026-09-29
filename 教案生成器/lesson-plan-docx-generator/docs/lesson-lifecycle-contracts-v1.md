@@ -169,7 +169,9 @@ both pass, `STALE` when the sidecar is internally valid but its upstream byte
 bindings no longer match, and `INVALID` when its own schema, semantic payload,
 or fingerprint fails. The shared `validation_status()` helper applies this
 precedence. A Source Truth check that deliberately skips local source bytes
-reports `STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED`, never `VALID`.
+reports `STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED`, never `VALID`. The same
+label applies when any HTTPS source is present: this offline validator checks
+its locator and declared digest format but cannot verify its remote bytes.
 
 This preserves explicit byte links even when a downstream file happens not to
 change: a Source Truth byte change still invalidates review and authorization,

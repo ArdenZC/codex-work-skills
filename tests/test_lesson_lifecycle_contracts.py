@@ -45,7 +45,11 @@ from production_authorization import (  # noqa: E402
     validate_production_authorization_files,
     validate_production_authorization_payload,
 )
-from source_truth import source_truth_fingerprint, validate_source_truth_payload  # noqa: E402
+from source_truth import (  # noqa: E402
+    source_truth_content_verified,
+    source_truth_fingerprint,
+    validate_source_truth_payload,
+)
 from teacher_review import (  # noqa: E402
     teacher_review_fingerprint,
     validate_teacher_review_files,
@@ -255,6 +259,13 @@ class SourceTruthContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             payload, manifest_path = _source_truth(Path(temp))
             self.assertEqual(validate_source_truth_payload(payload, manifest_path=manifest_path), [])
+            self.assertTrue(source_truth_content_verified(payload, verify_source_bytes=True))
+            self.assertFalse(source_truth_content_verified(payload, verify_source_bytes=False))
+            remote = copy.deepcopy(payload)
+            remote["sources"][0]["locator"] = "https://example.org/profile.json"
+            remote["manifest_fingerprint"] = source_truth_fingerprint(remote)
+            self.assertEqual(validate_source_truth_payload(remote, manifest_path=manifest_path), [])
+            self.assertFalse(source_truth_content_verified(remote, verify_source_bytes=True))
             reordered = copy.deepcopy(payload)
             reordered["sources"].reverse()
             self.assertEqual(source_truth_fingerprint(reordered), payload["manifest_fingerprint"])
