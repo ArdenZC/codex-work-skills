@@ -93,11 +93,22 @@ bytes. It supports Content 2.2 and 2.3, Lesson Skill 2.3.1, and canonical
 `lesson-plan` Template 1.1.2.
 
 Validation rechecks the actual Source Truth source files, Teacher Review
-links, installed Skill tree fingerprint, current repository commit when the
-Skill is tracked at its canonical repository path, runtime versions when requested, and template
-manifest/binary identity through the existing `package_common` helpers. An
-installed copy outside the tracked canonical tree records a null repository
-commit and still must carry its installed tree fingerprint. A changed Source Truth, Content, review,
+links, installed Skill tree fingerprint, repository commit provenance, runtime
+versions when requested, and template manifest/binary identity through the
+existing `package_common` helpers. Lesson Content 2.2/2.3 is revalidated with
+the production `package_common.validate_content_v2_input()` gate, with its
+test-fixture bypass disabled. A completed Benchmark disposition also requires
+the official Benchmark Authorization and Review validators, publication
+eligibility, and exact cross-links to the current Content and each other.
+
+When the Skill is at its canonical path in a Git checkout with a determinable
+HEAD, `source_repo_commit` is required and must equal that HEAD. An installed
+copy without Git metadata still requires its installed tree fingerprint;
+`source_repo_commit` may be null or a valid historical 40-hex commit recorded
+by the installer. That historical value is provenance, not a locally verified
+HEAD. Production Authorization requires offline byte verification of every
+Source Truth source; an HTTPS source can be recorded structurally but cannot authorize production.
+A changed Source Truth, Content, review,
 Skill tree, template manifest, or template binary invalidates the matching
 authorization evidence. `REVISION_REQUIRED` cannot authorize production;
 `APPROVED_WITH_NOTES` can authorize while its notes remain advisory.
@@ -130,9 +141,14 @@ error. A state record must replay from `INTAKE_CONFIRMED`, end at its declared
 `current_state`, and carry the required artifact hashes for that point.
 
 Validation has three explicit layers: JSON Schema validation, semantic replay
-and transition validation, and optional artifact-byte verification against
-supplied paths. Authority checks bind the Source Truth and Content hashes,
-require a byte-valid `APPROVED` Teacher Review for
+and transition validation, and file authority validation. The payload-only
+validator checks state structure/history and may accept SHA values. The file
+validator and `validate` CLI require an actual file for every artifact claimed
+by the current state or any recorded transition, then recalculate its SHA.
+Direct options cover Source Truth, Content, Teacher Review, and Production
+Authorization; `--artifact FIELD=PATH` supplies other evidence, including
+historical optional Benchmark stages. Authority checks bind the Source Truth
+and Content hashes, require a byte-valid `APPROVED` Teacher Review for
 `TEACHER_REVIEW_APPROVED`, and require a valid Production Authorization for
 `PRODUCTION_AUTHORIZED`. A state fingerprint detects accidental edits; it is
 not a signature and Pipeline state alone never grants authority.
@@ -153,10 +169,13 @@ The direct dependency graph is:
 Source Truth → Content, Benchmark preparation, Teacher Review, Production Authorization
 Content → Benchmark Review, Teacher Review, Production Authorization
 Benchmark preparation → Benchmark Review
-Benchmark Review → Teacher Review, Production Authorization
+Benchmark Review → Benchmark Authorization
+Benchmark Authorization → Benchmark disposition
+Benchmark disposition → Teacher Review, Production Authorization, final artifacts, Artifact QA, Visual Review, Acceptance
 Teacher Review → Production Authorization
 Production Authorization → final artifacts
-final artifacts → Visual Review
+final artifacts → Artifact QA
+Artifact QA → Visual Review, Acceptance
 Visual Review → Acceptance
 ```
 
@@ -172,6 +191,11 @@ precedence. A Source Truth check that deliberately skips local source bytes
 reports `STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED`, never `VALID`. The same
 label applies when any HTTPS source is present: this offline validator checks
 its locator and declared digest format but cannot verify its remote bytes.
+Foundation/Preview Pipeline validation may retain that structural state;
+Production Authorization and Production-Authorized-or-later Pipeline states
+remain `STALE` while any Source Truth source bytes are unverified. Materializing
+the source as a local file with matching bytes and refreshing downstream
+bindings restores the normal validation path without a network request.
 
 This preserves explicit byte links even when a downstream file happens not to
 change: a Source Truth byte change still invalidates review and authorization,

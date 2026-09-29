@@ -89,13 +89,20 @@ DEPENDENCIES = {
     "source_truth": {"content", "benchmark_preparation", "teacher_review", "production_authorization"},
     "content": {"benchmark_review", "teacher_review", "production_authorization"},
     "benchmark_preparation": {"benchmark_review"},
-    "benchmark_review": {"teacher_review", "production_authorization"},
+    "benchmark_review": {"benchmark_authorization"},
+    "benchmark_authorization": {"benchmark_disposition"},
+    "benchmark_disposition": {
+        "teacher_review", "production_authorization", "final_artifacts",
+        "artifact_qa", "visual_review", "acceptance",
+    },
     "teacher_review": {"production_authorization"},
     "production_authorization": {"final_artifacts"},
-    "final_artifacts": {"visual_review"},
+    "final_artifacts": {"artifact_qa"},
+    "artifact_qa": {"visual_review", "acceptance"},
     "visual_review": {"acceptance"},
     "acceptance": set(),
 }
+SUPPORTED_DEPENDENCY_NODES = frozenset(DEPENDENCIES)
 TRANSITION_EVIDENCE_FIELDS = {
     "SOURCE_TRUTH_FROZEN": "source_truth_manifest_sha256",
     "BENCHMARK_PREPARED": "benchmark_preparation_sha256",
@@ -222,11 +229,25 @@ def stale_downstream(changed_nodes: str | set[str] | tuple[str, ...] | list[str]
     stale: set[str] = set()
     while pending:
         node = pending.pop()
-        for downstream in DEPENDENCIES.get(node, set()):
+        if node not in SUPPORTED_DEPENDENCY_NODES:
+            raise LifecycleContractError(f"unknown lifecycle dependency node: {node}")
+        for downstream in DEPENDENCIES[node]:
             if downstream not in stale:
                 stale.add(downstream)
                 pending.append(downstream)
     return stale
+
+
+def _required_evidence_fields(state: Mapping[str, Any]) -> set[str]:
+    """Return every artifact claimed by the current state or its recorded history."""
+    artifacts = state.get("artifacts", {})
+    required = set(REQUIRED_ARTIFACTS.get(state.get("current_state"), ()))
+    required.update(field for field, digest in artifacts.items() if digest is not None)
+    for transition in state.get("transitions", []):
+        field = TRANSITION_EVIDENCE_FIELDS.get(transition.get("to_state"))
+        if field is not None:
+            required.add(field)
+    return required
 
 
 def validate_pipeline_artifact_bytes(
@@ -267,12 +288,17 @@ def validate_pipeline_state_files(
     template_path: str | Path | None = None,
 ) -> tuple[dict[str, Any], bytes, list[str]]:
     path_set: dict[str, str | Path] = {"pipeline_state": state_path}
+    errors: list[str] = []
     direct_fields = {
         "source_truth_manifest_sha256": source_truth_path,
         "content_sha256": content_path,
         "teacher_review_sha256": teacher_review_path,
         "production_authorization_sha256": production_authorization_path,
     }
+    supplied_artifacts = dict(artifact_paths or {})
+    for key in supplied_artifacts:
+        if key in direct_fields and direct_fields[key] is not None:
+            errors.append(f"Pipeline artifact {key} was supplied both directly and through artifact_paths")
     for key, value in (artifact_paths or {}).items():
         if key not in direct_fields or direct_fields[key] is None:
             path_set[f"artifact_{key}"] = value
@@ -292,15 +318,20 @@ def validate_pipeline_state_files(
     structural_errors = schema_errors(state, "pipeline-state.schema.json")
     if structural_errors:
         return state, raw, structural_errors
-    errors = validate_pipeline_state_payload(state)
-    supplied_artifacts = dict(artifact_paths or {})
+    errors.extend(validate_pipeline_state_payload(state))
     direct_paths = {
         "source_truth_manifest_sha256": source_truth_path,
         "content_sha256": content_path,
         "teacher_review_sha256": teacher_review_path,
         "production_authorization_sha256": production_authorization_path,
     }
-    supplied_artifacts.update({key: value for key, value in direct_paths.items() if value is not None})
+    supplied_artifacts.update({
+        key: value for key, value in direct_paths.items()
+        if value is not None and key not in supplied_artifacts
+    })
+    for field in sorted(_required_evidence_fields(state)):
+        if field not in supplied_artifacts:
+            errors.append(f"state evidence requires an artifact file for artifacts.{field}")
     errors.extend(validate_pipeline_artifact_bytes(state, supplied_artifacts))
 
     state_rank = STATES.index(state.get("current_state")) if state.get("current_state") in STATES else -1
@@ -310,10 +341,16 @@ def validate_pipeline_state_files(
         errors.append("state requires --content for authority linkage")
     if source_truth_path is not None and state_rank >= STATES.index("SOURCE_TRUTH_FROZEN"):
         try:
-            from source_truth import validate_source_truth_file
+            from source_truth import source_truth_content_verified, validate_source_truth_file
 
-            _manifest, _manifest_raw, source_errors = validate_source_truth_file(source_truth_path, verify_source_bytes=True)
+            manifest, _manifest_raw, source_errors = validate_source_truth_file(source_truth_path, verify_source_bytes=True)
             errors.extend(source_errors)
+            if (
+                state_rank >= STATES.index("PRODUCTION_AUTHORIZED")
+                and not source_errors
+                and not source_truth_content_verified(manifest, verify_source_bytes=True)
+            ):
+                errors.append("Source Truth source bytes are unverified; Pipeline authority requires offline byte verification")
         except LifecycleContractError as exc:
             errors.append(f"cannot validate Source Truth authority: {exc}")
     if state_rank >= STATES.index("TEACHER_REVIEW_APPROVED"):
