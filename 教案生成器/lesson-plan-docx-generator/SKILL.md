@@ -7,6 +7,8 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 本文件是 Lesson 的唯一人类行为合同。当前版本为 Lesson Skill 2.3.1、默认 Lesson Content Contract 2.3、兼容 Content Contract 2.2、Lesson Template 1.1.2、Acceptance Schema 2.0、Exemplar Contract 1.0、Benchmark Review 1.0 和 Authorization 1.0。默认 Word 模板 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
 
+Lifecycle 1.0 foundation exists but is not yet the default production orchestrator.
+
 ## 任务入口与一次性确认
 
 任务开始先读取当前会话、用户附件、能力图谱、章节任务拆解、课程标准、教材目录和指定模板。正式规划前进入 `INTAKE_PENDING`，用中文集中确认一次：课程名称、专业、授课对象、总课时、理论课时、实践课时、理论与实践组织方式、单课课时默认 2 学时、使用教材、辅助参考资料、是否同时生成实践任务工单。核心字段未给出显示“待补充”；理论/实践拆分、组织方式和工单偏好未给出显示“待确认”；推断的专业或对象标记“当前理解 / 如不准确请修改”。不得默认 50/50、综合式或“不需要”。

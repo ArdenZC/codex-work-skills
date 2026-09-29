@@ -3772,6 +3772,7 @@ esac
         lesson_job = workflow_data["jobs"]["template-lesson"]
         lesson_steps = "\n".join(str(step.get("run", "")) for step in lesson_job["steps"])
         self.assertIn("--suite lesson-content", lesson_steps)
+        self.assertIn("--suite lesson-lifecycle", lesson_steps)
         self.assertIn("--suite lesson-package", lesson_steps)
         self.assertIn("--suite hardening", lesson_steps)
 

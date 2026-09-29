@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/production-authorization.schema.json",
+  "title": "Lesson Production Authorization Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "authorization_id", "pipeline_run_id",
+    "source_truth_manifest_sha256", "content_sha256", "teacher_review_sha256",
+    "benchmark", "lesson_skill", "content_contract_version", "template",
+    "runtime", "created_at", "authorization_fingerprint"
+  ],
+  "properties": {
+    "contract_version": { "const": "1.0" },
+    "authorization_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "pipeline_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "source_truth_manifest_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "teacher_review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "authorization_sha256", "review_sha256", "evidence_sha256", "waiver_reference"],
+      "properties": {
+        "disposition": {
+          "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "BENCHMARK_WAIVED_BY_USER"]
+        },
+        "authorization_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }] },
+        "review_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }] },
+        "evidence_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }] },
+        "waiver_reference": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 2048 }] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "disposition": { "const": "BENCHMARK_REVIEW_COMPLETE" } }, "required": ["disposition"] },
+          "then": {
+            "properties": {
+              "authorization_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+              "review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "disposition": { "enum": ["BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] } }, "required": ["disposition"] },
+          "then": { "properties": { "evidence_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" } } }
+        },
+        {
+          "if": { "properties": { "disposition": { "const": "BENCHMARK_WAIVED_BY_USER" } }, "required": ["disposition"] },
+          "then": {
+            "properties": {
+              "evidence_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+              "waiver_reference": { "type": "string", "minLength": 1, "maxLength": 2048 }
+            }
+          }
+        }
+      ]
+    },
+    "lesson_skill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "installed_skill_fingerprint", "source_repo_commit"],
+      "properties": {
+        "version": { "const": "2.3.1" },
+        "installed_skill_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "source_repo_commit": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^[a-fA-F0-9]{40}$" }
+          ]
+        }
+      }
+    },
+    "content_contract_version": { "enum": ["2.2", "2.3"] },
+    "template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["template_id", "template_version", "template_sha256", "manifest_sha256"],
+      "properties": {
+        "template_id": { "const": "lesson-plan" },
+        "template_version": { "const": "1.1.2" },
+        "template_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+        "manifest_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["python_version", "python_docx_version", "jsonschema_version", "pyyaml_version", "libreoffice_version", "render_performed"],
+      "properties": {
+        "python_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "python_docx_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "jsonschema_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "pyyaml_version": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "libreoffice_version": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "string", "minLength": 1, "maxLength": 200 }
+          ]
+        },
+        "render_performed": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "render_performed": { "const": true } }, "required": ["render_performed"] },
+          "then": { "properties": { "libreoffice_version": { "type": "string", "minLength": 1 } } }
+        }
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "authorization_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  }
+}

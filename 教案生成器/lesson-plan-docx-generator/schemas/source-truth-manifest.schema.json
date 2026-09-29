@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/source-truth-manifest.schema.json",
+  "title": "Lesson Source Truth Manifest Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "source_truth_id", "course_identity", "sources", "created_at", "manifest_fingerprint"],
+  "properties": {
+    "contract_version": { "const": "1.0" },
+    "source_truth_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "course_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["course_name", "major", "audience"],
+      "properties": {
+        "course_name": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "major": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 300 }
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "source_type", "label", "locator", "sha256", "provenance"],
+        "properties": {
+          "source_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "source_type": {
+            "enum": [
+              "confirmed_course_profile",
+              "curriculum_standard",
+              "textbook",
+              "textbook_toc",
+              "whole_course_outline",
+              "capability_map",
+              "reference_pool",
+              "user_attachment",
+              "other_authoritative_source"
+            ]
+          },
+          "label": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "locator": { "type": "string", "minLength": 1, "maxLength": 2048 },
+          "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+          "provenance": { "type": "string", "minLength": 1, "maxLength": 2000 }
+        }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "manifest_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  }
+}
