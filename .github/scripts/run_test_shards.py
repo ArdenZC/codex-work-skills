@@ -143,6 +143,9 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     workflow = _workflow_ids()
     return {
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
+        "lesson-lifecycle": SuiteSpec(
+            "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
+        ),
         # This slice exercises Python/DOCX generation and package contracts;
         # LibreOffice/COM rendering is confined to the inherited content
         # regression and gradebook/release validators.  Keeping this shard
@@ -174,8 +177,8 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 
 ALIASES = {
-    "fast": ("lesson-content", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "fast": ("lesson-content", "lesson-lifecycle", "package-contracts", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -201,6 +204,8 @@ def _expand_suites(requested: Sequence[str], specs: dict[str, SuiteSpec]) -> tup
 def _suite_test_ids(name: str) -> tuple[str, ...]:
     if name == "lesson-content":
         return _lesson_content_ids()
+    if name == "lesson-lifecycle":
+        return ("tests.test_lesson_lifecycle_contracts",)
     if name == "lesson-package":
         return _lesson_package_ids()
     if name == "package-contracts":

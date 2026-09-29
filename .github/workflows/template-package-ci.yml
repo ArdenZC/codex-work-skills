@@ -455,6 +455,7 @@ jobs:
           --
           python .github/scripts/run_test_shards.py
           --suite lesson-content
+          --suite lesson-lifecycle
           --suite lesson-package
           --suite lesson-benchmark
           --suite hardening

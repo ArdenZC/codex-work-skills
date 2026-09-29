@@ -71,10 +71,20 @@ class TestShardManifest(unittest.TestCase):
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_exemplar_benchmark").countTestCases(),
         )
 
+    def test_lesson_lifecycle_suite_is_in_fast_and_full_manifests(self) -> None:
+        specs = run_test_shards._suite_specs()
+        self.assertIn("lesson-lifecycle", specs)
+        self.assertIn("lesson-lifecycle", run_test_shards._expand_suites(("fast",), specs))
+        self.assertIn("lesson-lifecycle", run_test_shards._expand_suites(("full",), specs))
+        self.assertEqual(
+            specs["lesson-lifecycle"].count,
+            unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_lifecycle_contracts").countTestCases(),
+        )
+
     def test_lesson_release_scale_suite_is_separate_and_serialized(self) -> None:
         specs = run_test_shards._suite_specs()
         full = run_test_shards._expand_suites(("full",), specs)
-        regular_lesson = ("lesson-content", "lesson-package", "lesson-benchmark", "hardening")
+        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-benchmark", "hardening")
         self.assertIn("lesson-release-scale", specs)
         self.assertNotIn("lesson-release-scale", full)
         self.assertTrue(

@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ArdenZC/codex-work-skills/blob/master/%E6%95%99%E6%A1%88%E7%94%9F%E6%88%90%E5%99%A8/lesson-plan-docx-generator/schemas/teacher-review.schema.json",
+  "title": "Lesson Teacher Review Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version", "teacher_review_id", "pipeline_run_id",
+    "source_truth_manifest_sha256", "content_sha256", "benchmark",
+    "selected_lessons", "whole_course_review", "decision", "decision_notes",
+    "reviewed_at", "review_fingerprint"
+  ],
+  "properties": {
+    "contract_version": { "const": "1.0" },
+    "teacher_review_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "pipeline_run_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "source_truth_manifest_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "content_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "benchmark": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["disposition", "authorization_sha256", "review_sha256", "evidence_sha256", "waiver_reference"],
+          "properties": {
+            "disposition": {
+              "enum": ["BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "BENCHMARK_WAIVED_BY_USER"]
+            },
+            "authorization_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }] },
+            "review_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }] },
+            "evidence_sha256": { "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }] },
+            "waiver_reference": { "oneOf": [{ "type": "null" }, { "type": "string", "minLength": 1, "maxLength": 2048 }] }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "disposition": { "const": "BENCHMARK_REVIEW_COMPLETE" } }, "required": ["disposition"] },
+              "then": {
+                "properties": {
+                  "authorization_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+                  "review_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+                }
+              }
+            },
+            {
+              "if": { "properties": { "disposition": { "enum": ["BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE"] } }, "required": ["disposition"] },
+              "then": { "properties": { "evidence_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" } } }
+            },
+            {
+              "if": { "properties": { "disposition": { "const": "BENCHMARK_WAIVED_BY_USER" } }, "required": ["disposition"] },
+              "then": {
+                "properties": {
+                  "evidence_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+                  "waiver_reference": { "type": "string", "minLength": 1, "maxLength": 2048 }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "selected_lessons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lesson_id", "selection_reasons", "directly_teachable", "task_executable",
+          "steps_operable", "evaluation_observable", "reflection_improvable", "notes"
+        ],
+        "properties": {
+          "lesson_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "selection_reasons": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "first_lesson", "last_lesson", "project_boundary_before", "project_boundary_after",
+                "highest_content_density", "highest_practice_complexity", "benchmark_gap",
+                "deterministic_supplemental"
+              ]
+            }
+          },
+          "directly_teachable": { "$ref": "#/$defs/lessonEvidence" },
+          "task_executable": { "$ref": "#/$defs/lessonEvidence" },
+          "steps_operable": { "$ref": "#/$defs/lessonEvidence" },
+          "evaluation_observable": { "$ref": "#/$defs/lessonEvidence" },
+          "reflection_improvable": { "$ref": "#/$defs/lessonEvidence" },
+          "notes": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        }
+      }
+    },
+    "whole_course_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["progression", "scope", "theory_practice_coherence", "repetition_template_risk", "difficulty_fit", "overall_notes"],
+      "properties": {
+        "progression": { "$ref": "#/$defs/courseEvidence" },
+        "scope": { "$ref": "#/$defs/courseEvidence" },
+        "theory_practice_coherence": { "$ref": "#/$defs/courseEvidence" },
+        "repetition_template_risk": { "$ref": "#/$defs/courseEvidence" },
+        "difficulty_fit": { "$ref": "#/$defs/courseEvidence" },
+        "overall_notes": { "type": "string", "minLength": 1, "maxLength": 8000 }
+      }
+    },
+    "decision": { "enum": ["APPROVED", "APPROVED_WITH_NOTES", "REVISION_REQUIRED"] },
+    "decision_notes": { "type": "string", "minLength": 1, "maxLength": 8000 },
+    "reviewed_at": { "type": "string", "format": "date-time" },
+    "review_fingerprint": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+  },
+  "$defs": {
+    "lessonEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rating", "notes"],
+      "properties": {
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 4000 }
+      }
+    },
+    "courseEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assessment", "notes"],
+      "properties": {
+        "assessment": { "enum": ["acceptable", "needs_attention", "not_applicable"] },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 4000 }
+      }
+    }
+  }
+}
