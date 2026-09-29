@@ -22,6 +22,7 @@ from lifecycle_digest import (
     sha256_file,
     skill_tree_fingerprint,
     timezone_aware_timestamp,
+    validation_status,
 )
 from source_truth import source_truth_local_file_paths, validate_source_truth_payload
 from teacher_review import validate_teacher_review_files
@@ -347,10 +348,14 @@ def _main(argv: list[str] | None = None) -> int:
             template_path=args.template,
             verify_runtime_environment=not args.skip_runtime_check,
         )
+        self_errors = validate_production_authorization_payload(authorization)
+        status = validation_status(self_errors, errors)
     except LifecycleContractError as exc:
         errors = [str(exc)]
         raw = b""
+        status = "INVALID"
     if errors:
+        print(status)
         for error in errors:
             print(f"ERROR: {error}")
         return 1

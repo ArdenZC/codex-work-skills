@@ -18,11 +18,11 @@ from lifecycle_digest import (
     assert_distinct_safe_paths,
     read_json_object,
     schema_errors,
-    schema_errors,
     semantic_fingerprint,
     sha256_bytes,
     sha256_file,
     timezone_aware_timestamp,
+    validation_status,
 )
 
 
@@ -95,6 +95,20 @@ DEPENDENCIES = {
     "visual_review": {"acceptance"},
     "acceptance": set(),
 }
+TRANSITION_EVIDENCE_FIELDS = {
+    "SOURCE_TRUTH_FROZEN": "source_truth_manifest_sha256",
+    "BENCHMARK_PREPARED": "benchmark_disposition_sha256",
+    "AUTHORING_COMPLETE": "content_sha256",
+    "PREPRODUCTION_QA_PASSED": "preproduction_qa_sha256",
+    "BENCHMARK_REVIEW_COMPLETE": "benchmark_disposition_sha256",
+    "READY_FOR_TEACHER_REVIEW": "preproduction_qa_sha256",
+    "TEACHER_REVIEW_APPROVED": "teacher_review_sha256",
+    "PRODUCTION_AUTHORIZED": "production_authorization_sha256",
+    "PRODUCTION_GENERATED": "artifact_manifest_sha256",
+    "ARTIFACT_QA_PASSED": "artifact_qa_sha256",
+    "VISUAL_REVIEW_APPROVED": "visual_review_sha256",
+    "ACCEPTED": "acceptance_sha256",
+}
 
 
 def pipeline_state_fingerprint(payload: Mapping[str, Any]) -> str:
@@ -133,6 +147,15 @@ def validate_pipeline_state_payload(payload: Mapping[str, Any]) -> list[str]:
             errors.append(f"transitions[{index}].from_state does not continue the recorded state history")
         if to_state not in TRANSITIONS.get(from_state, set()):
             errors.append(f"transitions[{index}] is not a legal forward transition: {from_state} -> {to_state}")
+        evidence_field = TRANSITION_EVIDENCE_FIELDS.get(to_state)
+        recorded_evidence = transition.get("evidence_sha256")
+        indexed_evidence = payload.get("artifacts", {}).get(evidence_field) if evidence_field else None
+        if (
+            isinstance(recorded_evidence, str)
+            and isinstance(indexed_evidence, str)
+            and recorded_evidence.casefold() != indexed_evidence.casefold()
+        ):
+            errors.append(f"transitions[{index}].evidence_sha256 does not match artifacts.{evidence_field}")
         current = to_state
         stamp = transition.get("recorded_at")
         if timezone_aware_timestamp(stamp):
@@ -165,7 +188,6 @@ def advance_pipeline_state(
     if not timezone_aware_timestamp(recorded_at):
         raise LifecycleContractError("recorded_at must include a timezone")
     result = copy.deepcopy(dict(payload))
-    result["transitions"].append({"from_state": current, "to_state": next_state, "recorded_at": recorded_at})
     result["current_state"] = next_state
     for field, digest in (artifact_sha256_updates or {}).items():
         if field not in ARTIFACT_FIELDS or not isinstance(digest, str) or len(digest) != 64:
@@ -175,6 +197,15 @@ def advance_pipeline_state(
         except ValueError as exc:
             raise LifecycleContractError(f"invalid SHA-256 digest for {field}") from exc
         result["artifacts"][field] = digest.lower()
+    evidence_field = TRANSITION_EVIDENCE_FIELDS[next_state]
+    evidence_sha256 = result["artifacts"].get(evidence_field)
+    if not isinstance(evidence_sha256, str):
+        raise LifecycleContractError(f"transition to {next_state} requires artifacts.{evidence_field}")
+    result["transitions"].append({
+        "from_state": current, "to_state": next_state,
+        "evidence_sha256": evidence_sha256,
+        "recorded_at": recorded_at,
+    })
     result["state_fingerprint"] = pipeline_state_fingerprint(result)
     errors = validate_pipeline_state_payload(result)
     if errors:
@@ -381,10 +412,14 @@ def _main(argv: list[str] | None = None) -> int:
             template_manifest_path=args.template_manifest,
             template_path=args.template,
         )
+        self_errors = validate_pipeline_state_payload(state)
+        status = validation_status(self_errors, errors)
     except LifecycleContractError as exc:
         errors = [str(exc)]
         raw = b""
+        status = "INVALID"
     if errors:
+        print(status)
         for error in errors:
             print(f"ERROR: {error}")
         return 1

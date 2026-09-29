@@ -129,6 +129,22 @@ def semantic_fingerprint(
     return hashlib.sha256(canonical_json_bytes(semantic, unordered_arrays=unordered_arrays)).hexdigest()
 
 
+def validation_status(self_errors: Iterable[str], dependency_errors: Iterable[str]) -> str:
+    """Classify a sidecar separately from its current upstream evidence.
+
+    A malformed schema, semantic payload, or own fingerprint is INVALID. A
+    well-formed sidecar bound to old or unavailable upstream bytes is STALE.
+    Only both checks passing is VALID. Callers must perform both checks; this
+    helper never treats a missing dependency check as proof of validity.
+    """
+
+    if any(self_errors):
+        return "INVALID"
+    if any(dependency_errors):
+        return "STALE"
+    return "VALID"
+
+
 def sha256_bytes(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 

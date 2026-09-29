@@ -36,7 +36,9 @@ hashes do not change.
 All contract timestamps must include a timezone. Source and artifact paths are
 ordinary files without symlinked path components. Local Source Truth locators
 are normalized relative POSIX paths under the manifest directory; absolute
-paths, parent traversal, backslashes, missing files, and aliases are rejected.
+paths, parent traversal, backslashes, and aliases are rejected. Full byte
+validation also rejects missing files; structural-only validation records
+that their content is unverified.
 URL locators must use HTTPS and may not contain credentials, fragments, or
 credential-like query parameters. URL sources are not fetched by validation;
 their declared SHA is provenance evidence supplied by the source curator.
@@ -94,7 +96,7 @@ Validation rechecks the actual Source Truth source files, Teacher Review
 links, installed Skill tree fingerprint, current repository commit when the
 Skill is tracked at its canonical repository path, runtime versions when requested, and template
 manifest/binary identity through the existing `package_common` helpers. An
-an installed copy outside the tracked canonical tree records a null repository
+installed copy outside the tracked canonical tree records a null repository
 commit and still must carry its installed tree fingerprint. A changed Source Truth, Content, review,
 Skill tree, template manifest, or template binary invalidates the matching
 authorization evidence. `REVISION_REQUIRED` cannot authorize production;
@@ -134,6 +136,11 @@ require a byte-valid `APPROVED` Teacher Review for
 `TEACHER_REVIEW_APPROVED`, and require a valid Production Authorization for
 `PRODUCTION_AUTHORIZED`. A state fingerprint detects accidental edits; it is
 not a signature and Pipeline state alone never grants authority.
+Each transition stores the SHA-256 of its stage evidence alongside its source,
+destination, and timezone-aware recording time. The helper derives this value
+from the relevant artifact index entry and rejects a transition with no stage
+evidence. Transition recording time remains part of the Pipeline semantic
+fingerprint.
 
 ## Invalidation dependencies
 
@@ -154,6 +161,13 @@ Visual Review → Acceptance
 Preview and Production entry points remain unchanged. LIF-02/03 can add the
 next lifecycle evidence and connect a later orchestrator or production gate
 after their own qualification.
+
+Validator outcomes use `VALID` when the sidecar and current dependency bytes
+both pass, `STALE` when the sidecar is internally valid but its upstream byte
+bindings no longer match, and `INVALID` when its own schema, semantic payload,
+or fingerprint fails. The shared `validation_status()` helper applies this
+precedence. A Source Truth check that deliberately skips local source bytes
+reports `STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED`, never `VALID`.
 
 This preserves explicit byte links even when a downstream file happens not to
 change: a Source Truth byte change still invalidates review and authorization,

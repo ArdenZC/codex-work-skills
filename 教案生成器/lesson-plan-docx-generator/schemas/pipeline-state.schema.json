@@ -35,10 +35,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["from_state", "to_state", "recorded_at"],
+        "required": ["from_state", "to_state", "evidence_sha256", "recorded_at"],
         "properties": {
           "from_state": { "$ref": "#/$defs/state" },
           "to_state": { "$ref": "#/$defs/state" },
+          "evidence_sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
           "recorded_at": { "type": "string", "format": "date-time" }
         }
       }

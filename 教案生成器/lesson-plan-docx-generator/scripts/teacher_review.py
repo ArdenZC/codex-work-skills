@@ -18,6 +18,7 @@ from lifecycle_digest import (
     sha256_bytes,
     sha256_file,
     timezone_aware_timestamp,
+    validation_status,
 )
 
 
@@ -111,19 +112,19 @@ def validate_teacher_review_payload(
     ]
     if len(selected_ids) != len(set(selected_ids)):
         errors.append("selected_lessons contains duplicate lesson_id values")
+    for index, row in enumerate(payload.get("selected_lessons", [])):
+        for field in ("lesson_id", "notes"):
+            if not str(row.get(field, "")).strip():
+                errors.append(f"selected_lessons[{index}].{field} must contain non-whitespace text")
+        for dimension in (
+            "directly_teachable", "task_executable", "steps_operable",
+            "evaluation_observable", "reflection_improvable",
+        ):
+            if not str(row.get(dimension, {}).get("notes", "")).strip():
+                errors.append(f"selected_lessons[{index}].{dimension}.notes must contain evidence text")
     if content is not None:
         known_ids, content_errors = _content_lesson_ids(content)
         errors.extend(content_errors)
-        for index, row in enumerate(payload.get("selected_lessons", [])):
-            for field in ("lesson_id", "notes"):
-                if not str(row.get(field, "")).strip():
-                    errors.append(f"selected_lessons[{index}].{field} must contain non-whitespace text")
-            for dimension in (
-                "directly_teachable", "task_executable", "steps_operable",
-                "evaluation_observable", "reflection_improvable",
-            ):
-                if not str(row.get(dimension, {}).get("notes", "")).strip():
-                    errors.append(f"selected_lessons[{index}].{dimension}.notes must contain evidence text")
         unknown = sorted(set(selected_ids) - known_ids)
         if unknown:
             errors.append("selected_lessons references unknown Content lesson_id values: " + ", ".join(unknown))
@@ -220,10 +221,14 @@ def _main(argv: list[str] | None = None) -> int:
             benchmark_evidence_path=args.benchmark_evidence,
             require_approved=args.require_approved,
         )
+        self_errors = validate_teacher_review_payload(review, require_benchmark_bytes=False)
+        status = validation_status(self_errors, errors)
     except LifecycleContractError as exc:
         errors = [str(exc)]
         raw = b""
+        status = "INVALID"
     if errors:
+        print(status)
         for error in errors:
             print(f"ERROR: {error}")
         return 1

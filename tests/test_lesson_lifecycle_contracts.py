@@ -27,6 +27,7 @@ from lifecycle_digest import (  # noqa: E402
     sha256_bytes,
     sha256_file,
     skill_tree_fingerprint,
+    validation_status,
 )
 from pipeline_state import (  # noqa: E402
     advance_pipeline_state,
@@ -309,6 +310,14 @@ class SourceTruthContractTests(unittest.TestCase):
             (Path(temp) / "evidence" / "profile.json").write_text("changed", encoding="utf-8")
             errors = validate_source_truth_payload(payload, manifest_path=manifest_path)
             self.assertTrue(any("does not match local source bytes" in item for item in errors))
+            (Path(temp) / "evidence" / "profile.json").unlink()
+            self.assertEqual(
+                validate_source_truth_payload(payload, manifest_path=manifest_path, verify_source_bytes=False),
+                [],
+            )
+            byte_errors = validate_source_truth_payload(payload, manifest_path=manifest_path, verify_source_bytes=True)
+            self.assertTrue(byte_errors)
+            self.assertEqual(validation_status([], byte_errors), "STALE")
 
     def test_unsafe_locator_and_symlink_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -369,6 +378,10 @@ class TeacherReviewContractTests(unittest.TestCase):
                 review_path, source_truth_path=source_path, content_path=content_path
             )
             self.assertTrue(any("content_sha256 is stale" in item for item in errors))
+            self.assertEqual(
+                validation_status(validate_teacher_review_payload(review, require_benchmark_bytes=False), errors),
+                "STALE",
+            )
 
             content_path.write_bytes(content_raw)
             source_path.write_bytes(source_raw + b" ")
@@ -699,7 +712,31 @@ class PipelineStateTests(unittest.TestCase):
         state = advance_pipeline_state(state, "VISUAL_REVIEW_APPROVED", recorded_at="2026-09-29T10:08:00Z", artifact_sha256_updates={"visual_review_sha256": "2" * 64})
         state = advance_pipeline_state(state, "ACCEPTED", recorded_at="2026-09-29T10:09:00Z", artifact_sha256_updates={"acceptance_sha256": "3" * 64})
         self.assertEqual(state["current_state"], "ACCEPTED")
+        self.assertEqual(len(state["transitions"]), 10)
+        self.assertEqual(state["transitions"][0]["evidence_sha256"], "a" * 64)
+        self.assertEqual(state["transitions"][-1]["evidence_sha256"], "3" * 64)
         self.assertEqual(validate_pipeline_state_payload(state), [])
+
+    def test_transition_requires_evidence_hash_and_statuses_distinguish_stale(self) -> None:
+        state = initial_pipeline_state("RUN-PIPE")
+        with self.assertRaisesRegex(LifecycleContractError, "requires artifacts.source_truth_manifest_sha256"):
+            advance_pipeline_state(state, "SOURCE_TRUTH_FROZEN", recorded_at="2026-09-29T10:00:00Z")
+        progressed = advance_pipeline_state(
+            state, "SOURCE_TRUTH_FROZEN", recorded_at="2026-09-29T10:00:00Z",
+            artifact_sha256_updates={"source_truth_manifest_sha256": "a" * 64},
+        )
+        missing_proof = copy.deepcopy(progressed)
+        del missing_proof["transitions"][0]["evidence_sha256"]
+        missing_proof["state_fingerprint"] = pipeline_state_fingerprint(missing_proof)
+        self.assertTrue(validate_pipeline_state_payload(missing_proof))
+        changed_proof = copy.deepcopy(progressed)
+        changed_proof["transitions"][0]["evidence_sha256"] = "b" * 64
+        changed_proof["state_fingerprint"] = pipeline_state_fingerprint(changed_proof)
+        self.assertTrue(any("does not match artifacts" in error for error in validate_pipeline_state_payload(changed_proof)))
+        self.assertEqual(validation_status([], []), "VALID")
+        self.assertEqual(validation_status([], ["old Content SHA"]), "STALE")
+        self.assertEqual(validation_status(["bad fingerprint"], []), "INVALID")
+        self.assertEqual(validation_status(["bad fingerprint"], ["old Content SHA"]), "INVALID")
 
     def test_skip_core_backwards_same_unknown_and_state_tamper_fail(self) -> None:
         state = initial_pipeline_state("RUN-PIPE")
@@ -711,7 +748,7 @@ class PipelineStateTests(unittest.TestCase):
             advance_pipeline_state(state, "NOT_A_STATE", recorded_at="2026-09-29T10:00:00Z")
         same_state = copy.deepcopy(state)
         same_state["transitions"] = [
-            {"from_state": "INTAKE_CONFIRMED", "to_state": "INTAKE_CONFIRMED", "recorded_at": "2026-09-29T10:00:00Z"}
+            {"from_state": "INTAKE_CONFIRMED", "to_state": "INTAKE_CONFIRMED", "evidence_sha256": "a" * 64, "recorded_at": "2026-09-29T10:00:00Z"}
         ]
         same_state["state_fingerprint"] = pipeline_state_fingerprint(same_state)
         errors = validate_pipeline_state_payload(same_state)

@@ -20,6 +20,7 @@ from lifecycle_digest import (
     sha256_bytes,
     sha256_file,
     timezone_aware_timestamp,
+    validation_status,
 )
 
 
@@ -67,7 +68,7 @@ def _canonical_https_locator(value: str) -> str:
     return normalize_canonical_url(normalized)
 
 
-def _local_source_path(locator: str, manifest_path: Path) -> Path:
+def _local_source_path(locator: str, manifest_path: Path, *, require_exists: bool = True) -> Path:
     if "\\" in locator or locator.startswith(("/", "~")) or re.match(r"^[A-Za-z]:", locator):
         raise LifecycleContractError("local source locator must be a relative POSIX path")
     components = locator.split("/")
@@ -89,7 +90,7 @@ def _local_source_path(locator: str, manifest_path: Path) -> Path:
     candidate = base.joinpath(*components)
     try:
         resolved_base = base.resolve(strict=True)
-        resolved_candidate = candidate.resolve(strict=True)
+        resolved_candidate = candidate.resolve(strict=require_exists)
         resolved_candidate.relative_to(resolved_base)
     except (OSError, RuntimeError, ValueError) as exc:
         raise LifecycleContractError(f"local source path escapes the manifest directory or is missing: {locator}") from exc
@@ -169,7 +170,7 @@ def validate_source_truth_payload(
                         errors.append(f"sources[{index}] local locator cannot be checked without manifest_path")
                     identity_locator = PurePosixPath(locator).as_posix()
                 else:
-                    source_path = _local_source_path(locator, base)
+                    source_path = _local_source_path(locator, base, require_exists=verify_source_bytes)
                     identity_locator = source_path.as_posix().casefold()
                     local_paths[f"source_{index}"] = source_path
                     if verify_source_bytes:
@@ -215,18 +216,29 @@ def _main(argv: list[str] | None = None) -> int:
         if args.command == "fingerprint":
             print(source_truth_fingerprint(payload))
             return 0
+        self_errors = validate_source_truth_payload(
+            payload,
+            manifest_path=args.manifest,
+            verify_source_bytes=False,
+        )
         errors = validate_source_truth_payload(
             payload,
             manifest_path=args.manifest,
             verify_source_bytes=not args.skip_source_bytes,
         )
+        status = validation_status(self_errors, errors)
     except LifecycleContractError as exc:
         errors = [str(exc)]
+        status = "INVALID"
     if errors:
+        print(status)
         for error in errors:
             print(f"ERROR: {error}")
         return 1
-    print(f"VALID source_truth_manifest_sha256={sha256_bytes(raw)}")
+    if args.skip_source_bytes:
+        print(f"STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED source_truth_manifest_sha256={sha256_bytes(raw)}")
+    else:
+        print(f"VALID source_truth_manifest_sha256={sha256_bytes(raw)}")
     return 0
 
 
