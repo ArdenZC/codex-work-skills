@@ -13,13 +13,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "source_truth_manifest_sha256", "content_sha256", "benchmark_disposition_sha256",
+        "source_truth_manifest_sha256", "content_sha256", "benchmark_preparation_sha256", "benchmark_disposition_sha256",
         "preproduction_qa_sha256", "teacher_review_sha256", "production_authorization_sha256",
         "artifact_manifest_sha256", "artifact_qa_sha256", "visual_review_sha256", "acceptance_sha256"
       ],
       "properties": {
         "source_truth_manifest_sha256": { "$ref": "#/$defs/optionalSha256" },
         "content_sha256": { "$ref": "#/$defs/optionalSha256" },
+        "benchmark_preparation_sha256": { "$ref": "#/$defs/optionalSha256" },
         "benchmark_disposition_sha256": { "$ref": "#/$defs/optionalSha256" },
         "preproduction_qa_sha256": { "$ref": "#/$defs/optionalSha256" },
         "teacher_review_sha256": { "$ref": "#/$defs/optionalSha256" },

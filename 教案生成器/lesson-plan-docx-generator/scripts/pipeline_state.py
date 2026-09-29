@@ -60,6 +60,7 @@ FINGERPRINT_EXCLUDED_FIELDS = {"state_fingerprint"}
 ARTIFACT_FIELDS = {
     "source_truth_manifest_sha256": "source_truth",
     "content_sha256": "content",
+    "benchmark_preparation_sha256": "benchmark_preparation",
     "benchmark_disposition_sha256": "benchmark_disposition",
     "preproduction_qa_sha256": "preproduction_qa",
     "teacher_review_sha256": "teacher_review",
@@ -72,7 +73,7 @@ ARTIFACT_FIELDS = {
 REQUIRED_ARTIFACTS = {
     "INTAKE_CONFIRMED": (),
     "SOURCE_TRUTH_FROZEN": ("source_truth_manifest_sha256",),
-    "BENCHMARK_PREPARED": ("source_truth_manifest_sha256",),
+    "BENCHMARK_PREPARED": ("source_truth_manifest_sha256", "benchmark_preparation_sha256"),
     "AUTHORING_COMPLETE": ("source_truth_manifest_sha256", "content_sha256"),
     "PREPRODUCTION_QA_PASSED": ("source_truth_manifest_sha256", "content_sha256", "preproduction_qa_sha256"),
     "BENCHMARK_REVIEW_COMPLETE": ("source_truth_manifest_sha256", "content_sha256", "preproduction_qa_sha256", "benchmark_disposition_sha256"),
@@ -97,7 +98,7 @@ DEPENDENCIES = {
 }
 TRANSITION_EVIDENCE_FIELDS = {
     "SOURCE_TRUTH_FROZEN": "source_truth_manifest_sha256",
-    "BENCHMARK_PREPARED": "benchmark_disposition_sha256",
+    "BENCHMARK_PREPARED": "benchmark_preparation_sha256",
     "AUTHORING_COMPLETE": "content_sha256",
     "PREPRODUCTION_QA_PASSED": "preproduction_qa_sha256",
     "BENCHMARK_REVIEW_COMPLETE": "benchmark_disposition_sha256",
@@ -150,7 +151,9 @@ def validate_pipeline_state_payload(payload: Mapping[str, Any]) -> list[str]:
         evidence_field = TRANSITION_EVIDENCE_FIELDS.get(to_state)
         recorded_evidence = transition.get("evidence_sha256")
         indexed_evidence = payload.get("artifacts", {}).get(evidence_field) if evidence_field else None
-        if (
+        if evidence_field and not isinstance(indexed_evidence, str):
+            errors.append(f"transitions[{index}] requires indexed artifacts.{evidence_field}")
+        elif (
             isinstance(recorded_evidence, str)
             and isinstance(indexed_evidence, str)
             and recorded_evidence.casefold() != indexed_evidence.casefold()

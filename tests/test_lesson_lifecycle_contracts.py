@@ -738,6 +738,38 @@ class PipelineStateTests(unittest.TestCase):
         self.assertEqual(validation_status(["bad fingerprint"], []), "INVALID")
         self.assertEqual(validation_status(["bad fingerprint"], ["old Content SHA"]), "INVALID")
 
+    def test_benchmark_prep_transition_has_own_evidence_and_keeps_index_bound(self) -> None:
+        state = initial_pipeline_state("RUN-PIPE")
+        state = advance_pipeline_state(
+            state,
+            "SOURCE_TRUTH_FROZEN",
+            recorded_at="2026-09-29T10:00:00Z",
+            artifact_sha256_updates={"source_truth_manifest_sha256": "a" * 64},
+        )
+        with self.assertRaisesRegex(LifecycleContractError, "requires artifacts.benchmark_preparation_sha256"):
+            advance_pipeline_state(state, "BENCHMARK_PREPARED", recorded_at="2026-09-29T10:01:00Z")
+        state = advance_pipeline_state(
+            state,
+            "BENCHMARK_PREPARED",
+            recorded_at="2026-09-29T10:01:00Z",
+            artifact_sha256_updates={"benchmark_preparation_sha256": "b" * 64},
+        )
+        state = advance_pipeline_state(
+            state,
+            "AUTHORING_COMPLETE",
+            recorded_at="2026-09-29T10:02:00Z",
+            artifact_sha256_updates={"content_sha256": "c" * 64},
+        )
+        damaged_index = copy.deepcopy(state)
+        damaged_index["artifacts"]["benchmark_preparation_sha256"] = None
+        damaged_index["state_fingerprint"] = pipeline_state_fingerprint(damaged_index)
+        self.assertTrue(
+            any(
+                "requires indexed artifacts.benchmark_preparation_sha256" in error
+                for error in validate_pipeline_state_payload(damaged_index)
+            )
+        )
+
     def test_skip_core_backwards_same_unknown_and_state_tamper_fail(self) -> None:
         state = initial_pipeline_state("RUN-PIPE")
         with self.assertRaises(LifecycleContractError):

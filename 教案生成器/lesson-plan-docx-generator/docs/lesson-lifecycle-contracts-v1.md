@@ -140,7 +140,9 @@ Each transition stores the SHA-256 of its stage evidence alongside its source,
 destination, and timezone-aware recording time. The helper derives this value
 from the relevant artifact index entry and rejects a transition with no stage
 evidence. Transition recording time remains part of the Pipeline semantic
-fingerprint.
+fingerprint. `BENCHMARK_PREPARED` binds `benchmark_preparation_sha256`; the
+separate `benchmark_disposition_sha256` is reserved for the later review
+outcome.
 
 ## Invalidation dependencies
 
