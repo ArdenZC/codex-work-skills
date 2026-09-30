@@ -70,7 +70,7 @@ def practice_complexity(content, lesson):
     hours = int(Decimal(str(lesson.get("practice_hours", 0)))) if content["content_contract_version"] == "2.3" else 0
     task_ids = set(lesson.get("practice_task_ids", []))
     tasks = [task for task in content.get("practice_task_contract", {}).get("tasks", [])
-             if task["task_id"] in task_ids]
+             if task["task_id"] in task_ids or lesson["lesson_id"] in task.get("lesson_ids", [])]
     return [hours, len(tasks), *(sum(len(task[field]) for task in tasks)
             for field in ("steps", "deliverables", "acceptance_criteria", "tools_or_materials"))]
 

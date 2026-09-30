@@ -1,6 +1,7 @@
 """SYNTHETIC human evidence tests authority linkage, never teaching quality."""
 import copy
 import json
+from pathlib import Path
 import shutil
 import tempfile
 import unittest
@@ -109,6 +110,24 @@ class SelectorTests(unittest.TestCase):
     def test_content_22_no_fabricated_practice(self):
         self.assertEqual(self.reason_position(course(version="2.2"), "highest_practice_complexity"), [])
 
+    def test_content_22_related_tasks_count_without_allocating_hours(self):
+        c = make_v22_payload(course="数据库应用基础", major="软件技术", audience="高职二年级",
+            theory_hours=14, practice_hours=2, lesson_count=7, lesson_hours=[2] * 7,
+            specs=_specs(7), practice_work_orders=True)
+        c["authoring_provenance"]["mode"] = "agent"
+        rows = packet._selection(c)
+        first = next(row for row in rows if row["lesson_id"] == "L01")
+        self.assertEqual(first["practice_complexity"], [0, 1, 3, 2, 2, 2])
+        self.assertFalse(any("highest_practice_complexity" in row["selection_reasons"] for row in rows))
+
+    def test_content_23_split_related_tasks_do_not_fabricate_allocation(self):
+        c = course(7)
+        _bind_v23(c, mode="split_lessons", theory_hours=14, practice_hours=2,
+                  workorders=True, task_links=[["L01"]])
+        rows = packet._selection(c)
+        self.assertEqual(rows[0]["practice_complexity"], [0, 1, 3, 2, 2, 2])
+        self.assertFalse(any("highest_practice_complexity" in row["selection_reasons"] for row in rows))
+
     def test_major_gap_precedes_more_minor_gaps(self):
         c = course(32)
         shards = synthetic_shards(c, {"L10": [("PARTIAL", "major")], "L20": [("GAP", "minor")] * 10})
@@ -203,7 +222,7 @@ class ArtifactTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        folder = self.template.folder.__class__(temporary.name) / "inputs"
+        folder = Path(temporary.name) / "inputs"
         shutil.copytree(self.template.folder, folder)
         self.h = pipeline_tests.PipelineTests()
         self.h.folder = folder
@@ -217,7 +236,7 @@ class ArtifactTests(unittest.TestCase):
         # Relocate synthetic test locators only. Every actual byte inventory and
         # Source Truth / Content / preparation / Review validator still executes.
         for binding in self.run["bindings"].values():
-            binding["path"] = str(folder / self.template.folder.__class__(binding["path"]).relative_to(self.template.folder))
+            binding["path"] = str(folder / Path(binding["path"]).relative_to(self.template.folder))
         self.run["run_fingerprint"] = pipeline.envelope_fingerprint(self.run)
         _write_json(self.h.run, self.run)
         self.benchmark = copy.deepcopy(self.benchmark_template)

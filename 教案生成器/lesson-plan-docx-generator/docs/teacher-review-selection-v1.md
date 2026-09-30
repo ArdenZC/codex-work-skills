@@ -73,7 +73,10 @@ Choose maximum bytes, ties earlier. No weights or quality interpretation are add
 `[allocated practice hours, linked task count, total steps, total deliverables,
 total acceptance criteria, total tools_or_materials]`, ties earlier.
 Content 2.3 supplies lesson `practice_hours` and formally validated
-`practice_task_ids` links into `practice_task_contract.tasks`. With zero allocations
+`practice_task_ids` links into `practice_task_contract.tasks`; actual task
+`lesson_ids` links also count (including formally related theory work orders).
+A task linked on both sides is counted once. Related theory links supply structural
+counts, never practice hours. With zero allocations
 there is no practice candidate. Content 2.2 has no per-lesson practice-allocation
 authority; its metric is zero hours plus actual linked structural fields if present,
 and separate work orders do not fabricate lesson allocation. Content and snapshots retain their original JSON numeric values; no allocations
