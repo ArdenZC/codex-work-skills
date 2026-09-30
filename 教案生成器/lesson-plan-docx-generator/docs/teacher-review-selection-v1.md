@@ -121,8 +121,11 @@ It supports human progression, scope, theory/practice coherence, repetition and
 difficulty review without duplicating every lesson body.
 
 The independent validator rereads upstream artifacts, reruns the selector and
-compares the entire expected Packet, including snapshots, map, metrics, order,
-reasons and fingerprint. A recomputed attacker fingerprint is insufficient.
+verifies the incoming self fingerprint, then compares the entire expected Packet,
+including snapshots, map, metrics, order,
+reasons and fingerprint. A recomputed attacker fingerprint is insufficient. Self-fingerprint verification
+also rejects numeric/boolean type substitutions that Python object equality alone
+would otherwise treat as equivalent.
 Byte changes to Content, disposition, Review or shards invalidate old authority.
 Resume checks immutable run binding inventories and semantic Packet derivation.
 Create a new run to iterate; rebinding old input bytes is forbidden.

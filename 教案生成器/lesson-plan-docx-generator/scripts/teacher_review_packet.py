@@ -179,6 +179,8 @@ def validate_teacher_review_packet(packet_path, run):
     errors = schema_errors(packet, "teacher-review-packet.schema.json")
     if errors:
         raise LifecycleContractError("invalid Packet schema: " + "; ".join(errors))
+    if packet["packet_fingerprint"] != packet_fingerprint(packet):
+        raise LifecycleContractError("invalid Packet self fingerprint")
     expected = build_teacher_review_packet(run, created_at=packet["created_at"])
     # Exact object comparison also protects snapshots beyond NFC hash equivalence.
     if packet != expected:

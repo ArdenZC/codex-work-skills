@@ -257,6 +257,12 @@ class ArtifactTests(unittest.TestCase):
 
     def test_valid_packet(self): self.assertEqual(self.valid(), self.packet)
     def test_wrong_content_sha(self): self.tamper(lambda p: p.update(content_sha256="a" * 64))
+    def test_snapshot_boolean_type_tamper_with_original_fingerprint(self):
+        self.tamper(lambda p: p["selected_lessons"][0]["lesson_snapshot"]["pedagogical_review"]["review_history"][0].update(round=True), fingerprint=False)
+
+    def test_snapshot_float_type_tamper_with_original_fingerprint(self):
+        self.tamper(lambda p: p["selected_lessons"][0]["lesson_snapshot"].update(hours=2.0), fingerprint=False)
+
     def test_changed_snapshot(self): self.tamper(lambda p: p["selected_lessons"][0]["lesson_snapshot"].update(task="篡改的任务"))
     def test_changed_course_map(self): self.tamper(lambda p: p["course_map"][0].update(hours=3))
     def test_forged_id(self): self.tamper(lambda p: p["selected_lessons"][0].update(lesson_id="fake"))
