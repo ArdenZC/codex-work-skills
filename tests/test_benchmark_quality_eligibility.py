@@ -44,7 +44,7 @@ def reviewed_records(catalog, decision="QUALITY_ELIGIBLE"):
             ("learner_relevance", "MATCH", "scope.learner_profile"),
             ("teaching_context_relevance", "MATCH", "scope.teaching_context"),
             ("pattern_evidence", "SUFFICIENT", "design_patterns"),
-            ("transferability", "SUFFICIENT", "design_patterns"),
+            ("transferability", "SUFFICIENT", "transferable_principles"),
         ):
             row[dimension] = {"status": status, "rationale": "SYNTHETIC explicit rationale, no quality claim.",
                               "evidence_refs": [reference(card, field)]}
@@ -55,6 +55,9 @@ def reviewed_records(catalog, decision="QUALITY_ELIGIBLE"):
 class BenchmarkQualityEligibilityTests(unittest.TestCase):
     def setUp(self):
         self.catalog = make_catalog(6, cards_per_group=2, nonqualified_count=1)
+        for card in self.catalog["exemplars"]:
+            card["transferable_principles"] = ["SYNTHETIC explicit transfer principle; contract test only."]
+        refresh_catalog_fingerprint(self.catalog)
         self.rows = reviewed_records(self.catalog)
         self.manifest = quality.build_quality_eligibility(self.catalog, self.rows)
         self.split = build_split(self.catalog)
@@ -160,6 +163,101 @@ class BenchmarkQualityEligibilityTests(unittest.TestCase):
         self.manifest["groups"][0]["course_relevance"]["status"] = "MISMATCH"
         self.assertTrue(self.errors())
 
+    def assert_wrong_dimension_evidence(self, dimension, field):
+        row = self.manifest["groups"][0]
+        row[dimension]["evidence_refs"] = [reference(self.catalog["exemplars"][0], field)]
+        errors = self.errors()
+        self.assertTrue(any(f"{dimension} requires dimension-appropriate evidence" in error for error in errors), errors)
+
+    def test_course_recognition_only_rejected(self):
+        self.assert_wrong_dimension_evidence("course_relevance", "source.recognition_evidence")
+
+    def test_course_design_pattern_only_rejected(self):
+        self.assert_wrong_dimension_evidence("course_relevance", "design_patterns")
+
+    def test_learner_recognition_only_rejected(self):
+        self.assert_wrong_dimension_evidence("learner_relevance", "source.recognition_evidence")
+
+    def test_learner_design_pattern_only_rejected(self):
+        self.assert_wrong_dimension_evidence("learner_relevance", "design_patterns")
+
+    def test_context_recognition_only_rejected(self):
+        self.assert_wrong_dimension_evidence("teaching_context_relevance", "source.recognition_evidence")
+
+    def test_context_learner_profile_only_rejected(self):
+        self.assert_wrong_dimension_evidence("teaching_context_relevance", "scope.learner_profile")
+
+    def test_pattern_course_scope_only_rejected(self):
+        self.assert_wrong_dimension_evidence("pattern_evidence", "scope.course")
+
+    def test_transferability_design_pattern_without_principle_rejected(self):
+        self.assert_wrong_dimension_evidence("transferability", "design_patterns")
+
+    def test_transferability_explicit_principle_and_rationale_pass(self):
+        self.assertEqual([], self.errors())
+        self.manifest["groups"][0]["transferability"]["rationale"] = "   "
+        self.assertTrue(self.errors())
+
+    def test_direct_course_match_uses_course_domain_topic_or_level(self):
+        card = self.catalog["exemplars"][0]
+        for field in quality.COURSE_MATCH_FIELDS:
+            with self.subTest(field=field):
+                self.manifest["groups"][0]["course_relevance"]["evidence_refs"] = [reference(card, field)]
+                self.assertEqual([], self.errors())
+        self.assert_wrong_dimension_evidence("course_relevance", "scope.scope_mode")
+
+    def test_transferable_course_requires_appropriate_scope(self):
+        row = self.manifest["groups"][0]
+        row["course_relevance"]["status"] = "TRANSFERABLE"
+        for field in quality.DIMENSION_EVIDENCE_FIELDS["course_relevance"]:
+            row["course_relevance"]["evidence_refs"] = [reference(self.catalog["exemplars"][0], field)]
+            self.assertEqual([], self.errors())
+        self.assert_wrong_dimension_evidence("course_relevance", "design_patterns")
+
+    def test_learner_match_adjacent_use_learner_or_level_scope(self):
+        row = self.manifest["groups"][0]
+        for status in ("MATCH", "ADJACENT"):
+            for field in quality.DIMENSION_EVIDENCE_FIELDS["learner_relevance"]:
+                with self.subTest(status=status, field=field):
+                    row["learner_relevance"]["status"] = status
+                    row["learner_relevance"]["evidence_refs"] = [reference(self.catalog["exemplars"][0], field)]
+                    self.assertEqual([], self.errors())
+
+    def test_context_match_transferable_use_context_mode_or_duration(self):
+        row = self.manifest["groups"][0]
+        for status in ("MATCH", "TRANSFERABLE"):
+            for field in quality.DIMENSION_EVIDENCE_FIELDS["teaching_context_relevance"]:
+                with self.subTest(status=status, field=field):
+                    row["teaching_context_relevance"]["status"] = status
+                    row["teaching_context_relevance"]["evidence_refs"] = [reference(self.catalog["exemplars"][0], field)]
+                    self.assertEqual([], self.errors())
+
+    def test_conditional_can_record_dimension_incomplete_evidence(self):
+        self.assert_incomplete_decision_can_be_saved("CONDITIONAL")
+
+    def test_rejected_can_record_dimension_incomplete_evidence(self):
+        self.assert_incomplete_decision_can_be_saved("REJECTED")
+
+    def assert_incomplete_decision_can_be_saved(self, decision):
+        row = self.rows[0]
+        row["decision"] = decision
+        for dimension in quality.DIMENSIONS:
+            row[dimension]["evidence_refs"] = [reference(self.catalog["exemplars"][0], "source.recognition_evidence")]
+        row["pattern_evidence"]["status"] = "INSUFFICIENT"
+        row["pattern_evidence"]["evidence_refs"] = []
+        manifest = quality.build_quality_eligibility(self.catalog, self.rows)
+        self.assertEqual([], self.errors(manifest))
+
+    def test_appropriate_evidence_value_hash_tamper_still_fails(self):
+        self.manifest["groups"][0]["transferability"]["evidence_refs"][0]["value_sha256"] = "0" * 64
+        self.assertTrue(any("value_sha256 differs" in error for error in self.errors()))
+
+    def test_supplementary_fields_do_not_replace_required_dimension_evidence(self):
+        row = self.manifest["groups"][0]
+        for dimension in quality.DIMENSIONS:
+            row[dimension]["evidence_refs"].append(reference(self.catalog["exemplars"][0], "scope.topic"))
+        self.assertEqual([], self.errors())
+
     def test_learner_and_context_mismatch_or_insufficient_reject_eligible(self):
         for dimension in ("course_relevance", "learner_relevance", "teaching_context_relevance"):
             for status in ("MISMATCH", "INSUFFICIENT_EVIDENCE"):
@@ -264,6 +362,7 @@ class BenchmarkQualityEligibilityTests(unittest.TestCase):
     def test_private_source_cannot_be_automatically_eligible(self):
         catalog = make_catalog(0)
         card = make_card(1, authority_tier="PRIVATE", visibility="private_session", source_type="private_user_provided")
+        card["transferable_principles"] = ["SYNTHETIC private transfer principle; no exemplary attestation."]
         card["source"]["canonical_url"] = None
         card["source"]["provided_source_id"] = "SYNTHETIC private evidence"
         card["source"]["source_identity_sha256"] = source_identity_sha256(card)

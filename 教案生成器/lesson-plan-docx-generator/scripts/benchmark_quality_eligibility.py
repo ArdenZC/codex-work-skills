@@ -42,6 +42,24 @@ ELIGIBLE_STATUSES = {
     "pattern_evidence": {"SUFFICIENT"},
     "transferability": {"SUFFICIENT"},
 }
+# Required evidence types for an eligible judgment, not an automated judgment
+# of the cited prose. Other globally permitted fields may supplement them.
+COURSE_MATCH_FIELDS = frozenset({
+    "scope.course", "scope.domain", "scope.topic",
+    "scope.education_level", "scope.vocational_level",
+})
+DIMENSION_EVIDENCE_FIELDS = {
+    "authority_excellence_basis": frozenset({"source.recognition_evidence"}),
+    "course_relevance": COURSE_MATCH_FIELDS | {"scope.scope_mode"},
+    "learner_relevance": frozenset({
+        "scope.learner_profile", "scope.education_level", "scope.vocational_level",
+    }),
+    "teaching_context_relevance": frozenset({
+        "scope.teaching_context", "scope.scope_mode", "scope.duration_minutes",
+    }),
+    "pattern_evidence": frozenset(PATTERN_FIELDS),
+    "transferability": frozenset({"transferable_principles"}),
+}
 
 
 def evidence_value_fingerprint(value: Any) -> str:
@@ -142,12 +160,14 @@ def validate_quality_eligibility_payload(
                 if not refs:
                     errors.append(f"{group}: {dimension} requires evidence for QUALITY_ELIGIBLE")
                 fields = {ref["field"] for ref in refs}
-                if dimension == "authority_excellence_basis" and "source.recognition_evidence" not in fields:
-                    errors.append(f"{group}: excellence requires recorded recognition evidence, not tier alone")
-                if dimension == "pattern_evidence" and not fields.intersection(PATTERN_FIELDS):
-                    errors.append(f"{group}: pattern sufficiency requires teaching-pattern evidence")
-                if dimension == "transferability" and not fields.intersection(PATTERN_FIELDS):
-                    errors.append(f"{group}: transferability requires transferable teaching-pattern evidence")
+                required_fields = DIMENSION_EVIDENCE_FIELDS[dimension]
+                if dimension == "course_relevance" and assessment["status"] == "DIRECT_MATCH":
+                    required_fields = COURSE_MATCH_FIELDS
+                if not fields.intersection(required_fields):
+                    errors.append(
+                        f"{group}: {dimension} requires dimension-appropriate evidence from "
+                        + ", ".join(sorted(required_fields))
+                    )
             if assessment["status"] == "TRANSFERABLE" and not refs:
                 errors.append(f"{group}: TRANSFERABLE requires evidence and rationale")
     try:

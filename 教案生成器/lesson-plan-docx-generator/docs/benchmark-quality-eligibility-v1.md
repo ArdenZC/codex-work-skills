@@ -81,7 +81,7 @@ Catalog course context; do not copy source lesson text.
 | `learner_relevance` | MATCH, ADJACENT, MISMATCH, INSUFFICIENT_EVIDENCE | MATCH or explained ADJACENT |
 | `teaching_context_relevance` | MATCH, TRANSFERABLE, MISMATCH, INSUFFICIENT_EVIDENCE | MATCH or evidenced TRANSFERABLE |
 | `pattern_evidence` | SUFFICIENT, INSUFFICIENT | SUFFICIENT plus a teaching-pattern reference |
-| `transferability` | SUFFICIENT, INSUFFICIENT | SUFFICIENT plus a teaching-pattern reference and rationale |
+| `transferability` | SUFFICIENT, INSUFFICIENT | SUFFICIENT plus an explicit `transferable_principles` reference and rationale |
 
 All six eligible assessments require actual evidence references. A transferable
 course/context assessment requires evidence and rationale for every decision,
@@ -95,6 +95,37 @@ An eligible decision with mismatch, insufficient evidence/patterns or insufficie
 transferability fails. A national-course label or recognition reference alone
 cannot establish pattern sufficiency. This is deterministic consistency over
 explicit judgments, not an automated numerical evaluation.
+
+Evidence refs are not only provenance links. For `QUALITY_ELIGIBLE`, the
+validator also requires **dimension-appropriate evidence** under
+`DIMENSION_EVIDENCE_FIELDS`. Each assessment must include at least one current,
+valid reference from its required set:
+
+| Dimension | Required evidence fields |
+| --- | --- |
+| Authority/excellence | `source.recognition_evidence` |
+| Course DIRECT_MATCH | `scope.course`, `scope.domain`, `scope.topic`, `scope.education_level`, or `scope.vocational_level` |
+| Course TRANSFERABLE | The course-match set above, or `scope.scope_mode`, with rationale |
+| Learner MATCH/ADJACENT | `scope.learner_profile`, `scope.education_level`, or `scope.vocational_level` |
+| Context MATCH/TRANSFERABLE | `scope.teaching_context`, `scope.scope_mode`, or non-null `scope.duration_minutes` |
+| Pattern SUFFICIENT | One of the existing `PATTERN_FIELDS` |
+| Transferability SUFFICIENT | At least one explicit `transferable_principles` item, with rationale |
+
+Recognition does not establish course relevance; authority does not establish
+learner fit. A learner-profile reference alone does not establish teaching
+context. A design pattern alone does not establish transferability: explicit
+transferable-principle evidence is mandatory for an eligible transferability
+judgment. Ordinary patterns and `non_transferable_context` may supplement it.
+For a direct course match, scope mode alone is insufficient.
+
+The global evidence-ref field enum is unchanged. Globally allowed fields may
+supplement the required types, but cannot replace them. Conditional/rejected
+records may retain missing or dimension-incomplete evidence to explain gaps;
+this new evidence-type hard gate applies only to `QUALITY_ELIGIBLE`. Existing
+reference integrity and nonblank rationale rules still apply. The validator
+checks policy consistency and linkage, not whether the prose is pedagogically
+convincing. It performs no fuzzy text comparison, NLP scoring or automated
+teaching-quality judgment.
 
 ## References to current Card values
 
