@@ -160,6 +160,10 @@ def validate_disposition(run):
     final = benchmark["disposition"]
     require(final in {"BENCHMARK_REVIEW_COMPLETE", "BENCHMARK_PARTIAL", "BENCHMARK_UNAVAILABLE", "BENCHMARK_WAIVED_BY_USER"},
             "BENCHMARK_NOT_EXECUTED or implicit Benchmark is forbidden")
+    require(("benchmark_review" in run["bindings"]) == (benchmark["review_sha256"] is not None),
+            "final disposition must bind the actual Benchmark Review")
+    if final == "BENCHMARK_WAIVED_BY_USER":
+        require(benchmark["review_sha256"] is None, "waiver is not a Benchmark Review")
     for field, name in (("authorization_sha256", "benchmark_authorization"),
                         ("review_sha256", "benchmark_review"), ("evidence_sha256", "benchmark_evidence")):
         if benchmark[field] is not None:
@@ -213,7 +217,8 @@ def validate_run(run, *, run_path=None):
                               outputs={"run"} if run_path else set())
     source, _, errors = validate_source_truth_file(path_of(run, "source_truth"), verify_source_bytes=True)
     checked(errors)
-    require(source_truth_content_verified(source, verify_source_bytes=True), "Source Truth source bytes are unverified")
+    if run["mode"] == "PRODUCTION":
+        require(source_truth_content_verified(source, verify_source_bytes=True), "Source Truth source bytes are unverified")
     field_paths = {field: paths[name] for field, name in ARTIFACT_FIELDS.items()
                    if state["artifacts"][field] is not None and name in paths}
     require(all(state["artifacts"][field] is None or name in paths for field, name in ARTIFACT_FIELDS.items()),
@@ -241,10 +246,22 @@ def validate_run(run, *, run_path=None):
         fresh = content_qa(path_of(run, "content"))
         fresh["created_at"] = qa.get("created_at")
         require(qa == fresh, "STALE or fabricated Preproduction QA evidence")
-    if rank >= STATES.index("BENCHMARK_REVIEW_COMPLETE"):
+    review_completed = any(row["to_state"] == "BENCHMARK_REVIEW_COMPLETE" for row in state["transitions"])
+    final_disposition_required = state["current_state"] in {
+        "READY_FOR_TEACHER_REVIEW", "TEACHER_REVIEW_APPROVED", "PRODUCTION_AUTHORIZED",
+    }
+    if review_completed or final_disposition_required:
+        require(state["artifacts"]["benchmark_disposition_sha256"] is not None,
+                "final Benchmark disposition must be indexed in state artifacts")
         benchmark = validate_disposition(run)
         require(benchmark["disposition"] == "BENCHMARK_WAIVED_BY_USER" or "benchmark_preparation" in paths,
                 "non-waived lifecycle requires quality-gated preparation")
+        if review_completed:
+            require(benchmark["review_sha256"] is not None,
+                    "BENCHMARK_REVIEW_COMPLETE history requires actual Benchmark Review evidence")
+        else:
+            require(benchmark["review_sha256"] is None,
+                    "actual Benchmark Review requires BENCHMARK_REVIEW_COMPLETE history")
     if rank >= STATES.index("TEACHER_REVIEW_APPROVED"):
         review, _, errors = validate_teacher_review_files(path_of(run, "teacher_review"),
             source_truth_path=paths["source_truth"], content_path=paths["content"],
@@ -358,13 +375,23 @@ def execute(command, run_path, **options):
                 run["run_fingerprint"] = envelope_fingerprint(run)
                 _replace_bundle((qa_path, run_path), (qa, run))
             return run
-        elif command == "bind-benchmark-review":
+        elif command in {"bind-benchmark-disposition", "bind-benchmark-review"}:
+            require(run["state"]["current_state"] == "PREPRODUCTION_QA_PASSED", "Benchmark binding requires passed QA")
+            review_inputs = ("benchmark_authorization", "benchmark_review", "authoring_selection",
+                             "holdout_selection", "lesson_reviews_dir", "previous_lesson_content",
+                             "previous_review", "previous_lesson_reviews_dir")
+            if command == "bind-benchmark-review":
+                require(options.get("benchmark_review"), "bind-benchmark-review requires an actual Benchmark Review artifact")
+            else:
+                require(not any(options.get(name) or name in run["bindings"] for name in review_inputs),
+                        "use bind-benchmark-review for actual Benchmark Review evidence")
             bind(run, "benchmark_disposition", options["disposition"])
-            for name in ("benchmark_evidence", "benchmark_authorization", "benchmark_review", "authoring_selection",
-                         "holdout_selection", "lesson_reviews_dir", "previous_lesson_content", "previous_review", "previous_lesson_reviews_dir"):
+            for name in ("benchmark_evidence", *review_inputs):
                 if options.get(name):
                     bind(run, name, options[name])
-            advance(run, "BENCHMARK_REVIEW_COMPLETE", ("benchmark_disposition_sha256", "benchmark_disposition"))
+            validate_disposition(run)
+            next_state = "BENCHMARK_REVIEW_COMPLETE" if command == "bind-benchmark-review" else "READY_FOR_TEACHER_REVIEW"
+            advance(run, next_state, ("benchmark_disposition_sha256", "benchmark_disposition"))
         elif command == "ready-for-teacher-review":
             require(run["state"]["current_state"] == "BENCHMARK_REVIEW_COMPLETE", "explicit final Benchmark disposition required")
             advance(run, "READY_FOR_TEACHER_REVIEW")
@@ -384,7 +411,7 @@ def execute(command, run_path, **options):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("init", "freeze-source-truth", "prepare-benchmark", "bind-content",
-        "validate-preproduction", "bind-benchmark-review", "ready-for-teacher-review", "bind-teacher-review",
+        "validate-preproduction", "bind-benchmark-disposition", "bind-benchmark-review", "ready-for-teacher-review", "bind-teacher-review",
         "authorize-production", "status"))
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--run-id")
@@ -397,7 +424,11 @@ def main(argv=None):
     args = vars(parser.parse_args(argv))
     try:
         result = execute(args.pop("command"), args.pop("run"), **args)
-        print(json.dumps({"status": "VALID", "mode": result["mode"], "state": result["state"]["current_state"]}))
+        source, _, _ = validate_source_truth_file(path_of(result, "source_truth"), verify_source_bytes=True)
+        source_status = ("VALID" if source_truth_content_verified(source, verify_source_bytes=True)
+                         else "STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED")
+        print(json.dumps({"status": "VALID", "mode": result["mode"], "state": result["state"]["current_state"],
+                          "source_truth_status": source_status}))
         return 0
     except (LifecycleContractError, ContractError, ValueError, OSError, TypeError, KeyError) as exc:
         parser.exit(1, f"STALE/INVALID: {exc}\n")

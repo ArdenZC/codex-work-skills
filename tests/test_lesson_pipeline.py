@@ -18,6 +18,8 @@ from tests.test_lesson_exemplar_benchmark import (
 from lifecycle_digest import LifecycleContractError, sha256_file
 from teacher_review import teacher_review_fingerprint
 from production_authorization import production_authorization_fingerprint
+from pipeline_state import pipeline_state_fingerprint
+from source_truth import source_truth_fingerprint, source_truth_content_verified
 import run_lesson_pipeline as pipeline
 
 
@@ -36,6 +38,182 @@ class PipelineTests(unittest.TestCase):
 
     def call(self, command, **options):
         return pipeline.execute(command, self.run, **options)
+
+    def assert_direct_ready(self, run):
+        state = run["state"]
+        self.assertEqual(state["current_state"], "READY_FOR_TEACHER_REVIEW")
+        self.assertNotIn("BENCHMARK_REVIEW_COMPLETE", [row["to_state"] for row in state["transitions"]])
+        self.assertEqual(state["transitions"][-1]["from_state"], "PREPRODUCTION_QA_PASSED")
+        self.assertEqual(state["transitions"][-1]["evidence_sha256"], state["artifacts"]["preproduction_qa_sha256"])
+        self.assertEqual(state["artifacts"]["benchmark_disposition_sha256"],
+                         sha256_file(pipeline.path_of(run, "benchmark_disposition")))
+
+    def ready_disposition(self, final="BENCHMARK_UNAVAILABLE"):
+        self.qa()
+        disposition, evidence, benchmark = self.disposition(final, waiver=final == "BENCHMARK_WAIVED_BY_USER")
+        result = self.call("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
+        return result, disposition, evidence, benchmark
+
+    def save_modified_run(self, run):
+        run["state"]["state_fingerprint"] = pipeline_state_fingerprint(run["state"])
+        run["run_fingerprint"] = pipeline.envelope_fingerprint(run)
+        _write_json(self.run, run)
+
+    def remote_source(self):
+        self.source["sources"][1]["locator"] = "https://example.com/outline.json"
+        self.source["manifest_fingerprint"] = source_truth_fingerprint(self.source)
+        _write_json(self.source_path, self.source)
+
+    def preview_init(self):
+        self.run = self.folder / "preview-run.json"
+        return self.call("init", mode="PREVIEW", run_id="RUN-001", source_truth=self.source_path)
+
+    def test_unavailable_disposition_direct_ready(self):
+        result, _, _, _ = self.ready_disposition()
+        self.assert_direct_ready(result)
+        self.assertEqual(self.call("status"), result)
+
+    def test_partial_disposition_without_review_direct_ready(self):
+        from exemplar_split import build_split
+        self.catalog, _, _ = inputs(self.folder, group_count=20, context=self.source["course_identity"])
+        split = build_split(self.catalog)
+        holdout_group = split["holdout_group_ids"][0]
+        self.catalog, self.quality, self.paths = inputs(self.folder, group_count=20, eligible={holdout_group},
+                                                       context=self.source["course_identity"])
+        result, _, _, _ = self.ready_disposition("BENCHMARK_PARTIAL")
+        self.assert_direct_ready(result)
+        self.assertEqual(self.call("status"), result)
+
+    def test_waiver_with_preparation_direct_ready(self):
+        result, _, _, _ = self.ready_disposition("BENCHMARK_WAIVED_BY_USER")
+        self.assert_direct_ready(result)
+
+    def test_disposition_only_cannot_use_review_command(self):
+        self.qa()
+        disposition, evidence, _ = self.disposition()
+        self.rejected("bind-benchmark-review", disposition=disposition, benchmark_evidence=evidence)
+
+    def test_real_review_cannot_use_disposition_command(self):
+        disposition, kwargs, _ = self.full_review(context_mode="single_context")
+        self.rejected("bind-benchmark-disposition", disposition=disposition, **kwargs)
+
+    def test_disposition_only_forged_review_history_rejected(self):
+        run, _, _, _ = self.ready_disposition()
+        ready = run["state"]["transitions"][-1]
+        forged = dict(ready, to_state="BENCHMARK_REVIEW_COMPLETE",
+                      evidence_sha256=run["state"]["artifacts"]["benchmark_disposition_sha256"])
+        ready["from_state"] = "BENCHMARK_REVIEW_COMPLETE"
+        run["state"]["transitions"].insert(-1, forged)
+        self.save_modified_run(run)
+        self.rejected("status")
+
+    def test_ready_missing_disposition_binding_rejected(self):
+        run, _, _, _ = self.ready_disposition()
+        del run["bindings"]["benchmark_disposition"]
+        run["state"]["artifacts"]["benchmark_disposition_sha256"] = None
+        self.save_modified_run(run)
+        self.rejected("status")
+
+    def test_ready_unindexed_disposition_rejected(self):
+        run, _, _, _ = self.ready_disposition()
+        run["state"]["artifacts"]["benchmark_disposition_sha256"] = None
+        self.save_modified_run(run)
+        self.rejected("status")
+
+    def test_ready_stale_disposition_bytes_rejected(self):
+        _, disposition, _, _ = self.ready_disposition()
+        disposition.write_bytes(disposition.read_bytes() + b"\n")
+        self.rejected("status")
+
+    def test_ready_rechecks_waiver_consent_semantics(self):
+        run, disposition, evidence, _ = self.ready_disposition("BENCHMARK_WAIVED_BY_USER")
+        payload = json.loads(evidence.read_bytes())
+        payload["user_identity"] = ""
+        _write_json(evidence, payload)
+        final = json.loads(disposition.read_bytes())
+        final["benchmark"]["evidence_sha256"] = sha256_file(evidence)
+        _write_json(disposition, final)
+        for name, path in (("benchmark_evidence", evidence), ("benchmark_disposition", disposition)):
+            run["bindings"][name]["sha256"] = sha256_file(path)
+        run["state"]["artifacts"]["benchmark_disposition_sha256"] = sha256_file(disposition)
+        self.save_modified_run(run)
+        self.rejected("status")
+
+    def test_teacher_review_must_match_final_benchmark_object(self):
+        _, _, evidence, benchmark = self.ready_disposition()
+        benchmark["disposition"] = "BENCHMARK_PARTIAL"
+        teacher = self.folder / "teacher.json"
+        _write_json(teacher, _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark))
+        self.rejected("bind-teacher-review", teacher_review=teacher)
+
+    def test_authorization_must_match_final_benchmark_object(self):
+        teacher, benchmark = self.reviewed()
+        benchmark["disposition"] = "BENCHMARK_PARTIAL"
+        authorization = self.folder / "authorization.json"
+        _write_json(authorization, _production_authorization(self.source_path.read_bytes(), self.content_path.read_bytes(),
+                                                            teacher.read_bytes(), benchmark))
+        self.rejected("authorize-production", authorization=authorization)
+
+    def test_authorized_resume_rechecks_disposition_and_evidence(self):
+        self.authorize()
+        for name in ("benchmark_disposition", "benchmark_evidence"):
+            with self.subTest(name=name):
+                run = self.call("status")
+                path = pipeline.path_of(run, name)
+                raw = path.read_bytes()
+                try:
+                    path.write_bytes(raw + b"\n")
+                    self.rejected("status")
+                finally:
+                    path.write_bytes(raw)
+
+    def test_preview_remote_source_init_status_offline_unverified(self):
+        self.remote_source()
+        with patch("socket.socket", side_effect=AssertionError("Source Truth must stay offline")):
+            self.preview_init()
+            result = subprocess.run([sys.executable, "-B", str(pipeline.SKILL_ROOT / "scripts/run_lesson_pipeline.py"),
+                                     "status", "--run", str(self.run)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["source_truth_status"],
+                             "STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED")
+            self.assertEqual(self.call("status")["mode"], "PREVIEW")
+            self.assertFalse(source_truth_content_verified(self.source, verify_source_bytes=True))
+
+    def test_production_remote_source_rejected(self):
+        self.remote_source()
+        with patch("socket.socket", side_effect=AssertionError("Source Truth must stay offline")):
+            path = self.folder / "remote-production.json"
+            with self.assertRaisesRegex(LifecycleContractError, "unverified"):
+                pipeline.execute("init", path, mode="PRODUCTION", run_id="RUN-001", source_truth=self.source_path)
+            self.assertFalse(path.exists())
+
+    def test_preview_remote_with_local_bytes_mismatch_rejected(self):
+        self.remote_source()
+        (self.folder / "evidence/profile.json").write_bytes(b"mismatched local bytes")
+        with self.assertRaisesRegex(LifecycleContractError, "local source bytes"):
+            self.preview_init()
+        self.assertFalse(self.run.exists())
+
+    def test_preview_remote_through_qa_and_ready_cannot_authorize(self):
+        self.remote_source()
+        with patch("socket.socket", side_effect=AssertionError("Source Truth must stay offline")):
+            self.preview_init()
+            result, _, _, _ = self.ready_disposition()
+            self.assert_direct_ready(result)
+            self.assertFalse(source_truth_content_verified(self.source, verify_source_bytes=True))
+            self.rejected("authorize-production", authorization=self.folder / "unused.json")
+
+    def test_materialized_remote_source_allows_production(self):
+        self.remote_source()
+        path = self.folder / "evidence/materialized-outline.json"
+        path.write_bytes((self.folder / "evidence/outline.json").read_bytes())
+        self.source["sources"][1]["locator"] = "evidence/materialized-outline.json"
+        self.source["manifest_fingerprint"] = source_truth_fingerprint(self.source)
+        _write_json(self.source_path, self.source)
+        self.run = self.folder / "materialized-production.json"
+        self.call("init", mode="PRODUCTION", run_id="RUN-001", source_truth=self.source_path)
+        self.assertTrue(source_truth_content_verified(self.source, verify_source_bytes=True))
+        self.assertEqual(self.authorize()["state"]["current_state"], "PRODUCTION_AUTHORIZED")
 
     def rejected(self, command, **options):
         before = self.run.read_bytes()
@@ -77,8 +255,7 @@ class PipelineTests(unittest.TestCase):
     def reviewed(self):
         self.qa()
         disposition, evidence, benchmark = self.disposition()
-        self.call("bind-benchmark-review", disposition=disposition, benchmark_evidence=evidence)
-        self.call("ready-for-teacher-review")
+        self.call("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
         teacher_path = self.folder / "teacher.json"
         teacher = _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark)
         _write_json(teacher_path, teacher)
@@ -137,7 +314,7 @@ class PipelineTests(unittest.TestCase):
     def test_not_executed_rejected(self):
         self.qa()
         disposition, evidence, _ = self.disposition("BENCHMARK_NOT_EXECUTED")
-        self.rejected("bind-benchmark-review", disposition=disposition, benchmark_evidence=evidence)
+        self.rejected("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
 
     def test_fake_waiver_rejected(self):
         self.qa()
@@ -148,7 +325,7 @@ class PipelineTests(unittest.TestCase):
         d = json.loads(disposition.read_bytes())
         d["benchmark"]["evidence_sha256"] = sha256_file(evidence)
         _write_json(disposition, d)
-        self.rejected("bind-benchmark-review", disposition=disposition, benchmark_evidence=evidence)
+        self.rejected("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
 
     def test_valid_external_waiver_path_without_preparation(self):
         self.call("freeze-source-truth")
@@ -163,8 +340,9 @@ class PipelineTests(unittest.TestCase):
         disposition = self.folder / "disposition.json"
         _write_json(disposition, {"pipeline_run_id": "RUN-001", "source_truth_manifest_sha256": sha256_file(self.source_path),
                                  "content_sha256": sha256_file(self.content_path), "benchmark": benchmark})
-        self.call("bind-benchmark-review", disposition=disposition)
-        self.assertEqual(self.call("status")["state"]["current_state"], "BENCHMARK_REVIEW_COMPLETE")
+        result = self.call("bind-benchmark-disposition", disposition=disposition)
+        self.assert_direct_ready(result)
+        self.assertEqual(self.call("status"), result)
 
     def test_invalid_content_rejected(self):
         self.prepared()
@@ -197,8 +375,7 @@ class PipelineTests(unittest.TestCase):
     def test_teacher_revision_required(self):
         self.qa()
         disposition, evidence, benchmark = self.disposition()
-        self.call("bind-benchmark-review", disposition=disposition, benchmark_evidence=evidence)
-        self.call("ready-for-teacher-review")
+        self.call("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
         teacher = _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark)
         teacher["decision"] = "REVISION_REQUIRED"
         teacher["review_fingerprint"] = teacher_review_fingerprint(teacher)
@@ -283,7 +460,7 @@ class PipelineTests(unittest.TestCase):
         payload = json.loads(disposition.read_bytes())
         payload["pipeline_run_id"] = "OTHER"
         _write_json(disposition, payload)
-        self.rejected("bind-benchmark-review", disposition=disposition, benchmark_evidence=evidence)
+        self.rejected("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
 
     def test_partial_and_unavailable_not_automatic_course_failure(self):
         self.authorize()  # zero eligible groups, externally APPROVED Teacher Review
@@ -380,8 +557,9 @@ class PipelineTests(unittest.TestCase):
         d = json.loads(disposition.read_bytes())
         d["benchmark"] = benchmark
         _write_json(disposition, d)
-        self.call("bind-benchmark-review", disposition=disposition, **kwargs)
-        self.call("ready-for-teacher-review")
+        result = self.call("bind-benchmark-review", disposition=disposition, **kwargs)
+        self.assertEqual(result["state"]["current_state"], "BENCHMARK_REVIEW_COMPLETE")
+        self.assertEqual(self.call("ready-for-teacher-review")["state"]["current_state"], "READY_FOR_TEACHER_REVIEW")
         teacher = self.folder / "teacher.json"
         _write_json(teacher, _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark))
         self.call("bind-teacher-review", teacher_review=teacher)
@@ -398,6 +576,9 @@ class PipelineTests(unittest.TestCase):
         disposition, kwargs, _ = self.full_review(context_mode="single_context")
         self.assertEqual(self.call("bind-benchmark-review", disposition=disposition, **kwargs)["state"]["current_state"],
                          "BENCHMARK_REVIEW_COMPLETE")
+        result = self.call("ready-for-teacher-review")
+        self.assertIn("BENCHMARK_REVIEW_COMPLETE", [row["to_state"] for row in result["state"]["transitions"]])
+        self.assertEqual(result["state"]["current_state"], "READY_FOR_TEACHER_REVIEW")
 
     def test_completed_review_shard_mutation_invalidates_resume(self):
         disposition, kwargs, _ = self.full_review()

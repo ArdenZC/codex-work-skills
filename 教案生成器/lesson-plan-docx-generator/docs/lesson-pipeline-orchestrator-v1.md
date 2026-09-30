@@ -10,12 +10,13 @@ Skill 2.3.1、Content 2.2/2.3、Template 1.1.2、Acceptance 2.0 和所有既有 
 | 命令 | 结果状态 | 实际证据 |
 | --- | --- | --- |
 | init | INTAKE_CONFIRMED | 外部已确认 Source Truth，固定 run ID 与 PREVIEW/PRODUCTION 模式 |
-| freeze-source-truth | SOURCE_TRUTH_FROZEN | Manifest 与全部本地 source bytes 复验 |
+| freeze-source-truth | SOURCE_TRUTH_FROZEN | Manifest 与全部本地 source bytes 复验；PREVIEW 保留远程 bytes 未验证分类 |
 | prepare-benchmark | BENCHMARK_PREPARED | Quality Eligibility + quality-only canonical projection + Split/Packs/preparation |
 | bind-content | AUTHORING_COMPLETE | 外部 Agent 提供合法 Content 2.2/2.3 |
 | validate-preproduction | PREPRODUCTION_QA_PASSED | 原 Content validator 与 content_quality hard gates |
-| bind-benchmark-review | BENCHMARK_REVIEW_COMPLETE | 明确最终 disposition 与真实证据；状态表示 disposition gate 已完成 |
-| ready-for-teacher-review | READY_FOR_TEACHER_REVIEW | 重验上述完整链 |
+| bind-benchmark-disposition | READY_FOR_TEACHER_REVIEW | 无正式 Review 的 PARTIAL/UNAVAILABLE 或用户 waiver；绑定最终 disposition 与不可变 evidence |
+| bind-benchmark-review | BENCHMARK_REVIEW_COMPLETE | 实际完成的 full-linkage Review（包括真实 partial Review）与最终 disposition |
+| ready-for-teacher-review | READY_FOR_TEACHER_REVIEW | 从真实 BENCHMARK_REVIEW_COMPLETE 重验上述完整链 |
 | bind-teacher-review | TEACHER_REVIEW_APPROVED | 外部 APPROVED / APPROVED_WITH_NOTES Teacher Review |
 | authorize-production | PRODUCTION_AUTHORIZED | 外部合法 Production Authorization 全链、Skill/Template/runtime 复验 |
 | status | 不变 | 重新读取所有上游字节与语义，支持独立进程恢复 |
@@ -40,13 +41,18 @@ python -B scripts/run_lesson_pipeline.py validate-preproduction --run F:\lesson-
 所有 run 与派生证据必须在独立外部 workspace，不能写 canonical 或提交到仓库。
 PREVIEW 和 PRODUCTION 分别建立 run 文件；模式保存在 run envelope 中，不能靠命令覆盖。
 PREVIEW 可以准备、绑定外部 Content、QA 和 Review；authorize-production 始终拒绝。
+两种模式都执行 `validate_source_truth_file(..., verify_source_bytes=True)`：可验证的本地来源
+必须逐字节匹配，HTTPS 来源不联网。PREVIEW 允许结构合法的远程来源，CLI 的
+`source_truth_status=STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED` 保留其未验证语义。
+PRODUCTION 从 init 到恢复始终要求所有来源 bytes 已验证；远程来源须先冻结为可复验的本地证据。
 本轮不调用 diagnostic renderer，也不改变 legacy generator transaction。
 迭代创建新 run；旧 run 绑定字节不静默重写。编辑任一源文件、Content、Review 或 sidecar
 都会使旧 run STALE，旧 Teacher Review/Production Authorization 不再有效。
 
 ## 最终 Benchmark disposition
 
-`bind-benchmark-review --disposition <external.json>` 接收外部显式 binding envelope：
+`bind-benchmark-disposition --disposition <external.json>`（无正式 Review）与
+`bind-benchmark-review --disposition <external.json>`（实际 Review）接收外部显式 binding envelope：
 
 ```json
 {
@@ -68,6 +74,10 @@ quality-gated preparation。准备状态为 PARTIAL/UNAVAILABLE 且尚未执行�
 `--benchmark-evidence <external.json>` 必须包含上述 run/source/content 绑定、
 `benchmark_preparation_sha256`、一致的 `disposition` 与非空 `notes`。
 READY preparation 不能仅靠文字 downgrade：必须提供实际 full-linkage Review。
+无正式 Review 的 PARTIAL/UNAVAILABLE 使用 `bind-benchmark-disposition`，直接从
+PREPRODUCTION_QA_PASSED 到 READY_FOR_TEACHER_REVIEW，不记录 BENCHMARK_REVIEW_COMPLETE。
+最终 disposition SHA 写入 `state.artifacts.benchmark_disposition_sha256`；该直接 transition 的
+正式 evidence 仍为 Pipeline Contract 1.0 的 `preproduction_qa_sha256`。
 
 正式 Review 使用 `--benchmark-review`、`--authoring-selection`、`--holdout-selection`、
 `--lesson-reviews-dir`，完成 Review 还需 `--benchmark-authorization`。
@@ -75,11 +85,17 @@ Round 2 使用 `--previous-lesson-content`、`--previous-review`、`--previous-l
 原 `derive_benchmark_authorization_claims` 重验 derived Catalog、Split、两侧 Packs/Selections、
 所有 Review shards 与 Content；Authorization 必须匹配重算 claims。
 实际 single-context partial 可以显式处置；REVISION_REQUIRED 不允许进入 final authority。
+`bind-benchmark-review` 必须提供真实 Review artifact，先进入 BENCHMARK_REVIEW_COMPLETE，
+再单独执行 `ready-for-teacher-review`。`bind-benchmark-disposition` 拒绝 Review inputs。
+READY 及后续状态明确要求并重新验证 indexed final disposition；history 经过
+BENCHMARK_REVIEW_COMPLETE 时还必须存在并重验真实 Review、selections 与 shards。
 
 WAIVED_BY_USER 是唯一允许绕过 preparation 的路径。`bind-content --waiver-evidence` 可绑定
 外部用户同意文件；之后最终 disposition 必须重验同一不可变文件。文件至少有 run/source/content
 绑定、`decision="WAIVED_BY_USER"`、非空 `user_identity` 和 `waiver_reference`，并与
 Benchmark 对象的 evidence SHA/reference 一致。CLI 从不创建此文件或伪造用户 consent。
+Waiver 同样使用 `bind-benchmark-disposition` 直接进入 READY，history 不记录 Review Complete；
+恢复时继续重验用户同意证据及 disposition。
 这些校验证明内容、显式声明与不可变绑定，不声称密码学验证人类身份；调用者负责提供真实用户授权。
 
 ## Teacher / Production Authorization
@@ -90,6 +106,8 @@ python -B scripts/run_lesson_pipeline.py bind-teacher-review --run <run.json> --
 python -B scripts/run_lesson_pipeline.py authorize-production --run <run.json> --authorization <external-authorization.json>
 python -B scripts/run_lesson_pipeline.py status --run <run.json>
 ```
+
+上面的 `ready-for-teacher-review` 仅用于已完成真实 Review 的 run；disposition-only run 已直接 READY。
 
 Teacher Review 由外部提供，沿用 Teacher Review 1.0；本轮不实现 deterministic selector。
 仅 APPROVED/APPROVED_WITH_NOTES 可推进，必须与当前 Content、Source Truth、run ID 和最终
