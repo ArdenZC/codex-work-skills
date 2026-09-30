@@ -195,7 +195,7 @@ def validate_disposition(run):
     return benchmark
 
 
-def validate_run(run, *, run_path=None):
+def validate_run_upstream(run, *, run_path=None):
     require(isinstance(run, dict) and set(run) == {
         "orchestrator_version", "mode", "state", "bindings", "run_fingerprint"}, "invalid run envelope")
     require(run["orchestrator_version"] == IMPLEMENTATION_VERSION and run["mode"] in {"PREVIEW", "PRODUCTION"},
@@ -246,6 +246,7 @@ def validate_run(run, *, run_path=None):
         fresh = content_qa(path_of(run, "content"))
         fresh["created_at"] = qa.get("created_at")
         require(qa == fresh, "STALE or fabricated Preproduction QA evidence")
+    benchmark = None
     review_completed = any(row["to_state"] == "BENCHMARK_REVIEW_COMPLETE" for row in state["transitions"])
     final_disposition_required = state["current_state"] in {
         "READY_FOR_TEACHER_REVIEW", "TEACHER_REVIEW_APPROVED", "PRODUCTION_AUTHORIZED",
@@ -262,13 +263,27 @@ def validate_run(run, *, run_path=None):
         else:
             require(benchmark["review_sha256"] is None,
                     "actual Benchmark Review requires BENCHMARK_REVIEW_COMPLETE history")
+    return benchmark
+
+
+def validate_run(run, *, run_path=None):
+    benchmark = validate_run_upstream(run, run_path=run_path)
+    paths = {name: path_of(run, name) for name in run["bindings"]}
+    state = run["state"]
+    rank = STATES.index(state["current_state"])
+    from teacher_review_packet import validate_teacher_review_packet, validate_teacher_review_against_packet
+    packet = None
+    if "teacher_review_packet" in paths:
+        packet = validate_teacher_review_packet(paths["teacher_review_packet"], run)
     if rank >= STATES.index("TEACHER_REVIEW_APPROVED"):
+        require(packet is not None, "canonical Teacher approval requires teacher_review_packet")
         review, _, errors = validate_teacher_review_files(path_of(run, "teacher_review"),
             source_truth_path=paths["source_truth"], content_path=paths["content"],
             require_approved=True, **evidence_kwargs(run))
         checked(errors)
         require(review["pipeline_run_id"] == state["pipeline_run_id"] and review["benchmark"] == benchmark,
                 "Teacher Review does not match pipeline / final Benchmark disposition")
+        validate_teacher_review_against_packet(review, packet)
     if rank >= STATES.index("PRODUCTION_AUTHORIZED"):
         authorization, _, errors = validate_production_authorization_files(path_of(run, "production_authorization"),
             source_truth_path=paths["source_truth"], content_path=paths["content"],
@@ -306,7 +321,7 @@ def advance(run, next_state, artifact=None):
 
 
 def execute(command, run_path, **options):
-    """One command, one state transition; failed candidates leave state unchanged."""
+    """Most commands advance one transition; Packet preparation only freezes evidence."""
     run_path = Path(run_path).absolute()
     assert_external_outputs((run_path,))
     with run_lock(run_path):
@@ -395,7 +410,28 @@ def execute(command, run_path, **options):
         elif command == "ready-for-teacher-review":
             require(run["state"]["current_state"] == "BENCHMARK_REVIEW_COMPLETE", "explicit final Benchmark disposition required")
             advance(run, "READY_FOR_TEACHER_REVIEW")
+        elif command == "prepare-teacher-review":
+            require(run["state"]["current_state"] == "READY_FOR_TEACHER_REVIEW",
+                    "prepare-teacher-review requires READY_FOR_TEACHER_REVIEW")
+            require("teacher_review_packet" not in run["bindings"], "Packet is already frozen; use status or create a new run")
+            from teacher_review_packet import build_teacher_review_packet
+            packet = build_teacher_review_packet(run)
+            packet_path = run_path.parent / (run_path.stem + "-teacher-review-packet.json")
+            assert_distinct_file_paths({"run": run_path, **{name: path_of(run, name) for name in run["bindings"]},
+                                       "teacher_review_packet": packet_path}, outputs={"teacher_review_packet"})
+            import tempfile
+            with tempfile.TemporaryDirectory(prefix="lesson-teacher-packet-", dir=run_path.parent) as directory:
+                staged = Path(directory) / "packet.json"
+                staged.write_bytes(json_bytes(packet))
+                bind(run, "teacher_review_packet", staged)
+                run["run_fingerprint"] = envelope_fingerprint(run)
+                validate_run(run)
+                run["bindings"]["teacher_review_packet"]["path"] = str(packet_path)
+                run["run_fingerprint"] = envelope_fingerprint(run)
+                _replace_bundle((packet_path, run_path), (packet, run))
+            return run
         elif command == "bind-teacher-review":
+            require("teacher_review_packet" in run["bindings"], "canonical Teacher Review requires a prepared Packet")
             bind(run, "teacher_review", options["teacher_review"])
             advance(run, "TEACHER_REVIEW_APPROVED", ("teacher_review_sha256", "teacher_review"))
         elif command == "authorize-production":
@@ -411,7 +447,7 @@ def execute(command, run_path, **options):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("init", "freeze-source-truth", "prepare-benchmark", "bind-content",
-        "validate-preproduction", "bind-benchmark-disposition", "bind-benchmark-review", "ready-for-teacher-review", "bind-teacher-review",
+        "validate-preproduction", "bind-benchmark-disposition", "bind-benchmark-review", "ready-for-teacher-review", "prepare-teacher-review", "bind-teacher-review",
         "authorize-production", "status"))
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--run-id")

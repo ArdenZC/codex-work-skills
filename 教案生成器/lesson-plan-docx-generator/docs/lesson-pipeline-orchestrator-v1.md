@@ -3,7 +3,7 @@
 独立入口 `scripts/run_lesson_pipeline.py`，复用 Pipeline State Contract 1.0，
 停止于 PRODUCTION_AUTHORIZED。本轮没有 final generator、artifact/visual QA 或 ACCEPTED 集成。
 Skill 2.3.1、Content 2.2/2.3、Template 1.1.2、Acceptance 2.0 和所有既有 Review/Authorization
-合同保持原版本及语义。此路径是 opt-in LIF-03 candidate foundation。
+合同保持原版本及语义。此路径是 opt-in LIF-04 candidate path。
 
 ## 状态与一次一步
 
@@ -17,11 +17,14 @@ Skill 2.3.1、Content 2.2/2.3、Template 1.1.2、Acceptance 2.0 和所有既有 
 | bind-benchmark-disposition | READY_FOR_TEACHER_REVIEW | 无正式 Review 的 PARTIAL/UNAVAILABLE 或用户 waiver；绑定最终 disposition 与不可变 evidence |
 | bind-benchmark-review | BENCHMARK_REVIEW_COMPLETE | 实际完成的 full-linkage Review（包括真实 partial Review）与最终 disposition |
 | ready-for-teacher-review | READY_FOR_TEACHER_REVIEW | 从真实 BENCHMARK_REVIEW_COMPLETE 重验上述完整链 |
-| bind-teacher-review | TEACHER_REVIEW_APPROVED | 外部 APPROVED / APPROVED_WITH_NOTES Teacher Review |
+| prepare-teacher-review | READY_FOR_TEACHER_REVIEW（不变） | 原子发布 deterministic Packet + run binding，不记录 transition |
+| bind-teacher-review | TEACHER_REVIEW_APPROVED | 外部 APPROVED / APPROVED_WITH_NOTES Teacher Review；IDs/顺序/reasons 与 Packet exact-match |
 | authorize-production | PRODUCTION_AUTHORIZED | 外部合法 Production Authorization 全链、Skill/Template/runtime 复验 |
 | status | 不变 | 重新读取所有上游字节与语义，支持独立进程恢复 |
 
-任何命令只执行一个 transition，不自动完成多个人工步骤、不生成正文或 APPROVED。
+大部分推进命令只执行一个 transition；`prepare-teacher-review` 只冻结 human-review input，
+不推进 lifecycle state，不制造 same-state transition。status 同样不推进状态。
+不自动完成多个人工步骤、不生成正文、Teacher 评分/notes 或 APPROVED。
 REVISION_REQUIRED、缺证据、未知命令或裸状态字符串全部 fail closed。
 
 ## 使用
@@ -130,3 +133,28 @@ O_EXCL lock 拒绝并发写入；candidate 先验证再原子替换。Preparatio
 
 Legacy generator 默认 `--benchmark-mode none` 继续兼容。
 直接 generator 的 `production_pass` 表示 artifact transaction 成功，不能等同 lifecycle ACCEPTED。
+
+
+## Deterministic Teacher Review Packet
+
+```text
+READY_FOR_TEACHER_REVIEW
+    ↓ prepare-teacher-review（状态不变）
+Deterministic Teacher Review Packet 1.0
+    ↓ Human Teacher Review（外部 artifact）
+bind-teacher-review
+    ↓
+TEACHER_REVIEW_APPROVED
+```
+
+Packet 写入 `<run-stem>-teacher-review-packet.json`，run envelope 的
+`bindings.teacher_review_packet` 保存 path + bytes SHA；Pipeline State Contract
+1.0 不添加字段。算法与独立校验见
+[teacher-review-selection-v1.md](teacher-review-selection-v1.md)。READY 尚无 Packet
+可 status；一旦绑定每次 resume 必须重验。Teacher-approved 及以后 Packet mandatory。
+绑定 Teacher Review 时，selected lesson IDs、order、selection_reasons 与重新派生的
+Packet 必须 exact equality。人工可填评分、备注和判断，不能减少/替换审查样本。
+旧 standalone Teacher Review 1.0 合同仍兼容；canonical PRODUCTION 路径拒绝任意手挑样本。
+PREVIEW 可准备 Packet / 绑定外部 Review，仍拒绝 Production Authorization。
+Content、disposition、Review 或 shard 任意 bytes 改变使旧 run / Packet / Review stale，
+须新建 run；禁止静默重新绑定。

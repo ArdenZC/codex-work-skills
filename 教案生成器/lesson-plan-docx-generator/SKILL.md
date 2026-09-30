@@ -19,7 +19,10 @@ Production Authorization。独立 CLI 与证据规则见
 [`docs/benchmark-preparation-v1.md`](docs/benchmark-preparation-v1.md)。
 PREVIEW 不能产生 Production Authorization；PRODUCTION 必须有真实准备链或外部用户 waiver，
 不能静默使用 BENCHMARK_NOT_EXECUTED。每个 transition/resume 重新读取实际上游字节。
-本轮止于 PRODUCTION_AUTHORIZED，Teacher selector、Acceptance 3.0 和最终生成/验收集成 deferred。
+LIF-04 candidate 在 READY 通过 `prepare-teacher-review` 冻结独立 Packet 1.0（不推进状态），
+机器确定样本，人工填写 Review；绑定时 IDs/顺序/reasons 必须 exact-match。算法见
+[`docs/teacher-review-selection-v1.md`](docs/teacher-review-selection-v1.md)。
+本轮仍止于 PRODUCTION_AUTHORIZED，Acceptance 3.0、Visual Review 和最终生成/验收集成 deferred。
 Legacy generator 的默认 benchmark-mode none 保留；其 production_pass 是 artifact transaction
 成功，不表示 lifecycle ACCEPTED 或教师最终教学验收。
 
