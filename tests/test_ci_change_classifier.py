@@ -56,6 +56,8 @@ class ChangeClassifierTests(unittest.TestCase):
             "教案生成器/lesson-plan-docx-generator/scripts/validate_output.py",
             "教案生成器/lesson-plan-docx-generator/schemas/practice-task-contract.schema.json",
             "教案生成器/lesson-plan-docx-generator/schemas/benchmark-authorization.schema.json",
+            "教案生成器/lesson-plan-docx-generator/scripts/benchmark_quality_eligibility.py",
+            "教案生成器/lesson-plan-docx-generator/schemas/benchmark-quality-eligibility.schema.json",
             "教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.2/manifest.yaml",
             "教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.2/template.docx",
             "教案生成器/lesson-plan-docx-generator/manifest.yaml",

@@ -9,6 +9,8 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 Lifecycle 1.0 foundation exists but is not yet the default production orchestrator.
 
+Benchmark Quality Eligibility 1.0 is an independent, offline group-level foundation; `QUALIFIED` does not mean excellent teaching. Its explicit helpers and evidence rules are in `docs/benchmark-quality-eligibility-v1.md`. Existing Benchmark defaults remain unchanged; no quality sidecar is mandatory in 2.3.1.
+
 ## 任务入口与一次性确认
 
 任务开始先读取当前会话、用户附件、能力图谱、章节任务拆解、课程标准、教材目录和指定模板。正式规划前进入 `INTAKE_PENDING`，用中文集中确认一次：课程名称、专业、授课对象、总课时、理论课时、实践课时、理论与实践组织方式、单课课时默认 2 学时、使用教材、辅助参考资料、是否同时生成实践任务工单。核心字段未给出显示“待补充”；理论/实践拆分、组织方式和工单偏好未给出显示“待确认”；推断的专业或对象标记“当前理解 / 如不准确请修改”。不得默认 50/50、综合式或“不需要”。

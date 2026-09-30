@@ -146,6 +146,9 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "lesson-lifecycle": SuiteSpec(
             "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
         ),
+        "lesson-quality": SuiteSpec(
+            "lesson-quality", True, "module", _module_count("tests.test_benchmark_quality_eligibility")
+        ),
         # This slice exercises Python/DOCX generation and package contracts;
         # LibreOffice/COM rendering is confined to the inherited content
         # regression and gradebook/release validators.  Keeping this shard
@@ -177,8 +180,8 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 
 ALIASES = {
-    "fast": ("lesson-content", "lesson-lifecycle", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "fast": ("lesson-content", "lesson-lifecycle", "lesson-quality", "package-contracts", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -206,6 +209,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return _lesson_content_ids()
     if name == "lesson-lifecycle":
         return ("tests.test_lesson_lifecycle_contracts",)
+    if name == "lesson-quality":
+        return ("tests.test_benchmark_quality_eligibility",)
     if name == "lesson-package":
         return _lesson_package_ids()
     if name == "package-contracts":
@@ -397,9 +402,13 @@ def _run_discovery(name: str, *, verbose: bool) -> int:
         start_dir = GRADEBOOK_SKILL_TESTS
     else:
         raise ValueError(f"unsupported discovery suite: {name}")
-    suite = unittest.defaultTestLoader.discover(str(start_dir), pattern="test_*")
-    result = unittest.TextTestRunner(verbosity=2 if verbose else 1).run(suite)
-    return 0 if result.wasSuccessful() else 1
+    # _suite_specs imports Lesson suites before dispatch, which can retain the
+    # Lesson package_common in sys.modules. Discovery needs a fresh interpreter
+    # as well as a distinct test_package name, particularly for Gradebook.
+    command = [sys.executable, "-B", "-m", "unittest", "discover", "-s", str(start_dir), "-p", "test_*"]
+    if verbose:
+        command.append("-v")
+    return subprocess.run(command, cwd=ROOT, env=os.environ.copy(), check=False).returncode
 
 
 def _run_worker(name: str, *, verbose: bool) -> int:

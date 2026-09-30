@@ -84,7 +84,7 @@ class TestShardManifest(unittest.TestCase):
     def test_lesson_release_scale_suite_is_separate_and_serialized(self) -> None:
         specs = run_test_shards._suite_specs()
         full = run_test_shards._expand_suites(("full",), specs)
-        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-benchmark", "hardening")
+        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-benchmark", "hardening")
         self.assertIn("lesson-release-scale", specs)
         self.assertNotIn("lesson-release-scale", full)
         self.assertTrue(
@@ -96,6 +96,24 @@ class TestShardManifest(unittest.TestCase):
             specs["lesson-release-scale"].count,
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_release_scale_e2e").countTestCases(),
         )
+
+    def test_quality_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
+        specs = run_test_shards._suite_specs()
+        self.assertEqual(
+            specs["lesson-quality"].count,
+            unittest.defaultTestLoader.loadTestsFromName("tests.test_benchmark_quality_eligibility").countTestCases(),
+        )
+        self.assertEqual(("tests.test_benchmark_quality_eligibility",), run_test_shards._suite_test_ids("lesson-quality"))
+        for alias in ("fast", "full", "ci"):
+            self.assertIn("lesson-quality", run_test_shards._expand_suites((alias,), specs))
+
+    def test_gradebook_discovery_worker_does_not_reuse_lesson_package_common(self) -> None:
+        result = subprocess.run(
+            [sys.executable, "-B", str(SCRIPTS / "run_test_shards.py"), "--worker", "--suite", "gradebook-skill"],
+            cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("Ran 2 tests", result.stderr)
 
     def test_list_json_reports_parallel_safety_and_counts(self) -> None:
         result = subprocess.run(
