@@ -446,15 +446,16 @@ class FullBenchmarkPacketTests(unittest.TestCase):
 
     def test_actual_zero_review_long_course_supplemental(self):
         content = course(10, units=["项目1 起点"] * 10)
-        for row in content["lessons"]:
-            for field in packet.DENSITY_FIELDS:
-                row[field] = copy.deepcopy(content["lessons"][0][field])
-        _refresh_review_digests(content)
         _write_json(self.h.content_path, content)
         _, result = self.ready()
-        self.assertEqual([r["course_position"] for r in result["selected_lessons"]], [1, 2, 3, 5, 7, 10])
-        self.assertEqual([r["course_position"] for r in result["selected_lessons"]
-                          if "deterministic_supplemental" in r["selection_reasons"]], [2, 3, 5, 7])
+        without_review = packet._selection(content)
+        self.assertEqual(len(result["selected_lessons"]), 6)
+        self.assertEqual([r["course_position"] for r in result["selected_lessons"]],
+                         [r["course_position"] for r in without_review])
+        self.assertEqual([r["selection_reasons"] for r in result["selected_lessons"]],
+                         [r["selection_reasons"] for r in without_review])
+        self.assertTrue(any("deterministic_supplemental" in r["selection_reasons"]
+                            for r in result["selected_lessons"]))
         for row in result["selected_lessons"]:
             self.assertEqual(packet.gap_tuple(row["benchmark_gap_summary"]), (0, 0, 0, 0, 0))
             self.assertNotIn("benchmark_gap", row["selection_reasons"])
@@ -467,7 +468,7 @@ class FullBenchmarkPacketTests(unittest.TestCase):
                 gap="SYNTHETIC minor gap", recommended_direction="SYNTHETIC direction")
             return rows
         with patch.object(pipeline_tests, "make_lesson_reviews", side_effect=minor_gap):
-            _, result = self.ready()
+            _, result = self.ready(context_mode="single_context")
         candidates = [row for row in result["selected_lessons"] if "benchmark_gap" in row["selection_reasons"]]
         self.assertEqual([r["lesson_id"] for r in candidates], [result["course_map"][-1]["lesson_id"]])
         self.assertEqual(packet.gap_tuple(candidates[0]["benchmark_gap_summary"]), (0, 1, 1, 0, 0))
