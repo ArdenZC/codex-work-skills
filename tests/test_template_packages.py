@@ -3774,6 +3774,7 @@ esac
         self.assertIn("--suite lesson-content", lesson_steps)
         self.assertIn("--suite lesson-lifecycle", lesson_steps)
         self.assertIn("--suite lesson-quality", lesson_steps)
+        self.assertIn("--suite lesson-pipeline", lesson_steps)
         self.assertIn("--suite lesson-package", lesson_steps)
         self.assertIn("--suite hardening", lesson_steps)
 

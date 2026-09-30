@@ -149,6 +149,10 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "lesson-quality": SuiteSpec(
             "lesson-quality", True, "module", _module_count("tests.test_benchmark_quality_eligibility")
         ),
+        "lesson-pipeline": SuiteSpec(
+            "lesson-pipeline", True, "module",
+            _module_count("tests.test_benchmark_preparation") + _module_count("tests.test_lesson_pipeline")
+        ),
         # This slice exercises Python/DOCX generation and package contracts;
         # LibreOffice/COM rendering is confined to the inherited content
         # regression and gradebook/release validators.  Keeping this shard
@@ -180,8 +184,8 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 
 ALIASES = {
-    "fast": ("lesson-content", "lesson-lifecycle", "lesson-quality", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "fast": ("lesson-content", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "package-contracts", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -211,6 +215,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return ("tests.test_lesson_lifecycle_contracts",)
     if name == "lesson-quality":
         return ("tests.test_benchmark_quality_eligibility",)
+    if name == "lesson-pipeline":
+        return ("tests.test_benchmark_preparation", "tests.test_lesson_pipeline")
     if name == "lesson-package":
         return _lesson_package_ids()
     if name == "package-contracts":

@@ -9,6 +9,20 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 Lifecycle 1.0 foundation exists but is not yet the default production orchestrator.
 
+## Lifecycle Production Candidate Path
+
+Skill 2.3.1 opt-in LIF-03 candidate foundation（不是 Skill 2.4 stable）：Source Truth →
+外部 Quality Eligibility → Quality-Gated Benchmark Preparation → 外部 Agent Content →
+Preproduction QA → 明确最终 Benchmark Review/disposition → 外部 Teacher Review →
+Production Authorization。独立 CLI 与证据规则见
+[`docs/lesson-pipeline-orchestrator-v1.md`](docs/lesson-pipeline-orchestrator-v1.md) 和
+[`docs/benchmark-preparation-v1.md`](docs/benchmark-preparation-v1.md)。
+PREVIEW 不能产生 Production Authorization；PRODUCTION 必须有真实准备链或外部用户 waiver，
+不能静默使用 BENCHMARK_NOT_EXECUTED。每个 transition/resume 重新读取实际上游字节。
+本轮止于 PRODUCTION_AUTHORIZED，Teacher selector、Acceptance 3.0 和最终生成/验收集成 deferred。
+Legacy generator 的默认 benchmark-mode none 保留；其 production_pass 是 artifact transaction
+成功，不表示 lifecycle ACCEPTED 或教师最终教学验收。
+
 Benchmark Quality Eligibility 1.0 is an independent, offline group-level foundation; `QUALIFIED` does not mean excellent teaching. Its explicit helpers and evidence rules are in `docs/benchmark-quality-eligibility-v1.md`. Existing Benchmark defaults remain unchanged; no quality sidecar is mandatory in 2.3.1.
 
 ## 任务入口与一次性确认
