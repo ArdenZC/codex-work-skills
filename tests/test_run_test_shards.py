@@ -84,7 +84,7 @@ class TestShardManifest(unittest.TestCase):
     def test_lesson_release_scale_suite_is_separate_and_serialized(self) -> None:
         specs = run_test_shards._suite_specs()
         full = run_test_shards._expand_suites(("full",), specs)
-        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-benchmark", "hardening")
+        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-benchmark", "hardening")
         self.assertIn("lesson-release-scale", specs)
         self.assertNotIn("lesson-release-scale", full)
         self.assertTrue(
@@ -106,6 +106,15 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(("tests.test_benchmark_quality_eligibility",), run_test_shards._suite_test_ids("lesson-quality"))
         for alias in ("fast", "full", "ci"):
             self.assertIn("lesson-quality", run_test_shards._expand_suites((alias,), specs))
+
+    def test_pipeline_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
+        specs = run_test_shards._suite_specs()
+        modules = ("tests.test_benchmark_preparation", "tests.test_lesson_pipeline")
+        self.assertEqual(sum(unittest.defaultTestLoader.loadTestsFromName(m).countTestCases() for m in modules),
+                         specs["lesson-pipeline"].count)
+        self.assertEqual(modules, run_test_shards._suite_test_ids("lesson-pipeline"))
+        for alias in ("fast", "full", "ci"):
+            self.assertIn("lesson-pipeline", run_test_shards._expand_suites((alias,), specs))
 
     def test_gradebook_discovery_worker_does_not_reuse_lesson_package_common(self) -> None:
         result = subprocess.run(

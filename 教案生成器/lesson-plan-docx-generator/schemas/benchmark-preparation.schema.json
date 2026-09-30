@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lesson Benchmark Preparation Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "preparation_contract_version",
+    "pipeline_run_id",
+    "source_catalog_id",
+    "projected_catalog_id",
+    "split_id",
+    "source_catalog_fingerprint",
+    "source_catalog_file_sha256",
+    "quality_eligibility_fingerprint",
+    "quality_eligibility_file_sha256",
+    "projected_catalog_fingerprint",
+    "projected_catalog_file_sha256",
+    "split_fingerprint",
+    "split_file_sha256",
+    "authoring_pack_sha256",
+    "holdout_pack_sha256",
+    "preparation_fingerprint",
+    "eligible_group_ids",
+    "created_at",
+    "disposition",
+    "authoring_quality_availability",
+    "holdout_quality_availability",
+    "benchmark_quality_availability"
+  ],
+  "properties": {
+    "preparation_contract_version": {
+      "const": "1.0"
+    },
+    "pipeline_run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source_catalog_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "projected_catalog_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "split_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source_catalog_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_catalog_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "quality_eligibility_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "quality_eligibility_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "projected_catalog_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "projected_catalog_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "split_file_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "authoring_pack_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "holdout_pack_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "preparation_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "eligible_group_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "disposition": {
+      "enum": [
+        "BENCHMARK_READY",
+        "BENCHMARK_PARTIAL",
+        "BENCHMARK_UNAVAILABLE"
+      ]
+    },
+    "authoring_quality_availability": {
+      "enum": [
+        "AVAILABLE",
+        "PARTIAL",
+        "UNAVAILABLE"
+      ]
+    },
+    "holdout_quality_availability": {
+      "enum": [
+        "AVAILABLE",
+        "PARTIAL",
+        "UNAVAILABLE"
+      ]
+    },
+    "benchmark_quality_availability": {
+      "enum": [
+        "AVAILABLE",
+        "PARTIAL",
+        "UNAVAILABLE"
+      ]
+    }
+  }
+}
