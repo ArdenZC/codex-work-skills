@@ -85,8 +85,11 @@ are rounded or invented.
 **Benchmark:** from each verified lesson shard's 15 dimensions, maximize
 `(major_count, GAP_count, minor_count, PARTIAL_count, advisory_count)`, ties earlier.
 Counts use exact `severity` and `status`, without guessed text meaning.
-A real Review always supplies a candidate, including an all-zero tuple (then the
-first lesson wins); this is a structural ranking, not a claim that a gap exists.
+A real Benchmark Review supplies per-Lesson gap summaries. `benchmark_gap` is a
+selection reason only when the best verified tuple contains at least one non-zero
+signal. An all-zero Review does not fabricate a gap candidate; the existing
+deterministic supplemental mechanism fills any remaining slots. This metric is a
+review coverage signal, not an automatic Teacher judgment.
 Existing REVISION_REQUIRED blocks lifecycle advancement even though the selector's
 ranking mechanics can represent major gaps. Each selected lesson gets only counts
 and sorted dimension IDs with GAP/PARTIAL, never a copied full Review.

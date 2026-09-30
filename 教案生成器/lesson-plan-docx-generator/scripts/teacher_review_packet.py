@@ -108,6 +108,8 @@ def _selection(content, reviews=None):
         reasons[practice].add("highest_practice_complexity")
     gaps = [gap_summary(reviews[row["lesson_id"]]) if reviews is not None else None for row in lessons]
     gap = max(range(count), key=lambda i: (gap_tuple(gaps[i]), -i)) if reviews is not None else None
+    if gap is not None and not any(gap_tuple(gaps[gap])):
+        gap = None
     if gap is not None:
         reasons[gap].add("benchmark_gap")
     target = min(count, 6)

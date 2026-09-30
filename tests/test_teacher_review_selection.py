@@ -139,11 +139,30 @@ class SelectorTests(unittest.TestCase):
         self.assertEqual(self.reason_position(c, "benchmark_gap", shards), [3])
 
     def test_no_actual_review_no_gap(self): self.assertEqual(self.reason_position(course(), "benchmark_gap"), [])
+
+    def test_all_zero_review_supplemental_matches_no_review(self):
+        c = course(10, units=["项目1 起点"] * 10)
+        for row in c["lessons"]:
+            for field in packet.DENSITY_FIELDS:
+                row[field] = copy.deepcopy(c["lessons"][0][field])
+        _refresh_review_digests(c)
+        reviews = synthetic_shards(c)
+        self.assertEqual(self.positions(c, reviews), [1, 2, 3, 5, 7, 10])
+        self.assertEqual(self.reason_position(c, "deterministic_supplemental", reviews), [2, 3, 5, 7])
+        self.assertEqual(self.reason_position(c, "benchmark_gap", reviews), [])
+        self.assertEqual([r["selection_reasons"] for r in packet._selection(c, reviews)],
+                         [r["selection_reasons"] for r in packet._selection(c)])
+
+    def test_advisory_signal_candidate(self):
+        c = course(7)
+        reviews = synthetic_shards(c, {"L04": [("PARTIAL", "advisory")]})
+        self.assertEqual(self.reason_position(c, "benchmark_gap", reviews), [4])
+
     def test_duplicate_candidates_deduplicated(self):
         c = course(10, units=["项目1 起点"] * 10)
         rows = packet._selection(c, synthetic_shards(c))
         self.assertEqual(len(rows), 6)
-        self.assertIn("benchmark_gap", rows[0]["selection_reasons"])
+        self.assertFalse(any("benchmark_gap" in row["selection_reasons"] for row in rows))
         self.assertEqual(len({row["lesson_id"] for row in rows}), 6)
 
     def test_supplemental_fills_target(self):
@@ -411,14 +430,85 @@ class FullBenchmarkPacketTests(unittest.TestCase):
     def test_real_completed_review_shards_used(self):
         run, result = self.ready()
         self.assertEqual(result["benchmark_review_sha256"], sha256_file(pipeline.path_of(run, "benchmark_review")))
-        self.assertIn("benchmark_gap", result["selected_lessons"][0]["selection_reasons"])
-        self.assertEqual(result["selected_lessons"][0]["benchmark_gap_summary"]["GAP_count"], 0)
+        self.assertEqual(result["benchmark"]["disposition"], "BENCHMARK_REVIEW_COMPLETE")
+        for row in result["selected_lessons"]:
+            self.assertNotIn("benchmark_gap", row["selection_reasons"])
+            self.assertIsNotNone(row["benchmark_gap_summary"])
+            self.assertEqual(packet.gap_tuple(row["benchmark_gap_summary"]), (0, 0, 0, 0, 0))
+            self.assertEqual(row["benchmark_gap_summary"]["gap_dimension_ids"], [])
+        self.assertEqual(len(result["selected_lessons"]), len(result["course_map"]))
         packet.validate_teacher_review_packet(pipeline.path_of(run, "teacher_review_packet"), run)
 
-    def test_actual_partial_review_has_gap_candidate(self):
+    def test_actual_partial_disposition_zero_review_has_no_gap_candidate(self):
         _, result = self.ready(context_mode="single_context")
         self.assertEqual(result["benchmark"]["disposition"], "BENCHMARK_PARTIAL")
-        self.assertIn("benchmark_gap", result["selected_lessons"][0]["selection_reasons"])
+        self.assertFalse(any("benchmark_gap" in row["selection_reasons"] for row in result["selected_lessons"]))
+
+    def test_actual_zero_review_long_course_supplemental(self):
+        content = course(10, units=["项目1 起点"] * 10)
+        for row in content["lessons"]:
+            for field in packet.DENSITY_FIELDS:
+                row[field] = copy.deepcopy(content["lessons"][0][field])
+        _refresh_review_digests(content)
+        _write_json(self.h.content_path, content)
+        _, result = self.ready()
+        self.assertEqual([r["course_position"] for r in result["selected_lessons"]], [1, 2, 3, 5, 7, 10])
+        self.assertEqual([r["course_position"] for r in result["selected_lessons"]
+                          if "deterministic_supplemental" in r["selection_reasons"]], [2, 3, 5, 7])
+        for row in result["selected_lessons"]:
+            self.assertEqual(packet.gap_tuple(row["benchmark_gap_summary"]), (0, 0, 0, 0, 0))
+            self.assertNotIn("benchmark_gap", row["selection_reasons"])
+
+    def test_actual_review_minor_gap_candidate(self):
+        original = pipeline_tests.make_lesson_reviews
+        def minor_gap(*args, **kwargs):
+            rows = original(*args, **kwargs)
+            rows[-1]["dimensions"][0].update(status="GAP", severity="minor",
+                gap="SYNTHETIC minor gap", recommended_direction="SYNTHETIC direction")
+            return rows
+        with patch.object(pipeline_tests, "make_lesson_reviews", side_effect=minor_gap):
+            _, result = self.ready()
+        candidates = [row for row in result["selected_lessons"] if "benchmark_gap" in row["selection_reasons"]]
+        self.assertEqual([r["lesson_id"] for r in candidates], [result["course_map"][-1]["lesson_id"]])
+        self.assertEqual(packet.gap_tuple(candidates[0]["benchmark_gap_summary"]), (0, 1, 1, 0, 0))
+
+    def test_actual_review_advisory_only_candidate(self):
+        original = pipeline_tests.make_lesson_reviews
+        def advisory(*args, **kwargs):
+            rows = original(*args, **kwargs)
+            rows[-1]["dimensions"][0].update(severity="advisory")
+            return rows
+        with patch.object(pipeline_tests, "make_lesson_reviews", side_effect=advisory):
+            _, result = self.ready()
+        candidates = [row for row in result["selected_lessons"] if "benchmark_gap" in row["selection_reasons"]]
+        self.assertEqual([r["lesson_id"] for r in candidates], [result["course_map"][-1]["lesson_id"]])
+        self.assertEqual(packet.gap_tuple(candidates[0]["benchmark_gap_summary"]), (0, 0, 0, 0, 1))
+
+    def test_actual_zero_review_teacher_invented_gap_rejected(self):
+        _, result = self.ready()
+        review = _teacher_review(self.h.source_path.read_bytes(), self.h.content_path.read_bytes(), result["benchmark"])
+        template = review["selected_lessons"][0]
+        review["selected_lessons"] = [dict(copy.deepcopy(template), lesson_id=row["lesson_id"],
+            selection_reasons=list(row["selection_reasons"])) for row in result["selected_lessons"]]
+        review["selected_lessons"][0]["selection_reasons"].append("benchmark_gap")
+        review["review_fingerprint"] = teacher_review_fingerprint(review)
+        path = self.h.folder / "invented-gap-teacher.json"
+        _write_json(path, review)
+        with self.assertRaisesRegex(ValueError, "exactly match"):
+            packet.validate_teacher_review_against_packet(review, result)
+        self.h.rejected("bind-teacher-review", teacher_review=path)
+
+    def test_zero_to_nonzero_shard_makes_packet_stale(self):
+        run, result = self.ready()
+        path = next(pipeline.path_of(run, "lesson_reviews_dir").glob("*.json"))
+        review = json.loads(path.read_bytes())
+        self.assertEqual(packet.gap_tuple(packet.gap_summary(review)), (0, 0, 0, 0, 0))
+        review["dimensions"][0].update(status="GAP", severity="minor",
+            gap="SYNTHETIC new signal", recommended_direction="SYNTHETIC direction")
+        _write_json(path, review)
+        with self.assertRaises(ValueError):
+            packet.validate_teacher_review_packet(pipeline.path_of(run, "teacher_review_packet"), run)
+        self.h.rejected("status")
 
     def test_review_changed_packet_stale(self):
         run, _ = self.ready()
