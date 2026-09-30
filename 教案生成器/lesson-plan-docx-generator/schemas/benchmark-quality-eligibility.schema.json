@@ -1,0 +1,346 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/schemas/benchmark-quality-eligibility.schema.json",
+  "title": "Benchmark Quality Eligibility Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "quality_eligibility_contract_version",
+    "quality_policy_version",
+    "qualification_policy_version",
+    "catalog_id",
+    "catalog_fingerprint",
+    "created_at",
+    "eligibility_fingerprint",
+    "groups"
+  ],
+  "properties": {
+    "quality_eligibility_contract_version": {
+      "const": "1.0"
+    },
+    "quality_policy_version": {
+      "const": "benchmark-quality-eligibility-v1"
+    },
+    "qualification_policy_version": {
+      "const": "teaching-exemplar-qualification-v1"
+    },
+    "catalog_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300,
+      "pattern": "\\S"
+    },
+    "catalog_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "eligibility_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    }
+  },
+  "$defs": {
+    "evidence_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exemplar_id",
+        "field",
+        "item_index",
+        "value_sha256"
+      ],
+      "properties": {
+        "exemplar_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "\\S"
+        },
+        "field": {
+          "enum": [
+            "source.recognition_evidence",
+            "design_patterns",
+            "difficulty_breakthrough_patterns",
+            "student_activity_patterns",
+            "learning_evidence_patterns",
+            "assessment_patterns",
+            "differentiation_patterns",
+            "reflection_patterns",
+            "transferable_principles",
+            "non_transferable_context",
+            "scope.education_level",
+            "scope.vocational_level",
+            "scope.domain",
+            "scope.course",
+            "scope.scope_mode",
+            "scope.topic",
+            "scope.learner_profile",
+            "scope.duration_minutes",
+            "scope.teaching_context"
+          ]
+        },
+        "item_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "value_sha256": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "qualified_exemplar_ids",
+        "decision",
+        "rationale",
+        "authority_excellence_basis",
+        "course_relevance",
+        "learner_relevance",
+        "teaching_context_relevance",
+        "pattern_evidence",
+        "transferability"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "pattern": "\\S"
+        },
+        "qualified_exemplar_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "pattern": "\\S"
+          }
+        },
+        "decision": {
+          "enum": [
+            "QUALITY_ELIGIBLE",
+            "CONDITIONAL",
+            "REJECTED"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "pattern": "\\S"
+        },
+        "authority_excellence_basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "evidence_refs"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "SUPPORTED",
+                "INSUFFICIENT_EVIDENCE"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            }
+          }
+        },
+        "course_relevance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "evidence_refs"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "DIRECT_MATCH",
+                "TRANSFERABLE",
+                "MISMATCH",
+                "INSUFFICIENT_EVIDENCE"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            }
+          }
+        },
+        "learner_relevance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "evidence_refs"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "MATCH",
+                "ADJACENT",
+                "MISMATCH",
+                "INSUFFICIENT_EVIDENCE"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            }
+          }
+        },
+        "teaching_context_relevance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "evidence_refs"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "MATCH",
+                "TRANSFERABLE",
+                "MISMATCH",
+                "INSUFFICIENT_EVIDENCE"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            }
+          }
+        },
+        "pattern_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "evidence_refs"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "SUFFICIENT",
+                "INSUFFICIENT"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            }
+          }
+        },
+        "transferability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "rationale",
+            "evidence_refs"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "SUFFICIENT",
+                "INSUFFICIENT"
+              ]
+            },
+            "rationale": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000,
+              "pattern": "\\S"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "maxItems": 100,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/evidence_ref"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
