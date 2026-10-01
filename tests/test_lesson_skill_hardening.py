@@ -520,6 +520,18 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 "v21_practice_link_mismatch",
             },
         )
+        scope_controls = {
+            item["id"]: item["detector"]
+            for item in catalog
+            if item["id"] in {"nursing_sql_contamination", "database_patient_bp"}
+        }
+        self.assertEqual(
+            scope_controls,
+            {
+                "nursing_sql_contamination": "frozen-outline course-scope grounding + intra-lesson coherence",
+                "database_patient_bp": "frozen-outline course-scope grounding + intra-lesson coherence",
+            },
+        )
         controls = lesson_acceptance.negative_controls()
         self.assertEqual(controls["status"], "not_executed")
         self.assertEqual(controls["transaction_safety"]["candidate_cleanup"], "not_executed")

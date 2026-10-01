@@ -89,10 +89,20 @@ class TestShardManifest(unittest.TestCase):
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_lifecycle_contracts").countTestCases(),
         )
 
+    def test_lesson_course_scope_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
+        specs = run_test_shards._suite_specs()
+        module = "tests.test_lesson_course_scope"
+        self.assertIn("lesson-course-scope", specs)
+        self.assertEqual(specs["lesson-course-scope"].count,
+                         unittest.defaultTestLoader.loadTestsFromName(module).countTestCases())
+        self.assertEqual((module,), run_test_shards._suite_test_ids("lesson-course-scope"))
+        for alias in ("fast", "full", "ci"):
+            self.assertIn("lesson-course-scope", run_test_shards._expand_suites((alias,), specs))
+
     def test_lesson_release_scale_suite_is_separate_and_serialized(self) -> None:
         specs = run_test_shards._suite_specs()
         full = run_test_shards._expand_suites(("full",), specs)
-        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-benchmark", "hardening")
+        regular_lesson = ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-benchmark", "hardening")
         self.assertIn("lesson-release-scale", specs)
         self.assertNotIn("lesson-release-scale", full)
         self.assertTrue(

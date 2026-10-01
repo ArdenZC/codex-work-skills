@@ -42,6 +42,7 @@ from package_common import (
     lesson_agent_content,
     practice_hour_allocation_errors_v23,
 )
+from course_scope_grounding import format_scope_failures, validate_course_scope_grounding
 
 
 # This starts at the level where a repeated Chinese sentence is substantive,
@@ -1523,7 +1524,12 @@ def _intra_diagnostic_evidence(evidence: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]) -> dict[str, Any]:
+def _intra_lesson_coherence(
+    lessons: list[dict[str, Any]],
+    lesson_ids: list[str],
+    *,
+    require_body_scope_anchors: bool = False,
+) -> dict[str, Any]:
     """Require one substantive connected component for the lesson's main chain."""
 
     checks: list[dict[str, Any]] = []
@@ -1893,6 +1899,44 @@ def _intra_lesson_coherence(lessons: list[dict[str, Any]], lesson_ids: list[str]
                     }
                 )
         failures.extend(implementation_failures)
+        if require_body_scope_anchors:
+            scope_values = [
+                ("unit", lesson.get("unit", "")),
+                ("task", lesson.get("task", "")),
+                ("deliverable", lesson.get("progression", {}).get("deliverable", "")),
+                ("prior_learning", lesson.get("progression", {}).get("prior_learning", "")),
+                ("next_bridge", lesson.get("progression", {}).get("next_bridge", "")),
+            ]
+            for node_id in sorted(set(body_node_ids) - task_component_ids):
+                node = node_by_id[node_id]
+                scope_evidence = [
+                    (field, _intra_anchor_evidence(node.get("value", ""), value))
+                    for field, value in scope_values
+                    if value
+                ]
+                best_scope_anchor = max(
+                    scope_evidence,
+                    key=lambda item: (
+                        item[1].get("status") == "passed",
+                        item[1].get("score", 0.0),
+                        item[0],
+                    ),
+                    default=(None, {"status": "failed", "score": 0.0, "reason": "no lesson scope anchors"}),
+                )
+                anchor_field, evidence = best_scope_anchor
+                if evidence.get("status") != "passed":
+                    failures.append(
+                        {
+                            "lesson_id": lesson_id,
+                            "failed_gate": "instructional_body_coherence",
+                            "score": evidence.get("score", 0.0),
+                            "anchor_status": "failed",
+                            "reason": "instructional body content is disconnected from task, deliverable, and progression anchors",
+                            "diagnostic": _diagnostic_fragment(node.get("value", "")),
+                            "scope_anchor_field": anchor_field,
+                            "evidence": _intra_diagnostic_evidence(evidence),
+                        }
+                    )
     return {
         "status": "passed" if not failures else "failed",
         "lessons": checks,
@@ -3266,7 +3310,14 @@ def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+def _assess_content_quality_v22(
+    data: dict[str, Any],
+    manifest: dict[str, Any] | None = None,
+    *,
+    source_truth_path: str | None = None,
+    content_path: str | None = None,
+    require_local_outline: bool = False,
+) -> dict[str, Any]:
     """Content 2.2 quality boundary: facts are deterministic, pedagogy is Agent-reviewed."""
 
     lessons = data.get("lessons", [])
@@ -3274,6 +3325,16 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
     errors = [f"confirmed course information: {message}" for message in confirmed_course_info_errors(data)]
     agent_review, review_errors = _v22_agent_review_report(lessons, lesson_ids)
     errors.extend(review_errors)
+    scoped_intra = _intra_lesson_coherence(
+        lessons,
+        lesson_ids,
+        require_body_scope_anchors=source_truth_path is not None,
+    )
+    if source_truth_path is not None and scoped_intra["status"] != "passed":
+        errors.extend(
+            f"intra_lesson_coherence {item['lesson_id']} {item['failed_gate']}: {item['reason']}"
+            for item in scoped_intra["failures"]
+        )
     exact_duplicates, duplicate_errors = _v22_exact_duplicate_report(lessons, lesson_ids)
     errors.extend(duplicate_errors)
 
@@ -3319,6 +3380,16 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
     )
     if practice_handoff["status"] == "failed":
         errors.append("practice handoff: task hours and WorkOrder count do not reconcile")
+
+    course_scope_grounding = validate_course_scope_grounding(
+        data,
+        source_truth_path,
+        content_path=content_path,
+        require_local_outline=require_local_outline,
+        intra_lesson_report=scoped_intra,
+    )
+    if course_scope_grounding["status"] == "failed":
+        errors.extend(f"course scope grounding: {message}" for message in format_scope_failures(course_scope_grounding))
 
     progression_links = [
         {
@@ -3398,10 +3469,19 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
         "boilerplate_hits": [],
         "progression": progression,
         "intra_lesson_coherence": {
-            "status": agent_review["status"],
-            "method": "stage-level chain: content -> teacher activity -> student activity/evidence -> design intent",
-            "failures": [record for record in agent_review["records"] if record["status"] != "passed"],
+            "status": scoped_intra["status"] if source_truth_path is not None else agent_review["status"],
+            "method": (
+                "frozen-outline scoped substantive lesson chain"
+                if source_truth_path is not None
+                else "stage-level chain: content -> teacher activity -> student activity/evidence -> design intent"
+            ),
+            "failures": (
+                scoped_intra["failures"]
+                if source_truth_path is not None
+                else [record for record in agent_review["records"] if record["status"] != "passed"]
+            ),
         },
+        "course_scope_grounding": course_scope_grounding,
         "reference_provenance": references,
         "practice_handoff": practice_handoff,
         "coverage": {
@@ -3436,11 +3516,24 @@ def _assess_content_quality_v22(data: dict[str, Any], manifest: dict[str, Any] |
     }
 
 
-def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
+def assess_content_quality(
+    data: dict[str, Any],
+    manifest: dict[str, Any] | None = None,
+    *,
+    source_truth_path: str | None = None,
+    content_path: str | None = None,
+    require_local_outline: bool = False,
+) -> dict[str, Any]:
     """Run deterministic course-level checks, including item and skeleton repetition."""
 
     if data.get("content_contract_version") in {"2.2", "2.3"}:
-        return _assess_content_quality_v22(data, manifest)
+        return _assess_content_quality_v22(
+            data,
+            manifest,
+            source_truth_path=source_truth_path,
+            content_path=content_path,
+            require_local_outline=require_local_outline,
+        )
 
     lessons = data.get("lessons", [])
     lesson_ids = [_lesson_id(lesson, index) for index, lesson in enumerate(lessons, 1)]
@@ -3454,7 +3547,11 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             "course_materials.textbook and reference_pool are separate"
         )
     course_terms = _course_terms(lessons)
-    intra_lesson_coherence = _intra_lesson_coherence(lessons, lesson_ids)
+    intra_lesson_coherence = _intra_lesson_coherence(
+        lessons,
+        lesson_ids,
+        require_body_scope_anchors=source_truth_path is not None,
+    )
     intra_lesson_coherence["calibration"] = intra_lesson_coherence_calibration()
     if intra_lesson_coherence["status"] != "passed":
         errors.extend(
@@ -4022,6 +4119,19 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
             "adjacent_implementation_structural": ADJACENT_IMPLEMENTATION_STRUCTURAL_SIMILARITY_THRESHOLD,
         },
     }
+    course_scope_grounding = validate_course_scope_grounding(
+        data,
+        source_truth_path,
+        content_path=content_path,
+        require_local_outline=require_local_outline,
+        intra_lesson_report=intra_lesson_coherence,
+    )
+    if course_scope_grounding["status"] == "failed":
+        errors.extend(
+            f"course scope grounding: {item.get('code', 'validation_failed')}"
+            for item in course_scope_grounding.get("failures", [])
+            if isinstance(item, dict)
+        )
     return {
         "status": "failed" if errors else "passed",
         "diagnostic_content_policy": {
@@ -4065,6 +4175,7 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
         "boilerplate_hits": boilerplate_hits,
         "progression": progression,
         "intra_lesson_coherence": intra_lesson_coherence,
+        "course_scope_grounding": course_scope_grounding,
         "reference_provenance": reference_provenance,
         "practice_handoff": practice_handoff,
         "coverage": coverage,
@@ -4077,8 +4188,21 @@ def assess_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None
     }
 
 
-def validate_content_quality(data: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any]:
-    report = assess_content_quality(data, manifest)
+def validate_content_quality(
+    data: dict[str, Any],
+    manifest: dict[str, Any] | None = None,
+    *,
+    source_truth_path: str | None = None,
+    content_path: str | None = None,
+    require_local_outline: bool = False,
+) -> dict[str, Any]:
+    report = assess_content_quality(
+        data,
+        manifest,
+        source_truth_path=source_truth_path,
+        content_path=content_path,
+        require_local_outline=require_local_outline,
+    )
     if report["status"] != "passed":
         details = "; ".join(report["errors"][:8])
         raise ContentQualityError(f"Content quality validation failed: {details}", report)

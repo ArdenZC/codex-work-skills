@@ -302,6 +302,8 @@ def validate_outputs(
     render: bool,
     render_pdf_dir: Path | None = None,
     allow_test_fixture_authoring: bool = False,
+    source_truth_path: Path | None = None,
+    content_path: Path | None = None,
 ) -> dict[str, Any]:
     return validate_output_dir(
         out_dir,
@@ -317,6 +319,9 @@ def validate_outputs(
         render=render,
         render_pdf_dir=render_pdf_dir,
         allow_test_fixture_authoring=allow_test_fixture_authoring,
+        source_truth_path=source_truth_path,
+        content_path=content_path,
+        require_local_outline=source_truth_path is not None,
     )
 
 
@@ -1080,6 +1085,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate template-matched Chinese lesson plan DOCX files.")
     parser.add_argument("--template", default="")
     parser.add_argument("--tasks-json", required=True)
+    parser.add_argument(
+        "--source-truth",
+        type=Path,
+        help="Source Truth manifest binding the frozen course outline; required by canonical production orchestration",
+    )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--backup-existing", action="store_true")
     parser.add_argument("--manifest", default="")
@@ -1137,6 +1147,8 @@ def main() -> None:
         raise FileNotFoundError(f"Template not found: {template}")
     out_dir = Path(args.output_dir).expanduser().absolute()
     source_path = Path(args.tasks_json).expanduser().resolve()
+    source_truth_path = Path(args.source_truth).expanduser().absolute() if args.source_truth is not None else None
+    source_truth_local_paths: list[Path] = []
     schema_path = Path(args.schema).expanduser().resolve()
     benchmark_authorization_path = (
         Path(args.benchmark_authorization).expanduser().absolute()
@@ -1206,6 +1218,32 @@ def main() -> None:
     )
     if meta.get("content_contract_version") in {"2.2", "2.3"}:
         meta = apply_reviewed_lesson_content(meta)
+    scope_report: dict[str, Any] | None = None
+    if source_truth_path is not None:
+        from course_scope_grounding import (
+            format_scope_failures,
+            load_frozen_course_outline,
+            validate_course_scope_grounding,
+        )
+        from source_truth import source_truth_local_file_paths
+
+        scope_report = validate_course_scope_grounding(
+            meta,
+            source_truth_path,
+            content_path=source_path,
+            require_local_outline=True,
+        )
+        if scope_report.get("status") != "passed":
+            details = "; ".join(format_scope_failures(scope_report)[:8])
+            raise ValueError("course-scope grounding failed before candidate creation: " + details)
+        frozen_outline = load_frozen_course_outline(
+            source_truth_path,
+            require_local_bytes=True,
+            content_path=source_path,
+        )
+        source_truth_local_paths = list(
+            source_truth_local_file_paths(frozen_outline.source_truth, source_truth_path).values()
+        )
     benchmark_authorization: dict[str, Any] | None = None
     benchmark_authorization_bytes: bytes | None = None
     benchmark_authorization_sha256: str | None = None
@@ -1261,6 +1299,9 @@ def main() -> None:
         manifest=manifest_path,
         package_roots=package_roots,
     )
+    if source_truth_path is not None:
+        protected_paths.append(source_truth_path)
+        protected_paths.extend(source_truth_local_paths)
     if benchmark_authorization_path is not None:
         protected_paths.append(benchmark_authorization_path)
     assert_output_path_safe(out_dir, protected_paths)
@@ -1290,7 +1331,13 @@ def main() -> None:
     external_candidate: Path | None = None
     operation_error: BaseException | None = None
     try:
-        content_quality = validate_content_quality(meta, manifest)
+        content_quality = validate_content_quality(
+            meta,
+            manifest,
+            source_truth_path=str(source_truth_path) if source_truth_path is not None else None,
+            content_path=str(source_path),
+            require_local_outline=source_truth_path is not None,
+        )
         practice_contract = meta.get("practice_task_contract")
         artifact_plan = meta.get("artifact_plan") or {}
         if meta.get("content_contract_version") in {"2.2", "2.3"}:
@@ -1322,6 +1369,8 @@ def main() -> None:
                 render=args.render,
                 render_pdf_dir=(candidate / "render" / "pdf") if args.render else None,
                 allow_test_fixture_authoring=allow_test_fixture_authoring,
+                source_truth_path=source_truth_path,
+                content_path=source_path,
             )
         else:
             report = write_skipped_report(
@@ -1338,6 +1387,8 @@ def main() -> None:
                 render=args.render,
                 render_pdf_dir=(candidate / "render" / "pdf") if args.render else None,
                 allow_test_fixture_authoring=allow_test_fixture_authoring,
+                source_truth_path=source_truth_path,
+                content_path=source_path,
             )
         if meta.get("content_contract_version") in {"2.2", "2.3"} and report.get("production_status") == "failed":
             raise RuntimeError("Content Contract 2.2/2.3 output did not pass production readiness checks")

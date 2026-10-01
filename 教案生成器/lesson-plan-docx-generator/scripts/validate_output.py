@@ -785,6 +785,9 @@ def write_skipped_report(
     render: bool = False,
     render_pdf_dir: Path | str | None = None,
     allow_test_fixture_authoring: bool = False,
+    source_truth_path: Path | str | None = None,
+    content_path: Path | str | None = None,
+    require_local_outline: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
@@ -828,7 +831,13 @@ def write_skipped_report(
         warnings,
     )
     report["content_contract_version"] = data.get("content_contract_version", "2.0")
-    content_quality = assess_content_quality(data, manifest)
+    content_quality = assess_content_quality(
+        data,
+        manifest,
+        source_truth_path=str(source_truth_path) if source_truth_path is not None else None,
+        content_path=str(content_path) if content_path is not None else None,
+        require_local_outline=require_local_outline,
+    )
     content_quality["coverage"]["non_it_contamination"] = []
     report["content_quality"] = content_quality
     if content_quality["status"] != "passed":
@@ -894,6 +903,9 @@ def validate_output_dir(
     render: bool = False,
     render_pdf_dir: Path | str | None = None,
     allow_test_fixture_authoring: bool = False,
+    source_truth_path: Path | str | None = None,
+    content_path: Path | str | None = None,
+    require_local_outline: bool = False,
 ) -> dict[str, Any]:
     out_dir = Path(output_dir).expanduser().resolve()
     manifest = manifest or load_manifest()
@@ -941,7 +953,13 @@ def validate_output_dir(
     errors: list[str] = report["errors"]
     checks: dict[str, Any] = report["checks"]
 
-    content_quality = assess_content_quality(data, manifest)
+    content_quality = assess_content_quality(
+        data,
+        manifest,
+        source_truth_path=str(source_truth_path) if source_truth_path is not None else None,
+        content_path=str(content_path) if content_path is not None else None,
+        require_local_outline=require_local_outline,
+    )
     report["content_quality"] = content_quality
     if content_quality["status"] != "passed":
         errors.extend(
@@ -1354,6 +1372,7 @@ def validate_output_dir(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Validate generated lesson-plan DOCX files and write a QA report.")
     parser.add_argument("--input-json", required=True)
+    parser.add_argument("--source-truth", type=Path)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--manifest", default="")
     parser.add_argument("--schema", default=str(DEFAULT_SCHEMA))
@@ -1432,6 +1451,9 @@ def main() -> int:
                 template_validation=not args.skip_template_validation,
                 render=args.render,
                 allow_test_fixture_authoring=args.allow_test_fixture_authoring,
+                source_truth_path=args.source_truth,
+                content_path=args.input_json,
+                require_local_outline=args.source_truth is not None,
             )
         else:
             report = validate_output_dir(
@@ -1446,6 +1468,9 @@ def main() -> int:
                 template_validation=not args.skip_template_validation,
                 render=args.render,
                 allow_test_fixture_authoring=args.allow_test_fixture_authoring,
+                source_truth_path=args.source_truth,
+                content_path=args.input_json,
+                require_local_outline=args.source_truth is not None,
             )
     except Exception as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

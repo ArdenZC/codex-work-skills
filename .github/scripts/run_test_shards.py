@@ -146,6 +146,9 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "lesson-lifecycle": SuiteSpec(
             "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
         ),
+        "lesson-course-scope": SuiteSpec(
+            "lesson-course-scope", False, "module", _module_count("tests.test_lesson_course_scope"), "lesson-render"
+        ),
         "lesson-quality": SuiteSpec(
             "lesson-quality", True, "module", _module_count("tests.test_benchmark_quality_eligibility")
         ),
@@ -191,8 +194,8 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 
 ALIASES = {
-    "fast": ("lesson-content", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "fast": ("lesson-content", "lesson-lifecycle", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -220,6 +223,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return _lesson_content_ids()
     if name == "lesson-lifecycle":
         return ("tests.test_lesson_lifecycle_contracts",)
+    if name == "lesson-course-scope":
+        return ("tests.test_lesson_course_scope",)
     if name == "lesson-quality":
         return ("tests.test_benchmark_quality_eligibility",)
     if name == "lesson-final-acceptance":

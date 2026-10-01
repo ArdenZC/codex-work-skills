@@ -19,8 +19,9 @@ from tests.test_lesson_content_v22 import make_v22_payload, DB_SPECS
 from tests.test_lesson_content_v23 import _bind_v23, _base_payload, _hybrid_8
 from tests.test_lesson_skill_hardening import install_adapters, lesson_install, LESSON
 from lesson_lifecycle_applicability import lesson_lifecycle_applicability, require_lesson_lifecycle_applicable
-from lifecycle_digest import LifecycleContractError, schema_errors
+from lifecycle_digest import LifecycleContractError, schema_errors, sha256_bytes
 from package_common import validate_content_v2_input
+from source_truth import source_truth_fingerprint
 import run_lesson_pipeline as pipeline
 import acceptance_v3
 
@@ -100,7 +101,6 @@ class LessonApplicabilityTests(unittest.TestCase):
         for mode in ("theory_only", "integrated_lessons", "hybrid", "split_lessons"):
             with self.subTest(mode=mode):
                 h = pipeline_tests.PipelineTests(); h.setUp(); self.addCleanup(h.doCleanups)
-                h.prepared()
                 content = _content()
                 if mode in {"integrated_lessons", "hybrid"}:
                     content["lessons"][0].update(lesson_type="integrated", theory_hours=1, practice_hours=1)
@@ -108,6 +108,16 @@ class LessonApplicabilityTests(unittest.TestCase):
                 else: theory, practice = 2, 2 if mode == "split_lessons" else 0
                 _bind_v23(content, mode=mode, theory_hours=theory, practice_hours=practice)
                 _write_json(h.content_path, content)
+                outline_source = next(
+                    item for item in h.source["sources"] if item["source_type"] == "whole_course_outline"
+                )
+                outline_path = h.source_path.parent / outline_source["locator"]
+                outline_source["sha256"] = sha256_bytes(_write_json(outline_path, content["outline"]))
+                h.source["manifest_fingerprint"] = source_truth_fingerprint(h.source)
+                _write_json(h.source_path, h.source)
+                h.run.unlink()
+                h.call("init", mode="PRODUCTION", run_id="RUN-001", source_truth=h.source_path)
+                h.prepared()
                 run = h.call("bind-content", content=h.content_path)
                 self.assertEqual(run["state"]["current_state"], "AUTHORING_COMPLETE")
                 self.assertIn("content", run["bindings"])
@@ -208,6 +218,7 @@ class InstalledLifecycleTests(unittest.TestCase):
     def test_complete_installed_copy_loads_lifecycle_without_original_repository(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder); source = self.copy_source(root)
+            self.assertIn(Path("scripts/course_scope_grounding.py"), install_adapters.CRITICAL_LIFECYCLE_RUNTIME_FILES)
             engine = self.install_full(source, root / "project")
             shutil.rmtree(source)
             env = {k: v for k, v in os.environ.items() if k not in {"PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "PYTHONINSPECT"}}
@@ -218,7 +229,10 @@ class InstalledLifecycleTests(unittest.TestCase):
 from pathlib import Path
 root=Path(sys.argv[1]).resolve(); sys.path.insert(0,str(root/'scripts'))
 from jsonschema import Draft202012Validator
+import course_scope_grounding,run_lesson_pipeline
 import install_adapters
+assert Path(course_scope_grounding.__file__).resolve().is_relative_to(root.resolve())
+assert Path(run_lesson_pipeline.__file__).resolve().is_relative_to(root.resolve())
 for relative in install_adapters.CRITICAL_LIFECYCLE_RUNTIME_FILES:
  module=importlib.import_module(relative.stem)
  assert Path(module.__file__).resolve().is_relative_to(root.resolve()), module.__file__

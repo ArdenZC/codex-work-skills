@@ -33,6 +33,7 @@ REQUIRED_RELATIVE_FILES = (
     Path("scripts/generate_lesson_plans.py"),
     Path("scripts/content_contract.py"),
     Path("scripts/content_quality.py"),
+    Path("scripts/course_scope_grounding.py"),
     Path("scripts/package_common.py"),
     Path("scripts/path_safety.py"),
     Path("scripts/validate_output.py"),
