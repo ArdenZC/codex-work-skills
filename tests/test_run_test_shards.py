@@ -59,8 +59,16 @@ class TestShardManifest(unittest.TestCase):
         self.assertIn("hardening", run_test_shards._expand_suites(("full",), specs))
         self.assertEqual(
             specs["hardening"].count,
-            unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_skill_hardening").countTestCases(),
+            sum(unittest.defaultTestLoader.loadTestsFromName(m).countTestCases() for m in ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")),
         )
+
+    def test_release_compatibility_module_is_covered_exactly_by_hardening(self):
+        self.assertEqual(run_test_shards._suite_test_ids("hardening"),
+            ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility"))
+        specs = run_test_shards._suite_specs()
+        for alias in ("full", "ci"):
+            expanded = run_test_shards._expand_suites((alias,), specs)
+            self.assertEqual(expanded.count("hardening"), 1)
 
     def test_lesson_benchmark_suite_is_in_full_manifest(self) -> None:
         specs = run_test_shards._suite_specs()

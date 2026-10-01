@@ -64,6 +64,7 @@ class ChangeClassifierTests(unittest.TestCase):
             "教案生成器/lesson-plan-docx-generator/scripts/visual_sampling.py",
             "教案生成器/lesson-plan-docx-generator/scripts/visual_review_authority.py",
             "教案生成器/lesson-plan-docx-generator/scripts/acceptance_v3.py",
+            "教案生成器/lesson-plan-docx-generator/scripts/lesson_lifecycle_applicability.py",
             "教案生成器/lesson-plan-docx-generator/schemas/lesson-acceptance-v3.schema.json",
             "教案生成器/lesson-plan-docx-generator/schemas/visual-review-packet.schema.json",
             "教案生成器/lesson-plan-docx-generator/schemas/visual-review-authority.schema.json",

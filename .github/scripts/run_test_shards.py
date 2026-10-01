@@ -176,7 +176,10 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         ),
         "classifier": SuiteSpec("classifier", True, "module", _module_count("tests.test_ci_change_classifier")),
         "runner": SuiteSpec("runner", True, "module", _module_count("tests.test_run_test_shards")),
-        "hardening": SuiteSpec("hardening", True, "module", _module_count("tests.test_lesson_skill_hardening")),
+        "hardening": SuiteSpec(
+            "hardening", True, "module",
+            sum(_module_count(m) for m in ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")),
+        ),
         "lesson-benchmark": SuiteSpec("lesson-benchmark", True, "module", _module_count("tests.test_lesson_exemplar_benchmark")),
         # The two skill directories intentionally contain the same generic
         # ``test_package`` module name.  They are therefore discovered in
@@ -240,7 +243,7 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
     if name == "runner":
         return ("tests.test_run_test_shards",)
     if name == "hardening":
-        return ("tests.test_lesson_skill_hardening",)
+        return ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")
     if name == "lesson-benchmark":
         return ("tests.test_lesson_exemplar_benchmark",)
     return ()

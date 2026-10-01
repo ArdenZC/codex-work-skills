@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 
 from path_safety import paths_overlap
+from install_adapters import _required_engine_files
 
 
 SKILL_NAME = "lesson-plan-docx-generator"
@@ -110,6 +111,8 @@ def _unique_backup_path(target_root: Path) -> Path:
 
 
 def _required_source_files(source: Path) -> list[Path]:
+    # Both full-copy entry points share the current production-critical floor.
+    _required_engine_files(source, copy_engine=True)
     missing = [source / relative for relative in REQUIRED_RELATIVE_FILES if not (source / relative).is_file()]
     if missing:
         raise FileNotFoundError(
@@ -135,7 +138,7 @@ def _sha256(path: Path) -> str:
 
 
 def _is_ignored(path: Path) -> bool:
-    return path.name == "__pycache__" or path.name == ".DS_Store" or path.name.endswith(".pyc")
+    return any(part == "__pycache__" or part == ".DS_Store" or part.endswith(".pyc") for part in path.parts)
 
 
 def _shared_source(source: Path) -> Path:

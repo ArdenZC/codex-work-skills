@@ -71,12 +71,18 @@ Per-course Acceptance 3.0 does not run or require Negative Controls. They belong
 to subsequent Skill Release Qualification; historical Acceptance 2.0 remains
 compatible. This PR does not qualify or release Skill 2.4 Stable.
 
-## Deferred release blocker
+## Lifecycle applicability (RC-01)
 
-**practice_only zero-Lesson lifecycle compatibility must be resolved before Lesson
-Skill 2.4 Stable.** Formal Content 2.3 requires `lessons=[]`, while existing Teacher
-Review 1.0 requires at least one selected Lesson. Canonical Lesson lifecycle does
-not cover this modality. It cannot be falsely Accepted; no Lesson or Teacher Review
-is fabricated. Independent Practice authority versus explicit lifecycle exclusion
-is deferred to 2.4 Compatibility / Release Closeout, along with release qualification,
-installer critical floor and the remaining Stable closeout.
+Formal Content 2.3 `practice_only` requires `lessons=[]` and remains valid.
+Canonical Lesson lifecycle requires at least one real Lesson, in PREVIEW and
+PRODUCTION. Shared applicability validation rejects zero-Lesson at bind-content,
+before any binding or AUTHORING_COMPLETE transition. It is not a schema failure.
+Teacher Review 1.0 remains unchanged with its nonempty selected Lesson requirement.
+Acceptance 3.0 preserves zero-Lesson → FAILED as defense in depth for forged,
+historical or noncanonical callers. It cannot falsely Accept practice-only and
+never fabricates a Lesson, Teacher Review or DOCX. Practice Task / WorkOrder
+handles requested practice materials; its teaching acceptance is not asserted by
+Lesson Acceptance 3.0 and it has no claimed equivalent lifecycle authority.
+
+RC-01 closes applicability and installer floor blockers. Skill stays 2.3.1
+candidate / pre-2.4; remaining RC-02 work is listed in `lesson-release-closeout.md`.

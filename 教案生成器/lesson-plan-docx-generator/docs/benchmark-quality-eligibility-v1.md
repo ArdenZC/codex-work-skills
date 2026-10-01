@@ -196,6 +196,9 @@ successful offline validation does not attest online truth or human teaching
 quality. New tests use explicitly SYNTHETIC data to prove contract closure only;
 the existing synthetic Benchmark bundle is unchanged and gains no quality claim.
 
-Mandatory production integration, orchestrator, teacher selector, default mode
-switch, Acceptance 3.0 and private exemplary attestation are deferred. No
-installer critical floor or version bump is introduced here.
+LIF-03～05 now supply the opt-in production orchestrator, deterministic Teacher
+Packet/Human Review, final generator/visual authority and Acceptance 3.0 chain.
+RC-01 adds early Lesson applicability and the installer lifecycle critical floor.
+The default standalone mode, private exemplary attestation and version migration
+are unchanged. Skill stays 2.3.1 candidate / pre-2.4; remaining qualification is
+listed in `lesson-release-closeout.md`.

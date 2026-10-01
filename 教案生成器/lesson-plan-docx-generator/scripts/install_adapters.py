@@ -73,7 +73,7 @@ FULL_ENGINE_RUNTIME_FILES = (
 # This explicit floor proves the source can run the current Lesson production
 # path. Examples and tests are deliberately excluded; the legacy full-engine
 # floor remains a separate compatibility check below.
-CRITICAL_PRODUCTION_SOURCE_FILES = (
+CRITICAL_GENERATOR_SOURCE_FILES = (
     Path("manifest.yaml"),
     Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
@@ -113,6 +113,29 @@ CRITICAL_PRODUCTION_SOURCE_FILES = (
     Path("assets/templates/lesson-plan/v1.1.2/template.docx"),
     SHARED_SCHEMA,
 )
+
+# LIF-01–05 authority runtime and its direct schema dependencies. The local
+# production import closure is audited in docs/lesson-release-closeout.md;
+# generator/shared helpers already covered above are not repeated here.
+CRITICAL_LIFECYCLE_RUNTIME_FILES = tuple(Path("scripts") / name for name in (
+    "lifecycle_digest.py", "source_truth.py", "teacher_review.py",
+    "production_authorization.py", "pipeline_state.py", "lifecycle_benchmark.py",
+    "benchmark_quality_eligibility.py", "benchmark_preparation.py",
+    "run_lesson_pipeline.py", "teacher_review_packet.py", "final_artifacts.py",
+    "visual_review_authority.py", "visual_sampling.py", "acceptance_v3.py",
+    "lesson_lifecycle_applicability.py",
+))
+CRITICAL_LIFECYCLE_SCHEMA_FILES = tuple(Path("schemas") / name for name in (
+    "pipeline-state.schema.json", "source-truth-manifest.schema.json",
+    "teacher-review.schema.json", "production-authorization.schema.json",
+    "benchmark-quality-eligibility.schema.json", "benchmark-preparation.schema.json",
+    "teacher-review-packet.schema.json", "visual-review-packet.schema.json",
+    "visual-review-authority.schema.json", "lesson-acceptance-v3.schema.json",
+))
+CRITICAL_LIFECYCLE_SOURCE_FILES = (*CRITICAL_LIFECYCLE_RUNTIME_FILES, *CRITICAL_LIFECYCLE_SCHEMA_FILES)
+CRITICAL_PRODUCTION_SOURCE_FILES = tuple(dict.fromkeys((
+    *CRITICAL_GENERATOR_SOURCE_FILES, *CRITICAL_LIFECYCLE_SOURCE_FILES,
+)))
 
 # ``FULL_ENGINE_INVENTORY_FILES`` is the existing static compatibility floor,
 # not the installed runtime inventory. The latter is dynamically fingerprinted
@@ -226,7 +249,7 @@ def _runtime_inventory_from_source(source_root: Path) -> dict[str, str]:
     inventory: dict[str, str] = {}
     for relative in _source_files(source_root, copy_engine=True):
         candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
-        source = next((candidate for candidate in candidates if candidate.is_file() and not candidate.is_symlink()), None) if relative == SHARED_SCHEMA else source_root / relative
+        source = next((candidate for candidate in candidates if _is_real_source_file(candidate.parent, Path(candidate.name))), None) if relative == SHARED_SCHEMA else source_root / relative
         if source is None:
             source = source_root / relative
         if source.is_symlink() or not source.is_file():
@@ -284,7 +307,7 @@ def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) 
             or relative.as_posix() != relative_name
             or ".." in relative.parts
             or relative == ENGINE_STATE_FILE
-            or bool(ignore_patterns("", [relative.name]))
+            or any(ignore_patterns("", [part]) for part in relative.parts)
         ):
             return False
     if state.get("schema_version") != ENGINE_STATE_SCHEMA_VERSION:
@@ -307,7 +330,7 @@ def _installed_inventory_matches(engine_target: Path, state: dict[str, object]) 
             continue
         if not path.is_file():
             return False
-        if path == engine_target / ENGINE_STATE_FILE or ignore_patterns("", [path.name]):
+        if path == engine_target / ENGINE_STATE_FILE or any(ignore_patterns("", [part]) for part in path.relative_to(engine_target).parts):
             continue
         actual_keys.add(path.relative_to(engine_target).as_posix())
     if actual_keys != set(inventory):
@@ -404,7 +427,7 @@ def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
                 if path.is_file()
                 and not path.is_symlink()
                 and path.relative_to(source_root) != ENGINE_STATE_FILE
-                and not ignore_patterns("", [path.name])
+                and not any(ignore_patterns("", [part]) for part in path.relative_to(source_root).parts)
             ),
             key=lambda path: path.as_posix(),
         )
@@ -417,7 +440,7 @@ def _source_files(source_root: Path, copy_engine: bool) -> list[Path]:
 def _is_real_source_file(source_root: Path, relative: Path) -> bool:
     """Require a regular file without symlinked components inside the Skill root."""
 
-    if source_root.is_symlink() or not source_root.is_dir():
+    if not source_root.is_dir() or any(path.is_symlink() for path in (source_root, *source_root.parents)):
         return False
     candidate = source_root
     for part in relative.parts:
@@ -430,7 +453,7 @@ def _is_real_source_file(source_root: Path, relative: Path) -> bool:
 def _required_engine_files(source_root: Path, copy_engine: bool) -> tuple[Path, ...]:
     required = FULL_ENGINE_SOURCE_FLOOR_FILES if copy_engine else MINIMAL_ENGINE_FILES
     shared_candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
-    shared_source = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
+    shared_source = next((candidate for candidate in shared_candidates if _is_real_source_file(candidate.parent, Path(candidate.name))), None)
     if shared_source is None:
         raise FileNotFoundError("Lesson adapter source is missing canonical shared Practice Task schema")
     missing = [
@@ -576,7 +599,7 @@ def build_plan(source_root: Path, target_root: Path, selected: list[str], *, rep
         # complete runtime byte-for-byte.  Never downgrade or rewrite it.
         engine_files = []
     shared_candidates = (source_root / SHARED_SCHEMA, source_root.parents[1] / SHARED_SCHEMA, source_root.parents[2] / SHARED_SCHEMA, Path(__file__).resolve().parents[3] / SHARED_SCHEMA)
-    shared_source = next((candidate for candidate in shared_candidates if candidate.is_file() and not candidate.is_symlink()), None)
+    shared_source = next((candidate for candidate in shared_candidates if _is_real_source_file(candidate.parent, Path(candidate.name))), None)
     for relative in engine_files:
         source = shared_source if relative == SHARED_SCHEMA else source_root / relative
         target = engine_target / relative
