@@ -296,7 +296,10 @@ class FinalLifecycleTests(unittest.TestCase):
         packet["required_sample"][0]["file"] = "unbound.docx"
         packet["packet_fingerprint"] = visual.fingerprint(packet, "packet_fingerprint")
         _write_json(self.path("visual_review_packet"), packet)
-        with self.assertRaises(ValueError): visual.validate_visual_review_packet(self.path("visual_review_packet"), self.run)
+        self.run["bindings"]["visual_review_packet"]["sha256"] = sha256_file(self.path("visual_review_packet"))
+        self.run["run_fingerprint"] = pipeline.envelope_fingerprint(self.run)
+        with self.assertRaisesRegex(ValueError, "exact current rederivation"):
+            visual.validate_visual_review_packet(self.path("visual_review_packet"), self.run)
 
     def test_recomputed_packet_cannot_reduce_required_pages(self):
         packet = json.loads(self.path("visual_review_packet").read_bytes())
@@ -305,7 +308,9 @@ class FinalLifecycleTests(unittest.TestCase):
             packet["required_sample"][0]["page_count"] = 2
         packet["packet_fingerprint"] = visual.fingerprint(packet, "packet_fingerprint")
         _write_json(self.path("visual_review_packet"), packet)
-        with self.assertRaises(ValueError):
+        self.run["bindings"]["visual_review_packet"]["sha256"] = sha256_file(self.path("visual_review_packet"))
+        self.run["run_fingerprint"] = pipeline.envelope_fingerprint(self.run)
+        with self.assertRaisesRegex(ValueError, "exact current rederivation"):
             visual.validate_visual_review_packet(self.path("visual_review_packet"), self.run)
 
     def test_nested_uppercase_pdf_is_unexpected_inventory(self):
@@ -401,7 +406,13 @@ class FinalLifecycleTests(unittest.TestCase):
     def test_recomputed_acceptance_cannot_hide_limitation(self):
         self.choose('accepted');payload=json.loads(self.path('acceptance').read_bytes());payload['final_status']='ACCEPTED';payload['limitations']=[]
         payload['acceptance_fingerprint']=acceptance.acceptance_fingerprint(payload);_write_json(self.path('acceptance'),payload)
-        with self.assertRaises(ValueError):acceptance.validate_acceptance_file(self.path('acceptance'),self.run)
+        digest = sha256_file(self.path('acceptance'))
+        self.run['bindings']['acceptance']['sha256'] = digest
+        self.run['state']['artifacts']['acceptance_sha256'] = digest
+        self.run['state']['transitions'][-1]['evidence_sha256'] = digest
+        self.h.save_modified_run(self.run)
+        with self.assertRaisesRegex(ValueError, 'exact chain rederivation'):
+            acceptance.validate_acceptance_file(self.path('acceptance'), self.run)
     def test_acceptance_sha_mismatch(self):
         self.choose('accepted');self.run['state']['artifacts']['acceptance_sha256']='0'*64;self.h.save_modified_run(self.run);self.reject('status')
     def test_fake_accepted_state_failed(self):
