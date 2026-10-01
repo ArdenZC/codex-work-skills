@@ -149,6 +149,8 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "lesson-quality": SuiteSpec(
             "lesson-quality", True, "module", _module_count("tests.test_benchmark_quality_eligibility")
         ),
+        "lesson-final-acceptance": SuiteSpec("lesson-final-acceptance", False, "module",
+            _module_count("tests.test_lesson_final_acceptance"), "lesson-render"),
         "lesson-teacher-review": SuiteSpec("lesson-teacher-review", True, "module",
             _module_count("tests.test_teacher_review_selection")),
         "lesson-pipeline": SuiteSpec(
@@ -186,8 +188,8 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 
 ALIASES = {
-    "fast": ("lesson-content", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "fast": ("lesson-content", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -217,6 +219,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return ("tests.test_lesson_lifecycle_contracts",)
     if name == "lesson-quality":
         return ("tests.test_benchmark_quality_eligibility",)
+    if name == "lesson-final-acceptance":
+        return ("tests.test_lesson_final_acceptance",)
     if name == "lesson-teacher-review":
         return ("tests.test_teacher_review_selection",)
     if name == "lesson-pipeline":
@@ -469,6 +473,7 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
         pending = list(names)
         running: dict[str, tuple[subprocess.Popen[bytes], Path, object, float]] = {}
         specs = _suite_specs()
+        capacity = max(1, min(len(names), os.cpu_count() or 1))
 
         def can_start(name: str) -> bool:
             """Return whether a pending shard can share the current workers.
@@ -492,7 +497,6 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
             return True
 
         while pending or running:
-            capacity = max(1, min(len(pending), os.cpu_count() or 1))
             while pending and len(running) < capacity:
                 candidate_index = next((index for index, name in enumerate(pending) if can_start(name)), None)
                 if candidate_index is None:
@@ -514,6 +518,7 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
                     stderr=subprocess.STDOUT,
                 )
                 running[candidate] = (process, log_path, handle, time.monotonic())
+                print(f"shard started: {candidate}; active={len(running)}/{capacity}", flush=True)
                 if not allow_office_parallel and not spec.parallel_safe:
                     break
             for name, (process, log_path, handle, item_started) in tuple(running.items()):
@@ -521,6 +526,7 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
                 if status is not None:
                     handle.close()
                     results[name] = (status, time.monotonic() - item_started, log_path)
+                    print(f"shard completed: {name}; {results[name][1]:.2f}s exit={status}", flush=True)
                     del running[name]
             if running:
                 time.sleep(0.1)

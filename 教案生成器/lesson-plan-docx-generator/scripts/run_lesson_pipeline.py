@@ -1,4 +1,4 @@
-"""Opt-in Lesson Lifecycle orchestrator 1.0; stops at PRODUCTION_AUTHORIZED.
+"""Opt-in Lesson Lifecycle orchestrator 1.0; final artifact / visual / Acceptance 3.0 authority chain.
 
 Commands bind external judgments; this engine neither authors lessons nor grants
 human approval. A run envelope contains the unchanged Pipeline State Contract 1.0.
@@ -119,7 +119,7 @@ def validate_waiver(run):
     return evidence
 
 
-def full_benchmark(run, benchmark):
+def benchmark_claims(run):
     from benchmark_authorization import (
         derive_benchmark_authorization_claims, validate_authorization_matches_claims,
     )
@@ -138,6 +138,12 @@ def full_benchmark(run, benchmark):
         if name in run["bindings"]:
             inputs[name + "_path" if name != "previous_lesson_reviews_dir" else name] = path_of(run, name)
     claims = derive_benchmark_authorization_claims(**inputs)
+    return claims
+
+
+def full_benchmark(run, benchmark):
+    from benchmark_authorization import validate_authorization_matches_claims
+    claims = benchmark_claims(run)
     require(claims["benchmark_decision"] != "REVISION_REQUIRED", "Benchmark REVISION_REQUIRED blocks advancement")
     if benchmark["disposition"] == "BENCHMARK_REVIEW_COMPLETE":
         authorization, _ = read_json_object(path_of(run, "benchmark_authorization"), "Benchmark Authorization")
@@ -196,15 +202,14 @@ def validate_disposition(run):
 
 
 def validate_run_upstream(run, *, run_path=None):
-    require(isinstance(run, dict) and set(run) == {
-        "orchestrator_version", "mode", "state", "bindings", "run_fingerprint"}, "invalid run envelope")
+    core = {"orchestrator_version", "mode", "state", "bindings", "run_fingerprint"}
+    require(isinstance(run, dict) and set(run) in (core, core | {"output_workspace"}), "invalid run envelope")
     require(run["orchestrator_version"] == IMPLEMENTATION_VERSION and run["mode"] in {"PREVIEW", "PRODUCTION"},
             "invalid implementation or mode")
     require(run["run_fingerprint"] == envelope_fingerprint(run), "invalid run fingerprint")
     checked(validate_pipeline_state_payload(run["state"]))
     state = run["state"]
     rank = STATES.index(state["current_state"])
-    require(rank <= STATES.index("PRODUCTION_AUTHORIZED"), "LIF-03 stops at PRODUCTION_AUTHORIZED")
     require(run["mode"] != "PREVIEW" or rank < STATES.index("PRODUCTION_AUTHORIZED"),
             "PREVIEW cannot authorize production")
     require(isinstance(run["bindings"], dict), "invalid bindings")
@@ -213,8 +218,17 @@ def validate_run_upstream(run, *, run_path=None):
         require(isinstance(binding, dict) and set(binding) == {"path", "sha256"}, "invalid artifact binding")
         paths[name] = path_of(run, name)
         require(binding["sha256"] == inventory(paths[name]), "STALE upstream bytes: " + name)
-    assert_distinct_file_paths({**paths, **({"run": run_path} if run_path else {})},
+    assert_distinct_file_paths({**{name: path for name, path in paths.items() if name != "final_output"}, **({"run": run_path} if run_path else {})},
                               outputs={"run"} if run_path else set())
+    if "final_output" in paths:
+        from final_artifacts import output_path
+        # The output directory necessarily contains the two bound machine files;
+        # all other aliases still use the existing strict overlap validator.
+        require(isinstance(run.get("output_workspace"), str), "final output requires its frozen workspace root")
+        if run_path is not None:
+            from path_safety import paths_equal
+            require(paths_equal(run["output_workspace"], Path(run_path).absolute().parent), "run workspace differs from frozen output workspace")
+        output_path(run, Path(run["output_workspace"]) / "run.json", paths["final_output"])
     source, _, errors = validate_source_truth_file(path_of(run, "source_truth"), verify_source_bytes=True)
     checked(errors)
     if run["mode"] == "PRODUCTION":
@@ -248,9 +262,7 @@ def validate_run_upstream(run, *, run_path=None):
         require(qa == fresh, "STALE or fabricated Preproduction QA evidence")
     benchmark = None
     review_completed = any(row["to_state"] == "BENCHMARK_REVIEW_COMPLETE" for row in state["transitions"])
-    final_disposition_required = state["current_state"] in {
-        "READY_FOR_TEACHER_REVIEW", "TEACHER_REVIEW_APPROVED", "PRODUCTION_AUTHORIZED",
-    }
+    final_disposition_required = rank >= STATES.index("READY_FOR_TEACHER_REVIEW")
     if review_completed or final_disposition_required:
         require(state["artifacts"]["benchmark_disposition_sha256"] is not None,
                 "final Benchmark disposition must be indexed in state artifacts")
@@ -266,7 +278,7 @@ def validate_run_upstream(run, *, run_path=None):
     return benchmark
 
 
-def validate_run(run, *, run_path=None):
+def validate_run_authorized(run, *, run_path=None):
     benchmark = validate_run_upstream(run, run_path=run_path)
     paths = {name: path_of(run, name) for name in run["bindings"]}
     state = run["state"]
@@ -291,6 +303,26 @@ def validate_run(run, *, run_path=None):
             verify_runtime_environment=True, **evidence_kwargs(run))
         checked(errors)
         require(authorization["pipeline_run_id"] == state["pipeline_run_id"], "Authorization run mismatch")
+
+
+def validate_run(run, *, run_path=None, validate_acceptance=True):
+    validate_run_authorized(run, run_path=run_path)
+    rank = STATES.index(run["state"]["current_state"])
+    from final_artifacts import validate_run_artifacts
+    from visual_review_authority import validate_visual_review_packet, validate_visual_review_authority
+    if rank >= STATES.index("PRODUCTION_GENERATED"):
+        validate_run_artifacts(run)
+    if "visual_review_packet" in run["bindings"]:
+        validate_visual_review_packet(path_of(run, "visual_review_packet"), run)
+    if "visual_review" in run["bindings"]:
+        authority = validate_visual_review_authority(path_of(run, "visual_review"), run, path_of(run, "visual_evidence"))
+        if rank >= STATES.index("VISUAL_REVIEW_APPROVED"):
+            require(authority["decision"] == "PASSED", "Visual REVISION_REQUIRED blocks advancement")
+    if rank >= STATES.index("VISUAL_REVIEW_APPROVED"):
+        require("visual_review" in run["bindings"] and "visual_review_packet" in run["bindings"], "Visual approval requires actual Authority and Packet")
+    if rank >= STATES.index("ACCEPTED") and validate_acceptance:
+        from acceptance_v3 import validate_acceptance_file
+        validate_acceptance_file(path_of(run, "acceptance"), run)
 
 
 @contextmanager
@@ -320,10 +352,44 @@ def advance(run, next_state, artifact=None):
                                            recorded_at=timestamp(), artifact_sha256_updates=updates)
 
 
+
+def publish_sidecar(run, run_path, name, destination, payload, *, next_state=None, artifact_field=None):
+    """Validate actual candidate bytes, then publish sidecar and state as one bundle."""
+    import tempfile
+    from path_safety import paths_overlap
+    assert_external_outputs((destination,))
+    from source_truth import source_truth_local_file_paths
+    source_path = path_of(run, "source_truth")
+    source, _ = read_json_object(source_path, "Source Truth")
+    from path_safety import assert_output_path_safe
+    assert_output_path_safe(destination, source_truth_local_file_paths(source, source_path).values())
+    assert_distinct_file_paths({"run": run_path, "candidate": destination,
+        **{key: path_of(run, key) for key in run["bindings"] if key != "final_output"}}, outputs={"candidate"})
+    if "final_output" in run["bindings"]:
+        require(not paths_overlap(destination, path_of(run, "final_output")), "sidecar must remain outside frozen final output")
+    with tempfile.TemporaryDirectory(prefix="lesson-final-sidecar-", dir=run_path.parent) as directory:
+        staged = Path(directory) / (name + ".json")
+        staged.write_bytes(json_bytes(payload))
+        bind(run, name, staged)
+        if next_state:
+            advance(run, next_state, (artifact_field, name))
+        run["run_fingerprint"] = envelope_fingerprint(run)
+        validate_run(run)
+        run["bindings"][name]["path"] = str(destination)
+        run["run_fingerprint"] = envelope_fingerprint(run)
+        _replace_bundle((destination, run_path), (payload, run))
+    return run
+
+
 def execute(command, run_path, **options):
     """Most commands advance one transition; Packet preparation only freezes evidence."""
     run_path = Path(run_path).absolute()
     assert_external_outputs((run_path,))
+    if command == "evaluate-acceptance":
+        from acceptance_v3 import evaluate
+        original, _ = read_json_object(run_path, "pipeline run")
+        inputs = {name: options[name] for name in ("teacher_review", "visual_review", "visual_evidence", "benchmark_review", "authoring_selection", "holdout_selection", "lesson_reviews_dir", "previous_lesson_content", "previous_review", "previous_lesson_reviews_dir") if options.get(name)}
+        return evaluate(original, diagnostic_inputs=inputs, run_path=run_path)
     with run_lock(run_path):
         if command == "init":
             require(not run_path.exists(), "run is immutable; use a separate new run to iterate")
@@ -438,6 +504,69 @@ def execute(command, run_path, **options):
             require(run["mode"] == "PRODUCTION", "PREVIEW cannot authorize production")
             bind(run, "production_authorization", options["authorization"])
             advance(run, "PRODUCTION_AUTHORIZED", ("production_authorization_sha256", "production_authorization"))
+        elif command == "generate-production":
+            require(run["mode"] == "PRODUCTION", "PREVIEW cannot generate production")
+            require(run["state"]["current_state"] == "PRODUCTION_AUTHORIZED", "generation requires current Production Authorization")
+            from final_artifacts import output_path, validate_artifact_files
+            from package_common import DEFAULT_MANIFEST, manifest_template_path, load_manifest
+            import subprocess
+            import sys
+            output = output_path(run, run_path, options.get("output_dir") or run_path.parent / (run_path.stem + "-final"))
+            require(not output.exists(), "canonical generation needs a new output directory; old authorized artifacts are immutable")
+            args = [sys.executable, "-B", str(SKILL_ROOT / "scripts/generate_lesson_plans.py"),
+                    "--tasks-json", str(path_of(run, "content")), "--output-dir", str(output),
+                    "--render", "--run-id", run["state"]["pipeline_run_id"],
+                    "--template", str(manifest_template_path(load_manifest(DEFAULT_MANIFEST))),
+                    "--manifest", str(DEFAULT_MANIFEST)]
+            disposition = validate_disposition(run)
+            if disposition["disposition"] == "BENCHMARK_REVIEW_COMPLETE":
+                args += ["--benchmark-mode", "required", "--benchmark-authorization", str(path_of(run, "benchmark_authorization"))]
+                inputs = {"projected_catalog": "catalog", "split": "split", "authoring_pack": "authoring-pack",
+                    "authoring_selection": "authoring-selection", "holdout_pack": "holdout-pack", "holdout_selection": "holdout-selection",
+                    "benchmark_review": "review", "lesson_reviews_dir": "lesson-reviews-dir", "previous_review": "previous-review",
+                    "previous_lesson_reviews_dir": "previous-lesson-reviews-dir", "previous_lesson_content": "previous-content"}
+                for name, flag in inputs.items():
+                    if name in run["bindings"]:
+                        args += ["--benchmark-" + flag, str(path_of(run, name))]
+            else:
+                args += ["--benchmark-mode", "none"]
+            result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+            require(result.returncode == 0, "canonical generator failed: " + result.stdout[-3000:] + result.stderr[-3000:])
+            auth, _ = read_json_object(path_of(run, "production_authorization"), "Authorization")
+            validate_artifact_files(output, path_of(run, "content"), auth, run["state"]["pipeline_run_id"])
+            run["output_workspace"] = str(run_path.parent)
+            bind(run, "final_output", output)
+            bind(run, "artifact_manifest", output / "artifact-manifest.json")
+            bind(run, "artifact_qa", output / "qa-report.json")
+            advance(run, "PRODUCTION_GENERATED", ("artifact_manifest_sha256", "artifact_manifest"))
+        elif command == "validate-artifacts":
+            require(run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "PRODUCTION_GENERATED", "Artifact QA requires PRODUCTION_GENERATED")
+            from final_artifacts import validate_run_artifacts
+            validate_run_artifacts(run)
+            advance(run, "ARTIFACT_QA_PASSED", ("artifact_qa_sha256", "artifact_qa"))
+        elif command == "prepare-visual-review":
+            require(run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "ARTIFACT_QA_PASSED", "Visual Packet requires ARTIFACT_QA_PASSED")
+            require("visual_review_packet" not in run["bindings"], "Visual Packet is already frozen")
+            from visual_review_authority import build_visual_review_packet
+            packet = build_visual_review_packet(run)
+            destination = run_path.parent / (run_path.stem + "-visual-review-packet.json")
+            return publish_sidecar(run, run_path, "visual_review_packet", destination, packet)
+        elif command == "bind-visual-review":
+            require(run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "ARTIFACT_QA_PASSED", "Visual binding requires ARTIFACT_QA_PASSED")
+            bind(run, "visual_evidence", options["visual_evidence"])
+            bind(run, "visual_review", options["visual_review"])
+            run["run_fingerprint"] = envelope_fingerprint(run)
+            from visual_review_authority import validate_visual_review_authority
+            authority = validate_visual_review_authority(path_of(run, "visual_review"), run, path_of(run, "visual_evidence"))
+            require(authority["decision"] == "PASSED", "Visual REVISION_REQUIRED does not advance state")
+            advance(run, "VISUAL_REVIEW_APPROVED", ("visual_review_sha256", "visual_review"))
+        elif command == "finalize-acceptance":
+            require(run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "VISUAL_REVIEW_APPROVED", "finalization requires PRODUCTION VISUAL_REVIEW_APPROVED")
+            from acceptance_v3 import evaluate
+            report = evaluate(run)
+            require(report["final_status"] in {"ACCEPTED", "ACCEPTED_WITH_NOTES"}, "Acceptance gates are not complete")
+            destination = run_path.parent / (run_path.stem + "-lesson-acceptance-v3.json")
+            return publish_sidecar(run, run_path, "acceptance", destination, report, next_state="ACCEPTED", artifact_field="acceptance_sha256")
         else:
             raise LifecycleContractError("unknown command; direct string state updates are forbidden")
         commit_run(run_path, run)
@@ -448,25 +577,28 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("init", "freeze-source-truth", "prepare-benchmark", "bind-content",
         "validate-preproduction", "bind-benchmark-disposition", "bind-benchmark-review", "ready-for-teacher-review", "prepare-teacher-review", "bind-teacher-review",
-        "authorize-production", "status"))
+        "authorize-production", "generate-production", "validate-artifacts", "prepare-visual-review", "bind-visual-review", "evaluate-acceptance", "finalize-acceptance", "status"))
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--run-id")
     parser.add_argument("--mode", choices=("PREVIEW", "PRODUCTION"))
     for name in ("source_truth", "source_catalog", "quality_eligibility", "content", "waiver_evidence", "disposition",
                  "benchmark_evidence", "benchmark_authorization", "benchmark_review", "authoring_selection", "holdout_selection",
                  "lesson_reviews_dir", "previous_lesson_content", "previous_review", "previous_lesson_reviews_dir",
-                 "teacher_review", "authorization"):
+                 "teacher_review", "authorization", "output_dir", "visual_review", "visual_evidence"):
         parser.add_argument("--" + name.replace("_", "-"), type=Path)
     args = vars(parser.parse_args(argv))
     try:
         result = execute(args.pop("command"), args.pop("run"), **args)
+        if "final_status" in result:
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 1 if result["final_status"] == "FAILED" else 0
         source, _, _ = validate_source_truth_file(path_of(result, "source_truth"), verify_source_bytes=True)
         source_status = ("VALID" if source_truth_content_verified(source, verify_source_bytes=True)
                          else "STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED")
         print(json.dumps({"status": "VALID", "mode": result["mode"], "state": result["state"]["current_state"],
                           "source_truth_status": source_status}))
         return 0
-    except (LifecycleContractError, ContractError, ValueError, OSError, TypeError, KeyError) as exc:
+    except (LifecycleContractError, ContractError, ValueError, RuntimeError, OSError, TypeError, KeyError) as exc:
         parser.exit(1, f"STALE/INVALID: {exc}\n")
 
 

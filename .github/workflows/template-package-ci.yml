@@ -484,6 +484,98 @@ jobs:
           $status = git status --porcelain
           if ($status) { $status; throw "Tests left changes in the worktree." }
 
+  # Keep retained-render authority tests on separate machines. They cannot
+  # safely share an Office process with core tests, but need not wait for them.
+  lesson-final-acceptance:
+    name: Lesson final acceptance / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_lesson == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            教案生成器/lesson-plan-docx-generator/requirements.txt
+            .github/scripts/requirements-ci-lesson-tests.txt
+
+      - name: Install LibreOffice on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: .github/scripts/install_libreoffice_macos.sh
+
+      - name: Install LibreOffice on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $started = Get-Date
+          choco install libreoffice-fresh --yes --no-progress
+          $programPaths = @(
+            (Join-Path $env:ProgramFiles "LibreOffice\program"),
+            (Join-Path ${env:ProgramFiles(x86)} "LibreOffice\program")
+          )
+          $programPath = $programPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $programPath) { throw "LibreOffice installation path was not found." }
+          $soffice = Join-Path $programPath "soffice.com"
+          if (-not (Test-Path $soffice)) { throw "LibreOffice command was not found: $soffice" }
+          & $soffice --version | Select-Object -First 1
+          $seconds = [math]::Round(((Get-Date) - $started).TotalSeconds, 2)
+          "- LibreOffice setup: ${seconds}s" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Install Python dependencies
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          -r .github/scripts/requirements-ci-lesson-tests.txt
+
+      - name: Compile lesson sources
+        run: python -m compileall -q "教案生成器/lesson-plan-docx-generator" "tests/test_template_packages.py"
+
+      - name: Run final lifecycle acceptance with real retained render
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "lesson final acceptance tests"
+          --
+          python .github/scripts/run_test_shards.py
+          --suite lesson-final-acceptance
+          -v
+
+      - name: Verify lesson worktree is clean on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
+      - name: Verify lesson worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) { $status; throw "Tests left changes in the worktree." }
+
   template-gradebook:
     name: Template core gradebook / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs: classify-changes
@@ -987,6 +1079,7 @@ jobs:
       - package-contracts
       - template-tooling
       - template-lesson
+      - lesson-final-acceptance
       - template-gradebook
       - template-workorder
       - template-courseware
@@ -1001,6 +1094,7 @@ jobs:
           PACKAGE_RESULT: ${{ needs.package-contracts.result }}
           TOOLING_RESULT: ${{ needs.template-tooling.result }}
           LESSON_RESULT: ${{ needs.template-lesson.result }}
+          FINAL_ACCEPTANCE_RESULT: ${{ needs.lesson-final-acceptance.result }}
           GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
           COURSEWARE_RESULT: ${{ needs.template-courseware.result }}
@@ -1047,6 +1141,7 @@ jobs:
           check_job package-contracts "$RUN_PACKAGE" "$PACKAGE_RESULT"
           check_job template-tooling "$RUN_TOOLING" "$TOOLING_RESULT"
           check_job template-lesson "$RUN_LESSON" "$LESSON_RESULT"
+          check_job lesson-final-acceptance "$RUN_LESSON" "$FINAL_ACCEPTANCE_RESULT"
           check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"
           check_job template-courseware "$RUN_COURSEWARE" "$COURSEWARE_RESULT"

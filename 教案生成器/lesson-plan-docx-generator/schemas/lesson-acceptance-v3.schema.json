@@ -1,0 +1,362 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Lesson Acceptance Contract 3.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "pipeline_run_id",
+    "mode",
+    "final_status",
+    "gate_matrix",
+    "evidence",
+    "final_artifact_inventory",
+    "skill_fingerprint",
+    "template",
+    "limitations",
+    "created_at",
+    "acceptance_fingerprint"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "3.0"
+    },
+    "pipeline_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "enum": [
+        "PRODUCTION",
+        "PREVIEW"
+      ]
+    },
+    "final_status": {
+      "enum": [
+        "ACCEPTED",
+        "ACCEPTED_WITH_NOTES",
+        "REVISION_REQUIRED",
+        "PENDING_REVIEW",
+        "FAILED"
+      ]
+    },
+    "gate_matrix": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "status",
+          "evidence_sha256",
+          "contract",
+          "version",
+          "notes"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "pipeline_identity",
+              "source_truth",
+              "content",
+              "preproduction_qa",
+              "benchmark_disposition",
+              "teacher_review_packet",
+              "teacher_review",
+              "production_authorization",
+              "artifact_manifest",
+              "artifact_qa",
+              "visual_review",
+              "lifecycle_state"
+            ]
+          },
+          "status": {
+            "enum": [
+              "PASS",
+              "FAIL",
+              "PENDING",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "evidence_sha256": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contract": {
+            "type": "string",
+            "minLength": 1
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_truth_manifest_sha256",
+        "content_sha256",
+        "preproduction_qa_sha256",
+        "benchmark_disposition_sha256",
+        "benchmark_review_sha256",
+        "teacher_review_packet_sha256",
+        "teacher_review_sha256",
+        "production_authorization_sha256",
+        "artifact_manifest_sha256",
+        "artifact_qa_sha256",
+        "visual_review_authority_sha256"
+      ],
+      "properties": {
+        "source_truth_manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "content_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preproduction_qa_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "benchmark_disposition_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "benchmark_review_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "teacher_review_packet_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "teacher_review_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "production_authorization_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_manifest_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artifact_qa_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "visual_review_authority_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "final_artifact_inventory": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "docx_count",
+            "pdf_count",
+            "pdf_total_pages",
+            "artifact_manifest_sha256",
+            "artifact_manifest_identity",
+            "output_inventory_fingerprint",
+            "render_status"
+          ],
+          "properties": {
+            "docx_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "pdf_count": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "pdf_total_pages": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "artifact_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "artifact_manifest_identity": {
+              "type": "string",
+              "minLength": 1
+            },
+            "output_inventory_fingerprint": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "render_status": {
+              "const": "passed"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "skill_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "template": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "template_id",
+            "template_version",
+            "manifest_sha256",
+            "template_sha256"
+          ],
+          "properties": {
+            "template_id": {
+              "const": "lesson-plan"
+            },
+            "template_version": {
+              "const": "1.1.2"
+            },
+            "manifest_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "template_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "limitations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "BENCHMARK_PARTIAL",
+          "BENCHMARK_UNAVAILABLE",
+          "BENCHMARK_WAIVED_BY_USER",
+          "TEACHER_APPROVED_WITH_NOTES"
+        ]
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "acceptance_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

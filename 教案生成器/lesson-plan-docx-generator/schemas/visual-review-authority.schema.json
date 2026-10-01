@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "visual-review-authority Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "pipeline_run_id",
+    "content_sha256",
+    "artifact_manifest_sha256",
+    "artifact_qa_sha256",
+    "sampling_policy_version",
+    "sampling_policy",
+    "required_sample",
+    "visual_review_packet_sha256",
+    "visual_inspection_evidence_sha256",
+    "inspected_files",
+    "inspected_pages",
+    "decision",
+    "notes",
+    "created_at",
+    "authority_fingerprint"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0"
+    },
+    "pipeline_run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "artifact_qa_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "sampling_policy_version": {
+      "const": "1.0"
+    },
+    "sampling_policy": {
+      "type": "string",
+      "minLength": 1
+    },
+    "required_sample": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lesson_id",
+          "file",
+          "pdf_file",
+          "page_count",
+          "required_pages",
+          "reasons"
+        ],
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pdf_file": {
+            "type": "string",
+            "minLength": 1
+          },
+          "page_count": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "required_pages": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "visual_review_packet_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "visual_inspection_evidence_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "inspected_files": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "inspected_pages": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "uniqueItems": true,
+        "items": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "decision": {
+      "enum": [
+        "PASSED",
+        "REVISION_REQUIRED"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

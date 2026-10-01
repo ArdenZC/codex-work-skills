@@ -619,7 +619,7 @@ def _artifact_relative_path(root: Path, value: Any) -> Path | None:
     return candidate
 
 
-def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> str | None:
+def verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> str | None:
     """Verify manifest provenance and return the artifact-level production state."""
 
     required = {
@@ -911,6 +911,11 @@ def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path:
         if qa_report.get("artifact_manifest") == "artifact-manifest.json" and qa_production_status not in (None, production_status):
             raise RuntimeError("final QA report production_status does not match verified artifact evidence")
     return production_status
+
+
+def _verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> str | None:
+    """Backward-compatible private entrypoint for the shared read-only verifier."""
+    return verify_artifact_manifest(root, manifest, source_path)
 
 
 def _unique_backup_path(out_dir: Path) -> Path:

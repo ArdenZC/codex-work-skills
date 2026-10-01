@@ -1,0 +1,1396 @@
+{
+  "reviewed_baseline": "8e8f44abb0eae42819e34c572e715574ac9c2999",
+  "purpose": "SYNTHETIC frozen Acceptance 2.0 sampling outputs from reviewed source",
+  "cases": [
+    {
+      "data": {
+        "lessons": []
+      },
+      "qa": {
+        "render": {
+          "page_counts": {}
+        }
+      },
+      "inventory": {
+        "docx_files": []
+      },
+      "manifest": null,
+      "expected": {
+        "policy": "risk_oriented_sample; render smoke remains all-doc; visual inspection is manual",
+        "sample_count": 0,
+        "sample": [],
+        "manual_inspection_status": "not_executed",
+        "max_pages_source": "qa-report.render.page_counts"
+      }
+    },
+    {
+      "data": {
+        "lessons": [
+          {
+            "lesson_id": "L01",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": ""
+            },
+            "reflection": ""
+          }
+        ]
+      },
+      "qa": {
+        "render": {
+          "page_counts": {
+            "01_SYNTHETIC.docx": 1
+          }
+        }
+      },
+      "inventory": {
+        "docx_files": [
+          "01_SYNTHETIC.docx"
+        ]
+      },
+      "manifest": null,
+      "expected": {
+        "policy": "risk_oriented_sample; render smoke remains all-doc; visual inspection is manual",
+        "sample_count": 1,
+        "sample": [
+          {
+            "lesson_id": "L01",
+            "file": "01_SYNTHETIC.docx",
+            "reasons": [
+              "each_project",
+              "first_lesson",
+              "last_lesson",
+              "maximum_content_chars",
+              "maximum_evaluation_density",
+              "maximum_implementation_density",
+              "maximum_pages"
+            ]
+          }
+        ],
+        "manual_inspection_status": "not_executed",
+        "max_pages_source": "qa-report.render.page_counts"
+      }
+    },
+    {
+      "data": {
+        "lessons": [
+          {
+            "lesson_id": "L01",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": ""
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L02",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "d"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L03",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "dd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L04",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "ddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L05",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": "dddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L06",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "ddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L07",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "cccccc"
+            },
+            "evaluation": {
+              "remarks": "dddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L08",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": "ddddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L09",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "dddddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L10",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "ddddddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L11",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "dddddddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L12",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": ""
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L13",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "d"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L14",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "cccccc"
+            },
+            "evaluation": {
+              "remarks": "dd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L15",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": "ddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L16",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "dddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L17",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "ddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L18",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "dddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L19",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": "ddddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L20",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "dddddddd"
+            },
+            "reflection": "e"
+          }
+        ]
+      },
+      "qa": {
+        "render": {
+          "page_counts": {
+            "01_SYNTHETIC.docx": 1,
+            "02_SYNTHETIC.docx": 2,
+            "03_SYNTHETIC.docx": 3,
+            "04_SYNTHETIC.docx": 4,
+            "05_SYNTHETIC.docx": 5,
+            "06_SYNTHETIC.docx": 1,
+            "07_SYNTHETIC.docx": 2,
+            "08_SYNTHETIC.docx": 3,
+            "09_SYNTHETIC.docx": 4,
+            "10_SYNTHETIC.docx": 5,
+            "11_SYNTHETIC.docx": 1,
+            "12_SYNTHETIC.docx": 2,
+            "13_SYNTHETIC.docx": 3,
+            "14_SYNTHETIC.docx": 4,
+            "15_SYNTHETIC.docx": 5,
+            "16_SYNTHETIC.docx": 1,
+            "17_SYNTHETIC.docx": 2,
+            "18_SYNTHETIC.docx": 3,
+            "19_SYNTHETIC.docx": 4,
+            "20_SYNTHETIC.docx": 5
+          }
+        }
+      },
+      "inventory": {
+        "docx_files": [
+          "01_SYNTHETIC.docx",
+          "02_SYNTHETIC.docx",
+          "03_SYNTHETIC.docx",
+          "04_SYNTHETIC.docx",
+          "05_SYNTHETIC.docx",
+          "06_SYNTHETIC.docx",
+          "07_SYNTHETIC.docx",
+          "08_SYNTHETIC.docx",
+          "09_SYNTHETIC.docx",
+          "10_SYNTHETIC.docx",
+          "11_SYNTHETIC.docx",
+          "12_SYNTHETIC.docx",
+          "13_SYNTHETIC.docx",
+          "14_SYNTHETIC.docx",
+          "15_SYNTHETIC.docx",
+          "16_SYNTHETIC.docx",
+          "17_SYNTHETIC.docx",
+          "18_SYNTHETIC.docx",
+          "19_SYNTHETIC.docx",
+          "20_SYNTHETIC.docx"
+        ]
+      },
+      "manifest": null,
+      "expected": {
+        "policy": "risk_oriented_sample; render smoke remains all-doc; visual inspection is manual",
+        "sample_count": 14,
+        "sample": [
+          {
+            "lesson_id": "L01",
+            "file": "01_SYNTHETIC.docx",
+            "reasons": [
+              "each_project",
+              "first_lesson"
+            ]
+          },
+          {
+            "lesson_id": "L05",
+            "file": "05_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L07",
+            "file": "07_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L08",
+            "file": "08_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_before"
+            ]
+          },
+          {
+            "lesson_id": "L09",
+            "file": "09_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_after",
+              "each_project",
+              "maximum_content_chars"
+            ]
+          },
+          {
+            "lesson_id": "L10",
+            "file": "10_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L11",
+            "file": "11_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_evaluation_density"
+            ]
+          },
+          {
+            "lesson_id": "L13",
+            "file": "13_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L14",
+            "file": "14_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_implementation_density"
+            ]
+          },
+          {
+            "lesson_id": "L15",
+            "file": "15_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L16",
+            "file": "16_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_before"
+            ]
+          },
+          {
+            "lesson_id": "L17",
+            "file": "17_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_after",
+              "each_project"
+            ]
+          },
+          {
+            "lesson_id": "L19",
+            "file": "19_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L20",
+            "file": "20_SYNTHETIC.docx",
+            "reasons": [
+              "last_lesson",
+              "maximum_pages"
+            ]
+          }
+        ],
+        "manual_inspection_status": "not_executed",
+        "max_pages_source": "qa-report.render.page_counts"
+      }
+    },
+    {
+      "data": {
+        "lessons": [
+          {
+            "lesson_id": "L01",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": ""
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L02",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "d"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L03",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "dd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L04",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "ddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L05",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": "dddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L06",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "ddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L07",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "cccccc"
+            },
+            "evaluation": {
+              "remarks": "dddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L08",
+            "unit": "项目1",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": "ddddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L09",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "dddddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L10",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "ddddddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L11",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "dddddddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L12",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": ""
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L13",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "d"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L14",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "cccccc"
+            },
+            "evaluation": {
+              "remarks": "dd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L15",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": "ddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L16",
+            "unit": "项目2",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "dddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L17",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "ddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L18",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "dddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L19",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": "ddddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L20",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "dddddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L21",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "cccccc"
+            },
+            "evaluation": {
+              "remarks": "ddddddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L22",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": "dddddddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L23",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": ""
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L24",
+            "unit": "项目3",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "d"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L25",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "dd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L26",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "cccc"
+            },
+            "evaluation": {
+              "remarks": "ddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L27",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaaaaaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "ccccc"
+            },
+            "evaluation": {
+              "remarks": "dddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L28",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC "
+            },
+            "implementation": {
+              "teacher_actions": "bb",
+              "student_actions": "cccccc"
+            },
+            "evaluation": {
+              "remarks": "ddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L29",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC a"
+            },
+            "implementation": {
+              "teacher_actions": "bbb",
+              "student_actions": ""
+            },
+            "evaluation": {
+              "remarks": "dddddd"
+            },
+            "reflection": "e"
+          },
+          {
+            "lesson_id": "L30",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC aa"
+            },
+            "implementation": {
+              "teacher_actions": "bbbb",
+              "student_actions": "c"
+            },
+            "evaluation": {
+              "remarks": "ddddddd"
+            },
+            "reflection": "ee"
+          },
+          {
+            "lesson_id": "L31",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC aaa"
+            },
+            "implementation": {
+              "teacher_actions": "",
+              "student_actions": "cc"
+            },
+            "evaluation": {
+              "remarks": "dddddddd"
+            },
+            "reflection": ""
+          },
+          {
+            "lesson_id": "L32",
+            "unit": "项目4",
+            "teaching_content": {
+              "content": "SYNTHETIC aaaa"
+            },
+            "implementation": {
+              "teacher_actions": "b",
+              "student_actions": "ccc"
+            },
+            "evaluation": {
+              "remarks": "ddddddddd"
+            },
+            "reflection": "e"
+          }
+        ]
+      },
+      "qa": {
+        "render": {
+          "page_counts": {
+            "01_SYNTHETIC.docx": 1,
+            "02_SYNTHETIC.docx": 2,
+            "03_SYNTHETIC.docx": 3,
+            "04_SYNTHETIC.docx": 4,
+            "05_SYNTHETIC.docx": 5,
+            "06_SYNTHETIC.docx": 1,
+            "07_SYNTHETIC.docx": 2,
+            "08_SYNTHETIC.docx": 3,
+            "09_SYNTHETIC.docx": 4,
+            "10_SYNTHETIC.docx": 5,
+            "11_SYNTHETIC.docx": 1,
+            "12_SYNTHETIC.docx": 2,
+            "13_SYNTHETIC.docx": 3,
+            "14_SYNTHETIC.docx": 4,
+            "15_SYNTHETIC.docx": 5,
+            "16_SYNTHETIC.docx": 1,
+            "17_SYNTHETIC.docx": 2,
+            "18_SYNTHETIC.docx": 3,
+            "19_SYNTHETIC.docx": 4,
+            "20_SYNTHETIC.docx": 5,
+            "21_SYNTHETIC.docx": 1,
+            "22_SYNTHETIC.docx": 2,
+            "23_SYNTHETIC.docx": 3,
+            "24_SYNTHETIC.docx": 4,
+            "25_SYNTHETIC.docx": 5,
+            "26_SYNTHETIC.docx": 1,
+            "27_SYNTHETIC.docx": 2,
+            "28_SYNTHETIC.docx": 3,
+            "29_SYNTHETIC.docx": 4,
+            "30_SYNTHETIC.docx": 5,
+            "31_SYNTHETIC.docx": 1,
+            "32_SYNTHETIC.docx": 2
+          }
+        }
+      },
+      "inventory": {
+        "docx_files": [
+          "01_SYNTHETIC.docx",
+          "02_SYNTHETIC.docx",
+          "03_SYNTHETIC.docx",
+          "04_SYNTHETIC.docx",
+          "05_SYNTHETIC.docx",
+          "06_SYNTHETIC.docx",
+          "07_SYNTHETIC.docx",
+          "08_SYNTHETIC.docx",
+          "09_SYNTHETIC.docx",
+          "10_SYNTHETIC.docx",
+          "11_SYNTHETIC.docx",
+          "12_SYNTHETIC.docx",
+          "13_SYNTHETIC.docx",
+          "14_SYNTHETIC.docx",
+          "15_SYNTHETIC.docx",
+          "16_SYNTHETIC.docx",
+          "17_SYNTHETIC.docx",
+          "18_SYNTHETIC.docx",
+          "19_SYNTHETIC.docx",
+          "20_SYNTHETIC.docx",
+          "21_SYNTHETIC.docx",
+          "22_SYNTHETIC.docx",
+          "23_SYNTHETIC.docx",
+          "24_SYNTHETIC.docx",
+          "25_SYNTHETIC.docx",
+          "26_SYNTHETIC.docx",
+          "27_SYNTHETIC.docx",
+          "28_SYNTHETIC.docx",
+          "29_SYNTHETIC.docx",
+          "30_SYNTHETIC.docx",
+          "31_SYNTHETIC.docx",
+          "32_SYNTHETIC.docx"
+        ]
+      },
+      "manifest": {
+        "artifacts": [
+          {
+            "final_docx_path": "01_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "02_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          },
+          {
+            "final_docx_path": "03_SYNTHETIC.docx",
+            "actual_pdf_page_count": 3
+          },
+          {
+            "final_docx_path": "04_SYNTHETIC.docx",
+            "actual_pdf_page_count": 4
+          },
+          {
+            "final_docx_path": "05_SYNTHETIC.docx",
+            "actual_pdf_page_count": 5
+          },
+          {
+            "final_docx_path": "06_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "07_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          },
+          {
+            "final_docx_path": "08_SYNTHETIC.docx",
+            "actual_pdf_page_count": 3
+          },
+          {
+            "final_docx_path": "09_SYNTHETIC.docx",
+            "actual_pdf_page_count": 4
+          },
+          {
+            "final_docx_path": "10_SYNTHETIC.docx",
+            "actual_pdf_page_count": 5
+          },
+          {
+            "final_docx_path": "11_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "12_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          },
+          {
+            "final_docx_path": "13_SYNTHETIC.docx",
+            "actual_pdf_page_count": 3
+          },
+          {
+            "final_docx_path": "14_SYNTHETIC.docx",
+            "actual_pdf_page_count": 4
+          },
+          {
+            "final_docx_path": "15_SYNTHETIC.docx",
+            "actual_pdf_page_count": 5
+          },
+          {
+            "final_docx_path": "16_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "17_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          },
+          {
+            "final_docx_path": "18_SYNTHETIC.docx",
+            "actual_pdf_page_count": 3
+          },
+          {
+            "final_docx_path": "19_SYNTHETIC.docx",
+            "actual_pdf_page_count": 4
+          },
+          {
+            "final_docx_path": "20_SYNTHETIC.docx",
+            "actual_pdf_page_count": 5
+          },
+          {
+            "final_docx_path": "21_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "22_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          },
+          {
+            "final_docx_path": "23_SYNTHETIC.docx",
+            "actual_pdf_page_count": 3
+          },
+          {
+            "final_docx_path": "24_SYNTHETIC.docx",
+            "actual_pdf_page_count": 4
+          },
+          {
+            "final_docx_path": "25_SYNTHETIC.docx",
+            "actual_pdf_page_count": 5
+          },
+          {
+            "final_docx_path": "26_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "27_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          },
+          {
+            "final_docx_path": "28_SYNTHETIC.docx",
+            "actual_pdf_page_count": 3
+          },
+          {
+            "final_docx_path": "29_SYNTHETIC.docx",
+            "actual_pdf_page_count": 4
+          },
+          {
+            "final_docx_path": "30_SYNTHETIC.docx",
+            "actual_pdf_page_count": 5
+          },
+          {
+            "final_docx_path": "31_SYNTHETIC.docx",
+            "actual_pdf_page_count": 1
+          },
+          {
+            "final_docx_path": "32_SYNTHETIC.docx",
+            "actual_pdf_page_count": 2
+          }
+        ]
+      },
+      "expected": {
+        "policy": "risk_oriented_sample; render smoke remains all-doc; visual inspection is manual",
+        "sample_count": 20,
+        "sample": [
+          {
+            "lesson_id": "L01",
+            "file": "01_SYNTHETIC.docx",
+            "reasons": [
+              "each_project",
+              "first_lesson"
+            ]
+          },
+          {
+            "lesson_id": "L03",
+            "file": "03_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L05",
+            "file": "05_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L08",
+            "file": "08_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_before"
+            ]
+          },
+          {
+            "lesson_id": "L09",
+            "file": "09_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_after",
+              "each_project",
+              "maximum_content_chars"
+            ]
+          },
+          {
+            "lesson_id": "L10",
+            "file": "10_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L11",
+            "file": "11_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_evaluation_density"
+            ]
+          },
+          {
+            "lesson_id": "L14",
+            "file": "14_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_implementation_density"
+            ]
+          },
+          {
+            "lesson_id": "L15",
+            "file": "15_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L16",
+            "file": "16_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_before"
+            ]
+          },
+          {
+            "lesson_id": "L17",
+            "file": "17_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_after",
+              "each_project"
+            ]
+          },
+          {
+            "lesson_id": "L18",
+            "file": "18_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L20",
+            "file": "20_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L23",
+            "file": "23_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L24",
+            "file": "24_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_before"
+            ]
+          },
+          {
+            "lesson_id": "L25",
+            "file": "25_SYNTHETIC.docx",
+            "reasons": [
+              "boundary_after",
+              "each_project",
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L26",
+            "file": "26_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L30",
+            "file": "30_SYNTHETIC.docx",
+            "reasons": [
+              "maximum_pages"
+            ]
+          },
+          {
+            "lesson_id": "L31",
+            "file": "31_SYNTHETIC.docx",
+            "reasons": [
+              "deterministic_random_10_to_20_percent"
+            ]
+          },
+          {
+            "lesson_id": "L32",
+            "file": "32_SYNTHETIC.docx",
+            "reasons": [
+              "last_lesson"
+            ]
+          }
+        ],
+        "manual_inspection_status": "not_executed",
+        "max_pages_source": "artifact-manifest.json"
+      }
+    }
+  ]
+}
