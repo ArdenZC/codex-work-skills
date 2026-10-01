@@ -494,7 +494,10 @@ jobs:
       (needs.classify-changes.outputs.force_full == 'true' ||
       needs.classify-changes.outputs.run_lesson == 'true')
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # Windows measured 28m for the 92 real-render tests plus ~2m setup;
+    # two 30m deadlines cancelled the job. Keep a bounded setup/cleanup
+    # margin while preserving every test and the required fail-closed Gate.
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 40 || 30 }}
     env:
       PYTHONUTF8: "1"
       PYTHONIOENCODING: utf-8
