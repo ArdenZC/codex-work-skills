@@ -458,6 +458,7 @@ jobs:
           --suite lesson-lifecycle
           --suite lesson-quality
           --suite lesson-pipeline
+          --suite lesson-teacher-review
           --suite lesson-package
           --suite lesson-benchmark
           --suite hardening

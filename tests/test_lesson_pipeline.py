@@ -141,9 +141,11 @@ class PipelineTests(unittest.TestCase):
 
     def test_teacher_review_must_match_final_benchmark_object(self):
         _, _, evidence, benchmark = self.ready_disposition()
-        benchmark["disposition"] = "BENCHMARK_PARTIAL"
+        payload = self.packet_teacher(benchmark)
+        payload["benchmark"]["disposition"] = "BENCHMARK_PARTIAL"
+        payload["review_fingerprint"] = teacher_review_fingerprint(payload)
         teacher = self.folder / "teacher.json"
-        _write_json(teacher, _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark))
+        _write_json(teacher, payload)
         self.rejected("bind-teacher-review", teacher_review=teacher)
 
     def test_authorization_must_match_final_benchmark_object(self):
@@ -252,12 +254,23 @@ class PipelineTests(unittest.TestCase):
                                        "content_sha256": content_sha, "benchmark": benchmark})
         return disposition_path, evidence_path, benchmark
 
+    def packet_teacher(self, benchmark):
+        run = self.call("prepare-teacher-review")
+        packet = json.loads(pipeline.path_of(run, "teacher_review_packet").read_bytes())
+        teacher = _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark)
+        row = teacher["selected_lessons"][0]
+        teacher["selected_lessons"] = [dict(copy.deepcopy(row), lesson_id=item["lesson_id"],
+                                           selection_reasons=item["selection_reasons"])
+                                       for item in packet["selected_lessons"]]
+        teacher["review_fingerprint"] = teacher_review_fingerprint(teacher)
+        return teacher
+
     def reviewed(self):
         self.qa()
         disposition, evidence, benchmark = self.disposition()
         self.call("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
         teacher_path = self.folder / "teacher.json"
-        teacher = _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark)
+        teacher = self.packet_teacher(benchmark)
         _write_json(teacher_path, teacher)
         self.call("bind-teacher-review", teacher_review=teacher_path)
         return teacher_path, benchmark
@@ -376,7 +389,7 @@ class PipelineTests(unittest.TestCase):
         self.qa()
         disposition, evidence, benchmark = self.disposition()
         self.call("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
-        teacher = _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark)
+        teacher = self.packet_teacher(benchmark)
         teacher["decision"] = "REVISION_REQUIRED"
         teacher["review_fingerprint"] = teacher_review_fingerprint(teacher)
         path = self.folder / "teacher.json"
@@ -561,7 +574,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(result["state"]["current_state"], "BENCHMARK_REVIEW_COMPLETE")
         self.assertEqual(self.call("ready-for-teacher-review")["state"]["current_state"], "READY_FOR_TEACHER_REVIEW")
         teacher = self.folder / "teacher.json"
-        _write_json(teacher, _teacher_review(self.source_path.read_bytes(), self.content_path.read_bytes(), benchmark))
+        _write_json(teacher, self.packet_teacher(benchmark))
         self.call("bind-teacher-review", teacher_review=teacher)
         authorization = self.folder / "authorization.json"
         _write_json(authorization, _production_authorization(self.source_path.read_bytes(), self.content_path.read_bytes(),

@@ -116,6 +116,16 @@ class TestShardManifest(unittest.TestCase):
         for alias in ("fast", "full", "ci"):
             self.assertIn("lesson-pipeline", run_test_shards._expand_suites((alias,), specs))
 
+    def test_teacher_review_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
+        specs = run_test_shards._suite_specs()
+        module = "tests.test_teacher_review_selection"
+        self.assertEqual(unittest.defaultTestLoader.loadTestsFromName(module).countTestCases(),
+                         specs["lesson-teacher-review"].count)
+        self.assertEqual((module,), run_test_shards._suite_test_ids("lesson-teacher-review"))
+        self.assertTrue(specs["lesson-teacher-review"].parallel_safe)
+        for alias in ("fast", "full", "ci"):
+            self.assertIn("lesson-teacher-review", run_test_shards._expand_suites((alias,), specs))
+
     def test_gradebook_discovery_worker_does_not_reuse_lesson_package_common(self) -> None:
         result = subprocess.run(
             [sys.executable, "-B", str(SCRIPTS / "run_test_shards.py"), "--worker", "--suite", "gradebook-skill"],

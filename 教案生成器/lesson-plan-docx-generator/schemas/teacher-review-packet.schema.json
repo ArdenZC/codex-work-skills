@@ -1,0 +1,413 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Teacher Review Packet Contract 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "packet_id",
+    "pipeline_run_id",
+    "source_truth_manifest_sha256",
+    "content_sha256",
+    "benchmark",
+    "benchmark_disposition_sha256",
+    "benchmark_review_sha256",
+    "selection_policy_version",
+    "target_count",
+    "selected_lessons",
+    "course_map",
+    "created_at",
+    "packet_fingerprint"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0"
+    },
+    "packet_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "pipeline_run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "source_truth_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "authorization_sha256",
+        "review_sha256",
+        "evidence_sha256",
+        "waiver_reference"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "BENCHMARK_REVIEW_COMPLETE",
+            "BENCHMARK_PARTIAL",
+            "BENCHMARK_UNAVAILABLE",
+            "BENCHMARK_WAIVED_BY_USER"
+          ]
+        },
+        "authorization_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          ]
+        },
+        "review_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          ]
+        },
+        "evidence_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-fA-F0-9]{64}$"
+            }
+          ]
+        },
+        "waiver_reference": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "BENCHMARK_REVIEW_COMPLETE"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "authorization_sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              },
+              "review_sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "enum": [
+                  "BENCHMARK_PARTIAL",
+                  "BENCHMARK_UNAVAILABLE"
+                ]
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "BENCHMARK_WAIVED_BY_USER"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence_sha256": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{64}$"
+              },
+              "waiver_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            }
+          }
+        }
+      ]
+    },
+    "benchmark_disposition_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "benchmark_review_sha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      ]
+    },
+    "selection_policy_version": {
+      "const": "1.0"
+    },
+    "target_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "selected_lessons": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lesson_id",
+          "course_position",
+          "selection_reasons",
+          "lesson_semantic_sha256",
+          "content_density_bytes",
+          "practice_complexity",
+          "benchmark_gap_summary",
+          "lesson_snapshot"
+        ],
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "course_position": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "selection_reasons": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "first_lesson",
+                "last_lesson",
+                "project_boundary_before",
+                "project_boundary_after",
+                "highest_content_density",
+                "highest_practice_complexity",
+                "benchmark_gap",
+                "deterministic_supplemental"
+              ]
+            }
+          },
+          "lesson_semantic_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "content_density_bytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "practice_complexity": {
+            "type": "array",
+            "minItems": 6,
+            "maxItems": 6,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "benchmark_gap_summary": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "major_count",
+                  "minor_count",
+                  "advisory_count",
+                  "GAP_count",
+                  "PARTIAL_count",
+                  "gap_dimension_ids"
+                ],
+                "properties": {
+                  "major_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "minor_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "advisory_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "GAP_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "PARTIAL_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "gap_dimension_ids": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "lesson_snapshot": {
+            "type": "object",
+            "minProperties": 1
+          }
+        }
+      }
+    },
+    "course_map": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "course_position",
+          "lesson_id",
+          "unit",
+          "task",
+          "hours"
+        ],
+        "properties": {
+          "course_position": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lesson_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task": {
+            "type": "string",
+            "minLength": 1
+          },
+          "hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1,
+                "multipleOf": 1
+              },
+              {
+                "type": "string",
+                "pattern": "^[1-9][0-9]*(?:\\.0+)?$"
+              }
+            ]
+          },
+          "theory_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "multipleOf": 1
+              },
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9][0-9]*(?:\\.0+)?)$"
+              }
+            ]
+          },
+          "practice_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "multipleOf": 1
+              },
+              {
+                "type": "string",
+                "pattern": "^(?:0|[1-9][0-9]*(?:\\.0+)?)$"
+              }
+            ]
+          },
+          "lesson_type": {
+            "enum": [
+              "theory",
+              "practice",
+              "integrated"
+            ]
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "packet_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
