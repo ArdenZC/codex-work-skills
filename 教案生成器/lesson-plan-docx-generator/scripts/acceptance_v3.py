@@ -55,8 +55,14 @@ def evaluate(run, *, created_at=None, validate_acceptance=True, diagnostic_input
               "version": version, "notes": "required evidence is not yet available"}
              for name, (_, contract, version) in GATES.items()]
     indexed = {row["name"]: row for row in gates}
-    result = {"contract_version": "3.0", "pipeline_run_id": run.get("state", {}).get("pipeline_run_id", "INVALID"),
-        "mode": run.get("mode", "PRODUCTION"), "final_status": "PENDING_REVIEW", "gate_matrix": gates,
+    # Diagnostic metadata must itself remain valid even when the envelope is
+    # malformed. The original, unsanitized run is still validated below.
+    state = run.get("state") if isinstance(run, dict) else None
+    run_id = state.get("pipeline_run_id") if isinstance(state, dict) else None
+    mode = run.get("mode") if isinstance(run, dict) else None
+    result = {"contract_version": "3.0", "pipeline_run_id": run_id if isinstance(run_id, str) and run_id.strip() else "INVALID",
+        "mode": mode if isinstance(mode, str) and mode in {"PRODUCTION", "PREVIEW"} else "PRODUCTION",
+        "final_status": "PENDING_REVIEW", "gate_matrix": gates,
         "evidence": {name: None for name in LINKS}, "final_artifact_inventory": None,
         "skill_fingerprint": None, "template": None, "limitations": [], "created_at": created_at or timestamp()}
     revision = False
@@ -153,7 +159,7 @@ def evaluate(run, *, created_at=None, validate_acceptance=True, diagnostic_input
         if result["mode"] == "PREVIEW":
             indexed["lifecycle_state"].update(status="PENDING", evidence_sha256=None, notes="PREVIEW cannot hold final production authority")
         result["final_status"] = final_status(result["mode"], gates, revision, result["limitations"])
-    except (ValueError, RuntimeError, OSError, TypeError, KeyError) as exc:
+    except (ValueError, RuntimeError, OSError, TypeError, KeyError, AttributeError, IndexError) as exc:
         result["final_status"] = "FAILED"
         indexed["pipeline_identity"].update(status="FAIL", notes="integrity/linkage validation failed: " + str(exc))
     result["acceptance_fingerprint"] = acceptance_fingerprint(result)

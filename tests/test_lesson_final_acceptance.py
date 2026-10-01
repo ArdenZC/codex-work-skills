@@ -454,6 +454,30 @@ class DiagnosticTests(unittest.TestCase):
     def setUp(self):
         self.h=pipeline_tests.PipelineTests();self.h.setUp();self.addCleanup(self.h.doCleanups)
 
+    def test_malformed_envelope_returns_schema_valid_failed_diagnostic(self):
+        run = self.h.call('status')
+        candidates = [[], {}, None]
+        for state in (None, [], "invalid", 42):
+            bad = copy.deepcopy(run)
+            bad['state'] = state
+            bad['run_fingerprint'] = pipeline.envelope_fingerprint(bad)
+            candidates.append(bad)
+        for run_id in (None, [], {}, ""):
+            bad = copy.deepcopy(run)
+            bad['state']['pipeline_run_id'] = run_id
+            bad['run_fingerprint'] = pipeline.envelope_fingerprint(bad)
+            candidates.append(bad)
+        for mode in (None, [], {}, "UNKNOWN"):
+            bad = copy.deepcopy(run)
+            bad['mode'] = mode
+            bad['run_fingerprint'] = pipeline.envelope_fingerprint(bad)
+            candidates.append(bad)
+        for bad in candidates:
+            with self.subTest(envelope=bad):
+                report = acceptance.evaluate(bad)
+                self.assertEqual(report['final_status'], 'FAILED')
+                self.assertEqual(schema_errors(report, 'lesson-acceptance-v3.schema.json'), [])
+
     def test_missing_teacher_pending(self):
         run,_,_,_=self.h.ready_disposition()
         self.assertEqual(acceptance.evaluate(run)['final_status'],'PENDING_REVIEW')
