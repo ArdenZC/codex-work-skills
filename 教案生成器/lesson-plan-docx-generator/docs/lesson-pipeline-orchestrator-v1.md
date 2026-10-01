@@ -1,9 +1,9 @@
 # Lesson Pipeline Orchestrator implementation 1.0
 
 独立入口 `scripts/run_lesson_pipeline.py`，复用 Pipeline State Contract 1.0，
-停止于 PRODUCTION_AUTHORIZED。本轮没有 final generator、artifact/visual QA 或 ACCEPTED 集成。
+LIF-05 opt-in candidate 实现 final generator、artifact/visual authority 与独立 Acceptance 3.0。
 Skill 2.3.1、Content 2.2/2.3、Template 1.1.2、Acceptance 2.0 和所有既有 Review/Authorization
-合同保持原版本及语义。此路径是 opt-in LIF-04 candidate path。
+合同保持原版本及语义。此路径是 opt-in LIF-05 candidate path；不是 Skill 2.4 Stable。
 
 ## 状态与一次一步
 
@@ -48,7 +48,7 @@ PREVIEW 可以准备、绑定外部 Content、QA 和 Review；authorize-producti
 必须逐字节匹配，HTTPS 来源不联网。PREVIEW 允许结构合法的远程来源，CLI 的
 `source_truth_status=STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED` 保留其未验证语义。
 PRODUCTION 从 init 到恢复始终要求所有来源 bytes 已验证；远程来源须先冻结为可复验的本地证据。
-本轮不调用 diagnostic renderer，也不改变 legacy generator transaction。
+最终生命周期调用 canonical generator 的正式 retained render，不使用 diagnostic renderer；legacy transaction 保留。
 迭代创建新 run；旧 run 绑定字节不静默重写。编辑任一源文件、Content、Review 或 sidecar
 都会使旧 run STALE，旧 Teacher Review/Production Authorization 不再有效。
 
@@ -158,3 +158,55 @@ Packet 必须 exact equality。人工可填评分、备注和判断，不能减�
 PREVIEW 可准备 Packet / 绑定外部 Review，仍拒绝 Production Authorization。
 Content、disposition、Review 或 shard 任意 bytes 改变使旧 run / Packet / Review stale，
 须新建 run；禁止静默重新绑定。
+
+## LIF-05 final authority commands
+
+| Command | Required current state | Result/evidence |
+| --- | --- | --- |
+| generate-production | PRODUCTION_AUTHORIZED / PRODUCTION | canonical existing generator `--render`; PRODUCTION_GENERATED; manifest bytes SHA |
+| validate-artifacts | PRODUCTION_GENERATED / PRODUCTION | ARTIFACT_QA_PASSED; existing qa-report bytes SHA |
+| prepare-visual-review | ARTIFACT_QA_PASSED / PRODUCTION | deterministic Visual Packet; no transition |
+| bind-visual-review | ARTIFACT_QA_PASSED / PRODUCTION | external PASSED Authority + inspection evidence; VISUAL_REVIEW_APPROVED |
+| evaluate-acceptance | read-only diagnostic | Acceptance 3.0 candidate/diagnosis; no files or transition |
+| finalize-acceptance | VISUAL_REVIEW_APPROVED / PRODUCTION | atomic Acceptance 3.0 artifact + ACCEPTED transition |
+
+Final generation requires current full Production Authorization and revalidates all
+upstream files first. It invokes only `generate_lesson_plans.py`, passes canonical
+Template/manifest and run ID, requires real retained PDF render, then reuses the
+public read-only `verify_artifact_manifest` helper. The old private entrypoint is a
+compatibility forwarding wrapper, so post-commit and lifecycle share one verifier.
+No second DOCX generator or Artifact-verification implementation exists.
+
+Complete Benchmark passes the existing complete evidence set and required mode to
+the generator. PARTIAL/UNAVAILABLE/WAIVED use the compatible low-level none mode
+without a fake Benchmark Authorization. Their actual lifecycle disposition remains
+bound in Teacher Review, Production Authorization and Acceptance limitations.
+Generator `production_pass` is an artifact transaction result, never lifecycle ACCEPTED.
+
+`--output-dir` must be a new descendant of the run workspace (default
+`<run-stem>-final`), independent from all actual Source Truth source files, Content,
+run and lifecycle sidecars, and outside protected Skills. Existing path safety checks
+include lexical/resolved aliases and reject symlinks. The envelope freezes
+`output_workspace` only when final artifacts are first bound; legacy envelopes remain
+valid. Final output directory inventory, manifest and QA are immutable bindings.
+Human inspection evidence and new sidecars are outside this frozen directory.
+
+Generation uses the existing generator transaction. Failure never advances state;
+the lifecycle never overwrites an older authorized output. If interrupted after
+publication but before the run commit, the unbound output grants no authority;
+create a new run/output location to retry, rather than editing or rebinding old evidence.
+
+Artifact QA revalidates actual DOCX/PDF inventories, IDs/count/hours, Content digest,
+canonical authorized Template, QA/retained render status, every SHA and page count.
+Exactly one DOCX and one retained PDF per Lesson; unexpected nested/case-variant
+DOCX/PDF or symlinks reject. `artifact_qa_sha256` is the real `qa-report.json` SHA;
+no duplicate machine QA sidecar is created. Structural/unrendered generator output
+remains available standalone, but cannot enter this final authority path.
+
+All final states revalidate actual files; Packet, human Authority and Acceptance
+also check self fingerprints and exact rederivation. State strings never grant
+production or acceptance. PREVIEW rejects all final commands; read-only evaluation
+of a legitimate PREVIEW returns PENDING_REVIEW. Visual revision requires a new run.
+Further details and final-status rules are in `visual-review-authority-v1.md` and
+`lesson-acceptance-v3.md`. practice_only zero-Lesson compatibility remains an explicit
+release blocker for the later 2.4 Compatibility / Release Closeout.

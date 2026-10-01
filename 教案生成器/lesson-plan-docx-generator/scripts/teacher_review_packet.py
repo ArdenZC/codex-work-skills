@@ -139,7 +139,8 @@ def _upstream(run):
     # this avoids recursion and reuses full Review/round/shard linkage validation.
     from run_lesson_pipeline import validate_run_upstream, path_of
     validate_run_upstream(run)
-    if run["state"]["current_state"] not in {"READY_FOR_TEACHER_REVIEW", "TEACHER_REVIEW_APPROVED", "PRODUCTION_AUTHORIZED"}:
+    from pipeline_state import STATES
+    if STATES.index(run["state"]["current_state"]) < STATES.index("READY_FOR_TEACHER_REVIEW"):
         raise LifecycleContractError("Packet requires final READY-or-later upstream evidence")
     content, _ = read_json_object(path_of(run, "content"), "Content")
     disposition, _ = read_json_object(path_of(run, "benchmark_disposition"), "final disposition")

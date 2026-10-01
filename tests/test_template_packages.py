@@ -3776,6 +3776,7 @@ esac
         self.assertIn("--suite lesson-quality", lesson_steps)
         self.assertIn("--suite lesson-pipeline", lesson_steps)
         self.assertIn("--suite lesson-teacher-review", lesson_steps)
+        self.assertIn("--suite lesson-final-acceptance", lesson_steps)
         self.assertIn("--suite lesson-package", lesson_steps)
         self.assertIn("--suite hardening", lesson_steps)
 
@@ -3812,7 +3813,7 @@ esac
         self.assertEqual(jobs["package-contracts"]["runs-on"], "ubuntu-latest")
         self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
         for job_name in ("template-tooling", "template-lesson", "template-gradebook", "template-workorder", "template-release"):
-            self.assertEqual(jobs[job_name]["timeout-minutes"], 30)
+            self.assertEqual(jobs[job_name]["timeout-minutes"], 45 if job_name == "template-lesson" else 30)
             setup_python = next(
                 step
                 for step in jobs[job_name]["steps"]

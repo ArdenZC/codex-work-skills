@@ -15,6 +15,7 @@ def validate_visual_inspection(
     output_dir: Path | str,
     qa_report: Path | str,
     evidence_path: Path | str,
+    *, require_passed: bool = True,
 ) -> dict[str, Any]:
     directory = Path(output_dir).expanduser().resolve()
     report_path = Path(qa_report).expanduser().resolve()
@@ -32,7 +33,7 @@ def validate_visual_inspection(
         raise ValueError("visual evidence requires a passed QA report")
     if "output_dir" in report and not paths_equal(report["output_dir"], directory):
         raise ValueError("qa-report output_dir does not match output_dir")
-    if evidence.get("status") != "passed" or evidence.get("qa_status") != "passed":
+    if evidence.get("qa_status") != "passed" or evidence.get("status") not in ({"passed"} if require_passed else {"passed", "failed"}):
         raise ValueError("visual evidence status is not passed")
     required = {
         "status",
@@ -61,8 +62,13 @@ def validate_visual_inspection(
     checks = evidence.get("checks")
     if not isinstance(inspected_files, list) or not isinstance(inspected_pages, dict):
         raise ValueError("visual evidence inspected_files/inspected_pages are malformed")
-    if set(checks or {}) != set(CHECK_NAMES) or any(checks[name] != "passed" for name in CHECK_NAMES):
+    if not isinstance(checks, dict) or set(checks) != set(CHECK_NAMES) or any(checks[name] not in {"passed", "failed"} for name in CHECK_NAMES):
+        raise ValueError("visual evidence must record all eleven checks")
+    all_passed = all(checks[name] == "passed" for name in CHECK_NAMES)
+    if require_passed and not all_passed:
         raise ValueError("visual evidence must record all eleven checks as passed")
+    if (evidence["status"] == "passed") != all_passed:
+        raise ValueError("visual evidence status is inconsistent with its checks")
     available = {path.name for path in directory.glob("*.docx") if path.is_file() and not path.is_symlink()}
     if set(inspected_files) != set(inspected_pages) or not set(inspected_files) <= available:
         raise ValueError("visual evidence references missing or unexpected DOCX files")

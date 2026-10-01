@@ -22,7 +22,14 @@ PREVIEW 不能产生 Production Authorization；PRODUCTION 必须有真实准备
 LIF-04 candidate 在 READY 通过 `prepare-teacher-review` 冻结独立 Packet 1.0（不推进状态），
 机器确定样本，人工填写 Review；绑定时 IDs/顺序/reasons 必须 exact-match。算法见
 [`docs/teacher-review-selection-v1.md`](docs/teacher-review-selection-v1.md)。
-本轮仍止于 PRODUCTION_AUTHORIZED，Acceptance 3.0、Visual Review 和最终生成/验收集成 deferred。
+LIF-05 opt-in candidate 继续通过 canonical generator（必须 render）→ Artifact Manifest /
+现有 qa-report → 外部真实 Human Visual Review Authority 1.0 → 独立 Acceptance 3.0 → ACCEPTED。
+命令逐步推进，`prepare-visual-review` 只冻结范围、不推进状态；外部人工视觉检查是明确停顿。
+新版链与规则见 [`docs/visual-review-authority-v1.md`](docs/visual-review-authority-v1.md) 和
+[`docs/lesson-acceptance-v3.md`](docs/lesson-acceptance-v3.md)。Acceptance 2.0 保留兼容；
+per-course Acceptance 3.0 不执行 Negative Controls，它们留给 Release Qualification。
+practice_only 零 Lesson 不在 canonical Lesson lifecycle 内，兼容决策是 2.4 Stable release blocker；
+不伪造 Lesson/Teacher Review。此阶段不发布 Skill 2.4 Stable。
 Legacy generator 的默认 benchmark-mode none 保留；其 production_pass 是 artifact transaction
 成功，不表示 lifecycle ACCEPTED 或教师最终教学验收。
 
