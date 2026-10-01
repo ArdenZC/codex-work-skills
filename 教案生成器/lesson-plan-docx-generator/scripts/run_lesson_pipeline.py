@@ -25,6 +25,7 @@ from pipeline_state import (
     ARTIFACT_FIELDS, STATES, advance_pipeline_state, initial_pipeline_state,
     validate_pipeline_artifact_bytes, validate_pipeline_state_payload,
 )
+from lesson_lifecycle_applicability import require_lesson_lifecycle_applicable
 from source_truth import validate_source_truth_file, source_truth_content_verified
 from teacher_review import validate_teacher_review_files
 from production_authorization import validate_production_authorization_files
@@ -248,9 +249,8 @@ def validate_run_upstream(run, *, run_path=None):
     elif rank >= STATES.index("BENCHMARK_PREPARED") and state["current_state"] == "BENCHMARK_PREPARED":
         raise LifecycleContractError("BENCHMARK_PREPARED requires actual quality preparation")
     if rank >= STATES.index("AUTHORING_COMPLETE"):
-        from package_common import DEFAULT_SCHEMA, validate_content_v2_input
         content, _ = read_json_object(path_of(run, "content"), "Content")
-        validate_content_v2_input(content, DEFAULT_SCHEMA)
+        require_lesson_lifecycle_applicable(content)
         require(all(content.get(field) == source["course_identity"][field] for field in source["course_identity"]),
                 "Content / Source Truth course identity mismatch")
         if run["mode"] == "PRODUCTION" and "benchmark_preparation" not in paths:
@@ -433,6 +433,8 @@ def execute(command, run_path, **options):
                 _replace_bundle((*destinations, run_path), (*bundle, run))
             return run
         elif command == "bind-content":
+            content, _ = read_json_object(options["content"], "Content")
+            require_lesson_lifecycle_applicable(content)
             if run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "SOURCE_TRUTH_FROZEN":
                 require(options.get("waiver_evidence"), "PRODUCTION requires preparation or explicit user waiver evidence")
                 bind(run, "benchmark_evidence", options["waiver_evidence"])

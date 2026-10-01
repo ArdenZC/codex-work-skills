@@ -101,7 +101,7 @@ def evaluate(run, *, created_at=None, validate_acceptance=True, diagnostic_input
             content, _ = read_json_object(path_of(working, "content"), "Content")
             indexed["content"]["version"] = content["content_contract_version"]
             if not content.get("lessons"):
-                raise LifecycleContractError("practice_only zero-Lesson compatibility is a deferred release blocker; not eligible for Lesson Acceptance 3.0")
+                raise LifecycleContractError("valid zero-Lesson Content is outside the canonical Lesson lifecycle; not eligible for Lesson Acceptance 3.0")
         if "benchmark_review" in working["bindings"]:
             claims = benchmark_claims(working)
             if claims["benchmark_decision"] == "REVISION_REQUIRED":

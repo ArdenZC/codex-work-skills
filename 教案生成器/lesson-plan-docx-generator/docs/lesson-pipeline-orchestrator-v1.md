@@ -5,6 +5,16 @@ LIF-05 opt-in candidate 实现 final generator、artifact/visual authority 与�
 Skill 2.3.1、Content 2.2/2.3、Template 1.1.2、Acceptance 2.0 和所有既有 Review/Authorization
 合同保持原版本及语义。此路径是 opt-in LIF-05 candidate path；不是 Skill 2.4 Stable。
 
+## Lifecycle applicability (RC-01)
+
+The shared lesson_lifecycle_applicability helper validates formal Content first.
+At least one real Lesson is APPLICABLE; zero Lessons is
+NOT_APPLICABLE_TO_LESSON_LIFECYCLE, not a Content schema failure. bind-content
+checks before binding Content/waiver or advancing AUTHORING_COMPLETE in PREVIEW
+and PRODUCTION. Resume revalidation and Acceptance 3 retain independent defenses.
+Valid practice_only Content routes to Practice Task / WorkOrder when requested;
+no fake Lesson, Teacher Packet/Review or DOCX is created.
+
 ## 状态与一次一步
 
 | 命令 | 结果状态 | 实际证据 |
@@ -208,5 +218,7 @@ also check self fingerprints and exact rederivation. State strings never grant
 production or acceptance. PREVIEW rejects all final commands; read-only evaluation
 of a legitimate PREVIEW returns PENDING_REVIEW. Visual revision requires a new run.
 Further details and final-status rules are in `visual-review-authority-v1.md` and
-`lesson-acceptance-v3.md`. practice_only zero-Lesson compatibility remains an explicit
-release blocker for the later 2.4 Compatibility / Release Closeout.
+`lesson-acceptance-v3.md`. RC-01 fixes applicability: valid zero-Lesson Content is
+outside the canonical Lesson lifecycle in both PREVIEW and PRODUCTION; bind-content
+rejects before binding or advancing. Standalone Content/generator compatibility remains.
+See `lesson-release-closeout.md` for the remaining RC-02 release items.

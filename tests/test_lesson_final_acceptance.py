@@ -511,10 +511,17 @@ class DiagnosticTests(unittest.TestCase):
         payload=make_v22_payload(course='数据库应用基础',major='软件技术',audience='高职二年级',theory_hours=0,practice_hours=4,lesson_count=0,specs=DB_SPECS)
         _bind_v23(payload,mode='practice_only',theory_hours=0,practice_hours=4,workorders=False)
         payload['authoring_provenance']['mode']='agent';_write_json(self.h.content_path,payload)
-        self.h.prepared();self.h.call('bind-content',content=self.h.content_path)
+        self.h.prepared()
+        # Simulate a noncanonical historical envelope; canonical bind-content
+        # now rejects before AUTHORING_COMPLETE. No teacher/artifact is fabricated.
+        run=self.h.call('status')
+        pipeline.bind(run,'content',self.h.content_path)
+        pipeline.advance(run,'AUTHORING_COMPLETE',('content_sha256','content'))
+        run['run_fingerprint']=pipeline.envelope_fingerprint(run)
+        _write_json(self.h.run,run)
         report=self.h.call('evaluate-acceptance')
         self.assertEqual(report['final_status'],'FAILED')
-        self.assertIn('zero-Lesson',report['gate_matrix'][0]['notes'])
+        self.assertIn('outside the canonical Lesson lifecycle',report['gate_matrix'][0]['notes'])
 
 
 class CompletedBenchmarkE2ETests(unittest.TestCase):

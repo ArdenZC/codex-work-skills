@@ -5,33 +5,24 @@ description: Generate projectized Chinese vocational-course lesson plan DOCX fil
 
 # 教案生成器 Skill 2.3.1
 
-本文件是 Lesson 的唯一人类行为合同。当前版本为 Lesson Skill 2.3.1、默认 Lesson Content Contract 2.3、兼容 Content Contract 2.2、Lesson Template 1.1.2、Acceptance Schema 2.0、Exemplar Contract 1.0、Benchmark Review 1.0 和 Authorization 1.0。默认 Word 模板 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
+本文件是 Lesson 的唯一人类行为合同。当前版本为 Lesson Skill 2.3.1、默认 Lesson Content Contract 2.3、兼容 Content Contract 2.2、Lesson Template 1.1.2、Acceptance 3.0（canonical lifecycle）/2.0（legacy 兼容）、Exemplar Contract 1.0、Benchmark Review 1.0 和 Authorization 1.0。默认 Word 模板 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
 
-Lifecycle 1.0 foundation exists but is not yet the default production orchestrator.
 
-## Lifecycle Production Candidate Path
+## Lifecycle candidate / practice_only 路由
 
-Skill 2.3.1 opt-in LIF-03 candidate foundation（不是 Skill 2.4 stable）：Source Truth →
-外部 Quality Eligibility → Quality-Gated Benchmark Preparation → 外部 Agent Content →
-Preproduction QA → 明确最终 Benchmark Review/disposition → 外部 Teacher Review →
-Production Authorization。独立 CLI 与证据规则见
-[`docs/lesson-pipeline-orchestrator-v1.md`](docs/lesson-pipeline-orchestrator-v1.md) 和
-[`docs/benchmark-preparation-v1.md`](docs/benchmark-preparation-v1.md)。
-PREVIEW 不能产生 Production Authorization；PRODUCTION 必须有真实准备链或外部用户 waiver，
-不能静默使用 BENCHMARK_NOT_EXECUTED。每个 transition/resume 重新读取实际上游字节。
-LIF-04 candidate 在 READY 通过 `prepare-teacher-review` 冻结独立 Packet 1.0（不推进状态），
-机器确定样本，人工填写 Review；绑定时 IDs/顺序/reasons 必须 exact-match。算法见
-[`docs/teacher-review-selection-v1.md`](docs/teacher-review-selection-v1.md)。
-LIF-05 opt-in candidate 继续通过 canonical generator（必须 render）→ Artifact Manifest /
-现有 qa-report → 外部真实 Human Visual Review Authority 1.0 → 独立 Acceptance 3.0 → ACCEPTED。
-命令逐步推进，`prepare-visual-review` 只冻结范围、不推进状态；外部人工视觉检查是明确停顿。
-新版链与规则见 [`docs/visual-review-authority-v1.md`](docs/visual-review-authority-v1.md) 和
-[`docs/lesson-acceptance-v3.md`](docs/lesson-acceptance-v3.md)。Acceptance 2.0 保留兼容；
-per-course Acceptance 3.0 不执行 Negative Controls，它们留给 Release Qualification。
-practice_only 零 Lesson 不在 canonical Lesson lifecycle 内，兼容决策是 2.4 Stable release blocker；
-不伪造 Lesson/Teacher Review。此阶段不发布 Skill 2.4 Stable。
-Legacy generator 的默认 benchmark-mode none 保留；其 production_pass 是 artifact transaction
-成功，不表示 lifecycle ACCEPTED 或教师最终教学验收。
+LIF-01～05 已合并，当前仍是 Lesson Skill **2.3.1 candidate / pre-2.4 release state**，尚未发布 2.4 Stable。Canonical Lesson lifecycle 的完整生产路径为：
+
+```text
+Source Truth → Quality Eligibility / Benchmark Preparation → Content → Preproduction QA → Benchmark disposition / Review → Deterministic Teacher Review Packet → Human Teacher Review → Production Authorization → Canonical Generator → Artifact QA → Deterministic Visual Review Packet → Human Visual Review → Acceptance 3.0 → ACCEPTED
+```
+
+两处 Human Review 都必须由外部人工提供；synthetic evidence 只证明 contract closure，不代表真实教学质量通过。`production_pass` 是 generator 产物事务结果，不能替代 lifecycle `ACCEPTED`。
+
+Content 2.3 的 `practice_only → lessons=[]` 继续合法。Canonical Lesson pipeline 的 PREVIEW/PRODUCTION 均只适用于至少 1 个真实 Lesson；`bind-content` 在绑定 Content 或推进 AUTHORING_COMPLETE 前明确拒绝 zero-Lesson，不能伪造 Lesson、Teacher Packet/Review 或 Lesson DOCX。Standalone Content tooling/direct generator 的历史行为保持兼容。需要纯实践材料时交给 Practice Task / WorkOrder Skill；Lesson Acceptance 3.0 不用于证明纯实践工单的教学验收，也不宣称 WorkOrder 已有等价生命周期。工单仍只在用户明确需要时创作。
+
+完整边界与剩余发布事项见 `docs/lesson-release-closeout.md`、`docs/lesson-pipeline-orchestrator-v1.md` 和 `docs/lesson-acceptance-v3.md`。
+
+PREVIEW 不能产生 Production Authorization；PRODUCTION 必须有真实准备链或外部用户 waiver，不能静默使用 BENCHMARK_NOT_EXECUTED。每个 transition/resume 重新读取实际上游字节。Teacher/Visual Packet 由机器确定范围、人工提供 Review；prepare 只冻结范围，不推进状态。Acceptance 2.0 与 standalone generator 默认 benchmark-mode none 继续兼容。
 
 Benchmark Quality Eligibility 1.0 is an independent, offline group-level foundation; `QUALIFIED` does not mean excellent teaching. Its explicit helpers and evidence rules are in `docs/benchmark-quality-eligibility-v1.md`. Existing Benchmark defaults remain unchanged; no quality sidecar is mandatory in 2.3.1.
 
@@ -77,7 +68,7 @@ Review 最多两轮。Round 2 固定同一 `benchmark_run_id`、B Pack 和 Holdo
 
 Authorization 由 `build_benchmark_authorization.py` 在完整验证 Content、Catalog、Split、A/B Packs、A/B Selections、汇总 Review 与每课 Review 后生成，绑定原始 Content 字节 SHA、最终 Agent 内容 digest、所有包/选择/Review 指纹、决策和上下文模式。生成器将授权副本、哈希和 benchmark 状态写入 artifact manifest；manifest 检查同时重新散列授权并核对原始/最终内容。正式生产应先得到有效授权再调用 generator。`validate_output.py --render` 是临时诊断；只有正式 generator `--render` 保留 PDF 并完成页数、哈希、QA 与事务核验后，才可能得到 `production_pass`。
 
-Acceptance 2.0 在提供 Review 时必须执行 A 与 B 两侧的 full-linkage 校验，并读取每课 Review 分片；Round 2 还需 Round 1 Review、分片与 Lesson snapshot。缺失或别名重叠的路径必须失败。`PASSED` 与 `PASSED_WITH_TEACHER_ADJUSTMENTS` 还要求 visual evidence、全部 teaching-design 维度、完整 teacher usability、每个 course-scope 项目和所有 provenance flags 均已处置；Benchmark 存在时必须是 `BENCHMARK_REVIEW_COMPLETE` / `NO_REVISION_REQUIRED`。未提供 Benchmark 继续兼容当前行为。Negative Controls 显式失败仍为 FAILED，但 per-course completion 不因默认 `not_executed` 阻塞通过；Negative Controls per-course completion intentionally deferred to Acceptance 3.0 lifecycle remediation。0 个合格来源是合法 UNAVAILABLE，可继续 Lesson production，但 `production_pass` 不代表 Benchmark 完成。
+Acceptance 2.0 在提供 Review 时必须执行 A 与 B 两侧的 full-linkage 校验，并读取每课 Review 分片；Round 2 还需 Round 1 Review、分片与 Lesson snapshot。缺失或别名重叠的路径必须失败。`PASSED` 与 `PASSED_WITH_TEACHER_ADJUSTMENTS` 还要求 visual evidence、全部 teaching-design 维度、完整 teacher usability、每个 course-scope 项目和所有 provenance flags 均已处置；Benchmark 存在时必须是 `BENCHMARK_REVIEW_COMPLETE` / `NO_REVISION_REQUIRED`。未提供 Benchmark 继续兼容当前行为。Negative Controls 显式失败仍为 FAILED，但 per-course completion 不因默认 `not_executed` 阻塞通过；Negative Controls 留给 Skill Release Qualification，不是 per-course Acceptance 3.0 的必需门禁。0 个合格来源是合法 UNAVAILABLE，可继续 Lesson production，但 `production_pass` 不代表 Benchmark 完成。
 
 ## Content Contract 2.3 (current default)
 

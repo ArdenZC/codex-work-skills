@@ -7,6 +7,13 @@ Task Contract 1.1, or the existing Benchmark contracts. These contracts record
 evidence and reject stale or contradictory evidence; they do not run workflow
 actions and are not the default production orchestrator.
 
+The implemented LIF-03~05 candidate orchestrator now connects these contracts
+through canonical generation, visual human authority and Acceptance 3.0 to
+ACCEPTED. RC-01 defines applicability for Lesson-bearing Content only; valid
+practice_only zero-Lesson Content stays outside that chain. See
+`lesson-pipeline-orchestrator-v1.md` and `lesson-release-closeout.md` for current
+behavior. Skill identity remains 2.3.1 candidate / pre-2.4.
+
 ## Canonical digest rules
 
 Lifecycle sidecars use `scripts/lifecycle_digest.py`, separate from the

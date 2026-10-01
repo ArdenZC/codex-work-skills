@@ -159,5 +159,8 @@ PRODUCTION requires the same Packet gate even for an otherwise valid standalone 
 
 Teacher Review 1.0 standalone validation and schema remain unchanged. Skill 2.3.1,
 Content 2.2/2.3, all existing Lifecycle/Benchmark/Authorization contracts, Practice
-Task, rubric, Template 1.1.2 and Acceptance 2.0 retain their versions. Acceptance
-3.0, visual review, final generator integration and final ACCEPTED remain deferred.
+Task, rubric, Template 1.1.2 and Acceptance 2.0 retain their versions. LIF-05 now
+provides canonical generator integration, visual Packet/Human Authority, Acceptance
+3.0 and final ACCEPTED. RC-01 limits this chain to Lesson-bearing Content; valid
+practice_only zero-Lesson Content routes outside the canonical Lesson lifecycle.
+Skill remains 2.3.1 candidate / pre-2.4; see `lesson-release-closeout.md`.
