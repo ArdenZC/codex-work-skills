@@ -197,6 +197,35 @@ class TestShardManifest(unittest.TestCase):
                 with patch.object(run_test_shards.shutil, "which", return_value=None):
                     run_test_shards._resolve_python_command("definitely-not-a-python")
 
+    def test_parallel_capacity_stays_full_as_pending_queue_shrinks(self):
+        # Three independent suites on two CPUs: when the first exits, the third
+        # must start immediately beside the still-running second suite.
+        active = set()
+        starts = []
+        polls = {}
+        class Process:
+            def __init__(self, command, **kwargs):
+                self.name = command[command.index("--suite") + 1]
+                starts.append((self.name, frozenset(active)))
+                active.add(self.name)
+                polls[self.name] = 0
+            def poll(self):
+                polls[self.name] += 1
+                if self.name == "b" and polls[self.name] < 3:
+                    return None
+                active.discard(self.name)
+                return 0
+        specs = {name: run_test_shards.SuiteSpec(name, True, "module", 1) for name in ("a", "b", "c")}
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(run_test_shards, "_suite_specs", return_value=specs), \
+                patch.object(run_test_shards.os, "cpu_count", return_value=2), \
+                patch.object(run_test_shards.subprocess, "Popen", Process), \
+                patch.object(run_test_shards.time, "sleep"):
+            status = run_test_shards._run_parent(tuple(specs), python=sys.executable,
+                root=Path(folder), parallel=True, allow_office_parallel=False, verbose=False)
+        self.assertEqual(status, 0)
+        self.assertEqual(starts, [("a", frozenset()), ("b", frozenset({"a"})), ("c", frozenset({"b"}))])
+
     def test_windows_style_missing_path_fails_closed(self) -> None:
         with self.assertRaises(FileNotFoundError):
             run_test_shards._resolve_python_command(r"C:\missing\python.exe")

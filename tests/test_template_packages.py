@@ -3776,7 +3776,18 @@ esac
         self.assertIn("--suite lesson-quality", lesson_steps)
         self.assertIn("--suite lesson-pipeline", lesson_steps)
         self.assertIn("--suite lesson-teacher-review", lesson_steps)
-        self.assertIn("--suite lesson-final-acceptance", lesson_steps)
+        self.assertNotIn("--suite lesson-final-acceptance", lesson_steps)
+        final_job = workflow_data["jobs"]["lesson-final-acceptance"]
+        self.assertEqual(final_job["needs"], "classify-changes")
+        self.assertEqual(final_job["strategy"]["matrix"], lesson_job["strategy"]["matrix"])
+        self.assertEqual(final_job["if"], lesson_job["if"])
+        final_steps = "\n".join(str(step.get("run", "")) for step in final_job["steps"])
+        self.assertIn("--suite lesson-final-acceptance", final_steps)
+        self.assertNotIn("--suite lesson-content", final_steps)
+        gate = workflow_data["jobs"]["ci-gate"]
+        self.assertIn("lesson-final-acceptance", gate["needs"])
+        gate_steps = "\n".join(str(step.get("run", "")) for step in gate["steps"])
+        self.assertIn('check_job lesson-final-acceptance "$RUN_LESSON" "$FINAL_ACCEPTANCE_RESULT"', gate_steps)
         self.assertIn("--suite lesson-package", lesson_steps)
         self.assertIn("--suite hardening", lesson_steps)
 
@@ -3813,7 +3824,7 @@ esac
         self.assertEqual(jobs["package-contracts"]["runs-on"], "ubuntu-latest")
         self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
         for job_name in ("template-tooling", "template-lesson", "template-gradebook", "template-workorder", "template-release"):
-            self.assertEqual(jobs[job_name]["timeout-minutes"], 45 if job_name == "template-lesson" else 30)
+            self.assertEqual(jobs[job_name]["timeout-minutes"], 30)
             setup_python = next(
                 step
                 for step in jobs[job_name]["steps"]
@@ -3981,6 +3992,7 @@ esac
                 "package-contracts",
                 "template-tooling",
                 "template-lesson",
+                "lesson-final-acceptance",
                 "template-gradebook",
                 "template-workorder",
                 "template-courseware",

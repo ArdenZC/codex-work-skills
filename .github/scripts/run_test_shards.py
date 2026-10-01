@@ -473,6 +473,7 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
         pending = list(names)
         running: dict[str, tuple[subprocess.Popen[bytes], Path, object, float]] = {}
         specs = _suite_specs()
+        capacity = max(1, min(len(names), os.cpu_count() or 1))
 
         def can_start(name: str) -> bool:
             """Return whether a pending shard can share the current workers.
@@ -496,7 +497,6 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
             return True
 
         while pending or running:
-            capacity = max(1, min(len(pending), os.cpu_count() or 1))
             while pending and len(running) < capacity:
                 candidate_index = next((index for index, name in enumerate(pending) if can_start(name)), None)
                 if candidate_index is None:
@@ -518,6 +518,7 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
                     stderr=subprocess.STDOUT,
                 )
                 running[candidate] = (process, log_path, handle, time.monotonic())
+                print(f"shard started: {candidate}; active={len(running)}/{capacity}", flush=True)
                 if not allow_office_parallel and not spec.parallel_safe:
                     break
             for name, (process, log_path, handle, item_started) in tuple(running.items()):
@@ -525,6 +526,7 @@ def _run_parent(names: Sequence[str], *, python: str, root: Path, parallel: bool
                 if status is not None:
                     handle.close()
                     results[name] = (status, time.monotonic() - item_started, log_path)
+                    print(f"shard completed: {name}; {results[name][1]:.2f}s exit={status}", flush=True)
                     del running[name]
             if running:
                 time.sleep(0.1)
