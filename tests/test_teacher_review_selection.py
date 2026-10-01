@@ -465,6 +465,14 @@ class FullBenchmarkPacketTests(unittest.TestCase):
 
     def test_actual_zero_review_long_course_supplemental(self):
         content = course(10, units=["项目1 起点"] * 10)
+        for index, lesson in enumerate(content["lessons"], 1):
+            lesson["task"] = f"分析数据路径边界{index}并形成边界分析记录{index}"
+            for query in content.get("reference_research", {}).get("queries", []):
+                if query.get("lesson_id") == lesson["lesson_id"]:
+                    query["query"] = (
+                        f"{content['course_name']} {content['major']} {lesson['task']} reference research"
+                    )
+        _bind_v23(content, mode="theory_only", theory_hours=20, practice_hours=0)
         _write_json(self.h.content_path, content)
         outline_source = next(
             row for row in self.h.source["sources"] if row["source_type"] == "whole_course_outline"
