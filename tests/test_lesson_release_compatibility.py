@@ -216,7 +216,7 @@ class InstalledLifecycleTests(unittest.TestCase):
             self.assertIn("finalize-acceptance", result.stdout)
             script = '''import importlib,json,sys
 from pathlib import Path
-root=Path(sys.argv[1]); sys.path.insert(0,str(root/'scripts'))
+root=Path(sys.argv[1]).resolve(); sys.path.insert(0,str(root/'scripts'))
 from jsonschema import Draft202012Validator
 import install_adapters
 for relative in install_adapters.CRITICAL_LIFECYCLE_RUNTIME_FILES:
@@ -225,7 +225,7 @@ for relative in install_adapters.CRITICAL_LIFECYCLE_RUNTIME_FILES:
 for relative in install_adapters.CRITICAL_LIFECYCLE_SCHEMA_FILES:
  Draft202012Validator.check_schema(json.loads((root/relative).read_text(encoding='utf-8')))
 import package_common,production_authorization,lifecycle_digest
-assert package_common.DEFAULT_SCHEMA.is_relative_to(root)
+assert package_common.DEFAULT_SCHEMA.resolve().is_relative_to(root), (package_common.DEFAULT_SCHEMA,root)
 assert production_authorization._current_repo_commit(root) is None
 assert len(lifecycle_digest.skill_tree_fingerprint(root)) == 64
 assert not any('codex-work-skills' in path for path in sys.path)
