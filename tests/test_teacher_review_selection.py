@@ -466,6 +466,15 @@ class FullBenchmarkPacketTests(unittest.TestCase):
     def test_actual_zero_review_long_course_supplemental(self):
         content = course(10, units=["项目1 起点"] * 10)
         _write_json(self.h.content_path, content)
+        outline_source = next(
+            row for row in self.h.source["sources"] if row["source_type"] == "whole_course_outline"
+        )
+        outline_path = self.h.source_path.parent / outline_source["locator"]
+        outline_source["sha256"] = sha256_bytes(_write_json(outline_path, content["outline"]))
+        self.h.source["manifest_fingerprint"] = source_truth_fingerprint(self.h.source)
+        _write_json(self.h.source_path, self.h.source)
+        self.h.run.unlink()
+        self.h.call("init", mode="PRODUCTION", run_id="RUN-001", source_truth=self.h.source_path)
         _, result = self.ready()
         without_review = packet._selection(content)
         self.assertEqual(len(result["selected_lessons"]), 6)
