@@ -15,6 +15,17 @@ and PRODUCTION. Resume revalidation and Acceptance 3 retain independent defenses
 Valid practice_only Content routes to Practice Task / WorkOrder when requested;
 no fake Lesson, Teacher Packet/Review or DOCX is created.
 
+## Frozen outline scope gate
+
+Before `bind-content` records Content, the shared course-scope validator reads
+the Source Truth `whole_course_outline`, verifies its local bytes and SHA, checks
+the Content self-snapshot and exact outline binding, aligns every Lesson to its
+frozen row, and runs the domain-agnostic scope/intra-Lesson gates. PRODUCTION
+requires locally verifiable outline bytes. PREVIEW can classify an HTTPS outline
+as `unverified`, but that state cannot reach Production Authorization. Resume,
+preproduction QA, and authorization repeat the same check against current bytes.
+See [`course-scope-grounding-v1.md`](course-scope-grounding-v1.md).
+
 ## 状态与一次一步
 
 | 命令 | 结果状态 | 实际证据 |
@@ -22,7 +33,7 @@ no fake Lesson, Teacher Packet/Review or DOCX is created.
 | init | INTAKE_CONFIRMED | 外部已确认 Source Truth，固定 run ID 与 PREVIEW/PRODUCTION 模式 |
 | freeze-source-truth | SOURCE_TRUTH_FROZEN | Manifest 与全部本地 source bytes 复验；PREVIEW 保留远程 bytes 未验证分类 |
 | prepare-benchmark | BENCHMARK_PREPARED | Quality Eligibility + quality-only canonical projection + Split/Packs/preparation |
-| bind-content | AUTHORING_COMPLETE | 外部 Agent 提供合法 Content 2.2/2.3 |
+| bind-content | AUTHORING_COMPLETE | 外部 Agent 提供合法 Content 2.2/2.3，并通过冻结大纲 course-scope grounding |
 | validate-preproduction | PREPRODUCTION_QA_PASSED | 原 Content validator 与 content_quality hard gates |
 | bind-benchmark-disposition | READY_FOR_TEACHER_REVIEW | 无正式 Review 的 PARTIAL/UNAVAILABLE 或用户 waiver；绑定最终 disposition 与不可变 evidence |
 | bind-benchmark-review | BENCHMARK_REVIEW_COMPLETE | 实际完成的 full-linkage Review（包括真实 partial Review）与最终 disposition |

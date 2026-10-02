@@ -193,7 +193,10 @@ def validate_source_truth_payload(
             semantic_sources.add(identity_locator)
         except LifecycleContractError as exc:
             errors.append(f"sources[{index}].locator is unsafe: {exc}")
-    for critical in ("confirmed_course_profile", "whole_course_outline"):
+    # Whole-course outlines were not present in every historical Source Truth
+    # 1.0 artifact.  They remain auditable here; the current canonical Lesson
+    # production scope gate requires exactly one locally verifiable outline.
+    for critical in ("confirmed_course_profile",):
         if critical not in source_types:
             errors.append(f"sources must include critical source_type {critical}")
 

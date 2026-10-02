@@ -81,7 +81,7 @@ def _source_truth(directory: Path) -> tuple[dict[str, Any], Path]:
     directory.mkdir(parents=True, exist_ok=True)
     evidence = directory / "evidence"
     profile_raw = _write_json(evidence / "profile.json", {"course_name": "数据库应用基础"})
-    outline_raw = _write_json(evidence / "outline.json", [{"lesson_id": "L01"}])
+    outline_raw = _write_json(evidence / "outline.json", _content()["outline"])
     manifest_path = directory / "source-truth.json"
     payload: dict[str, Any] = {
         "contract_version": "1.0",
@@ -482,8 +482,9 @@ class SourceTruthContractTests(unittest.TestCase):
             missing = copy.deepcopy(payload)
             missing["sources"] = [missing["sources"][0]]
             missing["manifest_fingerprint"] = source_truth_fingerprint(missing)
-            errors = validate_source_truth_payload(missing, manifest_path=manifest_path)
-            self.assertTrue(any("whole_course_outline" in item for item in errors))
+            # Historical Source Truth 1.0 artifacts remain auditable. Current
+            # canonical production requires the outline through the shared scope gate.
+            self.assertEqual(validate_source_truth_payload(missing, manifest_path=manifest_path), [])
 
             missing_profile = copy.deepcopy(payload)
             missing_profile["sources"] = [missing_profile["sources"][1]]

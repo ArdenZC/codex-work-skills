@@ -118,7 +118,7 @@ CRITICAL_GENERATOR_SOURCE_FILES = (
 # production import closure is audited in docs/lesson-release-closeout.md;
 # generator/shared helpers already covered above are not repeated here.
 CRITICAL_LIFECYCLE_RUNTIME_FILES = tuple(Path("scripts") / name for name in (
-    "lifecycle_digest.py", "source_truth.py", "teacher_review.py",
+    "lifecycle_digest.py", "source_truth.py", "course_scope_grounding.py", "teacher_review.py",
     "production_authorization.py", "pipeline_state.py", "lifecycle_benchmark.py",
     "benchmark_quality_eligibility.py", "benchmark_preparation.py",
     "run_lesson_pipeline.py", "teacher_review_packet.py", "final_artifacts.py",

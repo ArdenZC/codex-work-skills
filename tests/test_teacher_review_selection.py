@@ -11,7 +11,8 @@ import tests.test_lesson_pipeline as pipeline_tests
 from tests.test_lesson_lifecycle_contracts import _write_json, _teacher_review
 from tests.test_lesson_content_v22 import make_v22_payload, _refresh_review_digests
 from tests.test_lesson_content_v23 import _bind_v23, _specs, _integrated_64
-from lifecycle_digest import LifecycleContractError, canonical_json_bytes, sha256_file
+from lifecycle_digest import LifecycleContractError, canonical_json_bytes, sha256_bytes, sha256_file
+from source_truth import source_truth_fingerprint
 from teacher_review import teacher_review_fingerprint, validate_teacher_review_files
 import run_lesson_pipeline as pipeline
 import teacher_review_packet as packet
@@ -234,7 +235,25 @@ class ArtifactTests(unittest.TestCase):
         cls.template = pipeline_tests.PipelineTests()
         cls.template.setUp()
         cls.addClassCleanup(cls.template.doCleanups)
-        _write_json(cls.template.content_path, course())
+        content = course()
+        for index, lesson in enumerate(content["lessons"], 1):
+            lesson["task"] = f"分析数据路径边界{index}并形成边界分析记录{index}"
+            for query in content.get("reference_research", {}).get("queries", []):
+                if query.get("lesson_id") == lesson["lesson_id"]:
+                    query["query"] = (
+                        f"{content['course_name']} {content['major']} {lesson['task']} reference research"
+                    )
+        _bind_v23(content, mode="theory_only", theory_hours=14, practice_hours=0)
+        _write_json(cls.template.content_path, content)
+        outline_source = next(
+            item for item in cls.template.source["sources"] if item["source_type"] == "whole_course_outline"
+        )
+        outline_path = cls.template.source_path.parent / outline_source["locator"]
+        outline_source["sha256"] = sha256_bytes(_write_json(outline_path, content["outline"]))
+        cls.template.source["manifest_fingerprint"] = source_truth_fingerprint(cls.template.source)
+        _write_json(cls.template.source_path, cls.template.source)
+        cls.template.run.unlink()
+        cls.template.call("init", mode="PRODUCTION", run_id="RUN-001", source_truth=cls.template.source_path)
         _, _, _, cls.benchmark_template = cls.template.ready_disposition()
         cls.template.call("prepare-teacher-review")
 
@@ -446,7 +465,24 @@ class FullBenchmarkPacketTests(unittest.TestCase):
 
     def test_actual_zero_review_long_course_supplemental(self):
         content = course(10, units=["项目1 起点"] * 10)
+        for index, lesson in enumerate(content["lessons"], 1):
+            lesson["task"] = f"分析数据路径边界{index}并形成边界分析记录{index}"
+            for query in content.get("reference_research", {}).get("queries", []):
+                if query.get("lesson_id") == lesson["lesson_id"]:
+                    query["query"] = (
+                        f"{content['course_name']} {content['major']} {lesson['task']} reference research"
+                    )
+        _bind_v23(content, mode="theory_only", theory_hours=20, practice_hours=0)
         _write_json(self.h.content_path, content)
+        outline_source = next(
+            row for row in self.h.source["sources"] if row["source_type"] == "whole_course_outline"
+        )
+        outline_path = self.h.source_path.parent / outline_source["locator"]
+        outline_source["sha256"] = sha256_bytes(_write_json(outline_path, content["outline"]))
+        self.h.source["manifest_fingerprint"] = source_truth_fingerprint(self.h.source)
+        _write_json(self.h.source_path, self.h.source)
+        self.h.run.unlink()
+        self.h.call("init", mode="PRODUCTION", run_id="RUN-001", source_truth=self.h.source_path)
         _, result = self.ready()
         without_review = packet._selection(content)
         self.assertEqual(len(result["selected_lessons"]), 6)

@@ -51,6 +51,7 @@ class ChangeClassifierTests(unittest.TestCase):
         production_paths = (
             "教案生成器/lesson-plan-docx-generator/scripts/content_contract.py",
             "教案生成器/lesson-plan-docx-generator/scripts/content_quality.py",
+            "教案生成器/lesson-plan-docx-generator/scripts/course_scope_grounding.py",
             "教案生成器/lesson-plan-docx-generator/scripts/lesson_acceptance.py",
             "教案生成器/lesson-plan-docx-generator/scripts/install_adapters.py",
             "教案生成器/lesson-plan-docx-generator/scripts/validate_output.py",

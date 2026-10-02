@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 
+from course_scope_grounding import format_scope_failures, validate_course_scope_grounding
 from benchmark_preparation import (
     ARTIFACT_NAMES, assert_external_outputs, json_bytes, preparation_bundle, timestamp, validate_preparation_files,
 )
@@ -78,12 +79,18 @@ def envelope_fingerprint(run):
     return semantic_fingerprint(run, excluded_fields={"run_fingerprint"})
 
 
-def content_qa(content_path):
+def content_qa(content_path, source_truth_path, *, require_local_outline):
     from package_common import DEFAULT_SCHEMA, DEFAULT_MANIFEST, load_manifest, validate_content_v2_input
     from content_quality import validate_content_quality
     content, raw = read_json_object(content_path, "Content")
     validate_content_v2_input(content, DEFAULT_SCHEMA)
-    quality = validate_content_quality(content, load_manifest(DEFAULT_MANIFEST))
+    quality = validate_content_quality(
+        content,
+        load_manifest(DEFAULT_MANIFEST),
+        source_truth_path=str(source_truth_path),
+        content_path=str(content_path),
+        require_local_outline=require_local_outline,
+    )
     # Persist the existing machine report, rather than reimplementing its gates.
     result = {
         "qa_evidence_version": "1.0", "content_sha256": sha256_bytes(raw),
@@ -253,11 +260,26 @@ def validate_run_upstream(run, *, run_path=None):
         require_lesson_lifecycle_applicable(content)
         require(all(content.get(field) == source["course_identity"][field] for field in source["course_identity"]),
                 "Content / Source Truth course identity mismatch")
+        from course_scope_grounding import format_scope_failures, validate_course_scope_grounding
+        scope = validate_course_scope_grounding(
+            content,
+            path_of(run, "source_truth"),
+            content_path=path_of(run, "content"),
+            require_local_outline=run["mode"] == "PRODUCTION",
+        )
+        require(
+            scope["status"] not in {"failed", "unverified"} if run["mode"] == "PRODUCTION" else scope["status"] != "failed",
+            "course-scope grounding failed: " + "; ".join(format_scope_failures(scope)[:8]),
+        )
         if run["mode"] == "PRODUCTION" and "benchmark_preparation" not in paths:
             validate_waiver(run)
     if rank >= STATES.index("PREPRODUCTION_QA_PASSED"):
         qa, _ = read_json_object(path_of(run, "preproduction_qa"), "Preproduction QA")
-        fresh = content_qa(path_of(run, "content"))
+        fresh = content_qa(
+            path_of(run, "content"),
+            path_of(run, "source_truth"),
+            require_local_outline=run["mode"] == "PRODUCTION",
+        )
         fresh["created_at"] = qa.get("created_at")
         require(qa == fresh, "STALE or fabricated Preproduction QA evidence")
     benchmark = None
@@ -435,6 +457,20 @@ def execute(command, run_path, **options):
         elif command == "bind-content":
             content, _ = read_json_object(options["content"], "Content")
             require_lesson_lifecycle_applicable(content)
+            from package_common import DEFAULT_SCHEMA, validate_content_v2_input
+            from course_scope_grounding import format_scope_failures, validate_course_scope_grounding
+            validate_content_v2_input(content, DEFAULT_SCHEMA)
+            scope = validate_course_scope_grounding(
+                content,
+                path_of(run, "source_truth"),
+                content_path=options["content"],
+                require_local_outline=run["mode"] == "PRODUCTION",
+            )
+            require(
+                scope["status"] not in {"failed", "unverified"} if run["mode"] == "PRODUCTION" else scope["status"] != "failed",
+                "course-scope grounding failed before Content binding: "
+                + "; ".join(format_scope_failures(scope)[:8]),
+            )
             if run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "SOURCE_TRUTH_FROZEN":
                 require(options.get("waiver_evidence"), "PRODUCTION requires preparation or explicit user waiver evidence")
                 bind(run, "benchmark_evidence", options["waiver_evidence"])
@@ -442,7 +478,11 @@ def execute(command, run_path, **options):
             advance(run, "AUTHORING_COMPLETE", ("content_sha256", "content"))
         elif command == "validate-preproduction":
             require(run["state"]["current_state"] == "AUTHORING_COMPLETE", "QA requires completed authoring")
-            qa = content_qa(path_of(run, "content"))
+            qa = content_qa(
+                path_of(run, "content"),
+                path_of(run, "source_truth"),
+                require_local_outline=run["mode"] == "PRODUCTION",
+            )
             qa_path = run_path.parent / (run_path.stem + "-preproduction-qa.json")
             assert_distinct_file_paths({"run": run_path, **{name: path_of(run, name) for name in run["bindings"]},
                                        "qa": qa_path}, outputs={"qa"})
@@ -517,6 +557,7 @@ def execute(command, run_path, **options):
             require(not output.exists(), "canonical generation needs a new output directory; old authorized artifacts are immutable")
             args = [sys.executable, "-B", str(SKILL_ROOT / "scripts/generate_lesson_plans.py"),
                     "--tasks-json", str(path_of(run, "content")), "--output-dir", str(output),
+                    "--source-truth", str(path_of(run, "source_truth")),
                     "--render", "--run-id", run["state"]["pipeline_run_id"],
                     "--template", str(manifest_template_path(load_manifest(DEFAULT_MANIFEST))),
                     "--manifest", str(DEFAULT_MANIFEST)]

@@ -456,6 +456,7 @@ jobs:
           python .github/scripts/run_test_shards.py
           --suite lesson-content
           --suite lesson-lifecycle
+          --suite lesson-course-scope
           --suite lesson-quality
           --suite lesson-pipeline
           --suite lesson-teacher-review

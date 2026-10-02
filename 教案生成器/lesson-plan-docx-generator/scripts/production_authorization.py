@@ -320,6 +320,22 @@ def validate_production_authorization_files(
     if not source_errors and not source_truth_content_verified(source_truth, verify_source_bytes=True):
         errors.append("Source Truth source bytes are unverified; Production Authorization requires offline byte verification")
     try:
+        from course_scope_grounding import format_scope_failures, validate_course_scope_grounding
+
+        scope_report = validate_course_scope_grounding(
+            content,
+            source_truth_path,
+            content_path=content_path,
+            require_local_outline=True,
+        )
+        if scope_report.get("status") != "passed":
+            errors.extend(
+                "course-scope grounding: " + message
+                for message in format_scope_failures(scope_report)
+            )
+    except (ImportError, OSError, ValueError) as exc:
+        errors.append(f"course-scope grounding could not be verified: {exc}")
+    try:
         input_paths.update(source_truth_local_file_paths(source_truth, source_truth_path))
         assert_distinct_safe_paths(input_paths)
     except LifecycleContractError as exc:
