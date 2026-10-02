@@ -20,8 +20,13 @@ from pathlib import Path
 
 from docx import Document
 
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tests.fixture_lesson_plans import apply_authored_fixture_plan
+
+
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 GENERATOR = LESSON / "scripts" / "generate_lesson_plans.py"
 NON_IT_FORBIDDEN = ("工程伦理", "平凡又不平凡的价值观", "软件技术", "标准机房", "脚本", "截图工具", "代码编辑器", "数据安全")
@@ -372,7 +377,7 @@ def _lesson(
         key_strategy_pattern += scale_context
         knowledge_pattern += scale_context
         knowledge_artifact_pattern += scale_context
-    return {
+    lesson = {
         "lesson_id": f"L{index:02d}",
         "unit": unit,
         "task": task,
@@ -412,6 +417,10 @@ def _lesson(
             "improvement": chosen_reflection[2],
         },
     }
+    # Authored plans replace the old ordinal prose for these tasks at the
+    # generation source, before Content review digests or outline freezing.
+    apply_authored_fixture_plan(lesson, task=task, focus=focus, artifact=artifact)
+    return lesson
 
 
 _CURRENT_LESSON_HOURS = 2
