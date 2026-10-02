@@ -16,7 +16,7 @@ from contextlib import redirect_stdout
 from typing import Any
 from unittest.mock import patch
 
-from tests.test_lesson_content_v22 import DB_SPECS, make_v22_payload
+from tests.test_lesson_content_v22 import DB_SPECS, _refresh_review_digests, make_v22_payload
 from tests.test_lesson_content_v23 import _bind_v23
 
 if sys.platform == "darwin":
@@ -133,6 +133,39 @@ def _content(contract_version: str = "2.3") -> dict[str, Any]:
 
     validate_content_v2_input(payload, DEFAULT_SCHEMA)
     return payload
+
+
+def _mechanical_six_lesson_content(contract_version: str) -> dict[str, Any]:
+    if contract_version not in {"2.2", "2.3"}:
+        raise ValueError(f"unsupported current Content version: {contract_version}")
+    payload = make_v22_payload(
+        course="数据库应用基础",
+        major="软件技术",
+        audience="高职二年级",
+        theory_hours=12,
+        lesson_count=6,
+        specs=DB_SPECS,
+    )
+    if contract_version == "2.3":
+        payload = _bind_v23(payload, mode="theory_only", theory_hours=12, practice_hours=0)
+    for lesson in payload["lessons"]:
+        lesson["evaluation"]["score"] = 90
+    _refresh_review_digests(payload)
+    payload["authoring_provenance"]["mode"] = "agent"
+    payload["authoring_provenance"]["authoring_id"] = "lifecycle-mechanical-score-fixture"
+    from package_common import DEFAULT_SCHEMA, validate_content_v2_input
+
+    validate_content_v2_input(payload, DEFAULT_SCHEMA)
+    return payload
+
+
+def _replace_source_truth_outline(source: dict[str, Any], source_path: Path, outline: list[dict[str, Any]]) -> None:
+    outline_path = source_path.parent / "evidence" / "outline.json"
+    outline_raw = _write_json(outline_path, outline)
+    outline_source = next(item for item in source["sources"] if item["source_type"] == "whole_course_outline")
+    outline_source["sha256"] = sha256_bytes(outline_raw)
+    source["manifest_fingerprint"] = source_truth_fingerprint(source)
+    _write_json(source_path, source)
 
 
 def _benchmark(

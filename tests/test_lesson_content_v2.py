@@ -527,6 +527,7 @@ class LessonContentV2Mixin:
 
     def test_content_quality_calibration_rejects_copy_rewrites_but_allows_real_difference(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
+        self.assertEqual(base["content_contract_version"], "2.0")
 
         def recursive_replace(value, replacements):
             if isinstance(value, str):
@@ -890,6 +891,18 @@ class LessonContentV2Mixin:
         with self.assertRaisesRegex(ValueError, "capability_stage"):
             lesson_generator.validate_content_v2_input(invalid_stage)
 
+    def test_legacy_content_quality_keeps_two_identical_scores_as_a_hard_failure(self) -> None:
+        data = copy.deepcopy(load_fixture("lesson-plan-content-v2-it.json"))
+        self.assertEqual(data["content_contract_version"], "2.0")
+        data["lessons"] = data["lessons"][:2]
+        data["total_hours"] = 4
+        for lesson in data["lessons"]:
+            lesson["evaluation"]["score"] = 90
+        report = assess_content_quality(data)
+        self.assertTrue(report["coverage"]["score_pattern"]["all_same"], report)
+        self.assertTrue(any("evaluation scores are identical" in error for error in report["errors"]))
+        self.assertEqual(report["status"], "failed", report)
+
     def test_progression_gates_do_not_allow_false_inheritance_or_false_bridge(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
 
@@ -1059,6 +1072,7 @@ class LessonContentV2Mixin:
 
     def test_score_cycle_detection_rejects_partial_tails_and_keeps_natural_variation(self) -> None:
         base = load_fixture("lesson-plan-content-v2-it.json")
+        self.assertEqual(base["content_contract_version"], "2.0")
 
         def scored_data(scores: tuple[float, ...]) -> dict:
             data = copy.deepcopy(base)

@@ -9,6 +9,9 @@ from pathlib import Path
 from tests.test_lesson_content_v22 import (
     LESSON,
     NURSING_SPECS,
+    ROOT,
+    _refresh_review_digests,
+    _scored_v22_payload,
     lesson_acceptance,
     lesson_content_contract,
     lesson_content_quality,
@@ -16,7 +19,6 @@ from tests.test_lesson_content_v22 import (
     lesson_package_common,
     make_v22_payload,
     run_script,
-    _refresh_review_digests,
     _task,
 )
 from tests.test_lesson_exemplar_benchmark import (
@@ -194,6 +196,93 @@ def _validate_v23(payload: dict) -> None:
 
 
 class LessonContentV23Tests(unittest.TestCase):
+    def _scored_content_23(self, scores: tuple[float, ...] | list[float]) -> dict:
+        payload = _scored_v22_payload(scores)
+        return _bind_v23(
+            payload,
+            mode="theory_only",
+            theory_hours=len(scores) * 2,
+            practice_hours=0,
+        )
+
+    def test_current_content_23_score_patterns_are_production_hard_gates(self) -> None:
+        cases = (
+            ("all_same", (90, 90, 90, 90, 90, 90)),
+            ("simple_cycle", (88, 89, 90, 88, 89, 90)),
+            ("arithmetic_progression", (88, 88.5, 89, 89.5, 90, 90.5)),
+            ("strict_monotonic", (88, 88.5, 89.5, 90, 92, 93.5)),
+        )
+        for flag, scores in cases:
+            with self.subTest(flag=flag):
+                payload = self._scored_content_23(scores)
+                self.assertEqual(payload["content_contract_version"], "2.3")
+                _validate_v23(payload)
+                report = lesson_content_quality.assess_content_quality(payload)
+                pattern = report["coverage"]["score_pattern"]
+                self.assertEqual(pattern["values"], [float(score) for score in scores])
+                self.assertTrue(pattern[flag], pattern)
+                self.assertTrue(pattern["range_valid"], pattern)
+                self.assertEqual(report["status"], "failed", report)
+                if flag == "strict_monotonic":
+                    self.assertFalse(pattern["arithmetic_progression"], pattern)
+
+    def test_current_content_23_natural_and_short_score_controls_pass(self) -> None:
+        score_cases = (
+            (89, 90.5, 89.5, 91, 90, 92),
+            (90, 91, 90, 92, 90, 93),
+            (90,),
+            (89, 90),
+            (90, 89.5, 90),
+        )
+        for scores in score_cases:
+            with self.subTest(scores=scores):
+                payload = self._scored_content_23(scores)
+                self.assertEqual(payload["content_contract_version"], "2.3")
+                _validate_v23(payload)
+                report = lesson_content_quality.assess_content_quality(payload)
+                self.assertEqual(report["status"], "passed", report)
+                pattern = report["coverage"]["score_pattern"]
+                self.assertTrue(pattern["range_valid"], pattern)
+                for flag in ("all_same", "simple_cycle", "arithmetic_progression", "strict_monotonic"):
+                    self.assertFalse(pattern[flag], pattern)
+
+    def test_current_content_23_two_identical_scores_keep_existing_hard_gate(self) -> None:
+        payload = self._scored_content_23((90, 90))
+        self.assertEqual(payload["content_contract_version"], "2.3")
+        _validate_v23(payload)
+        report = lesson_content_quality.assess_content_quality(payload)
+        self.assertTrue(report["coverage"]["score_pattern"]["all_same"])
+        self.assertEqual(report["status"], "failed", report)
+
+    def test_current_content_23_range_report_remains_a_hard_gate(self) -> None:
+        payload = self._scored_content_23((84, 90))
+        report = lesson_content_quality.assess_content_quality(payload)
+        self.assertFalse(report["coverage"]["score_pattern"]["range_valid"])
+        self.assertTrue(any("outside 85-96 half-point contract" in error for error in report["errors"]))
+        self.assertEqual(report["status"], "failed", report)
+
+    def test_legacy_and_current_contracts_share_score_pattern_report_shape(self) -> None:
+        scores = (89, 90.5, 89.5, 91, 90, 92)
+        legacy = json.loads((ROOT / "tests" / "fixtures" / "lesson-plan-content-v2-it.json").read_text(encoding="utf-8"))
+        self.assertEqual(legacy["content_contract_version"], "2.0")
+        legacy["lessons"] = legacy["lessons"][: len(scores)]
+        legacy["total_hours"] = len(scores) * 2
+        for lesson, score in zip(legacy["lessons"], scores):
+            lesson["evaluation"]["score"] = score
+
+        payload_22 = _scored_v22_payload(scores)
+        payload_23 = self._scored_content_23(scores)
+        reports = (
+            lesson_content_quality.assess_content_quality(legacy),
+            lesson_content_quality.assess_content_quality(payload_22),
+            lesson_content_quality.assess_content_quality(payload_23),
+        )
+        report_keys = [set(report["coverage"]["score_pattern"]) for report in reports]
+        self.assertEqual(report_keys[0], report_keys[1])
+        self.assertEqual(report_keys[1], report_keys[2])
+        self.assertEqual(reports[1]["coverage"]["score_pattern"]["values"], [float(x) for x in scores])
+        self.assertEqual(reports[2]["coverage"]["score_pattern"]["values"], [float(x) for x in scores])
+
     def test_final_lesson_keeps_true_remainder(self) -> None:
         payload = _base_payload(theory_hours=6, lesson_count=3)
         final_stages = [stage["minutes"] for stage in payload["lessons"][-1]["implementation"]]
@@ -461,6 +550,11 @@ class LessonContentV23Tests(unittest.TestCase):
         _validate_v23(payload)
         quality = lesson_content_quality.assess_content_quality(payload)
         self.assertEqual(quality["status"], "passed", quality.get("errors"))
+        score_pattern = quality["coverage"]["score_pattern"]
+        self.assertTrue(score_pattern["range_valid"], score_pattern)
+        self.assertLess(len(set(score_pattern["values"])), len(score_pattern["values"]))
+        for flag in ("all_same", "simple_cycle", "arithmetic_progression", "strict_monotonic"):
+            self.assertFalse(score_pattern[flag], score_pattern)
         self.assertEqual(quality["agent_pedagogical_review"]["status"], "passed")
         self.assertEqual(
             quality["coverage"]["reference_metrics"]["pool_size"],

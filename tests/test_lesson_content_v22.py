@@ -111,6 +111,22 @@ SYNTHETIC_SCORES = (
     94.5,
     85.5,
     93.0,
+    # Longer fixtures repeat values in a varied order without cycling the first
+    # 18 scores; duplicate marks remain valid when the course pattern is natural.
+    94.0,
+    92.5,
+    90.5,
+    88.5,
+    87.0,
+    93.0,
+    93.5,
+    89.0,
+    89.5,
+    94.5,
+    86.5,
+    91.0,
+    96.0,
+    87.5,
 )
 
 
@@ -457,6 +473,20 @@ def _refresh_review_digests(payload: dict[str, object]) -> None:
     provenance["final_content_sha256"] = lesson_package_common.content_digest_rollup(final_digests)
 
 
+def _scored_v22_payload(scores: tuple[float, ...] | list[float]) -> dict[str, object]:
+    payload = make_v22_payload(
+        theory_hours=len(scores) * 2,
+        lesson_count=len(scores),
+        specs=DB_SPECS,
+    )
+    if payload["content_contract_version"] != "2.2":
+        raise AssertionError("score-pattern fixture must remain Content Contract 2.2")
+    for lesson, score in zip(payload["lessons"], scores):
+        lesson["evaluation"]["score"] = score
+    _refresh_review_digests(payload)
+    return payload
+
+
 def _scaled_context_payload(source: dict[str, object], lesson_count: int) -> dict[str, object]:
     """Scale a complete reviewed Content 2.2 payload for byte-size analysis only."""
 
@@ -518,6 +548,61 @@ class LessonContentV22Tests(unittest.TestCase):
         report = assess_content_quality(payload)
         self.assertEqual(report["status"], "passed", report)
         return report
+
+    def test_current_content_22_score_patterns_are_production_hard_gates(self) -> None:
+        cases = (
+            ("all_same", (90, 90, 90, 90, 90, 90)),
+            ("simple_cycle", (88, 89, 90, 88, 89, 90)),
+            ("arithmetic_progression", (88, 88.5, 89, 89.5, 90, 90.5)),
+            ("strict_monotonic", (88, 88.5, 89.5, 90, 92, 93.5)),
+        )
+        for flag, scores in cases:
+            with self.subTest(flag=flag):
+                payload = _scored_v22_payload(scores)
+                self.assertEqual(payload["content_contract_version"], "2.2")
+                lesson_generator.validate_test_fixture_content_v2_input(payload)
+                report = assess_content_quality(payload)
+                pattern = report["coverage"]["score_pattern"]
+                self.assertEqual(pattern["values"], [float(score) for score in scores])
+                self.assertTrue(pattern[flag], pattern)
+                self.assertTrue(pattern["range_valid"], pattern)
+                self.assertEqual(report["status"], "failed", report)
+                if flag == "strict_monotonic":
+                    self.assertFalse(pattern["arithmetic_progression"], pattern)
+
+    def test_current_content_22_natural_and_short_score_controls_pass(self) -> None:
+        score_cases = (
+            (89, 90.5, 89.5, 91, 90, 92),
+            (90, 91, 90, 92, 90, 93),
+            (90,),
+            (89, 90),
+            (90, 89.5, 90),
+        )
+        for scores in score_cases:
+            with self.subTest(scores=scores):
+                payload = _scored_v22_payload(scores)
+                self.assertEqual(payload["content_contract_version"], "2.2")
+                lesson_generator.validate_test_fixture_content_v2_input(payload)
+                report = self.assert_valid_and_qa(payload)
+                pattern = report["coverage"]["score_pattern"]
+                self.assertTrue(pattern["range_valid"], pattern)
+                for flag in ("all_same", "simple_cycle", "arithmetic_progression", "strict_monotonic"):
+                    self.assertFalse(pattern[flag], pattern)
+
+    def test_current_content_22_two_identical_scores_keep_existing_hard_gate(self) -> None:
+        payload = _scored_v22_payload((90, 90))
+        self.assertEqual(payload["content_contract_version"], "2.2")
+        lesson_generator.validate_test_fixture_content_v2_input(payload)
+        report = assess_content_quality(payload)
+        self.assertTrue(report["coverage"]["score_pattern"]["all_same"])
+        self.assertEqual(report["status"], "failed", report)
+
+    def test_current_content_22_range_report_remains_a_hard_gate(self) -> None:
+        payload = _scored_v22_payload((84, 90))
+        report = assess_content_quality(payload)
+        self.assertFalse(report["coverage"]["score_pattern"]["range_valid"])
+        self.assertTrue(any("outside 85-96 half-point contract" in error for error in report["errors"]))
+        self.assertEqual(report["status"], "failed", report)
 
     def test_production_validator_rejects_synthetic_authoring_without_explicit_test_path(self) -> None:
         payload = make_v22_payload(theory_hours=2, lesson_count=1, specs=DB_SPECS)
