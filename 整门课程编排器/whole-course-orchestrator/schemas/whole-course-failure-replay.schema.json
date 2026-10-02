@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/whole-course-failure-replay.schema.json",
+  "title": "Whole-Course Frozen Failure Replay",
+  "type": "object",
+  "required": ["schema_version", "report_type", "status", "replay_semantics", "integrity", "review", "expected_finding_codes", "observed_finding_codes", "missing_expected_findings"],
+  "properties": {
+    "schema_version": {"enum": ["1.0", "1.1"]},
+    "report_type": {"const": "whole_course_failure_benchmark_replay"},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "replay_semantics": {"enum": ["EXPECT_FAIL", "REPORT_ONLY"]},
+    "integrity": {"type": "object"},
+    "review": {"type": "object"},
+    "expected_finding_codes": {"type": "array", "items": {"type": "string"}},
+    "observed_finding_codes": {"type": "array", "items": {"type": "string"}},
+    "missing_expected_findings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

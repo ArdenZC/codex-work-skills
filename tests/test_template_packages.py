@@ -3817,6 +3817,7 @@ esac
             "template-workorder",
             "template-courseware",
             "practice-class-html",
+            "whole-course-orchestrator",
             "template-release",
             "ci-gate",
         ):
@@ -3839,6 +3840,7 @@ esac
         workorder_text = str(jobs["template-workorder"]).lower()
         courseware_text = str(jobs["template-courseware"]).lower()
         practice_class_text = str(jobs["practice-class-html"]).lower()
+        whole_course_text = str(jobs["whole-course-orchestrator"]).lower()
         release_text = str(jobs["template-release"]).lower()
         self.assertIn("libreoffice", tooling_text)
         self.assertIn("libreoffice", lesson_text)
@@ -3856,6 +3858,10 @@ esac
         self.assertIn("browser_smoke.mjs", practice_class_text)
         self.assertIn("playwright", practice_class_text)
         self.assertIn("validate_practice.py", practice_class_text)
+        self.assertIn("whole-course-orchestrator", whole_course_text)
+        self.assertIn("synthetic", whole_course_text)
+        self.assertIn("downstream_e2e.py", whole_course_text)
+        self.assertIn("contact-sheet", whole_course_text)
         self.assertEqual(
             {item["os"] for item in jobs["practice-class-html"]["strategy"]["matrix"]["include"]},
             {"windows-latest", "macos-14"},
@@ -3911,6 +3917,7 @@ esac
             "run_workorder",
             "run_courseware",
             "run_practice_class",
+            "run_whole_course",
             "run_tooling",
             "run_release",
             "run_package_contracts",
@@ -3927,6 +3934,8 @@ esac
             "平时成绩记分册生成器/简介.md",
             "HTML课件生成器/简介.md",
             "实践课HTML生成器/简介.md",
+            "整门课程编排器/简介.md",
+            "WHOLE-COURSE-ARCHITECTURE-REPORT.md",
             "多Agent兼容规范.md",
         ):
             self.assertIn(allowed_path, classifier)
@@ -3958,6 +3967,7 @@ esac
             ("template-workorder", "run_workorder"),
             ("template-courseware", "run_courseware"),
             ("practice-class-html", "run_practice_class"),
+            ("whole-course-orchestrator", "run_whole_course"),
             ("template-release", "run_release"),
         ):
             self.assertIn("always()", jobs[heavy_job]["if"])
@@ -3998,6 +4008,7 @@ esac
                 "template-workorder",
                 "template-courseware",
                 "practice-class-html",
+                "whole-course-orchestrator",
                 "template-release",
             },
         )

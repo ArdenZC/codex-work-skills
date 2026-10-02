@@ -1,0 +1,37 @@
+skill:
+  id: whole-course-orchestrator
+  name: 整门课程编排器
+  version: 1.0.0-alpha
+  phase: architecture-review-1.1
+  content_contract: "whole-course-orchestration 1.1"
+generator:
+  entrypoint: scripts/plan_sessions.py
+  validator: scripts/review_whole_course.py
+  runtime: deterministic-json-and-clean-package
+schemas:
+  - schemas/teaching-asset-inventory.schema.json
+  - schemas/course-knowledge-graph.schema.json
+  - schemas/session-plan.schema.json
+  - schemas/visual-plan.schema.json
+  - schemas/practice-plan.schema.json
+  - schemas/whole-course-qa.schema.json
+  - schemas/external-source-research.schema.json
+outputs:
+  - source-assets.json
+  - source-teaching-asset-report.json
+  - knowledge-graph.json
+  - session-plans.json
+  - visual-plans.json
+  - practice-plans.json
+  - external-source-research.json
+  - whole-course-qa.json
+  - source-portfolio.html
+  - whole-course-e2e.json
+  - contact-sheet-evidence.json
+  - failure-evidence-snapshot.json
+  - failure-benchmark-replay.json
+integrity_contract: "1.1"
+evidence_state_model:
+  required: "contract and question-specific acceptance requirement"
+  planned: "planner proposal or adapter intent"
+  observed: "final Courseware DOM, final Practice artifact, manifest/QA and rendered contact-sheet evidence"
