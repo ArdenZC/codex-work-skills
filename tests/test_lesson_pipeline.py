@@ -11,6 +11,7 @@ from unittest.mock import patch
 from tests.test_benchmark_preparation import inputs
 from tests.test_lesson_lifecycle_contracts import (
     _source_truth, _content, _write_json, _teacher_review, _production_authorization,
+    _mechanical_six_lesson_content, _replace_source_truth_outline,
 )
 from tests.test_lesson_exemplar_benchmark import (
     make_authoring_selection, make_holdout_selection, make_lesson_reviews, make_review,
@@ -361,6 +362,29 @@ class PipelineTests(unittest.TestCase):
         self.prepared()
         _write_json(self.content_path, {"content_contract_version": "2.3"})
         self.rejected("bind-content", content=self.content_path)
+
+    def test_mechanical_current_content_cannot_pass_preproduction_or_authorize(self):
+        for version in ("2.2", "2.3"):
+            with self.subTest(version=version):
+                content = _mechanical_six_lesson_content(version)
+                self.source, self.source_path = _source_truth(self.folder / f"score-pattern-{version}")
+                _replace_source_truth_outline(self.source, self.source_path, content["outline"])
+                self.content_path = self.folder / f"mechanical-content-{version}.json"
+                _write_json(self.content_path, content)
+                self.run = self.folder / f"mechanical-score-run-{version}.json"
+                self.call("init", mode="PRODUCTION", run_id=f"RUN-SCORE-{version}", source_truth=self.source_path)
+                self.prepared()
+                self.call("bind-content", content=self.content_path)
+                self.assertEqual(self.call("status")["state"]["current_state"], "AUTHORING_COMPLETE")
+                self.rejected("validate-preproduction")
+                status = self.call("status")
+                self.assertEqual(status["state"]["current_state"], "AUTHORING_COMPLETE")
+                self.assertNotIn(
+                    "PREPRODUCTION_QA_PASSED",
+                    [transition["to_state"] for transition in status["state"]["transitions"]],
+                )
+                self.rejected("authorize-production", authorization=self.folder / "unused-authorization.json")
+                self.assertEqual(self.call("status")["state"]["current_state"], "AUTHORING_COMPLETE")
 
     def test_stale_content_after_qa(self):
         self.qa()

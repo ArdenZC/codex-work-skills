@@ -2556,6 +2556,18 @@ def _score_pattern(scores: list[float], errors: list[str]) -> dict[str, Any]:
     return score_pattern
 
 
+def _lesson_score_values(lessons: list[dict[str, Any]]) -> list[float]:
+    """Read scores in canonical lesson order, matching the lesson list order."""
+
+    scores: list[float] = []
+    for lesson in lessons:
+        try:
+            scores.append(float(lesson["evaluation"]["score"]))
+        except (KeyError, TypeError, ValueError):
+            pass
+    return scores
+
+
 def _reference_provenance_report(
     lessons: list[dict[str, Any]],
     lesson_ids: list[str],
@@ -3323,6 +3335,7 @@ def _assess_content_quality_v22(
     lessons = data.get("lessons", [])
     lesson_ids = [_lesson_id(lesson, index) for index, lesson in enumerate(lessons, 1)]
     errors = [f"confirmed course information: {message}" for message in confirmed_course_info_errors(data)]
+    score_pattern = _score_pattern(_lesson_score_values(lessons), errors)
     agent_review, review_errors = _v22_agent_review_report(lessons, lesson_ids)
     errors.extend(review_errors)
     scoped_intra = _intra_lesson_coherence(
@@ -3486,6 +3499,7 @@ def _assess_content_quality_v22(
         "practice_handoff": practice_handoff,
         "coverage": {
             "lesson_count": len(lessons),
+            "score_pattern": score_pattern,
             "implementation_stages": {lesson_id: len(lesson.get("implementation", [])) for lesson_id, lesson in zip(lesson_ids, lessons)},
             "implementation_review": implementation,
             "meaningful_characters": None,
@@ -3955,13 +3969,7 @@ def assess_content_quality(
         },
     }
 
-    scores: list[float] = []
-    for lesson in lessons:
-        try:
-            scores.append(float(lesson["evaluation"]["score"]))
-        except (KeyError, TypeError, ValueError):
-            pass
-    score_pattern = _score_pattern(scores, errors)
+    score_pattern = _score_pattern(_lesson_score_values(lessons), errors)
 
     completeness, completeness_errors = _completeness_report(data)
     errors.extend(completeness_errors)

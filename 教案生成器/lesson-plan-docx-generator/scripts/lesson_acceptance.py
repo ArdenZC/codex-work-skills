@@ -152,7 +152,7 @@ _NEGATIVE_CONTROL_CATALOG = (
         "id": "mechanical_scores",
         "description": "评分全部相同或机械等差/循环",
         "expected": "reject",
-        "detector": "existing score-pattern QA",
+        "detector": "Content QA score_pattern hard gate",
     },
     {
         "id": "generic_fabricated_reference",

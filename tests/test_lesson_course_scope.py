@@ -15,6 +15,7 @@ from tests.test_lesson_content_v22 import (
     DB_SPECS,
     NURSING_SPECS,
     _refresh_review_digests,
+    _scored_v22_payload,
     make_v22_payload,
 )
 from tests.test_lesson_content_v23 import _bind_v23
@@ -531,6 +532,77 @@ class CourseScopeGroundingTests(unittest.TestCase):
             self.assertEqual(list(folder.glob("_output_backup_*")), [])
             self.assertEqual(list(folder.glob("*qa*backup*")), [])
 
+    def test_real_generator_rejects_mechanical_scores_without_mutating_transaction_state(self) -> None:
+        cases = (
+            ("all_same", (90, 90, 90, 90, 90, 90)),
+            ("simple_cycle", (88, 89, 90, 88, 89, 90)),
+            ("arithmetic_progression", (88, 88.5, 89, 89.5, 90, 90.5)),
+        )
+        for flag, scores in cases:
+            with self.subTest(flag=flag), tempfile.TemporaryDirectory(
+                prefix=f"lesson-score-pattern-{flag}-transaction-"
+            ) as temp:
+                folder = Path(temp)
+                content = _scored_v22_payload(scores)
+                self.assertEqual(content["content_contract_version"], "2.2")
+                validate_test_fixture_content_v2_input(content)
+                content_path = folder / "content.json"
+                _write_json(content_path, content)
+                source_truth = _freeze_outline(folder / "authority", content)
+
+                qa = content_quality.assess_content_quality(
+                    content,
+                    source_truth_path=str(source_truth),
+                    content_path=str(content_path),
+                    require_local_outline=True,
+                )
+                self.assertEqual(qa["status"], "failed", qa)
+                self.assertTrue(qa["coverage"]["score_pattern"][flag], qa)
+                self.assertTrue(any("evaluation scores" in message for message in qa["errors"]), qa)
+
+                output = folder / "output"
+                output.mkdir()
+                sentinel = output / "sentinel.bin"
+                sentinel.write_bytes(b"old-output-sentinel\x00\xff")
+                old_qa = output / "qa-report.json"
+                old_qa.write_bytes(b"old-output-qa-bytes")
+                old_manifest = output / "artifact-manifest.json"
+                old_manifest.write_bytes(b"old-artifact-manifest-bytes")
+                external_qa = folder / "external-qa.json"
+                external_qa.write_bytes(b"old-external-qa-bytes")
+                before = {
+                    path.relative_to(output).as_posix(): path.read_bytes()
+                    for path in output.rglob("*")
+                    if path.is_file()
+                }
+
+                result = run_script(
+                    LESSON / "scripts" / "generate_lesson_plans.py",
+                    "--tasks-json", str(content_path),
+                    "--source-truth", str(source_truth),
+                    "--output-dir", str(output),
+                    "--qa-report", str(external_qa),
+                    "--backup-existing",
+                )
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Content quality validation failed", result.stderr)
+                after = {
+                    path.relative_to(output).as_posix(): path.read_bytes()
+                    for path in output.rglob("*")
+                    if path.is_file()
+                }
+                self.assertEqual(after, before)
+                self.assertEqual(external_qa.read_bytes(), b"old-external-qa-bytes")
+                self.assertEqual(sentinel.read_bytes(), b"old-output-sentinel\x00\xff")
+                self.assertEqual(old_manifest.read_bytes(), b"old-artifact-manifest-bytes")
+                self.assertEqual(old_qa.read_bytes(), b"old-output-qa-bytes")
+                residues = [
+                    path.name
+                    for path in folder.iterdir()
+                    if any(token in path.name.casefold() for token in ("candidate", "staging", "stage", "backup"))
+                ]
+                self.assertEqual(residues, [])
+
     def test_real_generator_publishes_valid_scoped_content_and_rendered_artifacts(self) -> None:
         if render_qa.find_renderer() is None:
             if os.environ.get("CI"):
@@ -538,7 +610,9 @@ class CourseScopeGroundingTests(unittest.TestCase):
             self.skipTest("LibreOffice is unavailable for the local render regression")
         with tempfile.TemporaryDirectory(prefix="lesson-scope-generator-valid-") as temp:
             folder = Path(temp)
-            content = _domain_content("database")
+            scores = (90, 91, 90, 92, 90, 93)
+            content = _scored_v22_payload(scores)
+            self.assertEqual(content["content_contract_version"], "2.2")
             validate_test_fixture_content_v2_input(content)
             content_path = folder / "content.json"
             _write_json(content_path, content)
@@ -556,10 +630,18 @@ class CourseScopeGroundingTests(unittest.TestCase):
             qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(qa["content_quality"]["course_scope_grounding"]["status"], "passed")
+            self.assertEqual(qa["content_quality"]["status"], "passed", qa["content_quality"])
+            score_pattern = qa["content_quality"]["coverage"]["score_pattern"]
+            self.assertEqual(score_pattern["values"], [float(score) for score in scores])
+            self.assertLess(len(set(score_pattern["values"])), len(score_pattern["values"]))
+            self.assertFalse(score_pattern["all_same"])
+            self.assertFalse(score_pattern["simple_cycle"])
+            self.assertFalse(score_pattern["arithmetic_progression"])
+            self.assertFalse(score_pattern["strict_monotonic"])
             self.assertEqual(qa["render"]["status"], "passed", qa["render"])
             self.assertEqual(manifest["production_status"], "production_pass")
-            self.assertTrue(list(output.glob("*.docx")))
-            self.assertTrue(list((output / "render" / "pdf").glob("*.pdf")))
+            self.assertEqual(len(list(output.glob("*.docx"))), 6)
+            self.assertEqual(len(list((output / "render" / "pdf").glob("*.pdf"))), 6)
             self.assertEqual(manifest["run_id"], "SCOPE-GEN-001")
 
 

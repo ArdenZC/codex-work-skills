@@ -532,6 +532,8 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 "database_patient_bp": "frozen-outline course-scope grounding + intra-lesson coherence",
             },
         )
+        mechanical_scores = next(item["detector"] for item in catalog if item["id"] == "mechanical_scores")
+        self.assertEqual(mechanical_scores, "Content QA score_pattern hard gate")
         controls = lesson_acceptance.negative_controls()
         self.assertEqual(controls["status"], "not_executed")
         self.assertEqual(controls["transaction_safety"]["candidate_cleanup"], "not_executed")
