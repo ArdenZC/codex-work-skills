@@ -275,7 +275,7 @@ def make_v22_payload(
             },
         }
         lesson["teaching_methods"] = [
-            f"{method}（{focus}）" for method in lesson["teaching_methods"]
+            f"{method}（{task}）" for method in lesson["teaching_methods"]
         ]
         lesson["progression"]["prior_lesson_id"] = None if index == 1 else f"L{index - 1:02d}"
         for progression_field in ("prior_learning", "deliverable", "next_bridge"):
