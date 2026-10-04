@@ -3824,8 +3824,15 @@ esac
         self.assertEqual(jobs["classify-changes"]["runs-on"], "ubuntu-latest")
         self.assertEqual(jobs["package-contracts"]["runs-on"], "ubuntu-latest")
         self.assertEqual(jobs["ci-gate"]["runs-on"], "ubuntu-latest")
-        for job_name in ("template-tooling", "template-lesson", "template-gradebook", "template-workorder", "template-release"):
-            self.assertEqual(jobs[job_name]["timeout-minutes"], 30)
+        template_job_budgets = {
+            "template-tooling": 30,
+            "template-lesson": 40,
+            "template-gradebook": 30,
+            "template-workorder": 30,
+            "template-release": 30,
+        }
+        for job_name, timeout_minutes in template_job_budgets.items():
+            self.assertEqual(jobs[job_name]["timeout-minutes"], timeout_minutes)
             setup_python = next(
                 step
                 for step in jobs[job_name]["steps"]
