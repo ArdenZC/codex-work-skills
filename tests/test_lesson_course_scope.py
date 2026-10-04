@@ -630,6 +630,9 @@ class CourseScopeGroundingTests(unittest.TestCase):
             qa = json.loads((output / "qa-report.json").read_text(encoding="utf-8"))
             manifest = json.loads((output / "artifact-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(qa["content_quality"]["course_scope_grounding"]["status"], "passed")
+            authority = qa["content_quality"]["course_scope_grounding"]
+            paths = [n['scope_authority']['path'] for l in authority['lessons'] for n in l['body_scope_anchors']]
+            self.assertEqual(paths.count('frozen_deliverable_relation'), 1)
             self.assertEqual(qa["content_quality"]["status"], "passed", qa["content_quality"])
             score_pattern = qa["content_quality"]["coverage"]["score_pattern"]
             self.assertEqual(score_pattern["values"], [float(score) for score in scores])
@@ -643,6 +646,205 @@ class CourseScopeGroundingTests(unittest.TestCase):
             self.assertEqual(len(list(output.glob("*.docx"))), 6)
             self.assertEqual(len(list((output / "render" / "pdf").glob("*.pdf"))), 6)
             self.assertEqual(manifest["run_id"], "SCOPE-GEN-001")
+
+class DirectFrozenAuthorityTests(unittest.TestCase):
+    ORIGINAL_SHA = '878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352'
+
+    def original_nc02(self):
+        raw = (ROOT / 'tests/fixtures/lesson-original-nc02.json').read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(), self.ORIGINAL_SHA)
+        return raw, json.loads(raw)
+
+    def test_full_430_node_corpus_has_424_direct_and_6_deliverable_paths(self):
+        from collections import Counter
+        from tests.test_lesson_content_v22 import SOFTWARE_SPECS
+        corpus = {
+            'data-structures': make_v22_payload(theory_hours=36),
+            'software-modeling': make_v22_payload(course='软件建模', major='软件专业', theory_hours=32, specs=SOFTWARE_SPECS),
+            'nursing-full': make_v22_payload(course='基础护理', major='护理专业', theory_hours=10, specs=NURSING_SPECS),
+            **{d: _domain_content(d) for d in ('database', 'nursing', 'accounting', 'mechanical')},
+        }
+        counts = Counter()
+        for version in ('2.2', '2.3'):
+            for case, source in corpus.items():
+                content = copy.deepcopy(source)
+                if version == '2.3':
+                    _bind_v23(content, mode='theory_only', theory_hours=content['total_hours'], practice_hours=0)
+                with self.subTest(version=version, case=case), tempfile.TemporaryDirectory() as temp:
+                    truth = _freeze_outline(Path(temp) / 'authority', content)
+                    report = validate_course_scope_grounding(content, truth, require_local_outline=True)
+                    self.assertEqual(report['status'], 'passed', report['failures'])
+                    for lesson in report['lessons']:
+                        for node in lesson['body_scope_anchors']:
+                            authority = node['scope_authority']
+                            self.assertEqual(authority['status'], 'passed')
+                            counts[authority['path']] += 1
+                            self.assertIn('text_sha256', node['diagnostic'])
+                            if authority['path'] == 'frozen_deliverable_relation':
+                                self.assertEqual(node['node_id'], 'teaching_content[1]')
+                                self.assertEqual(authority['matched_outline_field'], 'deliverable')
+                                self.assertEqual(authority['relation_type'], 'explicit_deliverable_operation')
+        self.assertEqual(counts, {'direct_frozen': 424, 'frozen_deliverable_relation': 6})
+
+    def test_original_nc02_production_control_fails_both_paths_and_content_qa(self):
+        from course_scope_grounding import _frozen_scope_anchor_evidence, _frozen_deliverable_relation_evidence
+        raw, content = self.original_nc02()
+        with tempfile.TemporaryDirectory() as temp:
+            truth = _freeze_outline(Path(temp) / 'authority', content)
+            report = content_quality.assess_content_quality(content, source_truth_path=str(truth), require_local_outline=True)
+            self.assertEqual(report['status'], 'failed')
+            scope = report['course_scope_grounding']
+            self.assertEqual(scope['status'], 'failed')
+            nodes = scope['lessons'][0]['body_scope_anchors']
+            for node in nodes[3:5]:
+                self.assertEqual(node['scope_authority']['path'], 'none')
+                self.assertEqual(node['deliverable_relation']['status'], 'failed')
+                self.assertTrue(all(not c['evidence']['substantive_residuals'] for c in node['candidates']))
+        self.assertEqual((ROOT / 'tests/fixtures/lesson-original-nc02.json').read_bytes(), raw)
+
+    def test_deliverable_relation_rejects_mentions_actions_and_foreign_claims(self):
+        from course_scope_grounding import _frozen_deliverable_relation_evidence as relation
+        target = '接口设计记录'
+        for text in ('接口设计记录', '检查患者血压结果', '示范形成护理结果的关键步骤',
+                     '不示范形成接口设计记录的关键步骤',
+                     '测量患者血压；示范形成接口设计记录的关键步骤',
+                     '示范形成接口设计记录的关键步骤；随后执行输液护理'):
+            with self.subTest(text=text):
+                self.assertEqual(relation(text, target)['status'], 'failed')
+        self.assertEqual(relation('示范形成接口设计记录的关键步骤', target)['status'], 'passed')
+        self.assertEqual(relation('示范形成结果的关键步骤', '结果')['status'], 'failed')
+
+    def test_adversarial_transitive_patient_and_same_residual_controls_fail(self):
+        attacks = (
+            '先核对输入边界再开始操作；依据护理流程执行输液步骤并记录患者反应。',
+            '测量患者血压并判断生命体征异常。',
+            '根据护理计划执行输液并记录患者反应。',
+        )
+        for text in attacks:
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as temp:
+                content = _domain_content('database')
+                if text.startswith('测量患者'):
+                    content['lessons'][0]['teaching_content'].append(
+                        '使用患者信息表完成 SQL 查询与索引优化。')
+                content['lessons'][0]['teaching_content'].append(text)
+                foreign_id = f"teaching_content[{len(content['lessons'][0]['teaching_content']) - 1}]"
+                _refresh_review_digests(content)
+                truth = _freeze_outline(Path(temp) / 'authority', content)
+                report = validate_course_scope_grounding(content, truth, require_local_outline=True)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(next(n for n in report['lessons'][0]['body_scope_anchors'] if n['node_id']==foreign_id)['scope_authority']['path'], 'none')
+                if text.startswith('测量患者'):
+                    nodes = report['lessons'][0]['body_scope_anchors']
+                    self.assertEqual(nodes[3]['scope_authority']['path'], 'direct_frozen')
+                    coherence = content_quality._intra_lesson_coherence(
+                        content['lessons'], [lesson['lesson_id'] for lesson in content['lessons']])
+                    self.assertIn(foreign_id, coherence['lessons'][0]['main_component']['members'])
+        # This inserted foreign node actually joins the unchanged task graph
+        # through a legal sibling's scaffold, but cannot inherit its authority.
+        content = make_v22_payload(theory_hours=36)
+        content['lessons'][3]['teaching_content'].append(
+            '让每个步骤都留下可复查证据；执行护理输液步骤并记录患者血压。')
+        _refresh_review_digests(content)
+        coherence = content_quality._intra_lesson_coherence(
+            content['lessons'], [lesson['lesson_id'] for lesson in content['lessons']])
+        self.assertIn('teaching_content[3]', coherence['lessons'][3]['main_component']['members'])
+        with tempfile.TemporaryDirectory() as temp:
+            truth = _freeze_outline(Path(temp) / 'authority', content)
+            report = validate_course_scope_grounding(content, truth, require_local_outline=True)
+            node = report['lessons'][3]['body_scope_anchors'][3]
+            self.assertEqual(report['status'], 'failed')
+            self.assertEqual(node['scope_authority']['path'], 'none')
+            self.assertEqual(node['deliverable_relation']['status'], 'failed')
+        from course_scope_grounding import _frozen_scope_anchor_evidence, _frozen_deliverable_relation_evidence
+        content = make_v22_payload(theory_hours=36)
+        row = content['outline'][16]
+        text = '测量患者血压，整理护理结果并决定输液处置。'
+        self.assertEqual(_frozen_scope_anchor_evidence(text, row['task'])['substantive_residuals'], ['结果'])
+        self.assertEqual(_frozen_scope_anchor_evidence(text, row['task'])['status'], 'failed')
+        self.assertEqual(_frozen_deliverable_relation_evidence(text, row['deliverable'])['status'], 'failed')
+
+    def test_foreign_and_future_output_operations_cannot_borrow_bridge_authority(self):
+        content = make_v22_payload(theory_hours=36)
+        for artifact in ('护理评估记录', '接口护理记录', content['outline'][4]['deliverable']):
+            with self.subTest(artifact=artifact), tempfile.TemporaryDirectory() as temp:
+                modified = copy.deepcopy(content)
+                modified['lessons'][3]['teaching_content'][1] = f'示范形成{artifact}的关键步骤'
+                if artifact == '接口护理记录':
+                    from course_scope_grounding import _frozen_scope_anchor_evidence as anchor
+                    from course_scope_grounding import _frozen_deliverable_relation_evidence as relation
+                    row = content['outline'][3]
+                    positive = content['lessons'][3]['teaching_content'][1]
+                    negative = modified['lessons'][3]['teaching_content'][1]
+                    for field in ('task', 'deliverable', 'next_bridge'):
+                        self.assertEqual(anchor(positive, row[field])['substantive_residuals'], ['接口'])
+                        self.assertEqual(anchor(negative, row[field])['substantive_residuals'], ['接口'])
+                        self.assertEqual(anchor(positive, row[field])['status'], 'failed')
+                        self.assertEqual(anchor(negative, row[field])['status'], 'failed')
+                    self.assertEqual(relation(positive, row['deliverable'])['status'], 'passed')
+                    self.assertEqual(relation(negative, row['deliverable'])['status'], 'failed')
+                _refresh_review_digests(modified)
+                truth = _freeze_outline(Path(temp) / 'authority', content)
+                report = validate_course_scope_grounding(modified, truth, require_local_outline=True)
+                self.assertEqual(report['status'], 'failed')
+                self.assertEqual(report['lessons'][3]['body_scope_anchors'][1]['scope_authority']['path'], 'none')
+
+    def test_original_nc02_real_generator_preserves_all_old_transaction_bytes(self):
+        raw, content = self.original_nc02()
+        with tempfile.TemporaryDirectory(prefix='lesson-original-nc02-transaction-') as temp:
+            folder = Path(temp)
+            source = folder / 'original.json'
+            source.write_bytes(raw)
+            truth = _freeze_outline(folder / 'authority', content)
+            output = folder / 'output'
+            output.mkdir()
+            for name in ('old.docx', 'sentinel.bin', 'qa-report.json', 'artifact-manifest.json'):
+                (output / name).write_bytes(b'old bytes\x00\xff:' + name.encode())
+            external = folder / 'external-qa.json'
+            external.write_bytes(b'old external QA')
+            before = {p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob('*') if p.is_file()}
+            result = run_script(LESSON / 'scripts/generate_lesson_plans.py', '--tasks-json', str(source),
+                '--source-truth', str(truth), '--output-dir', str(output), '--qa-report', str(external), '--backup-existing')
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('course-scope grounding failed before candidate creation', result.stderr)
+            self.assertEqual({p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob('*') if p.is_file()}, before)
+            self.assertFalse(any(any(token in p.name for token in ('candidate', 'staging', 'backup')) for p in folder.iterdir()))
+
+    def test_original_nc02_cannot_bind_or_authorize_pipeline(self):
+        import run_lesson_pipeline as pipeline
+        raw, content = self.original_nc02()
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp)
+            source = folder / 'original.json'
+            source.write_bytes(raw)
+            truth = _freeze_outline(folder / 'authority', content)
+            run = folder / 'run.json'
+            pipeline.execute('init', run, mode='PRODUCTION', run_id='NC02-ORIGINAL', source_truth=truth)
+            pipeline.execute('freeze-source-truth', run)
+            before = run.read_bytes()
+            with self.assertRaisesRegex(Exception, 'course-scope grounding failed'):
+                pipeline.execute('bind-content', run, content=source)
+            self.assertEqual(run.read_bytes(), before)
+            with self.assertRaises(Exception):
+                pipeline.execute('authorize-production', run, authorization=folder / 'absent-authorization.json')
+            self.assertEqual(run.read_bytes(), before)
+            self.assertNotIn('PREPRODUCTION_QA_PASSED', run.read_text())
+            # A structurally valid, fully byte-bound authorization cannot
+            # bypass the shared scope validator either.
+            from tests.test_lesson_lifecycle_contracts import _benchmark, _teacher_review, _production_authorization
+            from production_authorization import validate_production_authorization_files
+            evidence_path = folder / 'benchmark-evidence.json'
+            evidence_raw = _write_json(evidence_path, {'reason': 'SYNTHETIC contract-only evidence'})
+            benchmark = _benchmark('BENCHMARK_UNAVAILABLE', sha256_bytes(evidence_raw))
+            teacher_path = folder / 'teacher.json'
+            teacher_raw = _write_json(teacher_path, _teacher_review(truth.read_bytes(), raw, benchmark))
+            authorization_path = folder / 'authorization.json'
+            _write_json(authorization_path, _production_authorization(truth.read_bytes(), raw, teacher_raw, benchmark))
+            _, _, errors = validate_production_authorization_files(
+                authorization_path, source_truth_path=truth, content_path=source,
+                teacher_review_path=teacher_path, benchmark_evidence_path=evidence_path)
+            self.assertTrue(errors)
+            self.assertTrue(all('course-scope grounding:' in error for error in errors), errors)
+            self.assertEqual(source.read_bytes(), raw)
 
 
 if __name__ == "__main__":

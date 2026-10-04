@@ -62,17 +62,14 @@ requires a new outline, Source Truth, and run.
 
 ## Semantic gates
 
-Structural binding catches full-Lesson replacement. For each Lesson, the
-validator considers frozen `unit`, `task`, `prior_learning`, `deliverable`, and
-`next_bridge` anchors. Authorization requires task-connected instructional
-body content to form an existing substantive anchor with the frozen `task`,
-`deliverable`, or `next_bridge`; unit and prior-learning matches remain bounded
-context evidence. It reuses `_intra_anchor_evidence()` and
-`_intra_lesson_coherence()`; it does not introduce a second NLP system or
-keyword blacklist. Intra-Lesson coherence also rejects body items that are
-disconnected from the Lesson's main component and its task/deliverable/
-progression anchors, which catches partial insertions that briefly leave
-scope and then return to the planned task.
+Structural binding catches full-Lesson replacement. Every required instructional
+body node independently needs strong direct evidence from the current frozen
+`task`, `deliverable`, or `next_bridge`, or an explicit operation on the current
+frozen deliverable. Unit and prior-learning matches remain context evidence.
+The shared extraction helper supplies direct evidence; the bounded deliverable
+helper supplies exact-object relation evidence. `_intra_lesson_coherence()` and
+its task component remain unchanged and prove coherence only. Connection to
+another legal node cannot authorize an otherwise foreign body node.
 
 The outline is domain-agnostic. A database Lesson may use patient, order, or
 financial records as data while teaching SQL, schema design, constraints,
@@ -103,3 +100,45 @@ structural behavior and are explicitly unscoped. Canonical production passes
 `--source-truth`; it cannot report `production_pass` or publish output without
 the shared gate. Lesson Skill remains at 2.3.1 during this remediation; this
 document does not declare a 2.4 release.
+
+## Per-node frozen authority
+
+Every `teaching_content[i]`, `key_point.content[i]`, and
+`difficult_point.content[i]` independently requires either strong direct frozen
+`task`/`deliverable`/`next_bridge` evidence, or an explicit operation on the
+current row's exact frozen deliverable. Graph connectivity continues to prove
+coherence; it never supplies course authority. Unit/prior-learning matches are
+context only. A single two-character residual does not grant authority.
+
+Direct strength uses the shared extraction evidence: a shared acronym, one
+independent residual of at least three characters, or at least two independent
+residuals within one frozen field. This rule does not use domain dictionaries,
+frequency, or body-to-body inheritance.
+
+The calibrated D1 relation is deliberately limited to the complete statement
+`示范形成<exact current frozen deliverable>的关键步骤`, optionally preceded by one
+of the three reviewed generic scaffolds (`让每个步骤都留下可复查证据`,
+`为关键结论保留依据来源`, or `把操作规范转成检查清单`). Scaffolds and action words
+never authorize a node by themselves. NFKC/whitespace normalization preserves
+the exact output identity; the whole statement must match. Bare mentions,
+negation, extra instructional clauses, derived artifacts, and other outputs do
+not receive D1 evidence. A named output operation conflicting with the current
+row cannot borrow lexical authority from a future bridge. No neighboring row or
+other body node participates in this decision.
+
+Per-node `scope_authority` records status, path (`direct_frozen`,
+`frozen_deliverable_relation`, or `none`), matched outline field, strength, and
+relation type. Diagnostics remain bounded and hash-addressed. The same shared
+validator feeds Content QA, pipeline binding/preproduction checks, Production
+Authorization, and generator preflight for Content 2.2 and 2.3.
+
+### NC-02 production control
+
+`tests/fixtures/lesson-original-nc02.json` preserves the original contaminated
+payload byte for byte (SHA-256
+`878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352`). Its two
+foreign nursing nodes have no substantive direct frozen residual and no current
+deliverable relation. It tests **per-node frozen course authority plus
+intra-Lesson coherence**, not nursing keywords or a short-residual detector.
+The separate “结果” nursing sentence is an adversarial synthetic calibration
+control and is never substituted for the original production control.

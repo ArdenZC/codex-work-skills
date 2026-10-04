@@ -18,10 +18,12 @@ import run_lesson_pipeline as pipeline
 import teacher_review_packet as packet
 
 
-def course(count=7, *, units=None, version="2.3"):
+def course(count=7, *, units=None, tasks=None, version="2.3"):
     specs = list(_specs(count))
     if units is not None:
         specs = [(units[i], *spec[1:]) for i, spec in enumerate(specs)]
+    if tasks is not None:
+        specs = [(spec[0], tasks[i], *spec[2:]) for i, spec in enumerate(specs)]
     result = make_v22_payload(course="数据库应用基础", major="软件技术", audience="高职二年级",
                               theory_hours=2 * count, practice_hours=0, lesson_count=count,
                               lesson_hours=[2] * count, specs=tuple(specs))
@@ -235,14 +237,12 @@ class ArtifactTests(unittest.TestCase):
         cls.template = pipeline_tests.PipelineTests()
         cls.template.setUp()
         cls.addClassCleanup(cls.template.doCleanups)
-        content = course()
-        for index, lesson in enumerate(content["lessons"], 1):
-            lesson["task"] = f"分析数据路径边界{index}并形成边界分析记录{index}"
-            for query in content.get("reference_research", {}).get("queries", []):
-                if query.get("lesson_id") == lesson["lesson_id"]:
-                    query["query"] = (
-                        f"{content['course_name']} {content['major']} {lesson['task']} reference research"
-                    )
+        # Define the tasks before authoring body fixtures, rather than
+        # renaming the frozen plan after its instructional body was built.
+        content = course(tasks=[
+            f"分析数据路径边界{index}并形成边界分析记录{index}"
+            for index in range(1, 8)
+        ])
         _bind_v23(content, mode="theory_only", theory_hours=14, practice_hours=0)
         _write_json(cls.template.content_path, content)
         outline_source = next(

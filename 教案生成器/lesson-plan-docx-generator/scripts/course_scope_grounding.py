@@ -12,6 +12,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 import hashlib
 import json
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -231,6 +233,75 @@ def _body_nodes(lesson: Mapping[str, Any]) -> list[tuple[str, str]]:
     return values
 
 
+def _frozen_scope_anchor_evidence(value: Any, authority: Any) -> dict[str, Any]:
+    """Prove direct authority without borrowing graph connectivity.
+
+    Ordinary intra-Lesson edges can rest on a single two-character residual.
+    Frozen authority requires a shared acronym, a residual of at least three
+    characters, or two independent concrete residuals. Context fields and
+    other body nodes never participate in this decision.
+    """
+
+    try:
+        from content_quality import _progression_anchor_evidence
+    except ModuleNotFoundError:
+        from .content_quality import _progression_anchor_evidence
+
+    evidence = _progression_anchor_evidence(value, authority)
+    residuals = evidence.get("substantive_residuals", [])
+    independent = [
+        residual for residual in residuals
+        if not any(residual != other and residual in other for other in residuals)
+    ]
+    strong = bool(evidence.get("acronym_matches")) or any(
+        len(residual) >= 3 for residual in independent
+    ) or len(independent) >= 2
+    return {
+        **evidence,
+        "status": "passed" if strong else "failed",
+        "reason": "direct strong frozen semantic anchor" if strong else "no direct strong frozen semantic anchor",
+        "independent_residuals": independent[:8],
+        "authority_rule": "shared acronym, residual length >= 3, or >= 2 independent residuals",
+    }
+
+
+def _frozen_deliverable_relation_evidence(value: Any, deliverable: Any) -> dict[str, Any]:
+    """D1 only: a complete teaching operation on this frozen output.
+
+    The observed production need is '示范形成<current output>的关键步骤'.
+    Its optional lead-in is one of the three reviewed, generic scaffolds.
+    Full-statement matching excludes bare mentions, negation, other targets,
+    and appended/prepended foreign instructional claims. These scaffolds do
+    not grant authority: the exact current-row object and operation must match.
+    No derived artifacts, neighboring rows, or body nodes are consulted.
+    """
+    def normalized(text: str) -> str:
+        return re.sub(r"\s+", "", unicodedata.normalize("NFKC", text))
+
+    failed = {"status": "failed", "relation_type": None,
+              "reason": "no explicit operation on current frozen deliverable"}
+    if not isinstance(value, str) or not isinstance(deliverable, str):
+        return failed
+    target = normalized(deliverable)
+    # Frozen Content deliverables have minLength=6. A bare short concept is
+    # neither a complete output identity nor an alternative authority class.
+    if len(target) < 6:
+        return failed
+    scaffolds = ("让每个步骤都留下可复查证据", "为关键结论保留依据来源", "把操作规范转成检查清单")
+    prefix = "|".join(re.escape(item) for item in scaffolds)
+    frame = re.fullmatch(rf"(?:(?:{prefix});)?示范形成(.+?)的关键步骤[。.]?", normalized(value))
+    if frame and frame.group(1) != target:
+        return {**failed, "object_conflict": True,
+                "reason": "explicit output operation targets a different frozen object"}
+    pattern = rf"(?:(?:{prefix});)?示范形成{re.escape(target)}的关键步骤[。.]?"
+    if not re.fullmatch(pattern, normalized(value)):
+        return failed
+    return {"status": "passed", "relation_type": "explicit_deliverable_operation",
+            "reason": "complete operation on exact current frozen deliverable",
+            "operation": "示范形成", "evidence_strength": "strong",
+            "object_sha256": hashlib.sha256(target.encode("utf-8")).hexdigest()}
+
+
 def _lesson_outline_alignment(lesson: Mapping[str, Any], outline_row: Mapping[str, Any]) -> list[str]:
     mismatches: list[str] = []
     for field in SHARED_PLANNING_FIELDS:
@@ -410,39 +481,97 @@ def validate_course_scope_grounding(
             row_report["outline_alignment"] = "failed" if mismatches else "passed"
 
         intra_record = intra_by_id.get(lesson_id, {})
-        core_members = set((intra_record.get("main_component") or {}).get("members", [])) if isinstance(intra_record, Mapping) else set()
         body_nodes = _body_nodes(lesson)
-        connected_body = [(node_id, value) for node_id, value in body_nodes if node_id in core_members]
-        if not connected_body:
+        if not body_nodes:
             if row_report is not None:
                 row_report["scope_anchor_status"] = "failed"
             report["failures"].append(_report_failure(
                 "lesson_out_of_frozen_outline_scope",
-                "Task-connected instructional body is empty.",
+                "Instructional body is empty.",
                 lesson_id,
             ))
             continue
         anchors = {field: outline_row.get(field, "") for field in SCOPE_ANCHOR_FIELDS}
         matches: list[tuple[str, str, dict[str, Any]]] = []
         context_matches: list[tuple[str, str, dict[str, Any]]] = []
+        body_scope_anchors: list[dict[str, Any]] = []
         try:
             try:
-                from content_quality import _intra_anchor_evidence
+                from content_quality import _diagnostic_fragment, _intra_anchor_evidence
             except ModuleNotFoundError:
-                from .content_quality import _intra_anchor_evidence
+                from .content_quality import _diagnostic_fragment, _intra_anchor_evidence
 
-            for node_id, value in connected_body:
+            for node_id, value in body_nodes:
+                node_matches = []
+                node_candidates = []
+                relation = _frozen_deliverable_relation_evidence(value, outline_row.get("deliverable"))
                 for anchor_field, anchor_value in anchors.items():
-                    evidence = _intra_anchor_evidence(value, anchor_value)
+                    evidence = (
+                        _frozen_scope_anchor_evidence(value, anchor_value)
+                        if anchor_field in SCOPE_SEMANTIC_ANCHOR_FIELDS
+                        else _intra_anchor_evidence(value, anchor_value)
+                    )
+                    # A named output operation contradicting this row cannot
+                    # use lexical overlap with a future bridge as authority.
+                    # This checks only the current object, never sibling rows.
+                    if anchor_field in SCOPE_SEMANTIC_ANCHOR_FIELDS and relation.get("object_conflict"):
+                        evidence = {**evidence, "status": "failed",
+                                    "reason": "explicit operation targets a non-current deliverable"}
+                    if anchor_field in SCOPE_SEMANTIC_ANCHOR_FIELDS:
+                        node_candidates.append({"outline_field": anchor_field, "evidence": evidence})
                     if evidence.get("status") == "passed":
                         match = (node_id, anchor_field, evidence)
                         if anchor_field in SCOPE_SEMANTIC_ANCHOR_FIELDS:
                             matches.append(match)
+                            node_matches.append(match)
                         else:
                             context_matches.append(match)
+                path = "direct_frozen" if node_matches else "frozen_deliverable_relation" if relation["status"] == "passed" else "none"
+                authorized = path != "none"
+                if not node_matches and authorized:
+                    matches.append((node_id, "deliverable", relation))
+                field, index_text = node_id.rsplit("[", 1)
+                node_report = {
+                    "lesson_id": lesson_id,
+                    "node_id": node_id,
+                    "field": field,
+                    "index": int(index_text.rstrip("]")),
+                    "status": "passed" if authorized else "failed",
+                    "reason": path if authorized else "instructional_body_out_of_frozen_scope",
+                    "diagnostic": {**_diagnostic_fragment(value), "source_text_sha256": hashlib.sha256(value.encode("utf-8")).hexdigest()},
+                    "matched_outline_field": node_matches[0][1] if node_matches else "deliverable" if authorized else None,
+                    "evidence": node_matches[0][2] if node_matches else relation,
+                    "scope_authority": {
+                        "status": "passed" if authorized else "failed", "path": path,
+                        "matched_outline_field": node_matches[0][1] if node_matches else "deliverable" if authorized else None,
+                        "evidence_strength": "strong" if authorized else None,
+                        "relation_type": relation["relation_type"] if path == "frozen_deliverable_relation" else None,
+                        "reason": path if authorized else "instructional_body_out_of_frozen_scope",
+                    },
+                    "deliverable_relation": relation,
+                    "candidates": node_candidates,
+                }
+                body_scope_anchors.append(node_report)
+                if not authorized:
+                    failure = _report_failure(
+                        "instructional_body_out_of_frozen_scope",
+                        "Instructional body node lacks strong direct frozen authority or an explicit current-deliverable operation.",
+                        lesson_id,
+                    )
+                    failure.update({key: node_report[key] for key in ("node_id", "field", "index", "diagnostic")})
+                    report["failures"].append(failure)
         except Exception:
             matches = []
-        if matches:
+            body_scope_anchors = []
+        if row_report is not None:
+            row_report["body_scope_anchors"] = body_scope_anchors
+            row_report["intra_lesson_status"] = (
+                "passed" if intra_record and not any(
+                    failure.get("lesson_id") == lesson_id for failure in intra.get("failures", [])
+                ) else "failed"
+            )
+        scope_passed = bool(body_scope_anchors) and all(node["status"] == "passed" for node in body_scope_anchors)
+        if scope_passed:
             if row_report is not None:
                 row_report["scope_anchor_status"] = "passed"
                 row_report["scope_anchor"] = {
@@ -464,7 +593,7 @@ def validate_course_scope_grounding(
                 row_report["scope_anchor_status"] = "failed"
             report["failures"].append(_report_failure(
                 "lesson_out_of_frozen_outline_scope",
-                "Task-connected instructional content has no substantive anchor to frozen task, deliverable, or next_bridge.",
+                "Instructional body lacks the required direct frozen semantic authority.",
                 lesson_id,
             ))
 

@@ -134,13 +134,13 @@ _NEGATIVE_CONTROL_CATALOG = (
         "id": "nursing_sql_contamination",
         "description": "护理课程混入 SQL/数据库技术内容",
         "expected": "reject",
-        "detector": "frozen-outline course-scope grounding + intra-lesson coherence",
+        "detector": "per-node frozen course authority + intra-lesson coherence",
     },
     {
         "id": "database_patient_bp",
         "description": "数据库课程混入患者血压等护理内容",
         "expected": "reject",
-        "detector": "frozen-outline course-scope grounding + intra-lesson coherence",
+        "detector": "per-node frozen course authority + intra-lesson coherence",
     },
     {
         "id": "copied_teacher_actions",

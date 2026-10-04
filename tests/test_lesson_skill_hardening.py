@@ -528,8 +528,8 @@ class LessonSkillHardeningTests(unittest.TestCase):
         self.assertEqual(
             scope_controls,
             {
-                "nursing_sql_contamination": "frozen-outline course-scope grounding + intra-lesson coherence",
-                "database_patient_bp": "frozen-outline course-scope grounding + intra-lesson coherence",
+                "nursing_sql_contamination": "per-node frozen course authority + intra-lesson coherence",
+                "database_patient_bp": "per-node frozen course authority + intra-lesson coherence",
             },
         )
         mechanical_scores = next(item["detector"] for item in catalog if item["id"] == "mechanical_scores")

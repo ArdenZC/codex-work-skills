@@ -1586,6 +1586,13 @@ class LessonContentV2Mixin:
                 created_under.append(Path(kwargs["dir"]).resolve())
                 return real_mkdtemp(*args, **kwargs)
 
+            # Mocking Darwin does not change the actual volume's case semantics.
+            # Measure the independent temp volume so this isolation regression
+            # also works on case-sensitive Linux and macOS volumes.
+            reference = safe_temp / "CaseReference"
+            reference.mkdir()
+            expected_case_sensitive = not (safe_temp / "casereference").exists()
+            reference.rmdir()
             lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
             with (
                 patch.object(lesson_path_safety.sys, "platform", "darwin"),
@@ -1593,7 +1600,7 @@ class LessonContentV2Mixin:
                 patch.object(lesson_path_safety.tempfile, "gettempdir", return_value=str(safe_temp)),
                 patch.object(lesson_path_safety.tempfile, "mkdtemp", side_effect=tracked_mkdtemp),
             ):
-                self.assertFalse(filesystem_case_sensitive(protected))
+                self.assertEqual(filesystem_case_sensitive(protected), expected_case_sensitive)
             self.assertEqual(created_under, [safe_temp.resolve()])
             self.assertEqual(list(protected.iterdir()), [])
             self.assertFalse(paths_overlap(safe_temp, protected))

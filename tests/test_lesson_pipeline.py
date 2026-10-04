@@ -25,6 +25,26 @@ import run_lesson_pipeline as pipeline
 
 
 class PipelineTests(unittest.TestCase):
+    def test_explicit_current_deliverable_path_reaches_production_authorization(self):
+        from tests.test_lesson_content_v22 import DB_SPECS, make_v22_payload
+        from tests.test_lesson_content_v23 import _bind_v23
+        content = make_v22_payload(course='数据库应用基础', major='软件技术', audience='高职二年级',
+            theory_hours=2, specs=(DB_SPECS[3],))
+        _bind_v23(content, mode='theory_only', theory_hours=2, practice_hours=0)
+        content['authoring_provenance']['mode'] = 'agent'
+        _write_json(self.content_path, content)
+        _replace_source_truth_outline(self.source, self.source_path, content['outline'])
+        self.run = self.folder / 'deliverable-production-run.json'
+        self.call('init', mode='PRODUCTION', run_id='RUN-001', source_truth=self.source_path)
+        # Existing SYNTHETIC teacher/benchmark evidence helpers exercise the
+        # unchanged authorization contract, not real human teaching acceptance.
+        authorized = self.authorize()
+        self.assertEqual(authorized['state']['current_state'], 'PRODUCTION_AUTHORIZED')
+        qa = json.loads(pipeline.path_of(authorized, 'preproduction_qa').read_bytes())
+        paths = [n['scope_authority']['path'] for l in json.loads(qa['content_quality']['report_json'])['course_scope_grounding']['lessons']
+                 for n in l['body_scope_anchors']]
+        self.assertIn('frozen_deliverable_relation', paths)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
