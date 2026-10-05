@@ -102,18 +102,19 @@ def _lesson(
              content=[content], teacher_actions=[teacher], student_actions=[student], objective=objective)
         for stage_id, label, minutes, content, teacher, student, objective in stages
     ]
+    # Evaluate an observable criterion/output; do not repeat instructional prose.
     remarks = {
-        key: f'{suffix}；{plan.introduction}'
+        key: suffix
         for key, suffix in {
             'attendance': '到课并备齐当前任务材料',
-            'attention': '关注当前对象及处理依据',
-            'participation': '说明本课成果中的依据',
+            'attention': f'关注{artifact}中的处理依据',
+            'participation': f'说明{artifact}的一项形成依据',
             'compliance': '按本课要求保留对应记录',
-            'values': '说明成果与任务要求的关系',
-            'ethics': '如实报告已完成和未完成事项',
+            'values': f'说明{artifact}的职业用途',
+            'ethics': f'如实报告{artifact}的完成情况',
             'habits': '整理本课材料及其对应位置',
-            'online_learning': '预读当前任务与产出要求',
-            'discussion': '围绕当前任务解释处理决定',
+            'online_learning': f'预读{artifact}对应的任务要求',
+            'discussion': f'围绕{artifact}解释处理决定',
             'homework': f'提交{artifact}及修订说明',
             'practice': f'按本课任务形成{artifact}',
             'presentation': f'说明{artifact}的形成依据',

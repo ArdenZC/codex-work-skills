@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 import unittest
 
 from tests.fixture_lesson_plans import AUTHORED_PLANS
@@ -27,6 +28,45 @@ def body_without_direct_evidence(payload: dict) -> list[tuple[str, str]]:
 
 
 class LessonFixturePlanningTests(unittest.TestCase):
+    def test_full_fixture_evaluation_remarks_satisfy_content_contract(self):
+        from tests.synthetic_lesson_content_v2_acceptance import synthetic_plan_from_brief
+        from tests.test_lesson_content_v22 import (
+            DB_SPECS, SOFTWARE_SPECS, make_v22_payload, lesson_content_quality,
+            lesson_package_common,
+        )
+        from tests.test_lesson_content_v23 import _bind_v23
+        schema = json.loads(lesson_package_common.DEFAULT_SCHEMA.read_text(encoding='utf-8'))
+        remark_schema = schema['$defs']['evaluation']['properties']['remarks']['properties']
+
+        historical = synthetic_plan_from_brief(
+            '课程：《数据库技术》\n专业：软件技术\n总课时：36\n每次：2学时'
+        )
+        fixtures = [('database', historical)]
+        for name, specs in (('data-structures', DB_SPECS), ('software-modeling', SOFTWARE_SPECS)):
+            current = make_v22_payload(theory_hours=len(specs) * 2, specs=specs)
+            fixtures.append((name, current))
+            revised = copy.deepcopy(current)
+            _bind_v23(revised, mode='theory_only', theory_hours=revised['total_hours'], practice_hours=0)
+            fixtures.append((name, revised))
+
+        for name, payload in fixtures:
+            with self.subTest(fixture=name, version=payload['content_contract_version']):
+                lesson_package_common.validate_test_fixture_content_v2_input(payload)
+                report = lesson_content_quality.assess_content_quality(payload)
+                remark_errors = [error for error in report['errors']
+                                 if 'evaluation.remarks.' in error]
+                self.assertEqual(remark_errors, [], remark_errors)
+                # Diagnostics use the production measurement and reported limit,
+                # rather than duplicating the density validator's semantics.
+                for lesson in payload['lessons']:
+                    for criterion, text in lesson['evaluation']['remarks'].items():
+                        actual = lesson_content_quality._meaningful_length(text)
+                        with self.subTest(lesson_id=lesson['lesson_id'], criterion=criterion,
+                                          actual_length=actual):
+                            limit = report['coverage'].get(
+                                'evaluation_remark_contract_limit', remark_schema[criterion]['maxLength'])
+                            self.assertLessEqual(actual, limit)
+
     def test_original_nc02_production_control_has_no_direct_residual(self):
         from tests.test_lesson_course_scope import _domain_content, content_quality
         row = _domain_content('database')['outline'][0]
