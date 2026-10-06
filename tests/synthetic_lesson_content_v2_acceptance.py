@@ -20,32 +20,16 @@ from pathlib import Path
 
 from docx import Document
 
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from tests.fixture_lesson_plans import apply_authored_fixture_plan
+
+
 LESSON = ROOT / "教案生成器" / "lesson-plan-docx-generator"
 GENERATOR = LESSON / "scripts" / "generate_lesson_plans.py"
 NON_IT_FORBIDDEN = ("工程伦理", "平凡又不平凡的价值观", "软件技术", "标准机房", "脚本", "截图工具", "代码编辑器", "数据安全")
-SYNTHETIC_LESSON_MARKERS = (
-    "先核对输入边界再开始操作",
-    "把条件分支写进处理记录",
-    "用反例检验关键判断",
-    "让每个步骤都留下可复查证据",
-    "按风险高低安排处理顺序",
-    "把异常现象与原始条件对应",
-    "用小样本先验证处理假设",
-    "在结果提交前进行交叉核对",
-    "区分事实记录与个人推测",
-    "为关键结论保留依据来源",
-    "遇到变式时先说明调整理由",
-    "把操作规范转成检查清单",
-    "用同伴复核发现遗漏条件",
-    "对边界结果进行单独标记",
-    "把修订前后的差异说清楚",
-    "在交付前确认成果可以复现",
-    "用对照结果支持质量判断",
-    "把后续改进落实到具体动作",
-)
-
 
 def _brief_metadata(brief: str) -> tuple[str, str, int, int]:
     course = re.search(r"课程：([^\n]+)", brief).group(1).strip()
@@ -56,362 +40,125 @@ def _brief_metadata(brief: str) -> tuple[str, str, int, int]:
 
 
 def _lesson(
-    *,
-    course: str,
-    major: str,
-    audience: str,
-    index: int,
-    unit: str,
-    task: str,
-    focus: str,
-    artifact: str,
-    next_focus: str,
-    next_task: str,
-    previous_artifact: str | None,
-    score: float,
+    *, course: str, major: str, audience: str, index: int, unit: str,
+    task: str, focus: str, artifact: str, next_focus: str, next_task: str,
+    previous_artifact: str | None, score: float,
 ) -> dict:
-    lesson_marker = SYNTHETIC_LESSON_MARKERS[(index - 1) % len(SYNTHETIC_LESSON_MARKERS)]
-    if index > len(SYNTHETIC_LESSON_MARKERS):
-        lesson_marker = f"{lesson_marker}，第{index}组实践记录"
+    """Build test scaffolding from a supplied task/output allocation.
+
+    Index controls identity and the historical capability-stage snapshot only.
+    Teaching intent never comes from an ordinal topic table. ``focus`` remains
+    in the frozen planning snapshot for compatibility; current prose comes from
+    the authored task/output plan. This helper cannot author production content.
+    """
+    from tests.fixture_scope_plans import scope_plan_for
+
+    plan = scope_plan_for(task, artifact)
     prior_learning = (
         f"课程开始前完成需求情境梳理，明确本课将围绕{focus}建立工作入口"
         if previous_artifact is None
         else f"已将{previous_artifact}带入本课的{focus}，据此补充新的判断条件"
     )
-    methods = [
-        f"{focus}任务驱动法",
-        ("案例研讨法" if index % 3 == 1 else "示范练习法" if index % 3 == 2 else "对照复盘法"),
-        f"{artifact}成果互评法",
-    ]
     stages = (
-        ("before_class_preparation", "课前准备", 10, "预读资料", "检查准备边界", "完成资料核对", "明确实训入口"),
-        ("task_introduction", "任务导入", 10, "呈现情境", "提出关键问题", "描述现象与需求", "建立任务目标"),
-        ("operation_demonstration", "方法示范", 20, "演示步骤", "分解判断方法", "记录操作要点", "掌握方法路径"),
-        ("task_implementation", "任务实施", 25, "开展操作", "巡视过程证据", "分工完成任务", "形成阶段成果"),
-        ("task_extension", "任务拓展", 10, "比较变式", "追问条件变化", "调整方案并说明理由", "迁移处理能力"),
-        ("project_practice", "项目实训", 10, "整理成果", "按清单检查质量", "提交可复查成果", "完成交付准备"),
-        ("peer_review", "组间互评", 5, "交换成果", "组织快速互审", "指出一项证据缺口", "学会外部校验"),
-        ("lesson_summary", "课堂小结", 10, "回顾路径", "归纳本课要点", "复述判断依据", "连接后续任务"),
-        ("after_class_improvement", "课后完善", 15, "修订成果", "反馈修改方向", "上传修订版本", "巩固迁移结果"),
+        ('before_class_preparation', '课前准备', 10,
+         f'预读{task}的任务说明，准备{artifact}所需的已有材料。',
+         f'检查{task}的已知要求，指出本课需要形成的{artifact}。',
+         f'列出{task}的给定条件与尚不清楚的要求，准备{artifact}材料。',
+         f'明确{task}的输入和本课产出范围。'),
+        ('task_introduction', '任务导入', 10, plan.introduction,
+         f'围绕{task}追问对象和要求，说明{artifact}为何是本课产出。',
+         f'解释{task}的对象与要求，指出{artifact}应回应的内容。', plan.key),
+        ('operation_demonstration', '方法示范', 20,
+         f'示范{task}的处理过程，展示{artifact}如何保留处理依据。',
+         f'结合{task}说明各步依据，把对应结果呈现在{artifact}中。',
+         f'记录{task}的示范步骤及其在{artifact}中的位置。', plan.key),
+        ('task_implementation', '任务实施', 25, plan.practice,
+         f'检查{task}的完成过程，引导学生说明{artifact}中的具体依据。',
+         f'完成{task}并提交{artifact}草稿，指出尚需说明的内容。', plan.difficulty),
+        ('task_extension', '任务拓展', 10,
+         f'复查{artifact}是否完整回应{task}，保持本课任务范围。',
+         f'对照{task}发现{artifact}的缺项，不扩展下一课的新任务。',
+         f'补充{task}的遗漏说明，在{artifact}中标明补充位置。', plan.difficulty),
+        ('project_practice', '项目实训', 10,
+         f'按{task}的既定范围整理{artifact}，使结果与依据对应。',
+         f'核对{artifact}是否覆盖{task}的已分配要求。',
+         f'提交{artifact}及{task}的对应说明，保留尚未完成的事项。', plan.practice),
+        ('peer_review', '组间互评', 5,
+         f'交换{artifact}，对照{task}要求独立核对。',
+         f'要求评阅者指明{artifact}中与{task}不对应的位置。',
+         f'为{artifact}写出一项与{task}相关的核对意见及位置。', plan.key),
+        ('lesson_summary', '课堂小结', 10,
+         f'归纳{task}的处理依据与{artifact}的形成过程。',
+         f'区分{task}中已完成的内容与仍未解决的问题。',
+         f'说明{artifact}如何回应{task}，报告本课完成范围。', plan.introduction),
+        ('after_class_improvement', '课后完善', 15,
+         f'依据核对意见完善{artifact}，保持{task}的原有范围。',
+         f'反馈{artifact}是否回应{task}的遗漏要求。',
+         f'上传{artifact}修订稿及对应{task}的修改说明。', plan.practice),
     )
-    implementation = []
-    for stage_id, label, minutes, activity, teacher_action, student_action, objective in stages:
-        implementation.append(
-            {
-                "id": stage_id,
-                "label": label,
-                "minutes": minutes,
-                "modality": "线上+线下" if stage_id in {"before_class_preparation", "after_class_improvement"} else "小组实训",
-                "content": [f"{lesson_marker}；围绕{focus}完成{activity}，记录{artifact}中的阶段证据"],
-                "teacher_actions": [f"{lesson_marker}；针对{focus}{teacher_action}，提醒成果必须对应{artifact}"],
-                "student_actions": [f"{lesson_marker}；围绕{focus}{student_action}，说明本组对{artifact}的处理依据"],
-                "objective": f"{lesson_marker}；通过{activity}掌握{focus}并推进{artifact}",
-            }
-        )
-    assessment_signals = (
-        "用边界清单逐项圈出未覆盖条件",
-        "在关系草图上标注依赖方向并说明取舍",
-        "用初始化日志复核环境参数和执行次序",
-        "拿字段字典逐列核对类型与空值规则",
-        "沿约束检查表追查一条失败记录的来源",
-        "用校验记录对照录入前后的异常数量",
-        "根据检索结果解释筛选条件的实际作用",
-        "从关联结果中定位连接条件造成的遗漏",
-        "借分组统计表说明口径变化带来的差异",
-        "以视图说明核对暴露字段和使用边界",
-        "根据执行计划比较索引调整前后的代价",
-        "通过提交回滚记录证明事务边界有效",
-        "按权限矩阵复核角色可以访问的对象",
-        "依据恢复演练日志确认备份链条可用",
-        "结合性能采样记录定位主要等待环节",
-        "沿成果清单复现跨模块操作路径",
-        "用对照结果说明验收问题的修订依据",
-        "按答辩追问逐项补齐最终交付证据",
-    )
-    assessment_signal = assessment_signals[(index - 1) % len(assessment_signals)]
+    implementation = [
+        dict(id=stage_id, label=label, minutes=minutes,
+             modality='线上+线下' if stage_id in {'before_class_preparation', 'after_class_improvement'} else '小组实训',
+             content=[content], teacher_actions=[teacher], student_actions=[student], objective=objective)
+        for stage_id, label, minutes, content, teacher, student, objective in stages
+    ]
+    # Evaluate an observable criterion/output; do not repeat instructional prose.
     remarks = {
-        key: f"在{focus}任务中{suffix}；{assessment_signal}"
+        key: suffix
         for key, suffix in {
-            "attendance": "按时完成到课与准备",
-            "attention": "持续关注关键条件",
-            "participation": "主动参与讨论与操作",
-            "compliance": "依照任务规范记录过程",
-            "values": "理解成果质量的职业价值",
-            "ethics": "如实说明过程与结果",
-            "habits": "保持材料归档有序",
-            "online_learning": "完成课前资料核对",
-            "discussion": "能解释一项判断依据",
-            "homework": "按要求提交修订成果",
-            "practice": f"完成{artifact}",
-            "presentation": "能够清楚介绍成果边界",
-            "improvement": f"依据反馈完善{next_focus}",
+            'attendance': '到课并备齐当前任务材料',
+            'attention': f'关注{artifact}中的处理依据',
+            'participation': f'说明{artifact}的一项形成依据',
+            'compliance': '按本课要求保留对应记录',
+            'values': f'说明{artifact}的职业用途',
+            'ethics': f'如实报告{artifact}的完成情况',
+            'habits': '整理本课材料及其对应位置',
+            'online_learning': f'预读{artifact}对应的任务要求',
+            'discussion': f'围绕{artifact}解释处理决定',
+            'homework': f'提交{artifact}及修订说明',
+            'practice': f'按本课任务形成{artifact}',
+            'presentation': f'说明{artifact}的形成依据',
+            'improvement': f'补齐{artifact}中的当前任务缺项',
         }.items()
     }
-    reflection_forms = (
-        (
-            f"第{index}课从{focus}情境切入，学生围绕{artifact}完成条件识别、操作记录和成果核验，"
-            "主要差异体现在依据说明的完整度。",
-            f"把{focus}的变式比较放进{artifact}制作，是本课的组织变化；在{focus}判断中小组需要先解释选择，再提交结果。",
-            f"下一课从{artifact}的实际缺口进入{next_focus}，要求补充新的判断条件并保留修订理由。",
-        ),
-        (
-            f"本次{task}的成果是{artifact}，多数学生能依据{focus}的任务条件完成处理，"
-            "少数小组还需加强结果与证据的对应。",
-            f"课堂将{focus}拆成连续的小检查点，学生通过互评发现{artifact}中容易遗漏的要素。",
-            f"课后先复核{artifact}的边界，再带着问题学习{next_focus}，避免只重复操作步骤。",
-        ),
-        (
-            f"围绕{focus}的本课练习已经形成{artifact}，学生在情境变化时开始主动说明处理依据，"
-            "成果可复查性有所提高。",
-            f"以{artifact}为交付线索串联示范、实训和互审，使{focus}不再停留在概念辨认。",
-            f"下一次课使用本课{artifact}作为输入，增加{next_focus}的限制条件并比较两种结果。",
-        ),
-        (
-            f"从{focus}到{artifact}的转换是第{index}课的重点，学生能够完成主体任务，"
-            "但个别记录仍缺少关键条件。",
-            f"本课先让学生处理{focus}的一个变式，再回到{artifact}核对成果，讨论更集中。",
-            f"下一课围绕{next_focus}继续推进，要求学生引用{artifact}中的一条证据完成新的任务。",
-        ),
-    )
-    chosen_reflection = reflection_forms[(index - 1) % len(reflection_forms)]
-    chosen_reflection = tuple(f"{text}本课特别要求学生{assessment_signal}。" for text in chosen_reflection)
-    quality_principles = (
-        "先核对输入边界再开始操作",
-        "把条件分支写进处理记录",
-        "用反例检验关键判断",
-        "让每个步骤都留下可复查证据",
-        "按风险高低安排处理顺序",
-        "把异常现象与原始条件对应",
-        "用小样本先验证处理假设",
-        "在结果提交前进行交叉核对",
-        "区分事实记录与个人推测",
-        "为关键结论保留依据来源",
-        "遇到变式时先说明调整理由",
-        "把操作规范转成检查清单",
-        "用同伴复核发现遗漏条件",
-        "对边界结果进行单独标记",
-        "把修订前后的差异说清楚",
-        "在交付前确认成果可以复现",
-        "用对照结果支持质量判断",
-        "把后续改进落实到具体动作",
-    )
-    difficulty_strategies = (
-        "先用对照案例区分条件，再逐项核验成果依据",
-        "把输入、处理和结果拆开，分别检查遗漏",
-        "让小组交换成果，按反例清单追查边界",
-        "先复现一条异常路径，再回看处理记录",
-        "用风险排序决定先验证哪一个关键条件",
-        "把现象与证据逐一配对，拒绝只写结论",
-        "先设计最小验证样例，再扩展到完整任务",
-        "设置提交前的交叉检查点，逐项确认结果",
-        "将事实、推断和待确认信息分栏记录",
-        "要求每项结论附带来源和复核方式",
-        "改变一个条件后比较前后结果并说明原因",
-        "把规范要求转换成可勾选的检查清单",
-        "安排同伴按不同角色复核同一份成果",
-        "单独抽取边界样例，验证特殊结果处理",
-        "标记修订前后的差异，说明每次调整目的",
-        "用另一组环境复现成果，确认步骤可迁移",
-        "将对照结果和判断标准并排呈现",
-        "把改进意见转换成下一次可执行的动作",
-    )
-    ability_patterns = (
-        "从输入边界出发，按清单完成{focus}处理",
-        "先拆分业务对象，再依据条件完成{focus}",
-        "对照正常与异常样例，完成{focus}判断",
-        "沿着操作链记录{focus}的每个处理节点",
-        "按风险优先顺序处理{focus}并留下结果",
-        "把现象和证据配对，说明{focus}处理结论",
-        "用最小样例验证{focus}的关键假设",
-        "在交付前逐项复核{focus}结果",
-        "区分事实和推断后说明{focus}处理",
-        "为{focus}结论补充来源和依据",
-        "改变一个条件，比较{focus}前后结果",
-        "将规范要求转成{focus}检查步骤",
-        "交换成果后按角色复核{focus}",
-        "单独抽取边界样例验证{focus}",
-        "标注修改点并解释{focus}调整",
-        "换一组条件复现{focus}成果",
-        "用对照结果支持{focus}判断",
-        "把改进意见落到下一次{focus}动作",
-    )
-    delivery_patterns = (
-        "按成果清单整理并提交可复查的{artifact}",
-        "把对象关系画清后提交{artifact}",
-        "用异常样例核对并归档{artifact}",
-        "沿操作节点整理一份可追溯的{artifact}",
-        "按风险顺序检查后交付{artifact}",
-        "将现象、步骤和证据合并为{artifact}",
-        "以最小验证样例为依据形成{artifact}",
-        "完成提交前复核并发布{artifact}",
-        "把事实判断分栏记录到{artifact}",
-        "为每项结论补全来源后形成{artifact}",
-        "比较条件变化后修订{artifact}",
-        "依据规范清单完善{artifact}",
-        "完成角色互审后确认{artifact}",
-        "单列边界样例并补充到{artifact}",
-        "标注修订差异后重新提交{artifact}",
-        "在另一组条件下复现并校正{artifact}",
-        "用对照结果说明并提交{artifact}",
-        "把改进动作落实到新版{artifact}",
-    )
-    key_content_patterns = (
-        "输入边界、处理条件与成果要素的对应关系",
-        "业务对象拆分和关系确认的关键依据",
-        "正常样例与异常样例的差异识别方法",
-        "操作节点记录与过程证据的完整要求",
-        "风险优先级和处理顺序的判断标准",
-        "现象、步骤、证据和结论的配对规则",
-        "最小验证样例与假设检验的关系",
-        "提交前复核和成果质量的检查要点",
-        "事实记录、推断说明和待确认项的区分",
-        "结论来源、依据链和成果可信度的关系",
-        "单一条件变化对结果的影响方式",
-        "规范条目转化为可执行检查步骤的方法",
-        "角色互审中不同观察角度的互补作用",
-        "边界样例对特殊结果的验证作用",
-        "修订差异与调整理由的清晰表达",
-        "跨条件复现对成果可迁移性的检验",
-        "对照结果支撑质量判断的证据关系",
-        "改进动作与后续成果衔接的落实要求",
-    )
-    key_strategy_patterns = (
-        "先画出输入边界，再用清单核对每个成果要素",
-        "先建立对象关系，再检查条件是否闭合",
-        "用一组正例和一组反例对照确认判断依据",
-        "沿操作节点记录证据，最后回看过程是否完整",
-        "先按风险排序，再决定验证和修订顺序",
-        "把现象逐条绑定到步骤和证据，避免只写结论",
-        "用最小样例试跑假设，再扩展到完整任务",
-        "设置提交前检查点，逐项确认成果可复查",
-        "用两栏记录事实与推断，再补充待确认信息",
-        "要求每项结论标注来源，并安排同伴复核",
-        "只改变一个条件，比较前后结果并解释差异",
-        "把规范条目改写成可勾选的操作检查单",
-        "交换成果并分配不同角色，覆盖不同观察角度",
-        "单独抽取边界样例，检查特殊结果处理",
-        "并排展示修改前后内容，说明每处调整目的",
-        "换一组条件复现成果，确认步骤仍然有效",
-        "将对照结果和判断标准并排呈现再下结论",
-        "把反馈意见写成下一课可以执行的具体动作",
-    )
-    difficulty_content_patterns = (
-        "把输入边界的复杂条件转成可以逐项检查的处理路径",
-        "把多个业务对象的关系转成可复核的判断顺序",
-        "把正反样例的差异转成可执行的判定规则",
-        "把连续操作中的隐含节点转成可追溯记录",
-        "把多项风险约束转成有先后次序的处理步骤",
-        "把零散现象与证据转成完整的结果说明",
-        "把抽象假设转成可以反复运行的最小验证任务",
-        "把交付前的遗漏转成明确的复核清单",
-        "把事实和推断混杂的表述转成两类记录",
-        "把缺少来源的结论转成有证据链的成果",
-        "把条件变化带来的差异转成可比较的结果",
-        "把规范要求转成不会遗漏步骤的操作路径",
-        "把单一视角的检查转成多角色互审流程",
-        "把普通样例覆盖不到的情况转成边界验证",
-        "把模糊的修改过程转成前后差异说明",
-        "把一次性成果转成可以跨条件复现的流程",
-        "把孤立的对照结果转成有标准支撑的判断",
-        "把笼统的改进意见转成下一次可执行动作",
-    )
-    knowledge_patterns = (
-        "说清输入边界包含哪些条件以及它们的作用",
-        "说明业务对象之间如何建立关系并保持一致",
-        "辨别正例和反例分别对应什么判断结果",
-        "解释过程记录为什么需要覆盖每个节点",
-        "概括风险优先级如何影响处理顺序",
-        "说明现象、步骤和证据怎样共同支持结论",
-        "理解最小样例如何用来检验一个假设",
-        "掌握交付前复核应覆盖的质量检查点",
-        "区分事实、推断以及仍需确认的信息",
-        "说明来源和依据如何支撑成果可信度",
-        "分析单一条件变化会怎样影响结果",
-        "理解规范条目如何变成可执行步骤",
-        "说明不同角色的观察角度如何互补",
-        "识别边界样例为什么需要单独验证",
-        "理解修改差异和调整理由的对应关系",
-        "说明跨条件复现如何检验流程迁移性",
-        "解释对照结果怎样支撑质量判断",
-        "理解改进动作如何衔接后续成果",
-    )
-    knowledge_artifact_patterns = (
-        "列出输入边界和成果要素的对应项",
-        "画出对象关系并标注关键关联",
-        "整理正反样例的判定依据表",
-        "列出过程节点和必备证据项",
-        "制作风险排序与处理步骤对照表",
-        "整理现象、步骤、证据和结论关系",
-        "写出最小样例及其预期判断结果",
-        "列明提交前需要复核的成果要素",
-        "把事实、推断和待确认项分开记录",
-        "为各项结论补充对应的来源说明",
-        "整理条件变化前后的结果对照",
-        "把规范要求整理成执行检查单",
-        "形成不同角色的互审分工表",
-        "单独汇总边界样例及处理结果",
-        "列出修改前后差异和调整原因",
-        "形成跨条件复现所需的步骤说明",
-        "整理对照结果和判断标准的关系",
-        "形成下一步改进动作清单",
-    )
-    quality_principle = quality_principles[(index - 1) % len(quality_principles)]
-    difficulty_strategy = difficulty_strategies[(index - 1) % len(difficulty_strategies)]
-    ability_pattern = ability_patterns[(index - 1) % len(ability_patterns)].format(focus=focus)
-    delivery_pattern = delivery_patterns[(index - 1) % len(delivery_patterns)].format(artifact=artifact)
-    key_content_pattern = key_content_patterns[(index - 1) % len(key_content_patterns)]
-    key_strategy_pattern = key_strategy_patterns[(index - 1) % len(key_strategy_patterns)]
-    difficulty_content_pattern = difficulty_content_patterns[(index - 1) % len(difficulty_content_patterns)]
-    knowledge_pattern = knowledge_patterns[(index - 1) % len(knowledge_patterns)]
-    knowledge_artifact_pattern = knowledge_artifact_patterns[(index - 1) % len(knowledge_artifact_patterns)]
-    if index > len(SYNTHETIC_LESSON_MARKERS):
-        scale_context = f"（第{index}组{focus}）"
-        quality_principle += scale_context
-        difficulty_strategy += scale_context
-        key_content_pattern += scale_context
-        key_strategy_pattern += scale_context
-        knowledge_pattern += scale_context
-        knowledge_artifact_pattern += scale_context
-    return {
-        "lesson_id": f"L{index:02d}",
-        "unit": unit,
-        "task": task,
-        "hours": lesson_hours_for_course(course),
-        "progression": {
-            "prior_lesson_id": None if previous_artifact is None else f"L{index - 1:02d}",
-            "prior_learning": prior_learning,
-            "capability_stage": ("认知", "理解", "模仿", "独立", "迁移")[min(index - 1, 4)],
-            "deliverable": artifact,
-            "next_bridge": f"下一课以{artifact}为输入，{next_task}，重点衔接{next_focus}",
+    lesson = {
+        'lesson_id': f'L{index:02d}', 'unit': unit, 'task': task,
+        'hours': lesson_hours_for_course(course),
+        'progression': {
+            'prior_lesson_id': None if previous_artifact is None else f'L{index - 1:02d}',
+            'prior_learning': prior_learning,
+            'capability_stage': ('认知', '理解', '模仿', '独立', '迁移')[min(index - 1, 4)],
+            'deliverable': artifact,
+            'next_bridge': f'下一课以{artifact}为输入，{next_task}，重点衔接{next_focus}',
         },
-        "student_analysis": {
-            "base": [f"能够{knowledge_pattern}，并识别{focus}涉及的基本对象；还能{assessment_signal}", f"接触过{knowledge_artifact_pattern}对应的简单记录"],
-            "problems": [f"容易在{key_content_pattern}中遗漏条件", f"成果说明常缺少{key_strategy_pattern}形成的依据关联"],
-            "strategies": [f"采用{difficulty_strategy}来拆解本课处理步骤", f"按照{key_strategy_pattern}互评并核对任务要求"],
+        'student_analysis': {
+            'base': [f'本测试假定能够阅读{task}的任务说明。', f'本测试假定接触过{artifact}所需的基础材料。'],
+            'problems': [f'{task}需要重点解释：{plan.key}', f'{task}的处理难点：{plan.difficulty}'],
+            'strategies': [plan.introduction, plan.practice],
         },
-        "teaching_content": [
-            f"{lesson_marker}；分析{focus}的任务边界与工作条件",
-            f"{lesson_marker}；示范形成{artifact}的关键步骤",
-            f"{lesson_marker}；通过{assessment_signal}比较不同情境下{focus}的处理结果",
-        ],
-        "goals": {
-            "knowledge": [f"{knowledge_pattern}，并联系{focus}的核心依据", f"{knowledge_artifact_pattern}，对应{artifact}"],
-            "ability": [ability_pattern, delivery_pattern],
-            "quality": [f"{quality_principle}，并以{assessment_signal}留下可追溯依据", f"对{focus}结果保持{quality_principle}，能够{assessment_signal}"],
-        },
-        "key_point": {"content": [f"{key_content_pattern}，对应{focus}的成果要求"], "strategy": [f"{key_strategy_pattern}，再核对{artifact}"]},
-        "difficult_point": {"content": [f"{difficulty_content_pattern}，最后落到{focus}步骤"], "strategy": [f"{difficulty_strategy}，再回看{artifact}的依据和边界"]},
-        "teaching_methods": methods,
-        "resources": [f"{focus}任务单", f"{artifact}成果模板", f"{next_focus}参考样例"],
-        "references": [{"text": "本课程项目任务资料", "source_kind": "generic"}],
-        "implementation": implementation,
-        "evaluation": {"score": score, "remarks": remarks},
-        "reflection": {
-            "summary": chosen_reflection[0],
-            "innovation": chosen_reflection[1],
-            "improvement": chosen_reflection[2],
+        'teaching_content': [plan.introduction,
+            f'示范形成{artifact}的关键步骤，说明产物如何回应“{task}”的要求。',
+            plan.practice],
+        'goals': {'knowledge': [plan.introduction, plan.key],
+                  'ability': [plan.practice, plan.difficulty],
+                  'quality': [f'如实说明{task}的完成范围，保留{artifact}中的依据。',
+                              f'以{artifact}核对{task}，对尚未完成的要求作明确标记。']},
+        'key_point': {'content': [plan.key], 'strategy': [plan.introduction]},
+        'difficult_point': {'content': [plan.difficulty], 'strategy': [plan.practice]},
+        'teaching_methods': [f'{task}任务驱动法', f'{artifact}示范练习法', f'{artifact}成果互评法'],
+        'resources': [f'{task}任务说明', f'{artifact}成果模板', '当前任务已有材料'],
+        'references': [{'text': '本课程项目任务资料', 'source_kind': 'generic'}],
+        'implementation': implementation,
+        'evaluation': {'score': score, 'remarks': remarks},
+        'reflection': {
+            'summary': f'本 synthetic fixture 以当前任务分配为界：{plan.introduction}',
+            'innovation': f'教学组织围绕当前产物{artifact}展开：{plan.practice}',
+            'improvement': f'后续应复查当前教学难点的表达：{plan.difficulty}',
         },
     }
+    # Preserve ad76ae0's two fully authored lessons without rewriting their plan.
+    apply_authored_fixture_plan(lesson, task=task, focus=focus, artifact=artifact)
+    return lesson
 
 
 _CURRENT_LESSON_HOURS = 2
