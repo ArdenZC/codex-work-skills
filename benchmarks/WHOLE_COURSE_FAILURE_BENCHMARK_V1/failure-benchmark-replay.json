@@ -1,0 +1,4542 @@
+{
+  "schema_version": "1.1",
+  "report_type": "whole_course_failure_benchmark_replay",
+  "status": "PASS",
+  "replay_semantics": "EXPECT_FAIL",
+  "integrity": {
+    "status": "PASS",
+    "errors": [],
+    "snapshot_sha256": "55a9ebdddeb4b3860448c1ecd4fb86368f3c0bc4036df6a8f7e73b0826c2e500"
+  },
+  "review": {
+    "schema_version": "1.1",
+    "report_type": "whole_course_failure_benchmark_replay",
+    "status": "FAIL",
+    "plan_status": "FAIL",
+    "render_status": "NOT_RUN",
+    "final_status": "NOT_EVALUATED",
+    "architecture_status": "WHOLE_COURSE_ARCHITECTURE_BLOCKED",
+    "metrics": {
+      "session_slide_counts": [
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8
+      ],
+      "layout_sequences": [
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ],
+        [
+          "hero",
+          "split",
+          "grid",
+          "timeline",
+          "focus",
+          "comparison",
+          "focus",
+          "default"
+        ]
+      ],
+      "slide_job_sequences": [
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ],
+        [
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core",
+          "core"
+        ]
+      ],
+      "timing_distributions": [
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ],
+        [
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            5.0,
+            10.0
+          ],
+          [
+            8.0,
+            7.0
+          ]
+        ]
+      ],
+      "block_signatures": [
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ],
+        [
+          [
+            "paragraph",
+            "cards"
+          ],
+          [
+            "cards",
+            "svg"
+          ],
+          [
+            "cards",
+            "paragraph"
+          ],
+          [
+            "stepper",
+            "paragraph"
+          ],
+          [
+            "paragraph",
+            "svg",
+            "bullets"
+          ],
+          [
+            "comparison",
+            "paragraph"
+          ],
+          [
+            "quiz",
+            "paragraph"
+          ],
+          [
+            "summary",
+            "paragraph"
+          ]
+        ]
+      ],
+      "visual_intent_distribution": {},
+      "normalized_session_fingerprints": [
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        },
+        {
+          "page_count": 8,
+          "normalized_teaching_jobs": [
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core",
+            "core"
+          ],
+          "layout_families": [
+            [
+              "hero"
+            ],
+            [
+              "split"
+            ],
+            [
+              "grid"
+            ],
+            [
+              "timeline"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "comparison"
+            ],
+            [
+              "focus"
+            ],
+            [
+              "default"
+            ]
+          ],
+          "lecture_activity_pattern": [
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "balanced",
+            "activity-heavy",
+            "balanced"
+          ],
+          "block_pattern": [
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "cards",
+              "svg"
+            ],
+            [
+              "cards",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "stepper"
+            ],
+            [
+              "bullets",
+              "paragraph",
+              "svg"
+            ],
+            [
+              "comparison",
+              "paragraph"
+            ],
+            [
+              "paragraph",
+              "quiz"
+            ],
+            [
+              "paragraph",
+              "summary"
+            ]
+          ],
+          "visual_role_pattern": [
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            [],
+            []
+          ],
+          "check_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ],
+          "worked_example_pattern": [
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false,
+            false
+          ]
+        }
+      ],
+      "session_structure_similarity": [
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "similarity_clusters": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15
+        ]
+      ],
+      "similarity_calibration": {
+        "pair_threshold": 0.85,
+        "cluster_fraction": 0.7,
+        "source": [
+          "synthetic failure fixtures",
+          "frozen UML failure benchmark",
+          "gold calibration examples"
+        ],
+        "reason": "A cluster is a course-level template risk when at least 70% of sessions remain at or above 0.85 structural similarity; one changed title, topic id, minute or layout cannot hide the shared teaching skeleton."
+      },
+      "teaching_asset_usage": {
+        "discovered_assets": [],
+        "selected_assets": [],
+        "contract_referenced_assets": [],
+        "rendered_assets": [],
+        "script_grounded_assets": [],
+        "actually_used": [],
+        "unused_high_value": [],
+        "by_session": {
+          "session-01": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-02": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-03": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-04": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-05": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-06": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-07": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-08": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-09": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-10": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-11": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-12": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-13": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-14": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-15": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          },
+          "session-16": {
+            "selected": [],
+            "contract_referenced": [],
+            "rendered": [],
+            "script_grounded": [],
+            "actually_used": []
+          }
+        },
+        "usage_definition": "An asset reference is not usage; actually_used requires final rendered evidence or a final speaker script grounding link."
+      },
+      "script_cross_similarity": {
+        "status": "PASS",
+        "same_position_similarity_mean": 0.4784,
+        "same_position_similarity_max": 0.525,
+        "cross_session_ngram_reuse_ratio": 1.0,
+        "generic_phrase_ratio": 4.0,
+        "repeated_sentence_clusters": {
+          "请教师先让学生指出系统边界，再检查每个概念是否有清晰的落点": 16,
+          "第1页的案例演示：用图书馆管理系统中的场景演示，演示提示（第1页）": 16,
+          "第1页的工具动作：问题引入的draw": 16,
+          "io操作建议是：打开draw": 8,
+          "io并选择uml图形库，建立librarymodel": 16,
+          "保存后重新打开，确认文件仍可编辑且页面标题能说明用途": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第1页）": 16,
+          "第1页的课堂追问：追问本页的判断依据，追问提示（第1页）": 16,
+          "第1页的收束：问题引入的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "io中落图、用场景复核": 128,
+          "需求、设计与实现是不同层次的表达，uml图不是装饰，而是沟通模型，图书馆管理系统作为贯穿案例，打开draw": 8,
+          "可以用一个反例说明，换了问题之后，选择的图和元素也应随之变化": 16,
+          "第2页的案例演示：用图书馆管理系统中的场景演示，演示提示（第2页）": 16,
+          "第2页的工具动作：核心概念的draw": 16,
+          "观察图形库搜索结果，提醒学生选择语义合适而不是外观相似的形状": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第2页）": 16,
+          "第2页的课堂追问：追问本页的判断依据，追问提示（第2页）": 16,
+          "第2页的收束：核心概念的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "讲解时把名词、职责和约束分开，避免学生只背图形名称": 16,
+          "第3页的案例演示：用图书馆管理系统中的场景演示，演示提示（第3页）": 16,
+          "第3页的工具动作：检查点的draw": 16,
+          "操作完成后请学生缩放检查文字和连线是否仍然可读": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第3页）": 16,
+          "第3页的课堂追问：追问本页的判断依据，追问提示（第3页）": 16,
+          "第3页的收束：检查点的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "让学生把当前规则写成自己的判断句，并在同伴解释中修正措辞": 16,
+          "第4页的案例演示：用图书馆管理系统中的场景演示，演示提示（第4页）": 16,
+          "第4页的工具动作：draw": 16,
+          "要求学生为关键关系补一句旁注，让工具动作留下设计理由": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第4页）": 16,
+          "第4页的课堂追问：追问本页的判断依据，追问提示（第4页）": 16,
+          "第4页的收束：draw": 16,
+          "io操作的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "追问如果删掉一个元素，哪个场景会无法说明，以此检验模型价值": 16,
+          "第5页的案例演示：用图书馆管理系统中的场景演示，演示提示（第5页）": 16,
+          "第5页的工具动作：贯穿案例的draw": 16,
+          "演示复制页面的方法，但强调复制后要重新确认语义是否成立": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第5页）": 16,
+          "第5页的课堂追问：追问本页的判断依据，追问提示（第5页）": 16,
+          "第5页的收束：贯穿案例的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "把模型中的线条重新翻译成业务语言，检查双方是否指向同一个含义": 16,
+          "第6页的案例演示：用图书馆管理系统中的场景演示，演示提示（第6页）": 16,
+          "第6页的工具动作：辨析比较的draw": 16,
+          "若画面拥挤，优先拆页或分区，不用极小字号解决布局问题": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第6页）": 16,
+          "第6页的课堂追问：追问本页的判断依据，追问提示（第6页）": 16,
+          "第6页的收束：辨析比较的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "邀请学生先给出答案，再要求他指出支持答案的可观察证据": 16,
+          "第7页的案例演示：用图书馆管理系统中的场景演示，演示提示（第7页）": 16,
+          "第7页的工具动作：课堂检验的draw": 16,
+          "把文件名、页面名和模型标题统一，方便后续复查与协作": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第7页）": 16,
+          "第7页的课堂追问：追问本页的判断依据，追问提示（第7页）": 16,
+          "第7页的收束：课堂检验的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "收束时回到‘问题—表达—复核’三步，帮助学生把规则迁移到新场景": 16,
+          "第8页的案例演示：用图书馆管理系统中的场景演示，演示提示（第8页）": 16,
+          "第8页的工具动作：课程收束的draw": 16,
+          "最后用一个场景重新读图，确认工具操作没有改变模型意图": 16,
+          "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第8页）": 16,
+          "第8页的课堂追问：追问本页的判断依据，追问提示（第8页）": 16,
+          "第8页的收束：课程收束的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+          "io操作建议是：在draw": 120,
+          "当问题是“谁想做什么”时，优先选择哪种图": 8,
+          "用例图与功能目标，类图、对象图与静态结构，顺序图、活动图、状态机图与动态行为，在draw": 8,
+          "案例分析不追求把图画满，而要看清在draw": 15,
+          "“手机app”是参与者吗": 8,
+          "参与者是角色，不等同于某一个具体人，用例必须体现一个可观察的系统目标，系统边界决定哪些行为属于系统，在draw": 8,
+          "如果某行为只在“库存不足”时发生，它应该是include还是extend": 8,
+          "为什么，回答提示（第1页）；先收集不同答案，再让学生比较它们背后的模型假设": 2,
+          "include是被包含用例的必经复用，extend是满足条件时发生的可选扩展，用例叙述要覆盖前置、基本、异常和后置，在draw": 8,
+          "为什么，回答提示（第2页）；要求回答中至少出现一个对象、一个关系或一个行为证据": 2,
+          "为什么，回答提示（第3页）；让学生把自己的判断写成可被同伴反驳或支持的句子": 2,
+          "为什么，回答提示（第4页）；如果意见不同，回到边界和触发条件，而不是投票决定": 2,
+          "为什么，回答提示（第5页）；追问这个判断能否帮助下一位开发者继续实现或测试": 2,
+          "为什么，回答提示（第6页）；鼓励学生指出不确定处，并说明还需要什么信息才能定案": 2,
+          "为什么，回答提示（第7页）；把答案和实践任务的验收条件对照，看看是否可观察": 2,
+          "为什么，回答提示（第8页）；请学生用一句短规则收束，并把规则带入下一次建模": 2,
+          "类是具有共同属性和行为的对象集合，属性回答对象保存什么信息，操作回答对象能够提供什么服务，在draw": 8,
+          "如果删除一个loan，bookcopy是否必须被删除": 8,
+          "关联表达结构上的认识联系，聚合和组合都表达整体—部分，但生命周期强度不同，对象图用具体实例检查类图是否说得通，在draw": 8,
+          "控制器应该直接读取数据库，还是通过仓储对象完成校验": 8,
+          "生命线表示对象在场景中的存在，激活期表示对象正在执行操作，消息名称要能对应对象职责和返回结果，在draw": 8,
+          "活动表示一个可执行的业务动作，判断节点要有条件和互斥出口，分叉与汇合用于表达并发路径，在draw": 8,
+          "“点击归还按钮”是状态还是事件": 8,
+          "状态是对象在一段时间内满足的条件，事件触发状态转移，同一事件在不同状态下可能产生不同响应，在draw": 8,
+          "io使用对象节点和连接线，在消息旁按1、1": 16,
+          "连接线表达对象之间可通信的结构，消息编号恢复交互顺序，通信图适合观察协作结构是否过度集中，在draw": 8,
+          "客户端关注交互与请求发起，服务器承担业务处理和数据访问，包可以按业务模块或架构层组织类，在draw": 8,
+          "数据库服务器是组件还是节点": 8,
+          "组件是可替换、可部署的软件单元，节点是运行时资源或设备，部署图描述运行时配置而不是业务流程，在draw": 8,
+          "为什么浏览器通常不应直接连接数据库": 8,
+          "浏览器承担展示和请求发起，web服务器承接http请求，业务服务和数据服务仍需保持职责分离，在draw": 8,
+          "搜索结果页面的列表数据来自哪里": 8,
+          "客户端页面负责收集输入和展示结果，服务器端页面或服务负责处理请求，表单字段应能追溯到用例和领域对象，在draw": 8,
+          "借阅期限规则应该只存在于数据库约束中吗": 8,
+          "类的属性可能映射为表字段或对象字段，类关系需要结合持久化策略落地，模型是实现的依据，不等于自动生成的系统，在draw": 8,
+          "分层降低变化传播，每张图都应能回到需求或实现问题，测试用例既验证行为，也暴露模型缺口，在draw": 8
+        },
+        "repeated_sentence_cluster_count": 97,
+        "script_count": 128
+      },
+      "repeated_phrase_ratio": 4.0,
+      "quiz_distractor_reuse": {
+        "distractor_count": 0,
+        "unique_distractor_count": 0,
+        "most_reused_distractor": null,
+        "most_reused_count": 0,
+        "reuse_ratio": 0,
+        "trivial_distractors": [],
+        "incomplete_distractor_metadata": []
+      },
+      "comparison_semantic_errors": [
+        {
+          "page_id": "s01-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s02-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s03-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s04-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s05-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s06-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s07-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s08-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s09-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s10-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s11-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s12-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s13-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s14-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s15-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        },
+        {
+          "page_id": "s16-p06",
+          "code": "MISSING_CONTRAST_DIMENSION"
+        }
+      ],
+      "practice_task_counts": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "practice_task_signatures": [
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ],
+        [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ]
+      ],
+      "practice_semantic_task_signatures": [
+        [
+          "e7da786d27690f645315e37c5e16d8709f8a6ea447d8b3a050a0d14e4b765d21",
+          "aa0a8cf5f0beb04fdbcd3193f3a42c17e00342c36b987ca6305c8110dfd731ae"
+        ],
+        [
+          "ba767c13a3cd36f09f96607f8dee3b25caf8bfaf16499c073e6720217f220faf",
+          "b2c023c2c9efaeee0a3af1ddac4f6eaed0605adce6cbab620233fa21bf425a8d"
+        ],
+        [
+          "fc92be167c58d1313c144574f2091c520fe7cb8c9e601c96c55c7b9417da6ee3",
+          "0c175757553d050a305d6dd5c549e1a1c4de7ab149bc980a7d4b6a13072d747b"
+        ],
+        [
+          "02340a74ac902534b3ffed6743e12336d9eaeea347415d1d80327a748a918dc3",
+          "0af0158259f75d27c590ff712ba426edfcc28724304a3b5c07e536e278c67bea"
+        ],
+        [
+          "4cc9d1171c40d0641d6fbabc56b197a3d04f21f1179dd105a3cdf2bc9483b119",
+          "17344ac16250bfdbdf20d20b49c98d978e892282d984c42e670bed24eabf4d53"
+        ],
+        [
+          "176261db8210959e404451a6ffc67cf33976443919b9c38e79d36b4d6f5b15b3",
+          "d19dd8f6683be6f2e56bd7c47db7d9db697b00dd9958e30281ed1040f9b7ccbf"
+        ],
+        [
+          "30db5a8e22808abc0d1ba71efe5a68cb7e37adb39992f31ba57e3a7b9dff280e",
+          "88fa5c46a84369e751dd93abd49f720b5a06557cf7e2890d46587e89ecf54862"
+        ],
+        [
+          "7f62a6b823b237d5b842242e50984de743cb45ef48c009a54e4461d054f4d1ce",
+          "da32b0622d89a3376422fca5076c62f7586a82d3c90e59fc15c64a2075414db0"
+        ],
+        [
+          "903ca8ea56bfec50567cb508018098996e4b87fc054be8533cbc12e2d5ed7e4c",
+          "a9ec6c8adcb511c940224c347902c56f76af1996e763fc75498ebf2362f2983f"
+        ],
+        [
+          "761653479381fae1e35e66db9a90293756845f5c80166bb6459a0d2291f492dc",
+          "77cc7a9dc868ca084fd414bb955eb82b2e41402c1a35fe0a900d4afce6f8adbc"
+        ],
+        [
+          "2e2f5f407347d061d574d9c9e9535c8b3db609cca3ae00c2815eaa7b79c95373",
+          "196d07c878009f7def13208005b2e435a86cdb8d787b810fc8d6901f53f856c9"
+        ],
+        [
+          "56c72b8daf6c8f5f11ef5689d3b3ef080daed0ab55ad2f05b736f04c2c423773",
+          "874e902ba71b1b62d0fc382f9c45d4c4c3462e8d9741aed397d6431e53ec979d"
+        ],
+        [
+          "49adc1f33fcc8ee1e30262b0da16c4dac6daaf5909afe53ddd98c62740471fba",
+          "178d81e02dc7e5717e2f124c46d182cee3a58ee1d8d4c509171320213e18e2d3"
+        ],
+        [
+          "e0ce0accfc6ff0501ded32a698bd3782f45b615a3727d2a18ac91618b74889fa",
+          "8686a09b2e3033cf6f1d0d86765c3035146526c305bf0d2227eda41ecd596c0c"
+        ],
+        [
+          "0c8160b71147398b941d63013472d27667068523ac59ae75328b08af6bfc3cb9",
+          "6057cf5af3edfc5e478b93f0a719a4839b69a5028222c726fe655a39d16658bc"
+        ],
+        [
+          "58b523c1e3f7f8635ab5cd2ab6678af5716e281a5b1732c17c7acd559d0b5fd3",
+          "4fc98d9a325892976c1c09ddc42cc591cb632f818ed95665ab6bf3c30f2b1cc9"
+        ]
+      ],
+      "starter_signatures": [
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ],
+        [
+          [
+            "model",
+            [
+              "2"
+            ]
+          ],
+          [
+            "diagram",
+            [
+              "2"
+            ]
+          ]
+        ]
+      ],
+      "knowledge_boundary_errors": []
+    },
+    "findings": [
+      {
+        "severity": "P0",
+        "code": "WHOLE_COURSE_TEMPLATE_COLLAPSE",
+        "clusters": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ]
+        ],
+        "message": "a high-similarity session cluster exceeds the calibrated course-level threshold"
+      },
+      {
+        "severity": "P1",
+        "code": "SCRIPT_CROSS_SESSION_TEMPLATE_REUSE",
+        "metrics": {
+          "status": "PASS",
+          "same_position_similarity_mean": 0.4784,
+          "same_position_similarity_max": 0.525,
+          "cross_session_ngram_reuse_ratio": 1.0,
+          "generic_phrase_ratio": 4.0,
+          "repeated_sentence_clusters": {
+            "请教师先让学生指出系统边界，再检查每个概念是否有清晰的落点": 16,
+            "第1页的案例演示：用图书馆管理系统中的场景演示，演示提示（第1页）": 16,
+            "第1页的工具动作：问题引入的draw": 16,
+            "io操作建议是：打开draw": 8,
+            "io并选择uml图形库，建立librarymodel": 16,
+            "保存后重新打开，确认文件仍可编辑且页面标题能说明用途": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第1页）": 16,
+            "第1页的课堂追问：追问本页的判断依据，追问提示（第1页）": 16,
+            "第1页的收束：问题引入的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "io中落图、用场景复核": 128,
+            "需求、设计与实现是不同层次的表达，uml图不是装饰，而是沟通模型，图书馆管理系统作为贯穿案例，打开draw": 8,
+            "可以用一个反例说明，换了问题之后，选择的图和元素也应随之变化": 16,
+            "第2页的案例演示：用图书馆管理系统中的场景演示，演示提示（第2页）": 16,
+            "第2页的工具动作：核心概念的draw": 16,
+            "观察图形库搜索结果，提醒学生选择语义合适而不是外观相似的形状": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第2页）": 16,
+            "第2页的课堂追问：追问本页的判断依据，追问提示（第2页）": 16,
+            "第2页的收束：核心概念的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "讲解时把名词、职责和约束分开，避免学生只背图形名称": 16,
+            "第3页的案例演示：用图书馆管理系统中的场景演示，演示提示（第3页）": 16,
+            "第3页的工具动作：检查点的draw": 16,
+            "操作完成后请学生缩放检查文字和连线是否仍然可读": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第3页）": 16,
+            "第3页的课堂追问：追问本页的判断依据，追问提示（第3页）": 16,
+            "第3页的收束：检查点的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "让学生把当前规则写成自己的判断句，并在同伴解释中修正措辞": 16,
+            "第4页的案例演示：用图书馆管理系统中的场景演示，演示提示（第4页）": 16,
+            "第4页的工具动作：draw": 16,
+            "要求学生为关键关系补一句旁注，让工具动作留下设计理由": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第4页）": 16,
+            "第4页的课堂追问：追问本页的判断依据，追问提示（第4页）": 16,
+            "第4页的收束：draw": 16,
+            "io操作的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "追问如果删掉一个元素，哪个场景会无法说明，以此检验模型价值": 16,
+            "第5页的案例演示：用图书馆管理系统中的场景演示，演示提示（第5页）": 16,
+            "第5页的工具动作：贯穿案例的draw": 16,
+            "演示复制页面的方法，但强调复制后要重新确认语义是否成立": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第5页）": 16,
+            "第5页的课堂追问：追问本页的判断依据，追问提示（第5页）": 16,
+            "第5页的收束：贯穿案例的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "把模型中的线条重新翻译成业务语言，检查双方是否指向同一个含义": 16,
+            "第6页的案例演示：用图书馆管理系统中的场景演示，演示提示（第6页）": 16,
+            "第6页的工具动作：辨析比较的draw": 16,
+            "若画面拥挤，优先拆页或分区，不用极小字号解决布局问题": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第6页）": 16,
+            "第6页的课堂追问：追问本页的判断依据，追问提示（第6页）": 16,
+            "第6页的收束：辨析比较的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "邀请学生先给出答案，再要求他指出支持答案的可观察证据": 16,
+            "第7页的案例演示：用图书馆管理系统中的场景演示，演示提示（第7页）": 16,
+            "第7页的工具动作：课堂检验的draw": 16,
+            "把文件名、页面名和模型标题统一，方便后续复查与协作": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第7页）": 16,
+            "第7页的课堂追问：追问本页的判断依据，追问提示（第7页）": 16,
+            "第7页的收束：课堂检验的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "收束时回到‘问题—表达—复核’三步，帮助学生把规则迁移到新场景": 16,
+            "第8页的案例演示：用图书馆管理系统中的场景演示，演示提示（第8页）": 16,
+            "第8页的工具动作：课程收束的draw": 16,
+            "最后用一个场景重新读图，确认工具操作没有改变模型意图": 16,
+            "请学生指出图中哪一个元素支持自己的判断，并说出如果删掉该元素会损失什么信息，证据提示（第8页）": 16,
+            "第8页的课堂追问：追问本页的判断依据，追问提示（第8页）": 16,
+            "第8页的收束：课程收束的教学重点不是记住术语，而是形成一个小闭环：提出问题、选择表达、在draw": 16,
+            "io操作建议是：在draw": 120,
+            "当问题是“谁想做什么”时，优先选择哪种图": 8,
+            "用例图与功能目标，类图、对象图与静态结构，顺序图、活动图、状态机图与动态行为，在draw": 8,
+            "案例分析不追求把图画满，而要看清在draw": 15,
+            "“手机app”是参与者吗": 8,
+            "参与者是角色，不等同于某一个具体人，用例必须体现一个可观察的系统目标，系统边界决定哪些行为属于系统，在draw": 8,
+            "如果某行为只在“库存不足”时发生，它应该是include还是extend": 8,
+            "为什么，回答提示（第1页）；先收集不同答案，再让学生比较它们背后的模型假设": 2,
+            "include是被包含用例的必经复用，extend是满足条件时发生的可选扩展，用例叙述要覆盖前置、基本、异常和后置，在draw": 8,
+            "为什么，回答提示（第2页）；要求回答中至少出现一个对象、一个关系或一个行为证据": 2,
+            "为什么，回答提示（第3页）；让学生把自己的判断写成可被同伴反驳或支持的句子": 2,
+            "为什么，回答提示（第4页）；如果意见不同，回到边界和触发条件，而不是投票决定": 2,
+            "为什么，回答提示（第5页）；追问这个判断能否帮助下一位开发者继续实现或测试": 2,
+            "为什么，回答提示（第6页）；鼓励学生指出不确定处，并说明还需要什么信息才能定案": 2,
+            "为什么，回答提示（第7页）；把答案和实践任务的验收条件对照，看看是否可观察": 2,
+            "为什么，回答提示（第8页）；请学生用一句短规则收束，并把规则带入下一次建模": 2,
+            "类是具有共同属性和行为的对象集合，属性回答对象保存什么信息，操作回答对象能够提供什么服务，在draw": 8,
+            "如果删除一个loan，bookcopy是否必须被删除": 8,
+            "关联表达结构上的认识联系，聚合和组合都表达整体—部分，但生命周期强度不同，对象图用具体实例检查类图是否说得通，在draw": 8,
+            "控制器应该直接读取数据库，还是通过仓储对象完成校验": 8,
+            "生命线表示对象在场景中的存在，激活期表示对象正在执行操作，消息名称要能对应对象职责和返回结果，在draw": 8,
+            "活动表示一个可执行的业务动作，判断节点要有条件和互斥出口，分叉与汇合用于表达并发路径，在draw": 8,
+            "“点击归还按钮”是状态还是事件": 8,
+            "状态是对象在一段时间内满足的条件，事件触发状态转移，同一事件在不同状态下可能产生不同响应，在draw": 8,
+            "io使用对象节点和连接线，在消息旁按1、1": 16,
+            "连接线表达对象之间可通信的结构，消息编号恢复交互顺序，通信图适合观察协作结构是否过度集中，在draw": 8,
+            "客户端关注交互与请求发起，服务器承担业务处理和数据访问，包可以按业务模块或架构层组织类，在draw": 8,
+            "数据库服务器是组件还是节点": 8,
+            "组件是可替换、可部署的软件单元，节点是运行时资源或设备，部署图描述运行时配置而不是业务流程，在draw": 8,
+            "为什么浏览器通常不应直接连接数据库": 8,
+            "浏览器承担展示和请求发起，web服务器承接http请求，业务服务和数据服务仍需保持职责分离，在draw": 8,
+            "搜索结果页面的列表数据来自哪里": 8,
+            "客户端页面负责收集输入和展示结果，服务器端页面或服务负责处理请求，表单字段应能追溯到用例和领域对象，在draw": 8,
+            "借阅期限规则应该只存在于数据库约束中吗": 8,
+            "类的属性可能映射为表字段或对象字段，类关系需要结合持久化策略落地，模型是实现的依据，不等于自动生成的系统，在draw": 8,
+            "分层降低变化传播，每张图都应能回到需求或实现问题，测试用例既验证行为，也暴露模型缺口，在draw": 8
+          },
+          "repeated_sentence_cluster_count": 97,
+          "script_count": 128
+        }
+      },
+      {
+        "severity": "P0",
+        "code": "COMPARISON_SEMANTIC_ERROR",
+        "errors": [
+          {
+            "page_id": "s01-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s02-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s03-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s04-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s05-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s06-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s07-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s08-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s09-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s10-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s11-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s12-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s13-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s14-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s15-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          },
+          {
+            "page_id": "s16-p06",
+            "code": "MISSING_CONTRAST_DIMENSION"
+          }
+        ]
+      },
+      {
+        "severity": "P0",
+        "code": "WHOLE_COURSE_PRACTICE_TEMPLATE_COLLAPSE",
+        "signature": [
+          "f71d3e0fc3b02a55a77a97b4dde03feb903e5af0fbd390cc3879544c6766bcba",
+          "edc6c65d2782781b805abbcc9dc58b869f9f803e964c9e5a82280badcf2923c7"
+        ]
+      }
+    ],
+    "human_review_boundary": "Plan QA does not replace final DOM/file evidence or teacher review of representative opening, core concept, complex visual, case, exercise and summary pages.",
+    "benchmark_id": "WHOLE_COURSE_FAILURE_BENCHMARK_V1",
+    "evidence_provenance": {
+      "extracted_from_real_output": true,
+      "snapshot_sha256": "55a9ebdddeb4b3860448c1ecd4fb86368f3c0bc4036df6a8f7e73b0826c2e500",
+      "source_benchmark_sha256": "1e6e9612c808264b73feb78a399da36300f70151242c1d1c487bc1142c405e40"
+    }
+  },
+  "expected_finding_codes": [
+    "SCRIPT_CROSS_SESSION_TEMPLATE_REUSE",
+    "WHOLE_COURSE_PRACTICE_TEMPLATE_COLLAPSE",
+    "WHOLE_COURSE_TEMPLATE_COLLAPSE"
+  ],
+  "observed_finding_codes": [
+    "COMPARISON_SEMANTIC_ERROR",
+    "SCRIPT_CROSS_SESSION_TEMPLATE_REUSE",
+    "WHOLE_COURSE_PRACTICE_TEMPLATE_COLLAPSE",
+    "WHOLE_COURSE_TEMPLATE_COLLAPSE"
+  ],
+  "missing_expected_findings": [],
+  "source_benchmark_id": "WHOLE_COURSE_FAILURE_BENCHMARK_V1",
+  "snapshot_sha256": "55a9ebdddeb4b3860448c1ecd4fb86368f3c0bc4036df6a8f7e73b0826c2e500"
+}

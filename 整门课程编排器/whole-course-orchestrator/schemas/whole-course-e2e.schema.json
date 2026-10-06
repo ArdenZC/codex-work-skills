@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/whole-course/whole-course-e2e.schema.json",
+  "title": "Whole-Course Downstream E2E",
+  "type": "object",
+  "required": ["schema_version", "report_type", "status", "browser_smoke_status", "evidence_mode", "strict_e2e_status", "courseware", "practice", "visual_evidence", "starter_evidence", "external_research", "contact_sheets", "plan_qa", "qa"],
+  "properties": {
+    "schema_version": {"enum": ["1.0", "1.1"]},
+    "report_type": {"const": "whole_course_downstream_e2e"},
+    "status": {"enum": ["PASS", "WHOLE_COURSE_ARCHITECTURE_BLOCKED", "FAIL"]},
+    "browser_smoke_status": {"enum": ["PASS", "FAIL", "UNAVAILABLE_OR_DEGRADED"]},
+    "evidence_mode": {"enum": ["strict", "migration-trust"]},
+    "strict_e2e_status": {"enum": ["PASS", "FAIL", "NOT_RUN"]},
+    "courseware": {"type": "array"},
+    "practice": {"type": "array"},
+    "visual_evidence": {"type": "object"},
+    "starter_evidence": {"type": "object"},
+    "external_research": {"type": "object"},
+    "contact_sheets": {"type": "object"},
+    "plan_qa": {"type": "object"},
+    "qa": {"type": "object"}
+  },
+  "additionalProperties": true
+}
