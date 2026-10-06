@@ -51,7 +51,7 @@ def _lesson(
     in the frozen planning snapshot for compatibility; current prose comes from
     the authored task/output plan. This helper cannot author production content.
     """
-    from tests.fixture_scope_plans import PRESERVED_DELIVERABLE_NODES, scope_plan_for
+    from tests.fixture_scope_plans import scope_plan_for
 
     plan = scope_plan_for(task, artifact)
     prior_learning = (
@@ -137,7 +137,7 @@ def _lesson(
             'strategies': [plan.introduction, plan.practice],
         },
         'teaching_content': [plan.introduction,
-            PRESERVED_DELIVERABLE_NODES.get(task, f'示范形成{artifact}的关键步骤，说明产物如何回应“{task}”的要求。'),
+            f'示范形成{artifact}的关键步骤，说明产物如何回应“{task}”的要求。',
             plan.practice],
         'goals': {'knowledge': [plan.introduction, plan.key],
                   'ability': [plan.practice, plan.difficulty],

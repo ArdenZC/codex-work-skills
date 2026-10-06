@@ -3,7 +3,6 @@
 This is test authoring data, not a domain dictionary or independent curriculum.
 Every plan is bounded by the existing canonical task and deliverable. Neighbor
 planning remains in the original specs; it must not supply the current body.
-RQ-03C's three explicit-output nodes are deliberately retained byte for byte.
 """
 from __future__ import annotations
 
@@ -18,8 +17,6 @@ class ScopePlan:
     practice: str
     key: str
     difficulty: str
-    # Source authority fields, not inferred from residual length or a domain word.
-    authority_fields: tuple[str, ...] = ('task', 'deliverable')
 
 
 # Each literal is a teaching expansion of the adjacent task/output allocation.
@@ -186,13 +183,6 @@ SCOPE_PLANS = (
         '软件建模方案综合交付要覆盖已完成的模型及说明，成果包应能够定位各项材料。',
         '将软件建模方案综合交付组织成完整材料，发现缺项时说明对应成果而不扩展新建模任务。'),
 )
-
-PRESERVED_DELIVERABLE_NODES = {
-    '设计栈和队列操作接口': '让每个步骤都留下可复查证据；示范形成接口设计记录的关键步骤',
-    '分析最短路径求解条件': '为关键结论保留依据来源；示范形成路径分析记录的关键步骤',
-    '依据约束检查模型一致性': '把操作规范转成检查清单；示范形成模型检查记录的关键步骤',
-}
-
 
 def scope_plan_for(task: str, artifact: str) -> ScopePlan:
     plan = next((p for p in SCOPE_PLANS if p.task == task), None)

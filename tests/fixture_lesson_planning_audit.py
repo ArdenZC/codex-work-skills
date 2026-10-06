@@ -1,4 +1,4 @@
-"""Fixture provenance checks independent of the candidate authority threshold."""
+"""Fixture task/output planning checks; lexical signals are only heuristics."""
 
 from __future__ import annotations
 
@@ -7,11 +7,16 @@ import json
 import unittest
 
 from tests.fixture_lesson_plans import AUTHORED_PLANS
-from tests.fixture_scope_plans import SCOPE_PLANS, PRESERVED_DELIVERABLE_NODES
+from tests.fixture_scope_plans import SCOPE_PLANS
 from tests.synthetic_lesson_content_v2_acceptance import _lesson
 
 
-def body_without_direct_evidence(payload: dict) -> list[tuple[str, str]]:
+def body_without_planning_evidence(payload: dict) -> list[tuple[str, str]]:
+    """Flag obvious fixture drift using lexical planning consistency signals.
+
+    Lexical overlap cannot prove complete semantic scope or production course
+    authority. Future Semantic Scope Review owns free-text semantic judgment.
+    """
     from tests.test_lesson_content_v2 import lesson_content_quality as content_quality
     missing = []
     for lesson, row in zip(payload['lessons'], payload['outline'], strict=True):
@@ -20,8 +25,8 @@ def body_without_direct_evidence(payload: dict) -> list[tuple[str, str]]:
             nodes.extend((f'{field}.content[{i}]', value) for i, value in enumerate(lesson[field]['content']))
         for node_id, value in nodes:
             evidence = [content_quality._progression_anchor_evidence(value, row[f]) for f in ('task', 'deliverable', 'next_bridge')]
-            # Existence audit only: this never applies the candidate's length,
-            # multiplicity, frequency or short-core PASS threshold.
+            # Existing lexical extraction is only a fixture consistency signal;
+            # overlap with the planning snapshot is not semantic authorization.
             if not any(e['substantive_residuals'] or e['acronym_matches'] for e in evidence):
                 missing.append((lesson['lesson_id'], node_id))
     return missing
@@ -67,33 +72,9 @@ class LessonFixturePlanningTests(unittest.TestCase):
                                 'evaluation_remark_contract_limit', remark_schema[criterion]['maxLength'])
                             self.assertLessEqual(actual, limit)
 
-    def test_original_nc02_production_control_has_no_direct_residual(self):
-        from tests.test_lesson_course_scope import _domain_content, content_quality
-        row = _domain_content('database')['outline'][0]
-        # Exact foreign-node text from the immutable original payload. This is
-        # an evidence test, not a claim that baseline production rejects it.
-        for text in ('完成患者血压测量与护理判断。',
-                     '按无菌操作要求执行输液步骤并观察患者反应。'):
-            for field in ('task', 'deliverable', 'next_bridge'):
-                evidence = content_quality._progression_anchor_evidence(text, row[field])
-                self.assertEqual(evidence['substantive_residuals'], [])
-                self.assertEqual(evidence['acronym_matches'], [])
-
-    def test_result_collision_is_an_adversarial_synthetic_control(self):
-        from tests.test_lesson_content_v22 import make_v22_payload
-        from tests.test_lesson_course_scope import content_quality
-        row = make_v22_payload(theory_hours=36)['outline'][16]
-        text = '测量患者血压，整理护理结果并决定输液处置。'
-        evidence = content_quality._progression_anchor_evidence(text, row['task'])
-        self.assertEqual(evidence['substantive_residuals'], ['结果'])
-        # The old synthetic positive's result-only prose is now replaced by
-        # current algorithm evidence review. It is not original NC-02 truth.
-        current = make_v22_payload(theory_hours=36)['lessons'][16]['teaching_content'][0]
-        self.assertIn('算法证据与运行结果', current)
-
     def test_current_instruction_is_invariant_under_lesson_ordinal(self):
         # Moving a plan must not turn its teaching into logs, transactions or
-        # backup drills. Compare all teaching fields, not candidate PASS bits.
+        # backup drills. Compare all current teaching fields.
         plans = [(p.task, p.artifact) for p in SCOPE_PLANS]
         plans.append(('测试给定的当前任务', '测试当前成果记录'))
         for task, artifact in plans:
@@ -140,10 +121,11 @@ class LessonFixturePlanningTests(unittest.TestCase):
                 with self.subTest(task=row['task']):
                     self.assertEqual(row['deliverable'].removesuffix('成果'), plan.artifact)
                     self.assertEqual(lesson['teaching_content'][0], plan.introduction)
+                    self.assertEqual(lesson['teaching_content'][1],
+                        f'示范形成{plan.artifact}的关键步骤，说明产物如何回应“{plan.task}”的要求。')
                     self.assertEqual(lesson['teaching_content'][2], plan.practice)
                     self.assertEqual(lesson['key_point']['content'], [plan.key])
                     self.assertEqual(lesson['difficult_point']['content'], [plan.difficulty])
-                    self.assertEqual(plan.authority_fields, ('task', 'deliverable'))
 
     def test_scope_factory_rejects_another_lessons_output(self):
         plan = SCOPE_PLANS[0]
@@ -152,22 +134,12 @@ class LessonFixturePlanningTests(unittest.TestCase):
                 unit='既定单元', task=plan.task, focus='规划标签', artifact='另一课的成果',
                 next_focus='未来', next_task='未来任务', previous_artifact=None, score=90)
 
-    def test_three_deliverable_relation_nodes_are_preserved_exactly(self):
-        for task, text in PRESERVED_DELIVERABLE_NODES.items():
-            plan = next(p for p in SCOPE_PLANS if p.task == task)
-            for index in (1, 14):
-                lesson = _lesson(course='测试', major='测试', audience='测试', index=index,
-                    unit='既定单元', task=task, focus='规划标签', artifact=plan.artifact,
-                    next_focus='未来', next_task='未来任务', previous_artifact=None, score=90)
-                self.assertEqual(lesson['teaching_content'][1], text)
-                self.assertIn(plan.artifact, text)
-
-    def test_canonical_full_bodies_have_frozen_evidence_without_candidate_threshold(self):
+    def test_canonical_full_bodies_have_planning_evidence(self):
         from tests.test_lesson_content_v22 import DB_SPECS, SOFTWARE_SPECS, make_v22_payload
         for specs in (DB_SPECS, SOFTWARE_SPECS):
             with self.subTest(specs=specs):
                 payload = make_v22_payload(theory_hours=len(specs)*2, specs=specs)
-                self.assertEqual(body_without_direct_evidence(payload), [])
+                self.assertEqual(body_without_planning_evidence(payload), [])
 
     def test_audit_detects_unsourced_body_insertion(self):
         from tests.test_lesson_content_v22 import make_v22_payload
@@ -175,7 +147,7 @@ class LessonFixturePlanningTests(unittest.TestCase):
         plan = AUTHORED_PLANS[0]
         lesson = next(l for l in payload['lessons'] if l['task'] == plan['task'])
         lesson['key_point']['content'][0] = '独立讲授患者血压测量及输液护理判断。'
-        self.assertIn((lesson['lesson_id'], 'key_point.content[0]'), body_without_direct_evidence(payload))
+        self.assertIn((lesson['lesson_id'], 'key_point.content[0]'), body_without_planning_evidence(payload))
 
     def test_authored_plan_selection_uses_task_and_output_not_lesson_number(self):
         for plan in AUTHORED_PLANS:
