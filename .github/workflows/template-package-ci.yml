@@ -460,6 +460,7 @@ jobs:
           --suite lesson-quality
           --suite lesson-pipeline
           --suite lesson-teacher-review
+          --suite semantic-scope
           --suite lesson-package
           --suite lesson-benchmark
           --suite hardening
