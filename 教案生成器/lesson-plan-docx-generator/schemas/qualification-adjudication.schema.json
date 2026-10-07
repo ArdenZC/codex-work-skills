@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "qualification-adjudication 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "run_id",
+    "review_operation_id",
+    "review_sha256",
+    "critical_truth_sha256",
+    "critical_truth_satisfied",
+    "bounded_rationale",
+    "adjudicator_principal",
+    "recorded_at"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "review_operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "review_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "critical_truth_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "critical_truth_satisfied": {
+      "type": "boolean"
+    },
+    "bounded_rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600,
+      "pattern": "\\S"
+    },
+    "adjudicator_principal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

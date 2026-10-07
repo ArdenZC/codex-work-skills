@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "qualification-corpus 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_contract_version",
+    "corpus_version",
+    "corpus_id",
+    "cases",
+    "created_at"
+  ],
+  "properties": {
+    "corpus_contract_version": {
+      "const": "1.0"
+    },
+    "corpus_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "course_context",
+          "inputs",
+          "expected_disposition",
+          "critical_truth_inventory_key",
+          "critical_truth_sha256"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "course_context": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "content",
+              "source_truth_manifest",
+              "outline",
+              "sources"
+            ],
+            "properties": {
+              "content": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "inventory_key",
+                  "sha256"
+                ],
+                "properties": {
+                  "inventory_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "source_truth_manifest": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "inventory_key",
+                  "sha256"
+                ],
+                "properties": {
+                  "inventory_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "outline": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "inventory_key",
+                  "sha256"
+                ],
+                "properties": {
+                  "inventory_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "inventory_key",
+                    "sha256"
+                  ],
+                  "properties": {
+                    "inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "expected_disposition": {
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED",
+              "HUMAN_REVIEW_REQUIRED"
+            ]
+          },
+          "critical_truth_inventory_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "critical_truth_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

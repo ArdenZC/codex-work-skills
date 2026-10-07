@@ -1,0 +1,1032 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reviewer-qualification 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "qualification_id",
+    "qualification_purpose",
+    "reviewer_configuration_sha256",
+    "reviewer_implementation",
+    "reviewer_version",
+    "corpus_contract_version",
+    "corpus_sha256",
+    "blind_holdout_sha256",
+    "qualification_runs",
+    "golden_results",
+    "holdout_results",
+    "disposition",
+    "qualified_at",
+    "valid_until",
+    "human_authority",
+    "qualification_fingerprint"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0"
+    },
+    "qualification_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "qualification_purpose": {
+      "enum": [
+        "agent_corpus_evaluation",
+        "human_scope_authority"
+      ]
+    },
+    "reviewer_configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer_implementation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "reviewer_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "corpus_contract_version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "corpus_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "blind_holdout_sha256": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "qualification_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "repetition",
+          "started_at",
+          "completed_at",
+          "operations"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "repetition": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "case_id",
+                "review_operation_id",
+                "review_inventory_key",
+                "review_sha256",
+                "receipt_inventory_key",
+                "receipt_sha256"
+              ],
+              "properties": {
+                "case_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "review_operation_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "review_inventory_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "review_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "receipt_inventory_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "receipt_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "golden_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "expected_disposition",
+          "expected_critical_truth_sha256",
+          "observations",
+          "hard_miss"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "expected_disposition": {
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED",
+              "HUMAN_REVIEW_REQUIRED"
+            ]
+          },
+          "expected_critical_truth_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "observations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "run_id",
+                "review_operation_id",
+                "observed_disposition",
+                "critical_truth_satisfied",
+                "adjudication_inventory_key",
+                "adjudication_sha256"
+              ],
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "review_operation_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "observed_disposition": {
+                  "enum": [
+                    "PASS",
+                    "REVISION_REQUIRED",
+                    "HUMAN_REVIEW_REQUIRED"
+                  ]
+                },
+                "critical_truth_satisfied": {
+                  "type": "boolean"
+                },
+                "adjudication_inventory_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "adjudication_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "minItems": 1
+          },
+          "hard_miss": {
+            "type": "boolean"
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "holdout_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "expected_disposition",
+          "expected_critical_truth_sha256",
+          "observations",
+          "hard_miss"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "expected_disposition": {
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED",
+              "HUMAN_REVIEW_REQUIRED"
+            ]
+          },
+          "expected_critical_truth_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "observations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "run_id",
+                "review_operation_id",
+                "observed_disposition",
+                "critical_truth_satisfied",
+                "adjudication_inventory_key",
+                "adjudication_sha256"
+              ],
+              "properties": {
+                "run_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "review_operation_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "observed_disposition": {
+                  "enum": [
+                    "PASS",
+                    "REVISION_REQUIRED",
+                    "HUMAN_REVIEW_REQUIRED"
+                  ]
+                },
+                "critical_truth_satisfied": {
+                  "type": "boolean"
+                },
+                "adjudication_inventory_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "adjudication_sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "minItems": 1
+          },
+          "hard_miss": {
+            "type": "boolean"
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "disposition": {
+      "enum": [
+        "QUALIFIED",
+        "NOT_QUALIFIED"
+      ]
+    },
+    "qualified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "human_authority": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "principal_id",
+            "teacher_authority_reference",
+            "procedure_id",
+            "procedure_version",
+            "procedure_sha256",
+            "training_authorization_sha256"
+          ],
+          "properties": {
+            "principal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "teacher_authority_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "procedure_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "procedure_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "procedure_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "training_authorization_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "qualification_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "qualification_purpose": {
+          "const": "agent_corpus_evaluation"
+        },
+        "corpus_contract_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "corpus_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "blind_holdout_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "qualification_runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "run_id",
+              "repetition",
+              "started_at",
+              "completed_at",
+              "operations"
+            ],
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "repetition": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "case_id",
+                    "review_operation_id",
+                    "review_inventory_key",
+                    "review_sha256",
+                    "receipt_inventory_key",
+                    "receipt_sha256"
+                  ],
+                  "properties": {
+                    "case_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_operation_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "\\S"
+                    },
+                    "review_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "receipt_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "receipt_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "minItems": 3
+        },
+        "golden_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "expected_disposition",
+              "expected_critical_truth_sha256",
+              "observations",
+              "hard_miss"
+            ],
+            "properties": {
+              "case_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "expected_disposition": {
+                "enum": [
+                  "PASS",
+                  "REVISION_REQUIRED",
+                  "HUMAN_REVIEW_REQUIRED"
+                ]
+              },
+              "expected_critical_truth_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "run_id",
+                    "review_operation_id",
+                    "observed_disposition",
+                    "critical_truth_satisfied",
+                    "adjudication_inventory_key",
+                    "adjudication_sha256"
+                  ],
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_operation_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "\\S"
+                    },
+                    "observed_disposition": {
+                      "enum": [
+                        "PASS",
+                        "REVISION_REQUIRED",
+                        "HUMAN_REVIEW_REQUIRED"
+                      ]
+                    },
+                    "critical_truth_satisfied": {
+                      "type": "boolean"
+                    },
+                    "adjudication_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "adjudication_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              },
+              "hard_miss": {
+                "type": "boolean"
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "holdout_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "expected_disposition",
+              "expected_critical_truth_sha256",
+              "observations",
+              "hard_miss"
+            ],
+            "properties": {
+              "case_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "expected_disposition": {
+                "enum": [
+                  "PASS",
+                  "REVISION_REQUIRED",
+                  "HUMAN_REVIEW_REQUIRED"
+                ]
+              },
+              "expected_critical_truth_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "run_id",
+                    "review_operation_id",
+                    "observed_disposition",
+                    "critical_truth_satisfied",
+                    "adjudication_inventory_key",
+                    "adjudication_sha256"
+                  ],
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_operation_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "\\S"
+                    },
+                    "observed_disposition": {
+                      "enum": [
+                        "PASS",
+                        "REVISION_REQUIRED",
+                        "HUMAN_REVIEW_REQUIRED"
+                      ]
+                    },
+                    "critical_truth_satisfied": {
+                      "type": "boolean"
+                    },
+                    "adjudication_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "adjudication_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              },
+              "hard_miss": {
+                "type": "boolean"
+              }
+            }
+          },
+          "minItems": 1
+        },
+        "human_authority": {
+          "const": null
+        }
+      }
+    },
+    {
+      "properties": {
+        "qualification_purpose": {
+          "const": "human_scope_authority"
+        },
+        "corpus_contract_version": {
+          "const": null
+        },
+        "corpus_sha256": {
+          "const": null
+        },
+        "blind_holdout_sha256": {
+          "const": null
+        },
+        "qualification_runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "run_id",
+              "repetition",
+              "started_at",
+              "completed_at",
+              "operations"
+            ],
+            "properties": {
+              "run_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "repetition": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "started_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "operations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "case_id",
+                    "review_operation_id",
+                    "review_inventory_key",
+                    "review_sha256",
+                    "receipt_inventory_key",
+                    "receipt_sha256"
+                  ],
+                  "properties": {
+                    "case_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_operation_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "\\S"
+                    },
+                    "review_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "receipt_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "receipt_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "golden_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "expected_disposition",
+              "expected_critical_truth_sha256",
+              "observations",
+              "hard_miss"
+            ],
+            "properties": {
+              "case_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "expected_disposition": {
+                "enum": [
+                  "PASS",
+                  "REVISION_REQUIRED",
+                  "HUMAN_REVIEW_REQUIRED"
+                ]
+              },
+              "expected_critical_truth_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "run_id",
+                    "review_operation_id",
+                    "observed_disposition",
+                    "critical_truth_satisfied",
+                    "adjudication_inventory_key",
+                    "adjudication_sha256"
+                  ],
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_operation_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "\\S"
+                    },
+                    "observed_disposition": {
+                      "enum": [
+                        "PASS",
+                        "REVISION_REQUIRED",
+                        "HUMAN_REVIEW_REQUIRED"
+                      ]
+                    },
+                    "critical_truth_satisfied": {
+                      "type": "boolean"
+                    },
+                    "adjudication_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "adjudication_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              },
+              "hard_miss": {
+                "type": "boolean"
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "holdout_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "expected_disposition",
+              "expected_critical_truth_sha256",
+              "observations",
+              "hard_miss"
+            ],
+            "properties": {
+              "case_id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "expected_disposition": {
+                "enum": [
+                  "PASS",
+                  "REVISION_REQUIRED",
+                  "HUMAN_REVIEW_REQUIRED"
+                ]
+              },
+              "expected_critical_truth_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "run_id",
+                    "review_operation_id",
+                    "observed_disposition",
+                    "critical_truth_satisfied",
+                    "adjudication_inventory_key",
+                    "adjudication_sha256"
+                  ],
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "review_operation_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "\\S"
+                    },
+                    "observed_disposition": {
+                      "enum": [
+                        "PASS",
+                        "REVISION_REQUIRED",
+                        "HUMAN_REVIEW_REQUIRED"
+                      ]
+                    },
+                    "critical_truth_satisfied": {
+                      "type": "boolean"
+                    },
+                    "adjudication_inventory_key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "\\S"
+                    },
+                    "adjudication_sha256": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    }
+                  }
+                },
+                "minItems": 1
+              },
+              "hard_miss": {
+                "type": "boolean"
+              }
+            }
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "human_authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "principal_id",
+            "teacher_authority_reference",
+            "procedure_id",
+            "procedure_version",
+            "procedure_sha256",
+            "training_authorization_sha256"
+          ],
+          "properties": {
+            "principal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "teacher_authority_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "procedure_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "procedure_version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "procedure_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "training_authorization_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

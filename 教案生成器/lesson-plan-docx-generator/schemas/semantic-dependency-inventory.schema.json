@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "semantic-dependency-inventory 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "inventory_version",
+    "entries"
+  ],
+  "properties": {
+    "inventory_version": {
+      "const": "1.0"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "inventory_key",
+          "path",
+          "sha256",
+          "storage_class"
+        ],
+        "properties": {
+          "inventory_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096,
+            "pattern": "\\S"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "storage_class": {
+            "enum": [
+              "run",
+              "protected_external"
+            ]
+          }
+        }
+      },
+      "minItems": 1
+    }
+  }
+}

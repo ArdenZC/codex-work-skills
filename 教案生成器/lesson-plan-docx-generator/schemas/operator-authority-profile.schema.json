@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "operator-authority-profile 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "authority_profile_id",
+    "policy_epoch",
+    "operator_reference",
+    "controller_id",
+    "controller_implementation",
+    "controller_version",
+    "ingress_procedure_reference",
+    "evidence_repository_reference",
+    "roles",
+    "revoked_authority_ids",
+    "created_at"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "1.0"
+    },
+    "authority_profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "policy_epoch": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "operator_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "controller_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "controller_implementation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "controller_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "ingress_procedure_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "evidence_repository_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "principal_id",
+          "allowed_roles",
+          "authorization_reference",
+          "valid_from",
+          "valid_until",
+          "revoked_at",
+          "revocation_reason"
+        ],
+        "properties": {
+          "principal_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "allowed_roles": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "author",
+                "scope_reviewer",
+                "qualification_approver",
+                "corpus_adjudicator",
+                "teacher_approver"
+              ]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "authorization_reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160,
+            "pattern": "\\S"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revocation_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 600,
+                "pattern": "\\S"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "revoked_authority_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160,
+        "pattern": "\\S"
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

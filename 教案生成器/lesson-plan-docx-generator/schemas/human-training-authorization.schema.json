@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "human-training-authorization 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_version",
+    "authorization_id",
+    "principal_id",
+    "authorized_scope",
+    "procedure_id",
+    "procedure_version",
+    "procedure_sha256",
+    "issuer_principal",
+    "issued_at",
+    "valid_from",
+    "valid_until",
+    "authorization_reference",
+    "revoked_at",
+    "revocation_reason"
+  ],
+  "properties": {
+    "record_version": {
+      "const": "1.0"
+    },
+    "authorization_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "authorized_scope": {
+      "const": "semantic_scope_review"
+    },
+    "procedure_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "procedure_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "procedure_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "issuer_principal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "authorization_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "revoked_at": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "revocation_reason": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}
