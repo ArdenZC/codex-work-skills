@@ -144,7 +144,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     return {
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
         "lesson-lifecycle": SuiteSpec(
-            "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
+            "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts") + _module_count("tests.test_semantic_scope_foundation")
         ),
         "lesson-course-scope": SuiteSpec(
             "lesson-course-scope", False, "module", _module_count("tests.test_lesson_course_scope"), "lesson-render"
@@ -222,7 +222,7 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
     if name == "lesson-content":
         return _lesson_content_ids()
     if name == "lesson-lifecycle":
-        return ("tests.test_lesson_lifecycle_contracts",)
+        return ("tests.test_lesson_lifecycle_contracts", "tests.test_semantic_scope_foundation")
     if name == "lesson-course-scope":
         return ("tests.test_lesson_course_scope",)
     if name == "lesson-quality":

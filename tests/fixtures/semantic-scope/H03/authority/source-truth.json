@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.0",
+  "source_truth_id": "ST-SCOPE-001",
+  "course_identity": {
+    "course_name": "基础护理",
+    "major": "护理专业",
+    "audience": "高职二年级"
+  },
+  "sources": [
+    {
+      "source_id": "confirmed-profile",
+      "source_type": "confirmed_course_profile",
+      "label": "Confirmed course facts",
+      "locator": "evidence/confirmed-profile.json",
+      "sha256": "c2ff3613ac54c7a7f3e498f79f101f3b1ee053a7f6b393302f3fa216dffa5958",
+      "provenance": "Synthetic regression fixture"
+    },
+    {
+      "source_id": "frozen-outline",
+      "source_type": "whole_course_outline",
+      "label": "Frozen whole-course outline",
+      "locator": "evidence/whole-course-outline.json",
+      "sha256": "77f692423656152a95a80cd9e8cc2caa8ebf981364165894ac3232544f5487c7",
+      "provenance": "Synthetic regression fixture"
+    }
+  ],
+  "created_at": "2026-10-01T10:00:00Z",
+  "manifest_fingerprint": "88537146d945cbffd47b1bfff9eb8fdc0cd17b5b43712b9c7fbe8e9e5652a85f"
+}

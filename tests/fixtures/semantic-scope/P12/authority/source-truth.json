@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.0",
+  "source_truth_id": "ST-SCOPE-001",
+  "course_identity": {
+    "course_name": "数据结构综合实施",
+    "major": "软件工程专业",
+    "audience": "高职三年级"
+  },
+  "sources": [
+    {
+      "source_id": "confirmed-profile",
+      "source_type": "confirmed_course_profile",
+      "label": "Confirmed course facts",
+      "locator": "evidence/confirmed-profile.json",
+      "sha256": "0321f2e31bf6966e899a12a3492beb0233c1a2c3d873f4174ad32277c8f47293",
+      "provenance": "Synthetic regression fixture"
+    },
+    {
+      "source_id": "frozen-outline",
+      "source_type": "whole_course_outline",
+      "label": "Frozen whole-course outline",
+      "locator": "evidence/whole-course-outline.json",
+      "sha256": "a786fafad4a2b14c0b9eb1ef8d84d04d13500f94d509ed3db5808baf8543c0d4",
+      "provenance": "Synthetic regression fixture"
+    }
+  ],
+  "created_at": "2026-10-01T10:00:00Z",
+  "manifest_fingerprint": "a56ac7d9e7539f36570148044ee08741b1a81bd1700ff2d27467e365ea271caa"
+}

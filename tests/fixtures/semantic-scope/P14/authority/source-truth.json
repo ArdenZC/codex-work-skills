@@ -1,0 +1,29 @@
+{
+  "contract_version": "1.0",
+  "source_truth_id": "ST-SCOPE-001",
+  "course_identity": {
+    "course_name": "数据结构",
+    "major": "软件技术",
+    "audience": "高职二年级"
+  },
+  "sources": [
+    {
+      "source_id": "confirmed-profile",
+      "source_type": "confirmed_course_profile",
+      "label": "Confirmed course facts",
+      "locator": "evidence/confirmed-profile.json",
+      "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9",
+      "provenance": "Synthetic regression fixture"
+    },
+    {
+      "source_id": "frozen-outline",
+      "source_type": "whole_course_outline",
+      "label": "Frozen whole-course outline",
+      "locator": "evidence/whole-course-outline.json",
+      "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053",
+      "provenance": "Synthetic regression fixture"
+    }
+  ],
+  "created_at": "2026-10-01T10:00:00Z",
+  "manifest_fingerprint": "a3bcea8d4c837e37d3b32f6c3f5867c2a17f68cc593464d7fdf95b3e2bce9d39"
+}

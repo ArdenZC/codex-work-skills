@@ -1,0 +1,386 @@
+{
+  "corpus_contract_version": "1.0",
+  "corpus_version": "synthetic-linkage-1",
+  "corpus_id": "qualification-corpus-synthetic",
+  "cases": [
+    {
+      "case_id": "N01",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "N01.content",
+          "sha256": "878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "N01.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "N01.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "N01.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "REVISION_REQUIRED",
+      "critical_truth_inventory_key": "N01.truth",
+      "critical_truth_sha256": "3679996918d4c2a19499de116b4eb0225737c97b1018d6b8930a0d74ed24fb65"
+    },
+    {
+      "case_id": "N02",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "N02.content",
+          "sha256": "1151b44b2be3e43530f7ca47178aa92d30366e96673c10fc68deb2c7375916a7"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "N02.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "N02.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "N02.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "REVISION_REQUIRED",
+      "critical_truth_inventory_key": "N02.truth",
+      "critical_truth_sha256": "68fa02d05f6482df5ba73ac33cdac8b09f4835f34754eacb239232052ffaf3ae"
+    },
+    {
+      "case_id": "N03",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "N03.content",
+          "sha256": "e02c519ebb837790760bd76b62667605a7c2916c7f561ba4ec120c195e0331e2"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "N03.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "N03.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "N03.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "REVISION_REQUIRED",
+      "critical_truth_inventory_key": "N03.truth",
+      "critical_truth_sha256": "18528afb775a8d0e26a378ec1656d776760286d8d7ded617c2da7053bb7c4a83"
+    },
+    {
+      "case_id": "N04",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "N04.content",
+          "sha256": "47094b26a926afc0ae2761109f1814a00f7ceb0bb222684a8ba6e93b266f597c"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "N04.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "N04.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "N04.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "REVISION_REQUIRED",
+      "critical_truth_inventory_key": "N04.truth",
+      "critical_truth_sha256": "432f7ab0b94e15b90bdc7882f4db3ff36bdecc1c0c2410ffecf5ae8ce5e43eb8"
+    },
+    {
+      "case_id": "N05",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "N05.content",
+          "sha256": "57a6efee6021248ded80d831564f5287c1315231cc08759e9f9d6ab223a3e2a1"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "N05.manifest",
+          "sha256": "00530dc5bfe0205e520c0f6045bcab18dbaf307912885461105a992eef8df2fd"
+        },
+        "outline": {
+          "inventory_key": "N05.outline",
+          "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053"
+        },
+        "sources": [
+          {
+            "inventory_key": "N05.profile",
+            "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9"
+          }
+        ]
+      },
+      "expected_disposition": "REVISION_REQUIRED",
+      "critical_truth_inventory_key": "N05.truth",
+      "critical_truth_sha256": "b593576bac2179ef8464e91c1d719bad69a110e1c13fb455d013441421955bfd"
+    },
+    {
+      "case_id": "N06",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "N06.content",
+          "sha256": "f491c68aeda4bdfa5430ab5c024327da181726fcfd1e835eeafa8ca813dc218b"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "N06.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "N06.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "N06.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "REVISION_REQUIRED",
+      "critical_truth_inventory_key": "N06.truth",
+      "critical_truth_sha256": "e0ca0d9f6692be547c2fd2fa850c82e2e3877b924a96c7f2a91dd4b6d469b4da"
+    },
+    {
+      "case_id": "P07",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P07.content",
+          "sha256": "6b21514f15c4e0b287f3a999dd475604b7d0f1f94f7d3b669433adf952be7fa3"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P07.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "P07.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "P07.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P07.truth",
+      "critical_truth_sha256": "ff6a810d44dfc6aab2788f9308b3fbc65d4a5c5ddb5f36f75ce44e27943843bc"
+    },
+    {
+      "case_id": "P08",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P08.content",
+          "sha256": "be75ec999322fc7985dcbd6cb7692d2bbe3bac0499e27fd5bc8cf879a260e867"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P08.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "P08.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "P08.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P08.truth",
+      "critical_truth_sha256": "a6b702c9ae43b5a0ff2a2a03432d6df7a2452d666d7ccbea609e50d56e590a98"
+    },
+    {
+      "case_id": "P09",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P09.content",
+          "sha256": "9da74d20e240e77ec207ca6a5fadc539c409dbaac16bf6d99f6cdd9ee02583a5"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P09.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "P09.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "P09.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P09.truth",
+      "critical_truth_sha256": "975bb6cea7b916b3c9eb419e68a912a65b8d4c3f7bcda6a30006978e5d02de80"
+    },
+    {
+      "case_id": "P10",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P10.content",
+          "sha256": "dd6e94df2a37c3fbfe0f29c873496e272498ab4c67ec557ae62c1591e26eb5ae"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P10.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "P10.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "P10.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P10.truth",
+      "critical_truth_sha256": "35113f0cf9bf011694115abb5a0390dcfd5b935a8f7806471b2a992bed69d48e"
+    },
+    {
+      "case_id": "P11",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P11.content",
+          "sha256": "769d72f7adbae5e617ac2c9a2a504b658a142d40304d535ef04d34766e8f6512"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P11.manifest",
+          "sha256": "00530dc5bfe0205e520c0f6045bcab18dbaf307912885461105a992eef8df2fd"
+        },
+        "outline": {
+          "inventory_key": "P11.outline",
+          "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053"
+        },
+        "sources": [
+          {
+            "inventory_key": "P11.profile",
+            "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P11.truth",
+      "critical_truth_sha256": "3ac7d9c433d148615d770ab216813d2e7d2d05179934c17e249bcaaa92f81ea7"
+    },
+    {
+      "case_id": "P12",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P12.content",
+          "sha256": "06ca333e97f9ad40e44d9e7b13a5dfa9b31d44986da43209d503fe1145738a2c"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P12.manifest",
+          "sha256": "e9027471b311fa646be4c49de01a5ca690de58392df1b61ac1bbd340fe08b5ec"
+        },
+        "outline": {
+          "inventory_key": "P12.outline",
+          "sha256": "a786fafad4a2b14c0b9eb1ef8d84d04d13500f94d509ed3db5808baf8543c0d4"
+        },
+        "sources": [
+          {
+            "inventory_key": "P12.profile",
+            "sha256": "0321f2e31bf6966e899a12a3492beb0233c1a2c3d873f4174ad32277c8f47293"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P12.truth",
+      "critical_truth_sha256": "f0a186e90a46cbbdea67fbd09880bf1d0d485cf7263e05be840f276f1ae3d46b"
+    },
+    {
+      "case_id": "A13",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "A13.content",
+          "sha256": "6438cdd391f5a2482e62b3be5e821daa860b09664aa0fb1b0f149d5e4786ab92"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "A13.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "A13.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "A13.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "HUMAN_REVIEW_REQUIRED",
+      "critical_truth_inventory_key": "A13.truth",
+      "critical_truth_sha256": "56e45dffc7d5ad001798508a81b79ce6a3903f5fd43aaa4761eacb131831fd18"
+    },
+    {
+      "case_id": "P14",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "P14.content",
+          "sha256": "c2163bbbd0d0d3f7cf65275185cda051a488c872fb2e3a8b798e05e135008000"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "P14.manifest",
+          "sha256": "00530dc5bfe0205e520c0f6045bcab18dbaf307912885461105a992eef8df2fd"
+        },
+        "outline": {
+          "inventory_key": "P14.outline",
+          "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053"
+        },
+        "sources": [
+          {
+            "inventory_key": "P14.profile",
+            "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "P14.truth",
+      "critical_truth_sha256": "b31858d6ba85ae9201713b4d8e77cddfcca350c1c7131140bf10f37fc6d02105"
+    }
+  ],
+  "created_at": "2026-10-01T10:00:00Z"
+}

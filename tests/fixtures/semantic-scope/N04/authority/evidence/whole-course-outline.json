@@ -1,0 +1,16 @@
+[
+  {
+    "lesson_id": "L01",
+    "unit": "项目一 SQL 查询与索引",
+    "task": "完成数据库查询与索引维护",
+    "lesson_type": "theory",
+    "hours": 2,
+    "theory_hours": 2,
+    "practice_hours": 0,
+    "prior_learning": "课程开始前完成需求情境梳理，明确本课将围绕SQL查询与数据库索引建立工作入口",
+    "capability_stage": "认知",
+    "deliverable": "查询与索引维护记录",
+    "next_bridge": "下一课以查询与索引维护记录为输入，复盘数据库应用基础，重点衔接后续执行计划分析",
+    "practice_task_ids": []
+  }
+]

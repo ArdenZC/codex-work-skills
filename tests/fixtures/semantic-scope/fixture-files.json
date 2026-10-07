@@ -1,0 +1,427 @@
+[
+  {
+    "inventory_key": "N01.content",
+    "path": "tests/fixtures/lesson-original-nc02.json",
+    "sha256": "878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352"
+  },
+  {
+    "inventory_key": "N01.manifest",
+    "path": "tests/fixtures/semantic-scope/N01/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "N01.outline",
+    "path": "tests/fixtures/semantic-scope/N01/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "N01.profile",
+    "path": "tests/fixtures/semantic-scope/N01/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "N01.truth",
+    "path": "tests/fixtures/semantic-scope/N01/critical-truth.json",
+    "sha256": "3679996918d4c2a19499de116b4eb0225737c97b1018d6b8930a0d74ed24fb65"
+  },
+  {
+    "inventory_key": "N02.content",
+    "path": "tests/fixtures/semantic-scope/N02/content.json",
+    "sha256": "1151b44b2be3e43530f7ca47178aa92d30366e96673c10fc68deb2c7375916a7"
+  },
+  {
+    "inventory_key": "N02.manifest",
+    "path": "tests/fixtures/semantic-scope/N02/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "N02.outline",
+    "path": "tests/fixtures/semantic-scope/N02/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "N02.profile",
+    "path": "tests/fixtures/semantic-scope/N02/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "N02.truth",
+    "path": "tests/fixtures/semantic-scope/N02/critical-truth.json",
+    "sha256": "68fa02d05f6482df5ba73ac33cdac8b09f4835f34754eacb239232052ffaf3ae"
+  },
+  {
+    "inventory_key": "N03.content",
+    "path": "tests/fixtures/semantic-scope/N03/content.json",
+    "sha256": "e02c519ebb837790760bd76b62667605a7c2916c7f561ba4ec120c195e0331e2"
+  },
+  {
+    "inventory_key": "N03.manifest",
+    "path": "tests/fixtures/semantic-scope/N03/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "N03.outline",
+    "path": "tests/fixtures/semantic-scope/N03/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "N03.profile",
+    "path": "tests/fixtures/semantic-scope/N03/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "N03.truth",
+    "path": "tests/fixtures/semantic-scope/N03/critical-truth.json",
+    "sha256": "18528afb775a8d0e26a378ec1656d776760286d8d7ded617c2da7053bb7c4a83"
+  },
+  {
+    "inventory_key": "N04.content",
+    "path": "tests/fixtures/semantic-scope/N04/content.json",
+    "sha256": "47094b26a926afc0ae2761109f1814a00f7ceb0bb222684a8ba6e93b266f597c"
+  },
+  {
+    "inventory_key": "N04.manifest",
+    "path": "tests/fixtures/semantic-scope/N04/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "N04.outline",
+    "path": "tests/fixtures/semantic-scope/N04/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "N04.profile",
+    "path": "tests/fixtures/semantic-scope/N04/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "N04.truth",
+    "path": "tests/fixtures/semantic-scope/N04/critical-truth.json",
+    "sha256": "432f7ab0b94e15b90bdc7882f4db3ff36bdecc1c0c2410ffecf5ae8ce5e43eb8"
+  },
+  {
+    "inventory_key": "N05.content",
+    "path": "tests/fixtures/semantic-scope/N05/content.json",
+    "sha256": "57a6efee6021248ded80d831564f5287c1315231cc08759e9f9d6ab223a3e2a1"
+  },
+  {
+    "inventory_key": "N05.manifest",
+    "path": "tests/fixtures/semantic-scope/N05/authority/source-truth.json",
+    "sha256": "00530dc5bfe0205e520c0f6045bcab18dbaf307912885461105a992eef8df2fd"
+  },
+  {
+    "inventory_key": "N05.outline",
+    "path": "tests/fixtures/semantic-scope/N05/authority/evidence/whole-course-outline.json",
+    "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053"
+  },
+  {
+    "inventory_key": "N05.profile",
+    "path": "tests/fixtures/semantic-scope/N05/authority/evidence/confirmed-profile.json",
+    "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9"
+  },
+  {
+    "inventory_key": "N05.truth",
+    "path": "tests/fixtures/semantic-scope/N05/critical-truth.json",
+    "sha256": "b593576bac2179ef8464e91c1d719bad69a110e1c13fb455d013441421955bfd"
+  },
+  {
+    "inventory_key": "N06.content",
+    "path": "tests/fixtures/semantic-scope/N06/content.json",
+    "sha256": "f491c68aeda4bdfa5430ab5c024327da181726fcfd1e835eeafa8ca813dc218b"
+  },
+  {
+    "inventory_key": "N06.manifest",
+    "path": "tests/fixtures/semantic-scope/N06/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "N06.outline",
+    "path": "tests/fixtures/semantic-scope/N06/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "N06.profile",
+    "path": "tests/fixtures/semantic-scope/N06/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "N06.truth",
+    "path": "tests/fixtures/semantic-scope/N06/critical-truth.json",
+    "sha256": "e0ca0d9f6692be547c2fd2fa850c82e2e3877b924a96c7f2a91dd4b6d469b4da"
+  },
+  {
+    "inventory_key": "P07.content",
+    "path": "tests/fixtures/semantic-scope/P07/content.json",
+    "sha256": "6b21514f15c4e0b287f3a999dd475604b7d0f1f94f7d3b669433adf952be7fa3"
+  },
+  {
+    "inventory_key": "P07.manifest",
+    "path": "tests/fixtures/semantic-scope/P07/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "P07.outline",
+    "path": "tests/fixtures/semantic-scope/P07/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "P07.profile",
+    "path": "tests/fixtures/semantic-scope/P07/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "P07.truth",
+    "path": "tests/fixtures/semantic-scope/P07/critical-truth.json",
+    "sha256": "ff6a810d44dfc6aab2788f9308b3fbc65d4a5c5ddb5f36f75ce44e27943843bc"
+  },
+  {
+    "inventory_key": "P08.content",
+    "path": "tests/fixtures/semantic-scope/P08/content.json",
+    "sha256": "be75ec999322fc7985dcbd6cb7692d2bbe3bac0499e27fd5bc8cf879a260e867"
+  },
+  {
+    "inventory_key": "P08.manifest",
+    "path": "tests/fixtures/semantic-scope/P08/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "P08.outline",
+    "path": "tests/fixtures/semantic-scope/P08/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "P08.profile",
+    "path": "tests/fixtures/semantic-scope/P08/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "P08.truth",
+    "path": "tests/fixtures/semantic-scope/P08/critical-truth.json",
+    "sha256": "a6b702c9ae43b5a0ff2a2a03432d6df7a2452d666d7ccbea609e50d56e590a98"
+  },
+  {
+    "inventory_key": "P09.content",
+    "path": "tests/fixtures/semantic-scope/P09/content.json",
+    "sha256": "9da74d20e240e77ec207ca6a5fadc539c409dbaac16bf6d99f6cdd9ee02583a5"
+  },
+  {
+    "inventory_key": "P09.manifest",
+    "path": "tests/fixtures/semantic-scope/P09/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "P09.outline",
+    "path": "tests/fixtures/semantic-scope/P09/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "P09.profile",
+    "path": "tests/fixtures/semantic-scope/P09/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "P09.truth",
+    "path": "tests/fixtures/semantic-scope/P09/critical-truth.json",
+    "sha256": "975bb6cea7b916b3c9eb419e68a912a65b8d4c3f7bcda6a30006978e5d02de80"
+  },
+  {
+    "inventory_key": "P10.content",
+    "path": "tests/fixtures/semantic-scope/P10/content.json",
+    "sha256": "dd6e94df2a37c3fbfe0f29c873496e272498ab4c67ec557ae62c1591e26eb5ae"
+  },
+  {
+    "inventory_key": "P10.manifest",
+    "path": "tests/fixtures/semantic-scope/P10/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "P10.outline",
+    "path": "tests/fixtures/semantic-scope/P10/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "P10.profile",
+    "path": "tests/fixtures/semantic-scope/P10/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "P10.truth",
+    "path": "tests/fixtures/semantic-scope/P10/critical-truth.json",
+    "sha256": "35113f0cf9bf011694115abb5a0390dcfd5b935a8f7806471b2a992bed69d48e"
+  },
+  {
+    "inventory_key": "P11.content",
+    "path": "tests/fixtures/semantic-scope/P11/content.json",
+    "sha256": "769d72f7adbae5e617ac2c9a2a504b658a142d40304d535ef04d34766e8f6512"
+  },
+  {
+    "inventory_key": "P11.manifest",
+    "path": "tests/fixtures/semantic-scope/P11/authority/source-truth.json",
+    "sha256": "00530dc5bfe0205e520c0f6045bcab18dbaf307912885461105a992eef8df2fd"
+  },
+  {
+    "inventory_key": "P11.outline",
+    "path": "tests/fixtures/semantic-scope/P11/authority/evidence/whole-course-outline.json",
+    "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053"
+  },
+  {
+    "inventory_key": "P11.profile",
+    "path": "tests/fixtures/semantic-scope/P11/authority/evidence/confirmed-profile.json",
+    "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9"
+  },
+  {
+    "inventory_key": "P11.truth",
+    "path": "tests/fixtures/semantic-scope/P11/critical-truth.json",
+    "sha256": "3ac7d9c433d148615d770ab216813d2e7d2d05179934c17e249bcaaa92f81ea7"
+  },
+  {
+    "inventory_key": "P12.content",
+    "path": "tests/fixtures/semantic-scope/P12/content.json",
+    "sha256": "06ca333e97f9ad40e44d9e7b13a5dfa9b31d44986da43209d503fe1145738a2c"
+  },
+  {
+    "inventory_key": "P12.manifest",
+    "path": "tests/fixtures/semantic-scope/P12/authority/source-truth.json",
+    "sha256": "e9027471b311fa646be4c49de01a5ca690de58392df1b61ac1bbd340fe08b5ec"
+  },
+  {
+    "inventory_key": "P12.outline",
+    "path": "tests/fixtures/semantic-scope/P12/authority/evidence/whole-course-outline.json",
+    "sha256": "a786fafad4a2b14c0b9eb1ef8d84d04d13500f94d509ed3db5808baf8543c0d4"
+  },
+  {
+    "inventory_key": "P12.profile",
+    "path": "tests/fixtures/semantic-scope/P12/authority/evidence/confirmed-profile.json",
+    "sha256": "0321f2e31bf6966e899a12a3492beb0233c1a2c3d873f4174ad32277c8f47293"
+  },
+  {
+    "inventory_key": "P12.truth",
+    "path": "tests/fixtures/semantic-scope/P12/critical-truth.json",
+    "sha256": "f0a186e90a46cbbdea67fbd09880bf1d0d485cf7263e05be840f276f1ae3d46b"
+  },
+  {
+    "inventory_key": "A13.content",
+    "path": "tests/fixtures/semantic-scope/A13/content.json",
+    "sha256": "6438cdd391f5a2482e62b3be5e821daa860b09664aa0fb1b0f149d5e4786ab92"
+  },
+  {
+    "inventory_key": "A13.manifest",
+    "path": "tests/fixtures/semantic-scope/A13/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "A13.outline",
+    "path": "tests/fixtures/semantic-scope/A13/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "A13.profile",
+    "path": "tests/fixtures/semantic-scope/A13/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "A13.truth",
+    "path": "tests/fixtures/semantic-scope/A13/critical-truth.json",
+    "sha256": "56e45dffc7d5ad001798508a81b79ce6a3903f5fd43aaa4761eacb131831fd18"
+  },
+  {
+    "inventory_key": "P14.content",
+    "path": "tests/fixtures/semantic-scope/P14/content.json",
+    "sha256": "c2163bbbd0d0d3f7cf65275185cda051a488c872fb2e3a8b798e05e135008000"
+  },
+  {
+    "inventory_key": "P14.manifest",
+    "path": "tests/fixtures/semantic-scope/P14/authority/source-truth.json",
+    "sha256": "00530dc5bfe0205e520c0f6045bcab18dbaf307912885461105a992eef8df2fd"
+  },
+  {
+    "inventory_key": "P14.outline",
+    "path": "tests/fixtures/semantic-scope/P14/authority/evidence/whole-course-outline.json",
+    "sha256": "d6b100299e70016cca1881e553f0f5c8a6c2c9ac40487fb0bbbcfbc1b6658053"
+  },
+  {
+    "inventory_key": "P14.profile",
+    "path": "tests/fixtures/semantic-scope/P14/authority/evidence/confirmed-profile.json",
+    "sha256": "efabb6cfdbeb7df2212c1ba8cd64da75a1c8411422e9fdb9dc8380f5245719a9"
+  },
+  {
+    "inventory_key": "P14.truth",
+    "path": "tests/fixtures/semantic-scope/P14/critical-truth.json",
+    "sha256": "b31858d6ba85ae9201713b4d8e77cddfcca350c1c7131140bf10f37fc6d02105"
+  },
+  {
+    "inventory_key": "H01.content",
+    "path": "tests/fixtures/semantic-scope/H01/content.json",
+    "sha256": "4cc354b058a6a0dc79eeff0907863594030eddbb2c50e294e3a8db6a444b8924"
+  },
+  {
+    "inventory_key": "H01.manifest",
+    "path": "tests/fixtures/semantic-scope/H01/authority/source-truth.json",
+    "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+  },
+  {
+    "inventory_key": "H01.outline",
+    "path": "tests/fixtures/semantic-scope/H01/authority/evidence/whole-course-outline.json",
+    "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+  },
+  {
+    "inventory_key": "H01.profile",
+    "path": "tests/fixtures/semantic-scope/H01/authority/evidence/confirmed-profile.json",
+    "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+  },
+  {
+    "inventory_key": "H01.truth",
+    "path": "tests/fixtures/semantic-scope/H01/critical-truth.json",
+    "sha256": "244bbc8900f72a384cf77dd243410dacd5e6dbeb2d54164704c892d4b4df8139"
+  },
+  {
+    "inventory_key": "H02.content",
+    "path": "tests/fixtures/semantic-scope/H02/content.json",
+    "sha256": "f31c794c2f624f5e8cc7154f30fb3dcb69ec25378e94bd92c55b3fba5c159d41"
+  },
+  {
+    "inventory_key": "H02.manifest",
+    "path": "tests/fixtures/semantic-scope/H02/authority/source-truth.json",
+    "sha256": "a2f371143bb68a9db5eb76ef2720b9dee62a1a1e69402fcc289e0890bc2a9117"
+  },
+  {
+    "inventory_key": "H02.outline",
+    "path": "tests/fixtures/semantic-scope/H02/authority/evidence/whole-course-outline.json",
+    "sha256": "49d7ecff2da41f79813962001fbfe9d9c6b2cf65ca88dc66f934089f1cd1081c"
+  },
+  {
+    "inventory_key": "H02.profile",
+    "path": "tests/fixtures/semantic-scope/H02/authority/evidence/confirmed-profile.json",
+    "sha256": "de2f60f9a9f5618831f69c8b3ce03651453f9ad66f89f2e0b00d3f9d3493c332"
+  },
+  {
+    "inventory_key": "H02.truth",
+    "path": "tests/fixtures/semantic-scope/H02/critical-truth.json",
+    "sha256": "1df5d6f7c9b74cc7b3892d149b1ce341543582502badc75d017ea1a828821461"
+  },
+  {
+    "inventory_key": "H03.content",
+    "path": "tests/fixtures/semantic-scope/H03/content.json",
+    "sha256": "85f75c14e687737fc95e5cec89f5ad67c5e977d49e6d4112dc0f2d3bead7b113"
+  },
+  {
+    "inventory_key": "H03.manifest",
+    "path": "tests/fixtures/semantic-scope/H03/authority/source-truth.json",
+    "sha256": "827e1ef64159f6419350b79345468fc8b5b4c112e19f741afa9964989bf6ecc7"
+  },
+  {
+    "inventory_key": "H03.outline",
+    "path": "tests/fixtures/semantic-scope/H03/authority/evidence/whole-course-outline.json",
+    "sha256": "77f692423656152a95a80cd9e8cc2caa8ebf981364165894ac3232544f5487c7"
+  },
+  {
+    "inventory_key": "H03.profile",
+    "path": "tests/fixtures/semantic-scope/H03/authority/evidence/confirmed-profile.json",
+    "sha256": "c2ff3613ac54c7a7f3e498f79f101f3b1ee053a7f6b393302f3fa216dffa5958"
+  },
+  {
+    "inventory_key": "H03.truth",
+    "path": "tests/fixtures/semantic-scope/H03/critical-truth.json",
+    "sha256": "6813e836b9787475c171e091df55651300c6cbbacf2fcdcf41d4f24f03cbb0c5"
+  }
+]

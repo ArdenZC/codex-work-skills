@@ -1,0 +1,11 @@
+{
+  "case_id": "H01",
+  "fixture_purpose": "synthetic deterministic linkage only; no semantic performance qualification",
+  "current_task": "完成数据库查询与索引维护",
+  "current_output": "查询与索引维护记录",
+  "progression": "下一课以查询与索引维护记录为输入，复盘数据库应用基础，重点衔接后续执行计划分析",
+  "expected_disposition": "PASS",
+  "expected_issue_category": null,
+  "claim": null,
+  "owner_realistic_prose_approval_required_for_actual_qualification": false
+}

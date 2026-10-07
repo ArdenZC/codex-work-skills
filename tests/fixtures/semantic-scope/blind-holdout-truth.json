@@ -1,0 +1,89 @@
+{
+  "corpus_contract_version": "1.0",
+  "corpus_version": "synthetic-linkage-1",
+  "corpus_id": "blind-holdout-truth-synthetic",
+  "cases": [
+    {
+      "case_id": "H01",
+      "course_context": "database",
+      "inputs": {
+        "content": {
+          "inventory_key": "H01.content",
+          "sha256": "4cc354b058a6a0dc79eeff0907863594030eddbb2c50e294e3a8db6a444b8924"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "H01.manifest",
+          "sha256": "a0b0149dc6be37b4272fd50532b50b86c16b42b9d4ad0ac6bc516e8431d76c83"
+        },
+        "outline": {
+          "inventory_key": "H01.outline",
+          "sha256": "1e5374e3b5ccbea5a184036db1695d3766e443e58301221bc637477aab045298"
+        },
+        "sources": [
+          {
+            "inventory_key": "H01.profile",
+            "sha256": "491e4e8edb07f60ce33f9efaa5e60818a8d68d7152d29eabd8b727eda4e477c2"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "H01.truth",
+      "critical_truth_sha256": "244bbc8900f72a384cf77dd243410dacd5e6dbeb2d54164704c892d4b4df8139"
+    },
+    {
+      "case_id": "H02",
+      "course_context": "mechanical",
+      "inputs": {
+        "content": {
+          "inventory_key": "H02.content",
+          "sha256": "f31c794c2f624f5e8cc7154f30fb3dcb69ec25378e94bd92c55b3fba5c159d41"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "H02.manifest",
+          "sha256": "a2f371143bb68a9db5eb76ef2720b9dee62a1a1e69402fcc289e0890bc2a9117"
+        },
+        "outline": {
+          "inventory_key": "H02.outline",
+          "sha256": "49d7ecff2da41f79813962001fbfe9d9c6b2cf65ca88dc66f934089f1cd1081c"
+        },
+        "sources": [
+          {
+            "inventory_key": "H02.profile",
+            "sha256": "de2f60f9a9f5618831f69c8b3ce03651453f9ad66f89f2e0b00d3f9d3493c332"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "H02.truth",
+      "critical_truth_sha256": "1df5d6f7c9b74cc7b3892d149b1ce341543582502badc75d017ea1a828821461"
+    },
+    {
+      "case_id": "H03",
+      "course_context": "nursing",
+      "inputs": {
+        "content": {
+          "inventory_key": "H03.content",
+          "sha256": "85f75c14e687737fc95e5cec89f5ad67c5e977d49e6d4112dc0f2d3bead7b113"
+        },
+        "source_truth_manifest": {
+          "inventory_key": "H03.manifest",
+          "sha256": "827e1ef64159f6419350b79345468fc8b5b4c112e19f741afa9964989bf6ecc7"
+        },
+        "outline": {
+          "inventory_key": "H03.outline",
+          "sha256": "77f692423656152a95a80cd9e8cc2caa8ebf981364165894ac3232544f5487c7"
+        },
+        "sources": [
+          {
+            "inventory_key": "H03.profile",
+            "sha256": "c2ff3613ac54c7a7f3e498f79f101f3b1ee053a7f6b393302f3fa216dffa5958"
+          }
+        ]
+      },
+      "expected_disposition": "PASS",
+      "critical_truth_inventory_key": "H03.truth",
+      "critical_truth_sha256": "6813e836b9787475c171e091df55651300c6cbbacf2fcdcf41d4f24f03cbb0c5"
+    }
+  ],
+  "created_at": "2026-10-01T10:00:00Z"
+}

@@ -1,0 +1,11 @@
+{
+  "case_id": "P11",
+  "fixture_purpose": "synthetic deterministic linkage only; no semantic performance qualification",
+  "current_task": "实现栈队列的典型算法",
+  "current_output": "算法实现记录",
+  "progression": "下一课以算法实现记录为输入，验证边界条件与异常处理，重点衔接边界条件与异常处理",
+  "expected_disposition": "PASS",
+  "expected_issue_category": null,
+  "claim": "按已经分配的栈队列任务验证边界与错误处理",
+  "owner_realistic_prose_approval_required_for_actual_qualification": false
+}

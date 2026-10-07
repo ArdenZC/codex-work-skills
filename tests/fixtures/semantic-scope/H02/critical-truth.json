@@ -1,0 +1,11 @@
+{
+  "case_id": "H02",
+  "fixture_purpose": "synthetic deterministic linkage only; no semantic performance qualification",
+  "current_task": "完成机械零件测绘与尺寸公差校验",
+  "current_output": "零件测绘与尺寸校验记录",
+  "progression": "下一课以零件测绘与尺寸校验记录为输入，复盘机械制图与测绘，重点衔接后续零件工艺分析",
+  "expected_disposition": "PASS",
+  "expected_issue_category": null,
+  "claim": null,
+  "owner_realistic_prose_approval_required_for_actual_qualification": false
+}

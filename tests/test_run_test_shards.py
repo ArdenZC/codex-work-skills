@@ -86,7 +86,8 @@ class TestShardManifest(unittest.TestCase):
         self.assertIn("lesson-lifecycle", run_test_shards._expand_suites(("full",), specs))
         self.assertEqual(
             specs["lesson-lifecycle"].count,
-            unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_lifecycle_contracts").countTestCases(),
+            sum(unittest.defaultTestLoader.loadTestsFromName(module).countTestCases()
+                for module in ("tests.test_lesson_lifecycle_contracts", "tests.test_semantic_scope_foundation")),
         )
 
     def test_lesson_course_scope_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
