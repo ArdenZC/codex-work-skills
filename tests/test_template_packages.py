@@ -3993,6 +3993,7 @@ esac
                 "package-contracts",
                 "template-tooling",
                 "template-lesson",
+                "lesson-semantic-scope",
                 "lesson-final-acceptance",
                 "template-gradebook",
                 "template-workorder",

@@ -130,17 +130,50 @@ class TestShardManifest(unittest.TestCase):
                 execute.assert_called_with(run_test_shards._suite_test_ids(name), verbose=True)
             self.assertEqual(execute.call_count, len(run_test_shards.SEMANTIC_SCOPE_SHARDS))
 
-    def test_workflow_calls_complete_semantic_scope_alias_with_unchanged_budget(self) -> None:
+    def test_workflow_requires_isolated_semantic_matrix_with_exact_coverage(self) -> None:
         import yaml
         data = yaml.safe_load((ROOT / ".github/workflows/template-package-ci.yml").read_text())
-        job = data["jobs"]["template-lesson"]
-        self.assertEqual(job["timeout-minutes"], 35)
-        command = next(step["run"] for step in job["steps"]
-                       if step.get("name") == "Run lesson-plan core regression tests")
-        self.assertEqual(command.split().count("semantic-scope"), 1)
-        self.assertIn("--suite lesson-lifecycle", command)
-        expanded = run_test_shards._expand_suites(("semantic-scope",), run_test_shards._suite_specs())
-        self.assertEqual(tuple(expanded), run_test_shards.SEMANTIC_SCOPE_SHARDS)
+        core = data["jobs"]["template-lesson"]
+        semantic = data["jobs"]["lesson-semantic-scope"]
+        self.assertEqual(core["timeout-minutes"], 35)
+        self.assertEqual(semantic["timeout-minutes"], 35)
+        self.assertEqual(semantic["if"], core["if"])
+        self.assertEqual(semantic["needs"], "classify-changes")
+        self.assertEqual(semantic["strategy"], core["strategy"])
+        core_commands = "\n".join(step.get("run", "") for step in core["steps"])
+        self.assertNotIn("--suite semantic-scope", core_commands)
+        self.assertIn("--suite lesson-lifecycle", core_commands)
+        commands = "\n".join(step.get("run", "") for step in semantic["steps"])
+        self.assertEqual(commands.split().count("semantic-scope"), 1)
+        self.assertIn("--parallel", commands)
+        self.assertNotIn("LibreOffice", commands)
+        self.assertNotIn("install_libreoffice", commands)
+        self.assertFalse(any(step.get("continue-on-error") for step in semantic["steps"]))
+        gate = data["jobs"]["ci-gate"]
+        self.assertIn("lesson-semantic-scope", gate["needs"])
+        step = next(step for step in gate["steps"] if step.get("name") == "Validate required checks")
+        self.assertEqual(step["env"]["SEMANTIC_SCOPE_RESULT"], "${{ needs.lesson-semantic-scope.result }}")
+        self.assertIn('check_job lesson-semantic-scope "$RUN_LESSON" "$SEMANTIC_SCOPE_RESULT"', step["run"])
+        self.assertEqual(tuple(run_test_shards._expand_suites(("semantic-scope",), run_test_shards._suite_specs())), run_test_shards.SEMANTIC_SCOPE_SHARDS)
+
+    def test_actual_gate_requires_semantic_success_and_non_lesson_skip(self) -> None:
+        import yaml
+        from classify_ci_changes import classify
+        data = yaml.safe_load((ROOT / ".github/workflows/template-package-ci.yml").read_text())
+        step = data["jobs"]["ci-gate"]["steps"][0]
+        for paths in (["README.md"], ["平时成绩记分册生成器/course-gradebook-generator/scripts/generate_gradebook.py"]):
+            self.assertFalse(classify(paths, event_name="pull_request")["run_lesson"])
+        for required in (True, False):
+            for outcome in ("success", "failure", "cancelled", "skipped"):
+                with self.subTest(required=required, outcome=outcome), tempfile.TemporaryDirectory() as temp:
+                    environment = os.environ.copy()
+                    environment.update({key: "false" if key.startswith("RUN_") or key=="FORCE_FULL" else "skipped" for key in step["env"]})
+                    environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome)
+                    if required:
+                        environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success")
+                    result = subprocess.run(["bash", "-c", step["run"]], env=environment, capture_output=True, text=True)
+                    expected = outcome == ("success" if required else "skipped")
+                    self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
 
     def test_new_semantic_scope_test_automatically_enters_partition(self) -> None:
         original = run_test_shards._module_test_ids
