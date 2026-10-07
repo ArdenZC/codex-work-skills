@@ -37,8 +37,8 @@
 | --- | --- | --- | --- |
 | [📝 教案生成器](教案生成器/lesson-plan-docx-generator) | Skill 2.3.1 · Lesson Content 2.3 · Template 1.1.2 | 按课程组织方式生成 Lesson `.docx` | ✅ Stable · release-qualified |
 | [📋 实践任务工单生成器](实践任务工单生成器/practice-task-workorder-generator) | **2.2.0 / Phase 2.2** · Practice Task **1.1** · WorkOrder Content **1.1** | 学生实践工单 `.docx` | ✅ Stable |
-| [🖥️ HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **1.2.1** · Courseware Contract **1.1** | `student.html` + `teacher.html` | ✅ Stable |
-| [🧪 实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **1.2.0** · Practice Class Contract **1.1** | student / teacher 离线 HTML 包 | ✅ Stable |
+| [🖥️ HTML 课件生成器](HTML课件生成器/courseware-html-generator) | **v1.2.1** · Courseware Contract **1.1** | `student.html` + `teacher.html` | ✅ Stable |
+| [🧪 实践课 HTML 生成器](实践课HTML生成器/practice-class-html-generator) | **v1.2.0** · Practice Class Contract **1.1** | student / teacher 离线 HTML 包 | ✅ Stable |
 | [📊 平时成绩记分册生成器](平时成绩记分册生成器/course-gradebook-generator) | Template **course-gradebook v1.1.0** | 平时成绩记分册 `.xls` | ✅ Stable |
 
 ### 当前能力概览
