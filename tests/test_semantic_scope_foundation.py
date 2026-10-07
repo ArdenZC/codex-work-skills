@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from tests.semantic_scope_test_support import Evidence, ROOT, FIXTURES
 from tests.semantic_scope_fixtures import freeze_original_outline
 from semantic_scope_records import (
@@ -19,7 +20,11 @@ from semantic_scope_records import (
     validate_training,
 )
 from semantic_scope_review import review_status, validate_review
-from reviewer_qualification import validate_qualification, ORIGINAL_NC02_SHA
+from reviewer_qualification import (
+    validate_qualification,
+    ORIGINAL_NC02_SHA,
+    _validate_case_exposures,
+)
 from operation_provenance import validate_receipt
 from lifecycle_digest import canonical_json_bytes
 
@@ -476,19 +481,199 @@ class SemanticScopeFoundationTests(unittest.TestCase):
 
 
 class AgentQualificationTests(unittest.TestCase):
-    def evidence(self, miss=None):
+    def evidence(self, miss=None, *, shared_source=False):
         temp = tempfile.TemporaryDirectory(prefix="semantic-agent-")
         self.addCleanup(temp.cleanup)
         e = Evidence(Path(temp.name), "agent")
-        e.agent_qualification(miss)
+        e.agent_qualification(miss, shared_source=shared_source)
         return e
 
     def test_all_golden_repetitions_qualified(self):
-        e = self.evidence()
+        e = self.evidence(shared_source=True)
         q = validate_qualification(
             e.context(), candidate_principal="reviewer", author_principal="author"
         )
         self.assertEqual(q["disposition"], "QUALIFIED")
+        cases = self.cases(e)
+        self.assertEqual(len(e.index["qualification_runs"]), 3)
+        for run, capture in zip(q["qualification_runs"], e.index["qualification_runs"]):
+            self.assertEqual(capture["run_id"], run["run_id"])
+            self.assertEqual(len(capture["operations"]), len(cases))
+            for operation, exposure, case in zip(
+                run["operations"], capture["operations"], cases
+            ):
+                self.assertEqual(exposure["case_id"], case["case_id"])
+                self.assertEqual(
+                    exposure["review_operation_id"], operation["review_operation_id"]
+                )
+                inputs = case["inputs"]
+                expected = {"reviewer_configuration"} | {
+                    row["inventory_key"]
+                    for row in (
+                        inputs["content"],
+                        inputs["source_truth_manifest"],
+                        inputs["outline"],
+                        *inputs["sources"],
+                    )
+                }
+                self.assertEqual(set(exposure["input_inventory_keys"]), expected)
+                self.assertTrue(
+                    all(
+                        exposure[field] is True
+                        for field in (
+                            "labels_hidden",
+                            "prior_reasoning_hidden",
+                            "fresh_context",
+                        )
+                    )
+                )
+                self.assertEqual(
+                    "shared-case-source" in expected, case["case_id"] in ("N02", "P07")
+                )
+        self.assertEqual(
+            sum(
+                "shared-case-source" in row["input_inventory_keys"]
+                for run in e.index["qualification_runs"]
+                for row in run["operations"]
+            ),
+            6,
+        )
+
+    def cases(self, evidence):
+        return [
+            case
+            for key in ("qualification_corpus", "blind_holdout_truth")
+            for case in json.loads(Path(evidence.entries[key]["path"]).read_bytes())[
+                "cases"
+            ]
+        ]
+
+    def test_per_operation_exposure_rejects_leakage_and_bad_bindings(self):
+        e = self.evidence()
+        e.write("previous-result-cache", {"cached_outcome": "PASS"}, protected=True)
+        context = e.context()
+        cases = self.cases(e)
+        by_case = {case["case_id"]: case for case in cases}
+        baseline = copy.deepcopy(e.index)
+        leaks = {
+            "other content": by_case["N02"]["inputs"]["content"]["inventory_key"],
+            "other source truth": by_case["N02"]["inputs"]["source_truth_manifest"][
+                "inventory_key"
+            ],
+            "other outline": by_case["N02"]["inputs"]["outline"]["inventory_key"],
+            "other case-only source": by_case["P07"]["inputs"]["sources"][0][
+                "inventory_key"
+            ],
+            "critical truth": by_case["N01"]["critical_truth_inventory_key"],
+            "corpus labels": "qualification_corpus",
+            "holdout truth": "blind_holdout_truth",
+            "previous review": e.qualification["qualification_runs"][0]["operations"][
+                0
+            ]["review_inventory_key"],
+            "adjudication": e.qualification["golden_results"][0]["observations"][0][
+                "adjudication_inventory_key"
+            ],
+            "previous result cache": "previous-result-cache",
+            "qualification itself": "reviewer_qualification",
+        }
+        variants = []
+        for name, key in leaks.items():
+            variant = copy.deepcopy(baseline)
+            variant["qualification_runs"][0]["operations"][0][
+                "input_inventory_keys"
+            ].append(key)
+            variants.append((name, variant))
+        variant = copy.deepcopy(baseline)
+        holdout_op = next(
+            row
+            for row in variant["qualification_runs"][0]["operations"]
+            if row["case_id"] == "H01"
+        )
+        holdout_op["input_inventory_keys"].append(
+            by_case["H02"]["inputs"]["content"]["inventory_key"]
+        )
+        variants.append(("holdout cross-case input", variant))
+        for name in (
+            "missing",
+            "duplicate",
+            "unknown",
+            "reordered",
+            "wrong case",
+            "wrong operation",
+            "wrong run",
+            "missing input",
+        ):
+            variant = copy.deepcopy(baseline)
+            operations = variant["qualification_runs"][0]["operations"]
+            if name == "missing":
+                operations.pop()
+            elif name == "duplicate":
+                operations.append(copy.deepcopy(operations[0]))
+            elif name == "unknown":
+                row = copy.deepcopy(operations[0])
+                row["case_id"] = "UNKNOWN"
+                row["review_operation_id"] = "unknown-operation"
+                operations.append(row)
+            elif name == "reordered":
+                operations[0], operations[1] = operations[1], operations[0]
+            elif name == "wrong case":
+                operations[0]["case_id"] = "N02"
+            elif name == "wrong operation":
+                operations[0]["review_operation_id"] = operations[1][
+                    "review_operation_id"
+                ]
+            elif name == "wrong run":
+                variant["qualification_runs"][0]["run_id"] = "wrong-run"
+            else:
+                operations[0]["input_inventory_keys"].remove("reviewer_configuration")
+            variants.append((name, variant))
+        for field in ("fresh_context", "labels_hidden", "prior_reasoning_hidden"):
+            variant = copy.deepcopy(baseline)
+            variant["qualification_runs"][0]["operations"][0][field] = False
+            variants.append((field + " false", variant))
+        variant = copy.deepcopy(baseline)
+        capture = variant["qualification_runs"][0]
+        operations = capture.pop("operations")
+        capture.update(
+            review_operation_ids=[row["review_operation_id"] for row in operations],
+            input_inventory_keys=sorted(
+                {key for row in operations for key in row["input_inventory_keys"]}
+            ),
+            labels_hidden=True,
+            prior_reasoning_hidden=True,
+            fresh_context=True,
+        )
+        variants.append(("legacy run-level union only", variant))
+        for name, variant in variants:
+            with self.subTest(name=name), self.assertRaises(RecordError):
+                # Actual wire schema and pure linkage preflight; authority/hash ingress
+                # is covered separately by the public-validator integration test.
+                e.write("operation_index", variant, protected=True)
+                captured = checked(
+                    Path(e.entries["operation_index"]["path"]).read_bytes(),
+                    "protected-operation-index",
+                )
+                _validate_case_exposures(
+                    context.inventory,
+                    e.qualification,
+                    captured,
+                    cases,
+                    "reviewer_qualification",
+                )
+
+    def test_public_qualification_rejects_late_case_leak_before_review_reads(self):
+        e = self.evidence()
+        cases = self.cases(e)
+        e.index["qualification_runs"][2]["operations"][0][
+            "input_inventory_keys"
+        ].append(cases[1]["inputs"]["content"]["inventory_key"])
+        context = e.context()
+        with patch(
+            "reviewer_qualification.validate_review",
+            side_effect=AssertionError("review read before exposure validated"),
+        ):
+            with self.assertRaisesRegex(RecordError, "per-operation input exposure"):
+                validate_qualification(context, candidate_principal="reviewer")
 
     def test_hard_miss_negative_positive_ambiguity_and_holdout(self):
         for miss in [
@@ -536,9 +721,9 @@ class AgentQualificationTests(unittest.TestCase):
 
     def test_revealed_holdout_and_unprotected_adjudication_rejected(self):
         e = self.evidence()
-        e.index["qualification_runs"][0]["input_inventory_keys"].append(
-            "blind_holdout_truth"
-        )
+        e.index["qualification_runs"][0]["operations"][0][
+            "input_inventory_keys"
+        ].append("blind_holdout_truth")
         with self.assertRaises(RecordError):
             validate_qualification(e.context(), candidate_principal="reviewer")
         e = self.evidence()
@@ -574,7 +759,9 @@ class AgentQualificationTests(unittest.TestCase):
             recorded="2026-10-02T10:00:00Z",
         )
         for run in e.index["qualification_runs"]:
-            run["input_inventory_keys"].append(case["critical_truth_inventory_key"])
+            run["operations"][0]["input_inventory_keys"].append(
+                case["critical_truth_inventory_key"]
+            )
         with self.assertRaisesRegex(RecordError, "input alias"):
             validate_qualification(
                 e.context(), candidate_principal="reviewer", require_approval=False

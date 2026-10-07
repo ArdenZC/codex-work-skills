@@ -99,6 +99,67 @@ def _case_context(context: TrustContext, case: dict[str, Any]) -> TrustContext:
     return replace(context, inventory=context.inventory.namespace(aliases))
 
 
+def _validate_case_exposures(
+    inventory, qualification, index, all_cases, qualification_key
+):
+    """Check protected run/case/operation exposure before evaluating any report."""
+    runs = qualification["qualification_runs"]
+    by_case = {case["case_id"]: case for case in all_cases}
+    forbidden_hashes = {
+        qualification["corpus_sha256"],
+        qualification["blind_holdout_sha256"],
+        inventory.entries[qualification_key]["sha256"],
+        *(case["critical_truth_sha256"] for case in all_cases),
+        *(
+            observation["adjudication_sha256"]
+            for result in qualification["golden_results"]
+            + qualification["holdout_results"]
+            for observation in result["observations"]
+        ),
+        *(op["review_sha256"] for run in runs for op in run["operations"]),
+    }
+    allowed_by_case = {}
+    for case_id, case in by_case.items():
+        inputs = case["inputs"]
+        allowed = {"reviewer_configuration"} | {
+            entry["inventory_key"]
+            for entry in (
+                inputs["content"],
+                inputs["source_truth_manifest"],
+                inputs["outline"],
+                *inputs["sources"],
+            )
+        }
+        require(
+            not {inventory.entries[key]["sha256"] for key in allowed}.intersection(
+                forbidden_hashes
+            ),
+            "truth/results exposed through an input alias",
+        )
+        allowed_by_case[case_id] = allowed
+    for run in runs:
+        require(
+            [op["case_id"] for op in run["operations"]] == list(by_case),
+            "incomplete/reordered evaluation run",
+        )
+        captures = [
+            row for row in index["qualification_runs"] if row["run_id"] == run["run_id"]
+        ]
+        require(len(captures) == 1, "missing/duplicate protected run exposure evidence")
+        exposures = captures[0]["operations"]
+        require(
+            [(row["case_id"], row["review_operation_id"]) for row in exposures]
+            == [(op["case_id"], op["review_operation_id"]) for op in run["operations"]],
+            "per-operation exposure binding/coverage/order mismatch",
+        )
+        for exposure in exposures:
+            require(
+                set(exposure["input_inventory_keys"])
+                == allowed_by_case[exposure["case_id"]],
+                "cross-case/label leakage or unrecorded per-operation input exposure",
+            )
+
+
 def _agent_evidence(
     context: TrustContext,
     qualification: dict[str, Any],
@@ -146,6 +207,9 @@ def _agent_evidence(
         [r["repetition"] for r in runs] == list(range(1, len(runs) + 1)),
         "repetition coverage/order mismatch",
     )
+    _validate_case_exposures(
+        inventory, qualification, index, all_cases, qualification_key
+    )
     observations: dict[tuple[str, str], dict[str, Any]] = {}
     operation_ids: list[str] = []
     seen_review_hashes: list[str] = []
@@ -161,55 +225,6 @@ def _agent_evidence(
         require(
             [o["case_id"] for o in run["operations"]] == list(by_case),
             "incomplete/reordered evaluation run",
-        )
-        exposure = [
-            r for r in index["qualification_runs"] if r["run_id"] == run["run_id"]
-        ]
-        require(len(exposure) == 1, "missing protected run exposure evidence")
-        exposure = exposure[0]
-        require(
-            exposure["review_operation_ids"]
-            == [o["review_operation_id"] for o in run["operations"]],
-            "run operation inventory mismatch",
-        )
-        allowed_inputs = {"reviewer_configuration"}
-        for case in all_cases:
-            inputs = case["inputs"]
-            allowed_inputs.update(
-                e["inventory_key"]
-                for e in (
-                    inputs["content"],
-                    inputs["source_truth_manifest"],
-                    inputs["outline"],
-                    *inputs["sources"],
-                )
-            )
-        forbidden_hashes = {
-            qualification["corpus_sha256"],
-            qualification["blind_holdout_sha256"],
-            inventory.entries[qualification_key]["sha256"],
-        }
-        forbidden_hashes.update(case["critical_truth_sha256"] for case in all_cases)
-        forbidden_hashes.update(
-            observation["adjudication_sha256"]
-            for result in qualification["golden_results"]
-            + qualification["holdout_results"]
-            for observation in result["observations"]
-        )
-        forbidden_hashes.update(
-            op["review_sha256"]
-            for evaluation in runs
-            for op in evaluation["operations"]
-        )
-        require(
-            not {
-                inventory.entries[key]["sha256"] for key in allowed_inputs
-            }.intersection(forbidden_hashes),
-            "truth/results exposed through an input alias",
-        )
-        require(
-            set(exposure["input_inventory_keys"]) == allowed_inputs,
-            "label leakage/unrecorded input exposure",
         )
         for op in run["operations"]:
             case = by_case[op["case_id"]]

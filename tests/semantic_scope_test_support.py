@@ -10,6 +10,7 @@ from typing import Any
 from tests.test_lesson_lifecycle_contracts import _content, _write_json
 from tests.semantic_scope_fixtures import freeze_original_outline
 from lifecycle_digest import canonical_json_bytes, sha256_bytes
+from source_truth import source_truth_fingerprint
 from semantic_scope_records import (
     Inventory,
     TrustContext,
@@ -476,7 +477,9 @@ class Evidence:
         )
         return payload
 
-    def agent_qualification(self, miss: tuple[str, str] | None = None):
+    def agent_qualification(
+        self, miss: tuple[str, str] | None = None, *, shared_source=False
+    ):
         metadata = json.loads((FIXTURES / "fixture-files.json").read_bytes())
         for row in metadata:
             src = ROOT / row["path"]
@@ -494,6 +497,51 @@ class Evidence:
             Path(self.entries["blind_holdout_truth"]["path"]).read_bytes()
         )
         cases = corpus["cases"] + holdout["cases"]
+        if shared_source:
+            common = self.protected / "shared-case-authority"
+            common.mkdir()
+            source = common / "shared-source.txt"
+            source.write_bytes(
+                b"Shared legitimate course reference, not labels or results."
+            )
+            self.add("shared-case-source", source, True)
+            for case in corpus["cases"]:
+                if case["case_id"] not in ("N02", "P07"):
+                    continue
+                inputs = case["inputs"]
+                manifest_key = inputs["source_truth_manifest"]["inventory_key"]
+                manifest = json.loads(
+                    Path(self.entries[manifest_key]["path"]).read_bytes()
+                )
+                for row in manifest["sources"]:
+                    entry = next(
+                        item
+                        for item in [inputs["outline"], *inputs["sources"]]
+                        if item["sha256"] == row["sha256"]
+                    )
+                    dest = common / case["case_id"] / row["locator"]
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(self.entries[entry["inventory_key"]]["path"], dest)
+                    self.add(entry["inventory_key"], dest, True)
+                    row["locator"] = case["case_id"] + "/" + row["locator"]
+                manifest["sources"].append(
+                    dict(
+                        source_id="shared-case-source",
+                        source_type="user_attachment",
+                        label="Shared legitimate source",
+                        locator="shared-source.txt",
+                        sha256=self.sha("shared-case-source"),
+                        provenance="Synthetic controlled shared dependency",
+                    )
+                )
+                manifest["manifest_fingerprint"] = source_truth_fingerprint(manifest)
+                path = common / (case["case_id"] + "-manifest.json")
+                _write_json(path, manifest)
+                self.add(manifest_key, path, True)
+                inputs["source_truth_manifest"]["sha256"] = self.sha(manifest_key)
+                inputs["sources"].append(self.binding("shared-case-source"))
+            self.write("qualification_corpus", corpus, protected=True)
+
         self.index["authors"] = []
         for case in cases:
             ck = case["inputs"]["content"]["inventory_key"]
@@ -522,6 +570,7 @@ class Evidence:
                 completed_at=date + "T11:00:00Z",
                 operations=[],
             )
+            exposures = []
             for case in cases:
                 op = run_id + "-" + case["case_id"]
                 disposition = (
@@ -547,6 +596,28 @@ class Evidence:
                         review_sha256=self.sha(op + "-review"),
                         receipt_inventory_key=op + "-receipt",
                         receipt_sha256=self.sha(op + "-receipt"),
+                    )
+                )
+                inputs = case["inputs"]
+                exposures.append(
+                    dict(
+                        case_id=case["case_id"],
+                        review_operation_id=op,
+                        input_inventory_keys=sorted(
+                            {"reviewer_configuration"}
+                            | {
+                                entry["inventory_key"]
+                                for entry in (
+                                    inputs["content"],
+                                    inputs["source_truth_manifest"],
+                                    inputs["outline"],
+                                    *inputs["sources"],
+                                )
+                            }
+                        ),
+                        labels_hidden=True,
+                        prior_reasoning_hidden=True,
+                        fresh_context=True,
                     )
                 )
                 adjudication = dict(
@@ -599,29 +670,8 @@ class Evidence:
                 )
                 result["hard_miss"] |= disposition != case["expected_disposition"]
             self.qualification["qualification_runs"].append(run)
-            input_keys = {"reviewer_configuration"}
-            for case in cases:
-                inputs = case["inputs"]
-                input_keys.update(
-                    e["inventory_key"]
-                    for e in [
-                        inputs["content"],
-                        inputs["outline"],
-                        inputs["source_truth_manifest"],
-                        *inputs["sources"],
-                    ]
-                )
             self.index["qualification_runs"].append(
-                dict(
-                    run_id=run_id,
-                    review_operation_ids=[
-                        o["review_operation_id"] for o in run["operations"]
-                    ],
-                    input_inventory_keys=sorted(input_keys),
-                    labels_hidden=True,
-                    prior_reasoning_hidden=True,
-                    fresh_context=True,
-                )
+                dict(run_id=run_id, operations=exposures)
             )
         self.qualification["disposition"] = "NOT_QUALIFIED" if miss else "QUALIFIED"
         self.write_qualification()

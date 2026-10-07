@@ -71,9 +71,13 @@ record encodings, not Skill products or a separate authority system:
   `authors`, `adjudications`, `qualification_runs`. Receipt entries capture ID,
   operation, actor, subject key/hash and receipt key/hash. Author entries map
   exact Content authoring ID/hash to principal and operation. Adjudication
-  entries capture operation, actor and exact subject key/hash. Run records list
-  exact review operations and exposed case/configuration keys with all-true
-  label-hidden, prior-reasoning-hidden and fresh-context declarations. This is
+  entries capture operation, actor and exact subject key/hash. Run records contain
+  ordered per-operation exposures, each bound to its case ID
+  and review operation ID. Each exposure has exactly reviewer_configuration plus
+  that case’s Content, Source Truth manifest, outline and source closure keys,
+  with per-operation all-true label-hidden, prior-reasoning-hidden and fresh-context
+  declarations. Shared legitimate dependency keys may occur in multiple cases;
+  run-wide unions cannot establish isolation. This is
   the externally controlled lookup source, not a subject hash dependency.
 - Corpus/holdout: ordered cases with three named input key/hash pairs (`content`,
   `source_truth_manifest`, `outline`), a `sources` closure, expected disposition

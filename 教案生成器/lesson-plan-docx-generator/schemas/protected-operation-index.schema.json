@@ -166,11 +166,7 @@
         "additionalProperties": false,
         "required": [
           "run_id",
-          "review_operation_ids",
-          "input_inventory_keys",
-          "labels_hidden",
-          "prior_reasoning_hidden",
-          "fresh_context"
+          "operations"
         ],
         "properties": {
           "run_id": {
@@ -179,36 +175,56 @@
             "maxLength": 160,
             "pattern": "\\S"
           },
-          "review_operation_ids": {
+          "operations": {
             "type": "array",
             "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 128,
-              "pattern": "\\S"
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "case_id",
+                "review_operation_id",
+                "input_inventory_keys",
+                "labels_hidden",
+                "prior_reasoning_hidden",
+                "fresh_context"
+              ],
+              "properties": {
+                "case_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "review_operation_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "input_inventory_keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "labels_hidden": {
+                  "const": true
+                },
+                "prior_reasoning_hidden": {
+                  "const": true
+                },
+                "fresh_context": {
+                  "const": true
+                }
+              }
             },
             "minItems": 1,
             "uniqueItems": true
-          },
-          "input_inventory_keys": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 160,
-              "pattern": "\\S"
-            },
-            "minItems": 1,
-            "uniqueItems": true
-          },
-          "labels_hidden": {
-            "const": true
-          },
-          "prior_reasoning_hidden": {
-            "const": true
-          },
-          "fresh_context": {
-            "const": true
           }
         }
       },
