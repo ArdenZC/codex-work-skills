@@ -675,23 +675,32 @@ class AgentQualificationTests(unittest.TestCase):
             with self.assertRaisesRegex(RecordError, "per-operation input exposure"):
                 validate_qualification(context, candidate_principal="reviewer")
 
-    def test_hard_miss_negative_positive_ambiguity_and_holdout(self):
-        for miss in [
-            ("N01", "PASS"),
-            ("N02", "HUMAN_REVIEW_REQUIRED"),
-            ("P07", "REVISION_REQUIRED"),
-            ("P08", "HUMAN_REVIEW_REQUIRED"),
-            ("A13", "PASS"),
-            ("H01", "REVISION_REQUIRED"),
-        ]:
-            with self.subTest(miss=miss):
-                e = self.evidence(miss)
-                q = validate_qualification(
-                    e.context(), candidate_principal="reviewer", require_approval=False
-                )
-                self.assertEqual(q["disposition"], "NOT_QUALIFIED")
-                with self.assertRaises(RecordError):
-                    validate_qualification(e.context(), candidate_principal="reviewer")
+    def _assert_hard_miss_not_qualified(self, miss):
+        e = self.evidence(miss)
+        q = validate_qualification(
+            e.context(), candidate_principal="reviewer", require_approval=False
+        )
+        self.assertEqual(q["disposition"], "NOT_QUALIFIED")
+        with self.assertRaises(RecordError):
+            validate_qualification(e.context(), candidate_principal="reviewer")
+
+    def test_hard_miss_n01_pass(self):
+        self._assert_hard_miss_not_qualified(("N01", "PASS"))
+
+    def test_hard_miss_n02_human_review_required(self):
+        self._assert_hard_miss_not_qualified(("N02", "HUMAN_REVIEW_REQUIRED"))
+
+    def test_hard_miss_p07_revision_required(self):
+        self._assert_hard_miss_not_qualified(("P07", "REVISION_REQUIRED"))
+
+    def test_hard_miss_p08_human_review_required(self):
+        self._assert_hard_miss_not_qualified(("P08", "HUMAN_REVIEW_REQUIRED"))
+
+    def test_hard_miss_a13_pass(self):
+        self._assert_hard_miss_not_qualified(("A13", "PASS"))
+
+    def test_hard_miss_h01_revision_required(self):
+        self._assert_hard_miss_not_qualified(("H01", "REVISION_REQUIRED"))
 
     def test_mutable_model_revision_and_float_settings_rejected(self):
         e = self.evidence()

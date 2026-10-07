@@ -89,6 +89,48 @@ class TestShardManifest(unittest.TestCase):
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_lifecycle_contracts").countTestCases(),
         )
 
+    def test_hard_miss_cases_are_independently_discovered_with_same_assertions(self) -> None:
+        from unittest.mock import Mock, call
+        import tests.test_semantic_scope_foundation as semantic
+        expected = {
+            "test_hard_miss_n01_pass": ("N01", "PASS"),
+            "test_hard_miss_n02_human_review_required": ("N02", "HUMAN_REVIEW_REQUIRED"),
+            "test_hard_miss_p07_revision_required": ("P07", "REVISION_REQUIRED"),
+            "test_hard_miss_p08_human_review_required": ("P08", "HUMAN_REVIEW_REQUIRED"),
+            "test_hard_miss_a13_pass": ("A13", "PASS"),
+            "test_hard_miss_h01_revision_required": ("H01", "REVISION_REQUIRED"),
+        }
+        ids = run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)
+        prefix = run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".AgentQualificationTests."
+        self.assertEqual({test_id.removeprefix(prefix) for test_id in ids
+                          if test_id.startswith(prefix + "test_hard_miss_")}, set(expected))
+        self.assertEqual(len(ids), 46)
+        hard_miss_ids = {prefix + name for name in expected}
+        for partition in run_test_shards._semantic_scope_partitions().values():
+            self.assertEqual(len(hard_miss_ids & set(partition)), 1)
+        evidence = []
+        for name, pair in expected.items():
+            instance = semantic.AgentQualificationTests(name)
+            fresh = Mock()
+            evidence.append(fresh)
+            with patch.object(instance, "evidence", return_value=fresh) as build, \
+                 patch.object(semantic, "validate_qualification",
+                              side_effect=[{"disposition": "NOT_QUALIFIED"}, semantic.RecordError("approval rejected")]) as validate:
+                getattr(instance, name)()
+                build.assert_called_once_with(pair)
+                self.assertEqual(fresh.context.call_count, 2)
+                self.assertEqual(validate.call_args_list, [
+                    call(fresh.context.return_value, candidate_principal="reviewer", require_approval=False),
+                    call(fresh.context.return_value, candidate_principal="reviewer"),
+                ])
+            # Both original assertions must fail when the public validator violates them.
+            for outcomes in ([{"disposition": "QUALIFIED"}], [{"disposition": "NOT_QUALIFIED"}, {}]):
+                with patch.object(instance, "evidence", return_value=Mock()), \
+                     patch.object(semantic, "validate_qualification", side_effect=outcomes), \
+                     self.assertRaises(AssertionError):
+                    getattr(instance, name)()
+        self.assertEqual(len({id(item) for item in evidence}), 6)
+
     def test_semantic_scope_top_level_partitions_are_exact(self) -> None:
         specs = run_test_shards._suite_specs()
         groups = run_test_shards._semantic_scope_partitions()
@@ -139,13 +181,24 @@ class TestShardManifest(unittest.TestCase):
         self.assertEqual(semantic["timeout-minutes"], 35)
         self.assertEqual(semantic["if"], core["if"])
         self.assertEqual(semantic["needs"], "classify-changes")
-        self.assertEqual(semantic["strategy"], core["strategy"])
+        matrix = semantic["strategy"]["matrix"]
+        self.assertFalse(semantic["strategy"]["fail-fast"])
+        self.assertEqual(matrix["os"], ["macos-14", "windows-latest"])
+        self.assertEqual(matrix["python-version"], ["3.11"])
+        self.assertEqual(tuple(matrix["partition"]), run_test_shards.SEMANTIC_SCOPE_SHARDS)
+        self.assertEqual(len(matrix["os"]) * len(matrix["partition"]), 12)
+        self.assertIn("${{ matrix.partition }}", semantic["name"])
+        coverage = next(step for step in semantic["steps"] if step["name"] == "Verify exact semantic partition coverage")
+        self.assertEqual(coverage["if"], "matrix.partition == 'semantic-scope-1'")
+        execution = next(step for step in semantic["steps"] if step["name"] == "Run requested semantic scope partition")
+        self.assertEqual(execution["run"].split(), ["python", ".github/scripts/run_test_shards.py", "--suite", "${{", "matrix.partition", "}}", "-v"])
+        self.assertNotIn("if", execution)
         core_commands = "\n".join(step.get("run", "") for step in core["steps"])
         self.assertNotIn("--suite semantic-scope", core_commands)
         self.assertIn("--suite lesson-lifecycle", core_commands)
         commands = "\n".join(step.get("run", "") for step in semantic["steps"])
-        self.assertEqual(commands.split().count("semantic-scope"), 1)
-        self.assertIn("--parallel", commands)
+        self.assertNotIn("--suite semantic-scope ", commands)
+        self.assertNotIn("--parallel", commands)
         self.assertNotIn("LibreOffice", commands)
         self.assertNotIn("install_libreoffice", commands)
         self.assertFalse(any(step.get("continue-on-error") for step in semantic["steps"]))
@@ -163,6 +216,7 @@ class TestShardManifest(unittest.TestCase):
         step = data["jobs"]["ci-gate"]["steps"][0]
         for paths in (["README.md"], ["平时成绩记分册生成器/course-gradebook-generator/scripts/generate_gradebook.py"]):
             self.assertFalse(classify(paths, event_name="pull_request")["run_lesson"])
+        self.assertTrue(classify(["tests/test_semantic_scope_foundation.py"], event_name="pull_request")["run_lesson"])
         for required in (True, False):
             for outcome in ("success", "failure", "cancelled", "skipped"):
                 with self.subTest(required=required, outcome=outcome), tempfile.TemporaryDirectory() as temp:
