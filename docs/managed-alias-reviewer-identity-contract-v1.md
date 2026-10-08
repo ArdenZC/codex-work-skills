@@ -12,7 +12,7 @@ run live qualification, activate Production, change RC-02, or change Lesson 2.4.
 | Managed service alias | Reviewer Configuration 1.1 | New closed version. `agent_identity_mode` is `managed_alias`; `model_reference` is the exact requested alias; `model_revision` is JSON null. Provider/service, client build, prompt/system/tool/context/decoding policy, fallback prohibition, and observation-policy bytes are bound. |
 | Managed service observations | Managed Service Observation 1.0 | A sanitized, per-operation record of the provider/service response metadata. It reports only what the service exposed and never claims that an alias identifies immutable weights. Exact bytes live in the protected evidence inventory. |
 | Existing qualification | Reviewer Qualification 1.0 | Unchanged for Configuration 1.0 immutable and human paths. |
-| Managed qualification | Reviewer Qualification 1.1 | Required for Configuration 1.1. Retains the existing three-or-more fresh repetitions, complete corpus/holdout coverage, per-case isolation, adjudication, and hard-miss rules. Each operation binds its service observation; all observations must have the same managed-service identity projection. Qualification validity is at most 24 hours from completion. |
+| Managed qualification | Reviewer Qualification 1.1 | Required for Configuration 1.1. Retains the existing three-or-more fresh repetitions, complete corpus/holdout coverage, per-case isolation, adjudication, and hard-miss rules. Each operation binds its service observation; all observations must have the same managed-service identity projection. `qualified_at` is derived from the validated protected evidence completion time; qualification validity is at most 24 hours from that time. |
 | Existing operation provenance | Operation Provenance Receipt 1.0 | Unchanged for immutable Configuration 1.0 and human paths. |
 | Managed operation provenance | Operation Provenance Receipt 1.1 | Required for managed semantic-review operations and managed qualification approvals. It binds the per-operation service observation or the independent approver-evidence record in protected inventory. |
 | O2 semantic review and downstream Teacher Review 2.0, Pipeline State 2.0, PA 2.0 | O2 dispatches and validates the managed 1.1 identity chain; downstream teacher, state, and authorization contracts remain unchanged | No lifecycle-state, teacher, PA, rollback, content, template, or acceptance contract changes. O2 accepts only a fully understood, current config/qualification/receipt version combination and fails closed on unknown or mixed versions. |
@@ -65,11 +65,25 @@ candidate-supplied observations fail closed.
 
 ## Expiry and invalidation
 
-The managed-alias maximum is **24 hours from `qualified_at`**. `valid_until` may
-be earlier but never later than `qualified_at + 24 hours`; authority is invalid
-at `now == valid_until`. No automatic extension or grace period exists. A fresh
-complete qualification and independent approval are required before first
-production use and after expiry.
+For managed-alias Qualification 1.1,
+`qualified_at` is a derived evidence-completion timestamp, not artifact
+creation time and not approval time. The validator derives it as the maximum
+of every validated `qualification_runs[].completed_at` and every protected
+adjudication `recorded_at` referenced by a validated golden or holdout result.
+An adjudication contributes only after its run/operation/truth bindings,
+adjudicator principal, and protected-index capture have been verified. Unused
+adjudications and timestamps copied into qualification results do not
+contribute. The validator requires exact timestamp equality with this derived
+maximum. Delayed serialization, file modification time, current time, and a
+new qualification approval cannot refresh older evaluation evidence; a fresh
+approver operation over a re-dated qualification still fails this invariant.
+
+The managed-alias maximum is **24 hours from this evidence-derived
+`qualified_at`**. `valid_until` may be earlier but never later than
+`qualified_at + 24 hours`; authority is invalid at `now == valid_until`. No
+automatic extension or grace period exists. A fresh complete qualification
+and independent approval are required before first production use and after
+expiry.
 
 Any changed config byte, provider/service reference, requested alias, client
 build, prompt/system/tool/context/decoding policy, observation policy, or

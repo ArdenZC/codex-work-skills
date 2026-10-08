@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import shutil
@@ -537,6 +537,79 @@ class Evidence:
             self.approver_principal,
         )
 
+    def refresh_managed_qualification_approval_for_test(
+        self, *, operation_id: str, reviewed_at: str
+    ) -> None:
+        """Capture a fresh, valid second-principal approval for a rewritten fixture.
+
+        This deliberately reuses the validated operation set while rebinding the
+        protected approval packet to the current qualification bytes. It lets
+        replay tests prove that even a fresh approval cannot refresh old runs.
+        """
+        q_sha = self.sha("reviewer_qualification")
+        config_sha = self.sha("reviewer_configuration")
+        packet = json.loads(
+            Path(self.entries["managed-qualification-review-packet"]["path"]).read_bytes()
+        )
+        packet["qualification_sha256"] = q_sha
+        packet["reviewer_configuration_sha256"] = config_sha
+        self.write("managed-qualification-review-packet", packet, protected=True)
+
+        rationale = "Synthetic independent re-review for " + operation_id
+        response = json.loads(
+            Path(self.entries["managed-qualification-approver-response"]["path"]).read_bytes()
+        )
+        response["rationale"] = rationale
+        self.write("managed-qualification-approver-response", response, protected=True)
+
+        reviewed = datetime.fromisoformat(reviewed_at.replace("Z", "+00:00"))
+        requested_at = (reviewed - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        observed_at = (reviewed - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.write(
+            "managed-qualification-approver-observation",
+            canonical_json_bytes(
+                self.managed_observation(operation_id, requested_at, observed_at)
+            ),
+            protected=True,
+        )
+        evidence = dict(
+            evidence_version="1.0",
+            qualification_sha256=q_sha,
+            reviewer_configuration_sha256=config_sha,
+            reviewer_principal=self.reviewer_principal,
+            approver_principal=self.approver_principal,
+            operation_id=operation_id,
+            approval_prompt_sha256=self.sha("approver-prompt"),
+            review_packet_inventory_key="managed-qualification-review-packet",
+            review_packet_sha256=self.sha("managed-qualification-review-packet"),
+            service_observation_inventory_key="managed-qualification-approver-observation",
+            service_observation_sha256=self.sha("managed-qualification-approver-observation"),
+            response_inventory_key="managed-qualification-approver-response",
+            response_sha256=self.sha("managed-qualification-approver-response"),
+            decision="APPROVED",
+            rationale=rationale,
+            reviewed_at=reviewed_at,
+        )
+        self.write("managed-qualification-approval-evidence", evidence, protected=True)
+        recorded = (reviewed + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.receipt(
+            "qualification_approval_receipt",
+            "qualification",
+            "reviewer_qualification",
+            dict(
+                reviewer_configuration=config_sha,
+                qualification_corpus=self.sha("qualification_corpus"),
+                blind_holdout_truth=self.sha("blind_holdout_truth"),
+                corpus_approval_receipt=self.sha("corpus_approval_receipt"),
+                managed_qualification_approval_evidence=self.binding(
+                    "managed-qualification-approval-evidence"
+                ),
+            ),
+            operation_id,
+            self.approver_principal,
+            recorded=recorded,
+        )
+
     def review(
         self,
         *,
@@ -745,7 +818,10 @@ class Evidence:
         self.qualification = self.qualification_payload(False)
         for repetition in range(1, 4):
             run_id = "evaluation-" + str(repetition)
-            date = "2026-10-0" + str(2 + repetition)
+            run_day = 2 + repetition
+            if self.config["configuration_version"] == "1.1" and repetition == 3:
+                run_day = 6
+            date = f"2026-10-{run_day:02d}"
             at = date + "T10:30:00Z"
             run = dict(
                 run_id=run_id,
@@ -822,7 +898,12 @@ class Evidence:
                     critical_truth_satisfied=True,
                     bounded_rationale="Externally adjudicated synthetic observation.",
                     adjudicator_principal="adjudicator",
-                    recorded_at=date + "T10:40:00Z",
+                    recorded_at=(
+                        date + "T18:00:00Z"
+                        if self.config["configuration_version"] == "1.1"
+                        and repetition == 3
+                        else date + "T10:40:00Z"
+                    ),
                 )
                 self.write(op + "-adjudication", adjudication, protected=True)
                 self.index["adjudications"].append(

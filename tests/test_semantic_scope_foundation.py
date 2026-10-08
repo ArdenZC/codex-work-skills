@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -26,6 +27,7 @@ from semantic_scope_review import review_status, validate_review
 from reviewer_qualification import (
     validate_qualification,
     ORIGINAL_NC02_SHA,
+    _managed_approval,
     _validate_case_exposures,
 )
 from operation_provenance import validate_receipt
@@ -797,6 +799,124 @@ class AgentQualificationTests(unittest.TestCase):
 
 
 class ManagedAliasReviewerIdentityTests(unittest.TestCase):
+    @staticmethod
+    def _managed_fixture(root):
+        evidence = Evidence(root, reviewer_type="agent")
+        evidence.enable_managed_alias()
+        evidence.agent_qualification()
+        return evidence
+
+    def test_managed_qualified_at_cannot_be_redated_after_evidence(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-redate-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            e.qualification["qualified_at"] = "2026-10-08T18:00:00Z"
+            e.qualification["valid_until"] = "2026-10-09T18:00:00Z"
+            e.write_qualification()
+            context = replace(
+                e.context(),
+                now=datetime(2026, 10, 9, 17, 59, 59, tzinfo=timezone.utc),
+            )
+
+            with self.assertRaisesRegex(
+                RecordError,
+                "managed qualification qualified_at does not equal evidence completion",
+            ):
+                validate_qualification(
+                    context,
+                    candidate_principal=e.reviewer_principal,
+                    require_approval=False,
+                )
+
+    def test_managed_redating_fails_even_with_fresh_independent_approval(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-redate-approval-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            old_observation_sha = e.sha("managed-qualification-approver-observation")
+            old_approval_evidence_sha = e.sha("managed-qualification-approval-evidence")
+            e.qualification["qualified_at"] = "2026-10-08T18:00:00Z"
+            e.qualification["valid_until"] = "2026-10-09T18:00:00Z"
+            e.write_qualification()
+            e.refresh_managed_qualification_approval_for_test(
+                operation_id="managed-qualification-approver-replay-operation",
+                reviewed_at="2026-10-08T18:10:00Z",
+            )
+            self.assertNotEqual(
+                e.sha("managed-qualification-approver-observation"),
+                old_observation_sha,
+            )
+            self.assertNotEqual(
+                e.sha("managed-qualification-approval-evidence"),
+                old_approval_evidence_sha,
+            )
+            context = replace(
+                e.context(),
+                now=datetime(2026, 10, 9, 17, 59, 59, tzinfo=timezone.utc),
+            )
+            excluded = {e.reviewer_principal, "author"}
+            approval_receipt = validate_receipt(
+                context,
+                "qualification_approval_receipt",
+                expected_kind="qualification",
+                subject_key="reviewer_qualification",
+                excluded_principals=excluded,
+            )
+            _managed_approval(
+                context,
+                e.qualification,
+                "reviewer_qualification",
+                e.reviewer_principal,
+                excluded,
+                approval_receipt,
+            )
+
+            with self.assertRaisesRegex(
+                RecordError,
+                "managed qualification qualified_at does not equal evidence completion",
+            ):
+                validate_qualification(
+                    context, candidate_principal=e.reviewer_principal
+                )
+
+    def test_managed_evidence_completion_and_strict_24_hour_boundary(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-boundary-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            self.assertEqual(e.qualification["qualified_at"], "2026-10-06T18:00:00Z")
+            before_expiry = replace(
+                e.context(),
+                now=datetime(2026, 10, 7, 17, 59, 59, tzinfo=timezone.utc),
+            )
+            self.assertEqual(
+                validate_qualification(
+                    before_expiry, candidate_principal=e.reviewer_principal
+                )["qualified_at"],
+                "2026-10-06T18:00:00Z",
+            )
+            at_expiry = replace(
+                before_expiry,
+                now=datetime(2026, 10, 7, 18, 0, tzinfo=timezone.utc),
+            )
+            with self.assertRaisesRegex(RecordError, "qualification expired/not-yet-valid"):
+                validate_qualification(at_expiry, candidate_principal=e.reviewer_principal)
+
+    def test_managed_qualification_serialization_delay_does_not_move_freshness(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-serialization-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            qualification_path = Path(e.entries["reviewer_qualification"]["path"])
+            serialized_at = datetime(2026, 10, 6, 19, 0, tzinfo=timezone.utc)
+            serialized_epoch = serialized_at.timestamp()
+            # Model a controller that writes the same qualification bytes at 19:00.
+            os.utime(qualification_path, (serialized_epoch, serialized_epoch))
+            self.assertAlmostEqual(
+                qualification_path.stat().st_mtime,
+                serialized_epoch,
+                delta=1,
+            )
+            self.assertEqual(e.qualification["qualified_at"], "2026-10-06T18:00:00Z")
+
+            result = validate_qualification(
+                e.context(), candidate_principal=e.reviewer_principal
+            )
+            self.assertEqual(result["qualified_at"], "2026-10-06T18:00:00Z")
+
     def test_managed_alias_contract_and_fail_closed_production(self):
         with tempfile.TemporaryDirectory(prefix="managed-alias-foundation-") as tmp:
             e = Evidence(Path(tmp), reviewer_type="agent")

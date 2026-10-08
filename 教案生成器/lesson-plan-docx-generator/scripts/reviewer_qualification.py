@@ -3,7 +3,7 @@
 from __future__ import annotations
 import base64
 from dataclasses import replace
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from lifecycle_digest import canonical_json_bytes, sha256_bytes
@@ -229,11 +229,15 @@ def _agent_evidence(
     seen_review_hashes: list[str] = []
     authors: set[str] = {author_principal} if author_principal else set()
     service_identities: set[str] = set()
+    # Only timestamps from evidence validated below may set managed freshness.
+    managed_evidence_completion_times: list[datetime] = []
     for run in runs:
+        run_started_at = stamp(run["started_at"])
+        run_completed_at = stamp(run["completed_at"])
         require(
             stamp(approval["recorded_at"])
-            <= stamp(run["started_at"])
-            < stamp(run["completed_at"])
+            <= run_started_at
+            < run_completed_at
             <= stamp(qualification["qualified_at"]),
             "invalid evaluation chronology",
         )
@@ -321,6 +325,8 @@ def _agent_evidence(
                 "operation": op,
                 "review": review,
             }
+        if qualification["contract_version"] == "1.1":
+            managed_evidence_completion_times.append(run_completed_at)
     require(
         approval["actor_principal"] not in authors,
         "corpus adjudicator equals evaluation author",
@@ -413,12 +419,26 @@ def _agent_evidence(
                     "adjudication not protected-index captured",
                 )
                 context.not_revoked(records[0]["operation_id"])
+                if qualification["contract_version"] == "1.1":
+                    managed_evidence_completion_times.append(
+                        stamp(adjudication["recorded_at"])
+                    )
                 hard_miss |= (
                     observed["observed_disposition"] != case["expected_disposition"]
                     or not observed["critical_truth_satisfied"]
                 )
             require(result["hard_miss"] == hard_miss, "cached hard_miss forgery")
             passed &= not hard_miss
+    if qualification["contract_version"] == "1.1":
+        require(
+            bool(managed_evidence_completion_times),
+            "managed qualification has no validated evidence completion",
+        )
+        require(
+            stamp(qualification["qualified_at"])
+            == max(managed_evidence_completion_times),
+            "managed qualification qualified_at does not equal evidence completion",
+        )
     # Every evaluation author, not just the caller's current author, is excluded.
     return passed, authors
 
