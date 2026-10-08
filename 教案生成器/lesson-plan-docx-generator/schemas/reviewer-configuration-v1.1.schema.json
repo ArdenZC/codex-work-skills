@@ -1,0 +1,378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reviewer-configuration 1.1 managed alias",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "configuration_version",
+    "reviewer_type",
+    "implementation",
+    "version",
+    "implementation_build_sha256",
+    "context_policy",
+    "agent",
+    "human"
+  ],
+  "properties": {
+    "configuration_version": {
+      "const": "1.1"
+    },
+    "reviewer_type": {
+      "const": "agent"
+    },
+    "implementation": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "implementation_build_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "context_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_sha256",
+        "whole_course",
+        "verified_sources_only",
+        "author_reasoning_hidden",
+        "candidate_read_only"
+      ],
+      "properties": {
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "whole_course": {
+          "const": true
+        },
+        "verified_sources_only": {
+          "const": true
+        },
+        "author_reasoning_hidden": {
+          "const": true
+        },
+        "candidate_read_only": {
+          "const": true
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_reference",
+        "model_revision",
+        "provider_reference",
+        "semantic_prompt_sha256",
+        "system_instructions_sha256",
+        "decoding",
+        "tool_permissions_sha256",
+        "agent_identity_mode",
+        "service_observation_policy_sha256",
+        "qualification_approver_prompt_sha256",
+        "fallback_policy"
+      ],
+      "properties": {
+        "model_reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "model_revision": {
+          "const": null
+        },
+        "provider_reference": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "semantic_prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "system_instructions_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "decoding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "temperature",
+            "top_p",
+            "seed",
+            "max_output_tokens",
+            "additional_parameters"
+          ],
+          "properties": {
+            "temperature": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "top_p": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "seed": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 64,
+                  "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "max_output_tokens": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "additional_parameters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  "value": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 600
+                      },
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              },
+              "minItems": 0
+            }
+          }
+        },
+        "tool_permissions_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "agent_identity_mode": {
+          "const": "managed_alias"
+        },
+        "service_observation_policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "qualification_approver_prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fallback_policy": {
+          "const": "deny"
+        }
+      }
+    },
+    "human": {
+      "const": null
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "reviewer_type": {
+          "const": "agent"
+        },
+        "agent": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "model_reference",
+            "model_revision",
+            "provider_reference",
+            "semantic_prompt_sha256",
+            "system_instructions_sha256",
+            "decoding",
+            "tool_permissions_sha256",
+            "agent_identity_mode",
+            "service_observation_policy_sha256",
+            "qualification_approver_prompt_sha256",
+            "fallback_policy"
+          ],
+          "properties": {
+            "model_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "model_revision": {
+              "const": null
+            },
+            "provider_reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "\\S"
+            },
+            "semantic_prompt_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "system_instructions_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "decoding": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "temperature",
+                "top_p",
+                "seed",
+                "max_output_tokens",
+                "additional_parameters"
+              ],
+              "properties": {
+                "temperature": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "top_p": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "seed": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 64,
+                      "pattern": "^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "max_output_tokens": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "additional_parameters": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "name",
+                      "value"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "\\S"
+                      },
+                      "value": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "maxLength": 600
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "minItems": 0
+                }
+              }
+            },
+            "tool_permissions_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "agent_identity_mode": {
+              "const": "managed_alias"
+            },
+            "service_observation_policy_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "qualification_approver_prompt_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "fallback_policy": {
+              "const": "deny"
+            }
+          }
+        },
+        "human": {
+          "const": null
+        }
+      }
+    }
+  ]
+}

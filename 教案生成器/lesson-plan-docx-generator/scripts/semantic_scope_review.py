@@ -14,6 +14,8 @@ from semantic_scope_records import (
     require,
     review_fingerprint,
     stamp,
+    managed_service_identity_fingerprint,
+    validate_managed_service_observation,
     validate_configuration,
 )
 from operation_provenance import validate_receipt
@@ -245,6 +247,27 @@ def validate_review(
             author_principal=receipt["author_principal"],
         )
         require(qualification["disposition"] == "QUALIFIED", "reviewer NOT_QUALIFIED")
+        if config["configuration_version"] == "1.1":
+            require(
+                qualification["contract_version"] == "1.1",
+                "managed production review needs managed qualification 1.1",
+            )
+            observation_binding = receipt["input_bindings"][
+                "managed_service_observation"
+            ]
+            observation = validate_managed_service_observation(
+                inventory,
+                observation_binding["inventory_key"],
+                observation_binding["sha256"],
+                config,
+                receipt["operation_id"],
+                now=context.now,
+            )
+            require(
+                managed_service_identity_fingerprint(observation)
+                == qualification["service_identity_fingerprint"],
+                "production service identity changed since qualification",
+            )
     else:
         require(
             review["reviewer"]["qualification_sha256"] is None,

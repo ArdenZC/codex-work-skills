@@ -7,6 +7,12 @@ integration qualification and one Draft PR, without production activation.
 Live reviewer qualification, RC-02 and Lesson 2.4 remain separate blocked gates.
 Historical design-stage references below do not change this normative policy.
 
+Issue #52 has a separate draft extension for providers that expose managed model
+aliases without immutable revisions: [Managed Alias Reviewer Identity Contract](managed-alias-reviewer-identity-contract-v1.md).
+It adds closed Configuration 1.1, Qualification 1.1 and operation receipt 1.1
+branches; the Reviewer Configuration 1.0 and human-reviewer clauses below stay
+unchanged.
+
 ## 1. Authority and independent review
 
 Agent/Human reviewers judge instructional meaning. Python validates structure,

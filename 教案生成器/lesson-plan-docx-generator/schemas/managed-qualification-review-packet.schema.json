@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "managed-qualification-review-packet 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "packet_version",
+    "qualification_sha256",
+    "reviewer_configuration_sha256",
+    "service_identity_fingerprint",
+    "operations",
+    "exposure"
+  ],
+  "properties": {
+    "packet_version": {
+      "const": "1.0"
+    },
+    "qualification_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer_configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "service_identity_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation_ref",
+          "review_sha256",
+          "receipt_sha256",
+          "service_observation_sha256",
+          "service_identity",
+          "review_report_base64"
+        ],
+        "properties": {
+          "operation_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          },
+          "review_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "service_observation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "service_identity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "provider_service_reference",
+              "requested_alias",
+              "reported_model_identifier",
+              "reported_model_revision",
+              "service_fingerprint",
+              "service_api_version",
+              "client_build_sha256",
+              "observation_policy_sha256",
+              "service_identity_fingerprint"
+            ],
+            "properties": {
+              "provider_service_reference": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "requested_alias": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "reported_model_identifier": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reported_model_revision": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "service_fingerprint": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "service_api_version": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "\\S"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "client_build_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observation_policy_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "service_identity_fingerprint": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "review_report_base64": {
+            "type": "string",
+            "minLength": 4,
+            "contentEncoding": "base64",
+            "description": "Canonical reviewer report display bytes with every corpus case identifier deterministically redacted. review_sha256 binds the original protected report bytes."
+          }
+        }
+      }
+    },
+    "exposure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_labels",
+        "critical_truth",
+        "blind_holdout_truth",
+        "adjudication_results",
+        "case_identifiers",
+        "review_outputs_included",
+        "fresh_context"
+      ],
+      "properties": {
+        "expected_labels": {
+          "const": false
+        },
+        "critical_truth": {
+          "const": false
+        },
+        "blind_holdout_truth": {
+          "const": false
+        },
+        "adjudication_results": {
+          "const": false
+        },
+        "case_identifiers": {
+          "const": false
+        },
+        "review_outputs_included": {
+          "const": true
+        },
+        "fresh_context": {
+          "const": true
+        }
+      }
+    }
+  }
+}

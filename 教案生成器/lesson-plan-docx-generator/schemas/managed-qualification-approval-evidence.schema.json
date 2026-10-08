@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "managed-qualification-approval-evidence 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "evidence_version",
+    "qualification_sha256",
+    "reviewer_configuration_sha256",
+    "reviewer_principal",
+    "approver_principal",
+    "operation_id",
+    "approval_prompt_sha256",
+    "review_packet_inventory_key",
+    "review_packet_sha256",
+    "service_observation_inventory_key",
+    "service_observation_sha256",
+    "response_inventory_key",
+    "response_sha256",
+    "decision",
+    "rationale",
+    "reviewed_at"
+  ],
+  "properties": {
+    "evidence_version": {
+      "const": "1.0"
+    },
+    "qualification_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer_configuration_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "reviewer_principal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "approver_principal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "approval_prompt_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "review_packet_inventory_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "review_packet_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "service_observation_inventory_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "service_observation_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "response_inventory_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "response_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "decision": {
+      "enum": [
+        "APPROVED",
+        "REJECTED"
+      ]
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200,
+      "pattern": "\\S"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
