@@ -224,7 +224,7 @@ class TestShardManifest(unittest.TestCase):
                     environment.update({key: "false" if key.startswith("RUN_") or key=="FORCE_FULL" else "skipped" for key in step["env"]})
                     environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome)
                     if required:
-                        environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success")
+                        environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success", SEMANTIC_LIFECYCLE_RESULT="success")
                     result = subprocess.run(["bash", "-c", step["run"]], env=environment, capture_output=True, text=True)
                     expected = outcome == ("success" if required else "skipped")
                     self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)

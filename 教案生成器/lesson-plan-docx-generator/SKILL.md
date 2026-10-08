@@ -185,3 +185,9 @@ python scripts/generate_lesson_plans.py --tasks-json tasks.json --output-dir out
 `--skip-template-validation`、`--skip-output-validation` 只允许受控测试并需显式环境变量；生产交付不得绕过。安装器不自动安装 Python 依赖，只执行完整源树、shared schema、模板和 fingerprint 的事务安装；完成后应在新会话中验证 Skill 版本和真实生成路径。
 
 Content 2.0/2.1 只走明确 `--legacy` 兼容入口；Content 2.2 是历史合同兼容输入；默认新生成遵循 2.3。不要删除、修改或重新发布 `lesson-plan v1.1.2` 模板 binary，也不要在本轮进入 Phase 3 或完整课程批量生产。
+
+## RQ-03O2 opt-in lifecycle
+
+显式 Orchestrator/Pipeline 2.0 运行要求独立 Semantic Scope Review 1.0、完整来源/配置/资格/受保护操作证据、Teacher Packet/Review 2.0 和 PA 2.0。歧义必须逐项由独立教师批准操作解决，确定性修订不得 waiver。外部 operator TrustContext 未配置时生产失败关闭；历史 1.0 和 standalone 行为保持 legacy，不授予 O2 权限。安装、更改正文/来源/outline 或权限策略后必须按合同重新运行与审查。Skill 2.3.1、Content 2.3、Template 1.1.2、Acceptance 3.0 不变，未发布 2.4。
+
+版本分派、控制器配置和门禁见 [Semantic lifecycle 2.0](docs/semantic-scope-lifecycle-v2.md).

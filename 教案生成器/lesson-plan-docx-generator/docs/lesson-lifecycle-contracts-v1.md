@@ -236,3 +236,9 @@ python -B scripts/teacher_review.py validate review.json --source-truth source-t
 python -B scripts/production_authorization.py validate authorization.json --source-truth source-truth.json --content lesson-content.json --teacher-review review.json
 python -B scripts/pipeline_state.py validate state.json --source-truth source-truth.json --content lesson-content.json --teacher-review review.json --authorization authorization.json
 ```
+
+## RQ-03O2 opt-in lifecycle
+
+显式 Orchestrator/Pipeline 2.0 运行要求独立 Semantic Scope Review 1.0、完整来源/配置/资格/受保护操作证据、Teacher Packet/Review 2.0 和 PA 2.0。歧义必须逐项由独立教师批准操作解决，确定性修订不得 waiver。外部 operator TrustContext 未配置时生产失败关闭；历史 1.0 和 standalone 行为保持 legacy，不授予 O2 权限。安装、更改正文/来源/outline 或权限策略后必须按合同重新运行与审查。Skill 2.3.1、Content 2.3、Template 1.1.2、Acceptance 3.0 不变，未发布 2.4。
+
+版本分派、控制器配置和门禁见 [Semantic lifecycle 2.0](semantic-scope-lifecycle-v2.md).

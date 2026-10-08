@@ -133,6 +133,10 @@ CRITICAL_LIFECYCLE_SCHEMA_FILES = tuple(Path("schemas") / name for name in (
     "visual-review-authority.schema.json", "lesson-acceptance-v3.schema.json",
 ))
 CRITICAL_LIFECYCLE_SOURCE_FILES = (*CRITICAL_LIFECYCLE_RUNTIME_FILES, *CRITICAL_LIFECYCLE_SCHEMA_FILES)
+CRITICAL_LIFECYCLE_SOURCE_FILES += (Path("scripts/semantic_lifecycle.py"),)
+CRITICAL_LIFECYCLE_SOURCE_FILES += tuple(Path("schemas") / (name + "-v2.schema.json") for name in (
+    "pipeline-state", "teacher-review", "teacher-review-packet", "production-authorization",
+))
 CRITICAL_PRODUCTION_SOURCE_FILES = tuple(dict.fromkeys((
     *CRITICAL_GENERATOR_SOURCE_FILES, *CRITICAL_LIFECYCLE_SOURCE_FILES,
 )))

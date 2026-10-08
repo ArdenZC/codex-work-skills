@@ -167,6 +167,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "lesson-quality": SuiteSpec(
             "lesson-quality", True, "module", _module_count("tests.test_benchmark_quality_eligibility")
         ),
+        "lesson-semantic-lifecycle": SuiteSpec("lesson-semantic-lifecycle", False, "module", _module_count("tests.test_semantic_lifecycle"), "lesson-render"),
         "lesson-final-acceptance": SuiteSpec("lesson-final-acceptance", False, "module",
             _module_count("tests.test_lesson_final_acceptance"), "lesson-render"),
         "lesson-teacher-review": SuiteSpec("lesson-teacher-review", True, "module",
@@ -211,7 +212,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 ALIASES = {
     "semantic-scope": SEMANTIC_SCOPE_SHARDS,
     "fast": ("lesson-content", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "full": ("lesson-semantic-lifecycle", "lesson-content", "lesson-package", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -237,6 +238,8 @@ def _expand_suites(requested: Sequence[str], specs: dict[str, SuiteSpec]) -> tup
 def _suite_test_ids(name: str) -> tuple[str, ...]:
     if name in SEMANTIC_SCOPE_SHARDS:
         return _semantic_scope_partitions()[name]
+    if name == "lesson-semantic-lifecycle":
+        return ("tests.test_semantic_lifecycle",)
     if name == "lesson-content":
         return _lesson_content_ids()
     if name == "lesson-lifecycle":

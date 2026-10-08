@@ -118,3 +118,10 @@ installer inventories the full ordinary-file tree and uses `copytree`, followed
 by staged byte-inventory comparison. It does not provision or approve an operator
 profile. Root-level tests/fixtures and audit reports are outside the installed
 Skill. Existing release/version identities and the 35-minute CI budget remain.
+
+## O2 opt-in integration
+
+The O1 foundation remains unchanged. RQ-03O2 adds explicit lifecycle 2.0
+dispatch through the same external TrustContext, not a second authority system.
+See [semantic-scope-lifecycle-v2.md](semantic-scope-lifecycle-v2.md) for version
+compatibility, controller setup, atomic publication and qualification limits.

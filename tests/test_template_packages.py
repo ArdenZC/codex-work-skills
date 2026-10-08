@@ -3994,6 +3994,7 @@ esac
                 "template-tooling",
                 "template-lesson",
                 "lesson-semantic-scope",
+                "lesson-semantic-lifecycle",
                 "lesson-final-acceptance",
                 "template-gradebook",
                 "template-workorder",

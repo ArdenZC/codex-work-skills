@@ -627,6 +627,20 @@ def _artifact_relative_path(root: Path, value: Any) -> Path | None:
 def verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: Path) -> str | None:
     """Verify manifest provenance and return the artifact-level production state."""
 
+    if "canonical_lifecycle" in manifest:
+        block = manifest["canonical_lifecycle"]
+        if not isinstance(block, dict) or set(block) != {"orchestrator_version", "production_authorization_sha256", "semantic_scope"} or block["orchestrator_version"] != "2.0":
+            raise RuntimeError("invalid O2 artifact provenance block")
+        from lifecycle_digest import read_json_object, sha256_bytes
+        from production_authorization import validate_production_authorization_payload
+        authorization, raw = read_json_object(root / "production-authorization.json", "artifact PA")
+        if validate_production_authorization_payload(authorization) or authorization["contract_version"] != "2.0":
+            raise RuntimeError("artifact provenance requires structurally valid PA 2.0")
+        if block["production_authorization_sha256"] != sha256_bytes(raw) or block["semantic_scope"] != authorization["semantic_scope"] or authorization["pipeline_run_id"] != manifest.get("run_id") or authorization["content_sha256"] != sha256_bytes(source_path.read_bytes()):
+            raise RuntimeError("STALE O2 artifact/PA byte bindings")
+        # This verifies stored provenance bytes only. Current external process
+        # authority is independently required by the canonical run validator.
+
     required = {
         "run_id",
         "course_name",
@@ -1081,7 +1095,14 @@ def _commit_candidate_transaction(
         print(f"WARNING: {diagnostic}", file=sys.stderr)
     return displaced_output
 
-def main() -> None:
+def main(argv=None, *, o2_run=None) -> None:
+    def revalidate_o2():
+        if o2_run is not None:
+            from run_lesson_pipeline import validate_run_authorized
+            if o2_run.get("orchestrator_version") != "2.0" or o2_run.get("mode") != "PRODUCTION" or o2_run["state"]["current_state"] != "PRODUCTION_AUTHORIZED":
+                raise ValueError("O2 generation requires current PRODUCTION_AUTHORIZED run")
+            validate_run_authorized(o2_run)
+    revalidate_o2()
     parser = argparse.ArgumentParser(description="Generate template-matched Chinese lesson plan DOCX files.")
     parser.add_argument("--template", default="")
     parser.add_argument("--tasks-json", required=True)
@@ -1131,7 +1152,24 @@ def main() -> None:
         action="store_true",
         help="Explicitly enable the non-production 2.0/2.1 compatibility path",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
+    if o2_run is not None:
+        from run_lesson_pipeline import path_of
+        from path_safety import paths_equal
+        if not paths_equal(args.tasks_json, path_of(o2_run, "content")) or not args.source_truth or not paths_equal(args.source_truth, path_of(o2_run, "source_truth")):
+            raise ValueError("O2 generator inputs differ from authorized candidate")
+        if args.run_id != o2_run["state"]["pipeline_run_id"] or not args.render or args.legacy or args.skip_output_validation or args.skip_template_validation or args.allow_test_fixture_authoring:
+            raise ValueError("O2 generation requires exact run, render and all existing gates")
+        canonical_template = manifest_template_path(load_manifest(DEFAULT_MANIFEST))
+        if (args.manifest and not paths_equal(args.manifest, DEFAULT_MANIFEST)) or (args.template and not paths_equal(args.template, canonical_template)) or not paths_equal(args.schema, DEFAULT_SCHEMA):
+            raise ValueError("O2 generation requires the canonical template, manifest and schema")
+        from lifecycle_digest import read_json_object
+        disposition, _ = read_json_object(path_of(o2_run, "benchmark_disposition"), "O2 Benchmark disposition")
+        if disposition["benchmark"]["disposition"] == "BENCHMARK_REVIEW_COMPLETE":
+            if args.benchmark_mode != "required" or args.benchmark_authorization is None or not paths_equal(args.benchmark_authorization, path_of(o2_run, "benchmark_authorization")):
+                raise ValueError("O2 generation must retain the authorized required Benchmark branch")
+        elif args.benchmark_mode != "none":
+            raise ValueError("O2 generation Benchmark mode differs from the authorized disposition")
     if (args.skip_template_validation or args.skip_output_validation) and os.environ.get(UNSAFE_VALIDATION_SKIP_ENV) != "1":
         raise RuntimeError("Unsafe validation bypass is disabled.")
     allow_test_fixture_authoring = args.allow_test_fixture_authoring
@@ -1325,6 +1363,7 @@ def main() -> None:
         for warning in template_warnings:
             print(f"WARNING: {warning}")
 
+    revalidate_o2()
     out_dir.parent.mkdir(parents=True, exist_ok=True)
     candidate = Path(tempfile.mkdtemp(prefix=f".{out_dir.name}.candidate-", dir=str(out_dir.parent)))
     assert_output_path_safe(candidate, protected_paths)
@@ -1410,6 +1449,13 @@ def main() -> None:
             benchmark_authorization=benchmark_authorization,
             benchmark_authorization_sha256=benchmark_authorization_sha256,
         )
+        if o2_run is not None:
+            from lifecycle_digest import read_json_object, sha256_bytes
+            from run_lesson_pipeline import path_of
+            authorization, raw = read_json_object(path_of(o2_run, "production_authorization"), "O2 PA")
+            (candidate / "production-authorization.json").write_bytes(raw)
+            manifest_data["canonical_lifecycle"] = dict(orchestrator_version="2.0", production_authorization_sha256=sha256_bytes(raw),
+                semantic_scope=authorization["semantic_scope"])
         # Production readiness is derived only after this tentative manifest's
         # files, hashes, and final page counts have all been verified.
         manifest_data.pop("production_status", None)
@@ -1439,11 +1485,13 @@ def main() -> None:
         _verify_artifact_manifest(candidate, manifest_data, source_path)
 
         def post_commit_validate(published: Path) -> None:
+            revalidate_o2()
             committed_manifest = json.loads((published / "artifact-manifest.json").read_text(encoding="utf-8"))
             _verify_artifact_manifest(published, committed_manifest, source_path)
             if external_qa is not None and _file_sha256(external_qa) != _file_sha256(published / "qa-report.json"):
                 raise RuntimeError("published external QA does not match the final output QA report")
 
+        revalidate_o2()
         if external_qa is not None:
             if not external_qa.parent.exists():
                 external_qa.parent.mkdir(parents=True, exist_ok=True)
