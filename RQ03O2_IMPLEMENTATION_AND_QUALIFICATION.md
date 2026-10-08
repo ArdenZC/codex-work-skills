@@ -71,12 +71,29 @@ Negative controls cover waiver/Benchmark readiness bypass, definite revision,
 missing/duplicate/human-revision ambiguity resolutions, Teacher 1.0 downgrade,
 unprovisioned authority, raw report staleness, transitive build mutation even when
 the external inventory is repinned, current teacher revocation/profile rotation,
-final stale generation rollback, and original N01/NC-02. The original JSON is
-read without rewriting and checked against
-`878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352`;
-its historical manifest/outline/profile bytes are copied unchanged. It yields
-REVISION_REQUIRED in the independent synthetic record and rejects actual
-production entry points without PA/output creation.
+and final stale generation rollback.
+
+The exact historical NC-02 JSON is read without rewriting and checked against
+SHA-256 `878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352`.
+Its historical Source Truth manifest, frozen outline and confirmed profile are
+copied byte-for-byte from the existing fixture. The test binds a contract-valid
+synthetic `WAIVED_BY_USER` record to those exact Source Truth and Content bytes;
+`bind-content`, Preproduction QA and final Benchmark disposition all pass. The
+independently validated Semantic Scope Review is then bound to the O2 run with
+`whole_course_disposition=REVISION_REQUIRED`. The actual
+`ready-for-teacher-review` call fails with `semantic REVISION_REQUIRED blocks
+READY`, and the run remains `PREPRODUCTION_QA_PASSED`. No Teacher Packet, Teacher
+Review/approval, PA or generated artifact is bound. A pre-existing output
+sentinel remains byte-identical, and no candidate or backup remains. Thus this
+is an exact historical-byte regression that reaches and is rejected by the
+actual semantic readiness gate; its failure is not caused by missing
+pre-semantic prerequisites.
+
+The Teacher Packet CLI regression creates and validates real 1.0 and 2.0
+packets through the lifecycle builder. It invokes the CLI for both; the O2
+invocation registers the test's externally supplied `TrustContext` in its fresh
+process, so packet derivation and validation run without a mock or trust bypass.
+Successful JSON output reports the validated packet's own contract version.
 
 The 32-Lesson course test verifies complete semantic coverage and a bounded
 six-Lesson Teacher sample with a complete issue index containing an unselected
@@ -91,14 +108,15 @@ Gradebook, Release and 32-Lesson retained-render E2E suites remain required.
 
 Local verification before the final commit:
 
-- All 23 new O2 integration tests passed in the final uninterrupted local run.
+- All 24 O2 integration tests passed in the final uninterrupted local run.
 - 175 existing lifecycle, pipeline and Teacher-selection regression tests passed.
+- 144 Final Acceptance, release compatibility and Lesson skill-hardening tests passed.
 - Seven static canonical template package identity/hash/schema checks passed;
   full Windows/macOS package validators remain required in CI. The Lesson template remains
   SHA-256 `6ffafa579d3aacbc535ba624d0a6a766644868b0af1fce6ac37b20ba8f3d8fc1`.
 - After the render-timeout correction, 11 focused shard/workflow/gate assertions passed. The manifest lists three exact singleton render partitions
-  plus the complementary 20-test evidence partition; the three render partitions are
-  pairwise disjoint and together with evidence cover all 23 O2 tests. The full shard
+  plus the complementary 21-test evidence partition; the three render partitions are
+  pairwise disjoint and together with evidence cover all 24 O2 tests. The full shard
   runner suite had one unrelated local Gradebook validator failure: it reports a
   protected workbook formatting mismatch. No Gradebook code or template bytes changed;
   the required Windows/macOS CI remains the qualification gate for those validators.

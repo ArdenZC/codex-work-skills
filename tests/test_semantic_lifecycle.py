@@ -248,15 +248,44 @@ finally: case.doCleanups()
         for key, path in (("source_truth_manifest", authority / "source-truth.json"), ("outline", authority / "evidence/whole-course-outline.json"),
             ("confirmed-profile", authority / "evidence/confirmed-profile.json")):
             self.e.add(key, path)
+        historical_source_bytes = {
+            key: Path(self.e.entries[key]["path"]).read_bytes()
+            for key in ("source_truth_manifest", "outline", "confirmed-profile")
+        }
         content = json.loads(original.read_bytes())
+        content_bytes = json.dumps(content, ensure_ascii=False)
+        self.assertIn("完成患者血压测量与护理判断。", content_bytes)
+        self.assertIn("按无菌操作要求执行输液步骤并观察患者反应。", content_bytes)
         self.e.index["authors"] = []
         self.e.author(content, "content")
         self.e.review(pipeline="RUN-001", disposition="REVISION_REQUIRED")
         report = validate_review(self.e.context(), frozen_lesson_ids=[row["lesson_id"] for row in content["lessons"]], pipeline_run_id="RUN-001")
         self.assertEqual(report["whole_course_disposition"], "REVISION_REQUIRED")
-        self.call("init", mode="PRODUCTION", run_id="RUN-001", source_truth=authority / "source-truth.json", orchestrator_version="2.0")
-        self.call("freeze-source-truth")
-        self.reject("bind-content", content=Path(self.e.entries["content"]["path"]))
+        # Use a contract-valid, hash-bound synthetic waiver so this historical
+        # input crosses every mandatory pre-semantic Production gate.
+        self.qa()
+        run = self.call("bind-semantic-scope-review")
+        self.assertEqual(run["state"]["current_state"], "PREPRODUCTION_QA_PASSED")
+        self.assertEqual(run["bindings"]["content"]["sha256"], "878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352")
+        self.assertEqual(run["bindings"]["benchmark_evidence"]["sha256"], sha256_file(self.e.run / "waiver.json"))
+        self.assertEqual(run["bindings"]["benchmark_disposition"]["sha256"], run["state"]["artifacts"]["benchmark_disposition_sha256"])
+        self.assertEqual(run["bindings"]["semantic_scope_review"]["sha256"], self.e.sha("semantic_scope_review"))
+        waiver = json.loads(Path(run["bindings"]["benchmark_evidence"]["path"]).read_bytes())
+        disposition = json.loads(Path(run["bindings"]["benchmark_disposition"]["path"]).read_bytes())
+        self.assertEqual(waiver["decision"], "WAIVED_BY_USER")
+        self.assertEqual(waiver["source_truth_manifest_sha256"], run["bindings"]["source_truth"]["sha256"])
+        self.assertEqual(waiver["content_sha256"], run["bindings"]["content"]["sha256"])
+        self.assertEqual(disposition["benchmark"]["disposition"], "BENCHMARK_WAIVED_BY_USER")
+        self.assertEqual(disposition["benchmark"]["evidence_sha256"], run["bindings"]["benchmark_evidence"]["sha256"])
+        before_ready = self.run.read_bytes()
+        with self.assertRaisesRegex(LifecycleContractError, "semantic REVISION_REQUIRED blocks READY"):
+            self.call("ready-for-teacher-review")
+        self.assertEqual(before_ready, self.run.read_bytes())
+        blocked = self.call("status")
+        self.assertEqual(blocked["state"]["current_state"], "PREPRODUCTION_QA_PASSED")
+        self.assertFalse({"teacher_review_packet", "teacher_review", "teacher_approval_receipt",
+                          "production_authorization", "artifact_manifest", "artifact_qa", "acceptance"}
+                         & set(blocked["bindings"]))
         self.reject("authorize-production", authorization=self.e.run / "missing-pa.json")
         output = self.e.run / "output"
         output.mkdir()
@@ -268,6 +297,71 @@ finally: case.doCleanups()
         self.assertFalse(list(output.parent.glob(".output.candidate-*")))
         self.assertFalse(list(output.parent.glob("_output_backup_*")))
         self.assertEqual(original.read_bytes(), Path(self.e.entries["content"]["path"]).read_bytes())
+        self.assertEqual(sha256_file(original), "878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352")
+        for key, raw in historical_source_bytes.items():
+            self.assertEqual(Path(self.e.entries[key]["path"]).read_bytes(), raw)
+
+    def test_teacher_review_packet_cli_reports_validated_contract_version(self):
+        from tests.test_lesson_pipeline import PipelineTests
+
+        cli = pipeline.SKILL_ROOT / "scripts/teacher_review_packet.py"
+        legacy = PipelineTests("test_unavailable_disposition_direct_ready")
+        legacy.setUp()
+        try:
+            legacy.qa()
+            disposition, evidence, _ = legacy.disposition()
+            legacy.call("bind-benchmark-disposition", disposition=disposition, benchmark_evidence=evidence)
+            legacy_run = legacy.call("prepare-teacher-review")
+            legacy_packet = pipeline.path_of(legacy_run, "teacher_review_packet")
+            self.assertEqual(json.loads(legacy_packet.read_bytes())["contract_version"], "1.0")
+            legacy_result = subprocess.run(
+                [sys.executable, "-B", str(cli), "--run", str(legacy.run), "--packet", str(legacy_packet)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(legacy_result.returncode, 0, legacy_result.stdout + legacy_result.stderr)
+            self.assertEqual(json.loads(legacy_result.stdout), {"status": "VALID", "contract_version": "1.0"})
+        finally:
+            legacy.doCleanups()
+
+        o2_run = self.ready()
+        o2_run = self.call("prepare-teacher-review")
+        o2_packet = pipeline.path_of(o2_run, "teacher_review_packet")
+        self.assertEqual(json.loads(o2_packet.read_bytes())["contract_version"], "2.0")
+        context = self.e.context()
+        config = self.e.run / "teacher-packet-cli-controller.json"
+        _write_json(config, dict(
+            entries={key: dict(row) for key, row in context.inventory.entries.items()},
+            run_root=str(self.e.run),
+            protected_root=str(self.e.protected),
+            profile=str(context.profile_path),
+            pin=context.profile_pin,
+            index=str(context.operation_index_path),
+        ))
+        script = """
+import json, runpy, sys
+from datetime import datetime, timezone
+from pathlib import Path
+config_path, cli_path, run_path, packet_path = map(Path, sys.argv[1:])
+sys.path.insert(0, str(cli_path.parent))
+from semantic_scope_records import Inventory, TrustContext
+import semantic_lifecycle
+config = json.loads(config_path.read_bytes())
+def provider():
+    inventory = Inventory(config['entries'], Path(config['run_root']), (Path(config['protected_root']),))
+    return TrustContext(inventory, Path(config['profile']), config['pin'], 1, Path(config['index']),
+        (('controller', 'controlled', '1.0'),), datetime.now(timezone.utc))
+with semantic_lifecycle.operator_context(provider):
+    sys.argv = [str(cli_path), '--run', str(run_path), '--packet', str(packet_path)]
+    runpy.run_path(str(cli_path), run_name='__main__')
+"""
+        o2_result = subprocess.run(
+            [sys.executable, "-B", "-c", script, str(config), str(cli), str(self.run), str(o2_packet)],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(o2_result.returncode, 0, o2_result.stdout + o2_result.stderr)
+        self.assertEqual(json.loads(o2_result.stdout), {"status": "VALID", "contract_version": "2.0"})
 
     def test_missing_human_resolution_blocks_approval(self):
         with self.assertRaises(ValueError):

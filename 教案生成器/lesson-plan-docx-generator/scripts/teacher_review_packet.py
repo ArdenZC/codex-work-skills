@@ -211,8 +211,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         run, _ = read_json_object(args.run, "pipeline run")
-        validate_teacher_review_packet(args.packet, run)
-        print(json.dumps({"status": "VALID", "contract_version": "1.0"}))
+        packet = validate_teacher_review_packet(args.packet, run)
+        print(json.dumps({"status": "VALID", "contract_version": packet["contract_version"]}))
         return 0
     except (ValueError, OSError, TypeError, KeyError) as exc:
         parser.exit(1, f"STALE/INVALID: {exc}\n")
