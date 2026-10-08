@@ -104,7 +104,7 @@ class TestShardManifest(unittest.TestCase):
         prefix = run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".AgentQualificationTests."
         self.assertEqual({test_id.removeprefix(prefix) for test_id in ids
                           if test_id.startswith(prefix + "test_hard_miss_")}, set(expected))
-        self.assertEqual(len(ids), 46)
+        self.assertEqual(len(ids), 51)
         hard_miss_ids = {prefix + name for name in expected}
         for partition in run_test_shards._semantic_scope_partitions().values():
             self.assertEqual(len(hard_miss_ids & set(partition)), 1)

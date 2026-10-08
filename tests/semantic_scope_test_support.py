@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import shutil
@@ -14,6 +14,7 @@ from source_truth import source_truth_fingerprint
 from semantic_scope_records import (
     Inventory,
     TrustContext,
+    managed_service_identity_fingerprint,
     review_fingerprint,
     qualification_fingerprint,
 )
@@ -27,6 +28,8 @@ END = "2027-01-01T00:00:00Z"
 
 class Evidence:
     def __init__(self, root: Path, reviewer_type: str = "human"):
+        self.reviewer_principal = "reviewer"
+        self.approver_principal = "approver"
         self.run = root / "candidate"
         self.protected = root / "operator"
         self.run.mkdir()
@@ -59,8 +62,8 @@ class Evidence:
             self.write(key, {"reference": key}, protected=True)
         for principal, roles in [
             ("author", ["author"]),
-            ("reviewer", ["scope_reviewer"]),
-            ("approver", ["qualification_approver"]),
+            (self.reviewer_principal, ["scope_reviewer"]),
+            (self.approver_principal, ["qualification_approver"]),
             ("adjudicator", ["corpus_adjudicator"]),
         ]:
             ref = principal + "-authorization"
@@ -170,6 +173,87 @@ class Evidence:
             self.qualification_approval()
         self.write("operation_index", self.index, protected=True)
 
+    def enable_managed_alias(self):
+        """Create synthetic operator-provisioned Reviewer A / approver B roles."""
+        self.reviewer_principal = "managed-agent:reviewer-a"
+        self.approver_principal = "managed-agent:qualification-approver-b"
+        self.profile["roles"] = [
+            role
+            for role in self.profile["roles"]
+            if role["principal_id"] not in {"reviewer", "approver"}
+        ]
+        for principal, role_name in (
+            (self.reviewer_principal, "scope_reviewer"),
+            (self.approver_principal, "qualification_approver"),
+        ):
+            reference = principal + "-authorization"
+            self.write(
+                reference,
+                dict(
+                    record_version="1.0",
+                    principal_id=principal,
+                    allowed_roles=[role_name],
+                ),
+                protected=True,
+            )
+            self.profile["roles"].append(
+                dict(
+                    principal_id=principal,
+                    allowed_roles=[role_name],
+                    authorization_reference=reference,
+                    valid_from="2026-01-01T00:00:00Z",
+                    valid_until=END,
+                    revoked_at=None,
+                    revocation_reason=None,
+                )
+            )
+        self.write("authority_profile", self.profile, protected=True)
+        self.write(
+            "service-observation-policy",
+            b"Fixture: exact managed endpoint and response identity fields; fallback denied.",
+            protected=True,
+        )
+        self.write(
+            "approver-prompt",
+            b"Fixture: inspect opaque operation evidence; no expected labels or truth.",
+            protected=True,
+        )
+        self.config["configuration_version"] = "1.1"
+        self.config["agent"] = {
+            **self.config["agent"],
+            "model_reference": "gpt-6.1-sol",
+            "model_revision": None,
+            "provider_reference": "fixture-managed-service",
+            "agent_identity_mode": "managed_alias",
+            "service_observation_policy_sha256": self.sha("service-observation-policy"),
+            "qualification_approver_prompt_sha256": self.sha("approver-prompt"),
+            "fallback_policy": "deny",
+        }
+        self.write(
+            "reviewer_configuration", canonical_json_bytes(self.config), protected=True
+        )
+
+    def managed_observation(self, operation_id, requested_at, observed_at=None):
+        observed_at = observed_at or requested_at
+        return dict(
+            observation_version="1.0",
+            operation_id=operation_id,
+            provider_service_reference="fixture-managed-service",
+            requested_alias="gpt-6.1-sol",
+            reported_model_identifier="gpt-6.1-sol",
+            reported_model_revision=None,
+            service_fingerprint="fixture-service-behavior-window-2026-10",
+            service_api_version="2026-10",
+            request_id="request-" + sha256_bytes(("request-id:" + operation_id).encode())[:18],
+            client_build_sha256=self.sha("build"),
+            observation_policy_sha256=self.sha("service-observation-policy"),
+            request_sha256=sha256_bytes(("request:" + operation_id).encode()),
+            response_sha256=sha256_bytes(("response:" + operation_id).encode()),
+            fallback_detected=False,
+            requested_at=requested_at,
+            observed_at=observed_at,
+        )
+
     def add(self, key: str, path: Path, protected: bool = False):
         self.entries[key] = dict(
             inventory_key=key,
@@ -230,8 +314,9 @@ class Evidence:
         )
 
     def qualification_payload(self, human):
-        return dict(
-            contract_version="1.0",
+        managed = self.config["configuration_version"] == "1.1"
+        payload = dict(
+            contract_version="1.1" if managed else "1.0",
             qualification_id="qualification",
             qualification_purpose=(
                 "human_scope_authority" if human else "agent_corpus_evaluation"
@@ -246,8 +331,8 @@ class Evidence:
             golden_results=[],
             holdout_results=[],
             disposition="QUALIFIED",
-            qualified_at=AT,
-            valid_until=END,
+            qualified_at=("2026-10-06T18:00:00Z" if managed else AT),
+            valid_until=("2026-10-07T18:00:00Z" if managed else END),
             human_authority=(
                 dict(
                     principal_id="reviewer",
@@ -264,6 +349,10 @@ class Evidence:
             ),
             qualification_fingerprint="",
         )
+        if managed:
+            sample = self.managed_observation("fingerprint-seed", "2026-10-06T18:00:00Z")
+            payload["service_identity_fingerprint"] = managed_service_identity_fingerprint(sample)
+        return payload
 
     def write_qualification(self):
         self.qualification["qualification_fingerprint"] = qualification_fingerprint(
@@ -298,7 +387,12 @@ class Evidence:
             else None
         )
         receipt = dict(
-            contract_version="1.0",
+            contract_version=(
+                "1.1"
+                if self.config["configuration_version"] == "1.1"
+                and kind in {"semantic_scope", "qualification"}
+                else "1.0"
+            ),
             receipt_id=key,
             operation_id=op,
             controller_id="controller",
@@ -352,6 +446,85 @@ class Evidence:
         )
 
     def qualification_approval(self):
+        if self.config["configuration_version"] == "1.1":
+            from reviewer_qualification import build_managed_qualification_review_packet
+
+            q_sha = self.sha("reviewer_qualification")
+            config_sha = self.sha("reviewer_configuration")
+            packet_raw = build_managed_qualification_review_packet(
+                self.context(), candidate_principal=self.reviewer_principal
+            )
+            packet = json.loads(packet_raw)
+            operation_refs = [row["operation_ref"] for row in packet["operations"]]
+            self.write("managed-qualification-review-packet", packet_raw, protected=True)
+            response = dict(
+                response_version="1.0",
+                decision="APPROVED",
+                rationale="Synthetic independent evidence review passed.",
+                reviewed_operation_refs=operation_refs,
+                checks=[
+                    dict(
+                        check_id=check,
+                        passed=True,
+                        supporting_operation_refs=operation_refs,
+                    )
+                    for check in (
+                        "operation_coverage",
+                        "artifact_binding",
+                        "service_identity_consistency",
+                        "truth_blindness",
+                        "separate_authority",
+                    )
+                ],
+            )
+            self.write("managed-qualification-approver-response", response, protected=True)
+            op = "managed-qualification-approver-operation"
+            reviewed_at = "2026-10-06T18:10:00Z"
+            service_observation = self.managed_observation(
+                op, "2026-10-06T18:05:00Z", "2026-10-06T18:06:00Z"
+            )
+            self.write(
+                "managed-qualification-approver-observation",
+                canonical_json_bytes(service_observation),
+                protected=True,
+            )
+            evidence = dict(
+                evidence_version="1.0",
+                qualification_sha256=q_sha,
+                reviewer_configuration_sha256=config_sha,
+                reviewer_principal=self.reviewer_principal,
+                approver_principal=self.approver_principal,
+                operation_id=op,
+                approval_prompt_sha256=self.sha("approver-prompt"),
+                review_packet_inventory_key="managed-qualification-review-packet",
+                review_packet_sha256=self.sha("managed-qualification-review-packet"),
+                service_observation_inventory_key="managed-qualification-approver-observation",
+                service_observation_sha256=self.sha("managed-qualification-approver-observation"),
+                response_inventory_key="managed-qualification-approver-response",
+                response_sha256=self.sha("managed-qualification-approver-response"),
+                decision="APPROVED",
+                rationale=response["rationale"],
+                reviewed_at=reviewed_at,
+            )
+            self.write("managed-qualification-approval-evidence", evidence, protected=True)
+            self.receipt(
+                "qualification_approval_receipt",
+                "qualification",
+                "reviewer_qualification",
+                dict(
+                    reviewer_configuration=config_sha,
+                    qualification_corpus=self.sha("qualification_corpus"),
+                    blind_holdout_truth=self.sha("blind_holdout_truth"),
+                    corpus_approval_receipt=self.sha("corpus_approval_receipt"),
+                    managed_qualification_approval_evidence=self.binding(
+                        "managed-qualification-approval-evidence"
+                    ),
+                ),
+                op,
+                self.approver_principal,
+                recorded="2026-10-06T18:12:00Z",
+            )
+            return
         self.receipt(
             "qualification_approval_receipt",
             "qualification",
@@ -361,7 +534,80 @@ class Evidence:
                 human_procedure=self.sha("human_procedure"),
             ),
             "qual-approval",
-            "approver",
+            self.approver_principal,
+        )
+
+    def refresh_managed_qualification_approval_for_test(
+        self, *, operation_id: str, reviewed_at: str
+    ) -> None:
+        """Capture a fresh, valid second-principal approval for a rewritten fixture.
+
+        This deliberately reuses the validated operation set while rebinding the
+        protected approval packet to the current qualification bytes. It lets
+        replay tests prove that even a fresh approval cannot refresh old runs.
+        """
+        q_sha = self.sha("reviewer_qualification")
+        config_sha = self.sha("reviewer_configuration")
+        packet = json.loads(
+            Path(self.entries["managed-qualification-review-packet"]["path"]).read_bytes()
+        )
+        packet["qualification_sha256"] = q_sha
+        packet["reviewer_configuration_sha256"] = config_sha
+        self.write("managed-qualification-review-packet", packet, protected=True)
+
+        rationale = "Synthetic independent re-review for " + operation_id
+        response = json.loads(
+            Path(self.entries["managed-qualification-approver-response"]["path"]).read_bytes()
+        )
+        response["rationale"] = rationale
+        self.write("managed-qualification-approver-response", response, protected=True)
+
+        reviewed = datetime.fromisoformat(reviewed_at.replace("Z", "+00:00"))
+        requested_at = (reviewed - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        observed_at = (reviewed - timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.write(
+            "managed-qualification-approver-observation",
+            canonical_json_bytes(
+                self.managed_observation(operation_id, requested_at, observed_at)
+            ),
+            protected=True,
+        )
+        evidence = dict(
+            evidence_version="1.0",
+            qualification_sha256=q_sha,
+            reviewer_configuration_sha256=config_sha,
+            reviewer_principal=self.reviewer_principal,
+            approver_principal=self.approver_principal,
+            operation_id=operation_id,
+            approval_prompt_sha256=self.sha("approver-prompt"),
+            review_packet_inventory_key="managed-qualification-review-packet",
+            review_packet_sha256=self.sha("managed-qualification-review-packet"),
+            service_observation_inventory_key="managed-qualification-approver-observation",
+            service_observation_sha256=self.sha("managed-qualification-approver-observation"),
+            response_inventory_key="managed-qualification-approver-response",
+            response_sha256=self.sha("managed-qualification-approver-response"),
+            decision="APPROVED",
+            rationale=rationale,
+            reviewed_at=reviewed_at,
+        )
+        self.write("managed-qualification-approval-evidence", evidence, protected=True)
+        recorded = (reviewed + timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.receipt(
+            "qualification_approval_receipt",
+            "qualification",
+            "reviewer_qualification",
+            dict(
+                reviewer_configuration=config_sha,
+                qualification_corpus=self.sha("qualification_corpus"),
+                blind_holdout_truth=self.sha("blind_holdout_truth"),
+                corpus_approval_receipt=self.sha("corpus_approval_receipt"),
+                managed_qualification_approval_evidence=self.binding(
+                    "managed-qualification-approval-evidence"
+                ),
+            ),
+            operation_id,
+            self.approver_principal,
+            recorded=recorded,
         )
 
     def review(
@@ -439,7 +685,7 @@ class Evidence:
             authoring_id=content["authoring_provenance"]["authoring_id"],
             reviewer=dict(
                 type=self.config["reviewer_type"],
-                identity="reviewer",
+                identity=self.reviewer_principal,
                 operation_id=operation,
                 implementation="fixture-reviewer",
                 version="1.0",
@@ -457,6 +703,15 @@ class Evidence:
         )
         payload["review_fingerprint"] = review_fingerprint(payload)
         self.write(key, payload, protected=case is not None)
+        observation_binding = None
+        if self.config["configuration_version"] == "1.1":
+            observation_key = key + "-service-observation"
+            self.write(
+                observation_key,
+                canonical_json_bytes(self.managed_observation(operation, at)),
+                protected=True,
+            )
+            observation_binding = self.binding(observation_key)
         bindings = dict(
             source_truth_manifest=self.sha(mk),
             outline=self.sha(ok),
@@ -464,13 +719,15 @@ class Evidence:
             reviewer_configuration=self.sha("reviewer_configuration"),
             reviewer_qualification=payload["reviewer"]["qualification_sha256"],
         )
+        if observation_binding:
+            bindings["managed_service_observation"] = observation_binding
         self.receipt(
             receipt_key,
             "semantic_scope",
             key,
             bindings,
             operation,
-            "reviewer",
+            self.reviewer_principal,
             content_key=ck,
             pipeline=pipeline,
             recorded=at,
@@ -561,7 +818,10 @@ class Evidence:
         self.qualification = self.qualification_payload(False)
         for repetition in range(1, 4):
             run_id = "evaluation-" + str(repetition)
-            date = "2026-10-0" + str(2 + repetition)
+            run_day = 2 + repetition
+            if self.config["configuration_version"] == "1.1" and repetition == 3:
+                run_day = 6
+            date = f"2026-10-{run_day:02d}"
             at = date + "T10:30:00Z"
             run = dict(
                 run_id=run_id,
@@ -572,7 +832,11 @@ class Evidence:
             )
             exposures = []
             for case in cases:
-                op = run_id + "-" + case["case_id"]
+                op = (
+                    "qualop-" + sha256_bytes((run_id + case["case_id"]).encode())[:24]
+                    if self.config["configuration_version"] == "1.1"
+                    else run_id + "-" + case["case_id"]
+                )
                 disposition = (
                     miss[1]
                     if miss and case["case_id"] == miss[0] and repetition == 1
@@ -588,8 +852,7 @@ class Evidence:
                     receipt_key=op + "-receipt",
                     at=at,
                 )
-                run["operations"].append(
-                    dict(
+                operation_record = dict(
                         case_id=case["case_id"],
                         review_operation_id=op,
                         review_inventory_key=op + "-review",
@@ -597,7 +860,13 @@ class Evidence:
                         receipt_inventory_key=op + "-receipt",
                         receipt_sha256=self.sha(op + "-receipt"),
                     )
-                )
+                if self.config["configuration_version"] == "1.1":
+                    observation_key = op + "-review-service-observation"
+                    operation_record.update(
+                        service_observation_inventory_key=observation_key,
+                        service_observation_sha256=self.sha(observation_key),
+                    )
+                run["operations"].append(operation_record)
                 inputs = case["inputs"]
                 exposures.append(
                     dict(
@@ -629,7 +898,12 @@ class Evidence:
                     critical_truth_satisfied=True,
                     bounded_rationale="Externally adjudicated synthetic observation.",
                     adjudicator_principal="adjudicator",
-                    recorded_at=date + "T10:40:00Z",
+                    recorded_at=(
+                        date + "T18:00:00Z"
+                        if self.config["configuration_version"] == "1.1"
+                        and repetition == 3
+                        else date + "T10:40:00Z"
+                    ),
                 )
                 self.write(op + "-adjudication", adjudication, protected=True)
                 self.index["adjudications"].append(
@@ -675,6 +949,9 @@ class Evidence:
             )
         self.qualification["disposition"] = "NOT_QUALIFIED" if miss else "QUALIFIED"
         self.write_qualification()
+        if self.config["configuration_version"] == "1.1":
+            self.qualification_approval()
+            return
         self.receipt(
             "qualification_approval_receipt",
             "qualification",

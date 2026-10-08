@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "managed-reviewer-service-observation 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observation_version",
+    "operation_id",
+    "provider_service_reference",
+    "requested_alias",
+    "reported_model_identifier",
+    "reported_model_revision",
+    "service_fingerprint",
+    "service_api_version",
+    "request_id",
+    "client_build_sha256",
+    "observation_policy_sha256",
+    "request_sha256",
+    "response_sha256",
+    "fallback_detected",
+    "requested_at",
+    "observed_at"
+  ],
+  "properties": {
+    "observation_version": {
+      "const": "1.0"
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "provider_service_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "requested_alias": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "reported_model_identifier": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reported_model_revision": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "service_fingerprint": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "service_api_version": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "client_build_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "observation_policy_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "request_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "response_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "fallback_detected": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

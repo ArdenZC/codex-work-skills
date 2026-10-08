@@ -3,7 +3,15 @@
 from __future__ import annotations
 from typing import Any, Iterable
 
-from semantic_scope_records import TrustContext, checked, parse, require, stamp
+from semantic_scope_records import (
+    TrustContext,
+    checked,
+    parse,
+    require,
+    stamp,
+    validate_configuration,
+    validate_managed_service_observation,
+)
 
 ROLES = {
     "semantic_scope": "scope_reviewer",
@@ -33,7 +41,16 @@ def validate_receipt(
     """
     inventory = context.inventory
     raw = inventory.raw(key, protected=True)
-    receipt = checked(raw, "operation-provenance-receipt")
+    parsed_receipt = parse(raw, allow_floats=False)
+    require(isinstance(parsed_receipt, dict), "operation receipt must be an object")
+    receipt_version = parsed_receipt.get("contract_version")
+    require(receipt_version in {"1.0", "1.1"}, "unsupported operation receipt version")
+    receipt = checked(
+        raw,
+        "operation-provenance-receipt"
+        if receipt_version == "1.0"
+        else "operation-provenance-receipt-v1.1",
+    )
     require(receipt["review_kind"] == expected_kind, "receipt kind mismatch")
     require(
         receipt["subject_inventory_key"] == subject_key, "receipt subject key mismatch"
@@ -79,13 +96,28 @@ def validate_receipt(
         receipt["subject_sha256"],
         protected=expected_kind in {"qualification", "corpus_approval"},
     )
-    subject = (
-        checked(subject_raw, SUBJECTS[expected_kind])
-        if expected_kind in SUBJECTS
-        else parse(subject_raw)
-    )
+    if expected_kind == "qualification":
+        parsed_subject = parse(subject_raw, allow_floats=False)
+        require(isinstance(parsed_subject, dict), "qualification must be an object")
+        qualification_version = parsed_subject.get("contract_version")
+        require(
+            qualification_version in {"1.0", "1.1"},
+            "unsupported reviewer qualification version",
+        )
+        subject = checked(
+            subject_raw,
+            "reviewer-qualification"
+            if qualification_version == "1.0"
+            else "reviewer-qualification-v1.1",
+        )
+    else:
+        subject = (
+            checked(subject_raw, SUBJECTS[expected_kind])
+            if expected_kind in SUBJECTS
+            else parse(subject_raw)
+        )
     for binding_key, digest in receipt["input_bindings"].items():
-        if digest is not None:
+        if isinstance(digest, str):
             inventory.raw(binding_key, digest)
     if expected_kind in {"semantic_scope", "teacher_approval"}:
         content = parse(inventory.raw("content"))
@@ -154,6 +186,27 @@ def validate_receipt(
             "qualification-purpose/null binding mismatch",
         )
         require(stamp(subject["reviewed_at"]) <= at, "receipt predates review")
+        config = validate_configuration(inventory)
+        managed = config["configuration_version"] == "1.1"
+        require(
+            managed == (receipt_version == "1.1"),
+            "managed reviewer and operation receipt versions differ",
+        )
+        if managed:
+            binding = receipt["input_bindings"]["managed_service_observation"]
+            observation = validate_managed_service_observation(
+                inventory,
+                binding["inventory_key"],
+                binding["sha256"],
+                config,
+                receipt["operation_id"],
+                now=context.now,
+            )
+            require(
+                stamp(observation["observed_at"])
+                <= stamp(subject["reviewed_at"]),
+                "service observation postdates managed reviewer response",
+            )
     elif expected_kind == "teacher_approval":
         require(
             subject.get("contract_version") == "2.0",
@@ -207,16 +260,16 @@ def validate_receipt(
                 subject["disposition"] == "QUALIFIED", "cannot approve NOT_QUALIFIED"
             )
         if subject["qualification_purpose"] == "agent_corpus_evaluation":
-            require(
-                set(receipt["input_bindings"])
-                == {
-                    "reviewer_configuration",
-                    "qualification_corpus",
-                    "blind_holdout_truth",
-                    "corpus_approval_receipt",
-                },
-                "agent qualification receipt branch mismatch",
-            )
+            expected_keys = {
+                "reviewer_configuration",
+                "qualification_corpus",
+                "blind_holdout_truth",
+                "corpus_approval_receipt",
+            }
+            if subject["contract_version"] == "1.1":
+                expected_keys.add("managed_qualification_approval_evidence")
+            require(set(receipt["input_bindings"]) == expected_keys,
+                    "agent qualification receipt branch mismatch")
             expected = {
                 "reviewer_configuration": subject["reviewer_configuration_sha256"],
                 "qualification_corpus": subject["corpus_sha256"],
@@ -243,6 +296,40 @@ def validate_receipt(
             require(
                 receipt["input_bindings"][binding] == digest,
                 f"qualification {binding} mismatch",
+            )
+        config = validate_configuration(inventory)
+        managed = config["configuration_version"] == "1.1"
+        require(
+            managed == (subject["contract_version"] == "1.1")
+            and managed == (receipt_version == "1.1"),
+            "managed qualification receipt/configuration versions differ",
+        )
+        if managed:
+            binding = receipt["input_bindings"][
+                "managed_qualification_approval_evidence"
+            ]
+            evidence_raw = inventory.raw(
+                binding["inventory_key"], binding["sha256"], protected=True
+            )
+            evidence = checked(
+                evidence_raw, "managed-qualification-approval-evidence"
+            )
+            require(
+                evidence["qualification_sha256"] == receipt["subject_sha256"]
+                and evidence["reviewer_configuration_sha256"]
+                == receipt["input_bindings"]["reviewer_configuration"],
+                "managed qualification approval subject/config mismatch",
+            )
+            require(
+                evidence["approver_principal"] == receipt["actor_principal"]
+                and evidence["operation_id"] == receipt["operation_id"]
+                and evidence["reviewer_principal"] != evidence["approver_principal"],
+                "managed qualification reviewer/approver identity mismatch",
+            )
+            require(
+                evidence["decision"] == receipt["decision"]
+                and stamp(evidence["reviewed_at"]) <= at,
+                "managed approval evidence decision/time mismatch",
             )
     elif expected_kind == "corpus_approval":
         require(

@@ -106,7 +106,15 @@ def qualification_fingerprint(payload: Mapping[str, Any]) -> str:
 
 
 def configuration_fingerprint(raw: bytes) -> str:
-    payload = checked(raw, "reviewer-configuration")
+    parsed = parse(raw, allow_floats=False)
+    require(isinstance(parsed, dict), "reviewer configuration must be an object")
+    version = parsed.get("configuration_version")
+    schema = {
+        "1.0": "reviewer-configuration",
+        "1.1": "reviewer-configuration-v1.1",
+    }.get(version)
+    require(schema is not None, "unsupported reviewer configuration version")
+    payload = checked(raw, schema)
     require(
         raw == canonical_json_bytes(payload),
         "configuration bytes must be canonical UTF-8 NFC JSON",
@@ -116,7 +124,14 @@ def configuration_fingerprint(raw: bytes) -> str:
 
 def receipt_fingerprint(raw: bytes) -> str:
     """Receipts bind raw bytes; the contract defines no excluded-field cache."""
-    checked(raw, "operation-provenance-receipt")
+    parsed = parse(raw, allow_floats=False)
+    require(isinstance(parsed, dict), "operation receipt must be an object")
+    schema = {
+        "1.0": "operation-provenance-receipt",
+        "1.1": "operation-provenance-receipt-v1.1",
+    }.get(parsed.get("contract_version"))
+    require(schema is not None, "unsupported operation receipt version")
+    checked(raw, schema)
     return sha256_bytes(raw)
 
 
@@ -399,23 +414,48 @@ def validate_configuration(
 ) -> dict[str, Any]:
     raw = inventory.raw(key)
     configuration_fingerprint(raw)
-    config = checked(raw, "reviewer-configuration")
-    build = checked(
-        inventory.by_sha(config["implementation_build_sha256"]),
-        "reviewer-build-inventory",
+    parsed = parse(raw, allow_floats=False)
+    managed = parsed["configuration_version"] == "1.1"
+    if managed:
+        require(
+            inventory.entries[key]["storage_class"] == "protected_external",
+            "managed reviewer configuration must be protected",
+        )
+    config = checked(
+        raw,
+        "reviewer-configuration-v1.1" if managed else "reviewer-configuration",
     )
+    build_raw = inventory.by_sha(
+        config["implementation_build_sha256"], protected=managed
+    )
+    build = checked(build_raw, "reviewer-build-inventory")
     for entry in build["files"]:
-        inventory.raw(entry["inventory_key"], entry["sha256"])
-    inventory.by_sha(config["context_policy"]["policy_sha256"])
+        if managed:
+            require(
+                inventory.entries[entry["inventory_key"]]["storage_class"]
+                == "protected_external",
+                "managed reviewer build files must be protected",
+            )
+        inventory.raw(entry["inventory_key"], entry["sha256"], protected=managed)
+    inventory.by_sha(config["context_policy"]["policy_sha256"], protected=managed)
     if config["reviewer_type"] == "agent":
         agent = config["agent"]
-        # Mutable aliases are not immutable revisions. Other revisions are opaque,
-        # provider-neutral pins; their service meaning belongs to controlled setup.
-        require(
-            agent["model_revision"].strip().casefold()
-            not in {"latest", "default", "current", "auto", "unversioned"},
-            "unpinned mutable model revision",
-        )
+        if managed:
+            require(
+                agent["agent_identity_mode"] == "managed_alias"
+                and agent["model_revision"] is None
+                and agent["fallback_policy"] == "deny",
+                "invalid managed alias identity/fallback policy",
+            )
+        else:
+            # Mutable aliases are not immutable revisions. Other revisions are
+            # opaque, provider-neutral pins; their service meaning belongs to
+            # controlled setup. This 1.0 rule is unchanged.
+            require(
+                agent["model_revision"].strip().casefold()
+                not in {"latest", "default", "current", "auto", "unversioned"},
+                "unpinned mutable model revision",
+            )
         names = [p["name"] for p in agent["decoding"]["additional_parameters"]]
         require(len(names) == len(set(names)), "duplicate decoding parameter")
         fields = (
@@ -423,12 +463,133 @@ def validate_configuration(
             "system_instructions_sha256",
             "tool_permissions_sha256",
         )
+        if managed:
+            fields += (
+                "service_observation_policy_sha256",
+                "qualification_approver_prompt_sha256",
+            )
     else:
+        require(not managed, "managed alias configuration must be an agent")
         agent = config["human"]
         fields = ("procedure_sha256", "interface_policy_sha256")
     for field in fields:
-        inventory.by_sha(agent[field])
+        inventory.by_sha(agent[field], protected=managed)
     return config
+
+
+def managed_service_identity_projection(
+    observation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return stable identity metadata without request-specific data."""
+    return {
+        field: observation[field]
+        for field in (
+            "provider_service_reference",
+            "requested_alias",
+            "reported_model_identifier",
+            "reported_model_revision",
+            "service_fingerprint",
+            "service_api_version",
+            "client_build_sha256",
+            "observation_policy_sha256",
+        )
+    }
+
+
+def managed_service_identity_fingerprint(observation: Mapping[str, Any]) -> str:
+    """Hash only the stable observed service identity, never claim a snapshot."""
+    projection = managed_service_identity_projection(observation)
+    return sha256_bytes(canonical_json_bytes(projection))
+
+
+def managed_approver_report_view(raw: bytes, case_ids: set[str]) -> bytes:
+    """Make a label-blind view without case IDs or corpus-linkable provenance refs."""
+    report = parse(raw, allow_floats=False)
+    require(isinstance(report, dict), "managed reviewer report must be an object")
+    ordered_ids = sorted(case_ids, key=len, reverse=True)
+    redacted_fields = {
+        "review_id",
+        "pipeline_run_id",
+        "authoring_id",
+        "content_sha256",
+        "outline_sha256",
+        "source_truth_manifest_sha256",
+        "configuration_sha256",
+        "qualification_sha256",
+        "identity",
+        "operation_id",
+        "source_id",
+    }
+
+    def redact(value: Any, field: str | None = None) -> Any:
+        if field in redacted_fields or (field and field.endswith("_sha256")) or field == "sha256":
+            return "[REDACTED]"
+        if isinstance(value, str):
+            for case_id in ordered_ids:
+                value = value.replace(case_id, "[CASE]")
+            return value
+        if isinstance(value, list):
+            return [redact(item) for item in value]
+        if isinstance(value, dict):
+            return {key: redact(item, key) for key, item in value.items()}
+        return value
+
+    view = redact(report)
+    encoded = canonical_json_bytes(view)
+    require(
+        not any(case_id.encode("utf-8") in encoded for case_id in case_ids),
+        "managed approver report view still contains a corpus case identifier",
+    )
+    return encoded
+
+
+def validate_managed_service_observation(
+    inventory: Inventory,
+    key: str,
+    digest: str,
+    config: Mapping[str, Any],
+    operation_id: str,
+    *,
+    started_at: datetime | None = None,
+    completed_at: datetime | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Validate one controller-protected, operation-bound service observation."""
+    require(
+        config["configuration_version"] == "1.1"
+        and config["reviewer_type"] == "agent",
+        "managed observation requires Reviewer Configuration 1.1",
+    )
+    raw = inventory.raw(key, digest, protected=True)
+    observation = checked(raw, "managed-reviewer-service-observation")
+    require(
+        raw == canonical_json_bytes(observation),
+        "managed service observation bytes must be canonical",
+    )
+    agent = config["agent"]
+    require(observation["operation_id"] == operation_id, "service operation mismatch")
+    require(
+        observation["provider_service_reference"] == agent["provider_reference"]
+        and observation["requested_alias"] == agent["model_reference"],
+        "managed service/provider alias changed",
+    )
+    require(
+        observation["client_build_sha256"] == config["implementation_build_sha256"]
+        and observation["observation_policy_sha256"]
+        == agent["service_observation_policy_sha256"],
+        "managed observation client/policy changed",
+    )
+    require(observation["fallback_detected"] is False, "managed service fallback")
+    requested = stamp(observation["requested_at"])
+    observed = stamp(observation["observed_at"])
+    require(requested <= observed, "invalid managed observation chronology")
+    if started_at is not None:
+        require(started_at <= requested, "service request predates operation")
+    if completed_at is not None:
+        require(observed <= completed_at, "service observation exceeds operation")
+    if now is not None:
+        require(observed <= now, "managed service observation is from the future")
+    return observation
 
 
 def validate_training(

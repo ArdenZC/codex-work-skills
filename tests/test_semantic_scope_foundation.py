@@ -1,12 +1,15 @@
 from __future__ import annotations
 import copy
 from dataclasses import replace
+from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+import base64
 from tests.semantic_scope_test_support import Evidence, ROOT, FIXTURES
 from tests.semantic_scope_fixtures import freeze_original_outline
 from semantic_scope_records import (
@@ -14,6 +17,7 @@ from semantic_scope_records import (
     Inventory,
     checked,
     configuration_fingerprint,
+    managed_service_identity_fingerprint,
     qualification_fingerprint,
     review_fingerprint,
     validate_configuration,
@@ -23,6 +27,7 @@ from semantic_scope_review import review_status, validate_review
 from reviewer_qualification import (
     validate_qualification,
     ORIGINAL_NC02_SHA,
+    _managed_approval,
     _validate_case_exposures,
 )
 from operation_provenance import validate_receipt
@@ -684,6 +689,7 @@ class AgentQualificationTests(unittest.TestCase):
         with self.assertRaises(RecordError):
             validate_qualification(e.context(), candidate_principal="reviewer")
 
+
     def test_hard_miss_n01_pass(self):
         self._assert_hard_miss_not_qualified(("N01", "PASS"))
 
@@ -790,6 +796,299 @@ class AgentQualificationTests(unittest.TestCase):
         e.capture("qualification_approval_receipt", r)
         with self.assertRaises(RecordError):
             validate_qualification(e.context(), candidate_principal="reviewer")
+
+
+class ManagedAliasReviewerIdentityTests(unittest.TestCase):
+    @staticmethod
+    def _managed_fixture(root):
+        evidence = Evidence(root, reviewer_type="agent")
+        evidence.enable_managed_alias()
+        evidence.agent_qualification()
+        return evidence
+
+    def test_managed_qualified_at_cannot_be_redated_after_evidence(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-redate-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            e.qualification["qualified_at"] = "2026-10-08T18:00:00Z"
+            e.qualification["valid_until"] = "2026-10-09T18:00:00Z"
+            e.write_qualification()
+            context = replace(
+                e.context(),
+                now=datetime(2026, 10, 9, 17, 59, 59, tzinfo=timezone.utc),
+            )
+
+            with self.assertRaisesRegex(
+                RecordError,
+                "managed qualification qualified_at does not equal evidence completion",
+            ):
+                validate_qualification(
+                    context,
+                    candidate_principal=e.reviewer_principal,
+                    require_approval=False,
+                )
+
+    def test_managed_redating_fails_even_with_fresh_independent_approval(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-redate-approval-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            old_observation_sha = e.sha("managed-qualification-approver-observation")
+            old_approval_evidence_sha = e.sha("managed-qualification-approval-evidence")
+            e.qualification["qualified_at"] = "2026-10-08T18:00:00Z"
+            e.qualification["valid_until"] = "2026-10-09T18:00:00Z"
+            e.write_qualification()
+            e.refresh_managed_qualification_approval_for_test(
+                operation_id="managed-qualification-approver-replay-operation",
+                reviewed_at="2026-10-08T18:10:00Z",
+            )
+            self.assertNotEqual(
+                e.sha("managed-qualification-approver-observation"),
+                old_observation_sha,
+            )
+            self.assertNotEqual(
+                e.sha("managed-qualification-approval-evidence"),
+                old_approval_evidence_sha,
+            )
+            context = replace(
+                e.context(),
+                now=datetime(2026, 10, 9, 17, 59, 59, tzinfo=timezone.utc),
+            )
+            excluded = {e.reviewer_principal, "author"}
+            approval_receipt = validate_receipt(
+                context,
+                "qualification_approval_receipt",
+                expected_kind="qualification",
+                subject_key="reviewer_qualification",
+                excluded_principals=excluded,
+            )
+            _managed_approval(
+                context,
+                e.qualification,
+                "reviewer_qualification",
+                e.reviewer_principal,
+                excluded,
+                approval_receipt,
+            )
+
+            with self.assertRaisesRegex(
+                RecordError,
+                "managed qualification qualified_at does not equal evidence completion",
+            ):
+                validate_qualification(
+                    context, candidate_principal=e.reviewer_principal
+                )
+
+    def test_managed_evidence_completion_and_strict_24_hour_boundary(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-boundary-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            self.assertEqual(e.qualification["qualified_at"], "2026-10-06T18:00:00Z")
+            before_expiry = replace(
+                e.context(),
+                now=datetime(2026, 10, 7, 17, 59, 59, tzinfo=timezone.utc),
+            )
+            self.assertEqual(
+                validate_qualification(
+                    before_expiry, candidate_principal=e.reviewer_principal
+                )["qualified_at"],
+                "2026-10-06T18:00:00Z",
+            )
+            at_expiry = replace(
+                before_expiry,
+                now=datetime(2026, 10, 7, 18, 0, tzinfo=timezone.utc),
+            )
+            with self.assertRaisesRegex(RecordError, "qualification expired/not-yet-valid"):
+                validate_qualification(at_expiry, candidate_principal=e.reviewer_principal)
+
+    def test_managed_qualification_serialization_delay_does_not_move_freshness(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-serialization-") as tmp:
+            e = self._managed_fixture(Path(tmp))
+            qualification_path = Path(e.entries["reviewer_qualification"]["path"])
+            serialized_at = datetime(2026, 10, 6, 19, 0, tzinfo=timezone.utc)
+            serialized_epoch = serialized_at.timestamp()
+            # Model a controller that writes the same qualification bytes at 19:00.
+            os.utime(qualification_path, (serialized_epoch, serialized_epoch))
+            self.assertAlmostEqual(
+                qualification_path.stat().st_mtime,
+                serialized_epoch,
+                delta=1,
+            )
+            self.assertEqual(e.qualification["qualified_at"], "2026-10-06T18:00:00Z")
+
+            result = validate_qualification(
+                e.context(), candidate_principal=e.reviewer_principal
+            )
+            self.assertEqual(result["qualified_at"], "2026-10-06T18:00:00Z")
+
+    def test_managed_alias_contract_and_fail_closed_production(self):
+        with tempfile.TemporaryDirectory(prefix="managed-alias-foundation-") as tmp:
+            e = Evidence(Path(tmp), reviewer_type="agent")
+            e.enable_managed_alias()
+            e.agent_qualification()
+            context = e.context()
+
+            qualification = validate_qualification(
+                context, candidate_principal=e.reviewer_principal
+            )
+            self.assertEqual(qualification["contract_version"], "1.1")
+            self.assertEqual(e.config["configuration_version"], "1.1")
+            self.assertEqual(e.config["agent"]["model_reference"], "gpt-6.1-sol")
+            self.assertIsNone(e.config["agent"]["model_revision"])
+            self.assertNotEqual(e.reviewer_principal, e.approver_principal)
+            approver_evidence = checked(
+                context.inventory.raw(
+                    "managed-qualification-approval-evidence", protected=True
+                ),
+                "managed-qualification-approval-evidence",
+            )
+            approver_observation = checked(
+                context.inventory.raw(
+                    approver_evidence["service_observation_inventory_key"],
+                    protected=True,
+                ),
+                "managed-reviewer-service-observation",
+            )
+            reviewer_op = qualification["qualification_runs"][0]["operations"][0]
+            reviewer_observation = checked(
+                context.inventory.raw(
+                    reviewer_op["service_observation_inventory_key"], protected=True
+                ),
+                "managed-reviewer-service-observation",
+            )
+            self.assertEqual(
+                approver_observation["requested_alias"],
+                reviewer_observation["requested_alias"],
+            )
+            self.assertEqual(
+                managed_service_identity_fingerprint(approver_observation),
+                managed_service_identity_fingerprint(reviewer_observation),
+            )
+            self.assertEqual(
+                managed_service_identity_fingerprint(approver_observation),
+                qualification["service_identity_fingerprint"],
+                "two independent managed logical principals may use one alias without claiming model diversity",
+            )
+
+            bad_config = copy.deepcopy(e.config)
+            bad_config["agent"]["model_revision"] = "gpt-6.1-sol"
+            with self.assertRaises(RecordError):
+                configuration_fingerprint(canonical_json_bytes(bad_config))
+
+            packet = checked(
+                context.inventory.raw(
+                    "managed-qualification-review-packet", protected=True
+                ),
+                "managed-qualification-review-packet",
+            )
+            case_ids = {
+                row["case_id"]
+                for row in qualification["golden_results"]
+                + qualification["holdout_results"]
+            }
+            self.assertEqual(len(packet["operations"]), 51)
+            refs = [row["operation_ref"] for row in packet["operations"]]
+            self.assertEqual(refs, sorted(refs))
+            for row in packet["operations"]:
+                self.assertEqual(
+                    row["service_identity"]["requested_alias"], "gpt-6.1-sol"
+                )
+                display = base64.b64decode(row["review_report_base64"], validate=True)
+                self.assertFalse(any(case_id.encode() in display for case_id in case_ids))
+                self.assertNotIn(b"expected_disposition", display)
+                self.assertNotIn(b"expected_critical_truth", display)
+
+            original_qualification = copy.deepcopy(e.qualification)
+            e.qualification["valid_until"] = "2026-10-07T18:00:01Z"
+            e.write_qualification()
+            with self.assertRaisesRegex(RecordError, "24-hour maximum"):
+                validate_qualification(
+                    e.context(), candidate_principal=e.reviewer_principal
+                )
+            e.qualification = original_qualification
+            e.write_qualification()
+            context = e.context()
+            expires_at = datetime(2026, 10, 7, 18, 0, tzinfo=timezone.utc)
+            with self.assertRaisesRegex(RecordError, "expired"):
+                validate_qualification(
+                    replace(context, now=expires_at),
+                    candidate_principal=e.reviewer_principal,
+                )
+
+            candidate_q_path = e.run / "candidate-created-qualification.json"
+            candidate_q_path.write_bytes(
+                Path(e.entries["reviewer_qualification"]["path"]).read_bytes()
+            )
+            candidate_inventory = Inventory(
+                {
+                    "candidate-created-qualification": dict(
+                        inventory_key="candidate-created-qualification",
+                        path=str(candidate_q_path),
+                        sha256=hashlib.sha256(candidate_q_path.read_bytes()).hexdigest(),
+                        storage_class="run",
+                    )
+                },
+                e.run,
+                (e.protected,),
+            )
+            candidate_context = replace(
+                context,
+                inventory=candidate_inventory,
+            )
+            with self.assertRaisesRegex(RecordError, "not protected evidence"):
+                validate_qualification(
+                    candidate_context,
+                    candidate_principal=e.reviewer_principal,
+                    qualification_key="candidate-created-qualification",
+                )
+            with self.assertRaises(RecordError):
+                candidate_context.role(
+                    "candidate-created-reviewer-b", "qualification_approver"
+                )
+
+            e.author(
+                json.loads(Path(e.entries["content"]["path"]).read_bytes()),
+                "content",
+            )
+            production = e.review(
+                operation="managed-production-review-operation",
+                pipeline="managed-production-run",
+                purpose="production_candidate",
+                key="managed-production-review",
+                receipt_key="managed-production-receipt",
+                at="2026-10-06T18:20:00Z",
+            )
+            context = e.context()
+            validate_review(
+                context,
+                review_key="managed-production-review",
+                receipt_key="managed-production-receipt",
+                frozen_lesson_ids=["L01"],
+                pipeline_run_id="managed-production-run",
+            )
+            receipt = json.loads(
+                Path(e.entries["managed-production-receipt"]["path"]).read_bytes()
+            )
+            observation_binding = receipt["input_bindings"][
+                "managed_service_observation"
+            ]
+            observation = json.loads(
+                Path(e.entries[observation_binding["inventory_key"]]["path"]).read_bytes()
+            )
+            observation["service_fingerprint"] = "changed-provider-service"
+            e.write(
+                observation_binding["inventory_key"],
+                canonical_json_bytes(observation),
+                protected=True,
+            )
+            receipt["input_bindings"]["managed_service_observation"]["sha256"] = e.sha(
+                observation_binding["inventory_key"]
+            )
+            e.capture("managed-production-receipt", receipt)
+            with self.assertRaisesRegex(RecordError, "service identity changed since qualification"):
+                validate_review(
+                    e.context(),
+                    review_key="managed-production-review",
+                    receipt_key="managed-production-receipt",
+                    frozen_lesson_ids=["L01"],
+                    pipeline_run_id="managed-production-run",
+                )
 
 
 if __name__ == "__main__":

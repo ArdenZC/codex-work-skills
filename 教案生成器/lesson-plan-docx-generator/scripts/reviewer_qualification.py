@@ -1,10 +1,12 @@
 """Reviewer Qualification 1.0 deterministic evidence and independent approval."""
 
 from __future__ import annotations
+import base64
 from dataclasses import replace
+from datetime import datetime, timedelta
 from typing import Any
 
-from lifecycle_digest import sha256_bytes
+from lifecycle_digest import canonical_json_bytes, sha256_bytes
 from semantic_scope_records import (
     TrustContext,
     checked,
@@ -12,6 +14,10 @@ from semantic_scope_records import (
     qualification_fingerprint,
     require,
     stamp,
+    managed_service_identity_fingerprint,
+    managed_service_identity_projection,
+    managed_approver_report_view,
+    validate_managed_service_observation,
     validate_configuration,
     validate_training,
 )
@@ -118,6 +124,12 @@ def _validate_case_exposures(
         ),
         *(op["review_sha256"] for run in runs for op in run["operations"]),
     }
+    if qualification["contract_version"] == "1.1":
+        forbidden_hashes.update(
+            op["service_observation_sha256"]
+            for run in runs
+            for op in run["operations"]
+        )
     allowed_by_case = {}
     for case_id, case in by_case.items():
         inputs = case["inputs"]
@@ -200,6 +212,8 @@ def _agent_evidence(
     by_case = {c["case_id"]: c for c in all_cases}
     _, index = context.load()
     runs = qualification["qualification_runs"]
+    if qualification["contract_version"] == "1.1":
+        require(len(runs) >= 3, "managed qualification needs three fresh repetitions")
     require(
         len({r["run_id"] for r in runs}) == len(runs), "duplicate evaluation run IDs"
     )
@@ -214,11 +228,16 @@ def _agent_evidence(
     operation_ids: list[str] = []
     seen_review_hashes: list[str] = []
     authors: set[str] = {author_principal} if author_principal else set()
+    service_identities: set[str] = set()
+    # Only timestamps from evidence validated below may set managed freshness.
+    managed_evidence_completion_times: list[datetime] = []
     for run in runs:
+        run_started_at = stamp(run["started_at"])
+        run_completed_at = stamp(run["completed_at"])
         require(
             stamp(approval["recorded_at"])
-            <= stamp(run["started_at"])
-            < stamp(run["completed_at"])
+            <= run_started_at
+            < run_completed_at
             <= stamp(qualification["qualified_at"]),
             "invalid evaluation chronology",
         )
@@ -227,6 +246,24 @@ def _agent_evidence(
             "incomplete/reordered evaluation run",
         )
         for op in run["operations"]:
+            if qualification["contract_version"] == "1.1":
+                observation = validate_managed_service_observation(
+                    inventory,
+                    op["service_observation_inventory_key"],
+                    op["service_observation_sha256"],
+                    validate_configuration(inventory),
+                    op["review_operation_id"],
+                    started_at=stamp(run["started_at"]),
+                    completed_at=stamp(run["completed_at"]),
+                    now=context.now,
+                )
+                require(
+                    op["case_id"] not in op["review_operation_id"],
+                    "managed operation identifier leaks qualification case ID",
+                )
+                service_identities.add(
+                    managed_service_identity_fingerprint(observation)
+                )
             case = by_case[op["case_id"]]
             inventory.raw(
                 op["review_inventory_key"], op["review_sha256"], protected=True
@@ -258,10 +295,25 @@ def _agent_evidence(
                 <= stamp(run["completed_at"]),
                 "review outside evaluation interval",
             )
-            receipt = checked(
-                inventory.raw(op["receipt_inventory_key"]),
-                "operation-provenance-receipt",
+            receipt_raw = inventory.raw(
+                op["receipt_inventory_key"], op["receipt_sha256"], protected=True
             )
+            parsed_receipt = parse(receipt_raw, allow_floats=False)
+            receipt = checked(
+                receipt_raw,
+                "operation-provenance-receipt"
+                if parsed_receipt.get("contract_version") == "1.0"
+                else "operation-provenance-receipt-v1.1",
+            )
+            if qualification["contract_version"] == "1.1":
+                require(
+                    receipt["input_bindings"]["managed_service_observation"]
+                    == {
+                        "inventory_key": op["service_observation_inventory_key"],
+                        "sha256": op["service_observation_sha256"],
+                    },
+                    "qualification operation/receipt service observation mismatch",
+                )
             require(
                 stamp(receipt["recorded_at"]) <= stamp(run["completed_at"]),
                 "receipt outside evaluation interval",
@@ -273,6 +325,8 @@ def _agent_evidence(
                 "operation": op,
                 "review": review,
             }
+        if qualification["contract_version"] == "1.1":
+            managed_evidence_completion_times.append(run_completed_at)
     require(
         approval["actor_principal"] not in authors,
         "corpus adjudicator equals evaluation author",
@@ -280,6 +334,16 @@ def _agent_evidence(
     passed = len(operation_ids) == len(set(operation_ids)) and len(
         seen_review_hashes
     ) == len(set(seen_review_hashes))
+    if qualification["contract_version"] == "1.1":
+        require(
+            len(service_identities) == 1,
+            "managed service identity changed during qualification",
+        )
+        require(
+            next(iter(service_identities))
+            == qualification["service_identity_fingerprint"],
+            "qualification managed service identity fingerprint mismatch",
+        )
     for field, manifest in (("golden_results", corpus), ("holdout_results", holdout)):
         results = qualification[field]
         require(
@@ -355,14 +419,219 @@ def _agent_evidence(
                     "adjudication not protected-index captured",
                 )
                 context.not_revoked(records[0]["operation_id"])
+                if qualification["contract_version"] == "1.1":
+                    managed_evidence_completion_times.append(
+                        stamp(adjudication["recorded_at"])
+                    )
                 hard_miss |= (
                     observed["observed_disposition"] != case["expected_disposition"]
                     or not observed["critical_truth_satisfied"]
                 )
             require(result["hard_miss"] == hard_miss, "cached hard_miss forgery")
             passed &= not hard_miss
+    if qualification["contract_version"] == "1.1":
+        require(
+            bool(managed_evidence_completion_times),
+            "managed qualification has no validated evidence completion",
+        )
+        require(
+            stamp(qualification["qualified_at"])
+            == max(managed_evidence_completion_times),
+            "managed qualification qualified_at does not equal evidence completion",
+        )
     # Every evaluation author, not just the caller's current author, is excluded.
     return passed, authors
+
+
+def _managed_approval(
+    context: TrustContext,
+    qualification: dict[str, Any],
+    qualification_key: str,
+    candidate_principal: str,
+    excluded_principals: set[str],
+    approval_receipt: dict[str, Any],
+) -> None:
+    """Verify the protected, label-blind operation by managed logical principal B."""
+    inventory = context.inventory
+    config = validate_configuration(inventory)
+    binding = approval_receipt["input_bindings"][
+        "managed_qualification_approval_evidence"
+    ]
+    evidence = checked(
+        inventory.raw(binding["inventory_key"], binding["sha256"], protected=True),
+        "managed-qualification-approval-evidence",
+    )
+    q_sha = inventory.entries[qualification_key]["sha256"]
+    config_sha = inventory.entries["reviewer_configuration"]["sha256"]
+    require(
+        evidence["qualification_sha256"] == q_sha
+        and evidence["reviewer_configuration_sha256"] == config_sha,
+        "managed approval evidence qualification/config binding mismatch",
+    )
+    approver = evidence["approver_principal"]
+    require(
+        evidence["reviewer_principal"] == candidate_principal
+        and approver == approval_receipt["actor_principal"]
+        and evidence["operation_id"] == approval_receipt["operation_id"],
+        "managed qualification approver is not the protected second principal/operation",
+    )
+    evaluation_operations = {
+        operation["review_operation_id"]
+        for run in qualification["qualification_runs"]
+        for operation in run["operations"]
+    }
+    require(
+        evidence["operation_id"] not in evaluation_operations,
+        "managed qualification approver reuses a reviewer operation",
+    )
+    require(approver not in excluded_principals, "managed qualification approver equals reviewer/author/evaluator")
+    context.role(approver, "qualification_approver", stamp(evidence["reviewed_at"]))
+    require(
+        stamp(qualification["qualified_at"])
+        <= stamp(evidence["reviewed_at"])
+        < stamp(qualification["valid_until"])
+        and stamp(evidence["reviewed_at"]) <= context.now,
+        "managed approver operation outside qualification validity",
+    )
+    require(
+        evidence["approval_prompt_sha256"]
+        == config["agent"]["qualification_approver_prompt_sha256"],
+        "managed qualification approver prompt changed",
+    )
+    inventory.by_sha(evidence["approval_prompt_sha256"], protected=True)
+    observation = validate_managed_service_observation(
+        inventory,
+        evidence["service_observation_inventory_key"],
+        evidence["service_observation_sha256"],
+        config,
+        evidence["operation_id"],
+        completed_at=stamp(evidence["reviewed_at"]),
+        now=context.now,
+    )
+    require(
+        managed_service_identity_fingerprint(observation)
+        == qualification["service_identity_fingerprint"],
+        "managed qualification approver service identity changed",
+    )
+    packet = checked(
+        inventory.raw(
+            evidence["review_packet_inventory_key"],
+            evidence["review_packet_sha256"],
+            protected=True,
+        ),
+        "managed-qualification-review-packet",
+    )
+    require(
+        packet["qualification_sha256"] == q_sha
+        and packet["reviewer_configuration_sha256"] == config_sha
+        and packet["service_identity_fingerprint"]
+        == qualification["service_identity_fingerprint"],
+        "managed qualification review packet subject/identity mismatch",
+    )
+    require(
+        packet["exposure"]
+        == {
+            "expected_labels": False,
+            "critical_truth": False,
+            "blind_holdout_truth": False,
+            "adjudication_results": False,
+            "case_identifiers": False,
+            "review_outputs_included": True,
+            "fresh_context": True,
+        },
+        "managed qualification approver packet exposes truth or reuses context",
+    )
+    expected: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for run in qualification["qualification_runs"]:
+        for operation in run["operations"]:
+            key = (
+                operation["review_sha256"],
+                operation["receipt_sha256"],
+                operation["service_observation_sha256"],
+            )
+            require(key not in expected, "duplicate managed qualification evidence tuple")
+            expected[key] = operation
+    actual: dict[tuple[str, str, str], str] = {}
+    refs: set[str] = set()
+    case_ids = {
+        row["case_id"]
+        for row in qualification["golden_results"]
+        + qualification["holdout_results"]
+    }
+    for row in packet["operations"]:
+        ref = row["operation_ref"]
+        require(ref not in refs, "duplicate managed approval operation ref")
+        refs.add(ref)
+        key = (
+            row["review_sha256"],
+            row["receipt_sha256"],
+            row["service_observation_sha256"],
+        )
+        require(key not in actual, "duplicate managed approval evidence row")
+        operation = expected.get(key)
+        require(operation is not None, "managed approval packet has unknown operation evidence")
+        operation_observation = validate_managed_service_observation(
+            inventory,
+            operation["service_observation_inventory_key"],
+            operation["service_observation_sha256"],
+            config,
+            operation["review_operation_id"],
+            now=context.now,
+        )
+        service_identity = managed_service_identity_projection(operation_observation)
+        service_identity["service_identity_fingerprint"] = (
+            managed_service_identity_fingerprint(operation_observation)
+        )
+        require(
+            row["service_identity"] == service_identity
+            and service_identity["service_identity_fingerprint"]
+            == qualification["service_identity_fingerprint"],
+            "managed approval packet service identity projection mismatch",
+        )
+        raw_report = inventory.raw(
+            operation["review_inventory_key"],
+            operation["review_sha256"],
+            protected=True,
+        )
+        try:
+            decoded = base64.b64decode(row["review_report_base64"], validate=True)
+        except (ValueError, TypeError) as exc:
+            raise ValueError("managed approval report is not valid base64") from exc
+        expected_view = managed_approver_report_view(raw_report, case_ids)
+        require(decoded == expected_view, "managed approval packet report view changed")
+        actual[key] = ref
+    require(set(actual) == set(expected), "managed approver packet omits evaluation operations")
+    response = checked(
+        inventory.raw(
+            evidence["response_inventory_key"], evidence["response_sha256"], protected=True
+        ),
+        "managed-qualification-approver-response",
+    )
+    require(
+        set(response["reviewed_operation_refs"]) == refs
+        and len(response["reviewed_operation_refs"]) == len(refs),
+        "managed approver did not review exact operation coverage",
+    )
+    checks = {row["check_id"]: row for row in response["checks"]}
+    expected_checks = {
+        "operation_coverage",
+        "artifact_binding",
+        "service_identity_consistency",
+        "truth_blindness",
+        "separate_authority",
+    }
+    require(set(checks) == expected_checks, "managed approver check coverage mismatch")
+    require(all(row["passed"] for row in checks.values()), "managed approver rejected qualification checks")
+    require(
+        all(set(row["supporting_operation_refs"]) == refs for row in checks.values()),
+        "managed approver check omitted operation evidence",
+    )
+    require(
+        response["decision"] == evidence["decision"] == approval_receipt["decision"]
+        and response["rationale"] == evidence["rationale"]
+        and response["decision"] == "APPROVED",
+        "managed approval response/evidence/receipt disagreement",
+    )
 
 
 def validate_qualification(
@@ -380,8 +649,14 @@ def validate_qualification(
     never grants current authority. Default and production consumers require it.
     """
     inventory = context.inventory
-    qualification = inventory.record(
-        qualification_key, "reviewer-qualification", protected=True
+    raw_qualification = inventory.raw(qualification_key, protected=True)
+    parsed_qualification = parse(raw_qualification, allow_floats=False)
+    require(isinstance(parsed_qualification, dict), "reviewer qualification must be an object")
+    version = parsed_qualification.get("contract_version")
+    require(version in {"1.0", "1.1"}, "unsupported reviewer qualification version")
+    qualification = checked(
+        raw_qualification,
+        "reviewer-qualification" if version == "1.0" else "reviewer-qualification-v1.1",
     )
     require(
         qualification["qualification_fingerprint"]
@@ -389,6 +664,11 @@ def validate_qualification(
         "qualification fingerprint mismatch",
     )
     config = validate_configuration(inventory)
+    managed = config["configuration_version"] == "1.1"
+    require(
+        managed == (qualification["contract_version"] == "1.1"),
+        "managed reviewer configuration/qualification versions differ",
+    )
     inventory.raw(
         "reviewer_configuration", qualification["reviewer_configuration_sha256"]
     )
@@ -406,6 +686,12 @@ def validate_qualification(
         < stamp(qualification["valid_until"]),
         "qualification expired/not-yet-valid",
     )
+    if managed:
+        require(
+            stamp(qualification["valid_until"])
+            <= stamp(qualification["qualified_at"]) + timedelta(hours=24),
+            "managed reviewer qualification exceeds 24-hour maximum",
+        )
     context.not_revoked(qualification["qualification_id"])
     if qualification["qualification_purpose"] == "human_scope_authority":
         require(
@@ -453,7 +739,116 @@ def validate_qualification(
             receipt["decision"] == "APPROVED",
             "missing independent APPROVED qualification receipt",
         )
+        if managed:
+            _managed_approval(
+                context,
+                qualification,
+                qualification_key,
+                candidate_principal,
+                excluded,
+                receipt,
+            )
     return qualification
+
+
+def build_managed_qualification_review_packet(
+    context: TrustContext,
+    *,
+    candidate_principal: str,
+    qualification_key: str = "reviewer_qualification",
+) -> bytes:
+    """Build the label-blind evidence packet for the independent managed approver.
+
+    The packet contains all candidate reports in opaque-reference order, with
+    case identifiers and corpus-linkable hashes removed from the display copy.
+    Exact source report/receipt/observation hashes remain bound for controller
+    verification; expected labels and holdout truth are never serialized.
+    """
+    inventory = context.inventory
+    qualification = validate_qualification(
+        context,
+        candidate_principal=candidate_principal,
+        qualification_key=qualification_key,
+        require_approval=False,
+    )
+    require(
+        qualification["contract_version"] == "1.1",
+        "managed approver packet requires Reviewer Qualification 1.1",
+    )
+    config = validate_configuration(inventory)
+    q_sha = inventory.entries[qualification_key]["sha256"]
+    config_sha = inventory.entries["reviewer_configuration"]["sha256"]
+    case_ids = {
+        row["case_id"]
+        for row in qualification["golden_results"]
+        + qualification["holdout_results"]
+    }
+    operations = []
+    for run in qualification["qualification_runs"]:
+        for operation in run["operations"]:
+            review_sha = operation["review_sha256"]
+            receipt_sha = operation["receipt_sha256"]
+            observation_sha = operation["service_observation_sha256"]
+            observation = validate_managed_service_observation(
+                inventory,
+                operation["service_observation_inventory_key"],
+                observation_sha,
+                config,
+                operation["review_operation_id"],
+                started_at=stamp(run["started_at"]),
+                completed_at=stamp(run["completed_at"]),
+                now=context.now,
+            )
+            identity = managed_service_identity_projection(observation)
+            identity["service_identity_fingerprint"] = (
+                managed_service_identity_fingerprint(observation)
+            )
+            report_raw = inventory.raw(
+                operation["review_inventory_key"], review_sha, protected=True
+            )
+            operation_ref = "op-" + sha256_bytes(
+                canonical_json_bytes(
+                    {
+                        "review_sha256": review_sha,
+                        "receipt_sha256": receipt_sha,
+                        "service_observation_sha256": observation_sha,
+                    }
+                )
+            )[:32]
+            operations.append(
+                {
+                    "operation_ref": operation_ref,
+                    "review_sha256": review_sha,
+                    "receipt_sha256": receipt_sha,
+                    "service_observation_sha256": observation_sha,
+                    "service_identity": identity,
+                    "review_report_base64": base64.b64encode(
+                        managed_approver_report_view(report_raw, case_ids)
+                    ).decode("ascii"),
+                }
+            )
+    operations.sort(key=lambda row: row["operation_ref"])
+    packet = {
+        "packet_version": "1.0",
+        "qualification_sha256": q_sha,
+        "reviewer_configuration_sha256": config_sha,
+        "service_identity_fingerprint": qualification[
+            "service_identity_fingerprint"
+        ],
+        "operations": operations,
+        "exposure": {
+            "expected_labels": False,
+            "critical_truth": False,
+            "blind_holdout_truth": False,
+            "adjudication_results": False,
+            "case_identifiers": False,
+            "review_outputs_included": True,
+            "fresh_context": True,
+        },
+    }
+    raw = canonical_json_bytes(packet)
+    checked(raw, "managed-qualification-review-packet")
+    return raw
 
 
 def qualification_status(context: TrustContext, **kwargs: Any):

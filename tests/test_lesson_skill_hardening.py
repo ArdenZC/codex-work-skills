@@ -1349,6 +1349,7 @@ class LessonSkillHardeningTests(unittest.TestCase):
             Path("scripts/benchmark_authorization.py"),
             Path("scripts/lesson_acceptance.py"),
             Path("schemas/benchmark-authorization.schema.json"),
+            Path("schemas/reviewer-configuration-v1.1.schema.json"),
         )
 
         def file_snapshot(root: Path) -> dict[str, bytes]:
@@ -1363,6 +1364,19 @@ class LessonSkillHardeningTests(unittest.TestCase):
                 relative.parts[0] in {"examples", "tests"}
                 for relative in install_adapters.CRITICAL_PRODUCTION_SOURCE_FILES
             )
+        )
+        managed_identity_schemas = {
+            Path("schemas/reviewer-configuration-v1.1.schema.json"),
+            Path("schemas/reviewer-qualification-v1.1.schema.json"),
+            Path("schemas/operation-provenance-receipt-v1.1.schema.json"),
+            Path("schemas/managed-reviewer-service-observation.schema.json"),
+            Path("schemas/managed-qualification-review-packet.schema.json"),
+            Path("schemas/managed-qualification-approver-response.schema.json"),
+            Path("schemas/managed-qualification-approval-evidence.schema.json"),
+        }
+        self.assertLessEqual(
+            managed_identity_schemas,
+            set(install_adapters.CRITICAL_PRODUCTION_SOURCE_FILES),
         )
         for index, relative in enumerate(missing_critical_files, start=1):
             with self.subTest(relative=relative.as_posix()):
