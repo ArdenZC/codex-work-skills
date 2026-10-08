@@ -36,6 +36,11 @@ LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
 LESSON_CONTRACT_HARDENING_TEST_MODULE = "tests.test_lesson_22_contract_hardening"
 SEMANTIC_SCOPE_TEST_MODULE = "tests.test_semantic_scope_foundation"
 SEMANTIC_SCOPE_SHARDS = tuple(f"semantic-scope-{index}" for index in range(1, 7))
+SEMANTIC_LIFECYCLE_RENDER_TESTS = frozenset({
+    "test_canonical_generation_actual_entry_point",
+    "test_installed_copy_external_controller_resume",
+    "test_real_generator_publication_and_final_stale_rollback",
+})
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
@@ -92,6 +97,15 @@ def _module_test_ids(module_name: str) -> tuple[str, ...]:
 
     visit(suite)
     return tuple(sorted(result))
+
+
+def _semantic_lifecycle_partitions() -> dict[str, tuple[str, ...]]:
+    all_ids = _module_test_ids("tests.test_semantic_lifecycle")
+    render = tuple(test_id for test_id in all_ids if test_id.rsplit(".", 1)[-1] in SEMANTIC_LIFECYCLE_RENDER_TESTS)
+    evidence = tuple(test_id for test_id in all_ids if test_id.rsplit(".", 1)[-1] not in SEMANTIC_LIFECYCLE_RENDER_TESTS)
+    if len(render) != len(SEMANTIC_LIFECYCLE_RENDER_TESTS) or set(render) & set(evidence) or set(render) | set(evidence) != set(all_ids):
+        raise ValueError("semantic lifecycle suites do not exactly partition discovered tests")
+    return {"lesson-semantic-lifecycle-render": render, "lesson-semantic-lifecycle-evidence": evidence}
 
 
 def _lesson_content_ids() -> tuple[str, ...]:
@@ -155,8 +169,11 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     gradebook_static_count = len(_static_gradebook_ids())
     workflow = _workflow_ids()
     semantic = _semantic_scope_partitions()
+    lifecycle = _semantic_lifecycle_partitions()
     return {
         **{name: SuiteSpec(name, True, "ids", len(ids)) for name, ids in semantic.items()},
+        "lesson-semantic-lifecycle-render": SuiteSpec("lesson-semantic-lifecycle-render", False, "ids", len(lifecycle["lesson-semantic-lifecycle-render"]), "lesson-render"),
+        "lesson-semantic-lifecycle-evidence": SuiteSpec("lesson-semantic-lifecycle-evidence", True, "ids", len(lifecycle["lesson-semantic-lifecycle-evidence"])),
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
         "lesson-lifecycle": SuiteSpec(
             "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
@@ -212,7 +229,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 ALIASES = {
     "semantic-scope": SEMANTIC_SCOPE_SHARDS,
     "fast": ("lesson-content", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-semantic-lifecycle", "lesson-content", "lesson-package", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "full": ("lesson-semantic-lifecycle-render", "lesson-semantic-lifecycle-evidence", "lesson-content", "lesson-package", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -238,8 +255,8 @@ def _expand_suites(requested: Sequence[str], specs: dict[str, SuiteSpec]) -> tup
 def _suite_test_ids(name: str) -> tuple[str, ...]:
     if name in SEMANTIC_SCOPE_SHARDS:
         return _semantic_scope_partitions()[name]
-    if name == "lesson-semantic-lifecycle":
-        return ("tests.test_semantic_lifecycle",)
+    if name in {"lesson-semantic-lifecycle-render", "lesson-semantic-lifecycle-evidence"}:
+        return _semantic_lifecycle_partitions()[name]
     if name == "lesson-content":
         return _lesson_content_ids()
     if name == "lesson-lifecycle":

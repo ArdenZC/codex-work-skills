@@ -139,6 +139,9 @@ CRITICAL_LIFECYCLE_SOURCE_FILES += tuple(Path("schemas") / (name + "-v2.schema.j
 ))
 CRITICAL_PRODUCTION_SOURCE_FILES = tuple(dict.fromkeys((
     *CRITICAL_GENERATOR_SOURCE_FILES, *CRITICAL_LIFECYCLE_SOURCE_FILES,
+    Path("scripts/operation_provenance.py"), Path("scripts/semantic_scope_review.py"),
+    Path("scripts/semantic_scope_records.py"), Path("scripts/reviewer_qualification.py"),
+    Path("schemas/semantic-dependency-inventory.schema.json"),
 )))
 
 # ``FULL_ENGINE_INVENTORY_FILES`` is the existing static compatibility floor,
@@ -216,7 +219,7 @@ def _rewrite_references(text: str, *, copy_engine: bool = True, namespace: bool 
     # Match the finite set of runtime path forms documented by this Skill,
     # including ``<skill>/scripts/...``.  Already namespaced paths are not
     # matched because the path component is preceded by ``/``.
-    unavailable = "the full Lesson runtime (install with --copy-engine)"
+    unavailable = "the complete Lesson runtime"
 
     def replace_runtime(match: re.Match[str]) -> str:
         path = match.group(1).replace("\\", "/")

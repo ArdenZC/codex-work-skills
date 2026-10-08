@@ -55,7 +55,7 @@ def evaluate(run, *, created_at=None, validate_acceptance=True, diagnostic_input
               "version": version, "notes": "required evidence is not yet available"}
              for name, (_, contract, version) in GATES.items()]
     indexed = {row["name"]: row for row in gates}
-    if run.get("orchestrator_version") == "2.0":
+    if isinstance(run, dict) and run.get("orchestrator_version") == "2.0":
         for name in ("pipeline_identity", "teacher_review_packet", "teacher_review", "production_authorization", "lifecycle_state"):
             indexed[name]["version"] = "2.0"
     # Diagnostic metadata must itself remain valid even when the envelope is

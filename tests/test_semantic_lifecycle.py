@@ -321,10 +321,15 @@ finally: case.doCleanups()
         from tests.semantic_scope_test_support import ROOT
         jobs = yaml.safe_load((ROOT / ".github/workflows/template-package-ci.yml").read_text())["jobs"]
         self.assertEqual(jobs["template-lesson"]["timeout-minutes"], 35)
-        self.assertIn("lesson-semantic-lifecycle", jobs["ci-gate"]["needs"])
         step = jobs["ci-gate"]["steps"][0]
-        self.assertEqual(step["env"]["SEMANTIC_LIFECYCLE_RESULT"], "${{ needs.lesson-semantic-lifecycle.result }}")
-        self.assertIn('check_job lesson-semantic-lifecycle "$RUN_LESSON" "$SEMANTIC_LIFECYCLE_RESULT"', step["run"])
+        for lane in ("render", "evidence"):
+            job = "lesson-semantic-lifecycle-" + lane
+            self.assertIn(job, jobs["ci-gate"]["needs"])
+            result_key = "SEMANTIC_LIFECYCLE_" + lane.upper() + "_RESULT"
+            self.assertEqual(step["env"][result_key], "${{ needs." + job + ".result }}")
+            self.assertIn(f'check_job {job} "$RUN_LESSON" "${result_key}"', step["run"])
+        self.assertEqual(jobs["lesson-semantic-lifecycle-render"]["timeout-minutes"], 30)
+        self.assertEqual(jobs["lesson-semantic-lifecycle-evidence"]["timeout-minutes"], 30)
 
     def test_completed_benchmark_cannot_skip_semantic_readiness(self):
         from tests.test_lesson_pipeline import PipelineTests

@@ -653,8 +653,8 @@ jobs:
           $status = git status --porcelain
           if ($status) { $status; throw "Tests left changes in the worktree." }
 
-  lesson-semantic-lifecycle:
-    name: Lesson semantic lifecycle / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+  lesson-semantic-lifecycle-render:
+    name: Lesson semantic lifecycle render / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs: classify-changes
     if: >-
       always() && needs.classify-changes.result == 'success' &&
@@ -728,7 +728,75 @@ jobs:
           --label "lesson semantic lifecycle tests"
           --
           python .github/scripts/run_test_shards.py
-          --suite lesson-semantic-lifecycle
+          --suite lesson-semantic-lifecycle-render
+          -v
+
+      - name: Verify lesson worktree is clean on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+
+      - name: Verify lesson worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) { $status; throw "Tests left changes in the worktree." }
+
+
+  lesson-semantic-lifecycle-evidence:
+    name: Lesson semantic lifecycle evidence / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_lesson == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            教案生成器/lesson-plan-docx-generator/requirements.txt
+            .github/scripts/requirements-ci-lesson-tests.txt
+
+      - name: Install Python dependencies
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "dependency setup"
+          --
+          python -m pip install
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          -r .github/scripts/requirements-ci-lesson-tests.txt
+
+      - name: Compile lesson sources
+        run: python -m compileall -q "教案生成器/lesson-plan-docx-generator" "tests/test_template_packages.py"
+
+      - name: Run semantic lifecycle integration with real retained render
+        run: >-
+          python .github/scripts/run_timed.py
+          --label "lesson semantic lifecycle tests"
+          --
+          python .github/scripts/run_test_shards.py
+          --suite lesson-semantic-lifecycle-evidence
           -v
 
       - name: Verify lesson worktree is clean on macOS
@@ -1248,7 +1316,8 @@ jobs:
       - template-lesson
       - lesson-semantic-scope
       - lesson-final-acceptance
-      - lesson-semantic-lifecycle
+      - lesson-semantic-lifecycle-render
+      - lesson-semantic-lifecycle-evidence
       - template-gradebook
       - template-workorder
       - template-courseware
@@ -1264,7 +1333,8 @@ jobs:
           TOOLING_RESULT: ${{ needs.template-tooling.result }}
           LESSON_RESULT: ${{ needs.template-lesson.result }}
           SEMANTIC_SCOPE_RESULT: ${{ needs.lesson-semantic-scope.result }}
-          SEMANTIC_LIFECYCLE_RESULT: ${{ needs.lesson-semantic-lifecycle.result }}
+          SEMANTIC_LIFECYCLE_RENDER_RESULT: ${{ needs.lesson-semantic-lifecycle-render.result }}
+          SEMANTIC_LIFECYCLE_EVIDENCE_RESULT: ${{ needs.lesson-semantic-lifecycle-evidence.result }}
           FINAL_ACCEPTANCE_RESULT: ${{ needs.lesson-final-acceptance.result }}
           GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
@@ -1313,7 +1383,8 @@ jobs:
           check_job template-tooling "$RUN_TOOLING" "$TOOLING_RESULT"
           check_job template-lesson "$RUN_LESSON" "$LESSON_RESULT"
           check_job lesson-semantic-scope "$RUN_LESSON" "$SEMANTIC_SCOPE_RESULT"
-          check_job lesson-semantic-lifecycle "$RUN_LESSON" "$SEMANTIC_LIFECYCLE_RESULT"
+          check_job lesson-semantic-lifecycle-render "$RUN_LESSON" "$SEMANTIC_LIFECYCLE_RENDER_RESULT"
+          check_job lesson-semantic-lifecycle-evidence "$RUN_LESSON" "$SEMANTIC_LIFECYCLE_EVIDENCE_RESULT"
           check_job lesson-final-acceptance "$RUN_LESSON" "$FINAL_ACCEPTANCE_RESULT"
           check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"

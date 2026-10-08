@@ -222,9 +222,9 @@ class TestShardManifest(unittest.TestCase):
                 with self.subTest(required=required, outcome=outcome), tempfile.TemporaryDirectory() as temp:
                     environment = os.environ.copy()
                     environment.update({key: "false" if key.startswith("RUN_") or key=="FORCE_FULL" else "skipped" for key in step["env"]})
-                    environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome)
+                    environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome, SEMANTIC_LIFECYCLE_RENDER_RESULT=outcome, SEMANTIC_LIFECYCLE_EVIDENCE_RESULT=outcome)
                     if required:
-                        environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success", SEMANTIC_LIFECYCLE_RESULT="success")
+                        environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success")
                     result = subprocess.run(["bash", "-c", step["run"]], env=environment, capture_output=True, text=True)
                     expected = outcome == ("success" if required else "skipped")
                     self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
@@ -242,6 +242,20 @@ class TestShardManifest(unittest.TestCase):
             self.assertEqual(set(flattened), set(discover(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)))
             specs = run_test_shards._suite_specs()
             self.assertEqual(sum(specs[name].count for name in groups), len(flattened))
+
+    def test_o2_lifecycle_suites_are_exact_disjoint_partitions(self) -> None:
+        specs = run_test_shards._suite_specs()
+        groups = run_test_shards._semantic_lifecycle_partitions()
+        all_ids = set(run_test_shards._module_test_ids("tests.test_semantic_lifecycle"))
+        render, evidence = set(groups["lesson-semantic-lifecycle-render"]), set(groups["lesson-semantic-lifecycle-evidence"])
+        self.assertEqual(render & evidence, set())
+        self.assertEqual(render | evidence, all_ids)
+        self.assertTrue(specs["lesson-semantic-lifecycle-render"].count > 0)
+        self.assertTrue(specs["lesson-semantic-lifecycle-evidence"].count > 0)
+        for alias in ("full", "ci"):
+            expanded = run_test_shards._expand_suites((alias,), specs)
+            self.assertIn("lesson-semantic-lifecycle-render", expanded)
+            self.assertIn("lesson-semantic-lifecycle-evidence", expanded)
 
     def test_lesson_course_scope_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
         specs = run_test_shards._suite_specs()

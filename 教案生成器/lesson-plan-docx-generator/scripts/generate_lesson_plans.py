@@ -1155,7 +1155,6 @@ def main(argv=None, *, o2_run=None) -> None:
     args = parser.parse_args(argv)
     if o2_run is not None:
         from run_lesson_pipeline import path_of
-        from path_safety import paths_equal
         if not paths_equal(args.tasks_json, path_of(o2_run, "content")) or not args.source_truth or not paths_equal(args.source_truth, path_of(o2_run, "source_truth")):
             raise ValueError("O2 generator inputs differ from authorized candidate")
         if args.run_id != o2_run["state"]["pipeline_run_id"] or not args.render or args.legacy or args.skip_output_validation or args.skip_template_validation or args.allow_test_fixture_authoring:
