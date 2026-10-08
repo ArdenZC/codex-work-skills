@@ -1,0 +1,11 @@
+{
+  "case_id": "H03",
+  "fixture_purpose": "synthetic deterministic linkage only; no semantic performance qualification",
+  "current_task": "完成生命体征测量记录",
+  "current_output": "生命体征测量记录",
+  "progression": "下一课以生命体征测量记录为输入，复盘基础护理，重点衔接异常沟通",
+  "expected_disposition": "PASS",
+  "expected_issue_category": null,
+  "claim": null,
+  "owner_realistic_prose_approval_required_for_actual_qualification": false
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "lesson_id": "L01",
+    "unit": "项目一 零件测绘",
+    "task": "完成机械零件测绘与尺寸公差校验",
+    "lesson_type": "theory",
+    "hours": 2,
+    "theory_hours": 2,
+    "practice_hours": 0,
+    "prior_learning": "课程开始前完成需求情境梳理，明确本课将围绕机械零件测绘与尺寸公差建立工作入口",
+    "capability_stage": "认知",
+    "deliverable": "零件测绘与尺寸校验记录",
+    "next_bridge": "下一课以零件测绘与尺寸校验记录为输入，复盘机械制图与测绘，重点衔接后续零件工艺分析",
+    "practice_task_ids": []
+  }
+]

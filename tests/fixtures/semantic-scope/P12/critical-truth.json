@@ -1,0 +1,11 @@
+{
+  "case_id": "P12",
+  "fixture_purpose": "synthetic deterministic linkage only; no semantic performance qualification",
+  "current_task": "分析第1类数据处理任务",
+  "current_output": "边界分析记录1",
+  "progression": "下一课以边界分析记录1为输入，分析第2类数据处理任务，重点衔接后续处理验证1",
+  "expected_disposition": "PASS",
+  "expected_issue_category": null,
+  "claim": null,
+  "owner_realistic_prose_approval_required_for_actual_qualification": true
+}

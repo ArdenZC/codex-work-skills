@@ -89,6 +89,160 @@ class TestShardManifest(unittest.TestCase):
             unittest.defaultTestLoader.loadTestsFromName("tests.test_lesson_lifecycle_contracts").countTestCases(),
         )
 
+    def test_hard_miss_cases_are_independently_discovered_with_same_assertions(self) -> None:
+        from unittest.mock import Mock, call
+        import tests.test_semantic_scope_foundation as semantic
+        expected = {
+            "test_hard_miss_n01_pass": ("N01", "PASS"),
+            "test_hard_miss_n02_human_review_required": ("N02", "HUMAN_REVIEW_REQUIRED"),
+            "test_hard_miss_p07_revision_required": ("P07", "REVISION_REQUIRED"),
+            "test_hard_miss_p08_human_review_required": ("P08", "HUMAN_REVIEW_REQUIRED"),
+            "test_hard_miss_a13_pass": ("A13", "PASS"),
+            "test_hard_miss_h01_revision_required": ("H01", "REVISION_REQUIRED"),
+        }
+        ids = run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)
+        prefix = run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".AgentQualificationTests."
+        self.assertEqual({test_id.removeprefix(prefix) for test_id in ids
+                          if test_id.startswith(prefix + "test_hard_miss_")}, set(expected))
+        self.assertEqual(len(ids), 46)
+        hard_miss_ids = {prefix + name for name in expected}
+        for partition in run_test_shards._semantic_scope_partitions().values():
+            self.assertEqual(len(hard_miss_ids & set(partition)), 1)
+        evidence = []
+        for name, pair in expected.items():
+            instance = semantic.AgentQualificationTests(name)
+            fresh = Mock()
+            evidence.append(fresh)
+            with patch.object(instance, "evidence", return_value=fresh) as build, \
+                 patch.object(semantic, "validate_qualification",
+                              side_effect=[{"disposition": "NOT_QUALIFIED"}, semantic.RecordError("approval rejected")]) as validate:
+                getattr(instance, name)()
+                build.assert_called_once_with(pair)
+                self.assertEqual(fresh.context.call_count, 2)
+                self.assertEqual(validate.call_args_list, [
+                    call(fresh.context.return_value, candidate_principal="reviewer", require_approval=False),
+                    call(fresh.context.return_value, candidate_principal="reviewer"),
+                ])
+            # Both original assertions must fail when the public validator violates them.
+            for outcomes in ([{"disposition": "QUALIFIED"}], [{"disposition": "NOT_QUALIFIED"}, {}]):
+                with patch.object(instance, "evidence", return_value=Mock()), \
+                     patch.object(semantic, "validate_qualification", side_effect=outcomes), \
+                     self.assertRaises(AssertionError):
+                    getattr(instance, name)()
+        self.assertEqual(len({id(item) for item in evidence}), 6)
+
+    def test_semantic_scope_top_level_partitions_are_exact(self) -> None:
+        specs = run_test_shards._suite_specs()
+        groups = run_test_shards._semantic_scope_partitions()
+        expected = run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)
+        self.assertEqual(tuple(groups), run_test_shards.SEMANTIC_SCOPE_SHARDS)
+        self.assertEqual(len(groups), 6)
+        flattened = [test_id for ids in groups.values() for test_id in ids]
+        self.assertEqual(sorted(flattened), list(expected))
+        self.assertEqual(len(flattened), len(set(flattened)))
+        self.assertEqual(sum(specs[name].count for name in groups), len(expected))
+        self.assertEqual(run_test_shards._suite_test_ids("lesson-lifecycle"),
+                         ("tests.test_lesson_lifecycle_contracts",))
+        for name, ids in groups.items():
+            self.assertTrue(specs[name].parallel_safe)
+            self.assertEqual(specs[name].kind, "ids")
+            self.assertEqual(run_test_shards._suite_test_ids(name), ids)
+        for index, left in enumerate(groups.values()):
+            for right in list(groups.values())[index + 1:]:
+                self.assertFalse(set(left) & set(right))
+
+    def test_semantic_scope_alias_coverage_and_full_manifest_exactly_once(self) -> None:
+        specs = run_test_shards._suite_specs()
+        expected = set(run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE))
+        for alias in ("semantic-scope", "fast", "full", "ci"):
+            expanded = run_test_shards._expand_suites((alias,), specs)
+            for name in run_test_shards.SEMANTIC_SCOPE_SHARDS:
+                self.assertEqual(expanded.count(name), 1)
+            captured = [test_id for name in expanded
+                        for test_id in run_test_shards._suite_test_ids(name)
+                        if test_id.startswith(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".")]
+            self.assertEqual(set(captured), expected)
+            self.assertEqual(len(captured), len(expected))
+
+    def test_semantic_scope_workers_use_existing_exact_id_execution(self) -> None:
+        with patch.object(run_test_shards, "_run_ids", return_value=0) as execute, \
+             patch.object(run_test_shards, "_run_lesson_package_parallel", side_effect=AssertionError("nested pool")):
+            for name in run_test_shards.SEMANTIC_SCOPE_SHARDS:
+                self.assertEqual(run_test_shards._run_worker(name, verbose=True), 0)
+                execute.assert_called_with(run_test_shards._suite_test_ids(name), verbose=True)
+            self.assertEqual(execute.call_count, len(run_test_shards.SEMANTIC_SCOPE_SHARDS))
+
+    def test_workflow_requires_isolated_semantic_matrix_with_exact_coverage(self) -> None:
+        import yaml
+        data = yaml.safe_load((ROOT / ".github/workflows/template-package-ci.yml").read_text())
+        core = data["jobs"]["template-lesson"]
+        semantic = data["jobs"]["lesson-semantic-scope"]
+        self.assertEqual(core["timeout-minutes"], 35)
+        self.assertEqual(semantic["timeout-minutes"], 35)
+        self.assertEqual(semantic["if"], core["if"])
+        self.assertEqual(semantic["needs"], "classify-changes")
+        matrix = semantic["strategy"]["matrix"]
+        self.assertFalse(semantic["strategy"]["fail-fast"])
+        self.assertEqual(matrix["os"], ["macos-14", "windows-latest"])
+        self.assertEqual(matrix["python-version"], ["3.11"])
+        self.assertEqual(tuple(matrix["partition"]), run_test_shards.SEMANTIC_SCOPE_SHARDS)
+        self.assertEqual(len(matrix["os"]) * len(matrix["partition"]), 12)
+        self.assertIn("${{ matrix.partition }}", semantic["name"])
+        coverage = next(step for step in semantic["steps"] if step["name"] == "Verify exact semantic partition coverage")
+        self.assertEqual(coverage["if"], "matrix.partition == 'semantic-scope-1'")
+        execution = next(step for step in semantic["steps"] if step["name"] == "Run requested semantic scope partition")
+        self.assertEqual(execution["run"].split(), ["python", ".github/scripts/run_test_shards.py", "--suite", "${{", "matrix.partition", "}}", "-v"])
+        self.assertNotIn("if", execution)
+        core_commands = "\n".join(step.get("run", "") for step in core["steps"])
+        self.assertNotIn("--suite semantic-scope", core_commands)
+        self.assertIn("--suite lesson-lifecycle", core_commands)
+        commands = "\n".join(step.get("run", "") for step in semantic["steps"])
+        self.assertNotIn("--suite semantic-scope ", commands)
+        self.assertNotIn("--parallel", commands)
+        self.assertNotIn("LibreOffice", commands)
+        self.assertNotIn("install_libreoffice", commands)
+        self.assertFalse(any(step.get("continue-on-error") for step in semantic["steps"]))
+        gate = data["jobs"]["ci-gate"]
+        self.assertIn("lesson-semantic-scope", gate["needs"])
+        step = next(step for step in gate["steps"] if step.get("name") == "Validate required checks")
+        self.assertEqual(step["env"]["SEMANTIC_SCOPE_RESULT"], "${{ needs.lesson-semantic-scope.result }}")
+        self.assertIn('check_job lesson-semantic-scope "$RUN_LESSON" "$SEMANTIC_SCOPE_RESULT"', step["run"])
+        self.assertEqual(tuple(run_test_shards._expand_suites(("semantic-scope",), run_test_shards._suite_specs())), run_test_shards.SEMANTIC_SCOPE_SHARDS)
+
+    def test_actual_gate_requires_semantic_success_and_non_lesson_skip(self) -> None:
+        import yaml
+        from classify_ci_changes import classify
+        data = yaml.safe_load((ROOT / ".github/workflows/template-package-ci.yml").read_text())
+        step = data["jobs"]["ci-gate"]["steps"][0]
+        for paths in (["README.md"], ["平时成绩记分册生成器/course-gradebook-generator/scripts/generate_gradebook.py"]):
+            self.assertFalse(classify(paths, event_name="pull_request")["run_lesson"])
+        self.assertTrue(classify(["tests/test_semantic_scope_foundation.py"], event_name="pull_request")["run_lesson"])
+        for required in (True, False):
+            for outcome in ("success", "failure", "cancelled", "skipped"):
+                with self.subTest(required=required, outcome=outcome), tempfile.TemporaryDirectory() as temp:
+                    environment = os.environ.copy()
+                    environment.update({key: "false" if key.startswith("RUN_") or key=="FORCE_FULL" else "skipped" for key in step["env"]})
+                    environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome)
+                    if required:
+                        environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success")
+                    result = subprocess.run(["bash", "-c", step["run"]], env=environment, capture_output=True, text=True)
+                    expected = outcome == ("success" if required else "skipped")
+                    self.assertEqual(result.returncode == 0, expected, result.stdout + result.stderr)
+
+    def test_new_semantic_scope_test_automatically_enters_partition(self) -> None:
+        original = run_test_shards._module_test_ids
+        added = run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".FutureTests.test_future_case"
+        def discover(module):
+            ids = original(module)
+            return tuple(sorted((*ids, added))) if module == run_test_shards.SEMANTIC_SCOPE_TEST_MODULE else ids
+        with patch.object(run_test_shards, "_module_test_ids", side_effect=discover):
+            groups = run_test_shards._semantic_scope_partitions()
+            flattened = [test_id for ids in groups.values() for test_id in ids]
+            self.assertEqual(flattened.count(added), 1)
+            self.assertEqual(set(flattened), set(discover(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)))
+            specs = run_test_shards._suite_specs()
+            self.assertEqual(sum(specs[name].count for name in groups), len(flattened))
+
     def test_lesson_course_scope_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
         specs = run_test_shards._suite_specs()
         module = "tests.test_lesson_course_scope"

@@ -1,0 +1,381 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "semantic-scope-review 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "review_id",
+    "pipeline_run_id",
+    "review_purpose",
+    "content_contract_version",
+    "source_truth_manifest_sha256",
+    "outline_sha256",
+    "content_sha256",
+    "authoring_id",
+    "reviewer",
+    "whole_course_disposition",
+    "lessons",
+    "reviewed_at",
+    "review_fingerprint"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0"
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "pipeline_run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "review_purpose": {
+      "enum": [
+        "production_candidate",
+        "qualification"
+      ]
+    },
+    "content_contract_version": {
+      "enum": [
+        "2.2",
+        "2.3"
+      ]
+    },
+    "source_truth_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outline_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "authoring_id": {
+      "type": "string",
+      "minLength": 6,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "reviewer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "identity",
+        "operation_id",
+        "implementation",
+        "version",
+        "configuration_sha256",
+        "qualification_sha256"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "agent",
+            "human"
+          ]
+        },
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "operation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "implementation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        "configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "qualification_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "whole_course_disposition": {
+      "enum": [
+        "PASS",
+        "REVISION_REQUIRED",
+        "HUMAN_REVIEW_REQUIRED"
+      ]
+    },
+    "lessons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lesson_id",
+          "disposition",
+          "rationale",
+          "source_references",
+          "issues"
+        ],
+        "properties": {
+          "lesson_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "\\S"
+          },
+          "disposition": {
+            "enum": [
+              "PASS",
+              "REVISION_REQUIRED",
+              "HUMAN_REVIEW_REQUIRED"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600,
+            "pattern": "\\S"
+          },
+          "source_references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_id",
+                "sha256",
+                "pointer",
+                "start",
+                "end"
+              ],
+              "properties": {
+                "source_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "pointer": {
+                  "type": "string",
+                  "maxLength": 512,
+                  "pattern": "^(?:/(?:[^~]|~[01])*)*$"
+                },
+                "start": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "end": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "minItems": 1,
+            "maxItems": 16
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "issue_id",
+                "category",
+                "disposition",
+                "location",
+                "bounded_excerpt",
+                "rationale",
+                "source_references"
+              ],
+              "properties": {
+                "issue_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "\\S"
+                },
+                "category": {
+                  "enum": [
+                    "foreign_instruction",
+                    "neighbor_lesson_leakage",
+                    "scope_expansion",
+                    "deliverable_mismatch",
+                    "mixed_instructional_claim",
+                    "ambiguous_scope"
+                  ]
+                },
+                "disposition": {
+                  "enum": [
+                    "REVISION_REQUIRED",
+                    "HUMAN_REVIEW_REQUIRED"
+                  ]
+                },
+                "location": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "field",
+                    "index",
+                    "start",
+                    "end"
+                  ],
+                  "properties": {
+                    "field": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 512,
+                      "pattern": "^(?:/(?:[^~]|~[01])*)+$"
+                    },
+                    "index": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "start": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  }
+                },
+                "bounded_excerpt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 320,
+                  "pattern": "\\S"
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 600,
+                  "pattern": "\\S"
+                },
+                "source_references": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "source_id",
+                      "sha256",
+                      "pointer",
+                      "start",
+                      "end"
+                    ],
+                    "properties": {
+                      "source_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "\\S"
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      "pointer": {
+                        "type": "string",
+                        "maxLength": 512,
+                        "pattern": "^(?:/(?:[^~]|~[01])*)*$"
+                      },
+                      "start": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "end": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "minItems": 1,
+                  "maxItems": 16
+                }
+              }
+            },
+            "minItems": 0,
+            "maxItems": 128
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "review_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}

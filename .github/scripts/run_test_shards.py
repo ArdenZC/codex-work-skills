@@ -34,6 +34,8 @@ LESSON_V21_TEST_MODULE = "tests.test_lesson_content_v21"
 LESSON_V22_TEST_MODULE = "tests.test_lesson_content_v22"
 LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
 LESSON_CONTRACT_HARDENING_TEST_MODULE = "tests.test_lesson_22_contract_hardening"
+SEMANTIC_SCOPE_TEST_MODULE = "tests.test_semantic_scope_foundation"
+SEMANTIC_SCOPE_SHARDS = tuple(f"semantic-scope-{index}" for index in range(1, 7))
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
@@ -119,6 +121,17 @@ def _lesson_package_ids() -> tuple[str, ...]:
     )
 
 
+def _semantic_scope_partitions() -> dict[str, tuple[str, ...]]:
+    """Round-robin sorted exact IDs across bounded top-level scheduler slots.
+
+    Discovery is live: newly added tests automatically join the partition.
+    Agent corpus tests sort together and are distributed across all six slots.
+    Each slot uses the existing isolated worker, without a nested pool.
+    """
+    groups = _partition_ids(_module_test_ids(SEMANTIC_SCOPE_TEST_MODULE), len(SEMANTIC_SCOPE_SHARDS))
+    return dict(zip(SEMANTIC_SCOPE_SHARDS, groups))
+
+
 def _workflow_ids() -> tuple[str, ...]:
     return _class_test_ids("WorkflowContractTests")
 
@@ -141,7 +154,9 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     gradebook_class_count = _module_count(f"{TEST_MODULE}.GradebookTemplatePackageTests")
     gradebook_static_count = len(_static_gradebook_ids())
     workflow = _workflow_ids()
+    semantic = _semantic_scope_partitions()
     return {
+        **{name: SuiteSpec(name, True, "ids", len(ids)) for name, ids in semantic.items()},
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
         "lesson-lifecycle": SuiteSpec(
             "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
@@ -194,8 +209,9 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 
 
 ALIASES = {
-    "fast": ("lesson-content", "lesson-lifecycle", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "semantic-scope": SEMANTIC_SCOPE_SHARDS,
+    "fast": ("lesson-content", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
+    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -219,6 +235,8 @@ def _expand_suites(requested: Sequence[str], specs: dict[str, SuiteSpec]) -> tup
 
 
 def _suite_test_ids(name: str) -> tuple[str, ...]:
+    if name in SEMANTIC_SCOPE_SHARDS:
+        return _semantic_scope_partitions()[name]
     if name == "lesson-content":
         return _lesson_content_ids()
     if name == "lesson-lifecycle":

@@ -282,6 +282,13 @@ jobs:
       - name: Run workflow contract tests
         run: python -m unittest "tests.test_template_packages.WorkflowContractTests" -v
 
+      - name: Verify semantic job and Gate wiring
+        run: >-
+          python -m unittest
+          tests.test_run_test_shards.TestShardManifest.test_workflow_requires_isolated_semantic_matrix_with_exact_coverage
+          tests.test_run_test_shards.TestShardManifest.test_actual_gate_requires_semantic_success_and_non_lesson_skip
+          -v
+
       - name: Verify package contract worktree is clean
         shell: bash
         run: test -z "$(git status --porcelain)"
@@ -479,6 +486,72 @@ jobs:
         run: test -z "$(git status --porcelain)"
 
       - name: Verify lesson worktree is clean on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $status = git status --porcelain
+          if ($status) { $status; throw "Tests left changes in the worktree." }
+
+  lesson-semantic-scope:
+    name: Lesson semantic scope / ${{ matrix.os }} / ${{ matrix.partition }} / Python ${{ matrix.python-version }}
+    needs: classify-changes
+    if: >-
+      always() && needs.classify-changes.result == 'success' &&
+      (needs.classify-changes.outputs.force_full == 'true' ||
+      needs.classify-changes.outputs.run_lesson == 'true')
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, windows-latest]
+        python-version: ["3.11"]
+        partition:
+          - semantic-scope-1
+          - semantic-scope-2
+          - semantic-scope-3
+          - semantic-scope-4
+          - semantic-scope-5
+          - semantic-scope-6
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            教案生成器/lesson-plan-docx-generator/requirements.txt
+            .github/scripts/requirements-ci-lesson-tests.txt
+      - name: Install semantic foundation Python dependencies
+        run: >-
+          python -m pip install
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          -r .github/scripts/requirements-ci-lesson-tests.txt
+      - name: Verify exact semantic partition coverage
+        if: matrix.partition == 'semantic-scope-1'
+        run: >-
+          python -m unittest
+          tests.test_run_test_shards.TestShardManifest.test_hard_miss_cases_are_independently_discovered_with_same_assertions
+          tests.test_run_test_shards.TestShardManifest.test_semantic_scope_top_level_partitions_are_exact
+          tests.test_run_test_shards.TestShardManifest.test_semantic_scope_alias_coverage_and_full_manifest_exactly_once
+          tests.test_run_test_shards.TestShardManifest.test_new_semantic_scope_test_automatically_enters_partition
+          tests.test_run_test_shards.TestShardManifest.test_semantic_scope_workers_use_existing_exact_id_execution
+          tests.test_run_test_shards.TestShardManifest.test_full_manifest_matches_root_discovery
+          -v
+      - name: Run requested semantic scope partition
+        run: >-
+          python .github/scripts/run_test_shards.py
+          --suite ${{ matrix.partition }} -v
+      - name: Verify semantic worktree is clean on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: test -z "$(git status --porcelain)"
+      - name: Verify semantic worktree is clean on Windows
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -1083,6 +1156,7 @@ jobs:
       - package-contracts
       - template-tooling
       - template-lesson
+      - lesson-semantic-scope
       - lesson-final-acceptance
       - template-gradebook
       - template-workorder
@@ -1098,6 +1172,7 @@ jobs:
           PACKAGE_RESULT: ${{ needs.package-contracts.result }}
           TOOLING_RESULT: ${{ needs.template-tooling.result }}
           LESSON_RESULT: ${{ needs.template-lesson.result }}
+          SEMANTIC_SCOPE_RESULT: ${{ needs.lesson-semantic-scope.result }}
           FINAL_ACCEPTANCE_RESULT: ${{ needs.lesson-final-acceptance.result }}
           GRADEBOOK_RESULT: ${{ needs.template-gradebook.result }}
           WORKORDER_RESULT: ${{ needs.template-workorder.result }}
@@ -1145,6 +1220,7 @@ jobs:
           check_job package-contracts "$RUN_PACKAGE" "$PACKAGE_RESULT"
           check_job template-tooling "$RUN_TOOLING" "$TOOLING_RESULT"
           check_job template-lesson "$RUN_LESSON" "$LESSON_RESULT"
+          check_job lesson-semantic-scope "$RUN_LESSON" "$SEMANTIC_SCOPE_RESULT"
           check_job lesson-final-acceptance "$RUN_LESSON" "$FINAL_ACCEPTANCE_RESULT"
           check_job template-gradebook "$RUN_GRADEBOOK" "$GRADEBOOK_RESULT"
           check_job template-workorder "$RUN_WORKORDER" "$WORKORDER_RESULT"

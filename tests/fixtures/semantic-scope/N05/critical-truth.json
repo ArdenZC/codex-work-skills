@@ -1,0 +1,11 @@
+{
+  "case_id": "N05",
+  "fixture_purpose": "synthetic deterministic linkage only; no semantic performance qualification",
+  "current_task": "组合线性与非线性结构",
+  "current_output": "结构组合方案",
+  "progression": "下一课以结构组合方案为输入，评估操作复杂度与性能，重点衔接复杂度评估",
+  "expected_disposition": "REVISION_REQUIRED",
+  "expected_issue_category": "neighbor_lesson_leakage",
+  "claim": "本课教授下一课的性能评估并提交性能测试报告",
+  "owner_realistic_prose_approval_required_for_actual_qualification": false
+}

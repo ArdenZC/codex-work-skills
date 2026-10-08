@@ -1,0 +1,16 @@
+[
+  {
+    "lesson_id": "L01",
+    "unit": "项目二 生命体征照护",
+    "task": "完成生命体征测量记录",
+    "lesson_type": "theory",
+    "hours": 2,
+    "theory_hours": 2,
+    "practice_hours": 0,
+    "prior_learning": "课程开始前完成需求情境梳理，明确本课将围绕生命体征观察建立工作入口",
+    "capability_stage": "认知",
+    "deliverable": "生命体征测量记录",
+    "next_bridge": "下一课以生命体征测量记录为输入，复盘基础护理，重点衔接异常沟通",
+    "practice_task_ids": []
+  }
+]
