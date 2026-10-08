@@ -222,7 +222,7 @@ class TestShardManifest(unittest.TestCase):
                 with self.subTest(required=required, outcome=outcome), tempfile.TemporaryDirectory() as temp:
                     environment = os.environ.copy()
                     environment.update({key: "false" if key.startswith("RUN_") or key=="FORCE_FULL" else "skipped" for key in step["env"]})
-                    environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome)
+                    environment.update(CLASSIFY_RESULT="success", CLASSIFICATION="test", REASON="gate contract", CHANGED_FILES="", GITHUB_STEP_SUMMARY=str(Path(temp)/"summary.md"), RUN_LESSON=str(required).lower(), SEMANTIC_SCOPE_RESULT=outcome, SEMANTIC_LIFECYCLE_RENDER_RESULT=outcome, SEMANTIC_LIFECYCLE_EVIDENCE_RESULT=outcome)
                     if required:
                         environment.update(LESSON_RESULT="success", FINAL_ACCEPTANCE_RESULT="success")
                     result = subprocess.run(["bash", "-c", step["run"]], env=environment, capture_output=True, text=True)
@@ -242,6 +242,32 @@ class TestShardManifest(unittest.TestCase):
             self.assertEqual(set(flattened), set(discover(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)))
             specs = run_test_shards._suite_specs()
             self.assertEqual(sum(specs[name].count for name in groups), len(flattened))
+
+    def test_o2_lifecycle_suites_are_exact_disjoint_partitions(self) -> None:
+        specs = run_test_shards._suite_specs()
+        groups = run_test_shards._semantic_lifecycle_partitions()
+        all_ids = set(run_test_shards._module_test_ids("tests.test_semantic_lifecycle"))
+        render_names = (
+            "lesson-semantic-lifecycle-canonical",
+            "lesson-semantic-lifecycle-installed",
+            "lesson-semantic-lifecycle-rollback",
+        )
+        render_groups = [set(groups[name]) for name in render_names]
+        evidence = set(groups["lesson-semantic-lifecycle-evidence"])
+        for index, group in enumerate(render_groups):
+            for other in render_groups[index + 1 :]:
+                self.assertTrue(group.isdisjoint(other))
+        render = set().union(*render_groups)
+        self.assertTrue(render.isdisjoint(evidence))
+        self.assertEqual(render | evidence, all_ids)
+        self.assertEqual([len(group) for group in render_groups], [1, 1, 1])
+        self.assertTrue(all(specs[name].count == 1 for name in render_names))
+        self.assertTrue(specs["lesson-semantic-lifecycle-evidence"].count > 0)
+        for alias in ("full", "ci"):
+            expanded = run_test_shards._expand_suites((alias,), specs)
+            for name in render_names:
+                self.assertIn(name, expanded)
+            self.assertIn("lesson-semantic-lifecycle-evidence", expanded)
 
     def test_lesson_course_scope_suite_has_exact_worker_and_fast_full_coverage(self) -> None:
         specs = run_test_shards._suite_specs()

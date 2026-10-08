@@ -253,7 +253,7 @@ def _template_errors(
 
 
 def validate_production_authorization_payload(payload: Mapping[str, Any]) -> list[str]:
-    errors = schema_errors(payload, "production-authorization.schema.json")
+    errors = schema_errors(payload, "production-authorization-v2.schema.json" if payload.get("contract_version") == "2.0" else "production-authorization.schema.json")
     if errors:
         return errors
     if not timezone_aware_timestamp(payload.get("created_at")):
@@ -287,9 +287,10 @@ def validate_production_authorization_files(
     template_manifest_path: str | Path | None = None,
     template_path: str | Path | None = None,
     verify_runtime_environment: bool = True,
+    semantic_run: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bytes, list[str]]:
     authorization, authorization_raw = read_json_object(authorization_path, "production_authorization")
-    structural_errors = schema_errors(authorization, "production-authorization.schema.json")
+    structural_errors = schema_errors(authorization, "production-authorization-v2.schema.json" if authorization.get("contract_version") == "2.0" else "production-authorization.schema.json")
     if structural_errors:
         return authorization, authorization_raw, structural_errors
     input_paths: dict[str, str | Path] = {
@@ -309,6 +310,22 @@ def validate_production_authorization_files(
     source_truth, source_truth_raw = read_json_object(source_truth_path, "source_truth_manifest")
     content, content_raw = read_json_object(content_path, "lesson_content")
     errors = validate_production_authorization_payload(authorization)
+    if authorization.get("contract_version") == "2.0":
+        try:
+            from semantic_lifecycle import authorization_scope
+            from run_lesson_pipeline import path_of
+            if semantic_run is None or semantic_run.get("orchestrator_version") != "2.0":
+                raise LifecycleContractError("PA 2.0 requires an actual O2 run and external TrustContext")
+            teacher, _ = read_json_object(teacher_review_path, "Teacher Review")
+            if authorization["semantic_scope"] != authorization_scope(semantic_run, teacher):
+                raise LifecycleContractError("STALE PA semantic dependency bytes")
+            for key, path in (("source_truth", source_truth_path), ("content", content_path), ("teacher_review", teacher_review_path)):
+                if Path(path).resolve() != path_of(semantic_run, key).resolve():
+                    raise LifecycleContractError("foreign PA input: " + key)
+            if authorization["pipeline_run_id"] != semantic_run["state"]["pipeline_run_id"]:
+                raise LifecycleContractError("foreign PA run")
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            errors.append(str(exc))
     try:
         from package_common import DEFAULT_SCHEMA, validate_content_v2_input
 
@@ -378,6 +395,7 @@ def validate_production_authorization_files(
         benchmark_review_path=benchmark_review_path,
         benchmark_evidence_path=benchmark_evidence_path,
         require_approved=True,
+        semantic_run=semantic_run,
     )
     errors.extend(review_errors)
     if authorization.get("teacher_review_sha256", "").casefold() != sha256_bytes(teacher_review_raw):

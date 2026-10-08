@@ -93,7 +93,7 @@ def validate_teacher_review_payload(
     benchmark_evidence_path: str | Path | None = None,
     require_benchmark_bytes: bool = True,
 ) -> list[str]:
-    errors = schema_errors(payload, "teacher-review.schema.json")
+    errors = schema_errors(payload, "teacher-review-v2.schema.json" if payload.get("contract_version") == "2.0" else "teacher-review.schema.json")
     if errors:
         return errors
     if not timezone_aware_timestamp(payload.get("reviewed_at")):
@@ -162,6 +162,7 @@ def validate_teacher_review_files(
     benchmark_review_path: str | Path | None = None,
     benchmark_evidence_path: str | Path | None = None,
     require_approved: bool = False,
+    semantic_run: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bytes, list[str]]:
     distinct_paths: dict[str, str | Path] = {
         "teacher_review": review_path,
@@ -204,6 +205,14 @@ def validate_teacher_review_files(
         ))
     if require_approved and review.get("decision") not in {"APPROVED", "APPROVED_WITH_NOTES"}:
         errors.append("only APPROVED or APPROVED_WITH_NOTES can satisfy an approval authority check")
+    if review.get("contract_version") == "2.0" and require_approved:
+        try:
+            from semantic_lifecycle import teacher
+            if semantic_run is None or semantic_run.get("orchestrator_version") != "2.0":
+                raise LifecycleContractError("Teacher 2.0 approval requires an O2 run and external TrustContext")
+            teacher(semantic_run, review)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            errors.append(str(exc))
     return review, review_raw, errors
 
 

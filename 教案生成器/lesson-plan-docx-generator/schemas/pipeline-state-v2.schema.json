@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "pipeline-state 2.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "pipeline_run_id",
+    "current_state",
+    "artifacts",
+    "transitions",
+    "state_fingerprint"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "2.0"
+    },
+    "pipeline_run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "current_state": {
+      "$ref": "#/$defs/state"
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_truth_manifest_sha256",
+        "content_sha256",
+        "benchmark_preparation_sha256",
+        "benchmark_disposition_sha256",
+        "preproduction_qa_sha256",
+        "teacher_review_sha256",
+        "production_authorization_sha256",
+        "artifact_manifest_sha256",
+        "artifact_qa_sha256",
+        "visual_review_sha256",
+        "acceptance_sha256",
+        "outline_sha256",
+        "semantic_scope_review_sha256",
+        "semantic_scope_operation_receipt_sha256",
+        "reviewer_configuration_sha256",
+        "reviewer_qualification_sha256",
+        "qualification_approval_receipt_sha256",
+        "authority_profile_sha256",
+        "teacher_approval_receipt_sha256"
+      ],
+      "properties": {
+        "source_truth_manifest_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "benchmark_preparation_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "benchmark_disposition_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "preproduction_qa_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "teacher_review_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "production_authorization_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "artifact_manifest_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "artifact_qa_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "visual_review_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "acceptance_sha256": {
+          "$ref": "#/$defs/optionalSha256"
+        },
+        "outline_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "semantic_scope_review_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "semantic_scope_operation_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "reviewer_configuration_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "reviewer_qualification_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "qualification_approval_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "authority_profile_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        },
+        "teacher_approval_receipt_sha256": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          ]
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from_state",
+          "to_state",
+          "evidence_sha256",
+          "recorded_at"
+        ],
+        "properties": {
+          "from_state": {
+            "$ref": "#/$defs/state"
+          },
+          "to_state": {
+            "$ref": "#/$defs/state"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{64}$"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "state_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    }
+  },
+  "$defs": {
+    "state": {
+      "enum": [
+        "INTAKE_CONFIRMED",
+        "SOURCE_TRUTH_FROZEN",
+        "BENCHMARK_PREPARED",
+        "AUTHORING_COMPLETE",
+        "PREPRODUCTION_QA_PASSED",
+        "BENCHMARK_REVIEW_COMPLETE",
+        "READY_FOR_TEACHER_REVIEW",
+        "TEACHER_REVIEW_APPROVED",
+        "PRODUCTION_AUTHORIZED",
+        "PRODUCTION_GENERATED",
+        "ARTIFACT_QA_PASSED",
+        "VISUAL_REVIEW_APPROVED",
+        "ACCEPTED"
+      ]
+    },
+    "optionalSha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      ]
+    }
+  }
+}

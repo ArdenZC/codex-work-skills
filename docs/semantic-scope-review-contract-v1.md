@@ -1,9 +1,11 @@
 # Semantic Scope Review Contract 1.0 — RQ-03N design
 
-Status: proposed normative contract, awaiting Owner Review. Trusted production
-master: `91ded51a2aa7668ba5eec8b70027b018eb03675d` (PR #46 MERGED / QUALIFIED,
-post-merge run `37421609102`). This document activates no runtime behavior.
-RQ-03 and RC-02 remain BLOCKED. RQ-03O, NC-01 and Lesson 2.4.0 are not started.
+Status: merged normative contract (PR #47). RQ-03O1 is MERGED_AND_QUALIFIED
+at `a6789d12b95d23385bbdcedd91d14c381da7b898` (PR #49; post-merge run
+`37715531429`). Issue #50 authorizes opt-in RQ-03O2 implementation, synthetic
+integration qualification and one Draft PR, without production activation.
+Live reviewer qualification, RC-02 and Lesson 2.4 remain separate blocked gates.
+Historical design-stage references below do not change this normative policy.
 
 ## 1. Authority and independent review
 
@@ -823,5 +825,6 @@ These are a test plan, not executable new release tests or activated contracts.
 
 This revision closes the design decision only. No schema file, signature code,
 keys, model call, adapter, runtime/installer/CI change or version bump is added.
-PR #47 remains OPEN / Draft, without requested reviewers or merge. RQ-03 and
-RC-02 remain BLOCKED; RQ-03O, NC-01 and Lesson 2.4.0 are not started.
+PR #47 is merged as the normative design. Issue #50 authorizes RQ-03O2 code
+integration; live qualification, production activation, RC-02 and Lesson 2.4
+remain outside that authorization.

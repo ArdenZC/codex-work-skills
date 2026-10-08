@@ -55,6 +55,9 @@ def evaluate(run, *, created_at=None, validate_acceptance=True, diagnostic_input
               "version": version, "notes": "required evidence is not yet available"}
              for name, (_, contract, version) in GATES.items()]
     indexed = {row["name"]: row for row in gates}
+    if isinstance(run, dict) and run.get("orchestrator_version") == "2.0":
+        for name in ("pipeline_identity", "teacher_review_packet", "teacher_review", "production_authorization", "lifecycle_state"):
+            indexed[name]["version"] = "2.0"
     # Diagnostic metadata must itself remain valid even when the envelope is
     # malformed. The original, unsanitized run is still validated below.
     state = run.get("state") if isinstance(run, dict) else None
@@ -113,7 +116,7 @@ def evaluate(run, *, created_at=None, validate_acceptance=True, diagnostic_input
         if "teacher_review" in working["bindings"]:
             teacher, _, errors = validate_teacher_review_files(path_of(working, "teacher_review"),
                 source_truth_path=path_of(working, "source_truth"), content_path=path_of(working, "content"),
-                require_approved=False, **evidence_kwargs(working))
+                require_approved=working["orchestrator_version"] == "2.0", semantic_run=working, **evidence_kwargs(working))
             if errors: raise LifecycleContractError("; ".join(errors))
             if teacher["pipeline_run_id"] != result["pipeline_run_id"]:
                 raise LifecycleContractError("diagnostic Teacher Review run mismatch")

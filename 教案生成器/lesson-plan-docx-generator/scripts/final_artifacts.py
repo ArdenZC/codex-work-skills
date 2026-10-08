@@ -82,4 +82,10 @@ def validate_run_artifacts(run):
     if path_of(run, "artifact_manifest") != output / "artifact-manifest.json" or path_of(run, "artifact_qa") != output / "qa-report.json":
         raise LifecycleContractError("final evidence must bind the canonical output manifest and qa-report")
     authorization, _ = read_json_object(path_of(run, "production_authorization"), "Production Authorization")
+    if run["orchestrator_version"] == "2.0":
+        manifest, _ = read_json_object(output / "artifact-manifest.json", "O2 Artifact manifest")
+        expected = dict(orchestrator_version="2.0", production_authorization_sha256=sha256_file(path_of(run, "production_authorization")),
+            semantic_scope=authorization["semantic_scope"])
+        if manifest.get("canonical_lifecycle") != expected or sha256_file(output / "production-authorization.json") != expected["production_authorization_sha256"]:
+            raise LifecycleContractError("O2 output does not bind exact authorized PA bytes")
     return validate_artifact_files(output, path_of(run, "content"), authorization, run["state"]["pipeline_run_id"])

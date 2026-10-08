@@ -70,6 +70,9 @@ ARTIFACT_FIELDS = {
     "visual_review_sha256": "visual_review",
     "acceptance_sha256": "acceptance",
 }
+LEGACY_ARTIFACT_FIELDS = dict(ARTIFACT_FIELDS)
+from semantic_lifecycle import FIELDS as SEMANTIC_ARTIFACT_FIELDS
+ARTIFACT_FIELDS.update(SEMANTIC_ARTIFACT_FIELDS)
 REQUIRED_ARTIFACTS = {
     "INTAKE_CONFIRMED": (),
     "SOURCE_TRUTH_FROZEN": ("source_truth_manifest_sha256",),
@@ -103,6 +106,20 @@ DEPENDENCIES = {
     "acceptance": set(),
 }
 SUPPORTED_DEPENDENCY_NODES = frozenset(DEPENDENCIES)
+SEMANTIC_DEPENDENCIES = {key: set(value) for key, value in DEPENDENCIES.items()}
+SEMANTIC_DEPENDENCIES["source_truth"].add("semantic_scope_review")
+SEMANTIC_DEPENDENCIES["content"].add("semantic_scope_review")
+SEMANTIC_DEPENDENCIES.update({
+    "outline": {"semantic_scope_review"},
+    "reviewer_configuration": {"reviewer_qualification", "semantic_scope_review"},
+    "reviewer_qualification": {"semantic_scope_review"},
+    "qualification_approval_receipt": {"semantic_scope_review"},
+    "authority_profile": {"reviewer_qualification", "semantic_scope_review", "teacher_review"},
+    "semantic_scope_review": {"semantic_scope_operation_receipt", "teacher_packet", "teacher_review"},
+    "semantic_scope_operation_receipt": {"teacher_packet", "teacher_review"},
+    "teacher_packet": {"teacher_review"},
+    "teacher_approval_receipt": {"production_authorization"},
+})
 TRANSITION_EVIDENCE_FIELDS = {
     "SOURCE_TRUTH_FROZEN": "source_truth_manifest_sha256",
     "BENCHMARK_PREPARED": "benchmark_preparation_sha256",
@@ -123,12 +140,12 @@ def pipeline_state_fingerprint(payload: Mapping[str, Any]) -> str:
     return semantic_fingerprint(payload, excluded_fields=FINGERPRINT_EXCLUDED_FIELDS)
 
 
-def initial_pipeline_state(pipeline_run_id: str) -> dict[str, Any]:
+def initial_pipeline_state(pipeline_run_id: str, *, contract_version: str = "1.0") -> dict[str, Any]:
     state: dict[str, Any] = {
-        "contract_version": "1.0",
+        "contract_version": contract_version,
         "pipeline_run_id": pipeline_run_id,
         "current_state": "INTAKE_CONFIRMED",
-        "artifacts": {field: None for field in ARTIFACT_FIELDS},
+        "artifacts": {field: None for field in (ARTIFACT_FIELDS if contract_version == "2.0" else LEGACY_ARTIFACT_FIELDS)},
         "transitions": [],
         "state_fingerprint": "",
     }
@@ -137,7 +154,7 @@ def initial_pipeline_state(pipeline_run_id: str) -> dict[str, Any]:
 
 
 def validate_pipeline_state_payload(payload: Mapping[str, Any]) -> list[str]:
-    errors = schema_errors(payload, "pipeline-state.schema.json")
+    errors = schema_errors(payload, "pipeline-state-v2.schema.json" if payload.get("contract_version") == "2.0" else "pipeline-state.schema.json")
     if errors:
         return errors
     if payload.get("state_fingerprint", "").casefold() != pipeline_state_fingerprint(payload):
@@ -176,6 +193,14 @@ def validate_pipeline_state_payload(payload: Mapping[str, Any]) -> list[str]:
     if payload.get("current_state") != current:
         errors.append("current_state does not match replayed transitions")
     artifacts = payload.get("artifacts", {})
+    if payload["contract_version"] == "2.0":
+        rank = STATES.index(payload["current_state"])
+        if rank >= STATES.index("READY_FOR_TEACHER_REVIEW"):
+            for field in SEMANTIC_ARTIFACT_FIELDS:
+                if field != "teacher_approval_receipt_sha256" and artifacts.get(field) is None:
+                    errors.append("O2 READY requires " + field)
+        if rank >= STATES.index("TEACHER_REVIEW_APPROVED") and artifacts.get("teacher_approval_receipt_sha256") is None:
+            errors.append("O2 approval requires a separate teacher receipt")
     for field in REQUIRED_ARTIFACTS.get(payload.get("current_state"), ()):
         if artifacts.get(field) is None:
             errors.append(f"artifacts.{field} is required in state {payload.get('current_state')}")
@@ -223,15 +248,16 @@ def advance_pipeline_state(
     return result
 
 
-def stale_downstream(changed_nodes: str | set[str] | tuple[str, ...] | list[str]) -> set[str]:
+def stale_downstream(changed_nodes: str | set[str] | tuple[str, ...] | list[str], *, contract_version: str = "1.0") -> set[str]:
     """Return every transitive downstream node invalidated by changed evidence."""
     pending = [changed_nodes] if isinstance(changed_nodes, str) else list(changed_nodes)
     stale: set[str] = set()
+    dependencies = SEMANTIC_DEPENDENCIES if contract_version == "2.0" else DEPENDENCIES
     while pending:
         node = pending.pop()
-        if node not in SUPPORTED_DEPENDENCY_NODES:
+        if node not in dependencies:
             raise LifecycleContractError(f"unknown lifecycle dependency node: {node}")
-        for downstream in DEPENDENCIES[node]:
+        for downstream in dependencies[node]:
             if downstream not in stale:
                 stale.add(downstream)
                 pending.append(downstream)
@@ -286,6 +312,7 @@ def validate_pipeline_state_files(
     skill_root: str | Path | None = None,
     template_manifest_path: str | Path | None = None,
     template_path: str | Path | None = None,
+    semantic_run: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bytes, list[str]]:
     path_set: dict[str, str | Path] = {"pipeline_state": state_path}
     errors: list[str] = []
@@ -315,10 +342,18 @@ def validate_pipeline_state_files(
             path_set[label] = value
     assert_distinct_safe_paths(path_set)
     state, raw = read_json_object(state_path, "pipeline_state")
-    structural_errors = schema_errors(state, "pipeline-state.schema.json")
+    structural_errors = schema_errors(state, "pipeline-state-v2.schema.json" if state.get("contract_version") == "2.0" else "pipeline-state.schema.json")
     if structural_errors:
         return state, raw, structural_errors
     errors.extend(validate_pipeline_state_payload(state))
+    if state["contract_version"] == "2.0":
+        try:
+            from run_lesson_pipeline import validate_run
+            if semantic_run is None or semantic_run.get("orchestrator_version") != "2.0" or semantic_run.get("state") != state:
+                raise LifecycleContractError("Pipeline 2.0 authority requires its exact O2 run and external TrustContext")
+            validate_run(semantic_run)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            errors.append(str(exc))
     direct_paths = {
         "source_truth_manifest_sha256": source_truth_path,
         "content_sha256": content_path,
@@ -368,6 +403,7 @@ def validate_pipeline_state_files(
                     benchmark_review_path=benchmark_review_path,
                     benchmark_evidence_path=benchmark_evidence_path,
                     require_approved=True,
+                    semantic_run=semantic_run,
                 )
                 errors.extend(review_errors)
                 if review.get("pipeline_run_id") != state.get("pipeline_run_id"):
@@ -396,6 +432,7 @@ def validate_pipeline_state_files(
                     template_manifest_path=template_manifest_path,
                     template_path=template_path,
                     verify_runtime_environment=False,
+                    semantic_run=semantic_run,
                 )
                 errors.extend(auth_errors)
                 if authorization.get("pipeline_run_id") != state.get("pipeline_run_id"):

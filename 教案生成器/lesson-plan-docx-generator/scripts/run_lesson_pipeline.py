@@ -79,7 +79,7 @@ def envelope_fingerprint(run):
     return semantic_fingerprint(run, excluded_fields={"run_fingerprint"})
 
 
-def content_qa(content_path, source_truth_path, *, require_local_outline):
+def content_qa(content_path, source_truth_path, *, require_local_outline, implementation_version=IMPLEMENTATION_VERSION):
     from package_common import DEFAULT_SCHEMA, DEFAULT_MANIFEST, load_manifest, validate_content_v2_input
     from content_quality import validate_content_quality
     content, raw = read_json_object(content_path, "Content")
@@ -102,7 +102,7 @@ def content_qa(content_path, source_truth_path, *, require_local_outline):
         "hour_ledger": {"lesson_count": len(content["lessons"]),
                         "lesson_hours": str(sum(row["hours"] for row in content["lessons"])),
                         "delivery_plan": content["delivery_plan"]},
-        "validator": {"skill_version": "2.3.1", "implementation_version": IMPLEMENTATION_VERSION,
+        "validator": {"skill_version": "2.3.1", "implementation_version": implementation_version,
                       "installed_skill_fingerprint": skill_tree_fingerprint(SKILL_ROOT)},
         "created_at": timestamp(),
     }
@@ -211,9 +211,12 @@ def validate_disposition(run):
 
 def validate_run_upstream(run, *, run_path=None):
     core = {"orchestrator_version", "mode", "state", "bindings", "run_fingerprint"}
-    require(isinstance(run, dict) and set(run) in (core, core | {"output_workspace"}), "invalid run envelope")
-    require(run["orchestrator_version"] == IMPLEMENTATION_VERSION and run["mode"] in {"PREVIEW", "PRODUCTION"},
+    extras = {"output_workspace", "semantic_dependency_inventory"}
+    require(isinstance(run, dict) and core <= set(run) <= core | extras, "invalid run envelope")
+    require("semantic_dependency_inventory" not in run or run["orchestrator_version"] == "2.0", "legacy run cannot carry O2 authority")
+    require(run["orchestrator_version"] in {"1.0", "2.0"} and run["mode"] in {"PREVIEW", "PRODUCTION"},
             "invalid implementation or mode")
+    require(run["state"]["contract_version"] == run["orchestrator_version"], "state/envelope version downgrade")
     require(run["run_fingerprint"] == envelope_fingerprint(run), "invalid run fingerprint")
     checked(validate_pipeline_state_payload(run["state"]))
     state = run["state"]
@@ -242,8 +245,8 @@ def validate_run_upstream(run, *, run_path=None):
     if run["mode"] == "PRODUCTION":
         require(source_truth_content_verified(source, verify_source_bytes=True), "Source Truth source bytes are unverified")
     field_paths = {field: paths[name] for field, name in ARTIFACT_FIELDS.items()
-                   if state["artifacts"][field] is not None and name in paths}
-    require(all(state["artifacts"][field] is None or name in paths for field, name in ARTIFACT_FIELDS.items()),
+                   if state["artifacts"].get(field) is not None and name in paths}
+    require(all(state["artifacts"].get(field) is None or name in paths for field, name in ARTIFACT_FIELDS.items()),
             "state contains naked artifact digest without actual file")
     checked(validate_pipeline_artifact_bytes(state, field_paths))
     if "benchmark_preparation" in paths:
@@ -279,6 +282,7 @@ def validate_run_upstream(run, *, run_path=None):
             path_of(run, "content"),
             path_of(run, "source_truth"),
             require_local_outline=run["mode"] == "PRODUCTION",
+            implementation_version=run["orchestrator_version"],
         )
         fresh["created_at"] = qa.get("created_at")
         require(qa == fresh, "STALE or fabricated Preproduction QA evidence")
@@ -297,6 +301,12 @@ def validate_run_upstream(run, *, run_path=None):
         else:
             require(benchmark["review_sha256"] is None,
                     "actual Benchmark Review requires BENCHMARK_REVIEW_COMPLETE history")
+    if run["orchestrator_version"] == "2.0":
+        from semantic_lifecycle import scope
+        if "semantic_scope_review" in paths or rank >= STATES.index("READY_FOR_TEACHER_REVIEW"):
+            _, report = scope(run)
+            if rank >= STATES.index("READY_FOR_TEACHER_REVIEW"):
+                require(report["whole_course_disposition"] in {"PASS", "HUMAN_REVIEW_REQUIRED"}, "semantic REVISION_REQUIRED blocks READY")
     return benchmark
 
 
@@ -313,18 +323,22 @@ def validate_run_authorized(run, *, run_path=None):
         require(packet is not None, "canonical Teacher approval requires teacher_review_packet")
         review, _, errors = validate_teacher_review_files(path_of(run, "teacher_review"),
             source_truth_path=paths["source_truth"], content_path=paths["content"],
-            require_approved=True, **evidence_kwargs(run))
+            require_approved=True, semantic_run=run, **evidence_kwargs(run))
         checked(errors)
         require(review["pipeline_run_id"] == state["pipeline_run_id"] and review["benchmark"] == benchmark,
                 "Teacher Review does not match pipeline / final Benchmark disposition")
         validate_teacher_review_against_packet(review, packet)
+        if run["orchestrator_version"] == "2.0":
+            from semantic_lifecycle import teacher
+            teacher(run, review)
     if rank >= STATES.index("PRODUCTION_AUTHORIZED"):
         authorization, _, errors = validate_production_authorization_files(path_of(run, "production_authorization"),
             source_truth_path=paths["source_truth"], content_path=paths["content"],
             teacher_review_path=paths["teacher_review"], skill_root=SKILL_ROOT,
-            verify_runtime_environment=True, **evidence_kwargs(run))
+            verify_runtime_environment=True, semantic_run=run, **evidence_kwargs(run))
         checked(errors)
         require(authorization["pipeline_run_id"] == state["pipeline_run_id"], "Authorization run mismatch")
+        require(authorization["contract_version"] == run["orchestrator_version"], "PA cannot downgrade O2 authority")
 
 
 def validate_run(run, *, run_path=None, validate_acceptance=True):
@@ -415,8 +429,10 @@ def execute(command, run_path, **options):
     with run_lock(run_path):
         if command == "init":
             require(not run_path.exists(), "run is immutable; use a separate new run to iterate")
-            run = {"orchestrator_version": IMPLEMENTATION_VERSION, "mode": options["mode"],
-                   "state": initial_pipeline_state(options["run_id"]), "bindings": {}, "run_fingerprint": ""}
+            version = options.get("orchestrator_version", "1.0")
+            require(version in {"1.0", "2.0"}, "unsupported orchestrator version")
+            run = {"orchestrator_version": version, "mode": options["mode"],
+                   "state": initial_pipeline_state(options["run_id"], contract_version=version), "bindings": {}, "run_fingerprint": ""}
             bind(run, "source_truth", options["source_truth"])
             commit_run(run_path, run)
             return run
@@ -465,7 +481,7 @@ def execute(command, run_path, **options):
                 path_of(run, "source_truth"),
                 content_path=options["content"],
                 require_local_outline=run["mode"] == "PRODUCTION",
-            )
+                )
             require(
                 scope["status"] not in {"failed", "unverified"} if run["mode"] == "PRODUCTION" else scope["status"] != "failed",
                 "course-scope grounding failed before Content binding: "
@@ -482,6 +498,7 @@ def execute(command, run_path, **options):
                 path_of(run, "content"),
                 path_of(run, "source_truth"),
                 require_local_outline=run["mode"] == "PRODUCTION",
+                implementation_version=run["orchestrator_version"],
             )
             qa_path = run_path.parent / (run_path.stem + "-preproduction-qa.json")
             assert_distinct_file_paths({"run": run_path, **{name: path_of(run, name) for name in run["bindings"]},
@@ -514,9 +531,28 @@ def execute(command, run_path, **options):
                     bind(run, name, options[name])
             validate_disposition(run)
             next_state = "BENCHMARK_REVIEW_COMPLETE" if command == "bind-benchmark-review" else "READY_FOR_TEACHER_REVIEW"
-            advance(run, next_state, ("benchmark_disposition_sha256", "benchmark_disposition"))
+            if run["orchestrator_version"] == "2.0" and command == "bind-benchmark-disposition":
+                run["state"]["artifacts"]["benchmark_disposition_sha256"] = run["bindings"]["benchmark_disposition"]["sha256"]
+                from pipeline_state import pipeline_state_fingerprint
+                run["state"]["state_fingerprint"] = pipeline_state_fingerprint(run["state"])
+            else:
+                advance(run, next_state, ("benchmark_disposition_sha256", "benchmark_disposition"))
+        elif command == "bind-semantic-scope-review":
+            require(run["orchestrator_version"] == "2.0", "semantic binding requires explicit O2 run")
+            require(run["state"]["current_state"] in {"PREPRODUCTION_QA_PASSED", "BENCHMARK_REVIEW_COMPLETE"}, "semantic binding requires pre-READY QA")
+            from semantic_lifecycle import context, FIELDS, LATER_ENTRIES
+            from pipeline_state import pipeline_state_fingerprint
+            ctx = context()
+            run["semantic_dependency_inventory"] = [dict(row) for key, row in ctx.inventory.entries.items()
+                if key not in LATER_ENTRIES]
+            for field, key in FIELDS.items():
+                if key != "teacher_approval_receipt":
+                    bind(run, key, ctx.inventory.entries[key]["path"])
+                    run["state"]["artifacts"][field] = run["bindings"][key]["sha256"]
+            run["state"]["state_fingerprint"] = pipeline_state_fingerprint(run["state"])
         elif command == "ready-for-teacher-review":
-            require(run["state"]["current_state"] == "BENCHMARK_REVIEW_COMPLETE", "explicit final Benchmark disposition required")
+            allowed = {"BENCHMARK_REVIEW_COMPLETE", "PREPRODUCTION_QA_PASSED"} if run["orchestrator_version"] == "2.0" else {"BENCHMARK_REVIEW_COMPLETE"}
+            require(run["state"]["current_state"] in allowed, "explicit final Benchmark disposition required")
             advance(run, "READY_FOR_TEACHER_REVIEW")
         elif command == "prepare-teacher-review":
             require(run["state"]["current_state"] == "READY_FOR_TEACHER_REVIEW",
@@ -541,6 +577,13 @@ def execute(command, run_path, **options):
         elif command == "bind-teacher-review":
             require("teacher_review_packet" in run["bindings"], "canonical Teacher Review requires a prepared Packet")
             bind(run, "teacher_review", options["teacher_review"])
+            if run["orchestrator_version"] == "2.0":
+                from semantic_lifecycle import context
+                from pipeline_state import pipeline_state_fingerprint
+                ctx = context()
+                bind(run, "teacher_approval_receipt", ctx.inventory.entries["teacher_approval_receipt"]["path"])
+                run["state"]["artifacts"]["teacher_approval_receipt_sha256"] = run["bindings"]["teacher_approval_receipt"]["sha256"]
+                run["state"]["state_fingerprint"] = pipeline_state_fingerprint(run["state"])
             advance(run, "TEACHER_REVIEW_APPROVED", ("teacher_review_sha256", "teacher_review"))
         elif command == "authorize-production":
             require(run["mode"] == "PRODUCTION", "PREVIEW cannot authorize production")
@@ -573,15 +616,26 @@ def execute(command, run_path, **options):
                         args += ["--benchmark-" + flag, str(path_of(run, name))]
             else:
                 args += ["--benchmark-mode", "none"]
-            result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
-            require(result.returncode == 0, "canonical generator failed: " + result.stdout[-3000:] + result.stderr[-3000:])
-            auth, _ = read_json_object(path_of(run, "production_authorization"), "Authorization")
-            validate_artifact_files(output, path_of(run, "content"), auth, run["state"]["pipeline_run_id"])
-            run["output_workspace"] = str(run_path.parent)
-            bind(run, "final_output", output)
-            bind(run, "artifact_manifest", output / "artifact-manifest.json")
-            bind(run, "artifact_qa", output / "qa-report.json")
-            advance(run, "PRODUCTION_GENERATED", ("artifact_manifest_sha256", "artifact_manifest"))
+            try:
+                if run["orchestrator_version"] == "2.0":
+                    from generate_lesson_plans import main as generate
+                    generate(args[3:], o2_run=original)
+                    result = subprocess.CompletedProcess(args, 0, "", "")
+                else:
+                    result = subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+                require(result.returncode == 0, "canonical generator failed: " + result.stdout[-3000:] + result.stderr[-3000:])
+                auth, _ = read_json_object(path_of(run, "production_authorization"), "Authorization")
+                validate_artifact_files(output, path_of(run, "content"), auth, run["state"]["pipeline_run_id"])
+                run["output_workspace"] = str(run_path.parent)
+                bind(run, "final_output", output)
+                bind(run, "artifact_manifest", output / "artifact-manifest.json")
+                bind(run, "artifact_qa", output / "qa-report.json")
+                advance(run, "PRODUCTION_GENERATED", ("artifact_manifest_sha256", "artifact_manifest"))
+            except BaseException:
+                if run["orchestrator_version"] == "2.0" and output.exists():
+                    import shutil
+                    shutil.rmtree(output)
+                raise
         elif command == "validate-artifacts":
             require(run["mode"] == "PRODUCTION" and run["state"]["current_state"] == "PRODUCTION_GENERATED", "Artifact QA requires PRODUCTION_GENERATED")
             from final_artifacts import validate_run_artifacts
@@ -612,18 +666,25 @@ def execute(command, run_path, **options):
             return publish_sidecar(run, run_path, "acceptance", destination, report, next_state="ACCEPTED", artifact_field="acceptance_sha256")
         else:
             raise LifecycleContractError("unknown command; direct string state updates are forbidden")
-        commit_run(run_path, run)
+        try:
+            commit_run(run_path, run)
+        except BaseException:
+            if command == "generate-production" and run["orchestrator_version"] == "2.0":
+                import shutil
+                shutil.rmtree(output)
+            raise
         return run
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("init", "freeze-source-truth", "prepare-benchmark", "bind-content",
-        "validate-preproduction", "bind-benchmark-disposition", "bind-benchmark-review", "ready-for-teacher-review", "prepare-teacher-review", "bind-teacher-review",
+        "validate-preproduction", "bind-benchmark-disposition", "bind-benchmark-review", "bind-semantic-scope-review", "ready-for-teacher-review", "prepare-teacher-review", "bind-teacher-review",
         "authorize-production", "generate-production", "validate-artifacts", "prepare-visual-review", "bind-visual-review", "evaluate-acceptance", "finalize-acceptance", "status"))
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--run-id")
     parser.add_argument("--mode", choices=("PREVIEW", "PRODUCTION"))
+    parser.add_argument("--orchestrator-version", choices=("1.0", "2.0"), default="1.0")
     for name in ("source_truth", "source_catalog", "quality_eligibility", "content", "waiver_evidence", "disposition",
                  "benchmark_evidence", "benchmark_authorization", "benchmark_review", "authoring_selection", "holdout_selection",
                  "lesson_reviews_dir", "previous_lesson_content", "previous_review", "previous_lesson_reviews_dir",
@@ -638,8 +699,13 @@ def main(argv=None):
         source, _, _ = validate_source_truth_file(path_of(result, "source_truth"), verify_source_bytes=True)
         source_status = ("VALID" if source_truth_content_verified(source, verify_source_bytes=True)
                          else "STRUCTURALLY_VALID_SOURCE_BYTES_UNVERIFIED")
+        diagnostics = {}
+        if result["orchestrator_version"] == "2.0":
+            diagnostics["production_authorized"] = result["mode"] == "PRODUCTION" and STATES.index(result["state"]["current_state"]) >= STATES.index("PRODUCTION_AUTHORIZED")
+            diagnostics["semantic_review_status"] = "VALID" if "semantic_scope_review" in result["bindings"] else "MISSING"
+            diagnostics["semantic_disposition"] = read_json_object(path_of(result, "semantic_scope_review"), "semantic report")[0]["whole_course_disposition"] if "semantic_scope_review" in result["bindings"] else None
         print(json.dumps({"status": "VALID", "mode": result["mode"], "state": result["state"]["current_state"],
-                          "source_truth_status": source_status}))
+                          "source_truth_status": source_status, **diagnostics}))
         return 0
     except (LifecycleContractError, ContractError, ValueError, RuntimeError, OSError, TypeError, KeyError) as exc:
         parser.exit(1, f"STALE/INVALID: {exc}\n")

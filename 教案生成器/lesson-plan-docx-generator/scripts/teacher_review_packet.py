@@ -171,7 +171,12 @@ def build_teacher_review_packet(run, *, created_at=None):
         "created_at": created_at if created_at is not None else timestamp(),
     }
     result["packet_fingerprint"] = packet_fingerprint(result)
-    errors = schema_errors(result, "teacher-review-packet.schema.json")
+    if run["orchestrator_version"] == "2.0":
+        from semantic_lifecycle import packet_scope
+        result["contract_version"] = "2.0"
+        result["semantic_scope"] = packet_scope(run)
+        result["packet_fingerprint"] = packet_fingerprint(result)
+    errors = schema_errors(result, "teacher-review-packet-v2.schema.json" if result["contract_version"] == "2.0" else "teacher-review-packet.schema.json")
     if errors or not timezone_aware_timestamp(result["created_at"]):
         raise LifecycleContractError("invalid Packet: " + "; ".join(errors))
     return result
@@ -179,7 +184,7 @@ def build_teacher_review_packet(run, *, created_at=None):
 
 def validate_teacher_review_packet(packet_path, run):
     packet, _ = read_json_object(packet_path, "Teacher Review Packet")
-    errors = schema_errors(packet, "teacher-review-packet.schema.json")
+    errors = schema_errors(packet, "teacher-review-packet-v2.schema.json" if packet.get("contract_version") == "2.0" else "teacher-review-packet.schema.json")
     if errors:
         raise LifecycleContractError("invalid Packet schema: " + "; ".join(errors))
     if packet["packet_fingerprint"] != packet_fingerprint(packet):
@@ -206,8 +211,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         run, _ = read_json_object(args.run, "pipeline run")
-        validate_teacher_review_packet(args.packet, run)
-        print(json.dumps({"status": "VALID", "contract_version": "1.0"}))
+        packet = validate_teacher_review_packet(args.packet, run)
+        print(json.dumps({"status": "VALID", "contract_version": packet["contract_version"]}))
         return 0
     except (ValueError, OSError, TypeError, KeyError) as exc:
         parser.exit(1, f"STALE/INVALID: {exc}\n")

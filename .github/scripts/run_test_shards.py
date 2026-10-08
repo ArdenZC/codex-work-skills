@@ -36,6 +36,11 @@ LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
 LESSON_CONTRACT_HARDENING_TEST_MODULE = "tests.test_lesson_22_contract_hardening"
 SEMANTIC_SCOPE_TEST_MODULE = "tests.test_semantic_scope_foundation"
 SEMANTIC_SCOPE_SHARDS = tuple(f"semantic-scope-{index}" for index in range(1, 7))
+SEMANTIC_LIFECYCLE_RENDER_TESTS = {
+    "lesson-semantic-lifecycle-canonical": frozenset({"test_canonical_generation_actual_entry_point"}),
+    "lesson-semantic-lifecycle-installed": frozenset({"test_installed_copy_external_controller_resume"}),
+    "lesson-semantic-lifecycle-rollback": frozenset({"test_real_generator_publication_and_final_stale_rollback"}),
+}
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
@@ -92,6 +97,31 @@ def _module_test_ids(module_name: str) -> tuple[str, ...]:
 
     visit(suite)
     return tuple(sorted(result))
+
+
+def _semantic_lifecycle_partitions() -> dict[str, tuple[str, ...]]:
+    all_ids = _module_test_ids("tests.test_semantic_lifecycle")
+    render = {
+        suite: tuple(test_id for test_id in all_ids if test_id.rsplit(".", 1)[-1] in names)
+        for suite, names in SEMANTIC_LIFECYCLE_RENDER_TESTS.items()
+    }
+    render_ids = {test_id for ids in render.values() for test_id in ids}
+    evidence = tuple(test_id for test_id in all_ids if test_id not in render_ids)
+    expected_render_ids = set().union(
+        *(
+            {test_id for test_id in all_ids if test_id.rsplit(".", 1)[-1] in names}
+            for names in SEMANTIC_LIFECYCLE_RENDER_TESTS.values()
+        )
+    )
+    if (
+        any(len(render[suite]) != len(names) for suite, names in SEMANTIC_LIFECYCLE_RENDER_TESTS.items())
+        or sum(map(len, render.values())) != len(render_ids)
+        or render_ids != expected_render_ids
+        or render_ids & set(evidence)
+        or render_ids | set(evidence) != set(all_ids)
+    ):
+        raise ValueError("semantic lifecycle suites do not exactly partition discovered tests")
+    return {**render, "lesson-semantic-lifecycle-evidence": evidence}
 
 
 def _lesson_content_ids() -> tuple[str, ...]:
@@ -155,8 +185,15 @@ def _suite_specs() -> dict[str, SuiteSpec]:
     gradebook_static_count = len(_static_gradebook_ids())
     workflow = _workflow_ids()
     semantic = _semantic_scope_partitions()
+    lifecycle = _semantic_lifecycle_partitions()
     return {
         **{name: SuiteSpec(name, True, "ids", len(ids)) for name, ids in semantic.items()},
+        **{
+            name: SuiteSpec(name, False, "ids", len(ids), "lesson-render")
+            for name, ids in lifecycle.items()
+            if name in SEMANTIC_LIFECYCLE_RENDER_TESTS
+        },
+        "lesson-semantic-lifecycle-evidence": SuiteSpec("lesson-semantic-lifecycle-evidence", True, "ids", len(lifecycle["lesson-semantic-lifecycle-evidence"])),
         "lesson-content": SuiteSpec("lesson-content", True, "ids", len(lesson_content)),
         "lesson-lifecycle": SuiteSpec(
             "lesson-lifecycle", True, "module", _module_count("tests.test_lesson_lifecycle_contracts")
@@ -167,6 +204,7 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         "lesson-quality": SuiteSpec(
             "lesson-quality", True, "module", _module_count("tests.test_benchmark_quality_eligibility")
         ),
+        "lesson-semantic-lifecycle": SuiteSpec("lesson-semantic-lifecycle", False, "module", _module_count("tests.test_semantic_lifecycle"), "lesson-render"),
         "lesson-final-acceptance": SuiteSpec("lesson-final-acceptance", False, "module",
             _module_count("tests.test_lesson_final_acceptance"), "lesson-render"),
         "lesson-teacher-review": SuiteSpec("lesson-teacher-review", True, "module",
@@ -211,7 +249,27 @@ def _suite_specs() -> dict[str, SuiteSpec]:
 ALIASES = {
     "semantic-scope": SEMANTIC_SCOPE_SHARDS,
     "fast": ("lesson-content", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "package-contracts", "classifier", "runner"),
-    "full": ("lesson-content", "lesson-package", "lesson-lifecycle", "semantic-scope", "lesson-course-scope", "lesson-quality", "lesson-pipeline", "lesson-teacher-review", "lesson-final-acceptance", "lesson-benchmark", "gradebook", "package-contracts", "tooling", "release", "classifier", "runner", "hardening"),
+    "full": (
+        *SEMANTIC_LIFECYCLE_RENDER_TESTS,
+        "lesson-semantic-lifecycle-evidence",
+        "lesson-content",
+        "lesson-package",
+        "lesson-lifecycle",
+        "semantic-scope",
+        "lesson-course-scope",
+        "lesson-quality",
+        "lesson-pipeline",
+        "lesson-teacher-review",
+        "lesson-final-acceptance",
+        "lesson-benchmark",
+        "gradebook",
+        "package-contracts",
+        "tooling",
+        "release",
+        "classifier",
+        "runner",
+        "hardening",
+    ),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
 }
 
@@ -237,6 +295,8 @@ def _expand_suites(requested: Sequence[str], specs: dict[str, SuiteSpec]) -> tup
 def _suite_test_ids(name: str) -> tuple[str, ...]:
     if name in SEMANTIC_SCOPE_SHARDS:
         return _semantic_scope_partitions()[name]
+    if name in {*SEMANTIC_LIFECYCLE_RENDER_TESTS, "lesson-semantic-lifecycle-evidence"}:
+        return _semantic_lifecycle_partitions()[name]
     if name == "lesson-content":
         return _lesson_content_ids()
     if name == "lesson-lifecycle":
@@ -590,7 +650,9 @@ def _print_manifest(specs: dict[str, SuiteSpec], *, as_json: bool) -> int:
         print(f"{name}: {details['tests']} tests, parallel_safe={details['parallel_safe']}")
     for alias, details in payload["aliases"].items():
         print(f"{alias}: {details['tests']} tests ({', '.join(details['suites'])})")
-    full_count = int(payload["aliases"]["full"]["tests"])
+    full_count = int(payload["aliases"]["full"]["tests"]) + int(
+        payload["suites"]["lesson-release-scale"]["tests"]
+    )
     discovered_count = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py").countTestCases()
     if full_count != discovered_count:
         raise SystemExit(
