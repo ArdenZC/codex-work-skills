@@ -328,7 +328,26 @@ finally: case.doCleanups()
             result_key = "SEMANTIC_LIFECYCLE_" + lane.upper() + "_RESULT"
             self.assertEqual(step["env"][result_key], "${{ needs." + job + ".result }}")
             self.assertIn(f'check_job {job} "$RUN_LESSON" "${result_key}"', step["run"])
-        self.assertEqual(jobs["lesson-semantic-lifecycle-render"]["timeout-minutes"], 30)
+        render_job = jobs["lesson-semantic-lifecycle-render"]
+        self.assertEqual(render_job["timeout-minutes"], 30)
+        self.assertEqual(
+            {
+                (row["lane"], row["suite"], row["os"])
+                for row in render_job["strategy"]["matrix"]["include"]
+            },
+            {
+                ("canonical-generation", "lesson-semantic-lifecycle-canonical", os_name)
+                for os_name in ("macos-14", "windows-latest")
+            }
+            | {
+                ("installed-copy", "lesson-semantic-lifecycle-installed", os_name)
+                for os_name in ("macos-14", "windows-latest")
+            }
+            | {
+                ("final-rollback", "lesson-semantic-lifecycle-rollback", os_name)
+                for os_name in ("macos-14", "windows-latest")
+            },
+        )
         self.assertEqual(jobs["lesson-semantic-lifecycle-evidence"]["timeout-minutes"], 30)
 
     def test_completed_benchmark_cannot_skip_semantic_readiness(self):

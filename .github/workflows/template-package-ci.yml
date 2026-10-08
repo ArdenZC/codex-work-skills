@@ -654,7 +654,7 @@ jobs:
           if ($status) { $status; throw "Tests left changes in the worktree." }
 
   lesson-semantic-lifecycle-render:
-    name: Lesson semantic lifecycle render / ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    name: Lesson semantic lifecycle render / ${{ matrix.lane }} / ${{ matrix.os }} / Python ${{ matrix.python-version }}
     needs: classify-changes
     if: >-
       always() && needs.classify-changes.result == 'success' &&
@@ -669,9 +669,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - lane: canonical-generation
+            suite: lesson-semantic-lifecycle-canonical
+            os: macos-14
             python-version: "3.11"
-          - os: windows-latest
+          - lane: installed-copy
+            suite: lesson-semantic-lifecycle-installed
+            os: macos-14
+            python-version: "3.11"
+          - lane: final-rollback
+            suite: lesson-semantic-lifecycle-rollback
+            os: macos-14
+            python-version: "3.11"
+          - lane: canonical-generation
+            suite: lesson-semantic-lifecycle-canonical
+            os: windows-latest
+            python-version: "3.11"
+          - lane: installed-copy
+            suite: lesson-semantic-lifecycle-installed
+            os: windows-latest
+            python-version: "3.11"
+          - lane: final-rollback
+            suite: lesson-semantic-lifecycle-rollback
+            os: windows-latest
             python-version: "3.11"
 
     steps:
@@ -728,7 +748,7 @@ jobs:
           --label "lesson semantic lifecycle tests"
           --
           python .github/scripts/run_test_shards.py
-          --suite lesson-semantic-lifecycle-render
+          --suite ${{ matrix.suite }}
           -v
 
       - name: Verify lesson worktree is clean on macOS

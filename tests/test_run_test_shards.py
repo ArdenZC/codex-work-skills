@@ -247,14 +247,26 @@ class TestShardManifest(unittest.TestCase):
         specs = run_test_shards._suite_specs()
         groups = run_test_shards._semantic_lifecycle_partitions()
         all_ids = set(run_test_shards._module_test_ids("tests.test_semantic_lifecycle"))
-        render, evidence = set(groups["lesson-semantic-lifecycle-render"]), set(groups["lesson-semantic-lifecycle-evidence"])
-        self.assertEqual(render & evidence, set())
+        render_names = (
+            "lesson-semantic-lifecycle-canonical",
+            "lesson-semantic-lifecycle-installed",
+            "lesson-semantic-lifecycle-rollback",
+        )
+        render_groups = [set(groups[name]) for name in render_names]
+        evidence = set(groups["lesson-semantic-lifecycle-evidence"])
+        for index, group in enumerate(render_groups):
+            for other in render_groups[index + 1 :]:
+                self.assertTrue(group.isdisjoint(other))
+        render = set().union(*render_groups)
+        self.assertTrue(render.isdisjoint(evidence))
         self.assertEqual(render | evidence, all_ids)
-        self.assertTrue(specs["lesson-semantic-lifecycle-render"].count > 0)
+        self.assertEqual([len(group) for group in render_groups], [1, 1, 1])
+        self.assertTrue(all(specs[name].count == 1 for name in render_names))
         self.assertTrue(specs["lesson-semantic-lifecycle-evidence"].count > 0)
         for alias in ("full", "ci"):
             expanded = run_test_shards._expand_suites((alias,), specs)
-            self.assertIn("lesson-semantic-lifecycle-render", expanded)
+            for name in render_names:
+                self.assertIn(name, expanded)
             self.assertIn("lesson-semantic-lifecycle-evidence", expanded)
 
     def test_lesson_course_scope_suite_has_exact_worker_and_fast_full_coverage(self) -> None:

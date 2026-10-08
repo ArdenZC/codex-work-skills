@@ -54,9 +54,9 @@ repository-level.
 | `SKILL.md`, `AGENTS.md`, `通用提示词.md`, lifecycle/orchestrator/selection/foundation docs | Opt-in O2 instructions; existing release identities and historical policy preserved |
 | repository `docs/semantic-scope-review-contract-v1.md` | Correct stale status prose only; normative judgments and authority rules unchanged |
 | repository `tests/test_semantic_lifecycle.py` | Synthetic actual entry-point lifecycle/installer/generator/rollback and authority controls |
-| repository `.github/scripts/run_test_shards.py` | Exact render/evidence partitions included in full discovery; existing Core and 12 semantic partitions unchanged |
-| repository `.github/workflows/template-package-ci.yml` | Two bounded required render/evidence lanes across Windows/macOS, both enforced by CI Gate; docs-only skip logic retained |
-| repository `tests/test_run_test_shards.py`, `tests/test_template_packages.py` | Suite-disjointness and gate contract assertions require both new lanes |
+| repository `.github/scripts/run_test_shards.py` | Exact canonical-generation, installed-copy, final-rollback and evidence partitions included in full discovery; existing Core and 12 semantic partitions unchanged |
+| repository `.github/workflows/template-package-ci.yml` | Three independently required real-render test lanes plus the evidence lane run on Windows/macOS, each with the existing 30-minute cap and all enforced by CI Gate; docs-only skip logic retained |
+| repository `tests/test_run_test_shards.py`, `tests/test_template_packages.py` | Suite-disjointness and gate contract assertions require every new matrix lane |
 
 ## Evidence and acceptance coverage
 
@@ -96,8 +96,12 @@ Local verification before the final commit:
 - Seven static canonical template package identity/hash/schema checks passed;
   full Windows/macOS package validators remain required in CI. The Lesson template remains
   SHA-256 `6ffafa579d3aacbc535ba624d0a6a766644868b0af1fce6ac37b20ba8f3d8fc1`.
-- All 14 workflow/gate/static assertions passed, including exact disjoint coverage for the new render/evidence partitions. Final CI, rather than Linux-local
-  LibreOffice behavior, qualifies the required Windows/macOS Gradebook/render jobs.
+- After the render-timeout correction, 11 focused shard/workflow/gate assertions passed. The manifest lists three exact singleton render partitions
+  plus the complementary 20-test evidence partition; the three render partitions are
+  pairwise disjoint and together with evidence cover all 23 O2 tests. The full shard
+  runner suite had one unrelated local Gradebook validator failure: it reports a
+  protected workbook formatting mismatch. No Gradebook code or template bytes changed;
+  the required Windows/macOS CI remains the qualification gate for those validators.
 - The new suite additionally exercises 12 original N02–N06/P07–P11/A13/P14
   control scenarios at actual O2 entry points. It preserves original claim and
   frozen source bytes; new production-compatible candidates add legitimate SQL
