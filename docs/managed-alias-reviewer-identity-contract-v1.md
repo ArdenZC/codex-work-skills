@@ -1,7 +1,9 @@
 # Managed Alias Reviewer Identity Contract 1.0
 
-Status: Issue #52 contract reassessment for Owner review. This design does not
-run live qualification, activate Production, change RC-02, or change Lesson 2.4.
+Status: managed-alias contract for Owner review, with the Issue #55 Observation
+1.1 extension in [Managed Service Observation 1.1](managed-service-observation-v1.1.md).
+This design does not run live qualification, activate Production, change RC-02,
+or change Lesson 2.4.
 
 ## Compatibility map
 
@@ -10,7 +12,8 @@ run live qualification, activate Production, change RC-02, or change Lesson 2.4.
 | Existing immutable model | Reviewer Configuration 1.0 | Unchanged schema, canonical bytes, fields, validators, and immutable `model_revision` semantics. An agent configuration at 1.0 is the existing immutable-revision mode. |
 | Existing human reviewer | Reviewer Configuration 1.0 + Reviewer Qualification 1.0 | Unchanged human procedure/training path. No managed-agent identity is inferred from a human record. |
 | Managed service alias | Reviewer Configuration 1.1 | New closed version. `agent_identity_mode` is `managed_alias`; `model_reference` is the exact requested alias; `model_revision` is JSON null. Provider/service, client build, prompt/system/tool/context/decoding policy, fallback prohibition, and observation-policy bytes are bound. |
-| Managed service observations | Managed Service Observation 1.0 | A sanitized, per-operation record of the provider/service response metadata. It reports only what the service exposed and never claims that an alias identifies immutable weights. Exact bytes live in the protected evidence inventory. |
+| Strict managed service observations | Managed Service Observation 1.0 | Existing closed semantics remain unchanged. `fallback_detected` must be exactly `false`; null/unknown continues to fail. Exact bytes live in the protected evidence inventory. |
+| Opaque managed service observations | Managed Service Observation 1.1 | New versioned path for client-observed captures when provider-internal routing is opaque. Controller fallback is exactly false; provider fallback is `not_observable` unless policy-approved raw trace metadata reports it. |
 | Existing qualification | Reviewer Qualification 1.0 | Unchanged for Configuration 1.0 immutable and human paths. |
 | Managed qualification | Reviewer Qualification 1.1 | Required for Configuration 1.1. Retains the existing three-or-more fresh repetitions, complete corpus/holdout coverage, per-case isolation, adjudication, and hard-miss rules. Each operation binds its service observation; all observations must have the same managed-service identity projection. `qualified_at` is derived from the validated protected evidence completion time; qualification validity is at most 24 hours from that time. |
 | Existing operation provenance | Operation Provenance Receipt 1.0 | Unchanged for immutable Configuration 1.0 and human paths. |
@@ -41,11 +44,13 @@ field is invalid.
 Configuration 1.1 also binds the exact client/harness build, semantic-review
 prompt, qualification-approver prompt, system instructions, tool policy,
 context policy, decoding settings, and a protected observation-policy file. A
-managed request has fallback disabled. If the requested alias is unavailable,
-the controller fails closed; it never substitutes another alias or model.
+managed controller request has fallback disabled. If the requested alias is
+unavailable, the controller fails closed; it never substitutes another alias
+or model. This is the controller/client boundary and makes no claim about
+provider-internal routing.
 
-Each actual managed-agent operation has a protected Managed Service Observation
-1.0 record binding its operation ID, provider/service reference, requested alias,
+The strict 1.0 path uses a protected Managed Service Observation 1.0 record
+binding its operation ID, provider/service reference, requested alias,
 any returned model/revision/fingerprint metadata, client build, request and
 response hashes, observation-policy hash, and timestamps. Optional provider
 metadata remains null when the provider did not report it. Raw credentials,
@@ -53,15 +58,25 @@ authorization headers, and secret values are prohibited. The record is hashed
 from its exact canonical bytes. Provider-reported metadata is an observation,
 not a claim that the weights are immutable.
 
+Opaque providers may instead use Observation 1.1 under its versioned protected
+capture policy. That path binds exact request bytes, raw Codex JSONL stdout,
+`codex --version` output, the controller build, operation timestamps and
+principal. It records controller fallback as `false` and provider fallback as
+`not_observable` unless an allowed provider-reported trace field proves a
+boolean value. Observation 1.0 is not reinterpreted or relaxed.
+
 The qualification controller derives a service-identity fingerprint from the
-nonvolatile identity projection (provider/service, requested alias, reported
-model metadata, client build, and observation policy). Request IDs, timestamps,
-and per-operation request/response hashes are excluded from this projection but
-remain bound by each operation receipt. Every qualification observation must
-produce the same identity fingerprint. A production semantic operation must
-provide a fresh protected observation whose projection equals the currently
-approved qualification's fingerprint. Missing, changed, malformed, or
-candidate-supplied observations fail closed.
+versioned identity projection. Observation 1.0 keeps its existing projection
+(provider/service, requested alias, reported model metadata, client build, and
+observation policy). Observation 1.1 additionally binds its version, provider
+visibility mode, and exact Codex CLI version while using the controller build
+SHA in the client-build slot. Request IDs, operation IDs, timestamps, and
+per-operation request/response hashes are excluded from either stable
+projection but remain bound by each operation receipt. Every qualification
+observation must produce the same identity fingerprint. A production semantic
+operation must provide a fresh protected observation whose projection equals
+the currently approved qualification's fingerprint. Missing, changed,
+malformed, or candidate-supplied observations fail closed.
 
 ## Expiry and invalidation
 
@@ -89,8 +104,11 @@ Any changed config byte, provider/service reference, requested alias, client
 build, prompt/system/tool/context/decoding policy, observation policy, or
 service-identity fingerprint makes the prior qualification stale or invalid.
 Qualification approval revocation, profile pin/epoch changes, role expiry, or
-controller revocation continue to invalidate authority under Option B. An
-unknown service fallback or changed reported identity is a hard failure.
+controller revocation continue to invalidate authority under Option B.
+Controller fallback or provider-reported true fallback is a hard failure.
+Provider-internal fallback that is not exposed by the service is recorded as
+`not_observable`, not guessed false. A changed reported identity is a hard
+failure.
 
 ## Principals and independent operations
 

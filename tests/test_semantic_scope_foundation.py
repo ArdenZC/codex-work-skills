@@ -21,6 +21,7 @@ from semantic_scope_records import (
     qualification_fingerprint,
     review_fingerprint,
     validate_configuration,
+    validate_managed_service_observation,
     validate_training,
 )
 from semantic_scope_review import review_status, validate_review
@@ -1088,6 +1089,339 @@ class ManagedAliasReviewerIdentityTests(unittest.TestCase):
                     receipt_key="managed-production-receipt",
                     frozen_lesson_ids=["L01"],
                     pipeline_run_id="managed-production-run",
+                )
+
+
+class OpaqueManagedServiceObservationTests(unittest.TestCase):
+    @staticmethod
+    def _fixture(root):
+        evidence = Evidence(root, reviewer_type="agent")
+        evidence.enable_managed_alias(observation_version="1.1")
+        return evidence
+
+    @staticmethod
+    def _validate(evidence, observation, key="opaque-observation"):
+        evidence.write(key, canonical_json_bytes(observation), protected=True)
+        context = evidence.context()
+        config = validate_configuration(context.inventory)
+        return validate_managed_service_observation(
+            context.inventory,
+            key,
+            evidence.sha(key),
+            config,
+            observation["operation_id"],
+            expected_principal=observation["logical_principal"],
+            now=context.now,
+        )
+
+    def test_observation_10_keeps_strict_unknown_fallback_failure(self):
+        with tempfile.TemporaryDirectory(prefix="observation-10-strict-") as tmp:
+            e = Evidence(Path(tmp), reviewer_type="agent")
+            e.enable_managed_alias()
+            observation = e.managed_observation(
+                "strict-observation", "2026-10-06T10:00:00Z"
+            )
+            observation["fallback_detected"] = None
+            e.write("strict-observation", canonical_json_bytes(observation), protected=True)
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "managed service fallback"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "strict-observation",
+                    e.sha("strict-observation"),
+                    validate_configuration(context.inventory),
+                    "strict-observation",
+                    now=context.now,
+                )
+
+    def test_observation_11_accepts_opaque_provider_with_exact_protected_codex_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-codex-") as tmp:
+            e = self._fixture(Path(tmp))
+            e.agent_qualification()
+            context = e.context()
+            qualification = validate_qualification(
+                context, candidate_principal=e.reviewer_principal
+            )
+            self.assertEqual(qualification["disposition"], "QUALIFIED")
+            self.assertEqual(qualification["contract_version"], "1.1")
+
+            operation = qualification["qualification_runs"][0]["operations"][0]
+            observation_raw = context.inventory.raw(
+                operation["service_observation_inventory_key"],
+                operation["service_observation_sha256"],
+                protected=True,
+            )
+            observation = json.loads(observation_raw)
+            self.assertEqual(observation["observation_version"], "1.1")
+            self.assertIsNone(observation["reported_model_identifier"])
+            self.assertIsNone(observation["reported_model_revision"])
+            self.assertIsNone(observation["request_id"])
+            self.assertIsNone(observation["service_fingerprint"])
+            self.assertIsNone(observation["service_api_version"])
+            self.assertFalse(observation["controller_fallback_performed"])
+            self.assertEqual(observation["provider_fallback_status"], "not_observable")
+            request_raw = context.inventory.raw(
+                observation["request_inventory_key"],
+                observation["request_sha256"],
+                protected=True,
+            )
+            trace_raw = context.inventory.raw(
+                observation["response_trace_inventory_key"],
+                observation["response_sha256"],
+                protected=True,
+            )
+            self.assertEqual(hashlib.sha256(request_raw).hexdigest(), observation["request_sha256"])
+            self.assertEqual(hashlib.sha256(trace_raw).hexdigest(), observation["response_sha256"])
+            self.assertIn(b'"type":"thread.started"', trace_raw)
+            self.assertEqual(
+                observation["codex_cli_version"], "codex-cli test-fixture-1.1"
+            )
+
+            e.author(
+                json.loads(Path(e.entries["content"]["path"]).read_bytes()), "content"
+            )
+            e.review(
+                operation="opaque-production-review-operation",
+                pipeline="opaque-production-run",
+                purpose="production_candidate",
+                key="opaque-production-review",
+                receipt_key="opaque-production-receipt",
+                at="2026-10-06T18:20:00Z",
+            )
+            validate_review(
+                e.context(),
+                review_key="opaque-production-review",
+                receipt_key="opaque-production-receipt",
+                frozen_lesson_ids=["L01"],
+                pipeline_run_id="opaque-production-run",
+            )
+
+    def test_controller_fallback_and_provider_reported_true_reject(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-fallback-") as tmp:
+            e = self._fixture(Path(tmp))
+            base = e.managed_observation(
+                "fallback-operation", "2026-10-06T10:00:00Z"
+            )
+            controller_fallback = dict(base)
+            controller_fallback["controller_fallback_performed"] = True
+            e.write("controller-fallback-observation", canonical_json_bytes(controller_fallback), protected=True)
+            context = e.context()
+            with self.assertRaises(RecordError):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "controller-fallback-observation",
+                    e.sha("controller-fallback-observation"),
+                    validate_configuration(context.inventory),
+                    base["operation_id"],
+                    expected_principal=base["logical_principal"],
+                    now=context.now,
+                )
+
+            provider_fallback = dict(base)
+            provider_fallback["provider_fallback_status"] = "reported_true"
+            e.write("provider-fallback-observation", canonical_json_bytes(provider_fallback), protected=True)
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "provider reported internal fallback"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "provider-fallback-observation",
+                    e.sha("provider-fallback-observation"),
+                    validate_configuration(context.inventory),
+                    base["operation_id"],
+                    expected_principal=base["logical_principal"],
+                    now=context.now,
+                )
+
+    def test_reported_false_and_provider_metadata_require_matching_raw_trace_paths(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-trace-metadata-") as tmp:
+            e = self._fixture(Path(tmp))
+            pointers = {
+                field: []
+                for field in (
+                    "reported_model_identifier",
+                    "reported_model_revision",
+                    "service_fingerprint",
+                    "service_api_version",
+                    "request_id",
+                )
+            }
+            pointers["reported_model_identifier"] = ["/reported_model_identifier"]
+            e.update_opaque_policy(
+                provider_metadata_json_pointers=pointers,
+                provider_fallback_json_pointers=["/provider_fallback"],
+            )
+            observation = e.managed_observation(
+                "trace-metadata-operation",
+                "2026-10-06T10:00:00Z",
+                reported_metadata={"reported_model_identifier": "reported-model-x"},
+                provider_fallback_status="reported_false",
+                provider_fallback_evidence={
+                    "line_index": 3,
+                    "json_pointer": "/provider_fallback",
+                },
+                trace_fields={
+                    "reported_model_identifier": "reported-model-x",
+                    "provider_fallback": False,
+                },
+            )
+            validated = self._validate(e, observation)
+            self.assertEqual(validated["reported_model_identifier"], "reported-model-x")
+            self.assertEqual(validated["provider_fallback_status"], "reported_false")
+
+            forged = dict(observation)
+            forged["reported_model_identifier"] = "invented-model"
+            e.write(
+                "forged-metadata-observation",
+                canonical_json_bytes(forged),
+                protected=True,
+            )
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "provider metadata is not trace-derived"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "forged-metadata-observation",
+                    e.sha("forged-metadata-observation"),
+                    validate_configuration(context.inventory),
+                    forged["operation_id"],
+                    expected_principal=forged["logical_principal"],
+                    now=context.now,
+                )
+
+    def test_observation_11_rejects_principal_mismatch_raw_byte_changes_and_candidate_capture(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-provenance-") as tmp:
+            e = self._fixture(Path(tmp))
+            observation = e.managed_observation(
+                "binding-operation", "2026-10-06T10:00:00Z"
+            )
+            e.write("bound-observation", canonical_json_bytes(observation), protected=True)
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "principal mismatch"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "bound-observation",
+                    e.sha("bound-observation"),
+                    validate_configuration(context.inventory),
+                    observation["operation_id"],
+                    expected_principal="different-principal",
+                    now=context.now,
+                )
+
+            trace_path = Path(e.entries[observation["response_trace_inventory_key"]]["path"])
+            trace_path.write_bytes(trace_path.read_bytes() + b" ")
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "changed raw-byte binding"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "bound-observation",
+                    e.sha("bound-observation"),
+                    validate_configuration(context.inventory),
+                    observation["operation_id"],
+                    expected_principal=observation["logical_principal"],
+                    now=context.now,
+                )
+
+            candidate_observation = e.managed_observation(
+                "candidate-observation-operation", "2026-10-06T10:00:00Z"
+            )
+            e.write(
+                "candidate-observation",
+                canonical_json_bytes(candidate_observation),
+                protected=False,
+            )
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "not protected evidence"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "candidate-observation",
+                    e.sha("candidate-observation"),
+                    validate_configuration(context.inventory),
+                    candidate_observation["operation_id"],
+                    expected_principal=candidate_observation["logical_principal"],
+                    now=context.now,
+                )
+
+    def test_request_bytes_are_hash_bound_and_alias_build_policy_versions_are_pinned(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-request-bytes-") as tmp:
+            e = self._fixture(Path(tmp))
+            observation = e.managed_observation(
+                "request-binding-operation", "2026-10-06T10:00:00Z"
+            )
+            e.write("request-binding-observation", canonical_json_bytes(observation), protected=True)
+            request_path = Path(e.entries[observation["request_inventory_key"]]["path"])
+            request_path.write_bytes(request_path.read_bytes() + b" ")
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "changed raw-byte binding"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "request-binding-observation",
+                    e.sha("request-binding-observation"),
+                    validate_configuration(context.inventory),
+                    observation["operation_id"],
+                    expected_principal=observation["logical_principal"],
+                    now=context.now,
+                )
+
+        with tempfile.TemporaryDirectory(prefix="observation-11-pins-") as tmp:
+            e = self._fixture(Path(tmp))
+            base = e.managed_observation("pin-operation", "2026-10-06T10:00:00Z")
+            mutations = [
+                ("alias", "requested_alias", "different-alias", "managed service/provider alias changed"),
+                ("build", "controller_build_sha256", "0" * 64, "controller build changed"),
+                ("policy", "observation_policy_sha256", "0" * 64, "managed observation policy changed"),
+                ("request-hash", "request_sha256", "0" * 64, "managed capture request_sha256 mismatch"),
+            ]
+            for label, field, value, message in mutations:
+                with self.subTest(label=label):
+                    observation = dict(base)
+                    observation[field] = value
+                    key = "pin-observation-" + label
+                    e.write(key, canonical_json_bytes(observation), protected=True)
+                    context = e.context()
+                    with self.assertRaisesRegex(RecordError, message):
+                        validate_managed_service_observation(
+                            context.inventory,
+                            key,
+                            e.sha(key),
+                            validate_configuration(context.inventory),
+                            observation["operation_id"],
+                            expected_principal=observation["logical_principal"],
+                            now=context.now,
+                        )
+
+            e.managed_observation_version = "1.0"
+            downgraded = e.managed_observation(
+                "downgraded-observation-operation", "2026-10-06T10:00:00Z"
+            )
+            e.write("downgraded-observation", canonical_json_bytes(downgraded), protected=True)
+            context = e.context()
+            with self.assertRaisesRegex(RecordError, "cannot use observation policy 1.1"):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "downgraded-observation",
+                    e.sha("downgraded-observation"),
+                    validate_configuration(context.inventory),
+                    downgraded["operation_id"],
+                    now=context.now,
+                )
+
+        with tempfile.TemporaryDirectory(prefix="observation-11-missing-policy-") as tmp:
+            e = Evidence(Path(tmp), reviewer_type="agent")
+            e.enable_managed_alias(observation_version="1.0")
+            e.managed_observation_version = "1.1"
+            observation = e.managed_observation(
+                "missing-policy-operation", "2026-10-06T10:00:00Z"
+            )
+            e.write("missing-policy-observation", canonical_json_bytes(observation), protected=True)
+            context = e.context()
+            with self.assertRaises(RecordError):
+                validate_managed_service_observation(
+                    context.inventory,
+                    "missing-policy-observation",
+                    e.sha("missing-policy-observation"),
+                    validate_configuration(context.inventory),
+                    observation["operation_id"],
+                    expected_principal=observation["logical_principal"],
+                    now=context.now,
                 )
 
 

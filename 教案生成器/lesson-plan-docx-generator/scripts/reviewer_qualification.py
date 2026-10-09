@@ -253,6 +253,7 @@ def _agent_evidence(
                     op["service_observation_sha256"],
                     validate_configuration(inventory),
                     op["review_operation_id"],
+                    expected_principal=candidate,
                     started_at=stamp(run["started_at"]),
                     completed_at=stamp(run["completed_at"]),
                     now=context.now,
@@ -505,6 +506,7 @@ def _managed_approval(
         evidence["service_observation_sha256"],
         config,
         evidence["operation_id"],
+        expected_principal=approver,
         completed_at=stamp(evidence["reviewed_at"]),
         now=context.now,
     )
@@ -576,6 +578,7 @@ def _managed_approval(
             operation["service_observation_sha256"],
             config,
             operation["review_operation_id"],
+            expected_principal=candidate_principal,
             now=context.now,
         )
         service_identity = managed_service_identity_projection(operation_observation)
@@ -795,6 +798,7 @@ def build_managed_qualification_review_packet(
                 observation_sha,
                 config,
                 operation["review_operation_id"],
+                expected_principal=candidate_principal,
                 started_at=stamp(run["started_at"]),
                 completed_at=stamp(run["completed_at"]),
                 now=context.now,

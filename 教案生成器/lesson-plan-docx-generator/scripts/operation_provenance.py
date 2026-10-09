@@ -200,6 +200,7 @@ def validate_receipt(
                 binding["sha256"],
                 config,
                 receipt["operation_id"],
+                expected_principal=receipt["actor_principal"],
                 now=context.now,
             )
             require(

@@ -173,7 +173,24 @@ class Evidence:
             self.qualification_approval()
         self.write("operation_index", self.index, protected=True)
 
-    def enable_managed_alias(self):
+    def update_opaque_policy(self, **changes):
+        policy = json.loads(
+            Path(self.entries["service-observation-policy"]["path"]).read_bytes()
+        )
+        policy.update(changes)
+        self.write(
+            "service-observation-policy",
+            canonical_json_bytes(policy),
+            protected=True,
+        )
+        self.config["agent"]["service_observation_policy_sha256"] = self.sha(
+            "service-observation-policy"
+        )
+        self.write(
+            "reviewer_configuration", canonical_json_bytes(self.config), protected=True
+        )
+
+    def enable_managed_alias(self, *, observation_version="1.0"):
         """Create synthetic operator-provisioned Reviewer A / approver B roles."""
         self.reviewer_principal = "managed-agent:reviewer-a"
         self.approver_principal = "managed-agent:qualification-approver-b"
@@ -208,11 +225,35 @@ class Evidence:
                 )
             )
         self.write("authority_profile", self.profile, protected=True)
-        self.write(
-            "service-observation-policy",
-            b"Fixture: exact managed endpoint and response identity fields; fallback denied.",
-            protected=True,
-        )
+        self.managed_observation_version = observation_version
+        if observation_version == "1.1":
+            policy = dict(
+                policy_version="1.1",
+                provider_service_reference="fixture-managed-service",
+                requested_alias="gpt-6.1-sol",
+                provider_visibility_mode="provider_internals_opaque",
+                codex_exec_argv_template=[
+                    "codex", "exec", "--json", "--model", "{{requested_alias}}", "-"
+                ],
+                codex_version_argv=["codex", "--version"],
+                provider_metadata_json_pointers={
+                    field: []
+                    for field in (
+                        "reported_model_identifier",
+                        "reported_model_revision",
+                        "service_fingerprint",
+                        "service_api_version",
+                        "request_id",
+                    )
+                },
+                provider_fallback_json_pointers=[],
+            )
+            observation_policy = canonical_json_bytes(policy)
+        else:
+            observation_policy = (
+                b"Fixture: exact managed endpoint and response identity fields; fallback denied."
+            )
+        self.write("service-observation-policy", observation_policy, protected=True)
         self.write(
             "approver-prompt",
             b"Fixture: inspect opaque operation evidence; no expected labels or truth.",
@@ -233,8 +274,137 @@ class Evidence:
             "reviewer_configuration", canonical_json_bytes(self.config), protected=True
         )
 
-    def managed_observation(self, operation_id, requested_at, observed_at=None):
+    def managed_observation(
+        self,
+        operation_id,
+        requested_at,
+        observed_at=None,
+        *,
+        principal=None,
+        reported_metadata=None,
+        provider_fallback_status="not_observable",
+        provider_fallback_evidence=None,
+        trace_fields=None,
+    ):
         observed_at = observed_at or requested_at
+        if getattr(self, "managed_observation_version", "1.0") == "1.1":
+            from datetime import datetime
+
+            requested = datetime.fromisoformat(requested_at.replace("Z", "+00:00"))
+            operation_started_at = (requested - timedelta(seconds=2)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            request_captured_at = (requested - timedelta(seconds=1)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            operation_completed_at = observed_at
+            principal = principal or self.reviewer_principal
+            request_key = operation_id + "-request-bytes"
+            trace_key = operation_id + "-codex-jsonl"
+            version_key = operation_id + "-codex-version"
+            manifest_key = operation_id + "-capture-manifest"
+            request_raw = canonical_json_bytes(
+                {
+                    "requested_alias": "gpt-6.1-sol",
+                    "operation": "semantic-scope-review",
+                    "input": "Exact protected reviewer request package.",
+                }
+            )
+            event_fields = dict(trace_fields or {})
+            thread = "thread-" + sha256_bytes(operation_id.encode())[:12]
+            events = [
+                {"type": "thread.started", "thread_id": thread},
+                {"type": "turn.started"},
+                {
+                    "type": "item.completed",
+                    "item": {
+                        "type": "agent_message",
+                        "text": "{\"fixture\":\"sanitized managed response\"}",
+                    },
+                },
+                {"type": "turn.completed", **event_fields},
+            ]
+            trace_raw = b"".join(
+                canonical_json_bytes(event) + b"\n" for event in events
+            )
+            codex_version = "codex-cli test-fixture-1.1"
+            codex_version_raw = (codex_version + "\n").encode("utf-8")
+            self.write(request_key, request_raw, protected=True)
+            self.write(trace_key, trace_raw, protected=True)
+            self.write(version_key, codex_version_raw, protected=True)
+            request_sha = sha256_bytes(request_raw)
+            trace_sha = sha256_bytes(trace_raw)
+            version_sha = sha256_bytes(codex_version_raw)
+            argv = ["codex", "exec", "--json", "--model", "gpt-6.1-sol", "-"]
+            manifest = dict(
+                capture_version="1.1",
+                operation_id=operation_id,
+                logical_principal=principal,
+                requested_alias="gpt-6.1-sol",
+                codex_exec_argv=argv,
+                codex_version_argv=["codex", "--version"],
+                request_inventory_key=request_key,
+                request_sha256=request_sha,
+                response_trace_inventory_key=trace_key,
+                response_trace_sha256=trace_sha,
+                codex_cli_version_inventory_key=version_key,
+                codex_cli_version_sha256=version_sha,
+                operation_started_at=operation_started_at,
+                request_captured_at=request_captured_at,
+                requested_at=requested_at,
+                observed_at=observed_at,
+                operation_completed_at=operation_completed_at,
+            )
+            self.write(manifest_key, canonical_json_bytes(manifest), protected=True)
+            metadata_values = {
+                field: None
+                for field in (
+                    "reported_model_identifier",
+                    "reported_model_revision",
+                    "service_fingerprint",
+                    "service_api_version",
+                    "request_id",
+                )
+            }
+            metadata_evidence = {field: None for field in metadata_values}
+            if reported_metadata:
+                metadata_values.update(reported_metadata)
+                for field, value in reported_metadata.items():
+                    if value is not None:
+                        metadata_evidence[field] = {
+                            "line_index": 3,
+                            "json_pointer": "/" + field,
+                        }
+            observation = dict(
+                observation_version="1.1",
+                operation_id=operation_id,
+                logical_principal=principal,
+                provider_service_reference="fixture-managed-service",
+                requested_alias="gpt-6.1-sol",
+                provider_visibility_mode="provider_internals_opaque",
+                **metadata_values,
+                metadata_evidence=metadata_evidence,
+                controller_build_sha256=self.sha("build"),
+                observation_policy_sha256=self.sha("service-observation-policy"),
+                codex_cli_version=codex_version,
+                codex_cli_version_inventory_key=version_key,
+                codex_cli_version_sha256=version_sha,
+                capture_manifest_inventory_key=manifest_key,
+                capture_manifest_sha256=self.sha(manifest_key),
+                request_inventory_key=request_key,
+                request_sha256=request_sha,
+                response_trace_inventory_key=trace_key,
+                response_sha256=trace_sha,
+                controller_fallback_performed=False,
+                provider_fallback_status=provider_fallback_status,
+                provider_fallback_evidence=provider_fallback_evidence,
+                operation_started_at=operation_started_at,
+                request_captured_at=request_captured_at,
+                requested_at=requested_at,
+                observed_at=observed_at,
+                operation_completed_at=operation_completed_at,
+            )
+            return observation
         return dict(
             observation_version="1.0",
             operation_id=operation_id,
@@ -481,7 +651,10 @@ class Evidence:
             op = "managed-qualification-approver-operation"
             reviewed_at = "2026-10-06T18:10:00Z"
             service_observation = self.managed_observation(
-                op, "2026-10-06T18:05:00Z", "2026-10-06T18:06:00Z"
+                op,
+                "2026-10-06T18:05:00Z",
+                "2026-10-06T18:06:00Z",
+                principal=self.approver_principal,
             )
             self.write(
                 "managed-qualification-approver-observation",
@@ -568,7 +741,12 @@ class Evidence:
         self.write(
             "managed-qualification-approver-observation",
             canonical_json_bytes(
-                self.managed_observation(operation_id, requested_at, observed_at)
+                self.managed_observation(
+                    operation_id,
+                    requested_at,
+                    observed_at,
+                    principal=self.approver_principal,
+                )
             ),
             protected=True,
         )

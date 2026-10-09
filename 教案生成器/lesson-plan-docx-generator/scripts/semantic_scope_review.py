@@ -261,6 +261,7 @@ def validate_review(
                 observation_binding["sha256"],
                 config,
                 receipt["operation_id"],
+                expected_principal=receipt["actor_principal"],
                 now=context.now,
             )
             require(

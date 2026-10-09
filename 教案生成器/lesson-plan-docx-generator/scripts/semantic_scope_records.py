@@ -481,6 +481,24 @@ def managed_service_identity_projection(
     observation: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Return stable identity metadata without request-specific data."""
+    if observation.get("observation_version") == "1.1":
+        return {
+            field: observation[field]
+            for field in (
+                "observation_version",
+                "provider_service_reference",
+                "requested_alias",
+                "reported_model_identifier",
+                "reported_model_revision",
+                "service_fingerprint",
+                "service_api_version",
+                "codex_cli_version",
+                "observation_policy_sha256",
+                "provider_visibility_mode",
+            )
+        } | {
+            "client_build_sha256": observation["controller_build_sha256"]
+        }
     return {
         field: observation[field]
         for field in (
@@ -550,6 +568,7 @@ def validate_managed_service_observation(
     config: Mapping[str, Any],
     operation_id: str,
     *,
+    expected_principal: str | None = None,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
     now: datetime | None = None,
@@ -561,7 +580,15 @@ def validate_managed_service_observation(
         "managed observation requires Reviewer Configuration 1.1",
     )
     raw = inventory.raw(key, digest, protected=True)
-    observation = checked(raw, "managed-reviewer-service-observation")
+    parsed = parse(raw, allow_floats=False)
+    require(isinstance(parsed, dict), "managed service observation must be an object")
+    version = parsed.get("observation_version")
+    schemas = {
+        "1.0": "managed-reviewer-service-observation",
+        "1.1": "managed-reviewer-service-observation-v1.1",
+    }
+    require(version in schemas, "unsupported managed service observation version")
+    observation = checked(raw, schemas[version])
     require(
         raw == canonical_json_bytes(observation),
         "managed service observation bytes must be canonical",
@@ -574,22 +601,310 @@ def validate_managed_service_observation(
         "managed service/provider alias changed",
     )
     require(
-        observation["client_build_sha256"] == config["implementation_build_sha256"]
-        and observation["observation_policy_sha256"]
+        observation["observation_policy_sha256"]
         == agent["service_observation_policy_sha256"],
-        "managed observation client/policy changed",
+        "managed observation policy changed",
     )
-    require(observation["fallback_detected"] is False, "managed service fallback")
     requested = stamp(observation["requested_at"])
     observed = stamp(observation["observed_at"])
-    require(requested <= observed, "invalid managed observation chronology")
-    if started_at is not None:
-        require(started_at <= requested, "service request predates operation")
-    if completed_at is not None:
-        require(observed <= completed_at, "service observation exceeds operation")
+    if version == "1.0":
+        require(
+            observation["client_build_sha256"]
+            == config["implementation_build_sha256"],
+            "managed observation client/policy changed",
+        )
+        require(observation["fallback_detected"] is False, "managed service fallback")
+        policy_raw = inventory.by_sha(
+            agent["service_observation_policy_sha256"], protected=True
+        )
+        try:
+            policy = parse(policy_raw, allow_floats=False)
+        except RecordError:
+            policy = None
+        require(
+            not (isinstance(policy, dict) and policy.get("policy_version") == "1.1"),
+            "managed observation 1.0 cannot use observation policy 1.1",
+        )
+        require(requested <= observed, "invalid managed observation chronology")
+        if started_at is not None:
+            require(started_at <= requested, "service request predates operation")
+        if completed_at is not None:
+            require(observed <= completed_at, "service observation exceeds operation")
+    else:
+        require(
+            expected_principal is not None
+            and observation["logical_principal"] == expected_principal,
+            "managed observation principal mismatch",
+        )
+        require(
+            observation["controller_build_sha256"]
+            == config["implementation_build_sha256"],
+            "managed observation controller build changed",
+        )
+        policy_raw = inventory.by_sha(
+            agent["service_observation_policy_sha256"], protected=True
+        )
+        policy = checked(policy_raw, "managed-service-observation-policy-v1.1")
+        require(
+            policy_raw == canonical_json_bytes(policy),
+            "managed observation policy bytes must be canonical",
+        )
+        require(
+            policy["provider_service_reference"] == agent["provider_reference"]
+            and policy["requested_alias"] == agent["model_reference"]
+            and policy["provider_visibility_mode"]
+            == observation["provider_visibility_mode"],
+            "managed observation policy identity changed",
+        )
+        require(
+            observation["provider_fallback_status"] != "reported_true",
+            "provider reported internal fallback",
+        )
+        capture_raw = inventory.raw(
+            observation["capture_manifest_inventory_key"],
+            observation["capture_manifest_sha256"],
+            protected=True,
+        )
+        capture = checked(capture_raw, "managed-service-capture-manifest-v1.1")
+        require(
+            capture_raw == canonical_json_bytes(capture),
+            "managed capture manifest bytes must be canonical",
+        )
+        argv = [
+            observation["requested_alias"]
+            if arg == "{{requested_alias}}"
+            else arg
+            for arg in policy["codex_exec_argv_template"]
+        ]
+        require(
+            capture["operation_id"] == observation["operation_id"]
+            and capture["logical_principal"] == observation["logical_principal"]
+            and capture["requested_alias"] == observation["requested_alias"]
+            and capture["codex_exec_argv"] == argv
+            and capture["codex_version_argv"] == policy["codex_version_argv"],
+            "managed capture invocation identity changed",
+        )
+        capture_bindings = (
+            ("request_inventory_key", "request_inventory_key"),
+            ("request_sha256", "request_sha256"),
+            ("response_trace_inventory_key", "response_trace_inventory_key"),
+            ("response_sha256", "response_trace_sha256"),
+            ("codex_cli_version_inventory_key", "codex_cli_version_inventory_key"),
+            ("codex_cli_version_sha256", "codex_cli_version_sha256"),
+        )
+        for observation_field, capture_field in capture_bindings:
+            require(
+                observation[observation_field] == capture[capture_field],
+                f"managed capture {observation_field} mismatch",
+            )
+        timestamp_fields = (
+            "operation_started_at",
+            "request_captured_at",
+            "requested_at",
+            "observed_at",
+            "operation_completed_at",
+        )
+        capture_times = {field: stamp(capture[field]) for field in timestamp_fields}
+        observation_times = {
+            field: stamp(observation[field]) for field in timestamp_fields
+        }
+        require(
+            capture_times == observation_times,
+            "managed capture operation timestamps mismatch",
+        )
+        require(
+            capture_times["operation_started_at"]
+            <= capture_times["request_captured_at"]
+            <= capture_times["requested_at"]
+            <= capture_times["observed_at"]
+            <= capture_times["operation_completed_at"],
+            "invalid managed observation chronology",
+        )
+        if started_at is not None:
+            require(
+                started_at <= capture_times["operation_started_at"],
+                "managed service operation predates evaluation run",
+            )
+        if completed_at is not None:
+            require(
+                capture_times["operation_completed_at"] <= completed_at,
+                "managed service operation exceeds evaluation run",
+            )
+        request_raw = inventory.raw(
+            observation["request_inventory_key"],
+            observation["request_sha256"],
+            protected=True,
+        )
+        response_raw = inventory.raw(
+            observation["response_trace_inventory_key"],
+            observation["response_sha256"],
+            protected=True,
+        )
+        # Reading these bytes through Inventory proves their hashes and protected roots.
+        del request_raw
+        version_raw = inventory.raw(
+            observation["codex_cli_version_inventory_key"],
+            observation["codex_cli_version_sha256"],
+            protected=True,
+        )
+        try:
+            version_text = version_raw.decode("utf-8").rstrip("\r\n")
+        except UnicodeError as exc:
+            raise RecordError("Codex CLI version evidence is not UTF-8") from exc
+        require(
+            version_text
+            and "\n" not in version_text
+            and "\r" not in version_text
+            and version_text == observation["codex_cli_version"],
+            "Codex CLI version does not match captured bytes",
+        )
+        events = _codex_jsonl_events(response_raw)
+        _validate_reported_provider_metadata(observation, policy, events)
+        _validate_provider_fallback(observation, policy, events)
     if now is not None:
         require(observed <= now, "managed service observation is from the future")
     return observation
+
+
+def _codex_jsonl_events(raw: bytes) -> list[dict[str, Any]]:
+    """Parse a successful codex exec --json stdout trace without normalizing it."""
+    lines = raw.splitlines()
+    require(bool(lines) and all(line.strip() for line in lines), "empty Codex JSONL trace")
+    events: list[dict[str, Any]] = []
+    for line in lines:
+        event = parse(line, allow_floats=True)
+        require(
+            isinstance(event, dict) and isinstance(event.get("type"), str),
+            "Codex JSONL trace contains a non-event row",
+        )
+        events.append(event)
+    types = [event["type"] for event in events]
+    require("thread.started" in types, "Codex JSONL trace lacks thread.started")
+    require(
+        types[-1] == "turn.completed"
+        and "turn.failed" not in types
+        and "error" not in types,
+        "Codex JSONL trace is not a successful completed turn",
+    )
+    require(
+        any(
+            event.get("type") == "item.completed"
+            and isinstance(event.get("item"), dict)
+            and event["item"].get("type") == "agent_message"
+            and isinstance(event["item"].get("text"), str)
+            and bool(event["item"]["text"].strip())
+            for event in events
+        ),
+        "Codex JSONL trace lacks a completed agent message",
+    )
+    return events
+
+
+_TRACE_MISSING = object()
+
+
+def _json_pointer_value(value: Any, pointer: str) -> Any:
+    require(pointer.startswith("/"), "metadata source is not a JSON Pointer")
+    current = value
+    for encoded in pointer[1:].split("/"):
+        require(
+            not any(
+                encoded[index] == "~"
+                and (index + 1 == len(encoded) or encoded[index + 1] not in "01")
+                for index in range(len(encoded))
+            ),
+            "metadata JSON Pointer has invalid escape",
+        )
+        token = encoded.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and token in current:
+            current = current[token]
+        elif isinstance(current, list) and token.isdigit() and int(token) < len(current):
+            current = current[int(token)]
+        else:
+            return _TRACE_MISSING
+    return current
+
+
+_PROVIDER_METADATA_FIELDS = (
+    "reported_model_identifier",
+    "reported_model_revision",
+    "service_fingerprint",
+    "service_api_version",
+    "request_id",
+)
+
+
+def _matching_trace_sources(
+    events: list[dict[str, Any]], pointers: list[str]
+) -> list[tuple[int, str, Any]]:
+    values: list[tuple[int, str, Any]] = []
+    for line_index, event in enumerate(events):
+        for pointer in pointers:
+            value = _json_pointer_value(event, pointer)
+            if value is not _TRACE_MISSING:
+                values.append((line_index, pointer, value))
+    return values
+
+
+def _validate_reported_provider_metadata(
+    observation: Mapping[str, Any],
+    policy: Mapping[str, Any],
+    events: list[dict[str, Any]],
+) -> None:
+    for field in _PROVIDER_METADATA_FIELDS:
+        observed = _matching_trace_sources(
+            events, policy["provider_metadata_json_pointers"][field]
+        )
+        evidence = observation["metadata_evidence"][field]
+        value = observation[field]
+        if not observed:
+            require(value is None and evidence is None, f"unreported provider metadata: {field}")
+            continue
+        require(
+            all(isinstance(row[2], str) and row[2] for row in observed),
+            f"invalid provider metadata type: {field}",
+        )
+        reported_values = {row[2] for row in observed}
+        require(len(reported_values) == 1, f"inconsistent provider metadata: {field}")
+        require(value == next(iter(reported_values)), f"provider metadata is not trace-derived: {field}")
+        require(isinstance(evidence, dict), f"provider metadata source missing: {field}")
+        require(
+            (evidence["line_index"], evidence["json_pointer"], value)
+            in observed,
+            f"provider metadata source mismatch: {field}",
+        )
+
+
+def _validate_provider_fallback(
+    observation: Mapping[str, Any],
+    policy: Mapping[str, Any],
+    events: list[dict[str, Any]],
+) -> None:
+    values = _matching_trace_sources(
+        events, policy["provider_fallback_json_pointers"]
+    )
+    evidence = observation["provider_fallback_evidence"]
+    if not values:
+        require(
+            observation["provider_fallback_status"] == "not_observable"
+            and evidence is None,
+            "provider fallback must be not_observable when no provider signal exists",
+        )
+        return
+    require(
+        all(isinstance(row[2], bool) for row in values),
+        "provider fallback metadata has invalid type",
+    )
+    require(not any(row[2] for row in values), "provider reported internal fallback")
+    require(
+        observation["provider_fallback_status"] == "reported_false"
+        and isinstance(evidence, dict),
+        "provider-reported no-fallback evidence is missing",
+    )
+    require(
+        (evidence["line_index"], evidence["json_pointer"], False) in values,
+        "provider fallback evidence does not match raw trace",
+    )
 
 
 def validate_training(

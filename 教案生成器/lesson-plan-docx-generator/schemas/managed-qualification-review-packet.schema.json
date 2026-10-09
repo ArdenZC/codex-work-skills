@@ -151,8 +151,34 @@
               "service_identity_fingerprint": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
+              },
+              "observation_version": {
+                "const": "1.1"
+              },
+              "codex_cli_version": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160,
+                "pattern": "\\S"
+              },
+              "provider_visibility_mode": {
+                "const": "provider_internals_opaque"
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "required": ["observation_version"]
+                },
+                "then": {
+                  "required": [
+                    "observation_version",
+                    "codex_cli_version",
+                    "provider_visibility_mode"
+                  ]
+                }
+              }
+            ]
           },
           "review_report_base64": {
             "type": "string",
