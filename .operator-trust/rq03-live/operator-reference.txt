@@ -1,0 +1,1 @@
+Owner-controlled trust anchor for RQ-03 live dual-agent qualification. Authority is valid only when launched from the exact pinned trust-anchor commit and profile digest recorded by the Owner.
