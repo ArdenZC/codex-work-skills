@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "managed-reviewer-service-observation 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "observation_version",
+    "operation_id",
+    "logical_principal",
+    "provider_service_reference",
+    "requested_alias",
+    "provider_visibility_mode",
+    "reported_model_identifier",
+    "reported_model_revision",
+    "service_fingerprint",
+    "service_api_version",
+    "request_id",
+    "metadata_evidence",
+    "controller_build_sha256",
+    "observation_policy_sha256",
+    "codex_cli_version",
+    "codex_cli_version_inventory_key",
+    "codex_cli_version_sha256",
+    "capture_manifest_inventory_key",
+    "capture_manifest_sha256",
+    "response_artifact_inventory_key",
+    "response_artifact_sha256",
+    "response_artifact_kind",
+    "request_inventory_key",
+    "request_sha256",
+    "response_trace_inventory_key",
+    "response_sha256",
+    "controller_fallback_performed",
+    "provider_fallback_status",
+    "provider_fallback_evidence",
+    "operation_started_at",
+    "request_captured_at",
+    "requested_at",
+    "observed_at",
+    "operation_completed_at"
+  ],
+  "properties": {
+    "observation_version": { "const": "1.1" },
+    "operation_id": {
+      "type": "string", "minLength": 1, "maxLength": 128, "pattern": "\\S"
+    },
+    "logical_principal": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "provider_service_reference": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "requested_alias": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "provider_visibility_mode": { "const": "provider_internals_opaque" },
+    "reported_model_identifier": { "$ref": "#/$defs/providerValue" },
+    "reported_model_revision": { "$ref": "#/$defs/providerValue" },
+    "service_fingerprint": { "$ref": "#/$defs/providerValue" },
+    "service_api_version": { "$ref": "#/$defs/providerValue" },
+    "request_id": {
+      "anyOf": [
+        { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S" },
+        { "type": "null" }
+      ]
+    },
+    "metadata_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_model_identifier", "reported_model_revision", "service_fingerprint",
+        "service_api_version", "request_id"
+      ],
+      "properties": {
+        "reported_model_identifier": { "$ref": "#/$defs/traceSourceOrNull" },
+        "reported_model_revision": { "$ref": "#/$defs/traceSourceOrNull" },
+        "service_fingerprint": { "$ref": "#/$defs/traceSourceOrNull" },
+        "service_api_version": { "$ref": "#/$defs/traceSourceOrNull" },
+        "request_id": { "$ref": "#/$defs/traceSourceOrNull" }
+      }
+    },
+    "controller_build_sha256": { "$ref": "#/$defs/sha256" },
+    "observation_policy_sha256": { "$ref": "#/$defs/sha256" },
+    "codex_cli_version": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "codex_cli_version_inventory_key": { "$ref": "#/$defs/inventoryKey" },
+    "codex_cli_version_sha256": { "$ref": "#/$defs/sha256" },
+    "capture_manifest_inventory_key": { "$ref": "#/$defs/inventoryKey" },
+    "capture_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_inventory_key": { "$ref": "#/$defs/inventoryKey" },
+    "response_artifact_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_kind": {
+      "enum": ["semantic_scope_review", "managed_qualification_approver_response"]
+    },
+    "request_inventory_key": { "$ref": "#/$defs/inventoryKey" },
+    "request_sha256": { "$ref": "#/$defs/sha256" },
+    "response_trace_inventory_key": { "$ref": "#/$defs/inventoryKey" },
+    "response_sha256": { "$ref": "#/$defs/sha256" },
+    "controller_fallback_performed": { "const": false },
+    "provider_fallback_status": {
+      "enum": ["not_observable", "reported_false", "reported_true"]
+    },
+    "provider_fallback_evidence": { "$ref": "#/$defs/traceSourceOrNull" },
+    "operation_started_at": { "type": "string", "format": "date-time" },
+    "request_captured_at": { "type": "string", "format": "date-time" },
+    "requested_at": { "type": "string", "format": "date-time" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "operation_completed_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "inventoryKey": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "providerValue": {
+      "anyOf": [
+        { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S" },
+        { "type": "null" }
+      ]
+    },
+    "traceSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["line_index", "json_pointer"],
+      "properties": {
+        "line_index": { "type": "integer", "minimum": 0 },
+        "json_pointer": { "type": "string", "minLength": 1, "pattern": "^/" }
+      }
+    },
+    "traceSourceOrNull": {
+      "anyOf": [{ "$ref": "#/$defs/traceSource" }, { "type": "null" }]
+    }
+  }
+}

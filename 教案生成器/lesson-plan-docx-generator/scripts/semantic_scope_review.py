@@ -94,7 +94,8 @@ def validate_review(
     pipeline_run_id: str,
 ) -> dict[str, Any]:
     inventory = context.inventory
-    review = checked(inventory.raw(review_key), "semantic-scope-review")
+    review_raw = inventory.raw(review_key)
+    review = checked(review_raw, "semantic-scope-review")
     require(
         review["review_fingerprint"] == review_fingerprint(review),
         "review fingerprint mismatch",
@@ -261,6 +262,9 @@ def validate_review(
                 observation_binding["sha256"],
                 config,
                 receipt["operation_id"],
+                expected_principal=receipt["actor_principal"],
+                expected_response_artifact_raw=review_raw,
+                expected_response_artifact_kind="semantic_scope_review",
                 now=context.now,
             )
             require(

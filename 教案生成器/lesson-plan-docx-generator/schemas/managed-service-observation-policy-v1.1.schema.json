@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "managed-service-observation-policy 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_version",
+    "provider_service_reference",
+    "requested_alias",
+    "provider_visibility_mode",
+    "codex_exec_argv_template",
+    "codex_version_argv",
+    "provider_metadata_json_pointers",
+    "provider_fallback_json_pointers"
+  ],
+  "properties": {
+    "policy_version": { "const": "1.1" },
+    "provider_service_reference": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "requested_alias": {
+      "type": "string", "minLength": 1, "maxLength": 160, "pattern": "\\S"
+    },
+    "provider_visibility_mode": { "const": "provider_internals_opaque" },
+    "codex_exec_argv_template": {
+      "type": "array",
+      "prefixItems": [
+        { "const": "codex" },
+        { "const": "exec" },
+        { "const": "--json" },
+        { "const": "--model" },
+        { "const": "{{requested_alias}}" },
+        { "const": "-" }
+      ],
+      "items": false,
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "codex_version_argv": {
+      "type": "array",
+      "prefixItems": [{ "const": "codex" }, { "const": "--version" }],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "provider_metadata_json_pointers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reported_model_identifier", "reported_model_revision", "service_fingerprint",
+        "service_api_version", "request_id"
+      ],
+      "properties": {
+        "reported_model_identifier": { "$ref": "#/$defs/jsonPointers" },
+        "reported_model_revision": { "$ref": "#/$defs/jsonPointers" },
+        "service_fingerprint": { "$ref": "#/$defs/jsonPointers" },
+        "service_api_version": { "$ref": "#/$defs/jsonPointers" },
+        "request_id": { "$ref": "#/$defs/jsonPointers" }
+      }
+    },
+    "provider_fallback_json_pointers": { "$ref": "#/$defs/jsonPointers" }
+  },
+  "$defs": {
+    "jsonPointers": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "pattern": "^/" }
+    }
+  }
+}

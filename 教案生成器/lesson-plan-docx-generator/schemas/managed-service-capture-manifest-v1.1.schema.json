@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "managed-service-capture-manifest 1.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "capture_version",
+    "operation_id",
+    "logical_principal",
+    "requested_alias",
+    "codex_exec_argv",
+    "codex_version_argv",
+    "request_inventory_key",
+    "request_sha256",
+    "response_trace_inventory_key",
+    "response_trace_sha256",
+    "response_artifact_inventory_key",
+    "response_artifact_sha256",
+    "response_artifact_kind",
+    "codex_cli_version_inventory_key",
+    "codex_cli_version_sha256",
+    "operation_started_at",
+    "request_captured_at",
+    "requested_at",
+    "observed_at",
+    "operation_completed_at"
+  ],
+  "properties": {
+    "capture_version": { "const": "1.1" },
+    "operation_id": { "$ref": "#/$defs/id" },
+    "logical_principal": { "$ref": "#/$defs/id" },
+    "requested_alias": { "$ref": "#/$defs/id" },
+    "codex_exec_argv": {
+      "type": "array", "minItems": 6, "maxItems": 6,
+      "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+    },
+    "codex_version_argv": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "request_inventory_key": { "$ref": "#/$defs/id" },
+    "request_sha256": { "$ref": "#/$defs/sha256" },
+    "response_trace_inventory_key": { "$ref": "#/$defs/id" },
+    "response_trace_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_inventory_key": { "$ref": "#/$defs/id" },
+    "response_artifact_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_kind": {
+      "enum": ["semantic_scope_review", "managed_qualification_approver_response"]
+    },
+    "codex_cli_version_inventory_key": { "$ref": "#/$defs/id" },
+    "codex_cli_version_sha256": { "$ref": "#/$defs/sha256" },
+    "operation_started_at": { "type": "string", "format": "date-time" },
+    "request_captured_at": { "type": "string", "format": "date-time" },
+    "requested_at": { "type": "string", "format": "date-time" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "operation_completed_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
