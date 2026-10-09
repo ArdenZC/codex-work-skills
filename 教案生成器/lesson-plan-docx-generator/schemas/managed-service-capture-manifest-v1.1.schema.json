@@ -14,6 +14,9 @@
     "request_sha256",
     "response_trace_inventory_key",
     "response_trace_sha256",
+    "response_artifact_inventory_key",
+    "response_artifact_sha256",
+    "response_artifact_kind",
     "codex_cli_version_inventory_key",
     "codex_cli_version_sha256",
     "operation_started_at",
@@ -39,6 +42,11 @@
     "request_sha256": { "$ref": "#/$defs/sha256" },
     "response_trace_inventory_key": { "$ref": "#/$defs/id" },
     "response_trace_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_inventory_key": { "$ref": "#/$defs/id" },
+    "response_artifact_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_kind": {
+      "enum": ["semantic_scope_review", "managed_qualification_approver_response"]
+    },
     "codex_cli_version_inventory_key": { "$ref": "#/$defs/id" },
     "codex_cli_version_sha256": { "$ref": "#/$defs/sha256" },
     "operation_started_at": { "type": "string", "format": "date-time" },

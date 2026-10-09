@@ -246,6 +246,9 @@ def _agent_evidence(
             "incomplete/reordered evaluation run",
         )
         for op in run["operations"]:
+            review_raw = inventory.raw(
+                op["review_inventory_key"], op["review_sha256"], protected=True
+            )
             if qualification["contract_version"] == "1.1":
                 observation = validate_managed_service_observation(
                     inventory,
@@ -254,6 +257,8 @@ def _agent_evidence(
                     validate_configuration(inventory),
                     op["review_operation_id"],
                     expected_principal=candidate,
+                    expected_response_artifact_raw=review_raw,
+                    expected_response_artifact_kind="semantic_scope_review",
                     started_at=stamp(run["started_at"]),
                     completed_at=stamp(run["completed_at"]),
                     now=context.now,
@@ -266,9 +271,6 @@ def _agent_evidence(
                     managed_service_identity_fingerprint(observation)
                 )
             case = by_case[op["case_id"]]
-            inventory.raw(
-                op["review_inventory_key"], op["review_sha256"], protected=True
-            )
             inventory.raw(
                 op["receipt_inventory_key"], op["receipt_sha256"], protected=True
             )
@@ -500,6 +502,11 @@ def _managed_approval(
         "managed qualification approver prompt changed",
     )
     inventory.by_sha(evidence["approval_prompt_sha256"], protected=True)
+    response_raw = inventory.raw(
+        evidence["response_inventory_key"],
+        evidence["response_sha256"],
+        protected=True,
+    )
     observation = validate_managed_service_observation(
         inventory,
         evidence["service_observation_inventory_key"],
@@ -507,6 +514,8 @@ def _managed_approval(
         config,
         evidence["operation_id"],
         expected_principal=approver,
+        expected_response_artifact_raw=response_raw,
+        expected_response_artifact_kind="managed_qualification_approver_response",
         completed_at=stamp(evidence["reviewed_at"]),
         now=context.now,
     )
@@ -572,6 +581,11 @@ def _managed_approval(
         require(key not in actual, "duplicate managed approval evidence row")
         operation = expected.get(key)
         require(operation is not None, "managed approval packet has unknown operation evidence")
+        raw_report = inventory.raw(
+            operation["review_inventory_key"],
+            operation["review_sha256"],
+            protected=True,
+        )
         operation_observation = validate_managed_service_observation(
             inventory,
             operation["service_observation_inventory_key"],
@@ -579,6 +593,8 @@ def _managed_approval(
             config,
             operation["review_operation_id"],
             expected_principal=candidate_principal,
+            expected_response_artifact_raw=raw_report,
+            expected_response_artifact_kind="semantic_scope_review",
             now=context.now,
         )
         service_identity = managed_service_identity_projection(operation_observation)
@@ -591,11 +607,6 @@ def _managed_approval(
             == qualification["service_identity_fingerprint"],
             "managed approval packet service identity projection mismatch",
         )
-        raw_report = inventory.raw(
-            operation["review_inventory_key"],
-            operation["review_sha256"],
-            protected=True,
-        )
         try:
             decoded = base64.b64decode(row["review_report_base64"], validate=True)
         except (ValueError, TypeError) as exc:
@@ -605,9 +616,7 @@ def _managed_approval(
         actual[key] = ref
     require(set(actual) == set(expected), "managed approver packet omits evaluation operations")
     response = checked(
-        inventory.raw(
-            evidence["response_inventory_key"], evidence["response_sha256"], protected=True
-        ),
+        response_raw,
         "managed-qualification-approver-response",
     )
     require(
@@ -792,6 +801,9 @@ def build_managed_qualification_review_packet(
             review_sha = operation["review_sha256"]
             receipt_sha = operation["receipt_sha256"]
             observation_sha = operation["service_observation_sha256"]
+            report_raw = inventory.raw(
+                operation["review_inventory_key"], review_sha, protected=True
+            )
             observation = validate_managed_service_observation(
                 inventory,
                 operation["service_observation_inventory_key"],
@@ -799,6 +811,8 @@ def build_managed_qualification_review_packet(
                 config,
                 operation["review_operation_id"],
                 expected_principal=candidate_principal,
+                expected_response_artifact_raw=report_raw,
+                expected_response_artifact_kind="semantic_scope_review",
                 started_at=stamp(run["started_at"]),
                 completed_at=stamp(run["completed_at"]),
                 now=context.now,
@@ -806,9 +820,6 @@ def build_managed_qualification_review_packet(
             identity = managed_service_identity_projection(observation)
             identity["service_identity_fingerprint"] = (
                 managed_service_identity_fingerprint(observation)
-            )
-            report_raw = inventory.raw(
-                operation["review_inventory_key"], review_sha, protected=True
             )
             operation_ref = "op-" + sha256_bytes(
                 canonical_json_bytes(

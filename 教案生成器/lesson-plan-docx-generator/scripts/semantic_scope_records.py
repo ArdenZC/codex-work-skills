@@ -569,6 +569,8 @@ def validate_managed_service_observation(
     operation_id: str,
     *,
     expected_principal: str | None = None,
+    expected_response_artifact_raw: bytes | None = None,
+    expected_response_artifact_kind: str | None = None,
     started_at: datetime | None = None,
     completed_at: datetime | None = None,
     now: datetime | None = None,
@@ -689,6 +691,8 @@ def validate_managed_service_observation(
             ("request_sha256", "request_sha256"),
             ("response_trace_inventory_key", "response_trace_inventory_key"),
             ("response_sha256", "response_trace_sha256"),
+            ("response_artifact_inventory_key", "response_artifact_inventory_key"),
+            ("response_artifact_sha256", "response_artifact_sha256"),
             ("codex_cli_version_inventory_key", "codex_cli_version_inventory_key"),
             ("codex_cli_version_sha256", "codex_cli_version_sha256"),
         )
@@ -697,6 +701,10 @@ def validate_managed_service_observation(
                 observation[observation_field] == capture[capture_field],
                 f"managed capture {observation_field} mismatch",
             )
+        require(
+            observation["response_artifact_kind"] == capture["response_artifact_kind"],
+            "managed capture response_artifact_kind mismatch",
+        )
         timestamp_fields = (
             "operation_started_at",
             "request_captured_at",
@@ -740,6 +748,11 @@ def validate_managed_service_observation(
             observation["response_sha256"],
             protected=True,
         )
+        response_artifact_raw = inventory.raw(
+            observation["response_artifact_inventory_key"],
+            observation["response_artifact_sha256"],
+            protected=True,
+        )
         # Reading these bytes through Inventory proves their hashes and protected roots.
         del request_raw
         version_raw = inventory.raw(
@@ -759,6 +772,28 @@ def validate_managed_service_observation(
             "Codex CLI version does not match captured bytes",
         )
         events = _codex_jsonl_events(response_raw)
+        if (
+            expected_response_artifact_raw is not None
+            or expected_response_artifact_kind is not None
+        ):
+            require(
+                expected_response_artifact_raw is not None
+                and expected_response_artifact_kind is not None,
+                "managed response consumer binding is incomplete",
+            )
+            require(
+                observation["response_artifact_kind"] == expected_response_artifact_kind,
+                "managed response artifact branch mismatch",
+            )
+            require(
+                response_artifact_raw == expected_response_artifact_raw,
+                "managed response artifact differs from consumed artifact",
+            )
+        _validate_trace_response_artifact(
+            events,
+            response_artifact_raw,
+            observation["response_artifact_kind"],
+        )
         _validate_reported_provider_metadata(observation, policy, events)
         _validate_provider_fallback(observation, policy, events)
     if now is not None:
@@ -798,6 +833,67 @@ def _codex_jsonl_events(raw: bytes) -> list[dict[str, Any]]:
         "Codex JSONL trace lacks a completed agent message",
     )
     return events
+
+
+def _validate_trace_response_artifact(
+    events: list[dict[str, Any]], artifact_raw: bytes, artifact_kind: str
+) -> None:
+    """Bind one unambiguous completed Codex output to the canonical scored JSON."""
+    completed_turn_indexes = [
+        index
+        for index, event in enumerate(events)
+        if event.get("type") == "turn.completed"
+    ]
+    started_turn_indexes = [
+        index
+        for index, event in enumerate(events)
+        if event.get("type") == "turn.started"
+    ]
+    require(bool(completed_turn_indexes), "Codex JSONL trace lacks a completed turn")
+    final_turn_completed = completed_turn_indexes[-1]
+    prior_turn_starts = [
+        index for index in started_turn_indexes if index < final_turn_completed
+    ]
+    require(bool(prior_turn_starts), "Codex JSONL trace lacks a started final turn")
+    final_turn_started = prior_turn_starts[-1]
+    completed_messages = [
+        event["item"]["text"]
+        for index, event in enumerate(events)
+        if final_turn_started < index < final_turn_completed
+        and event.get("type") == "item.completed"
+        and isinstance(event.get("item"), dict)
+        and event["item"].get("type") == "agent_message"
+        and isinstance(event["item"].get("text"), str)
+        and bool(event["item"]["text"].strip())
+    ]
+    require(
+        bool(completed_messages), "Codex JSONL trace lacks a completed agent message"
+    )
+    require(
+        len(completed_messages) == 1,
+        "Codex JSONL trace has multiple/ambiguous completed agent messages",
+    )
+    response_schemas = {
+        "semantic_scope_review": "semantic-scope-review",
+        "managed_qualification_approver_response": "managed-qualification-approver-response",
+    }
+    schema = response_schemas.get(artifact_kind)
+    require(schema is not None, "unsupported managed response artifact branch")
+    artifact = checked(artifact_raw, schema)
+    require(
+        artifact_raw == canonical_json_bytes(artifact),
+        "managed response artifact bytes must be canonical",
+    )
+    message_value = parse(completed_messages[0].encode("utf-8"), allow_floats=False)
+    require(
+        isinstance(message_value, dict),
+        "final Codex agent message must be a JSON object",
+    )
+    message_raw = canonical_json_bytes(message_value)
+    require(
+        message_raw == artifact_raw,
+        "Codex trace final message does not match protected response artifact",
+    )
 
 
 _TRACE_MISSING = object()

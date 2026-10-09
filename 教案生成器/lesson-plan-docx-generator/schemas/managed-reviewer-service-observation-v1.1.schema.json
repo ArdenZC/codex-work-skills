@@ -23,6 +23,9 @@
     "codex_cli_version_sha256",
     "capture_manifest_inventory_key",
     "capture_manifest_sha256",
+    "response_artifact_inventory_key",
+    "response_artifact_sha256",
+    "response_artifact_kind",
     "request_inventory_key",
     "request_sha256",
     "response_trace_inventory_key",
@@ -85,6 +88,11 @@
     "codex_cli_version_sha256": { "$ref": "#/$defs/sha256" },
     "capture_manifest_inventory_key": { "$ref": "#/$defs/inventoryKey" },
     "capture_manifest_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_inventory_key": { "$ref": "#/$defs/inventoryKey" },
+    "response_artifact_sha256": { "$ref": "#/$defs/sha256" },
+    "response_artifact_kind": {
+      "enum": ["semantic_scope_review", "managed_qualification_approver_response"]
+    },
     "request_inventory_key": { "$ref": "#/$defs/inventoryKey" },
     "request_sha256": { "$ref": "#/$defs/sha256" },
     "response_trace_inventory_key": { "$ref": "#/$defs/inventoryKey" },

@@ -1176,6 +1176,37 @@ class OpaqueManagedServiceObservationTests(unittest.TestCase):
             self.assertEqual(
                 observation["codex_cli_version"], "codex-cli test-fixture-1.1"
             )
+            review_raw = context.inventory.raw(
+                operation["review_inventory_key"],
+                operation["review_sha256"],
+                protected=True,
+            )
+            response_artifact_raw = context.inventory.raw(
+                observation["response_artifact_inventory_key"],
+                observation["response_artifact_sha256"],
+                protected=True,
+            )
+            capture = json.loads(
+                context.inventory.raw(
+                    observation["capture_manifest_inventory_key"],
+                    observation["capture_manifest_sha256"],
+                    protected=True,
+                )
+            )
+            self.assertEqual(observation["response_artifact_kind"], "semantic_scope_review")
+            self.assertEqual(response_artifact_raw, review_raw)
+            self.assertEqual(
+                hashlib.sha256(response_artifact_raw).hexdigest(),
+                observation["response_artifact_sha256"],
+            )
+            self.assertEqual(
+                capture["response_artifact_inventory_key"],
+                observation["response_artifact_inventory_key"],
+            )
+            self.assertEqual(
+                capture["response_artifact_sha256"],
+                observation["response_artifact_sha256"],
+            )
 
             e.author(
                 json.loads(Path(e.entries["content"]["path"]).read_bytes()), "content"
@@ -1194,6 +1225,35 @@ class OpaqueManagedServiceObservationTests(unittest.TestCase):
                 receipt_key="opaque-production-receipt",
                 frozen_lesson_ids=["L01"],
                 pipeline_run_id="opaque-production-run",
+            )
+            approval_evidence = json.loads(
+                context.inventory.raw(
+                    "managed-qualification-approval-evidence", protected=True
+                )
+            )
+            approval_observation = json.loads(
+                context.inventory.raw(
+                    approval_evidence["service_observation_inventory_key"],
+                    approval_evidence["service_observation_sha256"],
+                    protected=True,
+                )
+            )
+            approval_response_raw = context.inventory.raw(
+                approval_evidence["response_inventory_key"],
+                approval_evidence["response_sha256"],
+                protected=True,
+            )
+            self.assertEqual(
+                approval_observation["response_artifact_kind"],
+                "managed_qualification_approver_response",
+            )
+            self.assertEqual(
+                context.inventory.raw(
+                    approval_observation["response_artifact_inventory_key"],
+                    approval_observation["response_artifact_sha256"],
+                    protected=True,
+                ),
+                approval_response_raw,
             )
 
     def test_controller_fallback_and_provider_reported_true_reject(self):
@@ -1422,6 +1482,168 @@ class OpaqueManagedServiceObservationTests(unittest.TestCase):
                     observation["operation_id"],
                     expected_principal=observation["logical_principal"],
                     now=context.now,
+                )
+
+    def test_agent_a_trace_canonicalizes_to_exact_protected_review_consumed_by_o2(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-review-response-") as tmp:
+            e = self._fixture(Path(tmp))
+            e.review(
+                operation="canonical-review-operation",
+                pipeline="canonical-review-run",
+                purpose="qualification",
+                key="canonical-review",
+                receipt_key="canonical-review-receipt",
+                response_message_noncanonical=True,
+            )
+            context = e.context()
+            review_raw = context.inventory.raw("canonical-review")
+            receipt = json.loads(
+                context.inventory.raw("canonical-review-receipt", protected=True)
+            )
+            observation_binding = receipt["input_bindings"]["managed_service_observation"]
+            observation = json.loads(
+                context.inventory.raw(
+                    observation_binding["inventory_key"],
+                    observation_binding["sha256"],
+                    protected=True,
+                )
+            )
+            response_artifact_raw = context.inventory.raw(
+                observation["response_artifact_inventory_key"],
+                observation["response_artifact_sha256"],
+                protected=True,
+            )
+            self.assertEqual(observation["response_artifact_kind"], "semantic_scope_review")
+            self.assertEqual(review_raw, response_artifact_raw)
+            self.assertEqual(
+                hashlib.sha256(response_artifact_raw).hexdigest(),
+                observation["response_artifact_sha256"],
+            )
+            self.assertEqual(
+                validate_review(
+                    context,
+                    review_key="canonical-review",
+                    receipt_key="canonical-review-receipt",
+                    frozen_lesson_ids=["L01"],
+                    pipeline_run_id="canonical-review-run",
+                )["review_id"],
+                "canonical-review",
+            )
+
+    def test_agent_a_rejects_trace_review_mismatch_and_earlier_matching_message(self):
+        scenarios = (
+            (
+                "trace-review-mismatch",
+                dict(response_message_review_id="trace-review-A"),
+                "Codex trace final message does not match protected response artifact",
+            ),
+            (
+                "earlier-match-final-differs",
+                dict(
+                    earlier_agent_message_matches_artifact=True,
+                    response_message_review_id="different-final-review",
+                ),
+                "multiple/ambiguous completed agent messages",
+            ),
+        )
+        for name, options, message in scenarios:
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                prefix="observation-11-" + name + "-"
+            ) as tmp:
+                e = self._fixture(Path(tmp))
+                e.review(
+                    operation=name + "-operation",
+                    pipeline=name + "-run",
+                    purpose="qualification",
+                    key=name + "-review",
+                    receipt_key=name + "-receipt",
+                    **options,
+                )
+                with self.assertRaisesRegex(RecordError, message):
+                    validate_review(
+                        e.context(),
+                        review_key=name + "-review",
+                        receipt_key=name + "-receipt",
+                        frozen_lesson_ids=["L01"],
+                        pipeline_run_id=name + "-run",
+                    )
+
+    def test_agent_a_rejects_prose_missing_output_and_mutated_trace_or_artifact(self):
+        invalid_outputs = (
+            ("markdown", "```json\n{}\n```", "invalid JSON bytes"),
+            ("missing", "", "lacks a completed agent message"),
+        )
+        for name, message_text, message in invalid_outputs:
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                prefix="observation-11-invalid-output-"
+            ) as tmp:
+                e = self._fixture(Path(tmp))
+                e.review(
+                    operation=name + "-operation",
+                    pipeline=name + "-run",
+                    purpose="qualification",
+                    key=name + "-review",
+                    receipt_key=name + "-receipt",
+                    response_message_text=message_text,
+                )
+                with self.assertRaisesRegex(RecordError, message):
+                    validate_review(
+                        e.context(),
+                        review_key=name + "-review",
+                        receipt_key=name + "-receipt",
+                        frozen_lesson_ids=["L01"],
+                        pipeline_run_id=name + "-run",
+                    )
+
+        for name, field in (
+            ("mutated-trace", "response_trace_inventory_key"),
+            ("mutated-artifact", "response_artifact_inventory_key"),
+        ):
+            with self.subTest(name=name), tempfile.TemporaryDirectory(
+                prefix="observation-11-" + name + "-"
+            ) as tmp:
+                e = self._fixture(Path(tmp))
+                e.review(
+                    operation=name + "-operation",
+                    pipeline=name + "-run",
+                    purpose="qualification",
+                    key=name + "-review",
+                    receipt_key=name + "-receipt",
+                )
+                context = e.context()
+                receipt = json.loads(
+                    context.inventory.raw(name + "-receipt", protected=True)
+                )
+                observation_binding = receipt["input_bindings"]["managed_service_observation"]
+                observation = json.loads(
+                    context.inventory.raw(
+                        observation_binding["inventory_key"],
+                        observation_binding["sha256"],
+                        protected=True,
+                    )
+                )
+                path = Path(e.entries[observation[field]]["path"])
+                path.write_bytes(path.read_bytes() + b" ")
+                with self.assertRaisesRegex(RecordError, "changed raw-byte binding"):
+                    validate_review(
+                        e.context(),
+                        review_key=name + "-review",
+                        receipt_key=name + "-receipt",
+                        frozen_lesson_ids=["L01"],
+                        pipeline_run_id=name + "-run",
+                    )
+
+    def test_agent_b_trace_must_bind_exact_managed_approval_response(self):
+        with tempfile.TemporaryDirectory(prefix="observation-11-approver-response-") as tmp:
+            e = self._fixture(Path(tmp))
+            e.approver_response_mismatch = True
+            e.agent_qualification()
+            with self.assertRaisesRegex(
+                RecordError,
+                "Codex trace final message does not match protected response artifact",
+            ):
+                validate_qualification(
+                    e.context(), candidate_principal=e.reviewer_principal
                 )
 
 

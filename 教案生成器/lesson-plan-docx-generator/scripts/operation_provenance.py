@@ -201,6 +201,8 @@ def validate_receipt(
                 config,
                 receipt["operation_id"],
                 expected_principal=receipt["actor_principal"],
+                expected_response_artifact_raw=subject_raw,
+                expected_response_artifact_kind="semantic_scope_review",
                 now=context.now,
             )
             require(

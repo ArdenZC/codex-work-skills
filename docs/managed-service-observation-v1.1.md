@@ -43,7 +43,8 @@ protects the following ordinary files before validation:
    capture.
 2. A canonical capture manifest recording the logical principal, operation ID,
    operation timestamps, exact argv, request inventory key/hash, raw response
-   inventory key/hash, and `codex --version` evidence key/hash.
+    inventory key/hash, the protected structured response artifact key/hash and
+    response branch, and `codex --version` evidence key/hash.
 3. The exact stdout bytes from the successful `codex exec --json --model
    <requested_alias> -` process, retained as JSONL without parsing/re-encoding.
 4. The exact stdout bytes from `codex --version`.
@@ -51,7 +52,24 @@ protects the following ordinary files before validation:
    Observation Policy 1.1. The controller build SHA in the observation must
    equal the configuration's `implementation_build_sha256`.
 6. The parsed Semantic Scope Review artifact, separately protected and hashed
-   through the existing qualification operation or receipt binding.
+   through the existing qualification operation or receipt binding. For Agent B,
+   the protected managed qualification-approver response is the response
+   artifact instead.
+
+Both the Observation 1.1 record and capture manifest bind
+`response_artifact_inventory_key`, `response_artifact_sha256`, and
+`response_artifact_kind`. The kind is either `semantic_scope_review` or
+`managed_qualification_approver_response`. The validator reads the artifact
+from protected inventory and verifies its raw-byte SHA. It extracts the single
+completed `agent_message` from the trace's final completed turn, parses it as
+JSON for the declared branch, canonicalizes it using the repository's canonical
+JSON rules, and requires those canonical bytes to equal the exact protected
+response artifact bytes. The consumed Qualification/O2 review or Agent B
+approval response must also be byte-identical to that protected artifact.
+Missing output, multiple/ambiguous completed messages in the final turn,
+prose/Markdown, invalid JSON, a non-canonical artifact, or any
+trace/artifact/consumer mismatch fails closed. The existing Semantic Scope Review and managed approver validators
+still perform their full independent schema, evidence, and semantic checks.
 
 The capture policy pins the argv template and the only JSON Pointer paths that
 count as provider-reported metadata. For every configured provider metadata
@@ -82,9 +100,10 @@ the logical principal recorded for that operation.
 The protected capture excludes credentials, authorization headers, and
 secrets. Stderr is not an identity source; if operationally retained, it must
 be sanitized and separately protected. The trace validator requires a
-successful Codex JSONL turn and a completed agent message. The operation's
-parsed Semantic Scope Review remains a separate artifact with the existing
-qualification/receipt SHA binding.
+successful Codex JSONL turn with one completed agent message in the final turn.
+The operation's parsed Semantic Scope Review remains separately schema-checked
+and bound through its existing qualification/receipt SHA plus this response
+artifact equality check.
 
 ## Identity and qualification
 

@@ -285,6 +285,10 @@ class Evidence:
         provider_fallback_status="not_observable",
         provider_fallback_evidence=None,
         trace_fields=None,
+        response_artifact_raw=None,
+        response_artifact_kind="managed_qualification_approver_response",
+        response_message_text=None,
+        earlier_agent_message_text=None,
     ):
         observed_at = observed_at or requested_at
         if getattr(self, "managed_observation_version", "1.0") == "1.1":
@@ -301,8 +305,33 @@ class Evidence:
             principal = principal or self.reviewer_principal
             request_key = operation_id + "-request-bytes"
             trace_key = operation_id + "-codex-jsonl"
+            response_artifact_key = operation_id + "-response-artifact"
             version_key = operation_id + "-codex-version"
             manifest_key = operation_id + "-capture-manifest"
+            if response_artifact_raw is None:
+                response = dict(
+                    response_version="1.0",
+                    decision="APPROVED",
+                    rationale="Synthetic protected response artifact.",
+                    reviewed_operation_refs=["fixture-operation"],
+                    checks=[
+                        dict(
+                            check_id=check_id,
+                            passed=True,
+                            supporting_operation_refs=["fixture-operation"],
+                        )
+                        for check_id in (
+                            "operation_coverage",
+                            "artifact_binding",
+                            "service_identity_consistency",
+                            "truth_blindness",
+                            "separate_authority",
+                        )
+                    ],
+                )
+                response_artifact_raw = canonical_json_bytes(response)
+            if response_message_text is None:
+                response_message_text = response_artifact_raw.decode("utf-8")
             request_raw = canonical_json_bytes(
                 {
                     "requested_alias": "gpt-6.1-sol",
@@ -315,15 +344,29 @@ class Evidence:
             events = [
                 {"type": "thread.started", "thread_id": thread},
                 {"type": "turn.started"},
-                {
-                    "type": "item.completed",
-                    "item": {
-                        "type": "agent_message",
-                        "text": "{\"fixture\":\"sanitized managed response\"}",
-                    },
-                },
-                {"type": "turn.completed", **event_fields},
             ]
+            if earlier_agent_message_text is not None:
+                events.append(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "agent_message",
+                            "text": earlier_agent_message_text,
+                        },
+                    }
+                )
+            events.extend(
+                [
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "agent_message",
+                            "text": response_message_text,
+                        },
+                    },
+                    {"type": "turn.completed", **event_fields},
+                ]
+            )
             trace_raw = b"".join(
                 canonical_json_bytes(event) + b"\n" for event in events
             )
@@ -331,9 +374,11 @@ class Evidence:
             codex_version_raw = (codex_version + "\n").encode("utf-8")
             self.write(request_key, request_raw, protected=True)
             self.write(trace_key, trace_raw, protected=True)
+            self.write(response_artifact_key, response_artifact_raw, protected=True)
             self.write(version_key, codex_version_raw, protected=True)
             request_sha = sha256_bytes(request_raw)
             trace_sha = sha256_bytes(trace_raw)
+            response_artifact_sha = sha256_bytes(response_artifact_raw)
             version_sha = sha256_bytes(codex_version_raw)
             argv = ["codex", "exec", "--json", "--model", "gpt-6.1-sol", "-"]
             manifest = dict(
@@ -347,6 +392,9 @@ class Evidence:
                 request_sha256=request_sha,
                 response_trace_inventory_key=trace_key,
                 response_trace_sha256=trace_sha,
+                response_artifact_inventory_key=response_artifact_key,
+                response_artifact_sha256=response_artifact_sha,
+                response_artifact_kind=response_artifact_kind,
                 codex_cli_version_inventory_key=version_key,
                 codex_cli_version_sha256=version_sha,
                 operation_started_at=operation_started_at,
@@ -391,6 +439,9 @@ class Evidence:
                 codex_cli_version_sha256=version_sha,
                 capture_manifest_inventory_key=manifest_key,
                 capture_manifest_sha256=self.sha(manifest_key),
+                response_artifact_inventory_key=response_artifact_key,
+                response_artifact_sha256=response_artifact_sha,
+                response_artifact_kind=response_artifact_kind,
                 request_inventory_key=request_key,
                 request_sha256=request_sha,
                 response_trace_inventory_key=trace_key,
@@ -647,7 +698,15 @@ class Evidence:
                     )
                 ],
             )
-            self.write("managed-qualification-approver-response", response, protected=True)
+            response_raw = canonical_json_bytes(response)
+            self.write("managed-qualification-approver-response", response_raw, protected=True)
+            response_message_text = response_raw.decode("utf-8")
+            if getattr(self, "approver_response_mismatch", False):
+                trace_response = dict(response)
+                trace_response["rationale"] += " (trace-only alteration)"
+                response_message_text = canonical_json_bytes(trace_response).decode(
+                    "utf-8"
+                )
             op = "managed-qualification-approver-operation"
             reviewed_at = "2026-10-06T18:10:00Z"
             service_observation = self.managed_observation(
@@ -655,6 +714,9 @@ class Evidence:
                 "2026-10-06T18:05:00Z",
                 "2026-10-06T18:06:00Z",
                 principal=self.approver_principal,
+                response_artifact_raw=response_raw,
+                response_artifact_kind="managed_qualification_approver_response",
+                response_message_text=response_message_text,
             )
             self.write(
                 "managed-qualification-approver-observation",
@@ -733,7 +795,8 @@ class Evidence:
             Path(self.entries["managed-qualification-approver-response"]["path"]).read_bytes()
         )
         response["rationale"] = rationale
-        self.write("managed-qualification-approver-response", response, protected=True)
+        response_raw = canonical_json_bytes(response)
+        self.write("managed-qualification-approver-response", response_raw, protected=True)
 
         reviewed = datetime.fromisoformat(reviewed_at.replace("Z", "+00:00"))
         requested_at = (reviewed - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -746,6 +809,8 @@ class Evidence:
                     requested_at,
                     observed_at,
                     principal=self.approver_principal,
+                    response_artifact_raw=response_raw,
+                    response_artifact_kind="managed_qualification_approver_response",
                 )
             ),
             protected=True,
@@ -799,6 +864,11 @@ class Evidence:
         key="semantic_scope_review",
         receipt_key="semantic_scope_operation_receipt",
         at=AT,
+        response_message_text=None,
+        earlier_agent_message_text=None,
+        response_message_noncanonical=False,
+        response_message_review_id=None,
+        earlier_agent_message_matches_artifact=False,
     ):
         ck = "content" if case is None else case["inputs"]["content"]["inventory_key"]
         mk = (
@@ -880,13 +950,39 @@ class Evidence:
             review_fingerprint="",
         )
         payload["review_fingerprint"] = review_fingerprint(payload)
-        self.write(key, payload, protected=case is not None)
+        if getattr(self, "managed_observation_version", "1.0") == "1.1":
+            self.write(
+                key,
+                canonical_json_bytes(payload),
+                protected=case is not None,
+            )
+        else:
+            self.write(key, payload, protected=case is not None)
         observation_binding = None
         if self.config["configuration_version"] == "1.1":
             observation_key = key + "-service-observation"
+            review_raw = Path(self.entries[key]["path"]).read_bytes()
+            if response_message_noncanonical:
+                response_message_text = json.dumps(payload, ensure_ascii=False, indent=2)
+            elif response_message_review_id is not None:
+                trace_review = dict(payload)
+                trace_review["review_id"] = response_message_review_id
+                trace_review["review_fingerprint"] = review_fingerprint(trace_review)
+                response_message_text = canonical_json_bytes(trace_review).decode("utf-8")
+            if earlier_agent_message_matches_artifact:
+                earlier_agent_message_text = review_raw.decode("utf-8")
             self.write(
                 observation_key,
-                canonical_json_bytes(self.managed_observation(operation, at)),
+                canonical_json_bytes(
+                    self.managed_observation(
+                        operation,
+                        at,
+                        response_artifact_raw=review_raw,
+                        response_artifact_kind="semantic_scope_review",
+                        response_message_text=response_message_text,
+                        earlier_agent_message_text=earlier_agent_message_text,
+                    )
+                ),
                 protected=True,
             )
             observation_binding = self.binding(observation_key)
