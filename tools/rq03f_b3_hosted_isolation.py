@@ -363,7 +363,8 @@ def _prepare_fixture() -> dict:
         "path": str(index_path),
         "sha256": sha256_bytes(index_raw),
     }
-    fixture.run_root.chown(_identity("rq03f-candidate")[0], _identity("rq03f-candidate")[1])
+    candidate_uid, candidate_gid = _identity("rq03f-candidate")
+    os.chown(fixture.run_root, candidate_uid, candidate_gid)
     fixture.run_root.chmod(0o700)
     TRUST_ROOT.chmod(0o700)
 
