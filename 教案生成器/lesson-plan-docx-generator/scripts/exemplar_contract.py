@@ -19,7 +19,7 @@ import unicodedata
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-from path_safety import paths_equal, paths_overlap
+from path_safety import _variant_sets_overlap, _variants
 
 SKILL_DIR = Path(__file__).resolve().parents[1]
 SCHEMA_DIR = SKILL_DIR / "schemas"
@@ -161,10 +161,13 @@ def assert_distinct_file_paths(
     for label, path in rows:
         if label in output_names and _has_symlink_component(path):
             raise ContractError(f"{label} path must not traverse a symbolic link: {path}")
+    if len(rows) < 2 or not any(label in output_names for label, _ in rows):
+        return
+    expanded = {label: _variants(path) for label, path in rows}
     for index, (left_name, left) in enumerate(rows):
         for right_name, right in rows[index + 1:]:
             if left_name in output_names or right_name in output_names:
-                if paths_equal(left, right) or paths_overlap(left, right):
+                if _variant_sets_overlap(expanded[left_name], expanded[right_name]):
                     raise ContractError(f"{left_name} and {right_name} paths must not overlap")
 
 

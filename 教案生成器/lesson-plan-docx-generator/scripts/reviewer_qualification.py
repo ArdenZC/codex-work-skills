@@ -123,6 +123,11 @@ def _validate_case_exposures(
             for observation in result["observations"]
         ),
         *(op["review_sha256"] for run in runs for op in run["operations"]),
+        *(
+            row["sha256"]
+            for key, row in inventory.entries.items()
+            if key.startswith("qualification_corpus_intake:")
+        ),
     }
     if qualification["contract_version"] == "1.1":
         forbidden_hashes.update(
@@ -228,6 +233,7 @@ def _agent_evidence(
     operation_ids: list[str] = []
     seen_review_hashes: list[str] = []
     authors: set[str] = {author_principal} if author_principal else set()
+    custodians: set[str] = set()
     service_identities: set[str] = set()
     # Only timestamps from evidence validated below may set managed freshness.
     managed_evidence_completion_times: list[datetime] = []
@@ -302,12 +308,13 @@ def _agent_evidence(
                 op["receipt_inventory_key"], op["receipt_sha256"], protected=True
             )
             parsed_receipt = parse(receipt_raw, allow_floats=False)
-            receipt = checked(
-                receipt_raw,
-                "operation-provenance-receipt"
-                if parsed_receipt.get("contract_version") == "1.0"
-                else "operation-provenance-receipt-v1.1",
-            )
+            receipt_schema = {
+                "1.0": "operation-provenance-receipt",
+                "1.1": "operation-provenance-receipt-v1.1",
+                "1.2": "operation-provenance-receipt-v1.2",
+            }.get(parsed_receipt.get("contract_version"))
+            require(receipt_schema is not None, "unsupported operation receipt version")
+            receipt = checked(receipt_raw, receipt_schema)
             if qualification["contract_version"] == "1.1":
                 require(
                     receipt["input_bindings"]["managed_service_observation"]
@@ -321,7 +328,31 @@ def _agent_evidence(
                 stamp(receipt["recorded_at"]) <= stamp(run["completed_at"]),
                 "receipt outside evaluation interval",
             )
-            authors.add(receipt["author_principal"])
+            if receipt["contract_version"] == "1.2":
+                from qualification_corpus_intake import validate_qualification_corpus_intake
+
+                intake_binding = receipt["input_bindings"]["qualification_corpus_intake"]
+                intake = validate_qualification_corpus_intake(
+                    context,
+                    intake_binding["inventory_key"],
+                    intake_binding["sha256"],
+                    content_sha256=receipt["input_bindings"]["content"],
+                    authoring_id=review["authoring_id"],
+                    reviewer_principal=receipt["actor_principal"],
+                    reviewer_operation_id=receipt["operation_id"],
+                    reviewed_at=review["reviewed_at"],
+                )
+                enrolled_case = next(
+                    case for case in intake["cases"]
+                    if case["content"]["sha256"] == receipt["input_bindings"]["content"]
+                )
+                require(enrolled_case["case_id"] == op["case_id"],
+                        "qualification operation case differs from enrolled Content")
+                custodians.add(intake["operator_principal"])
+            else:
+                require(isinstance(receipt["author_principal"], str),
+                        "original author principal missing from protected receipt")
+                authors.add(receipt["author_principal"])
             operation_ids.append(op["review_operation_id"])
             seen_review_hashes.append(op["review_sha256"])
             observations[(run["run_id"], op["case_id"])] = {
@@ -331,8 +362,8 @@ def _agent_evidence(
         if qualification["contract_version"] == "1.1":
             managed_evidence_completion_times.append(run_completed_at)
     require(
-        approval["actor_principal"] not in authors,
-        "corpus adjudicator equals evaluation author",
+        approval["actor_principal"] not in authors | custodians,
+        "corpus adjudicator equals evaluation author or qualification custodian",
     )
     passed = len(operation_ids) == len(set(operation_ids)) and len(
         seen_review_hashes
@@ -397,8 +428,8 @@ def _agent_evidence(
                 )
                 principal = adjudication["adjudicator_principal"]
                 require(
-                    principal not in {candidate, *authors},
-                    "adjudicator self/author evaluation",
+                    principal not in {candidate, *authors, *custodians},
+                    "adjudicator self/author/custodian evaluation",
                 )
                 require(
                     stamp(actual["review"]["reviewed_at"])
@@ -443,7 +474,7 @@ def _agent_evidence(
             "managed qualification qualified_at does not equal evidence completion",
         )
     # Every evaluation author, not just the caller's current author, is excluded.
-    return passed, authors
+    return passed, authors | custodians
 
 
 def _managed_approval(

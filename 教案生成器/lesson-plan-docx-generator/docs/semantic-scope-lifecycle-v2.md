@@ -16,6 +16,11 @@ never implicitly upgraded to O2; a new run needs fresh independent review and
 approval. Standalone generator calls remain legacy and do not grant O2 authority.
 Content changes, teacher revisions or source/outline changes require successor
 runs. Installation changes invalidate existing QA and PA Skill inventories.
+The Draft RQ03F-B2 qualification-only corpus-intake extension does not change
+O2 dispatch or grant a production authoring, Teacher approval, PA or generation
+capability. Index 1.1/Receipt 1.2 intake evidence is limited to
+qualification-purpose case reviews; all production paths retain the actual
+protected author-operation requirement.
 
 After deterministic QA, both Benchmark branches require the same readiness gate.
 Disposition-only binding in O2 stays at PREPRODUCTION_QA_PASSED; a completed

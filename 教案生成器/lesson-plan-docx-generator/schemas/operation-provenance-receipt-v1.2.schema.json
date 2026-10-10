@@ -1,0 +1,302 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "operation-provenance-receipt 1.2 qualification-only historical corpus intake",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "receipt_id",
+    "operation_id",
+    "controller_id",
+    "actor_principal",
+    "review_kind",
+    "authority_profile_sha256",
+    "subject_sha256",
+    "subject_inventory_key",
+    "pipeline_run_id",
+    "input_bindings",
+    "author_principal",
+    "author_operation_id",
+    "isolation",
+    "decision",
+    "approval_procedure_reference",
+    "recorded_at",
+    "provenance_basis",
+    "historical_author_claim",
+    "intake_is_historical_authoring_operation"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.2"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "operation_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "controller_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "actor_principal": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "review_kind": {
+      "enum": [
+        "semantic_scope",
+        "qualification"
+      ]
+    },
+    "authority_profile_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "subject_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "subject_inventory_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "pipeline_run_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "input_bindings": {
+      "type": "object"
+    },
+    "author_principal": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "author_operation_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "isolation": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "separate_invocation",
+            "author_reasoning_hidden",
+            "candidate_read_only"
+          ],
+          "properties": {
+            "separate_invocation": {
+              "const": true
+            },
+            "author_reasoning_hidden": {
+              "const": true
+            },
+            "candidate_read_only": {
+              "const": true
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "decision": {
+      "enum": [
+        "REVIEW_RECORDED",
+        "APPROVED",
+        "APPROVED_WITH_NOTES",
+        "REVISION_REQUIRED",
+        "REJECTED"
+      ]
+    },
+    "approval_procedure_reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "provenance_basis": {
+      "const": "qualification_historical_corpus_intake"
+    },
+    "historical_author_claim": {
+      "const": "not_made"
+    },
+    "intake_is_historical_authoring_operation": {
+      "const": false
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "review_kind": {
+          "const": "semantic_scope"
+        },
+        "input_bindings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_truth_manifest",
+            "outline",
+            "content",
+            "reviewer_configuration",
+            "reviewer_qualification",
+            "managed_service_observation",
+            "qualification_corpus_intake"
+          ],
+          "properties": {
+            "source_truth_manifest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "outline": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "content": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "reviewer_configuration": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "reviewer_qualification": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "managed_service_observation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "inventory_key",
+                "sha256"
+              ],
+              "properties": {
+                "inventory_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "qualification_corpus_intake": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "inventory_key",
+                "sha256"
+              ],
+              "properties": {
+                "inventory_key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "\\S"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            }
+          }
+        },
+        "decision": {
+          "enum": [
+            "REVIEW_RECORDED"
+          ]
+        },
+        "pipeline_run_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "author_principal": {
+          "const": null
+        },
+        "author_operation_id": {
+          "const": null
+        },
+        "isolation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "separate_invocation",
+            "author_reasoning_hidden",
+            "candidate_read_only"
+          ],
+          "properties": {
+            "separate_invocation": {
+              "const": true
+            },
+            "author_reasoning_hidden": {
+              "const": true
+            },
+            "candidate_read_only": {
+              "const": true
+            }
+          }
+        }
+      }
+    }
+  ]
+}

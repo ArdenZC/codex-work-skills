@@ -134,7 +134,7 @@ class TestShardManifest(unittest.TestCase):
     def test_semantic_scope_top_level_partitions_are_exact(self) -> None:
         specs = run_test_shards._suite_specs()
         groups = run_test_shards._semantic_scope_partitions()
-        expected = run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)
+        expected = run_test_shards._semantic_scope_test_ids()
         self.assertEqual(tuple(groups), run_test_shards.SEMANTIC_SCOPE_SHARDS)
         self.assertEqual(len(groups), 6)
         flattened = [test_id for ids in groups.values() for test_id in ids]
@@ -153,14 +153,15 @@ class TestShardManifest(unittest.TestCase):
 
     def test_semantic_scope_alias_coverage_and_full_manifest_exactly_once(self) -> None:
         specs = run_test_shards._suite_specs()
-        expected = set(run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE))
+        expected = set(run_test_shards._semantic_scope_test_ids())
         for alias in ("semantic-scope", "fast", "full", "ci"):
             expanded = run_test_shards._expand_suites((alias,), specs)
             for name in run_test_shards.SEMANTIC_SCOPE_SHARDS:
                 self.assertEqual(expanded.count(name), 1)
             captured = [test_id for name in expanded
                         for test_id in run_test_shards._suite_test_ids(name)
-                        if test_id.startswith(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".")]
+                        if any(test_id.startswith(module + ".")
+                               for module in run_test_shards.SEMANTIC_SCOPE_TEST_MODULES)]
             self.assertEqual(set(captured), expected)
             self.assertEqual(len(captured), len(expected))
 
@@ -202,6 +203,12 @@ class TestShardManifest(unittest.TestCase):
         self.assertNotIn("LibreOffice", commands)
         self.assertNotIn("install_libreoffice", commands)
         self.assertFalse(any(step.get("continue-on-error") for step in semantic["steps"]))
+        semantic_runtime = "\n".join(
+            step.get("run", "") for step in semantic["steps"]
+            if step["name"].startswith("Prepare isolated semantic test runtime")
+        )
+        self.assertIn("RUN_TEST_SHARDS_PYTHON=", semantic_runtime)
+        self.assertIn("GITHUB_ENV", semantic_runtime)
         gate = data["jobs"]["ci-gate"]
         self.assertIn("lesson-semantic-scope", gate["needs"])
         step = next(step for step in gate["steps"] if step.get("name") == "Validate required checks")
@@ -239,7 +246,12 @@ class TestShardManifest(unittest.TestCase):
             groups = run_test_shards._semantic_scope_partitions()
             flattened = [test_id for ids in groups.values() for test_id in ids]
             self.assertEqual(flattened.count(added), 1)
-            self.assertEqual(set(flattened), set(discover(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)))
+            expected = {
+                test_id
+                for module in run_test_shards.SEMANTIC_SCOPE_TEST_MODULES
+                for test_id in discover(module)
+            }
+            self.assertEqual(set(flattened), expected)
             specs = run_test_shards._suite_specs()
             self.assertEqual(sum(specs[name].count for name in groups), len(flattened))
 
@@ -381,6 +393,12 @@ class TestShardManifest(unittest.TestCase):
             folder = Path(temp_name)
             explicit = folder / "fake-python.exe"
             explicit.write_bytes(b"placeholder")
+            with patch.dict(os.environ, {"RUN_TEST_SHARDS_PYTHON": str(explicit)}):
+                self.assertEqual(run_test_shards._default_python_command(), str(explicit))
+            if os.name != "nt":
+                alias = folder / "python-venv-alias"
+                alias.symlink_to(explicit)
+                self.assertEqual(run_test_shards._resolve_python_command(str(alias)), str(alias))
             with patch.object(run_test_shards.shutil, "which", return_value=str(explicit)) as which:
                 self.assertEqual(run_test_shards._resolve_python_command("python"), str(explicit.resolve()))
                 which.assert_called_once_with("python")

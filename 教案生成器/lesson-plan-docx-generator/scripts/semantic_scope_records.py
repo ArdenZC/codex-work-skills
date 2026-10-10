@@ -12,10 +12,13 @@ from datetime import datetime
 import json
 from functools import lru_cache
 from pathlib import Path
+import stat
+import sys
 from types import MappingProxyType
 from typing import Any, Mapping
 import unicodedata
 
+import operator_controller_bootstrap as controller_bootstrap
 from lifecycle_digest import (
     LifecycleContractError,
     assert_distinct_safe_paths,
@@ -129,6 +132,7 @@ def receipt_fingerprint(raw: bytes) -> str:
     schema = {
         "1.0": "operation-provenance-receipt",
         "1.1": "operation-provenance-receipt-v1.1",
+        "1.2": "operation-provenance-receipt-v1.2",
     }.get(parsed.get("contract_version"))
     require(schema is not None, "unsupported operation receipt version")
     checked(raw, schema)
@@ -190,7 +194,11 @@ class Inventory:
                 f"inventory path outside configured storage: {key}",
             )
             paths[key] = path
-            sha256_file(path)  # ordinary file and existing path/alias protections
+            try:
+                info = path.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise RecordError(f"cannot inspect inventory path: {key}: {exc}") from exc
+            require(stat.S_ISREG(info.st_mode), f"inventory path is not a regular file: {key}")
         assert_distinct_safe_paths(paths)
         object.__setattr__(
             self,
@@ -272,6 +280,14 @@ class TrustContext:
     operation_index_path: Path
     controller_allowlist: tuple[tuple[str, str, str], ...]
     now: datetime
+    # These values are supplied only by the external operator's launch policy.
+    # non_operator_process_unix_uids pins all process identities kept outside
+    # the trust-write boundary (Candidate, Author, Reviewer and Approver roles).
+    # A candidate-created TrustContext is not a trust source. Intake capture
+    # additionally checks the current effective UID and protected file owners.
+    operator_principal: str | None = None
+    operator_unix_uid: int | None = None
+    non_operator_process_unix_uids: tuple[int, ...] = ()
 
     def load(self) -> tuple[dict[str, Any], dict[str, Any]]:
         require(
@@ -293,7 +309,32 @@ class TrustContext:
             sha256_file(self.profile_path) == self.profile_pin,
             "operator profile pin changed: INVALID authority",
         )
-        profile = checked(self.profile_path.read_bytes(), "operator-authority-profile")
+        profile_raw = self.profile_path.read_bytes()
+        parsed_profile = parse(profile_raw, allow_floats=False)
+        require(isinstance(parsed_profile, dict), "operator profile must be an object")
+        profile_version = parsed_profile.get("profile_version")
+        if profile_version == "1.1":
+            try:
+                build_key = parsed_profile["controller_build_inventory_key"]
+                build_sha = parsed_profile["controller_build_inventory_sha256"]
+                build_path = Path(self.inventory.entries[build_key]["path"])
+                self.inventory.raw(build_key, build_sha, protected=True)
+                _build_raw, early_build = controller_bootstrap._read_build_inventory(
+                    build_path, build_sha
+                )
+                early_root = Path(early_build["controller_root"]).resolve(strict=True)
+            except (controller_bootstrap.BootstrapError, OSError, KeyError, TypeError, ValueError) as exc:
+                raise RecordError(f"Owner-pinned controller bootstrap preflight failed: {exc}") from exc
+            require(
+                controller_bootstrap.bootstrap_attested(build_sha, early_root),
+                "Profile 1.1 trust requires the isolated Owner-pinned controller bootstrap",
+            )
+        profile_schema = {
+            "1.0": "operator-authority-profile",
+            "1.1": "operator-authority-profile-v1.1",
+        }.get(profile_version)
+        require(profile_schema is not None, "unsupported operator authority profile version")
+        profile = checked(profile_raw, profile_schema)
         require(
             profile["policy_epoch"] == self.policy_epoch,
             "stale policy epoch: INVALID authority",
@@ -307,6 +348,116 @@ class TrustContext:
             in self.controller_allowlist,
             "controller implementation/version not operator-allowlisted",
         )
+        if profile_version == "1.1":
+            require(
+                self.operator_principal == profile["qualification_corpus_custodian_principal"]
+                and self.operator_unix_uid == profile["operator_unix_uid"]
+                and tuple(sorted(self.non_operator_process_unix_uids))
+                == tuple(sorted(profile["non_operator_process_unix_uids"])),
+                "operator process identity differs from the pinned authority profile",
+            )
+            build_raw = self.inventory.raw(
+                profile["controller_build_inventory_key"],
+                profile["controller_build_inventory_sha256"],
+                protected=True,
+            )
+            build = checked(build_raw, "operator-controller-build-inventory-v1.1")
+            require(
+                build["controller_id"] == profile["controller_id"],
+                "operator controller build inventory identity mismatch",
+            )
+            controller_root = Path(build["controller_root"]).resolve(strict=True)
+            require(
+                any(controller_root == root.resolve(strict=True)
+                    or controller_root.is_relative_to(root.resolve(strict=True))
+                    for root in self.inventory.protected_roots),
+                "installed controller root is outside the external protected roots",
+            )
+            require(
+                not controller_root.is_relative_to(self.inventory.run_root.resolve(strict=True))
+                and not self.inventory.run_root.resolve(strict=True).is_relative_to(controller_root),
+                "installed controller root overlaps candidate operation data",
+            )
+            # The isolated bootstrap has already verified every component in
+            # this exact, externally pinned inventory before importing any
+            # controller or third-party modules. Rehashing installed modules
+            # and packages on every TrustContext.load() repeats launch-time
+            # work for every case/repetition. Keep checking the manifest and
+            # inventory path bindings here; loaded module origins must still
+            # match the pinned paths. Schema bytes are re-read by validation,
+            # so their current hashes are checked below.
+            try:
+                controller_bootstrap.verify_build_inventory(
+                    Path(self.inventory.entries[profile["controller_build_inventory_key"]]["path"]),
+                    profile["controller_build_inventory_sha256"],
+                    controller_root,
+                    require_isolated=False,
+                    verify_runtime_tree=False,
+                    verify_component_hashes=False,
+                )
+            except (controller_bootstrap.BootstrapError, OSError, KeyError, TypeError, ValueError) as exc:
+                raise RecordError(f"operator controller runtime verification failed: {exc}") from exc
+            component_ids = [row["component_id"] for row in build["components"]]
+            require(len(component_ids) == len(set(component_ids)),
+                    "duplicate operator controller build component")
+            required_modules = controller_bootstrap.REQUIRED_MODULES
+            required_schemas = controller_bootstrap.REQUIRED_SCHEMAS
+            modules = {
+                row["component_id"]
+                for row in build["components"]
+                if row["component_type"] == "python_module"
+            }
+            schemas = {
+                row["component_id"]
+                for row in build["components"]
+                if row["component_type"] == "json_schema"
+            }
+            require(required_modules.issubset(modules)
+                    and required_schemas.issubset(schemas),
+                    "operator controller build inventory is incomplete")
+            for row in build["components"]:
+                if row["component_type"] not in {"python_module", "json_schema"}:
+                    continue
+                evidence = self.inventory.entries.get(row["inventory_key"])
+                require(evidence is not None,
+                        f"missing protected controller component: {row['component_id']}")
+                require(evidence["storage_class"] == "protected_external",
+                        f"controller component is not protected: {row['component_id']}")
+                require(evidence["sha256"] == row["sha256"],
+                        f"controller component inventory binding mismatch: {row['component_id']}")
+            components = {row["component_id"]: row for row in build["components"]}
+            for module_name in required_modules:
+                loaded = sys.modules.get(module_name)
+                require(loaded is not None and getattr(loaded, "__file__", None),
+                        f"operator controller module was not preloaded by the verified launcher: {module_name}")
+                expected_path = Path(components[module_name]["runtime_path"]).resolve(strict=True)
+                loaded_path = Path(loaded.__file__).resolve(strict=True)
+                require(loaded_path == expected_path,
+                        f"loaded operator controller module came from an unpinned import path: {module_name}")
+            for schema_name in required_schemas:
+                schema_path = Path(components[schema_name]["runtime_path"]).resolve(strict=True)
+                require(schema_path == controller_root / "schemas" / schema_name,
+                        f"schema path is outside pinned installed controller: {schema_name}")
+                require(
+                    sha256_file(schema_path)
+                    == components[schema_name]["sha256"],
+                    f"installed operator controller schema differs from pinned build: {schema_name}",
+                )
+            for package_name in controller_bootstrap.REQUIRED_PACKAGES:
+                loaded = sys.modules.get(package_name)
+                require(loaded is not None and getattr(loaded, "__file__", None),
+                        f"pinned Python validation package was not loaded: {package_name}")
+                package_path = Path(components[package_name]["runtime_path"]).resolve(strict=True)
+                loaded_path = Path(loaded.__file__).resolve(strict=True)
+                require(loaded_path.is_relative_to(package_path),
+                        f"Python validation package came from an unpinned import path: {package_name}")
+            for module_name in controller_bootstrap.REQUIRED_DEPENDENCY_MODULES:
+                loaded = sys.modules.get(module_name)
+                require(loaded is not None and getattr(loaded, "__file__", None),
+                        f"pinned Python validation module was not loaded: {module_name}")
+                expected_path = Path(components[module_name]["runtime_path"]).resolve(strict=True)
+                require(Path(loaded.__file__).resolve(strict=True) == expected_path,
+                        f"Python validation module came from an unpinned import path: {module_name}")
         require(
             self.inventory.raw("authority_profile", self.profile_pin, protected=True)
             == self.profile_path.read_bytes(),
@@ -317,7 +468,15 @@ class TrustContext:
             index_raw == self.operation_index_path.read_bytes(),
             "protected index path mismatch",
         )
-        index = checked(index_raw, "protected-operation-index")
+        parsed_index = parse(index_raw, allow_floats=False)
+        require(isinstance(parsed_index, dict), "protected operation index must be an object")
+        index_version = parsed_index.get("index_version")
+        index_schema = {
+            "1.0": "protected-operation-index",
+            "1.1": "protected-operation-index-v1.1",
+        }.get(index_version)
+        require(index_schema is not None, "unsupported protected operation index version")
+        index = checked(index_raw, index_schema)
         require(
             index["controller_id"] == profile["controller_id"]
             and index["policy_epoch"] == self.policy_epoch,
@@ -340,10 +499,24 @@ class TrustContext:
                 row["revoked_at"] is None or row["revocation_reason"] is not None,
                 "revocation requires reason",
             )
-            authorization = checked(
-                self.inventory.raw(row["authorization_reference"], protected=True),
-                "operator-role-authorization",
+            authorization_raw = self.inventory.raw(
+                row["authorization_reference"], protected=True
             )
+            parsed_authorization = parse(authorization_raw, allow_floats=False)
+            require(
+                isinstance(parsed_authorization, dict),
+                "operator role authorization must be an object",
+            )
+            authorization_version = parsed_authorization.get("record_version")
+            authorization_schema = {
+                "1.0": "operator-role-authorization",
+                "1.1": "operator-role-authorization-v1.1",
+            }.get(authorization_version)
+            require(
+                authorization_schema is not None,
+                "unsupported operator role authorization version",
+            )
+            authorization = checked(authorization_raw, authorization_schema)
             require(
                 authorization["principal_id"] == row["principal_id"]
                 and set(authorization["allowed_roles"]) == set(row["allowed_roles"]),
@@ -357,11 +530,21 @@ class TrustContext:
         ):
             ids = [r[id_field] for r in index[field]]
             require(len(ids) == len(set(ids)), f"duplicate protected index {field}")
+        if index_version == "1.1":
+            intake_ids = [r["intake_id"] for r in index["qualification_corpus_intakes"]]
+            require(
+                len(intake_ids) == len(set(intake_ids)),
+                "duplicate protected qualification corpus intake ID",
+            )
         operations = [
             r["operation_id"]
             for group in ("receipts", "authors", "adjudications")
             for r in index[group]
         ]
+        if index_version == "1.1":
+            operations.extend(
+                r["operation_id"] for r in index["qualification_corpus_intakes"]
+            )
         require(
             len(operations) == len(set(operations)), "reused protected operation ID"
         )
