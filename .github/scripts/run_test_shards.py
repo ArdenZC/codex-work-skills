@@ -370,6 +370,12 @@ def _resolve_python_command(requested: str | Path) -> str:
     return str(candidate)
 
 
+def _default_python_command() -> str:
+    """Use an explicitly selected isolated runtime for spawned shard workers."""
+
+    return os.environ.get("RUN_TEST_SHARDS_PYTHON") or sys.executable
+
+
 def _discover_count(name: str) -> int:
     if name == "lesson-skill":
         start_dir = LESSON_SKILL_TESTS
@@ -682,7 +688,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--parallel", action="store_true", help="run safe shards concurrently")
     parser.add_argument("--allow-office-parallel", action="store_true", help="also overlap Office/COM shards (opt-in)")
     parser.add_argument("--root", type=Path, help="artifact root on a non-system volume")
-    parser.add_argument("--python", default=sys.executable, help="Python executable used for worker processes")
+    parser.add_argument("--python", default=_default_python_command(), help="Python executable used for worker processes")
     parser.add_argument("--keep-artifacts", action="store_true", help="keep shard logs and temporary outputs")
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)

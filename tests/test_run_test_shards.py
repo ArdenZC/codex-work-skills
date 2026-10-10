@@ -203,6 +203,12 @@ class TestShardManifest(unittest.TestCase):
         self.assertNotIn("LibreOffice", commands)
         self.assertNotIn("install_libreoffice", commands)
         self.assertFalse(any(step.get("continue-on-error") for step in semantic["steps"]))
+        semantic_runtime = "\n".join(
+            step.get("run", "") for step in semantic["steps"]
+            if step["name"].startswith("Prepare isolated semantic test runtime")
+        )
+        self.assertIn("RUN_TEST_SHARDS_PYTHON=", semantic_runtime)
+        self.assertIn("GITHUB_ENV", semantic_runtime)
         gate = data["jobs"]["ci-gate"]
         self.assertIn("lesson-semantic-scope", gate["needs"])
         step = next(step for step in gate["steps"] if step.get("name") == "Validate required checks")
@@ -387,6 +393,8 @@ class TestShardManifest(unittest.TestCase):
             folder = Path(temp_name)
             explicit = folder / "fake-python.exe"
             explicit.write_bytes(b"placeholder")
+            with patch.dict(os.environ, {"RUN_TEST_SHARDS_PYTHON": str(explicit)}):
+                self.assertEqual(run_test_shards._default_python_command(), str(explicit))
             with patch.object(run_test_shards.shutil, "which", return_value=str(explicit)) as which:
                 self.assertEqual(run_test_shards._resolve_python_command("python"), str(explicit.resolve()))
                 which.assert_called_once_with("python")
