@@ -148,12 +148,14 @@ log "ACL_TEST reviewer_uid=$(id -u "$reviewer") parent=$test_root/operator-acl-p
 printf '%s\n' "$setfacl_text" | tee -a "$evidence_file"
 
 plan_dir="$test_root/owner-pinned-attempt"
+log "OWNER_PLAN_SETUP stage=create-directory path=$plan_dir"
 sudo -n install -d -o root -g root -m 0755 "$plan_dir"
 source_commit=$(git -C "$repo_root" rev-parse HEAD)
 parent="$test_root/operator-generation-parent"
 parent_device=$(stat -c %d "$parent")
 parent_inode=$(stat -c %i "$parent")
 parent_mount_id=$(findmnt -n -o ID -T "$parent")
+log "OWNER_PLAN_SETUP stage=parent-pinned device=$parent_device inode=$parent_inode mount_id=$parent_mount_id operator_uid=$operator_uid operator_gid=$operator_gid source_commit=$source_commit"
 plan_path="$plan_dir/plan.json"
 sudo -n /usr/bin/python3 - "$plan_path" "$parent" "$parent_device" "$parent_inode" \
   "$parent_mount_id" "$operator_uid" "$operator_gid" "$source_commit" "$repo_root" <<'PY'
@@ -181,15 +183,17 @@ try: os.write(fd,raw); os.fsync(fd)
 finally: os.close(fd)
 PY
 plan_sha=$(sha256sum "$plan_path" | cut -d ' ' -f1)
+log "OWNER_PLAN_SETUP stage=plan-created path=$plan_path sha256=$plan_sha"
 set +e
 candidate_attempt=$(run_as "$candidate" "$python_bin" "$repo_root/tools/rq03f_c1/operator_allocator.py" allocate \
   --plan "$plan_path" --expected-plan-sha256 "$plan_sha" 2>&1)
 candidate_status=$?
 set -e
+log "CANDIDATE_PLAN_SUBSTITUTION stage=identity-check uid=$candidate_uid expected_operator_uid=$operator_uid exit_code=$candidate_status"
+printf '%s\n' "$candidate_attempt" | tee -a "$evidence_file"
 [[ $candidate_status -ne 0 ]]
 [[ "$candidate_attempt" == *"exact non-root Owner-approved Operator UID"* ]]
-log "CANDIDATE_PLAN_SUBSTITUTION uid=$candidate_uid expected_operator_uid=$operator_uid exit_code=$candidate_status result=DENIED"
-printf '%s\n' "$candidate_attempt" | tee -a "$evidence_file"
+log "CANDIDATE_PLAN_SUBSTITUTION result=DENIED"
 [[ ! -e "$parent/rq03f-c1-unauthorized-candidate-attempt" ]]
 
 export RQ03F_C1_TEST_TMPDIR="$test_root/operator-work"
