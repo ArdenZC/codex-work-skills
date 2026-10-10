@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "operator-role-authorization 1.1 qualification corpus custodian role",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "record_version",
+    "principal_id",
+    "allowed_roles"
+  ],
+  "properties": {
+    "record_version": {
+      "const": "1.1"
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "\\S"
+    },
+    "allowed_roles": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "author",
+          "scope_reviewer",
+          "qualification_approver",
+          "corpus_adjudicator",
+          "teacher_approver",
+          "qualification_corpus_custodian"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  }
+}

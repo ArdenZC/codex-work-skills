@@ -13,6 +13,53 @@ It adds closed Configuration 1.1, Qualification 1.1 and operation receipt 1.1
 branches; the Reviewer Configuration 1.0 and human-reviewer clauses below stay
 unchanged.
 
+## RQ03F-B2 qualification-only intake addendum (Draft proposal)
+
+The RQ03F-B2 Draft PR proposes the following closed, explicitly versioned
+extension for controlled enrollment of the frozen qualification corpus. These
+version numbers are implementation candidates pending Owner review; this section
+does not activate live qualification or Production Trust.
+
+| Record | Existing behavior | Proposed extension |
+| --- | --- | --- |
+| Protected Operation Index | 1.0 closed schema with the existing receipts, authors, adjudications and qualification-runs collections | 1.1 adds only `qualification_corpus_intakes`; all existing rows and collections retain their prior meaning |
+| Operation Provenance Receipt | 1.0 and 1.1 retain their existing validation paths | 1.2 adds a qualification-only Semantic Review branch with an explicit intake provenance basis and null historical author fields |
+| Qualification Corpus Intake | None | 1.0 records current protected custody of the exact frozen corpus/holdout and case input closure; it does not claim historical authoring |
+| Operator authority profile / role authorization | Profile and role authorization 1.0 remain supported without reinterpretation | 1.1 adds one dedicated `qualification_corpus_custodian` role, pinned controller build, dedicated Operator UID and non-Operator process UID set |
+
+Receipt 1.0/1.1, Index 1.0, Profile 1.0 and Role Authorization 1.0 are not
+silently reinterpreted. Production-purpose Semantic Review and every Teacher,
+Production Authorization, approval and generation path continue to require the
+actual protected Content author operation. Intake does not populate `authors[]`
+and does not authorize those paths.
+
+`qualification_corpus_custodian` is a least-privilege authority granted through
+the external Operator profile and a separately protected role-authorization
+record. Existing `author`, `scope_reviewer`, and `corpus_adjudicator` grants do
+not imply intake permission. The custodian performs a distinct controller
+operation under the externally supplied TrustContext. The controller binds the
+exact current profile, policy epoch, build inventory, Operator principal, UID,
+corpus/holdout bytes and append-only Index 1.1 operation row. The pinned
+non-Operator UID set covers the deployed Candidate, Author, Reviewer and
+Approver processes that must not write the protected trust repository.
+
+Intake records present custody only. It does not establish who created historical
+Content; Git commit authors are not protected principals; the intake custodian
+is not the original author; and no claim is made that a reviewer is independent
+from an unknown historical author. This explicitly scoped custody evidence is
+usable only for qualification-purpose case review. Any RQ03F qualification
+continues to require three fresh repetitions, blind holdout truth isolation,
+hard-miss fail-closed handling, separate reviewer/custodian/adjudicator/approver
+authority, independent qualification approval, Observation 1.1 trace binding,
+the existing 24-hour managed-observation limit, and current profile epoch and
+revocation checks.
+
+The schema and validator changes cannot create the external Option B boundary.
+The executing account must not control the protected index, profile, controller
+build or ingress. A same-UID directory split or synthetic ACL test is not
+deployment proof. Live qualification remains blocked until independent Operator
+provisioning and Owner adoption are verified.
+
 ## 1. Authority and independent review
 
 Agent/Human reviewers judge instructional meaning. Python validates structure,

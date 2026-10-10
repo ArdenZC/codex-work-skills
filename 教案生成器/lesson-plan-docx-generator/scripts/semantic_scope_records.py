@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import importlib
 import json
 from functools import lru_cache
 from pathlib import Path
+import sys
 from types import MappingProxyType
 from typing import Any, Mapping
 import unicodedata
@@ -129,6 +131,7 @@ def receipt_fingerprint(raw: bytes) -> str:
     schema = {
         "1.0": "operation-provenance-receipt",
         "1.1": "operation-provenance-receipt-v1.1",
+        "1.2": "operation-provenance-receipt-v1.2",
     }.get(parsed.get("contract_version"))
     require(schema is not None, "unsupported operation receipt version")
     checked(raw, schema)
@@ -272,6 +275,14 @@ class TrustContext:
     operation_index_path: Path
     controller_allowlist: tuple[tuple[str, str, str], ...]
     now: datetime
+    # These values are supplied only by the external operator's launch policy.
+    # non_operator_process_unix_uids pins all process identities kept outside
+    # the trust-write boundary (Candidate, Author, Reviewer and Approver roles).
+    # A candidate-created TrustContext is not a trust source. Intake capture
+    # additionally checks the current effective UID and protected file owners.
+    operator_principal: str | None = None
+    operator_unix_uid: int | None = None
+    non_operator_process_unix_uids: tuple[int, ...] = ()
 
     def load(self) -> tuple[dict[str, Any], dict[str, Any]]:
         require(
@@ -293,7 +304,16 @@ class TrustContext:
             sha256_file(self.profile_path) == self.profile_pin,
             "operator profile pin changed: INVALID authority",
         )
-        profile = checked(self.profile_path.read_bytes(), "operator-authority-profile")
+        profile_raw = self.profile_path.read_bytes()
+        parsed_profile = parse(profile_raw, allow_floats=False)
+        require(isinstance(parsed_profile, dict), "operator profile must be an object")
+        profile_version = parsed_profile.get("profile_version")
+        profile_schema = {
+            "1.0": "operator-authority-profile",
+            "1.1": "operator-authority-profile-v1.1",
+        }.get(profile_version)
+        require(profile_schema is not None, "unsupported operator authority profile version")
+        profile = checked(profile_raw, profile_schema)
         require(
             profile["policy_epoch"] == self.policy_epoch,
             "stale policy epoch: INVALID authority",
@@ -307,6 +327,83 @@ class TrustContext:
             in self.controller_allowlist,
             "controller implementation/version not operator-allowlisted",
         )
+        if profile_version == "1.1":
+            require(
+                self.operator_principal == profile["qualification_corpus_custodian_principal"]
+                and self.operator_unix_uid == profile["operator_unix_uid"]
+                and tuple(sorted(self.non_operator_process_unix_uids))
+                == tuple(sorted(profile["non_operator_process_unix_uids"])),
+                "operator process identity differs from the pinned authority profile",
+            )
+            build_raw = self.inventory.raw(
+                profile["controller_build_inventory_key"],
+                profile["controller_build_inventory_sha256"],
+                protected=True,
+            )
+            build = checked(build_raw, "operator-controller-build-inventory-v1.0")
+            require(
+                build["controller_id"] == profile["controller_id"],
+                "operator controller build inventory identity mismatch",
+            )
+            component_ids = [row["component_id"] for row in build["components"]]
+            require(len(component_ids) == len(set(component_ids)),
+                    "duplicate operator controller build component")
+            required_modules = {
+                "semantic_scope_records",
+                "semantic_scope_review",
+                "operation_provenance",
+                "reviewer_qualification",
+                "qualification_corpus_intake",
+            }
+            required_schemas = {
+                "managed-reviewer-service-observation-v1.1.schema.json",
+                "managed-service-capture-manifest-v1.1.schema.json",
+                "managed-service-observation-policy-v1.1.schema.json",
+                "operation-provenance-receipt-v1.2.schema.json",
+                "operator-authority-profile-v1.1.schema.json",
+                "operator-controller-build-inventory-v1.0.schema.json",
+                "operator-role-authorization-v1.1.schema.json",
+                "protected-operation-index-v1.1.schema.json",
+                "qualification-adjudication.schema.json",
+                "qualification-corpus-intake-v1.0.schema.json",
+                "qualification-corpus.schema.json",
+                "reviewer-configuration-v1.1.schema.json",
+                "reviewer-qualification-v1.1.schema.json",
+                "semantic-scope-review.schema.json",
+                "source-truth-manifest.schema.json",
+            }
+            modules = {
+                row["component_id"]
+                for row in build["components"]
+                if row["component_type"] == "python_module"
+            }
+            schemas = {
+                row["component_id"]
+                for row in build["components"]
+                if row["component_type"] == "json_schema"
+            }
+            require(required_modules.issubset(modules)
+                    and required_schemas.issubset(schemas),
+                    "operator controller build inventory is incomplete")
+            for row in build["components"]:
+                self.inventory.raw(row["inventory_key"], row["sha256"], protected=True)
+            components = {row["component_id"]: row for row in build["components"]}
+            for module_name in required_modules:
+                loaded = sys.modules.get(module_name) or importlib.import_module(module_name)
+                require(loaded is not None and getattr(loaded, "__file__", None),
+                        f"operator controller module is not loaded: {module_name}")
+                require(
+                    sha256_file(Path(loaded.__file__))
+                    == components[module_name]["sha256"],
+                    f"loaded operator controller module differs from pinned build: {module_name}",
+                )
+            schema_root = Path(__file__).resolve().parents[1] / "schemas"
+            for schema_name in required_schemas:
+                require(
+                    sha256_file(schema_root / schema_name)
+                    == components[schema_name]["sha256"],
+                    f"loaded operator controller schema differs from pinned build: {schema_name}",
+                )
         require(
             self.inventory.raw("authority_profile", self.profile_pin, protected=True)
             == self.profile_path.read_bytes(),
@@ -317,7 +414,15 @@ class TrustContext:
             index_raw == self.operation_index_path.read_bytes(),
             "protected index path mismatch",
         )
-        index = checked(index_raw, "protected-operation-index")
+        parsed_index = parse(index_raw, allow_floats=False)
+        require(isinstance(parsed_index, dict), "protected operation index must be an object")
+        index_version = parsed_index.get("index_version")
+        index_schema = {
+            "1.0": "protected-operation-index",
+            "1.1": "protected-operation-index-v1.1",
+        }.get(index_version)
+        require(index_schema is not None, "unsupported protected operation index version")
+        index = checked(index_raw, index_schema)
         require(
             index["controller_id"] == profile["controller_id"]
             and index["policy_epoch"] == self.policy_epoch,
@@ -340,10 +445,24 @@ class TrustContext:
                 row["revoked_at"] is None or row["revocation_reason"] is not None,
                 "revocation requires reason",
             )
-            authorization = checked(
-                self.inventory.raw(row["authorization_reference"], protected=True),
-                "operator-role-authorization",
+            authorization_raw = self.inventory.raw(
+                row["authorization_reference"], protected=True
             )
+            parsed_authorization = parse(authorization_raw, allow_floats=False)
+            require(
+                isinstance(parsed_authorization, dict),
+                "operator role authorization must be an object",
+            )
+            authorization_version = parsed_authorization.get("record_version")
+            authorization_schema = {
+                "1.0": "operator-role-authorization",
+                "1.1": "operator-role-authorization-v1.1",
+            }.get(authorization_version)
+            require(
+                authorization_schema is not None,
+                "unsupported operator role authorization version",
+            )
+            authorization = checked(authorization_raw, authorization_schema)
             require(
                 authorization["principal_id"] == row["principal_id"]
                 and set(authorization["allowed_roles"]) == set(row["allowed_roles"]),
@@ -357,11 +476,21 @@ class TrustContext:
         ):
             ids = [r[id_field] for r in index[field]]
             require(len(ids) == len(set(ids)), f"duplicate protected index {field}")
+        if index_version == "1.1":
+            intake_ids = [r["intake_id"] for r in index["qualification_corpus_intakes"]]
+            require(
+                len(intake_ids) == len(set(intake_ids)),
+                "duplicate protected qualification corpus intake ID",
+            )
         operations = [
             r["operation_id"]
             for group in ("receipts", "authors", "adjudications")
             for r in index[group]
         ]
+        if index_version == "1.1":
+            operations.extend(
+                r["operation_id"] for r in index["qualification_corpus_intakes"]
+            )
         require(
             len(operations) == len(set(operations)), "reused protected operation ID"
         )

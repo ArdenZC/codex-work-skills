@@ -35,6 +35,10 @@ LESSON_V22_TEST_MODULE = "tests.test_lesson_content_v22"
 LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
 LESSON_CONTRACT_HARDENING_TEST_MODULE = "tests.test_lesson_22_contract_hardening"
 SEMANTIC_SCOPE_TEST_MODULE = "tests.test_semantic_scope_foundation"
+SEMANTIC_SCOPE_TEST_MODULES = (
+    SEMANTIC_SCOPE_TEST_MODULE,
+    "tests.test_qualification_corpus_intake",
+)
 SEMANTIC_SCOPE_SHARDS = tuple(f"semantic-scope-{index}" for index in range(1, 7))
 SEMANTIC_LIFECYCLE_RENDER_TESTS = {
     "lesson-semantic-lifecycle-canonical": frozenset({"test_canonical_generation_actual_entry_point"}),
@@ -158,8 +162,17 @@ def _semantic_scope_partitions() -> dict[str, tuple[str, ...]]:
     Agent corpus tests sort together and are distributed across all six slots.
     Each slot uses the existing isolated worker, without a nested pool.
     """
-    groups = _partition_ids(_module_test_ids(SEMANTIC_SCOPE_TEST_MODULE), len(SEMANTIC_SCOPE_SHARDS))
+    groups = _partition_ids(_semantic_scope_test_ids(), len(SEMANTIC_SCOPE_SHARDS))
     return dict(zip(SEMANTIC_SCOPE_SHARDS, groups))
+
+
+def _semantic_scope_test_ids() -> tuple[str, ...]:
+    """Discover every semantic foundation/intake test exactly once."""
+    return tuple(sorted(
+        test_id
+        for module_name in SEMANTIC_SCOPE_TEST_MODULES
+        for test_id in _module_test_ids(module_name)
+    ))
 
 
 def _workflow_ids() -> tuple[str, ...]:

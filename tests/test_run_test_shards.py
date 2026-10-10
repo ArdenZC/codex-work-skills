@@ -134,7 +134,7 @@ class TestShardManifest(unittest.TestCase):
     def test_semantic_scope_top_level_partitions_are_exact(self) -> None:
         specs = run_test_shards._suite_specs()
         groups = run_test_shards._semantic_scope_partitions()
-        expected = run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)
+        expected = run_test_shards._semantic_scope_test_ids()
         self.assertEqual(tuple(groups), run_test_shards.SEMANTIC_SCOPE_SHARDS)
         self.assertEqual(len(groups), 6)
         flattened = [test_id for ids in groups.values() for test_id in ids]
@@ -153,14 +153,15 @@ class TestShardManifest(unittest.TestCase):
 
     def test_semantic_scope_alias_coverage_and_full_manifest_exactly_once(self) -> None:
         specs = run_test_shards._suite_specs()
-        expected = set(run_test_shards._module_test_ids(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE))
+        expected = set(run_test_shards._semantic_scope_test_ids())
         for alias in ("semantic-scope", "fast", "full", "ci"):
             expanded = run_test_shards._expand_suites((alias,), specs)
             for name in run_test_shards.SEMANTIC_SCOPE_SHARDS:
                 self.assertEqual(expanded.count(name), 1)
             captured = [test_id for name in expanded
                         for test_id in run_test_shards._suite_test_ids(name)
-                        if test_id.startswith(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE + ".")]
+                        if any(test_id.startswith(module + ".")
+                               for module in run_test_shards.SEMANTIC_SCOPE_TEST_MODULES)]
             self.assertEqual(set(captured), expected)
             self.assertEqual(len(captured), len(expected))
 
@@ -239,7 +240,12 @@ class TestShardManifest(unittest.TestCase):
             groups = run_test_shards._semantic_scope_partitions()
             flattened = [test_id for ids in groups.values() for test_id in ids]
             self.assertEqual(flattened.count(added), 1)
-            self.assertEqual(set(flattened), set(discover(run_test_shards.SEMANTIC_SCOPE_TEST_MODULE)))
+            expected = {
+                test_id
+                for module in run_test_shards.SEMANTIC_SCOPE_TEST_MODULES
+                for test_id in discover(module)
+            }
+            self.assertEqual(set(flattened), expected)
             specs = run_test_shards._suite_specs()
             self.assertEqual(sum(specs[name].count for name in groups), len(flattened))
 

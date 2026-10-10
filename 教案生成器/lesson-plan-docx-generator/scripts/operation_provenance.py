@@ -44,12 +44,14 @@ def validate_receipt(
     parsed_receipt = parse(raw, allow_floats=False)
     require(isinstance(parsed_receipt, dict), "operation receipt must be an object")
     receipt_version = parsed_receipt.get("contract_version")
-    require(receipt_version in {"1.0", "1.1"}, "unsupported operation receipt version")
+    require(receipt_version in {"1.0", "1.1", "1.2"}, "unsupported operation receipt version")
     receipt = checked(
         raw,
-        "operation-provenance-receipt"
-        if receipt_version == "1.0"
-        else "operation-provenance-receipt-v1.1",
+        {
+            "1.0": "operation-provenance-receipt",
+            "1.1": "operation-provenance-receipt-v1.1",
+            "1.2": "operation-provenance-receipt-v1.2",
+        }[receipt_version],
     )
     require(receipt["review_kind"] == expected_kind, "receipt kind mismatch")
     require(
@@ -122,29 +124,76 @@ def validate_receipt(
     if expected_kind in {"semantic_scope", "teacher_approval"}:
         content = parse(inventory.raw("content"))
         authoring_id = content["authoring_provenance"]["authoring_id"]
-        authors = [r for r in index["authors"] if r["authoring_id"] == authoring_id]
-        require(
-            len(authors) == 1, "Content author operation not protected-index captured"
-        )
-        author = authors[0]
-        require(
-            author["content_sha256"] == receipt["input_bindings"]["content"],
-            "author Content binding mismatch",
-        )
-        require(
-            author["principal_id"] == receipt["author_principal"]
-            and author["operation_id"] == receipt["author_operation_id"],
-            "forged author separation",
-        )
-        context.role(author["principal_id"], "author", at)
-        require(
-            receipt["actor_principal"] != author["principal_id"],
-            "reviewer equals author principal",
-        )
-        require(
-            receipt["operation_id"] != author["operation_id"],
-            "review operation equals author operation",
-        )
+        author = None
+        if receipt_version == "1.2":
+            require(expected_kind == "semantic_scope",
+                    "qualification intake provenance cannot validate a Teacher receipt")
+            require(
+                receipt["provenance_basis"] == "qualification_historical_corpus_intake"
+                and receipt["historical_author_claim"] == "not_made"
+                and receipt["intake_is_historical_authoring_operation"] is False,
+                "invalid qualification-only intake provenance basis",
+            )
+            require(
+                receipt["author_principal"] is None
+                and receipt["author_operation_id"] is None,
+                "qualification intake cannot populate original author fields",
+            )
+            require(
+                subject["review_purpose"] == "qualification"
+                and subject["reviewer"]["qualification_sha256"] is None,
+                "qualification intake provenance is qualification-purpose only",
+            )
+            from qualification_corpus_intake import validate_qualification_corpus_intake
+
+            intake_binding = receipt["input_bindings"]["qualification_corpus_intake"]
+            intake = validate_qualification_corpus_intake(
+                context,
+                intake_binding["inventory_key"],
+                intake_binding["sha256"],
+                content_sha256=receipt["input_bindings"]["content"],
+                authoring_id=authoring_id,
+                reviewer_principal=receipt["actor_principal"],
+                reviewer_operation_id=receipt["operation_id"],
+                reviewed_at=subject["reviewed_at"],
+            )
+            enrolled = [
+                case for case in intake["cases"]
+                if case["content"]["sha256"] == receipt["input_bindings"]["content"]
+            ]
+            require(len(enrolled) == 1, "reviewed Content not uniquely present in intake")
+            enrolled_case = enrolled[0]
+            require(
+                enrolled_case["authoring_id"] == authoring_id
+                and enrolled_case["source_truth_manifest"]["sha256"]
+                == receipt["input_bindings"]["source_truth_manifest"]
+                and enrolled_case["outline"]["sha256"] == receipt["input_bindings"]["outline"],
+                "review input differs from enrolled frozen case closure",
+            )
+        else:
+            authors = [r for r in index["authors"] if r["authoring_id"] == authoring_id]
+            require(
+                len(authors) == 1, "Content author operation not protected-index captured"
+            )
+            author = authors[0]
+            require(
+                author["content_sha256"] == receipt["input_bindings"]["content"],
+                "author Content binding mismatch",
+            )
+            require(
+                author["principal_id"] == receipt["author_principal"]
+                and author["operation_id"] == receipt["author_operation_id"],
+                "forged author separation",
+            )
+            context.role(author["principal_id"], "author", at)
+            require(
+                receipt["actor_principal"] != author["principal_id"],
+                "reviewer equals author principal",
+            )
+            require(
+                receipt["operation_id"] != author["operation_id"],
+                "review operation equals author operation",
+            )
         require(
             subject["pipeline_run_id"] == receipt["pipeline_run_id"],
             "receipt pipeline run mismatch",
@@ -188,10 +237,13 @@ def validate_receipt(
         require(stamp(subject["reviewed_at"]) <= at, "receipt predates review")
         config = validate_configuration(inventory)
         managed = config["configuration_version"] == "1.1"
-        require(
-            managed == (receipt_version == "1.1"),
-            "managed reviewer and operation receipt versions differ",
-        )
+        if receipt_version == "1.2":
+            require(managed, "Qualification Corpus Intake requires managed reviewer configuration 1.1")
+        else:
+            require(
+                managed == (receipt_version == "1.1"),
+                "managed reviewer and operation receipt versions differ",
+            )
         if managed:
             binding = receipt["input_bindings"]["managed_service_observation"]
             observation = validate_managed_service_observation(

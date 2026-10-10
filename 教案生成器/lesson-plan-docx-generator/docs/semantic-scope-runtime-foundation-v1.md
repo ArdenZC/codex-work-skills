@@ -19,8 +19,11 @@ policy/ingress/index access outside authoring and reviewing adapters.
   alias checks. Reads verify both inventory pins and supplied artifact bindings.
 - `semantic_scope_records.TrustContext`: externally supplied profile path/raw
   pin, current epoch, protected operation-index path, controller implementation
-  allowlist, and timezone-aware current check time. None is discovered from
-  candidate JSON. Profile and index must match protected inventory files.
+  allowlist, and timezone-aware current check time. The proposed Profile 1.1
+  intake path also requires externally injected custodian principal, dedicated
+  Operator UID, non-Operator process UID set and a protected controller-build inventory.
+  None is discovered from candidate JSON. Profile and index must match
+  protected inventory files.
 - `validate_configuration`: canonical bytes, exact agent/human branch, all
   build/prompt/system/tool/context/procedure/interface dependencies. Build
   manifests enumerate actual inventory keys/digests. Decimal decoding strings
@@ -39,7 +42,11 @@ policy/ingress/index access outside authoring and reviewing adapters.
   operation/principal separation. Teacher-kind checks describe future subject
   operation/binding fields only; they do not implement Teacher Review 2.0,
   resolutions or lifecycle integration. Semantic provenance cannot replace
-  teacher, qualification or corpus approval.
+  teacher, qualification or corpus approval. The additive Receipt 1.2 branch is
+  limited to managed, qualification-purpose Semantic Review and requires the
+  separately adopted Qualification Corpus Intake. Its author fields are null;
+  it makes no claim about the unknown historical Content author and cannot be
+  used for production-purpose or Teacher Review receipts.
 - `reviewer_qualification.validate_qualification` / `qualification_status`:
   agent mandatory corpus and three or more fresh complete runs, independently
   captured adjudications, exact hard-miss derivation, approved blind holdout from
@@ -66,8 +73,15 @@ record encodings, not Skill products or a separate authority system:
 - Operator role authorization: closed `record_version`, `principal_id`,
   `allowed_roles`, matching the profile role; validity/revocation remains in the
   operator profile. Other operator/procedure/repository references resolve actual
-  protected inventory bytes under operator policy.
-- Protected operation index: closed version/controller/epoch, `receipts`,
+  protected inventory bytes under operator policy. The proposed Profile 1.1 and
+  Role Authorization 1.1 add only `qualification_corpus_custodian`; it is a
+  dedicated least-privilege role and is not inferred from author, reviewer or
+  corpus-adjudicator grants. Its authorization is not a production author,
+  Teacher, PA or generation grant.
+- Protected operation index: Index 1.0 retains its existing closed bytes and
+  semantics. The proposed closed Index 1.1 adds only
+  `qualification_corpus_intakes` beside the existing version/controller/epoch,
+  `receipts`,
   `authors`, `adjudications`, `qualification_runs`. Receipt entries capture ID,
   operation, actor, subject key/hash and receipt key/hash. Author entries map
   exact Content authoring ID/hash to principal and operation. Adjudication
@@ -79,6 +93,13 @@ record encodings, not Skill products or a separate authority system:
   declarations. Shared legitimate dependency keys may occur in multiple cases;
   run-wide unions cannot establish isolation. This is
   the externally controlled lookup source, not a subject hash dependency.
+- Qualification Corpus Intake 1.0 records present controlled custody for the
+  exact frozen golden and blind-holdout manifest bytes, case Content/source
+  closure and existing `authoring_id` values. It records no expected labels and
+  does not add author rows. Git commit/path are optional origin metadata only.
+  The custodian is not the historical Content author; intake cannot prove the
+  reviewer differs from an unknown historical author. Only the explicit
+  qualification-only Receipt 1.2 path may rely on this custody evidence.
 - Corpus/holdout: ordered cases with three named input key/hash pairs (`content`,
   `source_truth_manifest`, `outline`), a `sources` closure, expected disposition
   and exact critical-truth key/hash. Critical-truth semantics remain independently
@@ -98,6 +119,16 @@ qualification approval -> production review -> scope receipt. Review and
 qualification fingerprints exclude exactly the normative completion timestamp
 and own cache field. Configuration and receipt fingerprint helpers hash raw bytes;
 receipts have no invented canonical cache field.
+
+The intake extension is a draft compatibility addendum under Owner review. Exact
+dispatch preserves Index 1.0 and Receipt 1.0/1.1 behavior; it does not reinterpret
+nullable historical-author fields. Reviewer qualification still requires three
+fresh repetitions, truth-blind holdout handling, hard-miss fail-closed, separate
+custodian/reviewer/adjudicator/approver principals, independent qualification
+approval, Observation 1.1 trace binding and the existing 24-hour observation
+window. This code and its synthetic tests do not establish real Operator write
+isolation; an independently provisioned Option B deployment must do so before
+any live qualification.
 
 ## Test fixtures and installation
 
