@@ -614,6 +614,35 @@ class TestRQ03FCandidateBuildInventory(unittest.TestCase):
         self.assertEqual(isolated.returncode, 0, isolated.stderr)
         self.assertFalse(marker.exists())
 
+    def test_runtime_tree_hash_binds_safe_file_symlink_and_rejects_bad_targets(self) -> None:
+        stdlib = self.root / "synthetic-stdlib"
+        stdlib.mkdir(mode=0o700)
+        target = self.root / "sysconfigdata.py"
+        target.write_bytes(b"CONFIG = 1\n")
+        target.chmod(0o444)
+        link = stdlib / "_sysconfigdata.py"
+        link.symlink_to(os.path.relpath(target, stdlib))
+
+        first = runtime_closure._tree_sha(stdlib)
+        target.chmod(0o644)
+        target.write_bytes(b"CONFIG = 2\n")
+        target.chmod(0o444)
+        second = runtime_closure._tree_sha(stdlib)
+        self.assertNotEqual(first, second, "symlink target bytes must be in the tree digest")
+
+        link.unlink()
+        link.symlink_to("missing-sysconfigdata.py")
+        with self.assertRaisesRegex(runtime_closure.RuntimeEvidenceError, "unresolved runtime file symlink"):
+            runtime_closure._tree_sha(stdlib)
+
+        link.unlink()
+        target_directory = self.root / "target-directory"
+        target_directory.mkdir(mode=0o700)
+        link.symlink_to(target_directory, target_is_directory=True)
+        with self.assertRaisesRegex(runtime_closure.RuntimeEvidenceError,
+                                    "symlink/special runtime directory"):
+            runtime_closure._tree_sha(stdlib)
+
     def test_runtime_closure_is_candidate_only_and_independently_rechecked(self) -> None:
         evidence_dir = self.root / "runtime-closure-inputs"
         evidence_dir.mkdir(mode=0o700)

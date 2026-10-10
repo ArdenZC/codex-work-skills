@@ -107,7 +107,7 @@ def _file_sha(path: Path) -> str:
 
 def _tree_sha(root: Path, *, excluded_roots: tuple[Path, ...] = ()) -> str:
     _ordinary(root, directory=True)
-    rows: list[tuple[str, str]] = []
+    rows: list[dict[str, str]] = []
     for current, directories, files in os.walk(root, topdown=True, followlinks=False):
         base = Path(current)
         directories[:] = sorted(directories)
@@ -122,9 +122,29 @@ def _tree_sha(root: Path, *, excluded_roots: tuple[Path, ...] = ()) -> str:
         for name in sorted(files):
             path = base / name
             info = path.lstat()
-            _require(stat.S_ISREG(info.st_mode), f"symlink/special runtime file: {path}")
-            rows.append((path.relative_to(root).as_posix(), _file_sha(path)))
-    return hashlib.sha256(json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+            relative = path.relative_to(root).as_posix()
+            if stat.S_ISREG(info.st_mode):
+                rows.append({"path": relative, "kind": "file", "sha256": _file_sha(path)})
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                # Python distributions may represent a stdlib module as a file symlink.
+                # Preserve the exact link text and hash the resolved regular-file bytes;
+                # never walk a symlink directory or trust its target by name alone.
+                link_target = os.readlink(path)
+                try:
+                    resolved_target = path.resolve(strict=True)
+                except OSError as exc:
+                    raise RuntimeEvidenceError(f"unresolved runtime file symlink: {path}") from exc
+                _ordinary(resolved_target)
+                target_info = resolved_target.lstat()
+                _require(stat.S_ISREG(target_info.st_mode),
+                         f"runtime file symlink target is not a regular file: {path}")
+                rows.append({"path": relative, "kind": "symlink", "target": link_target,
+                             "target_sha256": _file_sha(resolved_target)})
+                continue
+            raise RuntimeEvidenceError(f"symlink/special runtime file: {path}")
+    raw = json.dumps(rows, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode()
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _canonical_bytes(value: Any) -> bytes:
