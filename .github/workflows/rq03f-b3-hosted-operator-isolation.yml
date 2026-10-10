@@ -86,7 +86,7 @@ jobs:
               failed=1
             fi
           done
-          for path in /opt/rq03f-b3 /var/lib/rq03f-operator/rq03f-b3-data /usr/local/sbin/rq03f-b3-operator-launch; do
+          for path in /var/lib/rq03f-b3-install /var/lib/rq03f-operator/rq03f-b3-data /usr/local/sbin/rq03f-b3-operator-launch; do
             if sudo -n test -e "$path"; then
               echo "temporary trust or controller path remains: $path"
               failed=1

@@ -27,7 +27,7 @@ SOURCE_SCRIPTS = REPO_ROOT / "教案生成器/lesson-plan-docx-generator/scripts
 SOURCE_SCHEMAS = REPO_ROOT / "教案生成器/lesson-plan-docx-generator/schemas"
 REQUIREMENTS = REPO_ROOT / "教案生成器/lesson-plan-docx-generator/requirements.txt"
 
-STAGE_ROOT = Path("/opt/rq03f-b3")
+STAGE_ROOT = Path("/var/lib/rq03f-b3-install")
 CONTROLLER_ROOT = STAGE_ROOT / "controller"
 RUNTIME_ROOT = STAGE_ROOT / "runtime"
 TRUST_DATA_ROOT = Path("/var/lib/rq03f-operator/rq03f-b3-data")
