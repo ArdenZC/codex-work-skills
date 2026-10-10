@@ -150,6 +150,15 @@ printf '%s\n' "$setfacl_text" | tee -a "$evidence_file"
 plan_dir="$test_root/owner-pinned-attempt"
 log "OWNER_PLAN_SETUP stage=create-directory path=$plan_dir"
 sudo -n install -d -o root -g root -m 0755 "$plan_dir"
+operator_code_dir="$test_root/operator-code"
+sudo -n install -d -o root -g root -m 0755 "$operator_code_dir"
+allocator_source="$repo_root/tools/rq03f_c1/operator_allocator.py"
+allocator_copy="$operator_code_dir/operator_allocator.py"
+allocator_source_sha=$(sha256sum "$allocator_source" | cut -d ' ' -f1)
+sudo -n install -o root -g root -m 0444 "$allocator_source" "$allocator_copy"
+allocator_copy_sha=$(sha256sum "$allocator_copy" | cut -d ' ' -f1)
+[[ "$allocator_copy_sha" == "$allocator_source_sha" ]]
+log "CANDIDATE_TOOL_INPUT source_sha256=$allocator_source_sha read_only_copy_sha256=$allocator_copy_sha copy_owner=$(stat -c %u "$allocator_copy") copy_mode=$(stat -c %a "$allocator_copy")"
 source_commit=$(git -C "$repo_root" rev-parse HEAD)
 parent="$test_root/operator-generation-parent"
 parent_device=$(stat -c %d "$parent")
@@ -185,7 +194,7 @@ PY
 plan_sha=$(sha256sum "$plan_path" | cut -d ' ' -f1)
 log "OWNER_PLAN_SETUP stage=plan-created path=$plan_path sha256=$plan_sha"
 set +e
-candidate_attempt=$(run_as "$candidate" "$python_bin" "$repo_root/tools/rq03f_c1/operator_allocator.py" allocate \
+candidate_attempt=$(run_as "$candidate" "$python_bin" "$allocator_copy" allocate \
   --plan "$plan_path" --expected-plan-sha256 "$plan_sha" 2>&1)
 candidate_status=$?
 set -e
