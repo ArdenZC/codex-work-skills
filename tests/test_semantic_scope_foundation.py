@@ -12,6 +12,8 @@ from unittest.mock import patch
 import base64
 from tests.semantic_scope_test_support import Evidence, ROOT, FIXTURES
 from tests.semantic_scope_fixtures import freeze_original_outline
+import exemplar_contract
+import path_safety
 from semantic_scope_records import (
     RecordError,
     Inventory,
@@ -362,6 +364,17 @@ class SemanticScopeFoundationTests(unittest.TestCase):
         entries["alias"]["path"] = str(target)
         with self.assertRaises(ValueError):
             Inventory(entries, self.e.run, (self.e.protected,))
+        with tempfile.TemporaryDirectory(prefix="semantic-path-alias-count-") as temp_name:
+            paths = {}
+            for index in range(6):
+                path = Path(temp_name) / f"input-{index}.json"
+                path.write_text(str(index), encoding="utf-8")
+                paths[f"input-{index}"] = path
+            with patch.object(
+                exemplar_contract, "_variants", wraps=path_safety._variants
+            ) as variants:
+                exemplar_contract.assert_distinct_file_paths(paths)
+            self.assertEqual(variants.call_count, len(paths))
 
     def test_subject_requires_scope_role_and_missing_training_fails(self):
         role = self.e.profile["roles"][1]

@@ -743,6 +743,19 @@ else:
         with tempfile.TemporaryDirectory(prefix="candidate-import-shadow-") as temp_name:
             shadow = Path(temp_name) / "source_truth.py"
             shadow.write_text("# candidate-controlled module shadow\n", encoding="utf-8")
+            source_truth_row = next(
+                row for row in good_build["components"]
+                if row["component_id"] == "source_truth"
+            )
+            source_truth_key = source_truth_row["inventory_key"]
+            evidence = self.e.entries[source_truth_key]
+            with patch.dict(
+                self.e.entries,
+                {source_truth_key: {**evidence, "sha256": "0" * 64}},
+            ):
+                with self.assertRaisesRegex(RecordError, "component inventory binding mismatch"):
+                    self.e.context().load()
+
             substituted = types.ModuleType("source_truth")
             substituted.__file__ = str(shadow)
             with patch.dict(sys.modules, {"source_truth": substituted}):

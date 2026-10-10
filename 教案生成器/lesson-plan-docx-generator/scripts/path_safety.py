@@ -172,16 +172,21 @@ def _contains(parent: str, child: str) -> bool:
         return False
 
 
+def _variant_sets_overlap(left_values: set[str], right_values: set[str]) -> bool:
+    """Compare already-expanded path aliases without repeating filesystem probes."""
+    return any(
+        left_value == right_value
+        or _contains(left_value, right_value)
+        or _contains(right_value, left_value)
+        for left_value in left_values
+        for right_value in right_values
+    )
+
+
 def paths_overlap(left: Path | str, right: Path | str) -> bool:
     """Return true for equality or either lexical/resolved containment direction."""
 
-    left_values = _variants(Path(left))
-    right_values = _variants(Path(right))
-    for left_value in left_values:
-        for right_value in right_values:
-            if left_value == right_value or _contains(left_value, right_value) or _contains(right_value, left_value):
-                return True
-    return False
+    return _variant_sets_overlap(_variants(Path(left)), _variants(Path(right)))
 
 
 def paths_equal(left: Path | str, right: Path | str) -> bool:

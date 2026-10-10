@@ -12,6 +12,7 @@ from datetime import datetime
 import json
 from functools import lru_cache
 from pathlib import Path
+import stat
 import sys
 from types import MappingProxyType
 from typing import Any, Mapping
@@ -193,7 +194,11 @@ class Inventory:
                 f"inventory path outside configured storage: {key}",
             )
             paths[key] = path
-            sha256_file(path)  # ordinary file and existing path/alias protections
+            try:
+                info = path.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise RecordError(f"cannot inspect inventory path: {key}: {exc}") from exc
+            require(stat.S_ISREG(info.st_mode), f"inventory path is not a regular file: {key}")
         assert_distinct_safe_paths(paths)
         object.__setattr__(
             self,
@@ -375,12 +380,12 @@ class TrustContext:
             )
             # The isolated bootstrap has already verified every component in
             # this exact, externally pinned inventory before importing any
-            # controller or third-party modules. Rehashing all package and
-            # controller trees on every TrustContext.load() would repeat that
-            # work for every case/repetition. Keep validating the pinned
-            # manifest structure and component path boundaries here. Validate
-            # loaded module/schema paths and hashes below; package bytes remain
-            # covered by the launch-time attestation.
+            # controller or third-party modules. Rehashing installed modules
+            # and packages on every TrustContext.load() repeats launch-time
+            # work for every case/repetition. Keep checking the manifest and
+            # inventory path bindings here; loaded module origins must still
+            # match the pinned paths. Schema bytes are re-read by validation,
+            # so their current hashes are checked below.
             try:
                 controller_bootstrap.verify_build_inventory(
                     Path(self.inventory.entries[profile["controller_build_inventory_key"]]["path"]),
@@ -411,8 +416,15 @@ class TrustContext:
                     and required_schemas.issubset(schemas),
                     "operator controller build inventory is incomplete")
             for row in build["components"]:
-                if row["component_type"] in {"python_module", "json_schema"}:
-                    self.inventory.raw(row["inventory_key"], row["sha256"], protected=True)
+                if row["component_type"] not in {"python_module", "json_schema"}:
+                    continue
+                evidence = self.inventory.entries.get(row["inventory_key"])
+                require(evidence is not None,
+                        f"missing protected controller component: {row['component_id']}")
+                require(evidence["storage_class"] == "protected_external",
+                        f"controller component is not protected: {row['component_id']}")
+                require(evidence["sha256"] == row["sha256"],
+                        f"controller component inventory binding mismatch: {row['component_id']}")
             components = {row["component_id"]: row for row in build["components"]}
             for module_name in required_modules:
                 loaded = sys.modules.get(module_name)
@@ -422,11 +434,6 @@ class TrustContext:
                 loaded_path = Path(loaded.__file__).resolve(strict=True)
                 require(loaded_path == expected_path,
                         f"loaded operator controller module came from an unpinned import path: {module_name}")
-                require(
-                    sha256_file(loaded_path)
-                    == components[module_name]["sha256"],
-                    f"loaded operator controller module differs from pinned build: {module_name}",
-                )
             for schema_name in required_schemas:
                 schema_path = Path(components[schema_name]["runtime_path"]).resolve(strict=True)
                 require(schema_path == controller_root / "schemas" / schema_name,
