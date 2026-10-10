@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ03F candidate runtime closure evidence 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "authority_status", "target_platform", "source_commit",
+    "build_inventory_sha256", "base_image_digest_claim", "os_release_path",
+    "os_release_sha256", "python_executable", "python_version", "python_stdlib_root",
+    "python_stdlib_tree_sha256", "runtime_root", "runtime_root_tree_sha256",
+    "os_package_manifest_path", "os_package_manifest_sha256",
+    "shared_libraries_manifest_path", "shared_libraries_manifest_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "rq03f-runtime-closure-candidate-1.0" },
+    "authority_status": { "const": "candidate_only_unverified_host_claims" },
+    "target_platform": { "type": "string", "minLength": 1 },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "build_inventory_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "base_image_digest_claim": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "os_release_path": { "type": "string", "minLength": 1 },
+    "os_release_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "python_executable": { "type": "string", "minLength": 1 },
+    "python_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "python_stdlib_root": { "type": "string", "minLength": 1 },
+    "python_stdlib_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "runtime_root": { "type": "string", "minLength": 1 },
+    "runtime_root_tree_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "os_package_manifest_path": { "type": "string", "minLength": 1 },
+    "os_package_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "shared_libraries_manifest_path": { "type": "string", "minLength": 1 },
+    "shared_libraries_manifest_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
