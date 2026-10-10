@@ -340,6 +340,11 @@ def _stage_roots() -> None:
 def _prepare_fixture() -> dict:
     if os.geteuid() != 0:
         raise RuntimeError("--prepare must run in the privileged disposable-runner phase")
+    TRUST_DATA_ROOT.mkdir(mode=0o755)
+    TRUST_DATA_ROOT.chmod(0o755)
+    data_root_stat = TRUST_DATA_ROOT.stat()
+    if data_root_stat.st_uid != 0 or data_root_stat.st_mode & 0o777 != 0o755:
+        raise RuntimeError("synthetic TrustContext data root must be root-owned and mode 0755")
     controller_scripts = CONTROLLER_ROOT / "scripts"
     controller_schemas = CONTROLLER_ROOT / "schemas"
     operator_uid, _ = _identity("rq03f-operator")
