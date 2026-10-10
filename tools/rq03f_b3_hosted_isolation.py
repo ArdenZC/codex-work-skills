@@ -303,6 +303,38 @@ def _stage_roots() -> None:
         ],
         label="install controller requirements in protected test runtime",
     )
+    _root_command(
+        [
+            "find",
+            str(RUNTIME_ROOT),
+            "-xdev",
+            "-type",
+            "d",
+            "-exec",
+            "chmod",
+            "go-w",
+            "--",
+            "{}",
+            "+",
+        ],
+        label="remove group/other write bits from temporary runtime directories",
+    )
+    _root_command(
+        [
+            "find",
+            str(RUNTIME_ROOT),
+            "-xdev",
+            "-type",
+            "f",
+            "-exec",
+            "chmod",
+            "go-w",
+            "--",
+            "{}",
+            "+",
+        ],
+        label="remove group/other write bits from temporary runtime files",
+    )
 
 
 def _prepare_fixture() -> dict:
