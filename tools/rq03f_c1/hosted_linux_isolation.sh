@@ -92,7 +92,11 @@ done
 run_as "$operator" "$python_bin" -c \
   'from pathlib import Path; p=Path(__import__("sys").argv[1]); (p/"authority-profile.json").write_bytes(b"synthetic-profile\n"); (p/"operation-index.json").write_bytes(b"synthetic-index\n"); [(q.chmod(0o600)) for q in p.iterdir()]' \
   "$test_root/protected-evidence"
-log "OPERATOR_READ uid=$operator_uid result=$(run_as "$operator" sha256sum "$test_root"/protected-evidence/*.json | tr '\n' ';')"
+operator_read_hashes=$(run_as "$operator" "$python_bin" -c \
+  'import hashlib,pathlib,sys; root=pathlib.Path(sys.argv[1]); print(";".join(f"{p.name}:{hashlib.sha256(p.read_bytes()).hexdigest()}" for p in sorted(root.glob("*.json"))))' \
+  "$test_root/protected-evidence")
+[[ "$operator_read_hashes" == *"authority-profile.json:"* && "$operator_read_hashes" == *"operation-index.json:"* ]]
+log "OPERATOR_READ uid=$operator_uid result=$operator_read_hashes"
 
 probe_python='import errno,os,sys
 root,index=sys.argv[1:]
@@ -115,14 +119,26 @@ if failed: print(f"unexpected={failed}"); raise SystemExit(1)'
 
 for user in "$candidate" "$author" "$reviewer" "$approver"; do
   actual_uid=$(run_as "$user" /usr/bin/id -u)
-  if run_as "$user" "$python_bin" -c "$probe_python" \
+  set +e
+  run_as "$user" "$python_bin" -c "$probe_python" \
     "$test_root/protected-evidence" "$test_root/protected-evidence/operation-index.json" \
-    >"$evidence_dir/${user}.probe.txt" 2>&1; then
-    log "ROLE_DENY role=$user uid=$actual_uid result=FAIL expected-denial"
-    cat "$evidence_dir/${user}.probe.txt" | tee -a "$evidence_file"
+    >"$evidence_dir/${user}.probe.txt" 2>&1
+  probe_status=$?
+  set -e
+  probe_output=$(cat "$evidence_dir/${user}.probe.txt")
+  if [[ $probe_status -ne 0 ]]; then
+    log "ROLE_DENY role=$user uid=$actual_uid result=FAIL probe_exit_code=$probe_status"
+    printf '%s\n' "$probe_output" | tee -a "$evidence_file"
     exit 1
   fi
-  log "ROLE_DENY role=$user uid=$actual_uid result=PASS exit_code=nonzero"
+  for operation in profile_read index_read index_write index_unlink index_rename index_create; do
+    if ! grep -Eq "^${operation}=DENIED errno=(1|13)$" "$evidence_dir/${user}.probe.txt"; then
+      log "ROLE_DENY role=$user uid=$actual_uid result=FAIL missing_denial=$operation"
+      printf '%s\n' "$probe_output" | tee -a "$evidence_file"
+      exit 1
+    fi
+  done
+  log "ROLE_DENY role=$user uid=$actual_uid result=PASS exit_code=$probe_status"
   sed 's/^/  /' "$evidence_dir/${user}.probe.txt" | tee -a "$evidence_file"
 done
 
