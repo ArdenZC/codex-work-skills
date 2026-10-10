@@ -20,6 +20,7 @@
 | Formal Trust Anchor | `eb4a95c618e05c5ad6413137478bc65dbca75ec9` |
 | B3 Draft PR | [#58](https://github.com/ArdenZC/codex-work-skills/pull/58) |
 | B3 code-under-test HEAD | `64fbe60c5f4f89a4044d8ce7b79c01ef387c6e55` |
+| Exact PR HEAD in completed post-report qualification CI | `4bfe03e5db8748d5871dc223c9c75bdd17687d11` |
 
 `origin/master` was fetched before testing and still matched the supplied trusted master. The external Trust Anchor checkout remained at the supplied commit and clean. Its Authority Profile SHA-256 is `d8e2ac76552f76b5dacf1ab7e31014da68ffe757da9bff5c97d27be9b67effd4`; Initial Operation Index SHA-256 is `52b3d01db27b10b4d9f54d6278a469ba7998a26057de93c8308b2b1fd50b67a4`. Neither was modified.
 
@@ -167,7 +168,8 @@ The harness has a `finally` cleanup path and the workflow has an `if: always()` 
 Exact code-under-test HEAD `64fbe60c5f4f89a4044d8ce7b79c01ef387c6e55`:
 
 - [B3 Hosted Operator Isolation run 38048852787](https://github.com/ArdenZC/codex-work-skills/actions/runs/38048852787) — SUCCESS, `ubuntu-24.04`, job `114203744227`, 78 contract tests `OK`, 146 structured hosted checks PASS, cleanup step PASS.
-- The post-report commit must receive fresh exact-HEAD B3 and Template Package CI before this report is accepted as complete. Their run IDs and exact HEADs are listed here once completed; the existing Windows/macOS matrix is not disabled or filtered out by this PR.
+- [Post-report B3 run 38049295371](https://github.com/ArdenZC/codex-work-skills/actions/runs/38049295371) — SUCCESS on exact PR HEAD `4bfe03e5db8748d5871dc223c9c75bdd17687d11`, job `114205010075`, 78 contract tests `OK`, 146 structured hosted checks PASS, cleanup step PASS.
+- [Post-report Template Package CI run 38049295377](https://github.com/ArdenZC/codex-work-skills/actions/runs/38049295377) — SUCCESS on the same exact PR HEAD. All 41 jobs completed: 40 SUCCESS and 1 conditional SKIPPED; there were no failures. All 12 Windows/macOS Semantic Scope shards passed. Existing CI gates and matrix remained enabled.
 
 Provisioning/harness failures during development were not counted as passes. The observed defects and changes were:
 
@@ -200,6 +202,6 @@ Before Production Trust can be established, an independent deployment owner stil
 
 **Ready for Owner review as a hosted OS-isolation qualification and as input to an independent deployment-owner acceptance.** This is not completion of that independent deployment acceptance. `PRODUCTION_OPERATOR_TRUST_ESTABLISHED` remains false, and B3 creates no production-authorized evidence.
 
-## Exact final report HEAD and post-report CI
+## Exact-HEAD verification and report scope
 
-The implementation code tested above is pinned to `64fbe60c5f4f89a4044d8ce7b79c01ef387c6e55`. This report is added as a documentation-only commit on the same Draft PR. The handoff records the exact final PR HEAD and the fresh post-report B3 and Template Package CI run IDs. Acceptance requires both workflows to report that same final PR HEAD; the B3 job must pass and the retained Template Package CI gates must complete successfully. GitHub run metadata is the source of exact report-commit SHA/run binding. No statement here upgrades hosted test data to formal Trust Evidence.
+The B3 implementation was tested at `64fbe60c5f4f89a4044d8ce7b79c01ef387c6e55`. The report commit at PR HEAD `4bfe03e5db8748d5871dc223c9c75bdd17687d11` then received both fresh post-report workflows listed above, each bound by GitHub run metadata to that exact HEAD. This report's final documentation update records those completed results; the code, workflow, fixtures, and frozen inputs are unchanged by this documentation-only update. The live PR HEAD is available directly from PR #58 metadata. No statement here upgrades hosted test data to formal Trust Evidence.
