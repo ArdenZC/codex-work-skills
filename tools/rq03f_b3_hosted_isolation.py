@@ -399,6 +399,10 @@ def _prepare_fixture() -> dict:
         "path": str(index_path),
         "sha256": sha256_bytes(index_raw),
     }
+    operator_uid, operator_gid = _identity("rq03f-operator")
+    operator_trust_parent = TRUST_ROOT.parent
+    os.chown(operator_trust_parent, operator_uid, operator_gid)
+    operator_trust_parent.chmod(0o700)
     candidate_uid, candidate_gid = _identity("rq03f-candidate")
     os.chown(fixture.run_root, candidate_uid, candidate_gid)
     fixture.run_root.chmod(0o700)
