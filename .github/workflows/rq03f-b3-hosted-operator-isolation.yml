@@ -1,0 +1,95 @@
+name: RQ-03F-B3 Hosted Operator Isolation
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/rq03f-b3-hosted-operator-isolation.yml
+      - tools/rq03f_operator_boundary.sh
+      - tools/rq03f_b3_hosted_isolation.py
+      - tools/rq03f_b3_hosted_operator_probe.py
+      - tests/test_qualification_corpus_intake.py
+      - tests/test_semantic_scope_foundation.py
+      - 教案生成器/lesson-plan-docx-generator/requirements.txt
+      - 教案生成器/lesson-plan-docx-generator/scripts/**
+      - 教案生成器/lesson-plan-docx-generator/schemas/**
+      - RQ03F_B3_HOSTED_OPERATOR_ISOLATION.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rq03f-b3-hosted-operator-isolation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  hosted-linux-operator-boundary:
+    name: Disposable Ubuntu real-UID boundary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Check out the exact PR head without persisting a GitHub token
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ACL inspection tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y acl
+
+      - name: Install deterministic contract-test requirements
+        run: >-
+          python -m pip install
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+
+      - name: Check hosted boundary scripts and shell syntax
+        run: |
+          bash -n tools/rq03f_operator_boundary.sh
+          python -m py_compile tools/rq03f_b3_hosted_isolation.py tools/rq03f_b3_hosted_operator_probe.py
+
+      - name: Run frozen intake and semantic contract suites
+        env:
+          PYTHONPATH: 教案生成器/lesson-plan-docx-generator/scripts
+        run: >-
+          python -m unittest
+          tests.test_qualification_corpus_intake
+          tests.test_semantic_scope_foundation
+          -v
+
+      - name: Run real Linux UID and filesystem permission qualification
+        run: python tools/rq03f_b3_hosted_isolation.py
+
+      - name: Verify temporary privilege identities and files were removed
+        if: always()
+        shell: bash
+        run: |
+          failed=0
+          for user in rq03f-operator rq03f-candidate rq03f-author rq03f-reviewer-a rq03f-approver-b; do
+            if getent passwd "$user" >/dev/null; then
+              echo "temporary role account remains: $user"
+              failed=1
+            fi
+            if getent group "$user" >/dev/null; then
+              echo "temporary role group remains: $user"
+              failed=1
+            fi
+          done
+          for path in /var/lib/rq03f-b3-install /var/lib/rq03f-operator/rq03f-b3-data /usr/local/sbin/rq03f-b3-operator-launch; do
+            if sudo -n test -e "$path"; then
+              echo "temporary trust or controller path remains: $path"
+              failed=1
+            fi
+          done
+          exit "$failed"
