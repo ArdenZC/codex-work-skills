@@ -9,12 +9,14 @@ this tool never cleans up, overwrites, repairs, or reuses it.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import stat
 import subprocess
 import sys
+from typing import Any
 
 try:
     from . import build_inventory as build
@@ -27,6 +29,29 @@ except ImportError:  # Direct script execution from its installed path.
 def _require(condition: bool, message: str) -> None:
     if not condition:
         raise build.BuildError(message)
+
+
+def _revalidate_allocation(plan: dict[str, Any]) -> None:
+    """Recheck the terminal allocation state immediately before installation writes."""
+    raw = build._read_pinned_file(
+        plan["allocation_record_path"], uid=plan["operator_uid"], gid=plan["operator_gid"]
+    )
+    _require(hashlib.sha256(raw).hexdigest() == plan["allocation_record_sha256"],
+             "Generation allocation record changed before installation")
+    try:
+        record = json.loads(raw.decode("utf-8"), object_pairs_hook=build._strict_pairs)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise build.BuildError(f"invalid Generation allocation record before installation: {exc}") from exc
+    _require(isinstance(record, dict)
+             and record.get("allocation_status") == "complete"
+             and record.get("target_id") == plan["generation_id"]
+             and record.get("owner_plan_sha256") == plan["allocation_plan_sha256"],
+             "Generation allocation evidence is incomplete or inconsistent before installation")
+    build._require_finalized_allocation(
+        plan["generation_root"], plan_sha256=plan["allocation_plan_sha256"],
+        record_sha256=plan["allocation_record_sha256"], generation_id=plan["generation_id"],
+        allocation_record=record, uid=plan["operator_uid"], gid=plan["operator_gid"],
+    )
 
 
 def _fresh_allocated_directory(path: Path) -> int:
@@ -152,6 +177,7 @@ def install_controller(plan_path: Path, expected_plan_sha256: str) -> dict[str, 
     plan, plan_sha = build._load_plan(plan_path, expected_plan_sha256)
     build._verify_source_checkout(plan)
     build._requirements_and_wheelhouse(plan)
+    _revalidate_allocation(plan)
     root_fd = _fresh_allocated_directory(plan["controller_root"])
     try:
         tracked = build._tracked_controller_files(plan)
@@ -181,6 +207,7 @@ def prepare_install_roots(plan_path: Path, expected_plan_sha256: str) -> dict[st
     plan, plan_sha = build._load_plan(plan_path, expected_plan_sha256)
     build._verify_source_checkout(plan)
     _lock_text, _wheelhouse = build._requirements_and_wheelhouse(plan)
+    _revalidate_allocation(plan)
     generation_fd, _ = allocator._open_directory_chain(
         str(plan["generation_root"]), plan["operator_uid"], plan["operator_gid"]
     )
@@ -232,6 +259,7 @@ def install_runtime(plan_path: Path, expected_plan_sha256: str) -> dict[str, str
     actual_base_version = build._python_version(source_python)
     _require(actual_base_version == plan["python_version"],
              "selected locked Python patch release does not match the Owner plan")
+    _revalidate_allocation(plan)
     _require(plan["runtime_root"].is_dir(), "Runtime Root must be preallocated before installation")
     root_fd = _fresh_allocated_directory(plan["runtime_root"])
     try:

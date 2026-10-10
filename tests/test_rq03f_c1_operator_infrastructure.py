@@ -15,6 +15,7 @@ import base64
 import csv
 import io
 import multiprocessing
+from unittest import mock
 
 from tools.rq03f_c1 import build_inventory, locked_install, operator_allocator, runtime_closure, verify_inventory
 
@@ -96,6 +97,38 @@ def _generation_plan(root: Path, source: Path, commit: str, target_id: str = "rq
     }
 
 
+def _build_plan_for_allocation(root: Path, source: Path, record: dict[str, object],
+                               allocation_plan_sha: str, allocation_record_sha: str) -> tuple[Path, str]:
+    generation_root = Path(str(record["parent"]["canonical_path"])) / str(record["target_id"])
+    major_minor = ".".join(sys.version.split()[0].split(".")[:2])
+    plan: dict[str, object] = {
+        "schema_version": "rq03f-build-inputs-1.0", "purpose": "candidate_inventory_only",
+        "source_commit": str(record["source_commit"]), "source_checkout": str(source),
+        "target_platform": f"linux-{platform.machine().lower()}",
+        "operator_uid": os.geteuid(), "operator_gid": os.getegid(),
+        "controller_id": "synthetic-c1-controller", "inventory_key": "c1:test-inventory",
+        "generation_id": str(record["target_id"]), "generation_root": str(generation_root),
+        "allocation_plan_sha256": allocation_plan_sha,
+        "allocation_record_path": str(generation_root / ".rq03f-allocation-record.json"),
+        "allocation_record_sha256": allocation_record_sha,
+        "controller_root": str(generation_root / "controller"),
+        "protected_trust_root": str(root / "formal-trust-placeholder"),
+        "scripts_root": str(generation_root / "controller" / "scripts"),
+        "schemas_root": str(generation_root / "controller" / "schemas"),
+        "runtime_root": str(generation_root / "runtime"),
+        "build_python_executable": str(Path(sys.executable).resolve()),
+        "python_executable": str(generation_root / "runtime" / "bin" / f"python{major_minor}"),
+        "python_version": sys.version.split()[0],
+        "site_packages_root": str(generation_root / "runtime" / "lib" / f"python{major_minor}" / "site-packages"),
+        "requirements_lock": str(root / "requirements.lock"), "requirements_lock_sha256": "1" * 64,
+        "wheelhouse_root": str(root / "wheelhouse"),
+        "wheelhouse_manifest": str(root / "wheelhouse-manifest.json"),
+        "wheelhouse_manifest_sha256": "2" * 64,
+        "inventory_output": str(root / "output" / "inventory.json"),
+    }
+    return _write_plan(root / "consumer-plan", plan)
+
+
 def _allocator_process(plan_path: str, plan_sha: str, queue: multiprocessing.Queue) -> None:
     try:
         result = operator_allocator.allocate(Path(plan_path), plan_sha)
@@ -130,6 +163,9 @@ class TestRQ03FExclusiveAllocator(unittest.TestCase):
         self.assertEqual(result["record"]["files"], [])
         record_bytes = (target / ".rq03f-allocation-record.json").read_bytes()
         self.assertEqual(hashlib.sha256(record_bytes).hexdigest(), result["record_sha256"])
+        finalization = json.loads((target / ".rq03f-allocation-finalized.json").read_text())
+        self.assertEqual(finalization["allocation_record_sha256"], result["record_sha256"])
+        self.assertEqual(finalization["finalization_status"], "finalized")
         with self.assertRaises(FileExistsError):
             operator_allocator.allocate(path, sha)
         self.assertEqual((target / ".rq03f-allocation-record.json").read_bytes(), record_bytes)
@@ -257,6 +293,89 @@ class TestRQ03FExclusiveAllocator(unittest.TestCase):
         self.assertFalse((target / ".rq03f-allocation-record.json").exists())
         with self.assertRaises(FileExistsError):
             operator_allocator.allocate(path, sha)
+
+    def _assert_build_install_and_verifier_reject(self, record: dict[str, object],
+                                                  allocation_plan_sha: str,
+                                                  record_sha256: str) -> None:
+        build_plan_path, build_plan_sha = _build_plan_for_allocation(
+            self.root, self.source, record, allocation_plan_sha, record_sha256
+        )
+        with self.assertRaisesRegex(build_inventory.BuildError, "incomplete/failure marker|unfinalized"):
+            build_inventory._load_plan(build_plan_path, build_plan_sha)
+        with self.assertRaisesRegex(build_inventory.BuildError, "incomplete/failure marker|unfinalized"):
+            locked_install.prepare_install_roots(build_plan_path, build_plan_sha)
+        with self.assertRaisesRegex(verify_inventory.VerifyError, "incomplete/failure marker|unfinalized"):
+            verify_inventory._read_plan(build_plan_path, build_plan_sha)
+
+    def test_parent_fsync_failure_after_complete_record_is_rejected_by_every_consumer(self) -> None:
+        plan = _generation_plan(self.root, self.source, self.commit, "rq03f-parent-fsync-late-failure")
+        path, sha = _write_plan(self.root / "parent-fsync-late-plan", plan)
+        target = Path(str(plan["trusted_parent"])) / str(plan["target_id"])
+        parent_info = Path(str(plan["trusted_parent"])).stat()
+        original_fsync = operator_allocator._fsync_directory
+
+        def fail_parent_after_record(directory_fd: int) -> None:
+            info = os.fstat(directory_fd)
+            if (info.st_dev, info.st_ino) == (parent_info.st_dev, parent_info.st_ino):
+                self.assertTrue((target / ".rq03f-allocation-record.json").is_file())
+                raise OSError("injected parent fsync failure after complete record write")
+            original_fsync(directory_fd)
+
+        with mock.patch.object(operator_allocator, "_fsync_directory", fail_parent_after_record):
+            with self.assertRaisesRegex(OSError, "parent fsync failure"):
+                operator_allocator.allocate(path, sha)
+
+        record_raw = (target / ".rq03f-allocation-record.json").read_bytes()
+        record = json.loads(record_raw)
+        record_sha = hashlib.sha256(record_raw).hexdigest()
+        self.assertEqual(record["allocation_status"], "complete")
+        self.assertTrue((target / ".rq03f-incomplete.json").is_file())
+        self.assertFalse((target / ".rq03f-allocation-finalized.json").exists())
+        self._assert_build_install_and_verifier_reject(record, sha, record_sha)
+        with self.assertRaises(FileExistsError):
+            operator_allocator.allocate(path, sha)
+
+    def test_final_parent_identity_failure_after_complete_record_is_rejected_by_every_consumer(self) -> None:
+        plan = _generation_plan(self.root, self.source, self.commit, "rq03f-final-identity-late-failure")
+        path, sha = _write_plan(self.root / "final-identity-late-plan", plan)
+        target = Path(str(plan["trusted_parent"])) / str(plan["target_id"])
+        parent = str(plan["trusted_parent"])
+        original_open = operator_allocator._open_directory_chain
+
+        def fail_final_parent_identity(path_text: str, operator_uid: int, operator_gid: int):
+            opened = original_open(path_text, operator_uid, operator_gid)
+            if path_text == parent and (target / ".rq03f-allocation-record.json").is_file():
+                os.close(opened[0])
+                raise operator_allocator.AllocationError("injected final parent identity check failure")
+            return opened
+
+        with mock.patch.object(operator_allocator, "_open_directory_chain", fail_final_parent_identity):
+            with self.assertRaisesRegex(operator_allocator.AllocationError, "final parent identity check failure"):
+                operator_allocator.allocate(path, sha)
+
+        record_raw = (target / ".rq03f-allocation-record.json").read_bytes()
+        record = json.loads(record_raw)
+        record_sha = hashlib.sha256(record_raw).hexdigest()
+        self.assertEqual(record["allocation_status"], "complete")
+        self.assertTrue((target / ".rq03f-incomplete.json").is_file())
+        self.assertFalse((target / ".rq03f-allocation-finalized.json").exists())
+        self._assert_build_install_and_verifier_reject(record, sha, record_sha)
+        with self.assertRaises(FileExistsError):
+            operator_allocator.allocate(path, sha)
+
+    def test_complete_record_without_failure_marker_or_finalizer_is_rejected(self) -> None:
+        plan = _generation_plan(self.root, self.source, self.commit, "rq03f-unfinalized-record")
+        path, sha = _write_plan(self.root / "unfinalized-plan", plan)
+        result = operator_allocator.allocate(path, sha)
+        target = Path(result["path"])
+        record_raw = (target / ".rq03f-allocation-record.json").read_bytes()
+        record = json.loads(record_raw)
+        (target / ".rq03f-allocation-finalized.json").unlink()
+        self.assertEqual(record["allocation_status"], "complete")
+        self.assertFalse((target / ".rq03f-incomplete.json").exists())
+        self._assert_build_install_and_verifier_reject(
+            record, sha, hashlib.sha256(record_raw).hexdigest()
+        )
 
     def test_same_generation_race_has_exactly_one_winner(self) -> None:
         plan = _generation_plan(self.root, self.source, self.commit, "rq03f-race-c1")

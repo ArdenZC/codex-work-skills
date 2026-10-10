@@ -45,6 +45,8 @@ _LOCK_LINE = re.compile(
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:-]{0,159}$")
+_ALLOCATION_INCOMPLETE = ".rq03f-incomplete.json"
+_ALLOCATION_FINALIZED = ".rq03f-allocation-finalized.json"
 
 
 def _paths_overlap(left: Path, right: Path) -> bool:
@@ -277,6 +279,54 @@ def _canonical_json(value: Any) -> bytes:
                         allow_nan=False) + "\n").encode("utf-8")
 
 
+def _require_finalized_allocation(generation_root: Path, *, plan_sha256: str,
+                                  record_sha256: str, generation_id: str,
+                                  allocation_record: dict[str, Any], uid: int, gid: int) -> None:
+    """Require one finalization receipt and no failure marker for this record."""
+    incomplete_path = generation_root / _ALLOCATION_INCOMPLETE
+    try:
+        incomplete_path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        raise BuildError("Generation allocation has an incomplete/failure marker")
+
+    target = allocation_record.get("target")
+    _require(isinstance(target, dict)
+             and set(target) == {"device", "inode", "uid", "gid", "mode"}
+             and type(target.get("device")) is int and target["device"] >= 0
+             and type(target.get("inode")) is int and target["inode"] > 0
+             and type(target.get("uid")) is int and target["uid"] == uid
+             and type(target.get("gid")) is int and target["gid"] == gid
+             and target.get("mode") == "0700",
+             "Generation allocation target identity is incomplete or invalid")
+    finalization_path = generation_root / _ALLOCATION_FINALIZED
+    try:
+        raw = _read_pinned_file(finalization_path, uid=uid, gid=gid, max_bytes=16 * 1024)
+    except FileNotFoundError as exc:
+        raise BuildError("Generation allocation is unfinalized: finalization receipt is absent") from exc
+    try:
+        finalization = json.loads(raw.decode("utf-8"), object_pairs_hook=_strict_pairs)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise BuildError(f"invalid Generation allocation finalization receipt: {exc}") from exc
+    expected = {
+        "record_version": "rq03f-allocation-finalization-1.0",
+        "finalization_status": "finalized",
+        "target_id": generation_id,
+        "owner_plan_sha256": plan_sha256,
+        "allocation_record_sha256": record_sha256,
+        "target": target,
+    }
+    _require(isinstance(finalization, dict) and finalization == expected
+             and raw == _canonical_json(finalization),
+             "Generation allocation is unfinalized or its finalization receipt conflicts")
+    try:
+        incomplete_path.lstat()
+    except FileNotFoundError:
+        return
+    raise BuildError("Generation allocation acquired an incomplete/failure marker during validation")
+
+
 def _git(plan: dict[str, Any], args: list[str], *, timeout: int = 30) -> str:
     source = str(plan["source_checkout"])
     git = Path("/usr/bin/git")
@@ -353,6 +403,12 @@ def _load_plan(path: Path, expected_sha256: str) -> tuple[dict[str, Any], str]:
         allocation_record = json.loads(record_raw.decode("utf-8"), object_pairs_hook=_strict_pairs)
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise BuildError(f"invalid Generation allocation record: {exc}") from exc
+    _require(isinstance(allocation_record, dict), "Generation allocation record must be an object")
+    _require_finalized_allocation(
+        plan["generation_root"], plan_sha256=plan["allocation_plan_sha256"],
+        record_sha256=plan["allocation_record_sha256"], generation_id=generation_id,
+        allocation_record=allocation_record, uid=plan["operator_uid"], gid=plan["operator_gid"],
+    )
     _require(isinstance(allocation_record, dict)
              and allocation_record.get("record_version") == "rq03f-allocation-record-1.0"
              and allocation_record.get("allocation_status") == "complete"
@@ -630,6 +686,17 @@ def build_candidate(plan_path: Path, expected_plan_sha256: str) -> dict[str, Any
     _require(site_packages.is_relative_to(runtime_root), "site-packages escaped Runtime Root")
     _require(python_executable.is_relative_to(runtime_root), "Python executable escaped Runtime Root")
     _verify_installed_distributions(plan, lock_text)
+    allocation_raw = _read_pinned_file(
+        plan["allocation_record_path"], uid=plan["operator_uid"], gid=plan["operator_gid"]
+    )
+    _require(hashlib.sha256(allocation_raw).hexdigest() == plan["allocation_record_sha256"],
+             "Generation allocation record changed during build")
+    allocation_record = json.loads(allocation_raw.decode("utf-8"), object_pairs_hook=_strict_pairs)
+    _require_finalized_allocation(
+        plan["generation_root"], plan_sha256=plan["allocation_plan_sha256"],
+        record_sha256=plan["allocation_record_sha256"], generation_id=plan["generation_id"],
+        allocation_record=allocation_record, uid=plan["operator_uid"], gid=plan["operator_gid"],
+    )
 
     components: list[dict[str, str]] = [
         _component("controller_scripts_tree", "controller_tree", plan["scripts_root"]),

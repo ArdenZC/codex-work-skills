@@ -36,6 +36,7 @@ _COMMIT = re.compile(r"^[0-9a-f]{40}$")
 _TARGET = re.compile(r"^rq03f-(?:[a-z0-9]|[a-z0-9][a-z0-9-]{0,54}[a-z0-9])$")
 _RECORD_NAME = ".rq03f-allocation-record.json"
 _INCOMPLETE_NAME = ".rq03f-incomplete.json"
+_FINALIZED_NAME = ".rq03f-allocation-finalized.json"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -362,7 +363,9 @@ def _mark_incomplete(target_fd: int, target_id: str, plan_sha256: str, error: Ba
         _write_exclusive(target_fd, _INCOMPLETE_NAME, raw)
         _fsync_directory(target_fd)
         return True
-    except OSError:
+    except BaseException:
+        # Preserve the original allocation failure.  A successfully created
+        # marker remains immutable even when its directory fsync also fails.
         return False
 
 
@@ -464,6 +467,11 @@ def allocate(plan_path: Path, expected_plan_sha256: str) -> dict[str, Any]:
         }
         record_bytes = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
         _write_exclusive(target_fd, _RECORD_NAME, record_bytes)
+
+        # The complete record is only prepared evidence.  It is deliberately
+        # not consumable until the target and parent durability checks and the
+        # reopened-parent identity check have succeeded.  Any failure before
+        # the finalization receipt leaves an immutable incomplete marker.
         _fsync_directory(target_fd)
         _fsync_directory(parent_fd)
         final_parent_fd, _ = _open_directory_chain(parent_path, operator_uid, operator_gid)
@@ -472,10 +480,46 @@ def allocate(plan_path: Path, expected_plan_sha256: str) -> dict[str, Any]:
             _require((final_parent_stat.st_dev, final_parent_stat.st_ino)
                      == (parent_stat.st_dev, parent_stat.st_ino),
                      "trusted parent identity changed before allocation completed")
+            final_target_fd = os.open(
+                target_id, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=final_parent_fd,
+            )
+            try:
+                final_target_stat = os.fstat(final_target_fd)
+                _require((final_target_stat.st_dev, final_target_stat.st_ino)
+                         == (target_stat.st_dev, target_stat.st_ino)
+                         and final_target_stat.st_uid == operator_uid
+                         and final_target_stat.st_gid == operator_gid
+                         and stat.S_IMODE(final_target_stat.st_mode) == 0o700,
+                         "target identity changed before allocation finalization")
+                _require(os.fstat(target_fd).st_ino == final_target_stat.st_ino,
+                         "open target identity differs from final parent entry")
+            finally:
+                os.close(final_target_fd)
         finally:
             os.close(final_parent_fd)
+
+        finalization = {
+            "record_version": "rq03f-allocation-finalization-1.0",
+            "finalization_status": "finalized",
+            "target_id": target_id,
+            "owner_plan_sha256": plan_sha256,
+            "allocation_record_sha256": hashlib.sha256(record_bytes).hexdigest(),
+            "target": {"device": target_stat.st_dev, "inode": target_stat.st_ino,
+                       "uid": target_stat.st_uid, "gid": target_stat.st_gid, "mode": "0700"},
+        }
+        finalization_bytes = (json.dumps(finalization, sort_keys=True, separators=(",", ":"))
+                              + "\n").encode("utf-8")
+        _write_exclusive(target_fd, _FINALIZED_NAME, finalization_bytes)
+        # The target directory entry is the final commit record.  It is created
+        # only after all path and parent checks.  If this sync fails, the
+        # exception path adds an incomplete marker; every reader rejects that
+        # marker even though the prepared complete record and finalizer remain.
+        _fsync_directory(target_fd)
         return {"path": os.path.join(parent_path, target_id), "record": record,
-                "record_sha256": hashlib.sha256(record_bytes).hexdigest()}
+                "record_sha256": hashlib.sha256(record_bytes).hexdigest(),
+                "finalization": finalization,
+                "finalization_sha256": hashlib.sha256(finalization_bytes).hexdigest()}
     except BaseException as exc:
         if created and target_fd is not None:
             marked = _mark_incomplete(target_fd, plan["target_id"], plan_sha256, exc)

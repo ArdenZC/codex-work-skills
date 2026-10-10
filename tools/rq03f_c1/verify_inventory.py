@@ -70,6 +70,8 @@ PLAN_KEYS = {
     "build_python_executable", "site_packages_root", "requirements_lock", "requirements_lock_sha256", "wheelhouse_root",
     "wheelhouse_manifest", "wheelhouse_manifest_sha256", "inventory_output",
 }
+ALLOCATION_INCOMPLETE = ".rq03f-incomplete.json"
+ALLOCATION_FINALIZED = ".rq03f-allocation-finalized.json"
 
 
 def _require(condition: bool, message: str) -> None:
@@ -91,6 +93,78 @@ def _path(raw: Any, label: str) -> Path:
     _require(os.path.normpath(raw) == raw and all(x not in {".", ".."} for x in raw.split("/")),
              f"non-canonical {label}")
     return Path(raw)
+
+
+def _require_finalized_allocation(generation_root: Path, *, plan_sha256: str,
+                                  record_sha256: str, generation_id: str,
+                                  allocation: dict[str, Any], uid: int, gid: int) -> None:
+    """Independent terminal-state check; intentionally does not import builder code."""
+    incomplete_path = generation_root / ALLOCATION_INCOMPLETE
+    try:
+        incomplete_path.lstat()
+    except FileNotFoundError:
+        pass
+    else:
+        raise VerifyError("Generation allocation has an incomplete/failure marker")
+
+    target = allocation.get("target")
+    _require(isinstance(target, dict)
+             and set(target) == {"device", "inode", "uid", "gid", "mode"}
+             and type(target.get("device")) is int and target["device"] >= 0
+             and type(target.get("inode")) is int and target["inode"] > 0
+             and type(target.get("uid")) is int and target["uid"] == uid
+             and type(target.get("gid")) is int and target["gid"] == gid
+             and target.get("mode") == "0700",
+             "Generation allocation target identity is incomplete or invalid")
+
+    finalization_path = generation_root / ALLOCATION_FINALIZED
+    try:
+        _ordinary(finalization_path, directory=False)
+        fd = os.open(finalization_path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    except FileNotFoundError as exc:
+        raise VerifyError("Generation allocation is unfinalized: finalization receipt is absent") from exc
+    try:
+        before = os.fstat(fd)
+        _require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
+                 and before.st_uid in {0, uid} and before.st_mode & 0o022 == 0
+                 and (before.st_uid != uid or before.st_gid == gid),
+                 "Generation finalization receipt identity/mode is unsafe")
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(fd, 16 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+            _require(sum(map(len, chunks)) <= 16 * 1024,
+                     "Generation finalization receipt exceeds size limit")
+        raw = b"".join(chunks)
+        after = os.fstat(fd)
+        _require((before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+                 == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns),
+                 "Generation finalization receipt changed while being read")
+    finally:
+        os.close(fd)
+    try:
+        finalization = json.loads(raw.decode("utf-8"), object_pairs_hook=_strict_pairs)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise VerifyError(f"invalid Generation finalization receipt: {exc}") from exc
+    expected = {
+        "record_version": "rq03f-allocation-finalization-1.0",
+        "finalization_status": "finalized",
+        "target_id": generation_id,
+        "owner_plan_sha256": plan_sha256,
+        "allocation_record_sha256": record_sha256,
+        "target": target,
+    }
+    canonical = (json.dumps(finalization, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+                            allow_nan=False) + "\n").encode("utf-8") if isinstance(finalization, dict) else b""
+    _require(isinstance(finalization, dict) and finalization == expected and raw == canonical,
+             "Generation allocation is unfinalized or its finalization receipt conflicts")
+    try:
+        incomplete_path.lstat()
+    except FileNotFoundError:
+        return
+    raise VerifyError("Generation allocation acquired an incomplete/failure marker during validation")
 
 
 def _ordinary(path: Path, *, directory: bool | None = None, readonly: bool = True) -> os.stat_result:
@@ -214,6 +288,12 @@ def _read_plan(path: Path, expected_sha256: str) -> tuple[dict[str, Any], str]:
         allocation = json.loads(allocation_raw.decode("utf-8"), object_pairs_hook=_strict_pairs)
     except (UnicodeError, json.JSONDecodeError) as exc:
         raise VerifyError(f"invalid exclusive Generation record: {exc}") from exc
+    _require(isinstance(allocation, dict), "exclusive Generation record must be an object")
+    _require_finalized_allocation(
+        plan["generation_root"], plan_sha256=plan["allocation_plan_sha256"],
+        record_sha256=plan["allocation_record_sha256"], generation_id=plan["generation_id"],
+        allocation=allocation, uid=plan["operator_uid"], gid=plan["operator_gid"],
+    )
     _require(isinstance(allocation, dict)
              and allocation.get("record_version") == "rq03f-allocation-record-1.0"
              and allocation.get("allocation_status") == "complete"
@@ -552,6 +632,20 @@ def verify_candidate(inventory_path: Path, expected_inventory_sha256: str,
     _verify_locked_inputs_and_installed_distributions(plan)
     expected_out = plan["inventory_output"]
     _require(inventory_path == expected_out, "Inventory output path differs from the build plan")
+    allocation_raw = plan["allocation_record_path"].read_bytes()
+    _require(hashlib.sha256(allocation_raw).hexdigest() == plan["allocation_record_sha256"],
+             "exclusive Generation record changed during verification")
+    try:
+        allocation = json.loads(allocation_raw.decode("utf-8"), object_pairs_hook=_strict_pairs)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise VerifyError(f"invalid exclusive Generation record during verification: {exc}") from exc
+    _require(isinstance(allocation, dict) and allocation.get("allocation_status") == "complete",
+             "exclusive Generation record became incomplete during verification")
+    _require_finalized_allocation(
+        plan["generation_root"], plan_sha256=plan["allocation_plan_sha256"],
+        record_sha256=plan["allocation_record_sha256"], generation_id=plan["generation_id"],
+        allocation=allocation, uid=plan["operator_uid"], gid=plan["operator_gid"],
+    )
     return {"verification_status": "PASS", "authority_status": "candidate_only_not_owner_approved",
             "inventory_sha256": actual_sha, "build_plan_sha256": plan_sha256,
             "components_verified": len(components), "source_commit": plan["source_commit"],
