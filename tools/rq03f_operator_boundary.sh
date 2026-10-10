@@ -72,7 +72,7 @@ assert_role_account() {
   local user=$1
   local expected_home="/var/lib/$user"
   local entry name password uid gid gecos home shell
-  local primary_gid groups home_owner home_mode passwd_state
+  local primary_gid groups home_owner home_mode passwd_state sudo_status
   entry=$(getent passwd "$user") || fail "role account is missing: $user"
   IFS=: read -r name password uid gid gecos home shell <<<"$entry"
   [[ $name == "$user" && $uid =~ ^[0-9]+$ && $gid =~ ^[0-9]+$ ]] \
@@ -94,9 +94,15 @@ assert_role_account() {
     || fail "role account home ownership/mode mismatch: $user"
   passwd_state=$(passwd -S "$user" | awk '{print $2}')
   [[ $passwd_state == L ]] || fail "role account password is not locked: $user"
-  if sudo -n -l -U "$user" >/dev/null 2>&1; then
+  if setpriv --reuid="$uid" --regid="$gid" --clear-groups -- \
+    /usr/bin/sudo -n true >/dev/null 2>&1; then
+    sudo_status=0
+    printf 'role_sudo_probe user=%s uid=%s exit_code=%s result=FAIL\n' "$user" "$uid" "$sudo_status" >&2
     fail "role account has sudo authorization: $user"
+  else
+    sudo_status=$?
   fi
+  printf 'role_sudo_probe user=%s uid=%s exit_code=%s result=PASS\n' "$user" "$uid" "$sudo_status"
 }
 
 assert_all_role_accounts() {
@@ -116,7 +122,8 @@ assert_all_role_accounts() {
 
 create_accounts() {
   require_root
-  command -v sudo >/dev/null || fail 'sudo is required to verify direct role grants'
+  [[ -x /usr/bin/sudo ]] || fail 'the absolute /usr/bin/sudo path is required to verify direct role grants'
+  command -v setpriv >/dev/null || fail 'setpriv is required to verify isolated role identities'
   trap cleanup_new_accounts EXIT
   local user
   for user in "${ROLE_USERS[@]}"; do
@@ -235,7 +242,8 @@ assert_no_named_acls() {
 
 provision() {
   require_root
-  command -v sudo >/dev/null || fail 'sudo is required to verify direct role grants'
+  [[ -x /usr/bin/sudo ]] || fail 'the absolute /usr/bin/sudo path is required to verify direct role grants'
+  command -v setpriv >/dev/null || fail 'setpriv is required to verify isolated role identities'
   command -v getfacl >/dev/null && command -v setfacl >/dev/null \
     || fail 'acl package (getfacl/setfacl) is required for effective permission checks'
   [[ $# -eq 6 ]] || usage

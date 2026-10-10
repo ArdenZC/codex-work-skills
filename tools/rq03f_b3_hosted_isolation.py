@@ -186,6 +186,60 @@ def _run_as(
     return result
 
 
+def _run_direct_sudo_probe(user: str) -> None:
+    """Check sudo policy as the real role UID without no_new_privs masking it."""
+    uid, gid = _identity(user)
+    home = pwd.getpwnam(user).pw_dir
+    identity_probe = (
+        "import os; "
+        "print('sudo_probe_identity=' + str({'uid':os.getuid(),'euid':os.geteuid(),'gid':os.getgid(),'groups':os.getgroups()}),flush=True); "
+        "os.execv('/usr/bin/sudo',['/usr/bin/sudo','-n','true'])"
+    )
+    command = [
+        "/usr/bin/sudo",
+        "-n",
+        "/usr/bin/setpriv",
+        f"--reuid={uid}",
+        f"--regid={gid}",
+        "--clear-groups",
+        "--",
+        "/usr/bin/env",
+        "-i",
+        f"HOME={home}",
+        f"USER={user}",
+        f"LOGNAME={user}",
+        "PATH=/usr/bin:/bin",
+        "/usr/bin/python3",
+        "-I",
+        "-S",
+        "-c",
+        identity_probe,
+    ]
+    result = subprocess.run(
+        command,
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        close_fds=True,
+        check=False,
+    )
+    _report_result(
+        f"direct sudo grant probe as actual UID:{user}",
+        user,
+        uid,
+        ["/usr/bin/sudo", "-n", "true"],
+        result,
+        "nonzero",
+    )
+    if (
+        f"'uid': {uid}" not in result.stdout
+        or f"'euid': {uid}" not in result.stdout
+        or f"'gid': {gid}" not in result.stdout
+        or "'groups': []" not in result.stdout
+    ):
+        FAILURES.append(f"direct sudo probe did not report the expected real UID for {user}")
+
+
 def _stage_roots() -> None:
     for path in (STAGE_ROOT, TRUST_DATA_ROOT):
         check = _root_command(["test", "!", "-e", str(path)], label=f"fresh-path:{path}")
@@ -583,6 +637,7 @@ def _verify_role_denials(pins: dict) -> None:
     open_code = "import os,sys; print(f'uid={os.getuid()} euid={os.geteuid()}',flush=True); open(sys.argv[1],'rb').read(1)"
     append_code = "import os,sys; print(f'uid={os.getuid()} euid={os.geteuid()}',flush=True); fd=os.open(sys.argv[1],os.O_WRONLY|os.O_APPEND); os.close(fd)"
     for user in NON_OPERATOR_USERS:
+        _run_direct_sudo_probe(user)
         for target, label in (
             (index_path, "index"),
             (profile_path, "profile"),
