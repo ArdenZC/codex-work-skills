@@ -159,6 +159,35 @@ sudo -n install -o root -g root -m 0444 "$allocator_source" "$allocator_copy"
 allocator_copy_sha=$(sha256sum "$allocator_copy" | cut -d ' ' -f1)
 [[ "$allocator_copy_sha" == "$allocator_source_sha" ]]
 log "CANDIDATE_TOOL_INPUT source_sha256=$allocator_source_sha read_only_copy_sha256=$allocator_copy_sha copy_owner=$(stat -c %u "$allocator_copy") copy_mode=$(stat -c %a "$allocator_copy")"
+
+mapfile -d '' test_sources < <(git -C "$repo_root" ls-files -z -- \
+  tools/rq03f_c1 tests/test_rq03f_c1_operator_infrastructure.py \
+  '教案生成器/lesson-plan-docx-generator/scripts' \
+  '教案生成器/lesson-plan-docx-generator/schemas')
+[[ ${#test_sources[@]} -gt 20 ]]
+for relative in "${test_sources[@]}"; do
+  case "$relative" in
+    tools/rq03f_c1/*.py|tools/rq03f_c1/schemas/*.json|tests/test_rq03f_c1_operator_infrastructure.py|\
+      教案生成器/lesson-plan-docx-generator/scripts/*|\
+      教案生成器/lesson-plan-docx-generator/schemas/*) ;;
+    *) log "FAIL unexpected hosted test source path: $relative"; exit 2 ;;
+  esac
+  mode=$(git -C "$repo_root" ls-files -s -- "$relative" | awk 'NR == 1 {print $1}')
+  source="$repo_root/$relative"
+  destination="$operator_code_dir/$relative"
+  if [[ "$mode" != "100644" && "$mode" != "100755" ]] || [[ ! -f "$source" || -L "$source" ]] || \
+    [[ "$(realpath -e "$source")" != "$source" ]]; then
+    log "FAIL hosted test source is not a tracked canonical regular file: $relative mode=$mode"
+    exit 2
+  fi
+  source_sha=$(sha256sum "$source" | cut -d ' ' -f1)
+  sudo -n install -D -o root -g root -m 0444 "$source" "$destination"
+  destination_sha=$(sha256sum "$destination" | cut -d ' ' -f1)
+  [[ "$destination_sha" == "$source_sha" ]]
+done
+sudo -n install -d -o root -g root -m 0755 "$operator_code_dir/tests"
+sudo -n install -o root -g root -m 0444 /dev/null "$operator_code_dir/tests/__init__.py"
+log "OPERATOR_TEST_INPUT files=${#test_sources[@]} owner=$(stat -c %u "$operator_code_dir/tests/test_rq03f_c1_operator_infrastructure.py") copied_sha_values_match=true"
 source_commit=$(git -C "$repo_root" rev-parse HEAD)
 parent="$test_root/operator-generation-parent"
 parent_device=$(stat -c %d "$parent")
@@ -210,7 +239,7 @@ export RQ03F_C1_ACL_TEST_PARENT="$test_root/operator-acl-parent"
 set +e
 run_as "$operator" /usr/bin/env RQ03F_C1_TEST_TMPDIR="$test_root/operator-work" \
   RQ03F_C1_ACL_TEST_PARENT="$test_root/operator-acl-parent" \
-  "$python_bin" -m unittest \
+  PYTHONPATH="$operator_code_dir" "$python_bin" -m unittest \
   tests.test_rq03f_c1_operator_infrastructure -v 2>&1 | tee "$evidence_dir/unittest.txt" | tee -a "$evidence_file"
 test_status=${PIPESTATUS[0]}
 set -e
