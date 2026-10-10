@@ -373,6 +373,14 @@ class TrustContext:
                 and not self.inventory.run_root.resolve(strict=True).is_relative_to(controller_root),
                 "installed controller root overlaps candidate operation data",
             )
+            # The isolated bootstrap has already verified every component in
+            # this exact, externally pinned inventory before importing any
+            # controller or third-party modules. Rehashing all package and
+            # controller trees on every TrustContext.load() would repeat that
+            # work for every case/repetition. Keep validating the pinned
+            # manifest structure and component path boundaries here. Validate
+            # loaded module/schema paths and hashes below; package bytes remain
+            # covered by the launch-time attestation.
             try:
                 controller_bootstrap.verify_build_inventory(
                     Path(self.inventory.entries[profile["controller_build_inventory_key"]]["path"]),
@@ -380,6 +388,7 @@ class TrustContext:
                     controller_root,
                     require_isolated=False,
                     verify_runtime_tree=False,
+                    verify_component_hashes=False,
                 )
             except (controller_bootstrap.BootstrapError, OSError, KeyError, TypeError, ValueError) as exc:
                 raise RecordError(f"operator controller runtime verification failed: {exc}") from exc

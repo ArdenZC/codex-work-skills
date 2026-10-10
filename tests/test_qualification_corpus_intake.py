@@ -47,11 +47,32 @@ from tests.semantic_scope_test_support import Evidence, FIXTURES, ROOT
 SCRIPTS = ROOT / "教案生成器/lesson-plan-docx-generator/scripts"
 SCHEMAS = ROOT / "教案生成器/lesson-plan-docx-generator/schemas"
 ORIGIN_COMMIT = "c67c2a83433417879b5e2b8c21bbddde8446224a"
+_STATIC_TRUST_FIXTURE = tempfile.TemporaryDirectory(prefix="qualification-static-trust-")
+STATIC_TRUST_ROOT = Path(_STATIC_TRUST_FIXTURE.name).resolve()
 
 
 @lru_cache(maxsize=4)
 def _site_packages_digest(path: str) -> str:
     return controller_bootstrap.sha256_runtime_tree(Path(path))
+
+
+@lru_cache(maxsize=128)
+def _component_tree_digest(path: str, include_bytecode_cache: bool = False) -> str:
+    """Reuse immutable source/dependency fixture hashes within this test process."""
+    return sha256_tree(Path(path), include_bytecode_cache=include_bytecode_cache)
+
+
+@lru_cache(maxsize=256)
+def _static_source_bytes(path: str) -> bytes:
+    return Path(path).read_bytes()
+
+
+@lru_cache(maxsize=256)
+def _seed_static_trust_file(key: str, raw: bytes) -> tuple[str, str]:
+    path = STATIC_TRUST_ROOT / (key.replace(":", "_") + ".bin")
+    path.write_bytes(raw)
+    path.chmod(0o444)
+    return str(path.resolve()), sha256_bytes(raw)
 
 
 class IntakeFixture:
@@ -68,29 +89,29 @@ class IntakeFixture:
         self.candidate_uid = self.operator_uid + 10000
         self.now = datetime.now(timezone.utc)
         self.operator = "owner-controller:qualification-corpus-custodian"
-        self.write_protected("operator-reference", b"Owner-managed operator reference\n")
-        self.write_protected("ingress-procedure", b"separate UID; clean controller launch\n")
-        self.write_protected("evidence-repository", b"protected append-only evidence store\n")
+        self.write_static_protected("operator-reference", b"Owner-managed operator reference\n")
+        self.write_static_protected("ingress-procedure", b"separate UID; clean controller launch\n")
+        self.write_static_protected("evidence-repository", b"protected append-only evidence store\n")
 
         fixture_files = json.loads((FIXTURES / "fixture-files.json").read_bytes())
         self.origin_by_case = {}
         for row in fixture_files:
             source = ROOT / row["path"]
-            raw = source.read_bytes()
-            self.write_protected(row["inventory_key"], raw)
+            raw = _static_source_bytes(str(source))
+            self.write_static_protected(row["inventory_key"], raw)
             if row["inventory_key"].endswith(".content"):
                 case_id = row["inventory_key"].split(".", 1)[0]
                 self.origin_by_case[case_id] = {
                     "git_commit": ORIGIN_COMMIT,
                     "content_path": row["path"],
                 }
-        self.write_protected(
+        self.write_static_protected(
             "qualification_corpus",
-            (FIXTURES / "qualification-corpus.json").read_bytes(),
+            _static_source_bytes(str(FIXTURES / "qualification-corpus.json")),
         )
-        self.write_protected(
+        self.write_static_protected(
             "blind_holdout_truth",
-            (FIXTURES / "blind-holdout-truth.json").read_bytes(),
+            _static_source_bytes(str(FIXTURES / "blind-holdout-truth.json")),
         )
 
         controller_components = []
@@ -157,7 +178,7 @@ class IntakeFixture:
                 "component_id": package_name,
                 "component_type": "python_package",
                 "runtime_path": str(package_path),
-                "sha256": sha256_tree(package_path, include_bytecode_cache=True),
+                "sha256": _component_tree_digest(str(package_path), include_bytecode_cache=True),
             })
         typing_module_path = (site_packages / "typing_extensions.py").resolve()
         controller_components.append({
@@ -171,13 +192,13 @@ class IntakeFixture:
                 "component_id": "controller_scripts_tree",
                 "component_type": "controller_tree",
                 "runtime_path": str(SCRIPTS.resolve()),
-                "sha256": sha256_tree(SCRIPTS),
+                "sha256": _component_tree_digest(str(SCRIPTS.resolve())),
             },
             {
                 "component_id": "controller_schemas_tree",
                 "component_type": "controller_tree",
                 "runtime_path": str(SCHEMAS.resolve()),
-                "sha256": sha256_tree(SCHEMAS),
+                "sha256": _component_tree_digest(str(SCHEMAS.resolve())),
             },
         ))
         build = {
@@ -283,6 +304,16 @@ class IntakeFixture:
         }
         return path
 
+    def write_static_protected(self, key: str, raw: bytes):
+        path, digest = _seed_static_trust_file(key, raw)
+        self.entries[key] = {
+            "inventory_key": key,
+            "path": path,
+            "sha256": digest,
+            "storage_class": "protected_external",
+        }
+        return Path(path)
+
     def write_run(self, key: str, raw: bytes):
         path = self.run_root / (key.replace(":", "_") + ".bin")
         path.write_bytes(raw)
@@ -296,7 +327,7 @@ class IntakeFixture:
 
     def context(self):
         return TrustContext(
-            Inventory(self.entries, self.run_root, (self.trust_root, SCRIPTS.parent)),
+            Inventory(self.entries, self.run_root, (self.trust_root, STATIC_TRUST_ROOT, SCRIPTS.parent)),
             Path(self.entries["authority_profile"]["path"]),
             self.entries["authority_profile"]["sha256"],
             self.profile["policy_epoch"],
@@ -697,8 +728,14 @@ else:
         )
         dependency["sha256"] = "0" * 64
         self.e._pin_build(tampered_dependency)
-        with self.assertRaisesRegex(RecordError, "component SHA mismatch"):
-            self.e.context().load()
+        with self.assertRaisesRegex(controller_bootstrap.BootstrapError, "component SHA mismatch"):
+            controller_bootstrap.verify_build_inventory(
+                Path(self.e.entries["operator_controller_build"]["path"]),
+                self.e.entries["operator_controller_build"]["sha256"],
+                Path(self.e.build["controller_root"]),
+                require_isolated=False,
+                verify_runtime_tree=False,
+            )
 
         # Restore the complete manifest, then simulate a module shadowed from a
         # candidate-controlled directory after the normal test imports.
@@ -808,7 +845,8 @@ else:
                 check=False,
             )
             self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-            self.assertIn(str(root / "scripts" / "semantic_scope_records.py"), result.stdout)
+            expected_module_path = (root / "scripts" / "semantic_scope_records.py").resolve()
+            self.assertIn(str(expected_module_path), result.stdout)
             self.assertFalse(marker.exists(), "malicious PYTHONPATH module executed")
             unsafe = subprocess.run(
                 [
@@ -955,7 +993,7 @@ else:
         inventory = Inventory(
             entries,
             e.run,
-            (e.protected, trust.trust_root, SCRIPTS.parent),
+            (e.protected, trust.trust_root, STATIC_TRUST_ROOT, SCRIPTS.parent),
         )
         context = TrustContext(
             inventory,

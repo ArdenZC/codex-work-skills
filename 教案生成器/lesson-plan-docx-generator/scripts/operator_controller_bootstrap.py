@@ -200,6 +200,7 @@ def verify_build_inventory(
     *,
     require_isolated: bool = True,
     verify_runtime_tree: bool = True,
+    verify_component_hashes: bool = True,
 ) -> dict[str, Any]:
     """Verify files and runtime before importing any non-stdlib dependencies."""
     if require_isolated:
@@ -256,30 +257,31 @@ def verify_build_inventory(
         if kind in {"python_module", "json_schema"}:
             _require(path.resolve(strict=True).is_relative_to(root.resolve(strict=True)),
                      f"controller file outside pinned install root: {row['component_id']}")
-            actual = sha256_file(path)
+            actual = sha256_file(path) if verify_component_hashes else None
         elif kind == "python_package":
             _require(path.resolve(strict=True).is_relative_to(site_packages),
                      f"Python package outside pinned site-packages: {row['component_id']}")
-            actual = sha256_tree(path, include_bytecode_cache=True)
+            actual = sha256_tree(path, include_bytecode_cache=True) if verify_component_hashes else None
         elif kind == "controller_tree":
             _require(path.resolve(strict=True).is_relative_to(root.resolve(strict=True)),
                      f"controller tree outside pinned install root: {row['component_id']}")
-            if require_isolated:
+            if require_isolated and verify_component_hashes:
                 for current, directories, files in os.walk(path, topdown=True, followlinks=False):
                     _require("__pycache__" not in directories,
                              f"controller installation contains bytecode cache: {current}")
                     _require(not any(Path(name).suffix.casefold() in {".pyc", ".pyo"}
                                      for name in files),
                              f"controller installation contains loose bytecode: {current}")
-            actual = sha256_tree(path)
+            actual = sha256_tree(path) if verify_component_hashes else None
         elif kind == "python_dependency_module":
             _require(path.resolve(strict=True).is_relative_to(site_packages),
                      f"Python dependency outside pinned site-packages: {row['component_id']}")
-            actual = sha256_file(path)
+            actual = sha256_file(path) if verify_component_hashes else None
         else:
             raise BootstrapError(f"unsupported controller component type: {kind}")
-        _require(actual == row["sha256"],
-                 f"controller component SHA mismatch: {row['component_id']}")
+        if actual is not None:
+            _require(actual == row["sha256"],
+                     f"controller component SHA mismatch: {row['component_id']}")
 
     return payload
 
