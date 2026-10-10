@@ -5,15 +5,24 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
+import sys
+import sysconfig
 import tempfile
+import types
 import unittest
+from unittest.mock import patch
 
+import qualification_corpus_intake as intake_module
 from lifecycle_digest import canonical_json_bytes, schema_errors, sha256_bytes
 from operation_provenance import validate_receipt
+import operator_controller_bootstrap as controller_bootstrap
+from operator_controller_bootstrap import sha256_tree
 from qualification_corpus_intake import (
     FROZEN_CASE_CONTENT_SHA256,
     FROZEN_GOLDEN_SHA256,
@@ -26,12 +35,23 @@ from qualification_corpus_intake import (
     validate_qualification_corpus_intake,
 )
 from semantic_scope_records import Inventory, RecordError, TrustContext, checked, parse
+import semantic_scope_review  # noqa: F401 - synthetic controller closure import
+import reviewer_qualification  # noqa: F401 - synthetic controller closure import
+import source_truth  # noqa: F401 - synthetic controller closure import
+import exemplar_contract  # noqa: F401 - synthetic controller closure import
+import exemplar_split  # noqa: F401 - synthetic controller closure import
+import path_safety  # noqa: F401 - synthetic controller closure import
 from tests.semantic_scope_test_support import Evidence, FIXTURES, ROOT
 
 
 SCRIPTS = ROOT / "教案生成器/lesson-plan-docx-generator/scripts"
 SCHEMAS = ROOT / "教案生成器/lesson-plan-docx-generator/schemas"
 ORIGIN_COMMIT = "c67c2a83433417879b5e2b8c21bbddde8446224a"
+
+
+@lru_cache(maxsize=4)
+def _site_packages_digest(path: str) -> str:
+    return controller_bootstrap.sha256_runtime_tree(Path(path))
 
 
 class IntakeFixture:
@@ -44,7 +64,7 @@ class IntakeFixture:
         self.run_root.mkdir(parents=True)
         self.trust_root.mkdir(parents=True)
         self.entries: dict[str, dict[str, str]] = {}
-        self.operator_uid = os.geteuid()
+        self.operator_uid = getattr(os, "geteuid", lambda: getattr(os, "getuid", lambda: 1000)())()
         self.candidate_uid = self.operator_uid + 10000
         self.now = datetime.now(timezone.utc)
         self.operator = "owner-controller:qualification-corpus-custodian"
@@ -74,13 +94,20 @@ class IntakeFixture:
         )
 
         controller_components = []
-        for module_name in (
+        required_modules = (
+            "operator_controller_bootstrap",
             "semantic_scope_records",
             "semantic_scope_review",
             "operation_provenance",
             "reviewer_qualification",
             "qualification_corpus_intake",
-        ):
+            "lifecycle_digest",
+            "source_truth",
+            "exemplar_contract",
+            "exemplar_split",
+            "path_safety",
+        )
+        for module_name in required_modules:
             key = "controller:" + module_name
             raw = (SCRIPTS / (module_name + ".py")).read_bytes()
             self.write_protected(key, raw)
@@ -89,16 +116,17 @@ class IntakeFixture:
                     "component_id": module_name,
                     "component_type": "python_module",
                     "inventory_key": key,
+                    "runtime_path": str((SCRIPTS / (module_name + ".py")).resolve()),
                     "sha256": sha256_bytes(raw),
                 }
             )
-        for schema_name in (
+        required_schemas = (
             "managed-reviewer-service-observation-v1.1.schema.json",
             "managed-service-capture-manifest-v1.1.schema.json",
             "managed-service-observation-policy-v1.1.schema.json",
             "operation-provenance-receipt-v1.2.schema.json",
             "operator-authority-profile-v1.1.schema.json",
-            "operator-controller-build-inventory-v1.0.schema.json",
+            "operator-controller-build-inventory-v1.1.schema.json",
             "operator-role-authorization-v1.1.schema.json",
             "protected-operation-index-v1.1.schema.json",
             "qualification-adjudication.schema.json",
@@ -108,7 +136,8 @@ class IntakeFixture:
             "reviewer-qualification-v1.1.schema.json",
             "semantic-scope-review.schema.json",
             "source-truth-manifest.schema.json",
-        ):
+        )
+        for schema_name in required_schemas:
             key = "controller-schema:" + schema_name
             raw = (SCHEMAS / schema_name).read_bytes()
             self.write_protected(key, raw)
@@ -117,17 +146,55 @@ class IntakeFixture:
                     "component_id": schema_name,
                     "component_type": "json_schema",
                     "inventory_key": key,
+                    "runtime_path": str((SCHEMAS / schema_name).resolve()),
                     "sha256": sha256_bytes(raw),
                 }
             )
+        site_packages = Path(sysconfig.get_paths()["purelib"]).resolve()
+        for package_name in sorted(("attr", "attrs", "jsonschema", "jsonschema_specifications", "referencing", "rpds")):
+            package_path = (site_packages / package_name).resolve()
+            controller_components.append({
+                "component_id": package_name,
+                "component_type": "python_package",
+                "runtime_path": str(package_path),
+                "sha256": sha256_tree(package_path, include_bytecode_cache=True),
+            })
+        typing_module_path = (site_packages / "typing_extensions.py").resolve()
+        controller_components.append({
+            "component_id": "typing_extensions",
+            "component_type": "python_dependency_module",
+            "runtime_path": str(typing_module_path),
+            "sha256": sha256_bytes(typing_module_path.read_bytes()),
+        })
+        controller_components.extend((
+            {
+                "component_id": "controller_scripts_tree",
+                "component_type": "controller_tree",
+                "runtime_path": str(SCRIPTS.resolve()),
+                "sha256": sha256_tree(SCRIPTS),
+            },
+            {
+                "component_id": "controller_schemas_tree",
+                "component_type": "controller_tree",
+                "runtime_path": str(SCHEMAS.resolve()),
+                "sha256": sha256_tree(SCHEMAS),
+            },
+        ))
         build = {
-            "build_inventory_version": "1.0",
+            "build_inventory_version": "1.1",
             "controller_id": "rq03f-intake-controller",
+            "controller_root": str(SCRIPTS.parent.resolve()),
+            "python_runtime": {
+                "python_executable": str(Path(sys.executable).resolve()),
+                "python_executable_sha256": sha256_bytes(Path(sys.executable).read_bytes()),
+                "python_version": sys.version.split()[0],
+                "site_packages_root": str(site_packages),
+                "site_packages_sha256": _site_packages_digest(str(site_packages)),
+            },
             "components": controller_components,
         }
-        build_raw = canonical_json_bytes(build)
-        self.write_protected("operator_controller_build", build_raw)
-        build_sha = sha256_bytes(build_raw)
+        self._pin_build(build)
+        build_sha = self.entries["operator_controller_build"]["sha256"]
 
         role_specs = (
             (self.operator, ["qualification_corpus_custodian"], "1.1"),
@@ -193,6 +260,16 @@ class IntakeFixture:
         }
         self.write_protected("operation_index", canonical_json_bytes(self.index), mode=0o600)
 
+    def _pin_build(self, build):
+        self.build = deepcopy(build)
+        build_raw = canonical_json_bytes(self.build)
+        self.write_protected("operator_controller_build", build_raw)
+        build_sha = sha256_bytes(build_raw)
+        if hasattr(self, "profile"):
+            self.profile["controller_build_inventory_sha256"] = build_sha
+            self.write_protected("authority_profile", canonical_json_bytes(self.profile), mode=0o600)
+        return build_sha
+
     def write_protected(self, key: str, raw: bytes, *, mode: int = 0o644):
         path = self.trust_root / (key.replace(":", "_") + ".bin")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -219,7 +296,7 @@ class IntakeFixture:
 
     def context(self):
         return TrustContext(
-            Inventory(self.entries, self.run_root, (self.trust_root,)),
+            Inventory(self.entries, self.run_root, (self.trust_root, SCRIPTS.parent)),
             Path(self.entries["authority_profile"]["path"]),
             self.entries["authority_profile"]["sha256"],
             self.profile["policy_epoch"],
@@ -293,6 +370,11 @@ class QualificationCorpusIntakeTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="qualification-corpus-intake-")
         self.addCleanup(self.temp.cleanup)
+        self._synthetic_bootstrap = patch.object(
+            controller_bootstrap, "bootstrap_attested", return_value=True
+        )
+        self._synthetic_bootstrap.start()
+        self.addCleanup(self._synthetic_bootstrap.stop)
         self.e = IntakeFixture(Path(self.temp.name))
 
     def test_frozen_manifest_and_all_17_content_bytes_match_b1(self):
@@ -350,6 +432,7 @@ class QualificationCorpusIntakeTests(unittest.TestCase):
         with self.assertRaisesRegex(RecordError, "duplicate protected operation ID"):
             append_intake_index(appended, {**new_row, "intake_id": "qci-2"})
 
+    @unittest.skipUnless(os.name == "posix", "protected capture requires POSIX no-follow locks and ownership checks")
     def test_operator_capture_appends_adoptable_record_in_temporary_store(self):
         context = self.e.context()
         _, before = context.load()
@@ -539,7 +622,7 @@ class QualificationCorpusIntakeTests(unittest.TestCase):
 
     def test_shared_operator_candidate_uid_and_missing_trust_fail_closed(self):
         context = self.e.context()
-        shared = replace(context, non_operator_process_unix_uids=(os.geteuid(),))
+        shared = replace(context, non_operator_process_unix_uids=(self.e.operator_uid,))
         with self.assertRaisesRegex(RecordError, "process identity differs"):
             shared.load()
 
@@ -558,6 +641,193 @@ class QualificationCorpusIntakeTests(unittest.TestCase):
         forged = replace(context, profile_path=candidate_profile, operation_index_path=candidate_index)
         with self.assertRaisesRegex(RecordError, "outside protected repository"):
             forged.load()
+
+    def test_capture_fails_closed_before_context_access_without_posix_apis(self):
+        with patch.object(intake_module, "_fcntl", None):
+            with self.assertRaisesRegex(RecordError, "requires POSIX filesystem controls"):
+                capture_qualification_corpus_intake(None)
+
+    def test_module_imports_and_fails_closed_when_fcntl_is_unavailable(self):
+        code = """
+import builtins, sys
+sys.path.insert(0, sys.argv[1])
+original_import = builtins.__import__
+def without_fcntl(name, *args, **kwargs):
+    if name == 'fcntl':
+        raise ModuleNotFoundError('simulated non-POSIX runtime')
+    return original_import(name, *args, **kwargs)
+builtins.__import__ = without_fcntl
+import qualification_corpus_intake as intake
+assert intake._fcntl is None
+try:
+    intake.capture_qualification_corpus_intake(None)
+except intake.RecordError as exc:
+    assert 'requires POSIX filesystem controls' in str(exc)
+else:
+    raise AssertionError('capture unexpectedly proceeded without POSIX controls')
+"""
+        result = subprocess.run(
+            [sys.executable, "-B", "-c", code, str(SCRIPTS)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+    def test_profile_1_1_requires_verified_isolated_bootstrap(self):
+        context = self.e.context()
+        with patch.object(controller_bootstrap, "bootstrap_attested", return_value=False):
+            with self.assertRaisesRegex(RecordError, "requires the isolated Owner-pinned controller bootstrap"):
+                context.load()
+
+    def test_unpinned_transitive_module_and_dependency_substitution_are_rejected(self):
+        good_build = deepcopy(self.e.build)
+        build = deepcopy(good_build)
+        build["components"] = [
+            row for row in build["components"] if row["component_id"] != "source_truth"
+        ]
+        self.e._pin_build(build)
+        with self.assertRaisesRegex(RecordError, "incomplete"):
+            self.e.context().load()
+
+        tampered_dependency = deepcopy(good_build)
+        dependency = next(
+            row for row in tampered_dependency["components"]
+            if row["component_type"] == "python_package"
+        )
+        dependency["sha256"] = "0" * 64
+        self.e._pin_build(tampered_dependency)
+        with self.assertRaisesRegex(RecordError, "component SHA mismatch"):
+            self.e.context().load()
+
+        # Restore the complete manifest, then simulate a module shadowed from a
+        # candidate-controlled directory after the normal test imports.
+        self.e._pin_build(good_build)
+        with tempfile.TemporaryDirectory(prefix="candidate-import-shadow-") as temp_name:
+            shadow = Path(temp_name) / "source_truth.py"
+            shadow.write_text("# candidate-controlled module shadow\n", encoding="utf-8")
+            substituted = types.ModuleType("source_truth")
+            substituted.__file__ = str(shadow)
+            with patch.dict(sys.modules, {"source_truth": substituted}):
+                with self.assertRaisesRegex(RecordError, "unpinned import path"):
+                    self.e.context().load()
+
+    def test_installed_controller_bootstrap_ignores_malicious_pythonpath(self):
+        with tempfile.TemporaryDirectory(prefix="controller-install-") as temp_name:
+            root = Path(temp_name) / "installed"
+            cache_ignore = shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo")
+            shutil.copytree(SCRIPTS, root / "scripts", ignore=cache_ignore)
+            shutil.copytree(SCHEMAS, root / "schemas", ignore=cache_ignore)
+            runtime_packages = Path(sysconfig.get_paths()["purelib"]).resolve()
+            rows = []
+            for module_name in sorted(controller_bootstrap.REQUIRED_MODULES):
+                path = root / "scripts" / (module_name + ".py")
+                raw = path.read_bytes()
+                rows.append({
+                    "component_id": module_name,
+                    "component_type": "python_module",
+                    "inventory_key": "module:" + module_name,
+                    "runtime_path": str(path.resolve()),
+                    "sha256": sha256_bytes(raw),
+                })
+            for schema_name in sorted(controller_bootstrap.REQUIRED_SCHEMAS):
+                path = root / "schemas" / schema_name
+                raw = path.read_bytes()
+                rows.append({
+                    "component_id": schema_name,
+                    "component_type": "json_schema",
+                    "inventory_key": "schema:" + schema_name,
+                    "runtime_path": str(path.resolve()),
+                    "sha256": sha256_bytes(raw),
+                })
+            for component_id, path in (
+                ("controller_scripts_tree", root / "scripts"),
+                ("controller_schemas_tree", root / "schemas"),
+            ):
+                rows.append({
+                    "component_id": component_id,
+                    "component_type": "controller_tree",
+                    "runtime_path": str(path.resolve()),
+                    "sha256": sha256_tree(path),
+                })
+            for package_name in sorted(controller_bootstrap.REQUIRED_PACKAGES):
+                path = runtime_packages / package_name
+                rows.append({
+                    "component_id": package_name,
+                    "component_type": "python_package",
+                    "runtime_path": str(path.resolve()),
+                    "sha256": sha256_tree(path, include_bytecode_cache=True),
+                })
+            dependency_path = (runtime_packages / "typing_extensions.py").resolve()
+            rows.append({
+                "component_id": "typing_extensions",
+                "component_type": "python_dependency_module",
+                "runtime_path": str(dependency_path),
+                "sha256": sha256_bytes(dependency_path.read_bytes()),
+            })
+            build = {
+                "build_inventory_version": "1.1",
+                "controller_id": "isolated-install-test",
+                "controller_root": str(root.resolve()),
+                "python_runtime": {
+                    "python_executable": str(Path(sys.executable).resolve()),
+                    "python_executable_sha256": sha256_bytes(Path(sys.executable).read_bytes()),
+                    "python_version": sys.version.split()[0],
+                    "site_packages_root": str(runtime_packages),
+                    "site_packages_sha256": _site_packages_digest(str(runtime_packages)),
+                },
+                "components": rows,
+            }
+            trust = Path(temp_name) / "trust"
+            trust.mkdir()
+            inventory_path = trust / "controller-build.json"
+            inventory_raw = canonical_json_bytes(build)
+            inventory_path.write_bytes(inventory_raw)
+            malicious = Path(temp_name) / "untrusted-pythonpath"
+            malicious.mkdir()
+            marker = Path(temp_name) / "shadow-imported"
+            (malicious / "semantic_scope_records.py").write_text(
+                f"from pathlib import Path\nPath({str(marker)!r}).write_text('loaded')\n",
+                encoding="utf-8",
+            )
+            env = dict(os.environ)
+            env["PYTHONPATH"] = str(malicious)
+            result = subprocess.run(
+                [
+                    sys.executable, "-I", "-S", "-B",
+                    str(root / "scripts" / "operator_controller_bootstrap.py"),
+                    "--build-inventory", str(inventory_path),
+                    "--build-sha256", sha256_bytes(inventory_raw),
+                    "--controller-root", str(root),
+                    "--probe-module", "semantic_scope_records",
+                ],
+                cwd=temp_name,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            self.assertIn(str(root / "scripts" / "semantic_scope_records.py"), result.stdout)
+            self.assertFalse(marker.exists(), "malicious PYTHONPATH module executed")
+            unsafe = subprocess.run(
+                [
+                    sys.executable, "-B",
+                    str(root / "scripts" / "operator_controller_bootstrap.py"),
+                    "--build-inventory", str(inventory_path),
+                    "--build-sha256", sha256_bytes(inventory_raw),
+                    "--controller-root", str(root),
+                    "--probe-module", "semantic_scope_records",
+                ],
+                cwd=temp_name,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(0, unsafe.returncode)
+            self.assertIn("must start with Python -I", unsafe.stderr)
+            self.assertFalse(marker.exists(), "non-isolated module executed before rejection")
 
     def test_candidate_modified_protected_index_bytes_fail_pinned_inventory_check(self):
         context = self.e.context()
@@ -685,7 +955,7 @@ class QualificationCorpusIntakeTests(unittest.TestCase):
         inventory = Inventory(
             entries,
             e.run,
-            (e.protected, trust.trust_root),
+            (e.protected, trust.trust_root, SCRIPTS.parent),
         )
         context = TrustContext(
             inventory,

@@ -1384,9 +1384,16 @@ class LessonSkillHardeningTests(unittest.TestCase):
         )
         qualification_intake_files = {
             Path("scripts/qualification_corpus_intake.py"),
+            Path("scripts/operator_controller_bootstrap.py"),
+            Path("scripts/lifecycle_digest.py"),
+            Path("scripts/source_truth.py"),
+            Path("scripts/exemplar_contract.py"),
+            Path("scripts/exemplar_split.py"),
+            Path("scripts/path_safety.py"),
             Path("schemas/operation-provenance-receipt-v1.2.schema.json"),
             Path("schemas/operator-authority-profile-v1.1.schema.json"),
             Path("schemas/operator-controller-build-inventory-v1.0.schema.json"),
+            Path("schemas/operator-controller-build-inventory-v1.1.schema.json"),
             Path("schemas/operator-role-authorization-v1.1.schema.json"),
             Path("schemas/protected-operation-index-v1.1.schema.json"),
             Path("schemas/qualification-corpus-intake-v1.0.schema.json"),

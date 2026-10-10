@@ -1,7 +1,7 @@
 # RQ-03F-B2 Enrollment and Protected Operator Boundary
 
 Date: 2026-10-10 (UTC)
-Status: contract implementation candidate for Owner review; no merge, release, Agent A invocation, live qualification, or Production Trust activation.
+Status: Owner Review #5477224955 remediation candidate; code readiness and external trust readiness remain separate. No merge, release, Agent A invocation, live qualification, or Production Trust activation.
 
 ## Baseline and scope
 
@@ -15,6 +15,14 @@ Status: contract implementation candidate for Owner review; no merge, release, A
 
 The accepted B1 finding remains unchanged: no protected historical author operation was found for any of the 17 cases. This branch implements a separate qualification-only custody path; it does not repair or infer original authorship.
 
+## Owner Review #5477224955 remediation map
+
+| Finding | Remediation | Evidence / boundary |
+| --- | --- | --- |
+| Windows Semantic Scope import/discovery failure | `qualification_corpus_intake.py` treats `fcntl` as optional at import and rejects capture before touching TrustContext unless POSIX lock, no-follow, ownership and UID APIs exist. Test fixtures do not call `os.geteuid()` unconditionally. POSIX capture remains a discovered test, skipped only on unsupported OS; Windows still discovers and runs import, fail-closed and deterministic contract tests. | Six-shard exact partition checks are unchanged. Original run `38018128731` completed with only Windows Semantic Scope shard 1/2 failing; macOS and the remaining platform jobs passed. Fresh exact-HEAD matrix is reported in section B after completion. |
+| Incomplete trusted controller dependency graph | Build Inventory 1.1 pins the installed controller root, complete scripts/schema trees, required modules (including `lifecycle_digest.py`, `source_truth.py`, `exemplar_contract.py`, `exemplar_split.py`, and `path_safety.py`), schemas, interpreter identity, every installed `site-packages` byte and the validation dependency packages. The stdlib-only bootstrap verifies the externally pinned inventory before controller imports, runs under `-I -S -B`, narrows `sys.path`, and TrustContext checks actual loaded module paths. | Negative tests reject omitted transitive modules, altered dependency pins, malicious `PYTHONPATH`, and non-isolated launch. Tests use an installed-copy fixture; they do not prove real deployment immutability or external Operator ACLs. |
+| Auxiliary Gradebook runner failure | The local runner's nested template-validator failure was reproduced on the candidate and exact trusted master. Both report the same template SHA and font charset mismatch. | The executor uses `LibreOfficeDev 26.8.0.0.alpha0`; the prior GitHub Windows/macOS Gradebook jobs passed. This is classified as an executor LibreOffice-version behavior, not a change from this PR. Full command/output details are in section B. |
+
 ## A. Contract and code implementation
 
 ### Version compatibility
@@ -27,13 +35,17 @@ The versions below are proposed closed extensions for Owner review, not pre-appr
 | Operation Provenance Receipt | 1.0, 1.1 | 1.2 | Receipt 1.2 adds one `qualification_historical_corpus_intake` basis for qualification-purpose Semantic Review. Existing 1.0/1.1 semantics and original-author checks are unchanged. |
 | Qualification Corpus Intake | none | 1.0 | New closed, custody-only record bound to the frozen corpus/holdout and all 17 case closures. |
 | Operator Authority Profile / Role Authorization | 1.0 | 1.1 | Adds the dedicated custodian grant, external process UID pins and controller-build pin; existing 1.0 remains supported. |
-| Operator Controller Build Inventory | none | 1.0 | Pins required loaded controller modules and schemas to protected raw bytes. |
+| Operator Controller Build Inventory | 1.0 candidate | 1.1 proposed | Pins the full installed controller trees, loaded module paths, schemas, interpreter, and validation package dependency trees to the externally pinned build. |
+
+Profile 1.1 now fails closed on a Build Inventory 1.0 value because that version cannot express the complete runtime closure. The 1.0 schema remains in the installed compatibility floor, but it is not accepted as the controller trust pin for this qualification-only Profile 1.1 path. The external profile and trust anchor have not been changed; an Owner-approved 1.1 pin is still required before any live use.
 
 Receipt 1.2 requires `author_principal=null`, `author_operation_id=null`, `historical_author_claim="not_made"`, `intake_is_historical_authoring_operation=false`, and `purpose=qualification_only`. Validation requires a current adopted Intake 1.0 record, exact frozen case/content/source/outline bindings, managed Reviewer Configuration 1.1 and Observation 1.1. The intake must predate the review operation. Production-purpose Semantic Review and Teacher receipts continue to require protected original author operations. Qualification intake evidence cannot authorize PA, Teacher Approval or generation.
 
 ### Intake authority and historical identity
 
 The new `qualification_corpus_custodian` role is separate from `author`, `scope_reviewer` and `corpus_adjudicator`; those roles do not imply intake permission. The profile grants only the single custodian role. Capture requires an externally injected Operator principal and dedicated UID, the actual process UID, the pinned non-Operator process UID set (Candidate, Author, Reviewer and Approver), an allowlisted controller, and exact protected controller-module/schema bytes. Capture writes one unique operation and intake artifact under the protected repository, then atomically appends one Index 1.1 row. It never writes `authors[]`.
+
+Owner Review #5477224955 identified that the initial controller build pin checked loaded module bytes after import, omitted transitive validator code, and did not bind runtime paths. Build Inventory 1.1 pins the installed controller root, exact module and schema runtime paths, full `scripts/` and `schemas/` tree hashes, Python executable/version, a full `site-packages` tree digest, and package-tree hashes for `attr`, `attrs`, `jsonschema`, `jsonschema_specifications`, `referencing`, `rpds`, plus `typing_extensions`. Required controller modules include `lifecycle_digest.py`, `source_truth.py`, `exemplar_contract.py`, `exemplar_split.py`, and `path_safety.py`. The stdlib-only `operator_controller_bootstrap.py` independently hashes the Owner-pinned inventory before controller or third-party imports, requires Python `-I -S -B`, and narrows `sys.path` to the installed controller, standard library, and pinned site-packages. `TrustContext.load()` requires that bootstrap attestation, refuses to import missing modules, and checks loaded module origins against the exact protected build paths. The installed-copy adversarial test injects a malicious `PYTHONPATH` module and confirms that only the installed copy loads. Inventory, controller file, schema, tree, and dependency hashes are recalculated directly from bytes. Candidate source SHA-256 values are `4e79117ca30284126e1c850fcf746309acabc0990817f0479a75bbf00187e887` for `operator_controller_bootstrap.py` and `f0d5a5b3177981f20be3273e30055ce6ffb55dcaabbf1a7974b5b0282055e030` for Build Inventory 1.1 schema. Test fixtures independently hash canonical Build Inventory bytes. The actual trust-anchor profile remains Profile 1.0 and has no controller-build pin; it was not changed, and no synthetic inventory is claimed as protected production evidence.
 
 Intake establishes current controlled custody only. Git commit author is not a protected author principal. The custodian is not the historical Content author. The system makes no claim that a reviewer is independent from an unknown historical author; it checks reviewer/custodian, reviewer/operation, adjudicator/custodian and approver/custodian separation within the explicitly authorized qualification-only path.
 
@@ -82,6 +94,7 @@ The deterministic intake test verified the exact golden and holdout manifest has
 - `教案生成器/lesson-plan-docx-generator/docs/semantic-scope-lifecycle-v2.md`
 - `教案生成器/lesson-plan-docx-generator/docs/semantic-scope-runtime-foundation-v1.md`
 - `教案生成器/lesson-plan-docx-generator/scripts/install_adapters.py`
+- `教案生成器/lesson-plan-docx-generator/scripts/operator_controller_bootstrap.py`
 - `教案生成器/lesson-plan-docx-generator/scripts/operation_provenance.py`
 - `教案生成器/lesson-plan-docx-generator/scripts/qualification_corpus_intake.py`
 - `教案生成器/lesson-plan-docx-generator/scripts/reviewer_qualification.py`
@@ -89,30 +102,50 @@ The deterministic intake test verified the exact golden and holdout manifest has
 - `教案生成器/lesson-plan-docx-generator/schemas/operation-provenance-receipt-v1.2.schema.json`
 - `教案生成器/lesson-plan-docx-generator/schemas/operator-authority-profile-v1.1.schema.json`
 - `教案生成器/lesson-plan-docx-generator/schemas/operator-controller-build-inventory-v1.0.schema.json`
+- `教案生成器/lesson-plan-docx-generator/schemas/operator-controller-build-inventory-v1.1.schema.json`
 - `教案生成器/lesson-plan-docx-generator/schemas/operator-role-authorization-v1.1.schema.json`
 - `教案生成器/lesson-plan-docx-generator/schemas/protected-operation-index-v1.1.schema.json`
 - `教案生成器/lesson-plan-docx-generator/schemas/qualification-corpus-intake-v1.0.schema.json`
 
 ## B. Deterministic CI and test evidence
 
-Passed:
+### Local candidate results
 
-- `python -m compileall -q 教案生成器/lesson-plan-docx-generator tests/test_qualification_corpus_intake.py .github/scripts/run_test_shards.py`, `bash -n tools/rq03f_operator_boundary.sh`, and `git diff --check` passed.
-- `python .github/scripts/run_test_shards.py --suite semantic-scope -v`: six shards passed, 73/73 (557.24 seconds). The final standalone Intake module passed 12/12; the 17-case exact-byte and frozen manifest test passed within the matrix.
-- Semantic shard-manifest checks: 6/6 passed, including exact partition coverage, automatic Intake-test inclusion, and full-root discovery.
-- `python .github/scripts/run_test_shards.py --suite hardening -v`: 52/52 passed against this candidate, including installed source-floor checks.
-- `python .github/scripts/run_test_shards.py --suite lesson-semantic-lifecycle-evidence -v`: 21/21 passed (492.89 seconds), including current production trust, teacher and PA separation gates.
-- `PYTHONPATH='教案生成器/lesson-plan-docx-generator/scripts:.' python -m unittest tests.test_semantic_lifecycle.SemanticLifecycleTests.test_installed_copy_external_controller_resume -v`: 1/1 passed (95.25 seconds).
+- `python -B -m compileall -q 教案生成器/lesson-plan-docx-generator tests/test_qualification_corpus_intake.py .github/scripts/run_test_shards.py`, `bash -n tools/rq03f_operator_boundary.sh`, and `git diff --check`: passed.
+- `python -B .github/scripts/run_test_shards.py --suite semantic-scope -v`: six shards passed, **78/78** (634.10 seconds). Exact six-shard manifest/partition checks ran; the new intake and import-boundary tests remained in discovery. All 17 frozen Content bytes and the golden/holdout manifest hashes passed.
+- `python -B .github/scripts/run_test_shards.py --suite hardening -v`: **52/52** passed (14.03 seconds), including the installed source-floor assertions for the controller bootstrap and Build Inventory 1.1 schema.
+- `python -B .github/scripts/run_test_shards.py --suite lesson-semantic-lifecycle-evidence -v`: **21/21** passed (462.44 seconds), including O2 entry points, transitive stale-build checks, production authorization, Teacher/PA separation and exact NC-02 bytes.
+- Semantic scope adversarial tests passed within the six shards: missing `source_truth` pin, altered dependency hash, malicious `PYTHONPATH`, wrong import origin, non-isolated bootstrap and candidate-side protected-index tampering all fail closed.
 
-The repository-wide auxiliary `runner` shard was also attempted. Its gradebook template subprocess failed in this executor environment; this is outside the Lesson semantic CI gate and does not modify or weaken that gate. It is not counted as a passing CI result.
+### Auxiliary Gradebook runner failure classification
+
+The repository helper was run as `python -B .github/scripts/run_test_shards.py --suite runner -v`: **27/28 pass, 1 fail**. The failing test is `test_gradebook_discovery_worker_does_not_reuse_lesson_package_common`; its nested Gradebook `test_template_validator` subprocess exits 1 with empty stderr. Direct reproduction:
+
+```text
+$ python 平时成绩记分册生成器/course-gradebook-generator/scripts/validate_template.py --json
+exit status: 1
+errors: ["Named-range template changed protected workbook structure or formatting."]
+template SHA expected=actual=FEA186D65DCE742FC7DD0370FF24C60D8D5A1004BC357D99FC75F22F06B9C28E
+protected_signature_differences: 20
+first difference: non_target_sheets.Sheet1.cells[1][1].format.font
+  expected font charset=1; actual font charset=null
+```
+
+The exact same validator command on candidate `25983a30b61985f429e148bfbc5222c4a67a88c9` and trusted master `a4bfa4155e84c55f56567af6b4bf38357e25ab3c` produced byte-for-byte equal `checks` JSON and the same 20 differences. The Gradebook subtree has no diff from trusted master. This executor runs Python 3.12.14, openpyxl 3.1.5 and `LibreOfficeDev 26.8.0.0.alpha0` (`2c87e51eeaa2b413ff4ae097b2705eea1995d8e5`). In original GitHub run `38018128731`, Windows and macOS Gradebook jobs both passed. Classification: **executor environment behavior from the LibreOffice development build**, not this PR's code and not evidence of an existing cross-platform Gradebook regression. The auxiliary runner result is not counted as passing.
+
+### GitHub CI evidence
+
+Original run [38018128731](https://github.com/ArdenZC/codex-work-skills/actions/runs/38018128731) completed with `CI Gate` failure because Windows Semantic Scope shards 1 and 2 failed. The macOS Semantic Scope shards, Windows shards 3–6, macOS shards 1–6, O2 lifecycle evidence, final acceptance, and Windows/macOS Gradebook jobs succeeded. Shard 1 failed at `Verify exact semantic partition coverage` because test discovery could not import `qualification_corpus_intake`; shard 2 failed at `Run requested semantic scope partition`. Owner Review #5477224955 identifies the import traceback as the unconditional `fcntl` dependency. This run is **not** a passing remediation CI result.
+
+Fresh exact-HEAD GitHub CI for the remediation commit: **pending push and completion**. Windows/macOS O1/O2 results will be recorded here from that run before Owner rereview.
 
 ## C. Independent Codex review
 
-**BLOCKED — review did not run.** The built-in `codex review` CLI was invoked against the uncommitted diff with the required security scope, but the installed CLI could not refresh its access token (`401 Unauthorized`: token could not be parsed/refreshed) and its review transport returned `451 no_biscuit_no_service`. It exited before producing findings. The separate `codex-review` tool was not used. This is not recorded as a clean independent review; Owner review remains required.
+**No independent review pass is claimed.** The previously attempted review endpoint failed before producing findings (`401 Unauthorized` while refreshing the token and `451 no_biscuit_no_service`). This remediation did not invoke `codex-review`, which remains prohibited. Owner review is still required.
 
 ## D. Actual Operator isolation
 
-**NOT ESTABLISHED.** The protected trust checkout is still at exact anchor commit `eb4a95c618e05c5ad6413137478bc65dbca75ec9`; its profile and index hashes still match the Owner pins; the trust worktree is clean. However, its directory is mode `0700` and files are mode `0600`, owned by the current executor UID 1000. That same UID has write access to the protected directory and index. No write was attempted, and no trust file or branch was changed.
+**NOT ESTABLISHED.** The external trust snapshot remains materialized at the Owner's exact anchor path `eb4a95c618e05c5ad6413137478bc65dbca75ec9`; its authority-profile and operation-index hashes still match the Owner pins. The snapshot path is not a Git worktree. Its trust directory is mode `0700` and files are mode `0600`, owned by the current executor UID 1000, so that same UID has write access to the protected directory and index. No write was attempted; no trust file or branch was changed.
 
 `tools/rq03f_operator_boundary.sh` is an Owner-run Linux Option B provisioning plan. It creates distinct Operator/Candidate/Author/Reviewer/Approver UIDs, makes the trust root Operator-owned/private, pins the immutable controller copy, and probes actual denied index writes under the non-Operator accounts. It was not run here. Its synthetic tests are not deployment proof.
 

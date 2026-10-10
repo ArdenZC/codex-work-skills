@@ -9,6 +9,8 @@ Usage (Owner deployment host, as root):
 
 TRUST_ROOT must be the already materialized external TrustContext directory.
 CONTROLLER_ROOT must be the reviewed, built controller copy outside the candidate checkout.
+The controller copy must include Build Inventory 1.1 and must be launched through
+scripts/operator_controller_bootstrap.py with Python -I -S -B and the Owner-pinned build SHA.
 The script changes Unix account/file ownership and modes only; it never edits trust bytes.
 EOF
   exit 2
@@ -53,6 +55,11 @@ for path in "$trust_root" "$controller_root"; do
     exit 1
   }
 done
+
+# Bytecode caches are mutable derived state and are not part of the installed
+# source closure. Python -B prevents the Operator process from recreating them.
+find "$controller_root" -xdev -type d -name __pycache__ -prune -exec rm -rf -- {} +
+find "$controller_root" -xdev -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
 
 users=(rq03f-operator rq03f-candidate rq03f-author rq03f-reviewer-a rq03f-approver-b)
 for user in "${users[@]}"; do

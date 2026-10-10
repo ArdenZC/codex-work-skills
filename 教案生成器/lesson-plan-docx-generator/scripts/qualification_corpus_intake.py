@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import timezone
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -17,6 +16,11 @@ import stat
 import tempfile
 from typing import Any, Mapping
 import uuid
+
+try:  # fcntl is intentionally optional: Windows can import and validate records.
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - exercised by Windows CI
+    _fcntl = None
 
 from lifecycle_digest import canonical_json_bytes, sha256_bytes, sha256_file
 from semantic_scope_records import RecordError, TrustContext, checked, parse, require, stamp
@@ -57,6 +61,22 @@ FROZEN_AUTHORING_IDS = {
     )
     for case_id in FROZEN_CASE_CONTENT_SHA256
 }
+
+
+def _require_posix_capture_support() -> None:
+    """The protected writer uses POSIX locks and no-follow filesystem APIs."""
+    required_os_apis = (
+        "geteuid", "getuid", "fchmod", "O_NOFOLLOW", "O_DIRECTORY",
+    )
+    if (
+        os.name != "posix"
+        or _fcntl is None
+        or any(not hasattr(os, name) for name in required_os_apis)
+        or not hasattr(_fcntl, "flock")
+    ):
+        raise RecordError(
+            "protected qualification corpus capture requires POSIX filesystem controls"
+        )
 
 
 def _binding(row: Mapping[str, Any]) -> dict[str, str]:
@@ -175,6 +195,7 @@ def _check_case_bytes(context: TrustContext, corpus: dict[str, Any], holdout: di
 
 
 def _profile_and_custodian(context: TrustContext):
+    _require_posix_capture_support()
     profile, index = context.load()
     require(profile["profile_version"] == "1.1", "Qualification Corpus Intake requires Operator Profile 1.1")
     require(index["index_version"] == "1.1", "Qualification Corpus Intake requires Protected Operation Index 1.1")
@@ -225,6 +246,11 @@ def _assert_protected_root_owner(context: TrustContext, intake: Mapping[str, Any
         == intake["protected_repository_owner_unix_uid"],
         "intake OS writer identity is not the external TrustContext owner",
     )
+    if os.name != "posix":
+        # Cross-platform validation trusts the externally supplied protected
+        # Inventory. POSIX ownership was asserted at capture time and is not
+        # reinterpreted from Windows file attributes.
+        return root
     for path in (root, context.profile_path, context.operation_index_path):
         info = path.stat(follow_symlinks=False)
         require(stat.S_ISDIR(info.st_mode) if path == root else stat.S_ISREG(info.st_mode),
@@ -290,12 +316,13 @@ def capture_qualification_corpus_intake(
     non-protected inputs, an Index 1.0 trust root, duplicate IDs, and writable
     group/world trust paths. It does not write to the repository Git branch.
     """
+    _require_posix_capture_support()
     profile, index, role, auth_sha, root = _profile_and_custodian(context)
     lock_path = root / ".qualification-corpus-intake.lock"
     lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
         os.fchmod(lock_fd, 0o600)
-        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        _fcntl.flock(lock_fd, _fcntl.LOCK_EX)
         # Reload under the lock so a concurrent capture cannot reuse IDs or drop rows.
         profile, index, role, auth_sha, root = _profile_and_custodian(context)
         corpus_raw, corpus, holdout_raw, holdout = _frozen_manifests(
@@ -412,7 +439,7 @@ def capture_qualification_corpus_intake(
             "recorded_at": recorded_at,
         }
     finally:
-        fcntl.flock(lock_fd, fcntl.LOCK_UN)
+        _fcntl.flock(lock_fd, _fcntl.LOCK_UN)
         os.close(lock_fd)
 
 

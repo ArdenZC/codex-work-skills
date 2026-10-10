@@ -142,6 +142,9 @@ CRITICAL_PRODUCTION_SOURCE_FILES = tuple(dict.fromkeys((
     Path("scripts/operation_provenance.py"), Path("scripts/semantic_scope_review.py"),
     Path("scripts/semantic_scope_records.py"), Path("scripts/reviewer_qualification.py"),
     Path("scripts/qualification_corpus_intake.py"),
+    Path("scripts/operator_controller_bootstrap.py"),
+    Path("scripts/exemplar_contract.py"), Path("scripts/exemplar_split.py"),
+    Path("scripts/path_safety.py"),
     Path("schemas/semantic-dependency-inventory.schema.json"),
     *(Path("schemas") / name for name in (
         "human-training-authorization.schema.json",
@@ -158,6 +161,7 @@ CRITICAL_PRODUCTION_SOURCE_FILES = tuple(dict.fromkeys((
         "operator-authority-profile.schema.json",
         "operator-authority-profile-v1.1.schema.json",
         "operator-controller-build-inventory-v1.0.schema.json",
+        "operator-controller-build-inventory-v1.1.schema.json",
         "operator-role-authorization.schema.json",
         "operator-role-authorization-v1.1.schema.json",
         "protected-operation-index.schema.json",

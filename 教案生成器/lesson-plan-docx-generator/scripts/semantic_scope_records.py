@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-import importlib
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +17,7 @@ from types import MappingProxyType
 from typing import Any, Mapping
 import unicodedata
 
+import operator_controller_bootstrap as controller_bootstrap
 from lifecycle_digest import (
     LifecycleContractError,
     assert_distinct_safe_paths,
@@ -308,6 +308,22 @@ class TrustContext:
         parsed_profile = parse(profile_raw, allow_floats=False)
         require(isinstance(parsed_profile, dict), "operator profile must be an object")
         profile_version = parsed_profile.get("profile_version")
+        if profile_version == "1.1":
+            try:
+                build_key = parsed_profile["controller_build_inventory_key"]
+                build_sha = parsed_profile["controller_build_inventory_sha256"]
+                build_path = Path(self.inventory.entries[build_key]["path"])
+                self.inventory.raw(build_key, build_sha, protected=True)
+                _build_raw, early_build = controller_bootstrap._read_build_inventory(
+                    build_path, build_sha
+                )
+                early_root = Path(early_build["controller_root"]).resolve(strict=True)
+            except (controller_bootstrap.BootstrapError, OSError, KeyError, TypeError, ValueError) as exc:
+                raise RecordError(f"Owner-pinned controller bootstrap preflight failed: {exc}") from exc
+            require(
+                controller_bootstrap.bootstrap_attested(build_sha, early_root),
+                "Profile 1.1 trust requires the isolated Owner-pinned controller bootstrap",
+            )
         profile_schema = {
             "1.0": "operator-authority-profile",
             "1.1": "operator-authority-profile-v1.1",
@@ -340,38 +356,38 @@ class TrustContext:
                 profile["controller_build_inventory_sha256"],
                 protected=True,
             )
-            build = checked(build_raw, "operator-controller-build-inventory-v1.0")
+            build = checked(build_raw, "operator-controller-build-inventory-v1.1")
             require(
                 build["controller_id"] == profile["controller_id"],
                 "operator controller build inventory identity mismatch",
             )
+            controller_root = Path(build["controller_root"]).resolve(strict=True)
+            require(
+                any(controller_root == root.resolve(strict=True)
+                    or controller_root.is_relative_to(root.resolve(strict=True))
+                    for root in self.inventory.protected_roots),
+                "installed controller root is outside the external protected roots",
+            )
+            require(
+                not controller_root.is_relative_to(self.inventory.run_root.resolve(strict=True))
+                and not self.inventory.run_root.resolve(strict=True).is_relative_to(controller_root),
+                "installed controller root overlaps candidate operation data",
+            )
+            try:
+                controller_bootstrap.verify_build_inventory(
+                    Path(self.inventory.entries[profile["controller_build_inventory_key"]]["path"]),
+                    profile["controller_build_inventory_sha256"],
+                    controller_root,
+                    require_isolated=False,
+                    verify_runtime_tree=False,
+                )
+            except (controller_bootstrap.BootstrapError, OSError, KeyError, TypeError, ValueError) as exc:
+                raise RecordError(f"operator controller runtime verification failed: {exc}") from exc
             component_ids = [row["component_id"] for row in build["components"]]
             require(len(component_ids) == len(set(component_ids)),
                     "duplicate operator controller build component")
-            required_modules = {
-                "semantic_scope_records",
-                "semantic_scope_review",
-                "operation_provenance",
-                "reviewer_qualification",
-                "qualification_corpus_intake",
-            }
-            required_schemas = {
-                "managed-reviewer-service-observation-v1.1.schema.json",
-                "managed-service-capture-manifest-v1.1.schema.json",
-                "managed-service-observation-policy-v1.1.schema.json",
-                "operation-provenance-receipt-v1.2.schema.json",
-                "operator-authority-profile-v1.1.schema.json",
-                "operator-controller-build-inventory-v1.0.schema.json",
-                "operator-role-authorization-v1.1.schema.json",
-                "protected-operation-index-v1.1.schema.json",
-                "qualification-adjudication.schema.json",
-                "qualification-corpus-intake-v1.0.schema.json",
-                "qualification-corpus.schema.json",
-                "reviewer-configuration-v1.1.schema.json",
-                "reviewer-qualification-v1.1.schema.json",
-                "semantic-scope-review.schema.json",
-                "source-truth-manifest.schema.json",
-            }
+            required_modules = controller_bootstrap.REQUIRED_MODULES
+            required_schemas = controller_bootstrap.REQUIRED_SCHEMAS
             modules = {
                 row["component_id"]
                 for row in build["components"]
@@ -386,24 +402,46 @@ class TrustContext:
                     and required_schemas.issubset(schemas),
                     "operator controller build inventory is incomplete")
             for row in build["components"]:
-                self.inventory.raw(row["inventory_key"], row["sha256"], protected=True)
+                if row["component_type"] in {"python_module", "json_schema"}:
+                    self.inventory.raw(row["inventory_key"], row["sha256"], protected=True)
             components = {row["component_id"]: row for row in build["components"]}
             for module_name in required_modules:
-                loaded = sys.modules.get(module_name) or importlib.import_module(module_name)
+                loaded = sys.modules.get(module_name)
                 require(loaded is not None and getattr(loaded, "__file__", None),
-                        f"operator controller module is not loaded: {module_name}")
+                        f"operator controller module was not preloaded by the verified launcher: {module_name}")
+                expected_path = Path(components[module_name]["runtime_path"]).resolve(strict=True)
+                loaded_path = Path(loaded.__file__).resolve(strict=True)
+                require(loaded_path == expected_path,
+                        f"loaded operator controller module came from an unpinned import path: {module_name}")
                 require(
-                    sha256_file(Path(loaded.__file__))
+                    sha256_file(loaded_path)
                     == components[module_name]["sha256"],
                     f"loaded operator controller module differs from pinned build: {module_name}",
                 )
-            schema_root = Path(__file__).resolve().parents[1] / "schemas"
             for schema_name in required_schemas:
+                schema_path = Path(components[schema_name]["runtime_path"]).resolve(strict=True)
+                require(schema_path == controller_root / "schemas" / schema_name,
+                        f"schema path is outside pinned installed controller: {schema_name}")
                 require(
-                    sha256_file(schema_root / schema_name)
+                    sha256_file(schema_path)
                     == components[schema_name]["sha256"],
-                    f"loaded operator controller schema differs from pinned build: {schema_name}",
+                    f"installed operator controller schema differs from pinned build: {schema_name}",
                 )
+            for package_name in controller_bootstrap.REQUIRED_PACKAGES:
+                loaded = sys.modules.get(package_name)
+                require(loaded is not None and getattr(loaded, "__file__", None),
+                        f"pinned Python validation package was not loaded: {package_name}")
+                package_path = Path(components[package_name]["runtime_path"]).resolve(strict=True)
+                loaded_path = Path(loaded.__file__).resolve(strict=True)
+                require(loaded_path.is_relative_to(package_path),
+                        f"Python validation package came from an unpinned import path: {package_name}")
+            for module_name in controller_bootstrap.REQUIRED_DEPENDENCY_MODULES:
+                loaded = sys.modules.get(module_name)
+                require(loaded is not None and getattr(loaded, "__file__", None),
+                        f"pinned Python validation module was not loaded: {module_name}")
+                expected_path = Path(components[module_name]["runtime_path"]).resolve(strict=True)
+                require(Path(loaded.__file__).resolve(strict=True) == expected_path,
+                        f"Python validation module came from an unpinned import path: {module_name}")
         require(
             self.inventory.raw("authority_profile", self.profile_pin, protected=True)
             == self.profile_path.read_bytes(),
