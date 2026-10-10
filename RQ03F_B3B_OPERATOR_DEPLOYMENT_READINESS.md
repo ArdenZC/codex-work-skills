@@ -2,9 +2,9 @@
 
 ## 结论
 
-**READY FOR OWNER REVIEW — DEPLOYMENT PACKAGE PREPARED / PRODUCTION TRUST BLOCKED**
+**READY FOR OWNER REREVIEW — RUNBOOK SAFETY REMEDIATED / PRODUCTION TRUST BLOCKED**
 
-本报告提供独立部署所有者可审阅的目标架构、版本迁移顺序、命令模板、验收 Runbook、失败处理和 Owner 决策清单。Codex 未登录或配置目标 Linux 主机，未创建正式账号，未写入正式 Profile/Index，未执行 Intake 或服务启动。这里的命令是未来由 Owner 指定的独立部署者在目标主机上执行的操作步骤，不是本轮执行记录。
+本报告提供独立部署所有者可审阅的目标架构、版本迁移顺序、不可执行的准备伪代码、验收清单、失败处理和 Owner 决策清单。对 Owner Review 5479337622 的裁定 **CHANGES_REQUIRED — DEPLOYMENT RUNBOOK SAFETY** 已逐项整改。Codex 未登录或配置目标 Linux 主机，未创建正式账号，未写入正式 Profile/Index，未执行 Intake 或服务启动。由于独立安全分配器、生产 Launcher、TrustContext provider 和 anti-rollback ledger 均缺失，本报告明确禁止任何正式特权部署操作。
 
 Production Trust 仍为 **BLOCKED**。当前材料没有 Owner 批准的 Profile 1.1、Index 1.1、Build Inventory 1.1、锁定运行时、目标 UID/GID、受控服务入口或真实外部写入边界。仓库有权限 provisioning 工具和 isolated bootstrap，但没有可运行正式 operation 的固定 launcher / TrustContext provider / service unit。不得把 B3-A Hosted PASS 当作这些缺项的替代。
 
@@ -144,13 +144,14 @@ The provisioning script validates path shape, owners, ACLs, links, mode bits, Pr
 
 The legacy bytes remain immutable at the current Anchor commit. They are an input snapshot, not the new production root.
 
-1. The independent Operator verifies the exact Trust Anchor commit and all old raw Profile/Index/role-authorization hashes above. Copy the legacy Profile 1.0 and Index 1.0 byte-for-byte into an access-controlled read-only archive outside the new candidate/operation root. Rehash the copies. Do not rewrite the old branch or files.
+1. The independent Operator verifies the exact Trust Anchor commit and all old raw Profile/Index/role-authorization hashes above. Preserve the original Anchor checkout and history read-only. Archive the legacy Profile 1.0 and Index 1.0 byte-for-byte only through a separately reviewed exclusive archive allocator, into a new directory under a pre-existing Owner-controlled canonical parent. Verify each source SHA before copying and each destination SHA after copying. A collision, mismatch, path alias, or failed copy is STOP; never repair or reuse an archive.
 2. The Owner selects the target host, runtime version, fresh role principals and actual UID/GID values. Only after account creation and identity verification can Profile 1.1 bind operator_unix_uid and non_operator_process_unix_uids.
-3. Build and verify the immutable controller/runtime first. Owner reviews and adopts its exact Build Inventory 1.1 key and SHA. Then the Owner issues new role authorizations and a new closed-schema Profile 1.1 that pins the approved build, controller tuple, exact UID mapping, dedicated corpus-custodian principal, allowed roles, validity period, revocation state, and new policy epoch.
-4. Create a distinct Index 1.1 migration artifact in staging. Preserve each legacy array record and order exactly; add only the required empty qualification_corpus_intakes array. Any new policy_epoch must be an explicit Owner-approved epoch transition greater than the legacy epoch. Do not populate authors, receipts, adjudications, or qualification_runs. The transformed Index is not adopted until its own exact SHA is reviewed.
-5. Create a separate Owner-controlled migration lineage record containing source Anchor commit, old raw Profile and Index digests, target Profile/Index/Build digests, old/new schema versions and epochs, record counts, canonical per-array digests, and a field-by-field diff. Verify old/new arrays are structurally identical and in the same order. The old raw bytes remain archived unchanged. The lineage record belongs to Owner-controlled adoption history; it does not claim that an intake custodian authored any historical Content.
-6. Owner adopts the exact new Profile, Index, Build Inventory and lineage record through the existing protected trust-anchor append/adoption procedure. Deployment copies only those approved bytes into the new staging generation and verifies their hashes against an independently delivered Owner pin list. Candidate files, Git author metadata, local JSON, synthetic B3 artifacts or a name/role pattern cannot supply the pins.
-7. Run schema and TrustContext verification against the exact target bytes. Any unexpected field, array change, epoch mismatch, revoked/expired authorization, principal/UID mismatch, build/path mismatch or duplicate identifier stops the deployment. Preserve the previous Anchor and old generation read-only; do not switch or delete it.
+3. Build controller/runtime from the exact trusted source and locked runtime in private staging. Allocate a fresh final Generation under a separately reviewed fail-closed allocator; install final bytes at their final absolute paths and freeze those paths. Only then build the candidate Build Inventory 1.1 for the installed paths, independently recalculate component/tree and raw Inventory hashes, and obtain Owner approval of that exact key, path, and SHA. Do not rewrite an adopted Inventory if a path or byte changes.
+4. After Build Inventory adoption, the Owner issues new role authorizations and a new closed-schema Profile 1.1 that pins the approved build, controller tuple, exact UID mapping, dedicated corpus-custodian principal, allowed roles, validity period, revocation state, and new policy epoch.
+5. Create a distinct Index 1.1 migration artifact in staging. Preserve each legacy array record and order exactly; add only the required empty qualification_corpus_intakes array. Any new policy_epoch must be an explicit Owner-approved epoch transition greater than the legacy epoch. Do not populate authors, receipts, adjudications, or qualification_runs. The transformed Index is not adopted until its exact SHA and Profile/Build/Generation binding are reviewed.
+6. Create a separate Owner-controlled migration lineage record containing source Anchor commit, old raw Profile and Index digests, target Profile/Index/Build digests, old/new schema versions and epochs, record counts, canonical per-array digests, and a field-by-field diff. Verify old/new arrays are structurally identical and in the same order. The old raw bytes remain archived unchanged. The lineage record belongs to Owner-controlled adoption history; it does not claim that an intake custodian authored any historical Content.
+7. Owner adopts the exact new Profile, Index, Build Inventory and lineage record through the existing protected trust-anchor append/adoption procedure. Deployment transfers only those approved bytes through the independent Owner channel and verifies their hashes against the same independently delivered pin list. Candidate files, Git author metadata, local JSON, synthetic B3 artifacts or a name/role pattern cannot supply the pins.
+8. Run schema and TrustContext verification against the exact target bytes. Any unexpected field, array change, epoch mismatch, revoked/expired authorization, principal/UID mismatch, build/path mismatch or duplicate identifier stops the deployment. Preserve the previous Anchor and old generation read-only; do not switch or delete it. Any copied/reinstalled path or byte change invalidates the Inventory candidate and requires a new Inventory SHA and fresh Owner adoption; never edit an adopted Inventory to fit a new path.
 
 Index 1.0 and Index 1.1 have closed schemas. Index 1.1 adds qualification_corpus_intakes; it does not reinterpret old fields. Profile 1.1 adds UID and Build Inventory binding requirements; Profile 1.0 is not promoted by editing its version string. New Profile values and the target epoch remain Owner decisions. A value of 2 is a possible next epoch after legacy epoch 1, but this report does not approve or assign it.
 
@@ -167,186 +168,137 @@ Index 1.0 and Index 1.1 have closed schemas. Index 1.1 adds qualification_corpus
 
 ## 6. Repeatable build and staged deployment procedure
 
-This procedure is for the future independent deployment Owner. Commands below deliberately fail if required Owner pins are unset. No placeholder value in this document is an authority value.
+**SAFETY STATUS: DESIGN ONLY / NOT AN EXECUTABLE PRODUCTION RUNBOOK.** This report authorizes no root-level provisioning, archival, trust-file installation, Generation allocation, service launch, or protected operation. Do not copy/paste the former privileged snippets. The repository currently has no separately reviewed exclusive Generation/archive allocator, fixed production Launcher, TrustContext provider, or monotonic anti-rollback ledger. Until these exist and are independently accepted, every production write or protected operation below is **STOP**. The read-only guard is for input-shape checks and synthetic validation only; it does not establish Owner authority or host trust.
 
-### 6.1 Offline source/runtime preparation
+### 6.1 Source, parameter, and locked-runtime gates
 
-Use a new clean package checkout of the exact Owner-accepted merged source commit, never a developer worktree or PR branch. Verify repository cleanliness and the Owner-provided source digest list before building:
+All values must come from an independently delivered Owner deployment manifest, not CLI arguments, Candidate files, inherited Candidate environment, local Git metadata, or generated JSON. Compare every value under examination with the separately delivered Owner-pinned value for exact equality. Missing and empty fields both fail before any root write.
 
-~~~bash
-set -euo pipefail
-: "$OWNER_ACCEPTED_SOURCE_COMMIT"
-: "$SOURCE_CHECKOUT"
-: "$OWNER_SHA256_MANIFEST"
-test "$(git -C "$SOURCE_CHECKOUT" rev-parse HEAD)" = "$OWNER_ACCEPTED_SOURCE_COMMIT"
-test -z "$(git -C "$SOURCE_CHECKOUT" status --porcelain=v1 --untracked-files=all)"
-(cd "$SOURCE_CHECKOUT" && sha256sum --check "$OWNER_SHA256_MANIFEST")
-~~~
-
-The Owner selects the Python patch version and supplies a reviewed, fully pinned requirements lock with hashes plus an offline wheelhouse whose manifest has been independently checked. Existing version ranges are not sufficient. In the copied runtime, install without network access:
+This Bash guard is read-only. It validates input shapes and exact source checkout identity; it is not a production launcher or trust decision:
 
 ~~~bash
 set -euo pipefail
-: "$PYTHON_EXE"
-: "$BUILD_RUNTIME"
-: "$LOCK_FILE"
-: "$WHEELHOUSE"
-"$PYTHON_EXE" -m venv --copies "$BUILD_RUNTIME"
-"$BUILD_RUNTIME/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" --require-hashes --no-compile -r "$LOCK_FILE"
-"$BUILD_RUNTIME/bin/python" --version
+fail() { printf 'STOP: %s\n' "$*" >&2; exit 2; }
+require_nonempty() {
+  local name value
+  for name in "$@"; do
+    declare -p "$name" >/dev/null 2>&1 || fail "unset: $name"
+    value="${!name}"
+    [[ -n "$value" ]] || fail "empty: $name"
+  done
+}
+require_sha256() { [[ "$1" =~ ^[a-f0-9]{64}$ ]] || fail "invalid SHA-256"; }
+require_commit() { [[ "$1" =~ ^[a-f0-9]{40}$ ]] || fail "invalid commit SHA"; }
+verify_pinned_file_sha() {
+  local file="$1" expected="$2" actual
+  require_sha256 "$expected"
+  [[ -f "$file" && ! -L "$file" ]] || fail "missing, non-regular, or symlinked pinned file"
+  actual="$(sha256sum -- "$file" | awk '{print $1}')" || fail "cannot hash pinned file"
+  [[ "$actual" == "$expected" ]] || fail "file SHA differs from Owner pin"
+}
+require_canonical_existing_path() {
+  local path="$1" expected="$2"
+  [[ "$path" == /* && "$expected" == /* ]] || fail "path is not absolute"
+  [[ -e "$path" && ! -L "$path" ]] || fail "path missing or symlink"
+  [[ "$(realpath -e -- "$path")" == "$expected" && "$path" == "$expected" ]] || fail "non-canonical path"
+}
+require_generation_id() {
+  [[ "$1" =~ ^rq03f-[a-z0-9][a-z0-9-]{0,54}$ && "$1" != *- ]] || fail "invalid Generation ID"
+  [[ "$1" != . && "$1" != .. ]] || fail "dot Generation ID"
+}
+require_inventory_key() {
+  [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_:-]{0,159}$ ]] || fail "invalid Inventory key"
+  [[ "$1" != . && "$1" != .. ]] || fail "dot Inventory key"
+}
+require_positive_id() { [[ "$1" =~ ^[1-9][0-9]{0,9}$ ]] || fail "invalid UID/GID"; }
+require_admin_uid() { [[ "$1" =~ ^(0|[1-9][0-9]{0,9})$ ]] || fail "invalid deployment-admin UID"; }
+require_distinct() {
+  local expected="$#" actual
+  actual="$(printf '%s\n' "$@" | sort -u | wc -l | tr -d ' ')"
+  [[ "$actual" == "$expected" ]] || fail "role identities are not distinct"
+}
+
+require_nonempty OWNER_ACCEPTED_SOURCE_COMMIT SOURCE_CHECKOUT \
+  OWNER_CANONICAL_SOURCE_CHECKOUT OWNER_SHA256_MANIFEST OWNER_CANONICAL_SHA256_MANIFEST
+require_commit "$OWNER_ACCEPTED_SOURCE_COMMIT"
+require_canonical_existing_path "$SOURCE_CHECKOUT" "$OWNER_CANONICAL_SOURCE_CHECKOUT"
+require_canonical_existing_path "$OWNER_SHA256_MANIFEST" "$OWNER_CANONICAL_SHA256_MANIFEST"
+[[ "$(git -C "$SOURCE_CHECKOUT" rev-parse HEAD)" == "$OWNER_ACCEPTED_SOURCE_COMMIT" ]] || fail "source commit mismatch"
+[[ -z "$(git -C "$SOURCE_CHECKOUT" status --porcelain=v1 --untracked-files=all)" ]] || fail "source tree dirty"
+(cd "$SOURCE_CHECKOUT" && sha256sum --check "$OWNER_SHA256_MANIFEST") || fail "source manifest mismatch"
 ~~~
 
-Dereference interpreter/package symlinks into the standalone installed tree, preserve no hard links, and verify before provisioning:
+The code block above runs only the source phase. Later phases must call these same guards with their complete phase-specific parameters, before any privileged operation:
 
-~~~bash
-set -euo pipefail
-find "$BUILD_CONTROLLER_ROOT" "$BUILD_RUNTIME" -type l -print -quit | (! read -r _)
-find "$BUILD_CONTROLLER_ROOT" "$BUILD_RUNTIME" -type f -links +1 -print -quit | (! read -r _)
-find "$BUILD_CONTROLLER_ROOT" "$BUILD_RUNTIME" -type f -perm /022 -print -quit | (! read -r _)
-sha256sum "$BUILD_RUNTIME/bin/python"
-~~~
+- **Archive:** require nonempty Owner Anchor commit, both exact source file paths and expected hashes, archive parent and target ID; validate commit/SHA formats, exact approved commit, canonical already-existing parent and ownership/ACL/mount chain; hash both source files before asking the exclusive helper to write.
+- **Generation:** require nonempty `OWNER_APPROVED_GENERATION_ID`, `GENERATION_ID`, `GENERATION_PARENT`, and Owner-pinned canonical parent; validate Generation ID syntax and exact equality; check parent identity/ownership/permissions for every ancestor before invoking the exclusive allocator. Reject `.`/`..`, empty values, separator characters and target existence.
+- **Pre-Inventory:** require nonempty Owner-expected Controller Root, runtime root, module paths, Python executable, site-packages, schemas, Generation ID and source commit. Compare every installed path to its Owner-pinned absolute canonical path and every byte to the locked staging manifest. There is not yet an approved Build SHA at this phase.
+- **Post-Inventory adoption:** only after Owner adoption, require nonempty Profile/Index/Build file paths, exact raw SHA pins, Inventory key and filename mapping, Owner-approved Generation, identities, host and maintenance window. Validate the Owner-pinned Profile/Index/Build files with `verify_pinned_file_sha`, every file's exact canonical path, and the Profile-to-Inventory key/SHA/path binding before staging.
+- **Role/permission acceptance:** require nonempty Owner, deployment-admin, Operator, Candidate, Author, Reviewer and Approver principals plus actual UID/GID map; validate numeric formats and uniqueness, then compare `getent` and real process IDs. The deployment-admin UID may be 0 only if explicitly Owner-approved; runtime role IDs must be positive and distinct.
 
-Build Inventory 1.1 must enumerate the complete installed closure, including required modules/schemas, scripts and schema tree hashes, runtime interpreter bytes/version, the complete site-packages tree and each required dependency. Recalculate the canonical Inventory file SHA independently. Owner pins that exact digest before it is placed in Profile 1.1. The current repository does not contain a production inventory generator or approved dependency lock; this step is a production gate, not a claimed completed build.
+For each phase, extend `require_nonempty` with every parameter used in that phase; Bash `: "$VAR"` alone is forbidden because it fails when unset but accepts an empty value. Every expected SHA must be lowercase 64-character SHA-256 and match the independently Owner-delivered pin. Every commit must be a lowercase 40-character object ID and resolve to the exact commit in the pinned checkout. The absolute path value must exactly equal the Owner-pinned canonical string and `realpath -e` result. Apply `require_canonical_existing_path` separately to the final Controller Root, each module/runtime path, Python executable, site-packages, schema tree, Profile/Index/Build source files, and Inventory path. A wrong absolute Build Inventory path is STOP even if its file contents hash correctly. For a not-yet-created target, validate only its already-existing canonical parent; creation belongs to the future exclusive allocator, never shell `mkdir -p`.
 
-### 6.2 Prepare isolated versioned roots
+Require explicit nonempty host ID, maintenance window, source/archive/Generation paths, Inventory file path, Profile/Index/Build source paths, Owner and deployment-admin principals, runtime principals and all UIDs/GIDs before the relevant operation. UIDs/GIDs must be canonical positive decimal values matching the Owner manifest and live `getent`/process results. Owner, deployment admin, Operator, Candidate, Author, Reviewer and Approver must have the approved independent identities; all runtime role UIDs/GIDs must be distinct, with no shared group, supplementary group, sudo grant, inherited writable descriptor, or cross-role identity. No Candidate-supplied identity, path, pin, launcher argument, or environment variable is accepted. Any exact-equality, format, ownership, permission, or separation failure means STOP before privileged execution.
 
-First preserve the old raw trust inputs outside the candidate checkout. Run as the deployment root administrator. The destination must be a fresh Owner-controlled archive directory with separate access control. The Anchor checkout is read only:
+The Owner must select a fully pinned Python patch release, complete hash-locked requirements file, and offline wheelhouse with independently checked manifests. Existing version ranges do not meet this condition. Build staging is private and non-root. Runtime trust is not established until the complete byte closure has been installed at final paths and inventoried. The current repository has neither an approved dependency lock nor a production Inventory producer.
 
-~~~bash
-set -euo pipefail
-: "$ANCHOR_CHECKOUT"
-: "$OWNER_TRUST_ANCHOR_COMMIT"
-: "$ARCHIVE_ROOT"
-test "$(git -C "$ANCHOR_CHECKOUT" rev-parse HEAD)" = "$OWNER_TRUST_ANCHOR_COMMIT"
-install -d -o root -g root -m 0700 "$ARCHIVE_ROOT"
-git -C "$ANCHOR_CHECKOUT" show "$OWNER_TRUST_ANCHOR_COMMIT:.operator-trust/rq03-live/authority-profile.json" > "$ARCHIVE_ROOT/authority-profile-v1.0.json"
-git -C "$ANCHOR_CHECKOUT" show "$OWNER_TRUST_ANCHOR_COMMIT:.operator-trust/rq03-live/operation-index.json" > "$ARCHIVE_ROOT/operation-index-v1.0.json"
-test "$(sha256sum "$ARCHIVE_ROOT/authority-profile-v1.0.json" | awk '{print $1}')" = "d8e2ac76552f76b5dacf1ab7e31014da68ffe757da9bff5c97d27be9b67effd4"
-test "$(sha256sum "$ARCHIVE_ROOT/operation-index-v1.0.json" | awk '{print $1}')" = "52b3d01db27b10b4d9f54d6278a469ba7998a26057de93c8308b2b1fd50b67a4"
-chmod 0400 "$ARCHIVE_ROOT/authority-profile-v1.0.json" "$ARCHIVE_ROOT/operation-index-v1.0.json"
-~~~
+### 6.2 Legacy archive and fresh Generation allocation
 
-Record the copied bytes and Anchor commit in the Owner migration lineage. Do not push or modify the source Anchor.
+#### Legacy Profile 1.0 / Index 1.0 archive
 
-Use three distinct fresh roots, all outside the Candidate checkout. Example path layout (the target Owner may approve another canonical layout):
+Preserve the original Anchor checkout, commit, and history read-only. The required source hashes are Profile `d8e2ac76552f76b5dacf1ab7e31014da68ffe757da9bff5c97d27be9b67effd4` and Index `52b3d01db27b10b4d9f54d6278a469ba7998a26057de93c8308b2b1fd50b67a4`. The source commit must equal Owner-pinned `eb4a95c618e05c5ad6413137478bc65dbca75ec9`, unless the independent Owner explicitly supplies a separately verified anchor.
 
-~~~bash
-set -euo pipefail
-: "$GENERATION_ID"
-case "$GENERATION_ID" in (*[!A-Za-z0-9._-]*|'') exit 2;; esac
-GEN_ROOT="/var/lib/rq03f/generations/$GENERATION_ID"
-TRUST_ROOT="$GEN_ROOT/trust"
-CONTROLLER_ROOT="$GEN_ROOT/controller"
-RUNTIME_ROOT="$GEN_ROOT/runtime"
-sudo install -d -o root -g root -m 0711 "$GEN_ROOT"
-sudo install -d -o root -g root -m 0750 "$TRUST_ROOT" "$CONTROLLER_ROOT" "$RUNTIME_ROOT"
-sudo cp -RL --preserve=mode,timestamps "$BUILD_CONTROLLER_ROOT/." "$CONTROLLER_ROOT/"
-sudo cp -RL --preserve=mode,timestamps "$BUILD_RUNTIME/." "$RUNTIME_ROOT/"
-sudo chown -R root:root "$CONTROLLER_ROOT" "$RUNTIME_ROOT"
-sudo chmod -R go-w "$CONTROLLER_ROOT" "$RUNTIME_ROOT"
-test "$(realpath -e "$TRUST_ROOT")" = "$TRUST_ROOT"
-test "$(realpath -e "$CONTROLLER_ROOT")" = "$CONTROLLER_ROOT"
-test "$(realpath -e "$RUNTIME_ROOT")" = "$RUNTIME_ROOT"
-~~~
+**NON-EXECUTABLE provisioning pseudocode — do not run as shell commands.** The future reviewed archive helper must: (1) require exact nonempty Owner commit, source paths, source SHA values, archive parent, and target identifier; (2) verify the source Anchor commit and both source-byte hashes before any destination write; (3) pin the exact source bytes through immutable Git objects or no-follow file descriptors and copy the same bytes that were prehashed; (4) require an already-existing canonical archive parent whose full ancestor chain is Owner/root controlled, with no symlink, path alias, Candidate-writable component, unexpected ACL, or unexpected mount; (5) atomically create a new archive directory with exclusive semantics and fail if any target entry exists; (6) create destination files with no-overwrite/exclusive semantics, copy exact raw bytes, and rehash both copies; and (7) only after both destination hashes match, apply read-only controls and record the hashes. No implicit parent creation is allowed. A collision, failure, or mismatch stops; a partial newly allocated archive is marked incomplete and never reused. No existing archive or source checkout is modified.
 
-Before any copy, capture target filesystem/mount and ACL state, confirm all ancestors are root-owned and not group/world writable, and verify the three roots do not overlap each other or the Candidate run root. Load only the Owner-adopted bytes into Trust Root. The file mapping for the pinned Build Inventory must match Profile 1.1's controller_build_inventory_key after the script's colon-to-underscore mapping and .bin suffix. Preserve the owner-delivered pin list outside Candidate-writable roots.
+The repository does not contain this reviewed helper. Formal archiving is therefore **STOP / NOT EXECUTABLE**. Do not use `install -d`, output redirection, `cp`, or `mv` against a formal archive path in this runbook.
 
-Copy only Owner-adopted Profile/Index/Inventory bytes from the separately delivered package. Confirm each raw SHA before staging. The inventory filename is derived from the Owner-pinned Profile key, and the script rechecks the Profile-to-Inventory digest binding:
+#### Fresh Generation and trusted root paths
 
-~~~bash
-set -euo pipefail
-: "$OWNER_PROFILE_FILE"
-: "$OWNER_INDEX_FILE"
-: "$OWNER_BUILD_FILE"
-: "$OWNER_BUILD_INVENTORY_KEY"
-: "$PROFILE_SHA256"
-: "$INDEX_SHA256"
-: "$BUILD_SHA256"
-case "$OWNER_BUILD_INVENTORY_KEY" in (*[!A-Za-z0-9._:-]*|'') exit 2;; esac
-test -f "$OWNER_PROFILE_FILE" && test ! -L "$OWNER_PROFILE_FILE"
-test -f "$OWNER_INDEX_FILE" && test ! -L "$OWNER_INDEX_FILE"
-test -f "$OWNER_BUILD_FILE" && test ! -L "$OWNER_BUILD_FILE"
-test "$(sha256sum "$OWNER_PROFILE_FILE" | awk '{print $1}')" = "$PROFILE_SHA256"
-test "$(sha256sum "$OWNER_INDEX_FILE" | awk '{print $1}')" = "$INDEX_SHA256"
-test "$(sha256sum "$OWNER_BUILD_FILE" | awk '{print $1}')" = "$BUILD_SHA256"
-BUILD_INVENTORY_FILENAME="$(printf '%s' "$OWNER_BUILD_INVENTORY_KEY" | tr ':' '_').bin"
-sudo install -o root -g root -m 0400 "$OWNER_PROFILE_FILE" "$TRUST_ROOT/authority-profile.json"
-sudo install -o root -g root -m 0400 "$OWNER_INDEX_FILE" "$TRUST_ROOT/operation-index.json"
-sudo install -o root -g root -m 0400 "$OWNER_BUILD_FILE" "$TRUST_ROOT/$BUILD_INVENTORY_FILENAME"
-~~~
+Generation ID is an Owner-manifest value, not a Candidate parameter. Accepted syntax is `rq03f-` followed by a lowercase letter or digit and up to 55 lowercase letters, digits, or hyphens, without a trailing hyphen. Empty values, `.`, `..`, slash, backslash, whitespace, path aliases, and any value differing from the Owner-approved ID are rejected. The trusted parent is fixed in the Owner manifest; Candidate cannot choose the ID, parent, or derived roots.
 
-The source files and pin list must come from the independent Owner delivery channel. A Candidate-controlled JSON file cannot set these variables or replace the pin list.
+**NON-EXECUTABLE allocation pseudocode — do not run as shell commands.** Before any root write, a future independently reviewed Linux allocator must pin/open the trusted parent by directory file descriptor; walk and verify every ancestor's canonical identity, owner, mode, ACL, mount, and non-Candidate writability; reject symlinks, hardlinks, bind/path aliases, directory replacement, and unexpected devices; then create the Generation atomically and exclusively relative to that verified descriptor (`openat2`/`mkdirat` with no-follow/beneath constraints or an independently reviewed equivalent). Existing target, dangling symlink, renamed/replaced parent, noncanonical path, or failed post-create identity check is an immediate STOP. Never chmod/chown, repair, reuse, overwrite, or continue inside an existing Generation. All root writes occur only after the path and authority checks pass. The new Generation and derived `trust`, `controller`, and `runtime` paths remain fixed; no rename or symlink/path normalization may retarget them while a process is using them.
 
-### 6.3 Provision separate role accounts and protected directories
+Archive and Generation parents must already exist with independently verified ownership and permissions. No implicit parent creation. Before each operation, collect `stat`, ACL, mount, and full-ancestor evidence; require the checked path to equal the Owner-pinned canonical path; and prove Candidate has no write/traverse route, inherited descriptor, shared group, or equivalent privilege. A read-only `realpath` check is necessary but cannot replace descriptor-anchored allocation or prove safety against TOCTOU.
 
-The checked-in script source SHA at trusted master is 59f45da183aac30926a7ca6badb414b7e2c29652cdaa9be68869d025c8bf34b0. After Owner accepts the final source commit, independently compare this tool's bytes with the Owner-approved source/build manifest. Run only during a maintenance window as root:
+No reviewed exclusive allocator exists in this repository. Formal archive and Generation creation are **STOP / NOT EXECUTABLE**. The existing `tools/rq03f_operator_boundary.sh` is not a safe allocator and must not create or reuse a Generation. Do not perform any root write before the allocator and trust-path checks are implemented, independently reviewed, and Owner accepted.
 
-~~~bash
-set -euo pipefail
-: "$APPROVED_SOURCE_CHECKOUT"
-TOOL="$APPROVED_SOURCE_CHECKOUT/tools/rq03f_operator_boundary.sh"
-test "$(sha256sum "$TOOL" | awk '{print $1}')" = "59f45da183aac30926a7ca6badb414b7e2c29652cdaa9be68869d025c8bf34b0"
-sudo -- bash "$TOOL" create-accounts
-~~~
+### 6.3 Final installation path, Build Inventory, and Owner binding order
 
-This exact digest applies to the trusted-master baseline. If an Owner-accepted commit changes the script, the Owner must approve the new digest and update the command rather than reuse this value. The script refuses pre-existing role names and emits actual UIDs/GIDs. Stop on any existing name, UID/GID collision, extra group, unlocked account, unexpected home/shell, or sudo grant. Do not choose Profile 1.1 UID fields from a design estimate.
+The required order is strict:
 
-Once the Owner has approved new Profile 1.1, Index 1.1 and Build Inventory 1.1 bytes, stage those exact files and run:
+**trusted source → locked runtime → final installation paths → Build Inventory build → independent SHA/path recheck → Owner approval → Profile/Index binding → deployment acceptance.**
 
-~~~bash
-set -euo pipefail
-: "$PROFILE_SHA256"
-: "$INDEX_SHA256"
-: "$BUILD_SHA256"
-sudo -- bash "$TOOL" provision "$TRUST_ROOT" "$CONTROLLER_ROOT" "$RUNTIME_ROOT" "$PROFILE_SHA256" "$INDEX_SHA256" "$BUILD_SHA256"
-~~~
+1. Verify the Owner-pinned trusted source commit and raw source hashes from the independent Owner channel.
+2. Build controller and runtime artifacts in locked, non-root staging; verify the complete runtime and offline package manifest.
+3. Securely allocate a fresh Generation under the fixed trusted parent using the reviewed exclusive allocator. Install controller and runtime bytes at their **final immutable absolute paths**. Reject source or destination links, special files, writable files, path aliases, and unexpected filesystem changes. Recalculate installed bytes against the staging manifest. Freeze `controller_root`, every module `runtime_path`, Python executable, site-packages root, schema paths, and Python/dependency tree paths.
+4. Only after installation at those final paths, generate candidate Build Inventory 1.1 naming those exact absolute paths and hashes. Cover controller root, every security-sensitive module and schema, module runtime paths, Python executable/version, site-packages root/tree, every dependency, and the separately pinned Python/system runtime closure. The current schema does not capture the complete standard-library/system-library closure; an Owner-approved immutable base-image/package manifest and update freeze are also required.
+5. A second independent verifier recalculates component hashes, exact path equality/canonicality, and canonical Inventory bytes, then independently computes raw Inventory SHA-256. Record verifier identity, tools/version, source commit, all absolute paths, component hashes, Inventory key, and raw Inventory digest. Any mismatch is STOP.
+6. The Owner reviews and adopts that exact Inventory key, file path, absolute path set, and raw SHA through the existing protected trust-anchor process. Only after this adoption may the Owner create Profile/Index bytes bound to the accepted Inventory SHA/key/paths, epoch, roles, and Generation. Deployment acceptance then rechecks these exact bytes and paths on the target host.
 
-Expected output includes Operator UID/GID, denied direct Index append for Candidate/Author/Reviewer/Approver, allowed Operator append open, and exact Profile/Index hashes. This script is not an Owner trust source and does not create a production launcher. Do not run it against the existing Trust Anchor directory. Since it mutates modes/ACLs in place, a nonzero exit means service remains disabled, logs are retained, and the entire new generation is quarantined; create a fresh generation to retry.
+The Inventory key comes only from the Owner-adopted Profile, never Candidate input. Before deriving the existing filename mapping (`:` becomes `_`, then `.bin`), enforce a deployment-safe key form, reject empty/dot/path components and separators, compare the resulting filename exactly with the independently Owner-pinned filename, and prove it resolves directly beneath the canonical Trust Root with no symlink or alias. Any mapping collision or mismatch is STOP. The Profile schema's broader non-whitespace key acceptance does not waive this path-safety gate.
 
-After provisioning, independently capture:
+Any copy, reinstall, relocation, symlink resolution, Python/runtime replacement, schema/module byte change, site-packages change, or final-path change invalidates the candidate Inventory. Generate a new candidate Inventory from the new final tree, independently recalculate its hashes, and obtain fresh Owner approval and corresponding Profile/Index binding. Never edit, relabel, or adapt an Inventory already adopted by the Owner.
 
-~~~bash
-sudo stat -Lc '%n %F %u:%g %a %h %d' "$TRUST_ROOT" "$TRUST_ROOT/authority-profile.json" "$TRUST_ROOT/operation-index.json" "$CONTROLLER_ROOT" "$RUNTIME_ROOT"
-sudo getfacl -pe -R "$TRUST_ROOT" "$CONTROLLER_ROOT" "$RUNTIME_ROOT"
-sudo find "$TRUST_ROOT" "$CONTROLLER_ROOT" "$RUNTIME_ROOT" -xdev -printf '%y %u:%g %m %n %p\n'
-~~~
+### 6.4 Existing provisioning tool and absent production runtime
 
-Compare Profile/Index raw hashes before and after provisioning. Confirm no candidate-writable parent, ACL, mount alias, symlink, hardlink, file descriptor, or writable bytecode path remains.
+The trusted-master baseline SHA for `tools/rq03f_operator_boundary.sh` is `59f45da183aac30926a7ca6badb414b0e2c29652cdaa9be68869d025c8bf34b0`. It refuses pre-existing account names and performs reviewed permission checks, but it mutates ACLs/ownership/modes in place and is non-transactional. It is not an exclusive archive/Generation allocator, Owner trust source, production launcher, TrustContext provider, or anti-rollback mechanism.
 
-### 6.4 Bootstrap verification command
+Use that tool only in a later Owner-authorized host window, from the exact independently approved source/build closure, after a reviewed allocator has created the fresh Generation and every final path and Owner-adopted Profile/Index/Inventory hash has been rechecked. Do not run it on the old Anchor or any existing/partially provisioned Generation. Any nonzero status means service remains disabled; preserve logs and the partial tree as incomplete and use a new Generation after the allocator exists. This document intentionally does not provide a root command template because the required trusted inputs and allocator do not yet exist.
 
-Only after a fixed root-owned service launcher exists, the Operator can run the bootstrap with clean environment and Owner-pinned values. For a read-only build probe, the direct command is:
-
-~~~bash
-sudo -u rq03f-operator -- env -i PATH=/usr/bin:/bin "$RUNTIME_ROOT/bin/python" -I -S -B "$CONTROLLER_ROOT/scripts/operator_controller_bootstrap.py" --build-inventory "$TRUST_ROOT/$BUILD_INVENTORY_FILENAME" --build-sha256 "$BUILD_SHA256" --controller-root "$CONTROLLER_ROOT"
-~~~
-
-Expected stdout: controller_build=verified and exit 0. A wrong build SHA, altered dependency/module/schema, unpinned root, normal Python launch, Candidate-selected Inventory or hostile import origin must exit nonzero. This probe validates a build, not a TrustContext provider, a semantic operation, or Production Trust. The direct bootstrap command must not be exposed to Candidate as a launcher.
+A read-only bootstrap probe can verify Build Inventory bytes, but it cannot establish the missing fixed Launcher, TrustContext provider, service unit, or monotonic anti-rollback state. Those operations are **NOT EXECUTABLE / STOP** until separately implemented, independently reviewed, Owner-pinned, and tested on the target host. No command in this report may be interpreted as permission to create Production Trust.
 
 ## 7. Independent Owner acceptance Runbook
 
-The following A–L steps are for the real target host and a later Owner-authorized acceptance window. No GitHub-hosted result substitutes for them. Each step must save UTC timestamps, command lines, actual UID/EUID/GID/groups, exit status, stdout/stderr, raw hashes and target host identity into the Owner-controlled acceptance record. Any unexpected result stops the procedure and leaves the service disabled.
+The following A–L items are an **acceptance checklist only**, not executable commands or production deployment approval. No GitHub-hosted result substitutes for an independent target-host acceptance. Every operational item is **STOP / NOT EXECUTABLE** until the Owner supplies and accepts the independent host, exact source/runtime/Inventory/Profile/Index pins, safe exclusive archive/Generation allocator, fixed Launcher, TrustContext provider, and monotonic anti-rollback mechanism. Any future authorized run must save UTC timestamps, exact command lines, actual UID/EUID/GID/groups, exit status, stdout/stderr, raw hashes, and target host identity in the Owner-controlled record.
 
-At the start, the independent Operator supplies the following verified values from the Owner-controlled deployment manifest. Empty or Candidate-sourced values fail closed:
+Before any future root operation, the independent Operator must run the read-only input-shape checks from §6.1 with an operation-specific complete required-variable list. That list must reject **both unset and empty** values. At minimum the source phase requires the Owner-approved source commit, source checkout and digest manifest; archive phase requires anchor commit, both source paths/SHA pins, canonical existing parent and new target identifier; Generation phase requires Owner-approved Generation ID, canonical existing parent, actual parent ownership/ACL/mount evidence, and all derived final paths; Inventory phase requires key, exact absolute paths, all component hashes, and independent verifier identity; provisioning/acceptance requires Profile/Index/Build SHA, exact Owner-adopted files, host/window, service unit, role principals, and actual UID/GID map. SHA-256 must be 64 lowercase hex; commits must be 40 lowercase hex and resolve in the exact checkout; IDs/keys must pass §6.1 syntax plus exact Owner-manifest equality; all filesystem paths must be absolute and exactly canonical. A wrong path, unapproved SHA, missing Owner approval, failed identity/permission prerequisite, or any empty parameter is STOP before root writes.
 
-~~~bash
-set -euo pipefail
-: "$OWNER_ACCEPTED_SOURCE_COMMIT"
-: "$OWNER_TRUST_ANCHOR_COMMIT"
-: "$PROFILE_SHA256"
-: "$INDEX_SHA256"
-: "$BUILD_SHA256"
-: "$GENERATION_ID"
-: "$TRUST_ROOT"
-: "$CONTROLLER_ROOT"
-: "$RUNTIME_ROOT"
-: "$BUILD_INVENTORY_FILENAME"
-~~~
+The current system has no Owner-adopted Profile 1.1, Index 1.1 or Build Inventory 1.1 for a production host; no final absolute install paths; and no production Launcher, TrustContext provider, service unit or anti-rollback ledger. Therefore these acceptance steps describe future evidence only; they cannot pass in this package and no formal command should be run.
 
 ### A. Real Operator identity and UID/GID
 
 - **Precondition / actor:** Root-controlled maintenance session, service disabled. The deployment admin must authenticate independently; the controller runs as rq03f-operator.
-- **Command:** Run the create-accounts/provision commands in §6.3; then run **id rq03f-operator**, **id rq03f-candidate**, **id rq03f-author**, **id rq03f-reviewer-a**, **id rq03f-approver-b**, **getent passwd** for each, and **sudo -n -u ROLE -- /usr/bin/sudo -n true** for each role.
+- **Command:** In a later Owner-authorized host window, use only the exact independently approved existing account/provisioning tool after the safe allocator and all §6.1 checks pass; this package supplies no root command and does not authorize account creation; then run **id rq03f-operator**, **id rq03f-candidate**, **id rq03f-author**, **id rq03f-reviewer-a**, **id rq03f-approver-b**, **getent passwd** for each, and **sudo -n -u ROLE -- /usr/bin/sudo -n true** for each role.
 - **Expected / evidence:** Five distinct nonzero UID/GID pairs, locked accounts, nologin shell, no supplementary group, private home and direct sudo denial. Store raw command output and host /etc/passwd + /etc/group snapshot hash.
 - **Stop / Owner:** Any reused name, shared UID/GID, unexpected group, unlocked account or sudo success is FAIL. Owner records and adopts the principal-to-UID mapping before Profile 1.1 is accepted.
 
@@ -360,16 +312,16 @@ set -euo pipefail
 ### C. Protected Repository, ACL and path verification
 
 - **Precondition / actor:** Root read-only audit before activating the fixed launcher.
-- **Command:** Run the stat/getfacl/find commands in §6.3, plus **namei -l "$TRUST_ROOT/operation-index.json"** and **findmnt -T "$TRUST_ROOT"**.
+- **Command:** In a later target-host acceptance, the independent verifier captures read-only stat/ACL/tree/ancestor/mount evidence for the exact Owner-pinned paths. This package does not define a privileged path mutation.
 - **Expected / evidence:** Trust files are Operator-owned/private; installed code/runtime root-owned/read-only; no named/default ACL, nested mount, symlink, hardlink, special file, group/world writable ancestor, path alias or candidate-owned component.
 - **Stop / Owner:** Any mismatch, mutable parent, unexpected mount or ACL is FAIL. Preserve complete output and filesystem/mount identity for Owner.
 
 ### D. Controller, schema and dependency SHA verification
 
 - **Precondition / actor:** Independent build verifier and Operator; exact Owner-pinned Build Inventory already in Trust Root.
-- **Command:** Run the §6.4 bootstrap probe with the Build Inventory hash delivered outside Candidate data. Recalculate the Build Inventory file SHA, controller/scripts tree, schemas tree, interpreter, site-packages tree and all components independently.
+- **Command:** Only after the final paths and independently Owner-adopted Inventory exist, an independent verifier recalculates the Inventory file SHA, controller/scripts and schemas trees, interpreter, site-packages tree, all components and absolute-path bindings. The existing bootstrap probe is not the missing production Launcher/provider and cannot establish Production Trust; no production probe is authorized in this package.
 - **Expected / evidence:** Bootstrap exits 0; independent SHA manifest has zero mismatches; all loaded modules originate at the installed root and package paths equal the Inventory.
-- **Stop / Owner:** Any omitted transitive module, schema, dependency, mutable byte, path drift, unknown Python patch or mismatch is FAIL. Owner signs exact Build Inventory SHA and runtime lock/wheelhouse digests.
+- **Stop / Owner:** Any omitted transitive module, schema, dependency, mutable byte, path drift, unknown Python patch or mismatch is FAIL. Owner signs exact Build Inventory SHA and runtime lock/wheelhouse digests. No probe result is captured or claimed in this documentation-only remediation.
 
 ### E. Candidate-controlled launcher, environment and module substitution
 
@@ -429,6 +381,8 @@ set -euo pipefail
 
 ## 8. Backup, recovery, activation and rollback policy
 
+This section is policy only, not executable steps. The production service unit and fixed Launcher are absent, so activation, restore and rollback are **STOP / NOT EXECUTABLE** until an independently reviewed implementation and Owner-controlled parameters exist.
+
 ### Before any activation
 
 - Use a maintenance window; stop/disable the independently audited service; verify no Operator writer is active and no lock is held.
@@ -438,26 +392,9 @@ set -euo pipefail
 
 ### Failure before activation
 
-- Keep service disabled.
-- Retain exact stdout/stderr, host identity and partial tree stat/ACL snapshots.
-- With no process using the generation, move the whole fresh generation directory to a root-only quarantine directory on the same filesystem. Example commands, executed as root after verifying the unit is stopped:
-
-~~~bash
-set -euo pipefail
-: "$OWNER_APPROVED_SERVICE_UNIT"
-: "$GEN_ROOT"
-: "$GENERATION_ID"
-sudo systemctl disable --now "$OWNER_APPROVED_SERVICE_UNIT"
-if sudo systemctl is-active --quiet "$OWNER_APPROVED_SERVICE_UNIT"; then exit 1; fi
-QUARANTINE_ROOT=/var/lib/rq03f/quarantine
-sudo install -d -o root -g root -m 0700 "$QUARANTINE_ROOT"
-test "$(stat -c %d "$GEN_ROOT")" = "$(stat -c %d "$QUARANTINE_ROOT")"
-test ! -e "$QUARANTINE_ROOT/$GENERATION_ID"
-sudo mv -T -- "$GEN_ROOT" "$QUARANTINE_ROOT/$GENERATION_ID"
-~~~
-
-The service-unit variable must come from the Owner-controlled deployment manifest, never Candidate input. The repository currently supplies no such unit, so this command is a required interface for the future integration and will fail closed until that unit exists. Do not attempt to repair a half-provisioned tree in place; the shell tool is not transactional.
-- Restart from a new generation ID and fresh paths after root-cause correction. Prior trust bytes are not changed by this method.
+- Keep the service disabled and retain exact stdout/stderr, host identity, and partial tree stat/ACL snapshots.
+- Do not repair, reuse, overwrite, rename, or move a Generation through ad hoc shell commands. A future independently reviewed quarantine helper must accept only nonempty Owner-pinned service-unit, canonical Generation path, Generation ID and quarantine-parent values; reject unset/empty inputs; verify the unit is stopped; verify every ancestor's canonical identity/ownership/permissions and same-filesystem requirement; and allocate a new quarantine target exclusively without overwriting any existing entry.
+- No such service unit or quarantine helper exists in this repository. Quarantine/rollback is therefore **STOP / NOT EXECUTABLE**. Do not run `install -d`, `mv`, or `systemctl` templates from this report. Restart planning requires a different fresh Generation ID after the safe allocator is implemented; prior trust bytes remain untouched.
 
 ### Failure after any protected operation
 
@@ -515,9 +452,12 @@ Existing requirements remain in force after deployment: three fresh repetitions,
 
 ## 12. 本轮交付
 
-- Added this deployment-readiness report only; no production code, schemas, scripts, workflow or fixture changed.
-- Independent byte checks confirmed all 17 frozen Content SHA entries and the supplied Golden Corpus, Blind Holdout and Original NC-02 digests.
-- No production tests were run because no production code changed; report formatting and patch whitespace are checked on the final commit.
-- No independent target-host deployment command was run.
-- No profile/index migration, trust anchor append, service installation/activation, Intake or qualification operation was performed.
-- The exact final Git HEAD and fresh exact-head PR CI are reported in the Owner handoff and verified from GitHub metadata after the documentation commit is pushed.
+- This remediation changes this deployment-readiness report only; no production code, schema, script, workflow, fixture, trust anchor, frozen corpus, holdout or golden truth is modified.
+- Owner Review finding 1 (Generation escape/reuse): rejects empty/dot/path-alias IDs, pins the canonical Owner parent, requires ancestor ownership/permission/ACL/mount checks, and marks exclusive descriptor-anchored allocation non-executable until a reviewed helper exists. Existing Generations are never repaired or reused.
+- Owner Review finding 2 (archive overwrite): requires a fresh exclusive archive under a pre-existing Owner-controlled parent, source SHA checks before copy, destination SHA checks after copy, no-overwrite writes, fail-stop behavior, and preservation of the original Anchor checkout/history.
+- Owner Review finding 3 (Inventory binding): records the exact trusted source → locked runtime → final install path → Inventory build → independent SHA/path review → Owner approval → Profile/Index binding → deployment acceptance order. Any path/byte change requires a new candidate Inventory and Owner approval; adopted Inventory is immutable.
+- Owner Review finding 4 (parameters/executability): read-only guard rejects unset and empty inputs, validates digest/commit/ID/key formats, canonical paths, exact Owner pins and role/UID/GID inputs; absent production Launcher, TrustContext provider, service unit and anti-rollback ledger are explicit STOP / NOT EXECUTABLE blockers.
+- Synthetic command-flow validation: **18 PASS** on disposable temporary paths and synthetic bytes, using real file operations under the current nonprivileged UID. Rejected `.`, `..`, empty/separator Generation IDs, unset and empty variables, invalid SHA, wrong absolute Build Inventory path, unapproved SHA before state advancement, existing Generation reuse, existing Archive overwrite, source SHA mismatch before Archive allocation, and a symlink parent alias. Existing Generation/Archive sentinel hashes remained unchanged; unapproved SHA created no advancement marker; a valid new synthetic Archive had matching source and copied-byte SHA. This does not exercise independent UIDs, root/DAC/ACL isolation, a production allocator, or a target host and is not deployment acceptance.
+- Frozen-byte recheck: trust anchor remains `eb4a95c618e05c5ad6413137478bc65dbca75ec9`; Profile SHA `d8e2ac76552f76b5dacf1ab7e31014da68ffe757da9bff5c97d27be9b67effd4`; Index SHA `52b3d01db27b10b4d9f54d6278a469ba7998a26057de93c8308b2b1fd50b67a4`. Golden corpus `96f5044f8b009d77c386e8acb414dface173bd5738354ae740d2361e0e52561a`, Blind Holdout `268e95379a15e0c4a848332e8b3a33618d05cb889991730e23ff8e693a59b57a`, Original NC-02 `878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352`; all **17 case Content bytes** match `fixture-files.json`.
+- No formal Anchor archive, Generation, Profile/Index migration, trust-anchor append, service installation/activation, Intake, Agent A/B, or qualification operation was performed.
+- Fresh exact-HEAD PR CI URL and final commit SHA are reported from GitHub after push; Production Trust remains BLOCKED.
