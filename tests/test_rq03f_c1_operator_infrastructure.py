@@ -417,7 +417,8 @@ def _wheelhouse(root: Path) -> tuple[Path, Path, Path, str, str]:
 class TestRQ03FCandidateBuildInventory(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.temp = tempfile.TemporaryDirectory(prefix="rq03f-c1-build-", dir=REPO_ROOT)
+        temp_parent = Path(os.environ.get("RQ03F_C1_TEST_TMPDIR", str(REPO_ROOT)))
+        cls.temp = tempfile.TemporaryDirectory(prefix="rq03f-c1-build-", dir=temp_parent)
         cls.root = Path(cls.temp.name)
         cls.root.chmod(0o700)
         cls.source = cls.root / "trusted-source"
