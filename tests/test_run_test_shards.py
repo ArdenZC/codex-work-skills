@@ -395,6 +395,10 @@ class TestShardManifest(unittest.TestCase):
             explicit.write_bytes(b"placeholder")
             with patch.dict(os.environ, {"RUN_TEST_SHARDS_PYTHON": str(explicit)}):
                 self.assertEqual(run_test_shards._default_python_command(), str(explicit))
+            if os.name != "nt":
+                alias = folder / "python-venv-alias"
+                alias.symlink_to(explicit)
+                self.assertEqual(run_test_shards._resolve_python_command(str(alias)), str(alias))
             with patch.object(run_test_shards.shutil, "which", return_value=str(explicit)) as which:
                 self.assertEqual(run_test_shards._resolve_python_command("python"), str(explicit.resolve()))
                 which.assert_called_once_with("python")

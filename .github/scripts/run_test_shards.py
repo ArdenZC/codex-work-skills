@@ -359,12 +359,15 @@ def _resolve_python_command(requested: str | Path) -> str:
     value = str(requested)
     explicit = Path(value).is_absolute() or ntpath.isabs(value) or value.startswith((".", "~")) or "/" in value or "\\" in value
     if explicit:
-        candidate = Path(value).expanduser().resolve(strict=False)
+        candidate = Path(os.path.abspath(Path(value).expanduser()))
     else:
         found = shutil.which(value)
         if not found:
             raise FileNotFoundError(f"requested interpreter not found on PATH: {value}")
-        candidate = Path(found).expanduser().resolve(strict=False)
+        # Keep the PATH entry spelling. On macOS, venv/bin/python is a
+        # symlink to the base executable; resolving it removes the venv
+        # context that Python uses to select site-packages.
+        candidate = Path(os.path.abspath(Path(found).expanduser()))
     if not candidate.is_file():
         raise FileNotFoundError(f"requested interpreter does not exist: {candidate}")
     return str(candidate)

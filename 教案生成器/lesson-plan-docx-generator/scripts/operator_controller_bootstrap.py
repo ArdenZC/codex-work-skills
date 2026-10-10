@@ -193,6 +193,45 @@ def _read_build_inventory(path: Path, expected_sha256: str) -> tuple[bytes, dict
     return raw, payload
 
 
+def _verify_venv_site_packages(site_packages: Path, python_version: str) -> None:
+    """Bind the pinned venv packages to the executable path under ``-S``.
+
+    Python 3.11 may report the base prefix under ``-S``.  Its venv launcher
+    path remains visible in ``sys.executable``; use that lexical path rather
+    than trusting mutable ``pyvenv.cfg`` metadata to establish the venv root.
+    The packages themselves are independently hash-pinned below.
+    """
+
+    if os.name == "nt":
+        _require(len(site_packages.parents) >= 2, "invalid Windows venv site-packages path")
+        venv_root = site_packages.parents[1]
+        expected_site_packages = venv_root / "Lib" / "site-packages"
+        executable_directory = venv_root / "Scripts"
+    else:
+        version_parts = python_version.split(".")
+        _require(len(version_parts) >= 2, "invalid Python version in venv inventory")
+        major_minor = ".".join(version_parts[:2])
+        _require(len(site_packages.parents) >= 3, "invalid POSIX venv site-packages path")
+        venv_root = site_packages.parents[2]
+        expected_site_packages = venv_root / "lib" / f"python{major_minor}" / "site-packages"
+        executable_directory = venv_root / "bin"
+    _require(
+        os.path.normcase(os.path.abspath(expected_site_packages))
+        == os.path.normcase(os.path.abspath(site_packages)),
+        "site-packages path does not match the interpreter venv layout",
+    )
+    executable_path = Path(os.path.abspath(sys.executable))
+    _require(
+        os.path.normcase(str(executable_path.parent))
+        == os.path.normcase(str(executable_directory)),
+        "pinned site-packages root is not under the active interpreter venv",
+    )
+    _require(
+        executable_path.name.casefold().startswith("python"),
+        "active venv executable has an unexpected name",
+    )
+
+
 def verify_build_inventory(
     inventory_path: Path,
     expected_sha256: str,
@@ -226,8 +265,8 @@ def verify_build_inventory(
              "Python executable SHA differs from the pinned controller runtime")
     purelib = Path(sysconfig.get_paths()["purelib"]).resolve(strict=True)
     site_packages = Path(runtime["site_packages_root"]).resolve(strict=True)
-    _require(purelib == site_packages,
-             "site-packages root differs from the pinned controller runtime")
+    if purelib != site_packages:
+        _verify_venv_site_packages(site_packages, runtime["python_version"])
     if verify_runtime_tree:
         _require(sha256_runtime_tree(site_packages) == runtime["site_packages_sha256"],
                  "site-packages runtime tree differs from the Owner-pinned build")

@@ -842,9 +842,10 @@ else:
             )
             env = dict(os.environ)
             env["PYTHONPATH"] = str(malicious)
+            python_executable = env.get("RUN_TEST_SHARDS_PYTHON", sys.executable)
             result = subprocess.run(
                 [
-                    sys.executable, "-I", "-S", "-B",
+                    python_executable, "-I", "-S", "-B",
                     str(root / "scripts" / "operator_controller_bootstrap.py"),
                     "--build-inventory", str(inventory_path),
                     "--build-sha256", sha256_bytes(inventory_raw),
@@ -879,6 +880,22 @@ else:
             self.assertNotEqual(0, unsafe.returncode)
             self.assertIn("must start with Python -I", unsafe.stderr)
             self.assertFalse(marker.exists(), "non-isolated module executed before rejection")
+            version = ".".join(sys.version.split()[0].split(".")[:2])
+            if os.name == "nt":
+                unrelated_site_packages = Path(temp_name) / "unrelated-venv" / "Lib" / "site-packages"
+            else:
+                unrelated_site_packages = (
+                    Path(temp_name) / "unrelated-venv" / "lib"
+                    / f"python{version}" / "site-packages"
+                )
+            unrelated_site_packages.mkdir(parents=True)
+            with self.assertRaisesRegex(
+                controller_bootstrap.BootstrapError,
+                "not under the active interpreter venv",
+            ):
+                controller_bootstrap._verify_venv_site_packages(
+                    unrelated_site_packages, sys.version.split()[0]
+                )
 
     def test_candidate_modified_protected_index_bytes_fail_pinned_inventory_check(self):
         context = self.e.context()
