@@ -387,9 +387,18 @@ PY
       fail "$user unexpectedly opened the protected index for append"
     fi
   done
-  setpriv --reuid="$(id -u rq03f-operator)" --regid="$(id -g rq03f-operator)" \
-    --clear-groups --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all -- \
-    python3 -c 'import os,sys; fd=os.open(sys.argv[1], os.O_WRONLY|os.O_APPEND); os.close(fd)' "$index"
+  local operator_uid operator_gid path
+  operator_uid=$(id -u -- rq03f-operator)
+  operator_gid=$(id -g -- rq03f-operator)
+  path=$index
+  while :; do
+    stat -c 'operator_path_probe path=%n owner=%u group=%g mode=%a type=%F' -- "$path"
+    [[ $path == / ]] && break
+    path=$(dirname -- "$path")
+  done
+  setpriv --reuid="$operator_uid" --regid="$operator_gid" --clear-groups \
+    --no-new-privs --bounding-set=-all --inh-caps=-all --ambient-caps=-all -- \
+    python3 -c 'import json,os,sys; print("operator_write_identity="+json.dumps({"uid":os.getuid(),"euid":os.geteuid(),"gid":os.getgid(),"groups":os.getgroups(),"access_write":os.access(sys.argv[1],os.W_OK)},sort_keys=True),flush=True); fd=os.open(sys.argv[1],os.O_WRONLY|os.O_APPEND); os.close(fd)' "$index"
 
   [[ $(sha256sum -- "$profile" | cut -d ' ' -f 1) == "$expected_profile_sha" ]] \
     || fail 'authority profile bytes changed during permission provisioning'
