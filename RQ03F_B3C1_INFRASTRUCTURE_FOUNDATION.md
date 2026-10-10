@@ -1,6 +1,56 @@
 # RQ-03F-B3-C1 — Production Operator Infrastructure Foundation
 
-## Review status and scope
+## Owner Review 5480118486 remediation status
+
+This addendum records the required changes on the existing Draft PR #60. Code commit `0fa07c65b930fbee16144a4f24dceac3298858b2` is the implementation/test head before this report update. The exact report commit SHA is the current PR head; it is also returned in the completion response and GitHub PR checks.
+
+### Allocation terminal-state fix
+
+`operator_allocator.allocate` now treats `.rq03f-allocation-record.json` with `allocation_status="complete"` as prepared data. It first fsyncs the target and parent directories, reopens and checks the pinned parent identity, and rechecks the target identity through the reopened parent. Only then does it exclusively create `.rq03f-allocation-finalized.json`, binding the exact allocation-record SHA, allocation-plan SHA, target ID, and target device/inode/UID/GID/mode. Any exception keeps the already-created target and record, adds an exclusive `.rq03f-incomplete.json` failure tombstone when possible, and never reuses the target ID.
+
+The builder, all locked-install entry points, and the independent stdlib verifier now require the canonical finalization receipt and reject any incomplete marker. The builder and verifier also recheck terminal allocation state before returning candidate output. A matching SHA for a complete record is insufficient when an incomplete marker exists; a complete record without a finalization receipt is unfinalized and rejected. Neither failure markers nor target directories are removed or overwritten.
+
+### Added deterministic coverage
+
+- `test_parent_fsync_failure_after_complete_record_is_rejected_by_every_consumer`: injects a parent-directory fsync error after the complete record exists, verifies the record remains complete with its exact SHA, confirms the incomplete marker exists and finalization is absent, and confirms Builder, Installer, and Verifier all refuse it. Reallocation of the target ID is refused.
+- `test_final_parent_identity_failure_after_complete_record_is_rejected_by_every_consumer`: injects failure at the reopened-parent identity check after the complete record write and asserts the same downstream refusal and no-reuse behavior.
+- `test_complete_record_without_failure_marker_or_finalizer_is_rejected`: removes only the success finalization receipt in an isolated synthetic fixture and confirms all consumers reject the otherwise correctly SHA-pinned complete record as unfinalized.
+- Positive allocation asserts the finalized receipt binds the exact complete-record SHA.
+
+### Required Template CI investigation
+
+The previous Template Package run [38070998888](https://github.com/ArdenZC/codex-work-skills/actions/runs/38070998888) did eventually schedule jobs after the initial zero-job queued period. Its Windows and macOS `semantic-scope-1` jobs failed at the existing full-manifest coverage assertion before running their semantic partition: both reported `manifest=982`, `discovered=1004`. The 22-test difference was the C1 test module added in this PR but absent from `run_test_shards.py`'s full manifest. This is a C1 CI coverage regression, not an infrastructure-only failure.
+
+The fix adds the C1 module as an explicit Linux-only suite in the full manifest and gives it an explicit non-Linux refusal path. The existing six semantic partitions and their Windows/macOS matrix are unchanged. On the implementation head, local manifest verification reports 1,006 full-suite tests plus the two release-scale tests, matching 1,008 discovered root tests. `test_c1_operator_tests_are_explicitly_covered_by_linux_full_manifest`, `test_full_manifest_matches_root_discovery`, and `test_semantic_scope_top_level_partitions_are_exact` all pass.
+
+The earlier zero-job observations were investigated against workflow/run APIs. `38070998888` was a `pull_request` run in `queued` state with no jobs at the review snapshot, then acquired a queued `Classify changes` job and later 40 jobs. The later zero-job cancellation `38070879497` has conclusion `cancelled`, but GitHub returned no cancellation reason. The workflow defines a PR-head concurrency group with `cancel-in-progress: true`; that policy is a possible interaction, not proven as the cause of either observation. The API approval endpoint for the remediation run returned an empty list. No evidence identifies whether queue delay, event processing, or concurrency caused the earlier no-job interval, so the report does not assign a root cause.
+
+### Current verification and CI state
+
+- Deterministic C1 suite on the implementation head: 25 tests run, 24 passed, one real-ACL test skipped locally because it runs in the disposable hosted Linux job.
+- Local manifest/semantic coverage checks: 3/3 passed; `run_test_shards.py --list` passed; `py_compile` and `git diff --check` passed.
+- Running the full local `tests.test_run_test_shards` module produced 28 passes and one Gradebook validator failure. The validator reported `Named-range template changed protected workbook structure or formatting` while the workbook SHA matched. No Gradebook code or template is changed in this remediation, and no root cause is assigned from this local observation. The fresh GitHub run is the authoritative matrix evidence.
+- Exact implementation-head hosted real-UID run [38072762678](https://github.com/ArdenZC/codex-work-skills/actions/runs/38072762678) completed SUCCESS on commit `0fa07c65b930fbee16144a4f24dceac3298858b2`: all 25 C1 tests passed under Operator UID 4601, including the real ACL case, late-failure injections, consumer rejection, exclusive creation, runtime drift, and cleanup. Candidate/Author/Reviewer/Approver UIDs 4602–4605 were separately exercised; the artifact is [11676754907](https://github.com/ArdenZC/codex-work-skills/actions/runs/38072762678/artifacts/11676754907), SHA-256 `9f3f69c2c7f4395217729980ba961a69569b4cb5cceb47619ba6f6187eb02fff`.
+- Exact implementation-head Template Package run [38072762647](https://github.com/ArdenZC/codex-work-skills/actions/runs/38072762647) remained `PENDING` with zero jobs at `2026-10-10T17:48:24Z`. The GitHub Actions workflow is `active`; the run and its Check Suite are `pending`; the Check Suite reports `latest_check_runs_count=0`; the jobs endpoint returns `total_count=0`; and the run approval endpoint returns `[]`. Thus GitHub accepted the pull-request event and created a Check Suite but had not created any job at that observation. The prior-head run [38070998888](https://github.com/ArdenZC/codex-work-skills/actions/runs/38070998888) remained overall `queued` while its jobs endpoint listed 40 jobs; its Windows and macOS `semantic-scope-1` jobs failed on the already-described `manifest=982`, `discovered=1004` guard. The checked-in workflow uses a PR-head concurrency group with `cancel-in-progress: true`, but the available API evidence does not establish whether concurrency, queue capacity, event processing, or another scheduler condition caused the current exact-head run to remain jobless. No root cause is assigned.
+- The full 12-job Windows/macOS semantic-scope matrix and CI Gate have not passed on the remediation head. The report commit will trigger another exact-head Template Package run; the final response will identify that run and its result. A pending or zero-job run is not a pass.
+- Recomputed all 85 SHA rows in `tests/fixtures/semantic-scope/fixture-files.json`; all match. The 17 `.content` entries cover N01–N06, P07–P12, A13, P14, and H01–H03. Golden corpus `96f5044f8b009d77c386e8acb414dface173bd5738354ae740d2361e0e52561a`, Blind Holdout `268e95379a15e0c4a848332e8b3a33618d05cb889991730e23ff8e693a59b57a`, and Original NC-02 `878604a6afba0b50dd758290ac280386fc301a9c76ff263cbece667ac8447352` match their frozen byte hashes. These source paths are unchanged from trusted master.
+- The external Trust Anchor checkout remains at `eb4a95c618e05c5ad6413137478bc65dbca75ec9`, clean; Profile SHA-256 `d8e2ac76552f76b5dacf1ab7e31014da68ffe757da9bff5c97d27be9b67effd4`, Index SHA-256 `52b3d01db27b10b4d9f54d6278a469ba7998a26057de93c8308b2b1fd50b67a4`.
+- No formal Trust Anchor, frozen case, Golden Truth, Blind Holdout, Original NC-02, or production authorization was modified. Production Trust remains unestablished; this work does not authorize deployment or qualification.
+
+### Remediation files
+
+- `tools/rq03f_c1/operator_allocator.py`
+- `tools/rq03f_c1/build_inventory.py`
+- `tools/rq03f_c1/locked_install.py`
+- `tools/rq03f_c1/verify_inventory.py`
+- `tests/test_rq03f_c1_operator_infrastructure.py`
+- `.github/scripts/run_test_shards.py`
+- `tests/test_run_test_shards.py`
+- `RQ03F_B3C1_INFRASTRUCTURE_FOUNDATION.md`
+
+## Original C1 review status and scope (historical baseline)
+
+This section records the evidence before Owner Review 5480118486. The remediation addendum above is authoritative for the current code, tests, and CI state.
 
 This PR implements the C1-A exclusive candidate Archive/Generation allocator and the C1-B candidate Runtime/Controller Build Inventory toolchain. All locally generated records and fixtures are synthetic. Nothing in this change grants production authority or changes the RQ-03F qualification state.
 
@@ -50,7 +100,7 @@ The builder emits the existing Build Controller Inventory 1.1 shape without chan
 
 **Production build input gate:** no independently Owner-approved production requirements lock or wheelhouse is currently available. The implementation was exercised only with a deterministic generated synthetic wheel. A production build request must stop until the actual Python patch release, locked requirements, wheelhouse manifest, all wheel SHA values, and the external plan digests are independently approved and supplied. The synthetic values in tests are not candidates for production adoption.
 
-## 4. Deterministic validation evidence
+## 4. Original deterministic validation evidence (pre-remediation)
 
 Command: `python3 -m unittest tests.test_rq03f_c1_operator_infrastructure -v`.
 
@@ -72,7 +122,7 @@ Local result: 22 tests discovered; 21 passed; one ACL test was skipped locally b
 | Runtime closure | Candidate sidecar is independently rechecked, candidate-only status retained, and existing output is never overwritten | PASS |
 | Runtime symlinks | Safe file symlink digest binds raw link text and resolved target bytes; changed target bytes, dangling links, and symlink directories are rejected/detected | PASS |
 
-## 5. Hosted Linux real-identity evidence
+## 5. Original hosted Linux real-identity evidence (pre-remediation)
 
 The dedicated `RQ-03F-B3-C1 Operator Infrastructure` workflow uses `ubuntu-24.04`, the runner's root-owned `/usr/bin/python3.12` (mode `0755`, `pip 24.0`), the real kernel UID/GID and POSIX ACL implementation, and creates temporary unrelated accounts for Operator, Candidate, Author, Reviewer, and Approver. The job log records UIDs/GIDs `4601/4601` through `4605/4605`; each has one private primary group, no supplementary groups, zero effective capabilities, and receives only standard input/output/error descriptors through `setpriv`. The job has `contents: read`, does not persist the checkout token, uses no repository secrets, and removes all temporary accounts/directories in an unconditional cleanup step.
 
@@ -98,7 +148,7 @@ Failed hosted attempts are retained as failures and each correction is recorded;
 | [38070575358](https://github.com/ArdenZC/codex-work-skills/actions/runs/38070575358) | Allocator tests passed; build fixture correctly rejected setup-python's group/world-writable Python executable at `/opt/hostedtoolcache/Python/3.11.17/x64/bin/python3.11`. | Keep the secure permission check; use root-owned non-writable `/usr/bin/python3` and system pip (`7ea16a7`). |
 | [38070683715](https://github.com/ArdenZC/codex-work-skills/actions/runs/38070683715) | Real UID denials, ACL test, and allocator tests passed; runtime closure failed closed on Ubuntu Python 3.12's standard-library file symlink `_sysconfigdata__linux_x86_64-linux-gnu.py`. | Hash the exact symlink text plus resolved regular target bytes; continue to reject dangling/special targets and symlink directories; add deterministic regression coverage (`ae88376`). |
 
-## 6. CI and changed files
+## 6. Original CI and changed files (pre-remediation)
 
 On implementation/test head `ae88376e3921534be1ba97316b9024e758c0d94e`:
 
