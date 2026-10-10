@@ -167,7 +167,7 @@ mapfile -d '' test_sources < <(git -C "$repo_root" ls-files -z -- \
 [[ ${#test_sources[@]} -gt 20 ]]
 for relative in "${test_sources[@]}"; do
   case "$relative" in
-    tools/rq03f_c1/*.py|tools/rq03f_c1/schemas/*.json|tests/test_rq03f_c1_operator_infrastructure.py|\
+    tools/rq03f_c1/*.py|tools/rq03f_c1/*.sh|tools/rq03f_c1/schemas/*.json|tests/test_rq03f_c1_operator_infrastructure.py|\
       教案生成器/lesson-plan-docx-generator/scripts/*|\
       教案生成器/lesson-plan-docx-generator/schemas/*) ;;
     *) log "FAIL unexpected hosted test source path: $relative"; exit 2 ;;
