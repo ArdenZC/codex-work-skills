@@ -152,9 +152,9 @@ canonical_existing_path() {
 }
 
 assert_safe_ancestors() {
-  local target=$1 allow_operator_parent=$2 cursor=/ component owner mode numeric_mode user uid
-  local role_uids=()
-  for user in "${NON_OPERATOR_USERS[@]}"; do role_uids+=("$(id -u -- "$user")"); done
+  local target=$1 allow_operator_parent=$2 cursor=/ component owner mode numeric_mode
+  local operator_uid
+  operator_uid=$(id -u -- rq03f-operator)
   IFS=/ read -r -a components <<<"${target#/}"
   for component in "${components[@]}"; do
     [[ -n $component ]] || continue
@@ -164,12 +164,11 @@ assert_safe_ancestors() {
     owner=$(stat -c '%u' -- "$cursor")
     mode=$(stat -c '%a' -- "$cursor")
     numeric_mode=$((8#$mode))
-    for uid in "${role_uids[@]}"; do
-      if [[ $owner == "$uid" ]]; then fail "non-Operator role owns a deployment path component: $cursor"; fi
-    done
-    if [[ $allow_operator_parent != true && $cursor != "$target" \
-      && $owner == "$(id -u rq03f-operator)" ]]; then
-      fail "Operator-owned path ancestor is not allowed for this deployment root: $cursor"
+    if [[ $allow_operator_parent == true ]]; then
+      [[ $owner == 0 || $owner == "$operator_uid" ]] \
+        || fail "trust path component is not root/Operator-owned: $cursor"
+    else
+      [[ $owner == 0 ]] || fail "controller/runtime path component is not root-owned: $cursor"
     fi
     if (( (numeric_mode & 0022) != 0 && (numeric_mode & 01000) == 0 )); then
       fail "group/world-writable non-sticky deployment ancestor: $cursor"
