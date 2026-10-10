@@ -30,15 +30,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install POSIX ACL inspection tools
+      - name: Install POSIX ACL tools and system Python pip
         run: |
           sudo apt-get update
-          sudo apt-get install --no-install-recommends -y acl
+          sudo apt-get install --no-install-recommends -y acl python3-pip
 
       - name: Check the isolated test harness
         run: bash -n tools/rq03f_c1/hosted_linux_isolation.sh

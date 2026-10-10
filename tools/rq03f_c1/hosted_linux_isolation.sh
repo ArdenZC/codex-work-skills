@@ -6,7 +6,7 @@ run_tag="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 test_root="/var/lib/rq03f-c1-${run_tag}"
 evidence_dir="${RUNNER_TEMP:-/tmp}/rq03f-c1-evidence"
 evidence_file="$evidence_dir/hosted-isolation.txt"
-python_bin=$(command -v python)
+python_bin=$(readlink -f /usr/bin/python3)
 roles=(operator candidate author reviewer approver)
 role_users=()
 created_users=()
@@ -28,6 +28,16 @@ cleanup() {
   sudo -n rm -rf -- "$test_root"
 }
 trap cleanup EXIT
+
+python_mode=$(stat -c %a "$python_bin")
+python_owner=$(stat -c %u "$python_bin")
+if [[ "$python_owner" != 0 || $((8#$python_mode & 18)) -ne 0 || ! -x "$python_bin" ]]; then
+  log "FAIL system Python is not a root-owned non-writable executable: path=$python_bin owner=$python_owner mode=$python_mode"
+  exit 2
+fi
+python_version=$("$python_bin" --version 2>&1)
+python_pip=$("$python_bin" -m pip --version 2>&1)
+log "SYSTEM_PYTHON path=$python_bin version=$python_version owner=$python_owner mode=$python_mode pip=$python_pip"
 
 for role in "${roles[@]}"; do
   user="rq03f-c1-${role}"
@@ -76,7 +86,8 @@ run_as() {
   gid=$(id -g "$user")
   sudo -n /usr/bin/setpriv --reuid="$uid" --regid="$gid" --clear-groups \
     --inh-caps=-all --ambient-caps=-all --bounding-set=-all -- \
-    /usr/bin/env -i HOME="$test_root/operator-work" PATH=/usr/bin:/bin LC_ALL=C PYTHONUTF8=1 "$@"
+    /usr/bin/env -i HOME="$test_root/operator-work" PATH=/usr/bin:/bin LC_ALL=C \
+    PYTHONUTF8=1 PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 "$@"
 }
 
 for user in "${role_users[@]}"; do
