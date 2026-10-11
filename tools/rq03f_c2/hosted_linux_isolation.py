@@ -375,6 +375,25 @@ def copy_source_tree(source: Path, destination: Path,
         fail("pinned Git Controller blobs were missing from the checked-out source tree")
 
 
+def remove_generated_venv_lib64_alias(runtime_root: Path) -> bool:
+    """Remove only the exact lib64 -> lib alias created by Python venv.
+
+    C1 Runtime Closure intentionally rejects directory symlinks. The disposable
+    test venv's interpreter uses ``lib/pythonX`` and does not need this generated
+    alias, so the hosted fixture removes that one known link before calculating
+    the strict closure. Any different object or link target is rejected.
+    """
+    alias = runtime_root / "lib64"
+    try:
+        info = alias.lstat()
+    except FileNotFoundError:
+        return False
+    if not stat.S_ISLNK(info.st_mode) or os.readlink(alias) != "lib":
+        fail("synthetic venv lib64 must be the exact generated lib alias")
+    alias.unlink()
+    return True
+
+
 def _git_source_blob_manifest(source: Path, commit: str) -> dict[str, tuple[str, str]]:
     try:
         source_key = source.relative_to(ROOT).as_posix()
@@ -843,6 +862,13 @@ def main() -> int:
         python3 = Path("/usr/bin/python3")
         command([str(python3), "-m", "venv", "--copies", str(runtime_root)])
         venv_python = runtime_root / "bin/python"
+        removed_lib64_alias = remove_generated_venv_lib64_alias(runtime_root)
+        command([str(venv_python), "-I", "-S", "-B", "-c",
+                 "import pathlib,sys; assert pathlib.Path(sys.executable).resolve() == pathlib.Path(sys.argv[1]).resolve()",
+                 str(venv_python)])
+        evidence.append({"case": "synthetic-venv-lib64-normalization",
+                         "removed_standard_lib64_alias": removed_lib64_alias,
+                         "runtime_closure_directory_symlinks_still_rejected": True})
         command([str(venv_python), "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "-r", str(REQUIREMENTS)])
         command([str(venv_python), "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "typing_extensions"])
         copy_controller(controller_root, source_commit)

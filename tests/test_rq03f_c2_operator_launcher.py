@@ -384,6 +384,26 @@ class HostedSourceCopyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "hard-linked file"):
                 self._copy(source, root / "destination")
 
+    def test_hosted_venv_removes_only_the_standard_lib64_alias(self):
+        from tools.rq03f_c2.hosted_linux_isolation import remove_generated_venv_lib64_alias
+
+        with tempfile.TemporaryDirectory(prefix="rq03f-c2-venv-") as temp:
+            runtime = Path(temp) / "runtime"
+            (runtime / "lib").mkdir(parents=True)
+            (runtime / "lib64").symlink_to("lib", target_is_directory=True)
+            self.assertTrue(remove_generated_venv_lib64_alias(runtime))
+            self.assertFalse((runtime / "lib64").exists())
+            self.assertFalse(remove_generated_venv_lib64_alias(runtime))
+
+            (runtime / "lib64").symlink_to("unexpected", target_is_directory=True)
+            with self.assertRaisesRegex(RuntimeError, "exact generated lib alias"):
+                remove_generated_venv_lib64_alias(runtime)
+
+            (runtime / "lib64").unlink()
+            (runtime / "lib64").mkdir()
+            with self.assertRaisesRegex(RuntimeError, "exact generated lib alias"):
+                remove_generated_venv_lib64_alias(runtime)
+
     def test_git_blob_manifest_copies_only_exact_committed_source_bytes(self):
         from tools.rq03f_c2.hosted_linux_isolation import (
             GIT_ENV,
