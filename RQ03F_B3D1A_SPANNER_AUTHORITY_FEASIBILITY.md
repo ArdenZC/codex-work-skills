@@ -113,10 +113,11 @@ Local command: `RQ03F_SPANNER_PYTHON=/tmp/rq03f-b3d1a-venv/bin/python bash resea
 The new workflow is needed because existing repository gates do not provision the official Spanner Emulator or install its isolated research SDK lock. It adds one non-required research job and preserves all existing workflows, gates, and matrix coverage.
 
 - Master post-merge run [38150178775](https://github.com/ArdenZC/codex-work-skills/actions/runs/38150178775) — `SUCCESS` on exact baseline master `3f4cebf782f1cf4ab527efcf2b307fa461f0b9de` (pre-change baseline evidence).
-- Research Emulator workflow: **PENDING final exact-HEAD run**.
-- Existing PR/Template Package CI: **PENDING final exact-HEAD run**.
+- Implementation commit `598bced0d65189fc7ca4b4d77474223cda0cecc5`, Tree `1e4b72aed4af4d1cddf683120503d80bc6ddf710`:
+  - [Spanner Emulator research workflow 38154778449](https://github.com/ArdenZC/codex-work-skills/actions/runs/38154778449) — `SUCCESS`; exact commit checkout, isolated dependency install and Emulator test step passed.
+  - [Template Package CI 38154778111](https://github.com/ArdenZC/codex-work-skills/actions/runs/38154778111) — `SUCCESS`, 40 jobs successful and one conditional job skipped. Windows/macOS Semantic Scope was 12/12; Windows/macOS Gradebook both passed. No failed jobs.
 
-The final report must be updated with final commit SHA and links/status for every triggered exact-HEAD run before review delivery. No check will be represented as passing until GitHub reports it complete and successful for that exact SHA.
+The report-only evidence refresh is intentionally separate from the implementation commit. It does not change source, tests, schema, workflow, or dependencies; GitHub runs both checks again on the new exact PR head. The final PR head and its latest exact-head workflow run links are delivered with the review result. Check [PR #65 checks](https://github.com/ArdenZC/codex-work-skills/pull/65/checks) for those final-head runs. No CI result is attributed to a SHA other than the SHA GitHub reports for that run.
 
 ## Emulator limitations and unverified production claims
 
