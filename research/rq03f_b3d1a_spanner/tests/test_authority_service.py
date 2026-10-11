@@ -236,6 +236,71 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         return rows[0]
 
+    def _current_intake_request(self, transition_id: str) -> dict:
+        head = self.service._read_head(self.database)
+        candidate = append_row(
+            head.index_raw, "qualification_corpus_intakes", intake_row(transition_id),
+        )
+        proposed = replace(
+            head.state, index_sha256=sha256(candidate),
+            index_revision=head.state.index_revision + 1,
+        )
+        return {
+            "transition_id": transition_id,
+            "expected_sequence": head.sequence,
+            "expected_state_digest": head.state_digest,
+            "operation_purpose": "qualification_corpus_intake",
+            "approval_reference": INTAKE_REF,
+            "proposed_state": proposed.payload(),
+            "candidate_index_b64": base64.b64encode(candidate).decode("ascii"),
+        }
+
+    def _commit_intake_history(self, count: int = 1) -> list[str]:
+        transition_ids = []
+        for number in range(count):
+            transition_id = f"history-commit-{number:04d}"
+            self.operator.prepare_transition(self._current_intake_request(transition_id))
+            self.operator.commit_transition(transition_id)
+            transition_ids.append(transition_id)
+        return transition_ids
+
+    def _assert_history_tamper_blocks_new_write(self, attempt_id: str) -> None:
+        head_before = self._read_head()
+        checkpoint_before = self.checkpoint.current()
+        with self.assertRaises(AuthorityError) as read_error:
+            self.service.read_current()
+        self.assertEqual(read_error.exception.code, "RECOVERY_REQUIRED")
+        with self.assertRaises(AuthorityError) as prepare_error:
+            self.operator.prepare_transition(self._current_intake_request(attempt_id))
+        self.assertEqual(prepare_error.exception.code, "RECOVERY_REQUIRED")
+        self.assertEqual(self._read_head(), head_before)
+        self.assertEqual(self.checkpoint.current(), checkpoint_before)
+        self.assertIsNone(self.service._read_transition(self.database, attempt_id))
+
+    def _assert_head_mirror_tamper_rejected(
+        self, field: str, value: object, value_type: object, attempt_id: str,
+    ) -> None:
+        request = self._current_intake_request(attempt_id)
+        original = self._read_head()
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            f"UPDATE AuthorityHead SET {field}=@value WHERE HeadId=@head_id",
+            params={"value": value, "head_id": "authority-head"},
+            param_types={"value": value_type, "head_id": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        with self.assertRaises(AuthorityError) as read_error:
+            self.service.read_current()
+        self.assertEqual(read_error.exception.code, "AUTHORITY_HEAD_CORRUPT")
+        with self.assertRaises(AuthorityError) as prepare_error:
+            self.operator.prepare_transition(request)
+        self.assertEqual(prepare_error.exception.code, "AUTHORITY_HEAD_CORRUPT")
+        after = self._read_head()
+        self.assertEqual(after[0], original[0])
+        self.assertEqual(after[1], original[1])
+        self.assertEqual(after[3], original[3])
+        self.assertEqual(after[4], original[4])
+        self.assertIsNone(self.service._read_transition(self.database, attempt_id))
+
     def _events(self, transition_id: str) -> list:
         return self._query(
             "SELECT EventNumber, EventType, EventSHA256 FROM TransitionEvents "
@@ -272,6 +337,128 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         self.assertEqual([(int(row[0]), row[1]) for row in events],
                          [(0, "prepared"), (1, "committed")])
         self.assertTrue(all(len(row[2]) == 64 for row in events))
+
+    def test_policy_epoch_mirror_tamper_is_rejected_without_new_transition(self):
+        self._assert_head_mirror_tamper_rejected(
+            "PolicyEpoch", 2, param_types.INT64, "mirror-policy-0001",
+        )
+
+    def test_index_revision_mirror_tamper_is_rejected_without_new_transition(self):
+        self._assert_head_mirror_tamper_rejected(
+            "IndexRevision", 1, param_types.INT64, "mirror-revision-0001",
+        )
+
+    def test_revocation_sha_mirror_tamper_is_rejected_without_new_transition(self):
+        self._assert_head_mirror_tamper_rejected(
+            "RevocationStateSHA256", sha256(b"different-revocation-state"),
+            param_types.STRING, "mirror-revocation-0001",
+        )
+
+    def test_modified_committed_event_is_rejected_and_does_not_advance_head(self):
+        transition_id, _ = self._commit_intake_history(2)
+        altered = base64.b64encode(b'{"tampered":true}').decode("ascii")
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "UPDATE TransitionEvents SET EventJSONB64=@event "
+            "WHERE TransitionId=@id AND EventNumber=1",
+            params={"event": altered, "id": transition_id},
+            param_types={"event": param_types.STRING, "id": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_history_tamper_blocks_new_write("history-event-modified-deny")
+
+    def test_rehashed_but_rebound_committed_event_is_rejected(self):
+        transition_id, _ = self._commit_intake_history(2)
+        rows = self._query(
+            "SELECT EventJSONB64 FROM TransitionEvents "
+            "WHERE TransitionId=@id AND EventNumber=1",
+            {"id": transition_id}, {"id": param_types.STRING},
+        )
+        payload = json.loads(base64.b64decode(rows[0][0]))
+        payload["state_digest"] = sha256(b"coherently forged event only")
+        event_raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "UPDATE TransitionEvents SET EventJSONB64=@event, EventSHA256=@digest "
+            "WHERE TransitionId=@id AND EventNumber=1",
+            params={"event": base64.b64encode(event_raw).decode("ascii"),
+                    "digest": sha256(event_raw), "id": transition_id},
+            param_types={"event": param_types.STRING, "digest": param_types.STRING,
+                         "id": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_history_tamper_blocks_new_write("history-event-rebound-deny")
+
+    def test_deleted_committed_event_is_rejected_and_does_not_advance_head(self):
+        transition_id, _ = self._commit_intake_history(2)
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "DELETE FROM TransitionEvents WHERE TransitionId=@id AND EventNumber=1",
+            params={"id": transition_id}, param_types={"id": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_history_tamper_blocks_new_write("history-event-deleted-deny")
+
+    def test_reordered_committed_events_are_rejected_and_do_not_advance_head(self):
+        transition_id, _ = self._commit_intake_history(2)
+        rows = self._query(
+            "SELECT EventType, EventJSONB64, EventSHA256, OccurredAt "
+            "FROM TransitionEvents WHERE TransitionId=@id AND EventNumber=1",
+            {"id": transition_id}, {"id": param_types.STRING},
+        )
+        self.assertEqual(len(rows), 1)
+        event_type, event_b64, event_sha, occurred_at = rows[0]
+        def reorder_event(transaction):
+            deleted = transaction.execute_update(
+                "DELETE FROM TransitionEvents WHERE TransitionId=@id AND EventNumber=1",
+                params={"id": transition_id}, param_types={"id": param_types.STRING},
+            )
+            transaction.insert(
+                "TransitionEvents",
+                columns=("TransitionId", "EventNumber", "EventType", "EventJSONB64", "EventSHA256", "OccurredAt"),
+                values=[(transition_id, 2, event_type, event_b64, event_sha, occurred_at)],
+            )
+            return deleted
+        self.assertEqual(self.database.run_in_transaction(reorder_event), 1)
+        self._assert_history_tamper_blocks_new_write("history-event-reordered-deny")
+
+    def test_modified_prior_index_history_bytes_and_valid_sha_are_rejected(self):
+        self._commit_intake_history(2)
+        altered = b"{" + b'"synthetic":"different prior Index"' + b"}\n"
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "UPDATE IndexHistory SET IndexBytesB64=@bytes, IndexSHA256=@digest "
+            "WHERE IndexRevision=1",
+            params={"bytes": base64.b64encode(altered).decode("ascii"),
+                    "digest": sha256(altered)},
+            param_types={"bytes": param_types.STRING, "digest": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_history_tamper_blocks_new_write("history-index-modified-deny")
+
+    def test_deleted_prior_index_history_revision_is_rejected(self):
+        self._commit_intake_history(2)
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "DELETE FROM IndexHistory WHERE IndexRevision=1",
+        ))
+        self.assertEqual(count, 1)
+        self._assert_history_tamper_blocks_new_write("history-index-deleted-deny")
+
+    def test_reordered_prior_index_history_revision_is_rejected(self):
+        self._commit_intake_history(2)
+        rows = self._query(
+            "SELECT IndexSHA256, IndexBytesB64, TransitionId FROM IndexHistory WHERE IndexRevision=1",
+        )
+        self.assertEqual(len(rows), 1)
+        index_sha, index_b64, transition_id = rows[0]
+        def reorder_index_history(transaction):
+            deleted = transaction.execute_update(
+                "DELETE FROM IndexHistory WHERE IndexRevision=1",
+            )
+            transaction.insert(
+                "IndexHistory",
+                columns=("IndexRevision", "IndexSHA256", "IndexBytesB64", "TransitionId"),
+                values=[(99, index_sha, index_b64, transition_id)],
+            )
+            return deleted
+        self.assertEqual(self.database.run_in_transaction(reorder_index_history), 1)
+        self._assert_history_tamper_blocks_new_write("history-index-reordered-deny")
 
     def test_prepared_transition_can_be_aborted_without_index_change(self):
         request = self._request("abort-0001")
@@ -508,7 +695,12 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         self.assertFalse(any(thread.is_alive() for thread in threads))
         prepared_ids = [item[1] for item in outcomes if item[0] == "prepared"]
         self.assertEqual(len(prepared_ids), 1, outcomes)
-        self.assertEqual(len([item for item in outcomes if item[0] in {"CAS_BUSY", "CAS_STALE"}]), 1)
+        rejected = [item for item in outcomes if item[0] != "prepared"]
+        # During the DB-commit / external-checkpoint gap the loser must fail
+        # closed as RECOVERY_REQUIRED; once the checkpoint is current it reports
+        # the ordinary busy/stale CAS outcome. It must never prepare as well.
+        self.assertEqual(len(rejected), 1, outcomes)
+        self.assertIn(rejected[0][0], {"CAS_BUSY", "CAS_STALE", "RECOVERY_REQUIRED"}, outcomes)
         self.operator.commit_transition(prepared_ids[0])
         self.assertEqual(int(self._read_head()[0]), 1)
         self.assertEqual(self.service.read_current().sequence, 1)
@@ -517,6 +709,7 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
             for item in outcomes
         ]
         self.assertEqual(sum(1 for status in statuses if status and status["status"] == "committed"), 1)
+        self.assertEqual(sum(status is None for status in statuses), 1)
 
     def test_commit_ack_loss_is_resolved_by_transition_id_without_retry(self):
         request = self._request("lost-ack-0001")

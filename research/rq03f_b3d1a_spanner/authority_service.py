@@ -276,25 +276,318 @@ class SpannerAuthorityService:
     def _read_head(cls, transaction: Any) -> Head:
         rows = cls._read_sql(
             transaction,
-            "SELECT Sequence, StateJSONB64, StateDigest, IndexBytesB64, IndexSHA256, "
-            "FencingToken, PendingTransitionId FROM AuthorityHead WHERE HeadId=@head_id",
+            "SELECT Sequence, StateJSONB64, StateDigest, PolicyEpoch, IndexRevision, "
+            "IndexBytesB64, IndexSHA256, RevocationStateSHA256, FencingToken, "
+            "PendingTransitionId FROM AuthorityHead WHERE HeadId=@head_id",
             {"head_id": HEAD_ID}, {"head_id": param_types.STRING},
         )
         if len(rows) != 1:
             raise AuthorityError("AUTHORITY_HEAD_MISSING", "Authority head is absent or duplicated")
         row = rows[0]
-        state_raw = _decode_bytes(row[1])
-        index_raw = _decode_bytes(row[3])
-        state = c3.TrustState.from_payload(json.loads(state_raw))
-        computed_state = c3._digest(state.payload())
-        computed_index = sha256(index_raw)
-        if computed_state != row[2] or computed_index != row[4]:
-            raise AuthorityError("AUTHORITY_HEAD_CORRUPT", "stored state or Index bytes fail their SHA binding")
-        if (state.index_sha256 != computed_index or state.index_revision < 0
-                or state.policy_epoch < 1):
-            raise AuthorityError("AUTHORITY_HEAD_CORRUPT", "C3 state and current Index binding disagree")
-        return Head(int(row[0]), state, row[2], index_raw, row[4],
-                    int(row[5]), row[6])
+        try:
+            state_raw = _decode_bytes(row[1])
+            index_raw = _decode_bytes(row[5])
+            state = c3.TrustState.from_payload(json.loads(state_raw))
+            sequence = int(row[0])
+            policy_epoch = int(row[3])
+            index_revision = int(row[4])
+            fencing_token = int(row[8])
+            computed_state = c3._digest(state.payload())
+            computed_index = sha256(index_raw)
+            if (not isinstance(row[2], str) or not c3.SHA256_RE.fullmatch(row[2])
+                    or not isinstance(row[6], str) or not c3.SHA256_RE.fullmatch(row[6])
+                    or not isinstance(row[7], str) or not c3.SHA256_RE.fullmatch(row[7])
+                    or computed_state != row[2] or computed_index != row[6]):
+                raise ValueError("stored state or Index bytes fail their SHA binding")
+            if (sequence < 0 or fencing_token < 0 or policy_epoch < 1 or index_revision < 0
+                    or state.policy_epoch != policy_epoch
+                    or state.index_revision != index_revision
+                    or state.revocation_state_sha256 != row[7]
+                    or state.index_sha256 != computed_index):
+                raise ValueError("AuthorityHead mirror columns disagree with validated TrustState")
+        except Exception as exc:
+            if isinstance(exc, AuthorityError) and exc.code == "AUTHORITY_HEAD_CORRUPT":
+                raise
+            raise AuthorityError(
+                "AUTHORITY_HEAD_CORRUPT",
+                "AuthorityHead bytes, SHA values, or PolicyEpoch/IndexRevision/RevocationStateSHA256 mirrors disagree",
+            ) from exc
+        return Head(sequence, state, row[2], index_raw, row[6], fencing_token, row[9])
+
+    @staticmethod
+    def _history_failure(message: str, cause: Exception | None = None) -> None:
+        error = AuthorityError("RECOVERY_REQUIRED", f"Authority committed history is incomplete or inconsistent: {message}")
+        if cause is None:
+            raise error
+        raise error from cause
+
+    @classmethod
+    def _verify_history(cls, source: Any, head: Head) -> None:
+        """Check that stored transition/event/index rows form the current service history.
+
+        These checks detect missing or independently altered rows. They are not an
+        administrator-resistant audit log: an administrator able to rewrite all
+        related rows can recompute ordinary hashes and may produce a consistent
+        replacement history. A production deployment needs an independent Owner
+        checkpoint over the history itself or an independently administered log.
+        """
+        try:
+            record_rows = cls._read_sql(
+                source,
+                "SELECT TransitionId, Status, RequestJSONB64, RequestSHA256, ActorPrincipal, "
+                "OperationPurpose, ApprovalReference, AuthorizedRole, AuthorizationClass, "
+                "AuthorizationEpoch, RevocationSHA256, ExpectedSequence, ExpectedStateDigest, "
+                "ProposedStateDigest, ProposedIndexRevision, ProposedIndexSHA256, CandidateIndexB64, "
+                "FencingToken, ResolutionCode, ResultSequence, ResultStateDigest "
+                "FROM TransitionRecords ORDER BY TransitionId",
+            )
+            event_rows = cls._read_sql(
+                source,
+                "SELECT TransitionId, EventNumber, EventType, EventJSONB64, EventSHA256, OccurredAt "
+                "FROM TransitionEvents ORDER BY TransitionId, EventNumber",
+            )
+            index_rows = cls._read_sql(
+                source,
+                "SELECT IndexRevision, IndexSHA256, IndexBytesB64, TransitionId "
+                "FROM IndexHistory ORDER BY IndexRevision",
+            )
+            if head.sequence < 0 or head.state.index_revision < 0:
+                cls._history_failure("negative Authority sequence or Index revision")
+            if head.sequence != head.state.index_revision:
+                cls._history_failure("Authority sequence and Index revision do not advance together")
+
+            records: dict[str, dict[str, Any]] = {}
+            for row in record_rows:
+                (transition_id, status, request_b64, request_sha, actor, purpose,
+                 approval_reference, authorized_role, authorization_class,
+                 authorization_epoch, revocation_sha, expected_sequence,
+                 expected_state_digest, proposed_state_digest, proposed_index_revision,
+                 proposed_index_sha, candidate_b64, fencing_token, resolution_code,
+                 result_sequence, result_state_digest) = row
+                if transition_id in records:
+                    cls._history_failure("duplicate Transition ID")
+                request_raw = _decode_bytes(request_b64)
+                if (not isinstance(request_sha, str) or not c3.SHA256_RE.fullmatch(request_sha)
+                        or sha256(request_raw) != request_sha):
+                    cls._history_failure(f"Transition {transition_id} request SHA mismatch")
+                request_payload = json.loads(request_raw)
+                request = OperatorRequest.parse(request_payload)
+                if canonical_bytes(request.wire()) != request_raw:
+                    cls._history_failure(f"Transition {transition_id} request is not canonical")
+                candidate_raw = _decode_bytes(candidate_b64)
+                scope = c3.PURPOSE_INDEX_SCOPES.get(purpose)
+                if scope is None:
+                    cls._history_failure(f"Transition {transition_id} has an unknown purpose")
+                proposed = c3.TrustState.from_payload(request.proposed_state)
+                if (
+                    request.transition_id != transition_id
+                    or request.operation_purpose != purpose
+                    or request.approval_reference != approval_reference
+                    or request.expected_sequence != int(expected_sequence)
+                    or request.expected_state_digest != expected_state_digest
+                    or request.candidate_index_raw != candidate_raw
+                    or c3._digest(proposed.payload()) != proposed_state_digest
+                    or proposed.index_revision != int(proposed_index_revision)
+                    or proposed.index_sha256 != proposed_index_sha
+                    or sha256(candidate_raw) != proposed_index_sha
+                    or authorized_role != scope.authorized_role
+                    or authorization_class != scope.authorization_class
+                    or int(authorization_epoch) < 1
+                    or not isinstance(revocation_sha, str)
+                    or not c3.SHA256_RE.fullmatch(revocation_sha)
+                    or not isinstance(expected_state_digest, str)
+                    or not c3.SHA256_RE.fullmatch(expected_state_digest)
+                    or not isinstance(proposed_state_digest, str)
+                    or not c3.SHA256_RE.fullmatch(proposed_state_digest)
+                ):
+                    cls._history_failure(f"Transition {transition_id} record/request bindings disagree")
+                records[transition_id] = {
+                    "status": status, "actor": actor, "purpose": purpose,
+                    "approval_reference": approval_reference,
+                    "expected_sequence": int(expected_sequence),
+                    "expected_state_digest": expected_state_digest,
+                    "proposed_state_digest": proposed_state_digest,
+                    "proposed_index_revision": int(proposed_index_revision),
+                    "proposed_index_sha": proposed_index_sha,
+                    "candidate_raw": candidate_raw,
+                    "proposed_state": proposed,
+                    "authorization_epoch": int(authorization_epoch),
+                    "revocation_sha": revocation_sha,
+                    "fencing_token": int(fencing_token),
+                    "resolution_code": resolution_code,
+                    "result_sequence": None if result_sequence is None else int(result_sequence),
+                    "result_state_digest": result_state_digest,
+                }
+
+                if int(fencing_token) < 1:
+                    cls._history_failure("Transition fencing token is invalid")
+
+            events: dict[str, list[dict[str, Any]]] = {}
+            for row in event_rows:
+                transition_id, number, event_type, event_b64, event_sha, occurred_at = row
+                raw = _decode_bytes(event_b64)
+                payload = json.loads(raw)
+                if (not isinstance(event_sha, str) or not c3.SHA256_RE.fullmatch(event_sha)
+                        or sha256(raw) != event_sha or canonical_bytes(payload) != raw):
+                    cls._history_failure(f"Transition {transition_id} event bytes/hash are invalid")
+                events.setdefault(transition_id, []).append({
+                    "number": int(number), "type": event_type, "payload": payload,
+                    "occurred_at": occurred_at,
+                })
+            if set(events) - set(records):
+                cls._history_failure("event row has no Transition record")
+
+            index_history: dict[int, dict[str, Any]] = {}
+            for revision, index_sha, index_b64, transition_id in index_rows:
+                revision = int(revision)
+                if revision in index_history:
+                    cls._history_failure("duplicate IndexHistory revision")
+                raw = _decode_bytes(index_b64)
+                if (revision < 0 or not isinstance(index_sha, str)
+                        or not c3.SHA256_RE.fullmatch(index_sha) or sha256(raw) != index_sha):
+                    cls._history_failure(f"IndexHistory revision {revision} bytes/hash are invalid")
+                index_history[revision] = {
+                    "sha": index_sha, "raw": raw, "transition_id": transition_id,
+                }
+            expected_revisions = set(range(head.state.index_revision + 1))
+            if set(index_history) != expected_revisions:
+                cls._history_failure("IndexHistory has a missing, extra, or reordered revision")
+            genesis = index_history.get(0)
+            if genesis is None or genesis["transition_id"] != "genesis-only":
+                cls._history_failure("IndexHistory genesis row is missing or misbound")
+
+            committed_by_revision: dict[int, str] = {}
+            prepared_ids: list[str] = []
+            for transition_id, record in records.items():
+                state = record["status"]
+                rows = events.get(transition_id, [])
+                rows.sort(key=lambda item: item["number"])
+                if state == "committed":
+                    expected_numbers = [0, 1]
+                    if (record["result_sequence"] != record["expected_sequence"] + 1
+                            or record["result_sequence"] != record["proposed_index_revision"]
+                            or record["result_state_digest"] != record["proposed_state_digest"]
+                            or record["proposed_index_revision"] in committed_by_revision):
+                        cls._history_failure(f"committed Transition {transition_id} result is inconsistent")
+                    committed_by_revision[record["proposed_index_revision"]] = transition_id
+                    expected_events = [
+                        ("prepared", {
+                            "transition_id": transition_id, "purpose": record["purpose"],
+                            "actor": record["actor"],
+                            "authorization_reference": record["approval_reference"],
+                            "expected_sequence": record["expected_sequence"],
+                            "fencing_token": record["fencing_token"],
+                        }),
+                        ("committed", {
+                            "transition_id": transition_id,
+                            "sequence": record["result_sequence"],
+                            "state_digest": record["result_state_digest"],
+                            "index_revision": record["proposed_index_revision"],
+                            "index_sha256": record["proposed_index_sha"],
+                            "fencing_token": record["fencing_token"],
+                        }),
+                    ]
+                elif state == "aborted":
+                    expected_numbers = [0, 1]
+                    if (record["result_sequence"] is not None
+                            or record["result_state_digest"] is not None
+                            or not isinstance(record["resolution_code"], str)
+                            or not re.fullmatch(r"[A-Z0-9_]{1,64}", record["resolution_code"])):
+                        cls._history_failure(f"aborted Transition {transition_id} result is inconsistent")
+                    expected_events = [
+                        ("prepared", {
+                            "transition_id": transition_id, "purpose": record["purpose"],
+                            "actor": record["actor"],
+                            "authorization_reference": record["approval_reference"],
+                            "expected_sequence": record["expected_sequence"],
+                            "fencing_token": record["fencing_token"],
+                        }),
+                        ("aborted", {
+                            "transition_id": transition_id,
+                            "reason_code": record["resolution_code"],
+                            "actor": record["actor"],
+                        }),
+                    ]
+                elif state == "prepared":
+                    expected_numbers = [0]
+                    prepared_ids.append(transition_id)
+                    if (record["result_sequence"] is not None
+                            or record["result_state_digest"] is not None
+                            or record["resolution_code"] is not None
+                            or record["expected_sequence"] != head.sequence
+                            or record["proposed_index_revision"] != head.state.index_revision + 1
+                            or record["fencing_token"] != head.fencing_token
+                            or head.pending_transition_id != transition_id):
+                        cls._history_failure(f"prepared Transition {transition_id} is not the current reservation")
+                    expected_events = [
+                        ("prepared", {
+                            "transition_id": transition_id, "purpose": record["purpose"],
+                            "actor": record["actor"],
+                            "authorization_reference": record["approval_reference"],
+                            "expected_sequence": record["expected_sequence"],
+                            "fencing_token": record["fencing_token"],
+                        }),
+                    ]
+                else:
+                    cls._history_failure(f"Transition {transition_id} has unknown status {state!r}")
+                if [event["number"] for event in rows] != expected_numbers:
+                    cls._history_failure(f"Transition {transition_id} event sequence is missing, duplicated, or reordered")
+                if len(rows) != len(expected_events):
+                    cls._history_failure(f"Transition {transition_id} has an unexpected event count")
+                for actual, (expected_type, expected_payload) in zip(rows, expected_events):
+                    if actual["type"] != expected_type or actual["payload"] != expected_payload:
+                        cls._history_failure(f"Transition {transition_id} event does not bind to its record")
+                if len(rows) == 2 and rows[0]["occurred_at"] > rows[1]["occurred_at"]:
+                    cls._history_failure(f"Transition {transition_id} event timestamps are out of order")
+
+            if prepared_ids != ([head.pending_transition_id] if head.pending_transition_id else []):
+                cls._history_failure("prepared Transition set does not match AuthorityHead pending ID")
+            if set(committed_by_revision) != set(range(1, head.state.index_revision + 1)):
+                cls._history_failure("committed Transition set does not cover the Index revision sequence")
+            for revision in range(1, head.state.index_revision + 1):
+                history = index_history[revision]
+                transition_id = committed_by_revision[revision]
+                record = records[transition_id]
+                if (history["transition_id"] != transition_id
+                        or history["sha"] != record["proposed_index_sha"]
+                        or history["raw"] != record["candidate_raw"]):
+                    cls._history_failure(f"IndexHistory revision {revision} is not bound to its committed Transition")
+                previous_history = index_history[revision - 1]
+                if revision > 1:
+                    previous_record = records[committed_by_revision[revision - 1]]
+                    previous_state = previous_record["proposed_state"]
+                    if (record["expected_state_digest"] != previous_record["result_state_digest"]
+                            or record["authorization_epoch"] != previous_state.policy_epoch
+                            or record["revocation_sha"] != previous_state.revocation_state_sha256):
+                        cls._history_failure(f"Transition {transition_id} does not bind to the prior committed state/authorization epoch")
+                try:
+                    c3.validate_index_append(
+                        previous_history["raw"], history["raw"],
+                        expected_epoch=record["proposed_state"].policy_epoch,
+                        expected_controller_id=record["proposed_state"].controller_id,
+                        expected_previous_sha256=previous_history["sha"],
+                        expected_current_sha256=history["sha"],
+                        operation_purpose=record["purpose"],
+                        actor_principal=record["actor"],
+                        operation_id=transition_id,
+                    )
+                except c3.LedgerError as exc:
+                    cls._history_failure(f"Transition {transition_id} Index delta violates its C3 purpose/Actor contract", exc)
+            current = index_history[head.state.index_revision]
+            if (current["raw"] != head.index_raw or current["sha"] != head.index_sha256):
+                cls._history_failure("current IndexHistory row does not match AuthorityHead")
+            if head.sequence > 0:
+                latest = records[committed_by_revision[head.sequence]]
+                if (latest["result_sequence"] != head.sequence
+                        or latest["result_state_digest"] != head.state_digest
+                        or latest["proposed_state"].payload() != head.state.payload()):
+                    cls._history_failure("latest committed Transition does not match the current AuthorityHead state")
+        except AuthorityError as exc:
+            if exc.code == "RECOVERY_REQUIRED":
+                raise
+            cls._history_failure("stored rows could not be validated", exc)
+        except Exception as exc:
+            cls._history_failure("stored rows could not be validated", exc)
 
     @classmethod
     def _read_role(cls, transaction: Any, reference: str) -> dict[str, Any] | None:
@@ -371,8 +664,10 @@ class SpannerAuthorityService:
             )
 
     def read_current(self) -> Snapshot:
-        head = self._read_head(self.__database)
-        self._reconcile_checkpoint(head)
+        with self.__database.snapshot(multi_use=True) as snapshot:
+            head = self._read_head(snapshot)
+            self._reconcile_checkpoint(head)
+            self._verify_history(snapshot, head)
         return self._snapshot(head)
 
     def _proposal_and_authorization(
@@ -462,6 +757,7 @@ class SpannerAuthorityService:
         def prepare_tx(transaction: Any) -> dict[str, Any]:
             now = self._clock().astimezone(timezone.utc)
             head = self._read_head(transaction)
+            self._verify_history(transaction, head)
             existing = self._read_transition(transaction, request.transition_id)
             if existing is not None:
                 raise AuthorityError("TRANSITION_ID_REUSE", "Transition ID already exists and is never reusable")
@@ -547,12 +843,13 @@ class SpannerAuthorityService:
             )
         def commit_tx(transaction: Any) -> tuple[str, Any]:
             now = self._clock().astimezone(timezone.utc)
+            head = self._read_head(transaction)
+            self._verify_history(transaction, head)
             transition = self._read_transition(transaction, transition_id)
             if transition is None:
                 return ("rejected", "TRANSITION_NOT_FOUND")
             if transition["status"] != "prepared":
                 return ("rejected", "TRANSITION_NOT_PREPARED")
-            head = self._read_head(transaction)
             if transition["actor"] != peer.principal:
                 self._abort_in_transaction(transaction, head, transition, transition_id,
                                             "ACTOR_IDENTITY_REJECTED", now)
@@ -644,6 +941,7 @@ class SpannerAuthorityService:
             if transition is None or transition["status"] != "prepared":
                 raise AuthorityError("TRANSITION_NOT_PREPARED", "only a prepared transition can be aborted")
             head = self._read_head(transaction)
+            self._verify_history(transaction, head)
             if peer.principal != transition["actor"]:
                 raise AuthorityError("ACTOR_IDENTITY_REJECTED", "only the bound actor can cancel its reservation")
             self._abort_in_transaction(transaction, head, transition, transition_id, reason_code, now)
