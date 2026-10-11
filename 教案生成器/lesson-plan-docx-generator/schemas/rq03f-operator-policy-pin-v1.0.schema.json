@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ-03F independent Operator Launch Policy pin 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pin_version", "policy_identity", "policy_sha256", "adoption_status"],
+  "properties": {
+    "pin_version": { "const": "rq03f-operator-policy-pin-1.0" },
+    "policy_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+    "policy_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "adoption_status": { "enum": ["candidate_only", "owner_adopted"] }
+  }
+}
