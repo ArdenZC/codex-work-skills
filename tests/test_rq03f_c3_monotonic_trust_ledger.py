@@ -976,6 +976,19 @@ class LedgerContractTests(unittest.TestCase):
         self.assertEqual(self.gate().check_current_state(**self.request()).decision, "verified")
 
 
+class HostedIdentityNameContractTests(unittest.TestCase):
+    def test_ephemeral_role_and_group_names_fit_linux_limit(self):
+        from tools.rq03f_c3.hosted_linux_isolation import _hosted_identity_names
+
+        api_group, role_names = _hosted_identity_names("0123456789abcd")
+        self.assertEqual(set(role_names), {"operator", "candidate", "author", "reviewer", "approver", "witness"})
+        self.assertEqual(len(set(role_names.values())), len(role_names))
+        self.assertLessEqual(max(map(len, [api_group, *role_names.values()])), 32)
+        self.assertEqual(len(role_names["candidate"]), 31)
+        with self.assertRaisesRegex(RuntimeError, "14 lowercase hex"):
+            _hosted_identity_names("0" * 16)
+
+
 def gate_request(values: dict) -> object:
     from rq03f_monotonic_trust_ledger import LedgerRequest
     return LedgerRequest(**values)

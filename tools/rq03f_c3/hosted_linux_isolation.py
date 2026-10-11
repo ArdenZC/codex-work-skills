@@ -783,6 +783,18 @@ def _add_user(name: str) -> None:
                     "--shell", "/usr/sbin/nologin", name], check=True)
 
 
+def _hosted_identity_names(token: str) -> tuple[str, dict[str, str]]:
+    if len(token) != 14 or any(character not in "0123456789abcdef" for character in token):
+        raise RuntimeError("synthetic hosted identity token must be 14 lowercase hex characters")
+    prefix = f"rq03c3-{token}"
+    api_group = f"{prefix}-api"
+    role_names = {role: f"{prefix}-{role}" for role in
+                  ("operator", "candidate", "author", "reviewer", "approver", "witness")}
+    if max(len(api_group), *(len(name) for name in role_names.values())) > 32:
+        raise RuntimeError("synthetic hosted identity name exceeds Linux login-name limit")
+    return api_group, role_names
+
+
 def _ensure_denied(label: str, action) -> dict[str, Any]:
     try:
         action()
@@ -946,12 +958,10 @@ def _wait_socket(proc: subprocess.Popen[str], path: Path) -> None:
 def _run_root(args: argparse.Namespace) -> int:
     if os.geteuid() != 0 or not sys.platform.startswith("linux"):
         raise RuntimeError("hosted C3 isolation must run as root on disposable Linux")
-    role_labels = ("operator", "candidate", "author", "reviewer", "approver", "witness")
     for _attempt in range(32):
-        token = secrets.token_hex(8)
+        token = secrets.token_hex(7)
         prefix = f"rq03c3-{token}"
-        api_group = f"{prefix}-api"
-        role_names = {role: f"{prefix}-{role}" for role in role_labels}
+        api_group, role_names = _hosted_identity_names(token)
         base = Path("/var/lib") / f"rq03f-c3-hosted-{token}"
         users_or_groups_exist = any(
             subprocess.run(["getent", kind, name], stdout=subprocess.DEVNULL,
