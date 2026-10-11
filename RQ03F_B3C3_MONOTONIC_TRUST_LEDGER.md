@@ -7,7 +7,7 @@
 - C1 Hosted [38112567308](https://github.com/ArdenZC/codex-work-skills/actions/runs/38112567308), C2 Hosted [38112567301](https://github.com/ArdenZC/codex-work-skills/actions/runs/38112567301), and Template Package [38112567310](https://github.com/ArdenZC/codex-work-skills/actions/runs/38112567310): `SUCCESS` at C2 PR head `b32e9c53f183e1a1ec5e4137411e53f1e9be4840`.
 - Formal Trust Anchor: `eb4a95c618e05c5ad6413137478bc65dbca75ec9` (not changed or written).
 - Branch: `feature/rq03f-b3c3-monotonic-trust-ledger`.
-- Draft PR: added after the implementation push; this report will identify its number and current checks page before final review.
+- Draft PR: [#62](https://github.com/ArdenZC/codex-work-skills/pull/62), current implementation HEAD `8ef89b6e65897193f71a7da5a113002249679e96`.
 - Formal Production Operator Trust, external High-Water Authority, protected Intake, Agent A/B, Live Qualification, RC-02, and Lesson Skill 2.4 remain blocked/not started.
 
 ## Scope and threat model
@@ -103,8 +103,7 @@ This hosted workflow is authored by the PR and runs on a GitHub-hosted temporary
 ## CI and exact-head tracking
 
 - C2 post-merge baseline: [run 38114284561](https://github.com/ArdenZC/codex-work-skills/actions/runs/38114284561), `SUCCESS`, head `b894077fb5967a9aed8713892f448acfa5b65b62`.
-- Current exact-head PR checks: to be set to the Draft PR Checks page after PR creation. The dedicated C3 and existing C2 workflows check out `pull_request.head.sha`; Template Package CI classifies this PR and retains all required platform/shard gates, including Windows/macOS Semantic Scope shards.
-- Final C3 hosted UID, inherited C1/C2 hosted, and Template Package CI run URLs and conclusions will be recorded here after the final report commit triggers fresh exact-HEAD runs.
+- Exact-head PR checks: [PR #62 Checks](https://github.com/ArdenZC/codex-work-skills/pull/62/checks). The dedicated C3 and existing C2 workflows check out `pull_request.head.sha`; Template Package CI classifies this PR and retains all required platform/shard gates, including Windows/macOS Semantic Scope shards. This report update itself triggers fresh exact-head runs; their exact run URLs and outcomes are included in the delivery response.
 
 ## Files changed
 
@@ -124,8 +123,7 @@ Before Production Trust could be considered, an independent deployment owner mus
 
 ## Final review fields
 
-- Final exact HEAD: pending final commit.
-- Draft PR: pending PR creation; no merge requested or performed.
-- Hosted Linux UID/Witness CI: pending fresh exact-head run.
-- Template Package CI: pending fresh exact-head run.
+- Implementation HEAD before this report-only commit: `8ef89b6e65897193f71a7da5a113002249679e96`; final PR head is the report commit recorded in PR #62.
+- Draft PR: [#62](https://github.com/ArdenZC/codex-work-skills/pull/62), remains Draft; no merge requested or performed.
+- Hosted Linux UID/Witness and Template Package CI: exact-head results are available from [PR #62 Checks](https://github.com/ArdenZC/codex-work-skills/pull/62/checks) and listed in the delivery response.
 - Production trust: **not established**; Formal Trust Anchor unchanged.
