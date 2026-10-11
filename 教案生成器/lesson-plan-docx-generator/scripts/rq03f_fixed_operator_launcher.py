@@ -268,8 +268,21 @@ def _validate_c2_component_closure(state: Any, payload: dict[str, Any]) -> None:
              "LAUNCHER_PATH_DRIFT", "running launcher path differs from fixed policy")
 
 
+def _exception_type_chain(exc: BaseException, *, limit: int = 5) -> list[str]:
+    """Return bounded exception class names without logging exception text."""
+    names: list[str] = []
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and len(names) < limit and id(current) not in seen:
+        seen.add(id(current))
+        names.append(type(current).__name__)
+        current = current.__cause__ if current.__cause__ is not None else current.__context__
+    return names
+
+
 def _log(*, code: str, stage: str, uid: int, policy_sha256: str | None,
-         build_sha256: str | None, status: str) -> None:
+         build_sha256: str | None, status: str,
+         exception_type_chain: list[str] | None = None) -> None:
     record = {
         "at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "stage": stage,
@@ -280,6 +293,8 @@ def _log(*, code: str, stage: str, uid: int, policy_sha256: str | None,
         "build_inventory_sha256": build_sha256,
         "protected_operation_performed": False,
     }
+    if exception_type_chain is not None:
+        record["exception_type_chain"] = exception_type_chain[:5]
     stream = sys.stdout if status == "preflight_pass" else sys.stderr
     print(json.dumps(record, sort_keys=True, separators=(",", ":")), file=stream)
 
@@ -345,7 +360,8 @@ def main() -> int:
             raise
         code = getattr(exc, "code", None) or "PREFLIGHT_BLOCKED"
         _log(code=str(code), stage=stage, uid=getattr(os, "getuid", lambda: -1)(),
-             policy_sha256=policy_sha, build_sha256=build_sha, status="blocked")
+             policy_sha256=policy_sha, build_sha256=build_sha, status="blocked",
+             exception_type_chain=_exception_type_chain(exc))
         return 2
 
 

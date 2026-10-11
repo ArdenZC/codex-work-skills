@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import configparser
 import copy
+from contextlib import redirect_stderr
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -139,6 +141,31 @@ def valid_policy() -> dict:
         },
         "service": {"disabled_by_default": True, "install_or_start_authorized": False},
     }
+
+
+class LauncherFailureLogTests(unittest.TestCase):
+    def test_failure_log_includes_bounded_exception_types_without_messages(self):
+        cause = RuntimeError("sensitive /private/holdout/path")
+        error = ValueError("candidate supplied secret-value")
+        error.__cause__ = cause
+        stream = io.StringIO()
+        with redirect_stderr(stream):
+            fixed_launcher._log(
+                code="PREFLIGHT_BLOCKED",
+                stage="provider_preflight",
+                uid=4601,
+                policy_sha256=_sha("policy"),
+                build_sha256=_sha("build"),
+                status="blocked",
+                exception_type_chain=fixed_launcher._exception_type_chain(error),
+            )
+        row = json.loads(stream.getvalue())
+        self.assertEqual(row["exception_type_chain"], ["ValueError", "RuntimeError"])
+        self.assertEqual(row["error_code"], "PREFLIGHT_BLOCKED")
+        self.assertFalse(row["protected_operation_performed"])
+        self.assertNotIn("sensitive", stream.getvalue())
+        self.assertNotIn("holdout", stream.getvalue())
+        self.assertNotIn("secret-value", stream.getvalue())
 
 
 class LaunchPolicyContractTests(unittest.TestCase):
