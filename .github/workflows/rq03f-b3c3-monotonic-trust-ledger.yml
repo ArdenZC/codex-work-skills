@@ -111,6 +111,7 @@ jobs:
               -- "$python_bin" -c \
                 'import os; status = dict(line.split(":", 1) for line in open("/proc/self/status") if ":" in line); capeff = int(status["CapEff"].strip(), 16); print(f"C1 test process identity: uid={os.getuid()} euid={os.geteuid()} gid={os.getgid()} egid={os.getegid()} supplementary_groups={os.getgroups()} CapEff={capeff:x}"); assert not os.getgroups() and capeff == 0'
           sudo -n env "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
+            "RQ03F_C1_TEST_TMPDIR=$RQ03F_C3_PROJECTION_TEST_ROOT" \
             /usr/bin/setpriv \
             --reuid="$runner_uid" \
             --regid="$runner_gid" \
