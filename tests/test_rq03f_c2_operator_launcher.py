@@ -158,14 +158,19 @@ class LauncherFailureLogTests(unittest.TestCase):
                 build_sha256=_sha("build"),
                 status="blocked",
                 exception_type_chain=fixed_launcher._exception_type_chain(error),
+                exception_sites=fixed_launcher._exception_sites(error),
             )
         row = json.loads(stream.getvalue())
         self.assertEqual(row["exception_type_chain"], ["ValueError", "RuntimeError"])
+        self.assertLessEqual(len(row["exception_sites"]), 8)
+        self.assertTrue(all(set(site) == {"module", "function", "line"}
+                            for site in row["exception_sites"]))
         self.assertEqual(row["error_code"], "PREFLIGHT_BLOCKED")
         self.assertFalse(row["protected_operation_performed"])
         self.assertNotIn("sensitive", stream.getvalue())
         self.assertNotIn("holdout", stream.getvalue())
         self.assertNotIn("secret-value", stream.getvalue())
+        self.assertNotIn("/private/", stream.getvalue())
 
 
 class LaunchPolicyContractTests(unittest.TestCase):

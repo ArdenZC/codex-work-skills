@@ -280,9 +280,27 @@ def _exception_type_chain(exc: BaseException, *, limit: int = 5) -> list[str]:
     return names
 
 
+def _exception_sites(exc: BaseException, *, limit: int = 8) -> list[dict[str, Any]]:
+    """Return bounded source locations without paths, source text, or values."""
+    sites: list[dict[str, Any]] = []
+    tb = exc.__traceback__
+    while tb is not None and len(sites) < limit:
+        frame = tb.tb_frame
+        module = frame.f_globals.get("__name__", "unknown")
+        function = frame.f_code.co_name
+        sites.append({
+            "module": module if isinstance(module, str) and re.fullmatch(r"[A-Za-z0-9_.]{1,120}", module) else "unknown",
+            "function": function if isinstance(function, str) and re.fullmatch(r"[A-Za-z0-9_]{1,120}", function) else "unknown",
+            "line": tb.tb_lineno,
+        })
+        tb = tb.tb_next
+    return sites
+
+
 def _log(*, code: str, stage: str, uid: int, policy_sha256: str | None,
          build_sha256: str | None, status: str,
-         exception_type_chain: list[str] | None = None) -> None:
+         exception_type_chain: list[str] | None = None,
+         exception_sites: list[dict[str, Any]] | None = None) -> None:
     record = {
         "at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "stage": stage,
@@ -295,6 +313,8 @@ def _log(*, code: str, stage: str, uid: int, policy_sha256: str | None,
     }
     if exception_type_chain is not None:
         record["exception_type_chain"] = exception_type_chain[:5]
+    if exception_sites is not None:
+        record["exception_sites"] = exception_sites[:8]
     stream = sys.stdout if status == "preflight_pass" else sys.stderr
     print(json.dumps(record, sort_keys=True, separators=(",", ":")), file=stream)
 
@@ -361,7 +381,8 @@ def main() -> int:
         code = getattr(exc, "code", None) or "PREFLIGHT_BLOCKED"
         _log(code=str(code), stage=stage, uid=getattr(os, "getuid", lambda: -1)(),
              policy_sha256=policy_sha, build_sha256=build_sha, status="blocked",
-             exception_type_chain=_exception_type_chain(exc))
+             exception_type_chain=_exception_type_chain(exc),
+             exception_sites=_exception_sites(exc))
         return 2
 
 
