@@ -1,0 +1,46 @@
+name: RQ03F B3-D1A Spanner Emulator research
+
+on:
+  pull_request:
+    paths:
+      - "research/rq03f_b3d1a_spanner/**"
+      - "RQ03F_B3D1A_SPANNER_AUTHORITY_FEASIBILITY.md"
+      - ".github/workflows/rq03f-b3d1a-spanner-emulator.yml"
+  push:
+    branches:
+      - master
+    paths:
+      - "research/rq03f_b3d1a_spanner/**"
+      - "RQ03F_B3D1A_SPANNER_AUTHORITY_FEASIBILITY.md"
+      - ".github/workflows/rq03f-b3d1a-spanner-emulator.yml"
+
+concurrency:
+  group: rq03f-b3d1a-emulator-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  emulator-prototype:
+    name: Research prototype / Ubuntu / Spanner Emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up isolated research Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/rq03f_b3d1a_spanner/requirements-spanner-lock.txt
+
+      - name: Install research-only dependencies
+        run: python -m pip install --disable-pip-version-check -r research/rq03f_b3d1a_spanner/requirements-spanner-lock.txt
+
+      - name: Run local-only Spanner Emulator contract tests
+        run: bash research/rq03f_b3d1a_spanner/run_emulator_tests.sh
