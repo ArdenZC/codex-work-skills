@@ -443,6 +443,9 @@ def copy_controller(controller_root: Path, source_commit: str) -> None:
 
 def build_inventory(controller_root: Path, runtime_root: Path, build_path: Path,
                     controller_id: str) -> tuple[dict[str, Any], bytes, Path]:
+    # Importing the pinned helper must not create __pycache__ inside the
+    # installed Controller tree; C1 Bootstrap rejects bytecode in that tree.
+    sys.dont_write_bytecode = True
     sys.path.insert(0, str(controller_root / "scripts"))
     import operator_controller_bootstrap as bootstrap
     scripts_root = controller_root / "scripts"
@@ -892,6 +895,8 @@ def main() -> int:
         controller_id = "rq03f-c2-synthetic-controller"
         build_payload, build_raw, site_packages = build_inventory(
             controller_root, runtime_root, BUILD_PATH, controller_id)
+        if any(path.name == "__pycache__" for path in controller_root.rglob("__pycache__")):
+            fail("synthetic Build Inventory capture created a Controller bytecode cache")
         build_sha = sha_bytes(build_raw)
         (CONFIG_ROOT / "os-package-manifest.txt").write_text("synthetic hosted package evidence only\n", encoding="utf-8")
         (CONFIG_ROOT / "shared-libraries-manifest.txt").write_text("synthetic hosted shared-library evidence only\n", encoding="utf-8")
