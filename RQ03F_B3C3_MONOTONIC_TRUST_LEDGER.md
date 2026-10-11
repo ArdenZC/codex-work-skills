@@ -11,6 +11,55 @@
 - Hosted implementation head before the production critical-floor correction: `244a4b1dd4dbcdda7ad96e40e0ad56cd03e9cb09`.
 - Formal Production Operator Trust, external High-Water Authority, protected Intake, Agent A/B, Live Qualification, RC-02, and Lesson Skill 2.4 remain blocked/not started.
 
+## Owner Review Remediation — C3 Authorization Boundary
+
+Owner Review `5482753409` reviewed PR #62 at `04ca0508ece429b842ea6d75e4bcfa016581e6a7` and required changes to purpose/index authorization and Prepare-to-Commit authorization freshness. This section records the targeted remediation. The PR remains Draft and no production trust or formal protected operation was activated.
+
+### Root causes
+
+1. `validate_transition_proposal()` checked that a purpose and an Authority authorization existed, while `validate_index_append()` checked append-only prefixes and identifiers without receiving the purpose, actor, or operation binding. The generic Coordinator and Hosted Witness could therefore accept a purpose whose broad authorization reference accompanied unrelated Index rows.
+2. The Coordinator and Witness treated the Prepare reservation as sufficient to proceed to Commit. Recovery could submit a persisted prepared token without checking whether the referenced role had expired or been revoked after Prepare.
+
+### Closed purpose to Index contract
+
+The mapping is derived from the Index 1.1 record fields and the established Intake custody / protected author provenance paths. Counts are exact; any unlisted Index array must remain unchanged.
+
+| Operation purpose | Exact allowed Index delta | Required authorized role and class | State rule |
+| --- | --- | --- | --- |
+| `qualification_corpus_intake` | Exactly one `qualification_corpus_intakes[]` row | `qualification_corpus_custodian` / `operator_role_operation` | Same epoch |
+| `production_authoring` | Exactly one `authors[]` row | `author` / `operator_role_operation` | Same epoch |
+| `epoch_transition` | No Index business rows | `owner_policy_transition` / `owner_policy_transition` | One epoch advance, new Profile and Generation; no revocation additions in the same transaction |
+| `revocation` | No Index business rows | `owner_policy_transition` / `owner_policy_transition` | One epoch advance, new Profile and Generation, and at least one new monotonic revoked authority or role reference |
+| `read_only_preflight`, `qualification_review`, `teacher_approval`, `pa_approval`, `generation` | **Blocked** | No approved C3 mutation scope exists | Fail closed |
+
+The original closed purpose enum and Index 1.1 schema were not changed. `qualification_review` remains read-only at the C3 transition boundary: Index 1.1 `qualification_runs[]` groups multiple review operation IDs but does not carry the actor, authorized role/reference, or a single-operation binding needed for C3 to authorize one exact append. Existing reviewer contracts validate the underlying protected review artifacts; they do not define a separate C3 transaction mapping. Receipt, adjudication, and generation-record purpose mappings also remain blocked because the current contracts do not establish an exact actor, subject, and count relationship for a single C3 transition. This is an explicit fail-closed result, not an inferred permission. An Intake can never add Author, Receipt, Qualification Run, Adjudication, or any other record in the same transaction.
+
+For an allowed business row, its `operation_id` must equal the transition's unique `transition_id`; Intake `operator_principal` or Author `principal_id` must equal the approved Actor. The verified authorization reference must equal the transaction approval reference and bind the exact proposed-state digest, which includes the candidate Index byte SHA. The role, authorization class, Actor/approver separation, source epoch, source revocation digest, and source fencing token are checked together. Thus the authorized subject key/SHA and exact record bytes are part of the digest that the Authority approved.
+
+### Prepare / Commit authorization protocol
+
+- `VerifiedTransitionAuthorization` now includes authorized role and reference, source epoch and revocation digest, Authority fencing token, check time, role expiry, and exact proposed-state digest.
+- The generic Coordinator validates a fresh authorization before Prepare and rechecks it after staging immediately before Commit. It binds the check to the same sequence, source state, and fencing token.
+- `HighWaterAuthority.prepare_transition()` independently reloads current authorization before reserving. `commit_transition()` must reload it again atomically with CAS linearization. The synthetic Hosted Witness implements both checks under its transition lock; it does not rely on the caller's earlier authorization object.
+- Recovery reads the Authority's typed pending proposal, prepared token, and status. A still-prepared transition receives a fresh authorization check before the Authority is asked to Commit. Expiry or revocation causes a known abort; an unknown/unavailable status produces `RECOVERY_REQUIRED` and never triggers an automatic Commit retry. An already committed status is reconciled from authenticated history without treating recovery as a new authorization.
+- The three externally distinguishable outcomes are: an explicit rejected/aborted transition (`TRANSITION_ABORTED` or a definite authorization rejection), a committed transition (typed snapshot and Authority status `committed`), and unknown state (`RECOVERY_REQUIRED`).
+
+### Files and deterministic tests
+
+- `scripts/rq03f_monotonic_trust_ledger.py` — closed scope table, exact array/count/role/Actor/Operation binding, current authorization fields, Coordinator rechecks, and no-retry recovery behavior.
+- `tools/rq03f_c3/hosted_linux_isolation.py` — independent synthetic Witness revalidates role, purpose, expiry, revocation, and fencing at Prepare and Commit; the real-UID harness adds short-lived role expiry and revocation during prepared recovery.
+- `tests/test_rq03f_c3_monotonic_trust_ledger.py` — intake-to-Author/Receipt/Qualification-Run and mixed-record attacks; purpose/record mismatch; Actor and authorization-class mismatch; legal Intake and one-Author production-authoring append; separate Owner revocation; expiry/revocation after Prepare; expired recovery; unknown status; Hosted Witness positive and negative Prepare/Commit checks.
+
+The rejection tests verify final Authority sequence/head, pending IDs, transition status where prepared, and exact local Index bytes. Existing old-Epoch/revision, CAS contention, fencing-token, lost-ACK, recovery, and duplicate-ID regression cases remain enabled. Index 1.1 schemas and existing C1/C2/C3 trust gates are unchanged. No test uses a frozen clock or an extended expiry to mask invalidation: the deterministic unit tests change actual synthetic grant state, and the hosted expiry probe waits for the short real wall-clock expiry.
+
+The local C3 module now passes **69 tests**. New tests prove an uncontracted qualification-run append remains blocked and that an authorization-reference mismatch is rejected before reservation. The Hosted Witness test class directly checks the service-side implementation, including `AUTHORIZATION_EXPIRED` and `AUTHORIZATION_REVOKED` responses with final state and Index SHA unchanged. The six-real-UID hosted workflow remains the deployment-like test; its exact-head result is recorded below only after the fresh run completes.
+
+The post-remediation local regression command `python -m unittest tests.test_rq03f_c3_monotonic_trust_ledger tests.test_rq03f_c2_operator_launcher tests.test_rq03f_c1_operator_infrastructure tests.test_qualification_corpus_intake` passed **142 tests** with one inherited POSIX ACL case skipped outside Linux; Python compilation and `git diff --check` also passed. The production Trust Anchor, `trust/`, frozen corpus data and schemas have no working-tree changes.
+
+### Remaining boundary
+
+The Hosted Witness and its role grants are synthetic and branch-controlled. They demonstrate protocol enforcement only. A production Authority must independently load the adopted Profile/role registry and revocation state, bind real principal identities and authorization references, apply its own trusted clock and current fencing token, and atomically revalidate before CAS. Formal trust remains blocked; the C2 production write gate remains unconditionally denied. Formal Trust Anchor, frozen qualification material, Golden/Blind data, Original NC-02, and Production Trust state are unchanged.
+
 ## Scope and threat model
 
 C3 addresses rollback or split-brain of the Operator's local Profile/Index/Ledger projection after filesystem restore, stale process state, concurrent writers, partial persistence, or a lost commit response. Candidate-controlled JSON, hashes, paths, Python import paths, and local locks are not trust roots. The local ledger detects local inconsistency but cannot detect a complete rollback of its own storage domain.
@@ -87,7 +136,7 @@ C2 `ReadOnlyPreflightTrustContext` and `require_protected_write()` remain uncond
 
 ## Deterministic tests and local environment evidence
 
-The new C3 module has 53 tests covering closed schemas and duplicate JSON, Ledger chain and Authority freshness, state/epoch/profile/Generation/revocation/Index mismatches, stale and replayed transitions, duplicate operation IDs, stale fencing/CAS, two writers racing one revision, definite CAS rejection after a competing commit, ABA restoration, C2 old-context behavior, transaction/recovery failure injection before prepare, after prepare, after staging, after Authority commit, after Index install, after local Ledger projection, before final reread, and after lost ACK. Filesystem tests exercise exclusive staging, symlink/hardlink rejection, and exact atomic projection behavior. The hosted harness also checks that every disposable Linux role/group name remains within the 32-character login-name limit.
+The C3 module had 53 tests before Owner Review remediation and now has 67. They cover closed schemas and duplicate JSON, Ledger chain and Authority freshness, state/epoch/profile/Generation/revocation/Index mismatches, purpose and record scope, stale and replayed transitions, duplicate operation IDs, stale fencing/CAS, two writers racing one revision, definite CAS rejection after a competing commit, ABA restoration, C2 old-context behavior, transaction/recovery failure injection before prepare, after prepare, after staging, after Authority commit, after Index install, after local Ledger projection, before final reread, and after lost ACK. Filesystem tests exercise exclusive staging, symlink/hardlink rejection, and exact atomic projection behavior. Hosted Witness protocol cases cover legal Intake, forbidden mixed Intake/Author writes, and role expiry/revocation at Commit. The hosted harness also checks that every disposable Linux role/group name remains within the 32-character login-name limit.
 
 Local regression results:
 

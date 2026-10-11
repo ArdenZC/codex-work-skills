@@ -35,6 +35,7 @@ from rq03f_monotonic_trust_ledger import (
     TrustState,
     VerifiedTransitionAuthorization,
     WitnessSnapshot,
+    _same_authorization_grant,
     build_ledger_record,
     encode_ledger,
     revocation_state,
@@ -176,12 +177,22 @@ class MemoryWitness:
     """In-process synthetic authority for deterministic protocol tests only."""
 
     def __init__(self, state: TrustState, *, approved_references: set[str] | None = None,
-                 owner_policy_transition_refs: set[str] | None = None):
+                 owner_policy_transition_refs: set[str] | None = None,
+                 role_authorizations: dict[str, tuple[str, str, str]] | None = None):
         self.records = [genesis_record(state)]
         self.pending: dict[str, tuple[TransitionProposal, PreparedTransition]] = {}
         self.statuses: dict[str, TransitionStatus] = {}
-        self.approved_references = approved_references or {"role-approval-1", "owner-approval-1"}
+        self.approved_references = approved_references or {
+            "role-approval-1", "author-approval-1", "owner-approval-1"}
         self.owner_policy_transition_refs = owner_policy_transition_refs or {"owner-approval-1"}
+        self.authorization_expiry: dict[str, datetime] = {}
+        self.default_authorization_valid_until = datetime.now(timezone.utc) + timedelta(seconds=15)
+        self.revoked_references: set[str] = set()
+        self.role_authorizations = role_authorizations or {
+            "role-approval-1": ("synthetic-operator", "qualification_corpus_custodian", "operator_role_operation"),
+            "author-approval-1": ("synthetic-author", "author", "operator_role_operation"),
+            "owner-approval-1": ("owner", "owner_policy_transition", "owner_policy_transition"),
+        }
         self.unavailable = False
         self.lose_next_ack = False
         self.lock = threading.RLock()
@@ -217,18 +228,38 @@ class MemoryWitness:
                 return TransitionStatus(
                     AUTHORITY, transition_id, "prepared", prepared.expected_sequence,
                     prepared.expected_state_digest, prepared.proposed_state_digest,
-                    prepared.proposed_index_sha256, prepared,
+                    prepared.proposed_index_sha256, prepared, proposal,
                 )
             if transition_id in self.statuses:
                 return self.statuses[transition_id]
             return None
 
     def verify_transition_authorization(self, proposal: TransitionProposal) -> VerifiedTransitionAuthorization:
+        from rq03f_monotonic_trust_ledger import PURPOSE_INDEX_SCOPES
+
         if proposal.owner_approval_reference not in self.approved_references:
             raise LedgerError("AUTHORIZATION_REJECTED", "synthetic witness rejected approval reference")
-        auth_class = ("owner_policy_transition"
-                      if proposal.owner_approval_reference in self.owner_policy_transition_refs
-                      else "operator_role_operation")
+        if proposal.owner_approval_reference in self.revoked_references:
+            raise LedgerError("AUTHORIZATION_REVOKED", "synthetic witness rejected revoked role authorization")
+        scope = PURPOSE_INDEX_SCOPES.get(proposal.operation_purpose)
+        if scope is None:
+            raise LedgerError("PURPOSE_INDEX_SCOPE_UNDEFINED", "purpose has no synthetic authorization scope")
+        grant = self.role_authorizations.get(proposal.owner_approval_reference)
+        if grant is None:
+            raise LedgerError("AUTHORIZATION_REJECTED", "synthetic witness has no typed role grant")
+        principal, authorized_role, auth_class = grant
+        if principal != proposal.actor_principal:
+            raise LedgerError("ACTOR_IDENTITY_REJECTED", "synthetic witness role principal differs from actor")
+        if authorized_role != scope.authorized_role or auth_class != scope.authorization_class:
+            raise LedgerError("AUTHORIZATION_PURPOSE_MISMATCH", "synthetic witness role/class does not authorize purpose")
+        snapshot = self.read_current()
+        checked_at = datetime.now(timezone.utc)
+        valid_until = self.authorization_expiry.get(
+            proposal.owner_approval_reference, self.default_authorization_valid_until)
+        if checked_at >= valid_until:
+            raise LedgerError("AUTHORIZATION_EXPIRED", "synthetic witness role authorization expired")
+        if proposal.owner_approval_reference in snapshot.state.revoked_role_authorization_references:
+            raise LedgerError("AUTHORIZATION_REVOKED", "synthetic witness role authorization is in committed revocation state")
         return VerifiedTransitionAuthorization(
             authority_identity=AUTHORITY,
             transition_id=proposal.transition_id,
@@ -238,9 +269,17 @@ class MemoryWitness:
             approval_reference=proposal.owner_approval_reference,
             authorization_class=auth_class,
             proposed_state_digest=state_digest(proposal.proposed_state),
+            authorized_role=scope.authorized_role,
+            role_authorization_reference=proposal.owner_approval_reference,
+            authorization_epoch=snapshot.state.policy_epoch,
+            revocation_state_sha256=snapshot.state.revocation_state_sha256,
+            authority_fencing_token=snapshot.fencing_token,
+            checked_at=checked_at,
+            valid_until=valid_until,
         )
 
-    def prepare_transition(self, proposal: TransitionProposal) -> PreparedTransition:
+    def prepare_transition(self, proposal: TransitionProposal,
+                           authorization: VerifiedTransitionAuthorization) -> PreparedTransition:
         with self.lock:
             if self.pending:
                 raise LedgerError("CAS_BUSY", "synthetic witness serializes outstanding transition")
@@ -253,10 +292,12 @@ class MemoryWitness:
             if proposal.owner_approval_reference not in self.approved_references:
                 raise LedgerError("AUTHORIZATION_REJECTED", "synthetic witness rejects unapproved transition")
             snapshot = self.read_current()
-            authorization = self.verify_transition_authorization(proposal)
+            current_authorization = self.verify_transition_authorization(proposal)
+            if not _same_authorization_grant(current_authorization, authorization):
+                raise LedgerError("AUTHORIZATION_REJECTED", "Prepare authorization changed before reservation")
             validate_transition_proposal(
                 proposal, snapshot, authorization=authorization,
-                expected_authority_identity=AUTHORITY,
+                expected_authority_identity=AUTHORITY, now=datetime.now(timezone.utc),
             )
             prepared = PreparedTransition(
                 authority_identity=AUTHORITY,
@@ -272,7 +313,8 @@ class MemoryWitness:
             self.pending[proposal.transition_id] = (proposal, prepared)
             return prepared
 
-    def commit_transition(self, prepared: PreparedTransition) -> WitnessSnapshot:
+    def commit_transition(self, prepared: PreparedTransition,
+                          authorization: VerifiedTransitionAuthorization) -> WitnessSnapshot:
         with self.lock:
             pending = self.pending.get(prepared.transition_id)
             if pending is None or pending[1] != prepared:
@@ -282,6 +324,14 @@ class MemoryWitness:
             if (prepared.expected_sequence != previous["sequence"]
                     or prepared.expected_state_digest != previous["current_committed_state_digest"]):
                 raise LedgerError("CAS_STALE", "synthetic witness rejects stale commit")
+            snapshot = self.read_current()
+            current_authorization = self.verify_transition_authorization(proposal)
+            if not _same_authorization_grant(current_authorization, authorization):
+                raise LedgerError("AUTHORIZATION_REJECTED", "Commit authorization changed after Prepare")
+            validate_transition_proposal(
+                proposal, snapshot, authorization=authorization,
+                expected_authority_identity=AUTHORITY, now=datetime.now(timezone.utc),
+            )
             record = build_ledger_record(
                 authority_identity=AUTHORITY,
                 sequence=previous["sequence"] + 1,
@@ -298,7 +348,7 @@ class MemoryWitness:
             self.statuses[proposal.transition_id] = TransitionStatus(
                 AUTHORITY, proposal.transition_id, "committed", prepared.expected_sequence,
                 prepared.expected_state_digest, prepared.proposed_state_digest,
-                prepared.proposed_index_sha256, None,
+                prepared.proposed_index_sha256, None, proposal,
             )
             snapshot = self.read_current()
             if self.lose_next_ack:
@@ -317,7 +367,7 @@ class MemoryWitness:
             self.statuses[prepared.transition_id] = TransitionStatus(
                 AUTHORITY, prepared.transition_id, "aborted", prepared.expected_sequence,
                 prepared.expected_state_digest, prepared.proposed_state_digest,
-                prepared.proposed_index_sha256, None,
+                prepared.proposed_index_sha256, None, pending[0],
             )
 
 
@@ -355,9 +405,10 @@ class LedgerContractTests(unittest.TestCase):
         )
 
     def proposal(self, *, transition_id: str = "tx-0001", old_raw: bytes | None = None,
-                 intake_id: str = "intake-0001", operation_id: str = "operation-0001",
+                 intake_id: str = "intake-0001", operation_id: str | None = None,
                  approval_ref: str = "role-approval-1") -> TransitionProposal:
         old_raw = old_raw or self.store.read_index()
+        operation_id = operation_id or transition_id
         candidate = append_intake(old_raw, intake_id=intake_id, operation_id=operation_id)
         state = append_state(self.witness.state, candidate)
         snapshot = self.witness.read_current()
@@ -379,6 +430,31 @@ class LedgerContractTests(unittest.TestCase):
             authority_identity=AUTHORITY,
             store=store or self.store,
         )
+
+    def prepare(self, proposal, *, witness=None):
+        authority = witness or self.witness
+        return authority.prepare_transition(
+            proposal, authority.verify_transition_authorization(proposal))
+
+    def commit_prepared(self, prepared, *, witness=None):
+        authority = witness or self.witness
+        proposal = authority.pending[prepared.transition_id][0]
+        return authority.commit_transition(
+            prepared, authority.verify_transition_authorization(proposal))
+
+    def assert_rejected_without_witness_or_index_change(self, proposal, expected_code: str):
+        old_index = self.store.read_index()
+        old_ledger = self.store.read_ledger()
+        old_snapshot = self.witness.read_current()
+        with self.assertRaisesRegex(LedgerError, expected_code):
+            self.coordinator().commit(proposal)
+        current = self.witness.read_current()
+        self.assertEqual(current.sequence, old_snapshot.sequence)
+        self.assertEqual(current.head_state_digest, old_snapshot.head_state_digest)
+        self.assertEqual(current.pending_transition_ids, ())
+        self.assertEqual(self.store.read_index(), old_index)
+        self.assertEqual(self.store.read_ledger(), old_ledger)
+        self.assertIsNone(self.witness.read_transition(proposal.transition_id))
 
     def test_all_three_versioned_schemas_accept_closed_records(self):
         from lifecycle_digest import schema_errors
@@ -543,12 +619,15 @@ class LedgerContractTests(unittest.TestCase):
                                      expected_authority_identity=AUTHORITY, transition_id="tx")
 
     def test_epoch_transition_requires_typed_owner_authorization_and_new_generation(self):
+        epoch_index = encode_json(base_index(epoch=2))
         candidate = replace(self.state, policy_epoch=2, profile_sha256=sha("profile-b"),
-                            generation_id="generation-b", index_revision=1,
+                            generation_id="generation-b", index_sha256=sha(epoch_index), index_revision=1,
                             revocation_state_sha256=sha("revocation-b"))
-        authorization = VerifiedTransitionAuthorization(
-            AUTHORITY, "epoch-tx", "operator", "owner", "epoch_transition", "owner-approval-1",
-            "operator_role_operation", state_digest(candidate))
+        proposal = TransitionProposal(
+            "epoch-tx", 0, self.witness.read_current().head_state_digest,
+            self.index, epoch_index, candidate, "epoch_transition", "owner", "owner-approval-1")
+        authorization = self.witness.verify_transition_authorization(proposal)
+        authorization = replace(authorization, authorization_class="operator_role_operation")
         with self.assertRaisesRegex(LedgerError, "Owner approval"):
             validate_state_successor(self.state, candidate, authorization=authorization,
                                      expected_authority_identity=AUTHORITY, transition_id="epoch-tx")
@@ -563,13 +642,16 @@ class LedgerContractTests(unittest.TestCase):
     def test_revoked_authority_and_role_cannot_reappear_after_epoch_change(self):
         previous = initial_state(self.index, revoked_ids=("authority-1",),
                                  revoked_roles=("authorization-1",))
+        revocation_index = encode_json(base_index(epoch=2))
         candidate = replace(previous, policy_epoch=2, profile_sha256=sha("profile-2"),
-                            generation_id="generation-b", index_revision=1,
+                            generation_id="generation-b", index_sha256=sha(revocation_index), index_revision=1,
                             revocation_state_sha256=sha("revocation-2"),
                             revoked_authority_ids=(), revoked_role_authorization_references=())
-        authorization = VerifiedTransitionAuthorization(
-            AUTHORITY, "tx", "operator", "owner", "epoch_transition", "owner-approval-1",
-            "owner_policy_transition", state_digest(candidate))
+        witness = MemoryWitness(previous)
+        proposal = TransitionProposal(
+            "tx", 0, witness.read_current().head_state_digest, self.index,
+            revocation_index, candidate, "epoch_transition", "owner", "owner-approval-1")
+        authorization = witness.verify_transition_authorization(proposal)
         with self.assertRaisesRegex(LedgerError, "cannot become active"):
             validate_state_successor(previous, candidate, authorization=authorization,
                                      expected_authority_identity=AUTHORITY, transition_id="tx")
@@ -579,8 +661,245 @@ class LedgerContractTests(unittest.TestCase):
         result = validate_index_append(
             self.index, candidate, expected_epoch=1, expected_controller_id="controller-a",
             expected_previous_sha256=sha(self.index), expected_current_sha256=sha(candidate),
+            operation_purpose="qualification_corpus_intake", actor_principal="synthetic-operator",
+            operation_id="operation-0001",
         )
         self.assertEqual(len(result["qualification_corpus_intakes"]), 1)
+
+    def test_qualification_review_run_mutation_is_blocked_without_a_closed_scope(self):
+        proposal = self.proposal()
+        index = json.loads(proposal.candidate_index_raw)
+        index["qualification_corpus_intakes"] = []
+        index["qualification_runs"].append({
+            "run_id": "qualification-run-1",
+            "operations": [{
+                "case_id": "case-1", "review_operation_id": "review-op-1",
+                "input_inventory_keys": ["case-1-content"], "labels_hidden": True,
+                "prior_reasoning_hidden": True, "fresh_context": True,
+            }],
+        })
+        raw = encode_json(index)
+        blocked_review = replace(
+            proposal, candidate_index_raw=raw,
+            proposed_state=replace(proposal.proposed_state, index_sha256=sha(raw)),
+            operation_purpose="qualification_review",
+        )
+        self.assert_rejected_without_witness_or_index_change(
+            blocked_review, "PURPOSE_INDEX_SCOPE_UNDEFINED")
+
+    def test_authorization_reference_is_bound_to_the_transition(self):
+        original_verify = self.witness.verify_transition_authorization
+
+        def wrong_reference(proposal):
+            return replace(original_verify(proposal), role_authorization_reference="other-role-reference")
+
+        self.witness.verify_transition_authorization = wrong_reference
+        self.assert_rejected_without_witness_or_index_change(
+            self.proposal(), "AUTHORIZATION_BINDING_MISMATCH")
+
+    def test_intake_purpose_rejects_author_receipt_run_and_mixed_appends(self):
+        def make_case(additions):
+            proposal = self.proposal()
+            index = json.loads(proposal.candidate_index_raw)
+            for group, row in additions:
+                index[group].append(row)
+            raw = encode_json(index)
+            return replace(proposal, candidate_index_raw=raw,
+                           proposed_state=replace(proposal.proposed_state, index_sha256=sha(raw)))
+
+        cases = {
+            "author": [("authors", {
+                "authoring_id": "authoring-forbidden", "operation_id": "author-operation",
+                "principal_id": "synthetic-operator", "content_sha256": sha("content"),
+            })],
+            "receipt": [("receipts", {
+                "receipt_id": "receipt-forbidden", "operation_id": "receipt-operation",
+                "actor_principal": "synthetic-operator", "subject_inventory_key": "subject",
+                "subject_sha256": sha("subject"), "receipt_inventory_key": "receipt",
+                "receipt_sha256": sha("receipt"),
+            })],
+            "qualification_run": [("qualification_runs", {
+                "run_id": "run-forbidden", "operations": [{
+                    "case_id": "case-1", "review_operation_id": "review-operation",
+                    "input_inventory_keys": ["case"], "labels_hidden": True,
+                    "prior_reasoning_hidden": True, "fresh_context": True,
+                }],
+            })],
+            "mixed_author_receipt": [
+                ("authors", {
+                    "authoring_id": "authoring-mixed", "operation_id": "author-operation-mixed",
+                    "principal_id": "synthetic-operator", "content_sha256": sha("content"),
+                }),
+                ("receipts", {
+                    "receipt_id": "receipt-mixed", "operation_id": "receipt-operation-mixed",
+                    "actor_principal": "synthetic-operator", "subject_inventory_key": "subject",
+                    "subject_sha256": sha("subject"), "receipt_inventory_key": "receipt",
+                    "receipt_sha256": sha("receipt"),
+                }),
+            ],
+        }
+        for label, additions in cases.items():
+            with self.subTest(label=label):
+                self.assert_rejected_without_witness_or_index_change(
+                    make_case(additions), "PURPOSE_INDEX_SCOPE_MISMATCH")
+
+    def test_purpose_record_mismatch_and_actor_binding_fail_before_prepare(self):
+        intake = self.proposal()
+        author_purpose = replace(intake, operation_purpose="production_authoring",
+                                 actor_principal="synthetic-author",
+                                 owner_approval_reference="author-approval-1")
+        self.assert_rejected_without_witness_or_index_change(
+            author_purpose, "PURPOSE_INDEX_SCOPE_MISMATCH")
+
+        index = json.loads(intake.candidate_index_raw)
+        index["qualification_corpus_intakes"][0]["operator_principal"] = "different-operator"
+        raw = encode_json(index)
+        actor_mismatch = replace(
+            intake, candidate_index_raw=raw,
+            proposed_state=replace(intake.proposed_state, index_sha256=sha(raw)),
+        )
+        self.assert_rejected_without_witness_or_index_change(
+            actor_mismatch, "INDEX_OPERATION_BINDING_MISMATCH")
+
+    def test_authorization_class_and_reference_are_purpose_scoped(self):
+        self.witness.role_authorizations["role-approval-1"] = (
+            "synthetic-operator", "qualification_corpus_custodian", "owner_policy_transition")
+        self.assert_rejected_without_witness_or_index_change(
+            self.proposal(), "AUTHORIZATION_PURPOSE_MISMATCH")
+
+    def test_authorized_production_authoring_appends_exactly_one_bound_author(self):
+        transition_id = "author-op-1"
+        index = base_index()
+        index["authors"].append({
+            "authoring_id": "authoring-0001", "operation_id": transition_id,
+            "principal_id": "synthetic-author", "content_sha256": sha("content"),
+        })
+        raw = encode_json(index)
+        state = append_state(self.state, raw)
+        snapshot = self.witness.read_current()
+        proposal = TransitionProposal(
+            transition_id, snapshot.sequence, snapshot.head_state_digest,
+            self.index, raw, state, "production_authoring", "synthetic-author",
+            "author-approval-1",
+        )
+        committed = self.coordinator().commit(proposal)
+        status = self.witness.read_transition(transition_id)
+        self.assertEqual(committed.sequence, 1)
+        self.assertEqual(status.status, "committed")
+        self.assertEqual(self.store.read_index(), raw)
+        self.assertEqual(json.loads(self.store.read_index())["authors"][0]["operation_id"], transition_id)
+
+    def test_owner_revocation_is_a_separate_state_only_transition(self):
+        previous = self.state
+        index = base_index(epoch=2)
+        raw = encode_json(index)
+        state = replace(
+            previous, policy_epoch=2, profile_sha256=sha("revoked-profile"),
+            generation_id="generation-after-revocation", index_sha256=sha(raw),
+            index_revision=1, revocation_state_sha256=sha("revocation-after"),
+            revoked_role_authorization_references=("old-role-reference",),
+        )
+        snapshot = self.witness.read_current()
+        proposal = TransitionProposal(
+            "owner-revocation-1", snapshot.sequence, snapshot.head_state_digest,
+            self.index, raw, state, "revocation", "owner", "owner-approval-1",
+        )
+        committed = self.coordinator().commit(proposal)
+        status = self.witness.read_transition(proposal.transition_id)
+        self.assertEqual(status.status, "committed")
+        self.assertEqual(committed.state.revoked_role_authorization_references,
+                         ("old-role-reference",))
+        self.assertEqual(self.store.read_index(), raw)
+        self.assertEqual(json.loads(raw)["receipts"], [])
+        self.assertEqual(json.loads(raw)["authors"], [])
+        self.assertEqual(json.loads(raw)["qualification_corpus_intakes"], [])
+
+    def test_revocation_purpose_without_new_revocation_is_rejected_unchanged(self):
+        index = base_index(epoch=2)
+        raw = encode_json(index)
+        state = replace(
+            self.state, policy_epoch=2, profile_sha256=sha("rotated-profile"),
+            generation_id="generation-after-epoch", index_sha256=sha(raw),
+            index_revision=1, revocation_state_sha256=sha("rotated-revocation"),
+        )
+        snapshot = self.witness.read_current()
+        proposal = TransitionProposal(
+            "empty-revocation", snapshot.sequence, snapshot.head_state_digest,
+            self.index, raw, state, "revocation", "owner", "owner-approval-1",
+        )
+        self.assert_rejected_without_witness_or_index_change(proposal, "PURPOSE_STATE_MISMATCH")
+
+    def test_prepare_then_role_expiry_rejects_commit_and_preserves_index_bytes(self):
+        proposal = self.proposal()
+        old_index = self.store.read_index()
+
+        def expire_after_prepare(stage):
+            if stage == "index_staged":
+                self.witness.authorization_expiry[proposal.owner_approval_reference] = (
+                    datetime.now(timezone.utc) - timedelta(milliseconds=1))
+
+        with self.assertRaisesRegex(LedgerError, "TRANSITION_ABORTED.*AUTHORIZATION_EXPIRED"):
+            self.coordinator().commit(proposal, failpoint=expire_after_prepare)
+        status = self.witness.read_transition(proposal.transition_id)
+        snapshot = self.witness.read_current()
+        self.assertEqual(status.status, "aborted")
+        self.assertEqual(snapshot.sequence, 0)
+        self.assertEqual(snapshot.pending_transition_ids, ())
+        self.assertEqual(self.store.read_index(), old_index)
+
+    def test_prepare_then_role_revocation_rejects_commit_and_preserves_index_bytes(self):
+        proposal = self.proposal()
+        old_index = self.store.read_index()
+
+        def revoke_after_prepare(stage):
+            if stage == "index_staged":
+                self.witness.revoked_references.add(proposal.owner_approval_reference)
+
+        with self.assertRaisesRegex(LedgerError, "TRANSITION_ABORTED.*AUTHORIZATION_REVOKED"):
+            self.coordinator().commit(proposal, failpoint=revoke_after_prepare)
+        status = self.witness.read_transition(proposal.transition_id)
+        snapshot = self.witness.read_current()
+        self.assertEqual(status.status, "aborted")
+        self.assertEqual(snapshot.sequence, 0)
+        self.assertEqual(snapshot.pending_transition_ids, ())
+        self.assertEqual(self.store.read_index(), old_index)
+
+    def test_expired_authorization_cannot_commit_during_recovery(self):
+        proposal = self.proposal()
+        old_index = self.store.read_index()
+        self.prepare(proposal)
+        self.store.stage_index(proposal.transition_id, proposal.candidate_index_raw)
+        self.witness.authorization_expiry[proposal.owner_approval_reference] = (
+            datetime.now(timezone.utc) - timedelta(milliseconds=1))
+        with self.assertRaisesRegex(LedgerError, "TRANSITION_ABORTED.*AUTHORIZATION_EXPIRED"):
+            self.coordinator().recover(transition_id=proposal.transition_id)
+        status = self.witness.read_transition(proposal.transition_id)
+        snapshot = self.witness.read_current()
+        self.assertEqual(status.status, "aborted")
+        self.assertEqual(snapshot.sequence, 0)
+        self.assertEqual(snapshot.pending_transition_ids, ())
+        self.assertEqual(self.store.read_index(), old_index)
+
+    def test_unknown_transition_status_stays_recovery_required_without_retry(self):
+        proposal = self.proposal()
+        self.prepare(proposal)
+        self.store.stage_index(proposal.transition_id, proposal.candidate_index_raw)
+
+        class UnknownStatusWitness(MemoryWitness):
+            def read_transition(inner_self, transition_id):
+                return None
+
+        unknown = UnknownStatusWitness(self.state)
+        unknown.pending[proposal.transition_id] = self.witness.pending[proposal.transition_id]
+        unknown.statuses = self.witness.statuses
+        old_index = self.store.read_index()
+        coordinator = self.coordinator(witness=unknown)
+        with self.assertRaisesRegex(LedgerError, "RECOVERY_REQUIRED"):
+            coordinator.recover(transition_id=proposal.transition_id)
+        self.assertEqual(unknown.read_current().sequence, 0)
+        self.assertEqual(unknown.read_current().pending_transition_ids, (proposal.transition_id,))
+        self.assertEqual(self.store.read_index(), old_index)
+        self.assertTrue(self.store.recovery_required())
 
     def test_index_rewrite_and_old_index_new_profile_mixes_fail(self):
         prior = json.loads(append_intake(self.index, intake_id="intake-original",
@@ -598,6 +917,8 @@ class LedgerContractTests(unittest.TestCase):
             validate_index_append(
                 prior_raw, candidate, expected_epoch=1, expected_controller_id="controller-a",
                 expected_previous_sha256=sha(prior_raw), expected_current_sha256=sha(candidate),
+                operation_purpose="qualification_corpus_intake", actor_principal="synthetic-operator",
+                operation_id="operation-new",
             )
 
     def test_index_wrong_sha_and_duplicate_operation_id_are_rejected(self):
@@ -606,6 +927,8 @@ class LedgerContractTests(unittest.TestCase):
             validate_index_append(
                 self.index, candidate, expected_epoch=1, expected_controller_id="controller-a",
                 expected_previous_sha256=sha("wrong"), expected_current_sha256=sha(candidate),
+                operation_purpose="qualification_corpus_intake", actor_principal="synthetic-operator",
+                operation_id="operation-0001",
             )
         first = json.loads(candidate)
         first["qualification_corpus_intakes"].append({
@@ -618,6 +941,8 @@ class LedgerContractTests(unittest.TestCase):
             validate_index_append(
                 self.index, second, expected_epoch=1, expected_controller_id="controller-a",
                 expected_previous_sha256=sha(self.index), expected_current_sha256=sha(second),
+                operation_purpose="qualification_corpus_intake", actor_principal="synthetic-operator",
+                operation_id="operation-0002",
             )
 
     def test_operation_ids_cannot_be_reused_in_a_later_revision(self):
@@ -627,6 +952,8 @@ class LedgerContractTests(unittest.TestCase):
             validate_index_append(
                 first, second, expected_epoch=1, expected_controller_id="controller-a",
                 expected_previous_sha256=sha(first), expected_current_sha256=sha(second),
+                operation_purpose="qualification_corpus_intake", actor_principal="synthetic-operator",
+                operation_id="op-a",
             )
 
     def test_same_epoch_different_index_sha_at_same_revision_is_not_committable(self):
@@ -678,6 +1005,7 @@ class LedgerContractTests(unittest.TestCase):
         snapshot = self.coordinator().commit(proposal)
         self.assertEqual(snapshot.state.index_sha256, sha(proposal.candidate_index_raw))
         self.assertEqual(self.store.read_index(), proposal.candidate_index_raw)
+        self.assertEqual(self.witness.read_transition(proposal.transition_id).status, "committed")
         result = self.gate().check_current_state(**self.request(snapshot.state))
         self.assertEqual(result.decision, "verified")
 
@@ -690,7 +1018,7 @@ class LedgerContractTests(unittest.TestCase):
 
     def test_two_writers_cannot_prepare_the_same_revision(self):
         first = self.proposal(transition_id="writer-a")
-        second = self.proposal(transition_id="writer-b", intake_id="intake-b", operation_id="operation-b")
+        second = self.proposal(transition_id="writer-b", intake_id="intake-b", operation_id="writer-b")
         barrier = threading.Barrier(2)
         outcomes: list[str] = []
 
@@ -698,7 +1026,7 @@ class LedgerContractTests(unittest.TestCase):
             auth = self.witness.verify_transition_authorization(proposal)
             barrier.wait()
             try:
-                self.witness.prepare_transition(proposal)
+                self.prepare(proposal)
                 outcomes.append("prepared")
             except LedgerError:
                 outcomes.append("rejected")
@@ -712,14 +1040,16 @@ class LedgerContractTests(unittest.TestCase):
 
     def test_definite_cas_busy_after_competing_commit_does_not_mark_loser_unresolved(self):
         winner = self.proposal(transition_id="winner", intake_id="winner-intake",
-                               operation_id="winner-operation")
+                               operation_id="winner")
         loser = self.proposal(transition_id="loser", intake_id="loser-intake",
-                              operation_id="loser-operation")
+                              operation_id="loser")
         original_prepare = self.witness.prepare_transition
 
-        def competing_commit(_loser_proposal):
-            prepared = original_prepare(winner)
-            self.witness.commit_transition(prepared)
+        def competing_commit(_loser_proposal, _authorization):
+            winner_auth = self.witness.verify_transition_authorization(winner)
+            prepared = original_prepare(winner, winner_auth)
+            self.witness.commit_transition(
+                prepared, self.witness.verify_transition_authorization(winner))
             self.store.index = winner.candidate_index_raw
             self.store.ledger = encode_ledger(AUTHORITY, self.witness.records)
             raise LedgerError("CAS_BUSY", "a concurrent writer already reserved and committed this revision")
@@ -744,10 +1074,11 @@ class LedgerContractTests(unittest.TestCase):
 
     def test_stale_fencing_token_cannot_commit_another_transition(self):
         proposal = self.proposal()
-        prepared = self.witness.prepare_transition(proposal)
+        prepared = self.prepare(proposal)
         wrong = replace(prepared, fencing_token="stale-fence")
         with self.assertRaisesRegex(LedgerError, "stale fencing"):
-            self.witness.commit_transition(wrong)
+            self.witness.commit_transition(
+                wrong, self.witness.verify_transition_authorization(proposal))
         self.assertEqual(self.witness.read_current().sequence, 0)
 
     def test_crash_before_prepare_leaves_committed_state_unchanged(self):
@@ -817,15 +1148,16 @@ class LedgerContractTests(unittest.TestCase):
 
     def test_prepared_transition_recovers_to_abort_if_candidate_was_not_staged(self):
         proposal = self.proposal()
-        prepared = self.witness.prepare_transition(proposal)
+        prepared = self.prepare(proposal)
         self.assertEqual(prepared.status, "prepared")
-        recovered = self.coordinator().recover(transition_id=proposal.transition_id)
-        self.assertEqual(recovered.sequence, 0)
+        with self.assertRaisesRegex(LedgerError, "TRANSITION_ABORTED"):
+            self.coordinator().recover(transition_id=proposal.transition_id)
+        self.assertEqual(self.witness.read_current().sequence, 0)
         self.assertEqual(self.witness.read_current().pending_transition_ids, ())
 
     def test_prepared_transition_recovers_to_commit_only_from_exact_staged_candidate(self):
         proposal = self.proposal()
-        prepared = self.witness.prepare_transition(proposal)
+        prepared = self.prepare(proposal)
         self.store.stage_index(proposal.transition_id, proposal.candidate_index_raw)
         recovered = self.coordinator().recover(transition_id=proposal.transition_id)
         self.assertEqual(recovered.sequence, 1)
@@ -834,7 +1166,7 @@ class LedgerContractTests(unittest.TestCase):
 
     def test_prepared_transition_with_mismatched_staged_bytes_requires_recovery(self):
         proposal = self.proposal()
-        self.witness.prepare_transition(proposal)
+        self.prepare(proposal)
         self.store.stage_index(proposal.transition_id, self.index)
         with self.assertRaisesRegex(LedgerError, "do not match"):
             self.coordinator().recover(transition_id=proposal.transition_id)
@@ -858,7 +1190,10 @@ class LedgerContractTests(unittest.TestCase):
 
     def test_owner_approval_reference_is_not_inferred_from_role_name(self):
         candidate_witness = MemoryWitness(self.state, approved_references={"operator-role"},
-                                          owner_policy_transition_refs=set())
+                                          owner_policy_transition_refs=set(),
+                                          role_authorizations={"operator-role": (
+                                              "synthetic-operator", "qualification_corpus_custodian",
+                                              "operator_role_operation")})
         proposal = self.proposal(approval_ref="operator-role")
         new_state = replace(proposal.proposed_state, policy_epoch=2,
                             profile_sha256=sha("profile-b"), generation_id="generation-b")
@@ -869,7 +1204,7 @@ class LedgerContractTests(unittest.TestCase):
                            proposed_state=replace(new_state, index_sha256=sha(epoch_bytes)),
                            operation_purpose="epoch_transition")
         store = MemoryProjection(self.index, [genesis_record(self.state)])
-        with self.assertRaisesRegex(LedgerError, "Owner approval"):
+        with self.assertRaisesRegex(LedgerError, "AUTHORIZATION_PURPOSE_MISMATCH"):
             MonotonicTransitionCoordinator(authority=candidate_witness, authority_identity=AUTHORITY,
                                            store=store).commit(proposal)
 
@@ -891,9 +1226,11 @@ class LedgerContractTests(unittest.TestCase):
     def test_generation_replay_is_rejected_by_epoch_transition_contract(self):
         candidate = replace(self.state, policy_epoch=2, profile_sha256=sha("profile-b"),
                             index_revision=1, revocation_state_sha256=sha("revocation-b"))
-        auth = VerifiedTransitionAuthorization(AUTHORITY, "tx", "operator", "owner", "epoch_transition",
-                                               "owner-approval-1", "owner_policy_transition",
-                                               state_digest(candidate))
+        epoch_index = encode_json(base_index(epoch=2))
+        proposal = TransitionProposal(
+            "tx", 0, self.witness.read_current().head_state_digest, self.index,
+            epoch_index, candidate, "epoch_transition", "owner", "owner-approval-1")
+        auth = self.witness.verify_transition_authorization(proposal)
         with self.assertRaisesRegex(LedgerError, "new Generation"):
             validate_state_successor(self.state, candidate, authorization=auth,
                                      expected_authority_identity=AUTHORITY, transition_id="tx")
@@ -974,6 +1311,135 @@ class LedgerContractTests(unittest.TestCase):
         self.assertEqual(result.error_code, "RECOVERY_REQUIRED")
         self.store.clear_recovery_required("recovery-0001")
         self.assertEqual(self.gate().check_current_state(**self.request()).decision, "verified")
+
+
+class HostedWitnessProtocolTests(unittest.TestCase):
+    """Exercise the independent hosted service's own Prepare/Commit checks."""
+
+    def setUp(self):
+        from tools.rq03f_c3.hosted_linux_isolation import (
+            AUTHORITY_ID, APPROVAL_REF, WitnessServer, _initial_material,
+        )
+
+        self._temp = tempfile.TemporaryDirectory()
+        root = Path(self._temp.name)
+        root.chmod(0o700)
+        self.state_path = root / "witness-state.json"
+        self.socket_path = root / "witness.sock"
+        self.initial_index, self.state, payload = _initial_material()
+        payload["lose_next_commit_ack"] = False
+        self.state_path.write_bytes(encode_json(payload))
+        self.state_path.chmod(0o600)
+        self.server = WitnessServer(
+            state_path=self.state_path, socket_path=self.socket_path,
+            operator_uid=os.getuid(), api_gid=os.getgid(),
+        )
+        self.authority_id = AUTHORITY_ID
+        self.approval_ref = APPROVAL_REF
+
+    def tearDown(self):
+        self._temp.cleanup()
+
+    def proposal(self, *, transition_id="hosted-unit-transition", add_author=False,
+                 actor="synthetic-hosted-operator"):
+        index = json.loads(self.initial_index)
+        index["qualification_corpus_intakes"].append({
+            "intake_id": "hosted-unit-intake", "operation_id": transition_id,
+            "operator_principal": actor, "subject_inventory_key": "hosted-unit-corpus",
+            "subject_sha256": sha("hosted-unit-corpus"),
+        })
+        if add_author:
+            index["authors"].append({
+                "authoring_id": "hosted-authoring", "operation_id": "hosted-author-op",
+                "principal_id": actor, "content_sha256": sha("hosted-content"),
+            })
+        candidate = encode_json(index)
+        proposed = append_state(self.state, candidate)
+        return TransitionProposal(
+            transition_id, 0, state_digest(self.state), self.initial_index, candidate,
+            proposed, "qualification_corpus_intake", actor, self.approval_ref,
+        )
+
+    def prepare(self, proposal):
+        from tools.rq03f_c3.hosted_linux_isolation import (
+            UnixWitnessAdapter, _authorization_from_wire,
+        )
+
+        proposal_wire = UnixWitnessAdapter._proposal_wire(proposal)
+        auth_response = self.server._handle({
+            "action": "verify_transition_authorization", "proposal": proposal_wire,
+        })
+        self.assertTrue(auth_response["ok"], auth_response)
+        authorization = _authorization_from_wire(auth_response["authorization"])
+        result = self.server._handle({
+            "action": "prepare_transition", "proposal": proposal_wire,
+            "authorization": auth_response["authorization"],
+        })
+        return authorization, result
+
+    def test_hosted_witness_commits_only_exact_authorized_intake(self):
+        from tools.rq03f_c3.hosted_linux_isolation import _authorization_wire
+
+        proposal = self.proposal()
+        authorization, prepared_response = self.prepare(proposal)
+        self.assertTrue(prepared_response["ok"], prepared_response)
+        result = self.server._handle({
+            "action": "commit_transition", "prepared": prepared_response["prepared"],
+            "authorization": _authorization_wire(authorization),
+        })
+        self.assertTrue(result["ok"], result)
+        payload = self.server._load()
+        self.assertEqual(payload["records"][-1]["sequence"], 1)
+        self.assertEqual(payload["records"][-1]["state"]["index_sha256"], sha(proposal.candidate_index_raw))
+        self.assertEqual(payload["pending"], {})
+        self.assertEqual(self.server._status(payload, proposal.transition_id)["status"], "committed")
+
+    def test_hosted_witness_rejects_intake_that_also_appends_author(self):
+        proposal = self.proposal(add_author=True)
+        _authorization, prepared_response = self.prepare(proposal)
+        self.assertFalse(prepared_response["ok"])
+        self.assertEqual(prepared_response["code"], "PURPOSE_INDEX_SCOPE_MISMATCH")
+        payload = self.server._load()
+        self.assertEqual(payload["records"][-1]["sequence"], 0)
+        self.assertEqual(payload["records"][-1]["state"]["index_sha256"], sha(self.initial_index))
+        self.assertEqual(payload["pending"], {})
+        self.assertIsNone(self.server._status(payload, proposal.transition_id))
+
+    def _assert_hosted_witness_rechecks_invalidation_at_commit(self, kind):
+        from tools.rq03f_c3.hosted_linux_isolation import _authorization_wire
+
+        proposal = self.proposal(transition_id=f"hosted-unit-{kind}")
+        authorization, prepared_response = self.prepare(proposal)
+        self.assertTrue(prepared_response["ok"], prepared_response)
+        payload = self.server._load()
+        grant = payload["role_authorizations"][self.approval_ref]
+        if kind == "expired":
+            grant["valid_until"] = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+        else:
+            grant["revoked"] = True
+        self.server._persist(payload)
+        result = self.server._handle({
+            "action": "commit_transition", "prepared": prepared_response["prepared"],
+            "authorization": _authorization_wire(authorization),
+        })
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["code"], "AUTHORIZATION_EXPIRED" if kind == "expired" else "AUTHORIZATION_REVOKED")
+        abort = self.server._handle({
+            "action": "abort_transition", "prepared": prepared_response["prepared"],
+            "reason_code": result["code"],
+        })
+        self.assertTrue(abort["ok"], abort)
+        payload = self.server._load()
+        self.assertEqual(payload["records"][-1]["sequence"], 0)
+        self.assertEqual(payload["records"][-1]["state"]["index_sha256"], sha(self.initial_index))
+        self.assertEqual(payload["pending"], {})
+        self.assertEqual(self.server._status(payload, proposal.transition_id)["status"], "aborted")
+
+    def test_hosted_witness_rechecks_role_expiry_at_commit(self):
+        self._assert_hosted_witness_rechecks_invalidation_at_commit("expired")
+
+    def test_hosted_witness_rechecks_role_revocation_at_commit(self):
+        self._assert_hosted_witness_rechecks_invalidation_at_commit("revoked")
 
 
 class HostedIdentityNameContractTests(unittest.TestCase):

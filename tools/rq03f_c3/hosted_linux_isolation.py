@@ -50,11 +50,12 @@ from rq03f_monotonic_trust_ledger import (
     TrustState,
     VerifiedTransitionAuthorization,
     WitnessSnapshot,
+    PURPOSE_INDEX_SCOPES,
+    _same_authorization_grant,
     build_ledger_record,
     encode_ledger,
     revocation_state,
-    validate_index_append,
-    validate_state_successor,
+    validate_transition_proposal,
 )
 
 
@@ -118,6 +119,36 @@ def _typed_snapshot(payload: dict[str, Any]) -> WitnessSnapshot:
         history=tuple(payload["history"]),
         pending_transition_ids=tuple(payload["pending_transition_ids"]),
     )
+
+
+def _proposal_from_wire(payload: dict[str, Any]) -> TransitionProposal:
+    return TransitionProposal(
+        transition_id=payload["transition_id"],
+        expected_sequence=payload["expected_sequence"],
+        expected_state_digest=payload["expected_state_digest"],
+        previous_index_raw=base64.b64decode(payload["previous_index_b64"], validate=True),
+        candidate_index_raw=base64.b64decode(payload["candidate_index_b64"], validate=True),
+        proposed_state=_state_from_wire(payload["proposed_state"]),
+        operation_purpose=payload["operation_purpose"],
+        actor_principal=payload["actor_principal"],
+        owner_approval_reference=payload["owner_approval_reference"],
+    )
+
+
+def _authorization_from_wire(payload: dict[str, Any]) -> VerifiedTransitionAuthorization:
+    return VerifiedTransitionAuthorization(
+        **(payload | {
+            "checked_at": datetime.fromisoformat(payload["checked_at"].replace("Z", "+00:00")),
+            "valid_until": datetime.fromisoformat(payload["valid_until"].replace("Z", "+00:00")),
+        })
+    )
+
+
+def _authorization_wire(authorization: VerifiedTransitionAuthorization) -> dict[str, Any]:
+    return authorization.__dict__ | {
+        "checked_at": authorization.checked_at.isoformat().replace("+00:00", "Z"),
+        "valid_until": authorization.valid_until.isoformat().replace("+00:00", "Z"),
+    }
 
 
 class WitnessServer:
@@ -186,8 +217,57 @@ class WitnessServer:
                 "proposed_state_digest": prepared["proposed_state_digest"],
                 "proposed_index_sha256": prepared["proposed_index_sha256"],
                 "prepared": prepared,
+                "proposal": pending["proposal"],
             }
         return payload["transitions"].get(transition_id)
+
+    @staticmethod
+    def _snapshot(payload: dict[str, Any]) -> WitnessSnapshot:
+        last = payload["records"][-1]
+        return _typed_snapshot(_wire_snapshot(payload, fence=f"witness-{last['sequence']}"))
+
+    def _verify_authorization(self, payload: dict[str, Any],
+                              proposal: TransitionProposal) -> VerifiedTransitionAuthorization:
+        scope = PURPOSE_INDEX_SCOPES.get(proposal.operation_purpose)
+        if scope is None:
+            raise LedgerError("PURPOSE_INDEX_SCOPE_UNDEFINED", "Witness blocks purpose without an Index contract")
+        reference = proposal.owner_approval_reference
+        grant = payload.get("role_authorizations", {}).get(reference)
+        if reference not in payload["approved_references"] or not isinstance(grant, dict):
+            raise LedgerError("AUTHORIZATION_REJECTED", "Witness has no current authorization for this reference")
+        snapshot = self._snapshot(payload)
+        if grant.get("revoked") is True or reference in snapshot.state.revoked_role_authorization_references:
+            raise LedgerError("AUTHORIZATION_REVOKED", "Witness role authorization has been revoked")
+        if grant.get("principal") != proposal.actor_principal:
+            raise LedgerError("ACTOR_IDENTITY_REJECTED", "Witness role principal differs from transition actor")
+        if grant.get("role") != scope.authorized_role:
+            raise LedgerError("AUTHORIZATION_PURPOSE_MISMATCH", "Witness role is not permitted for this purpose")
+        if grant.get("authorization_class") != scope.authorization_class:
+            raise LedgerError("AUTHORIZATION_CLASS_MISMATCH", "Witness authorization class is not permitted for this purpose")
+        try:
+            valid_until = datetime.fromisoformat(grant["valid_until"].replace("Z", "+00:00"))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise LedgerError("AUTHORIZATION_INVALID", "Witness authorization validity is malformed") from exc
+        checked_at = datetime.now(timezone.utc)
+        if checked_at >= valid_until:
+            raise LedgerError("AUTHORIZATION_EXPIRED", "Witness role authorization has expired")
+        return VerifiedTransitionAuthorization(
+            authority_identity=AUTHORITY_ID,
+            transition_id=proposal.transition_id,
+            actor_principal=proposal.actor_principal,
+            approver_principal=grant.get("approver_principal", ""),
+            operation_purpose=proposal.operation_purpose,
+            approval_reference=reference,
+            authorization_class=grant["authorization_class"],
+            proposed_state_digest=_sha(canonical_json_bytes(proposal.proposed_state.payload())),
+            authorized_role=grant["role"],
+            role_authorization_reference=reference,
+            authorization_epoch=snapshot.state.policy_epoch,
+            revocation_state_sha256=snapshot.state.revocation_state_sha256,
+            authority_fencing_token=snapshot.fencing_token,
+            checked_at=checked_at,
+            valid_until=valid_until,
+        )
 
     def _handle(self, request: dict[str, Any]) -> dict[str, Any]:
         action = request.get("action")
@@ -199,24 +279,12 @@ class WitnessServer:
             status = self._status(payload, request["transition_id"])
             return {"ok": True, "status": status}
         if action == "verify_transition_authorization":
-            proposal = request["proposal"]
-            reference = proposal["owner_approval_reference"]
-            if reference not in payload["approved_references"]:
-                return {"ok": False, "code": "AUTHORIZATION_REJECTED"}
-            if proposal["actor_principal"] != "synthetic-hosted-operator":
-                return {"ok": False, "code": "ACTOR_IDENTITY_REJECTED"}
-            authorization_class = ("owner_policy_transition" if reference in payload["owner_policy_refs"]
-                                   else "operator_role_operation")
-            return {"ok": True, "authorization": {
-                "authority_identity": AUTHORITY_ID,
-                "transition_id": proposal["transition_id"],
-                "actor_principal": proposal["actor_principal"],
-                "approver_principal": "synthetic-independent-approver",
-                "operation_purpose": proposal["operation_purpose"],
-                "approval_reference": reference,
-                "authorization_class": authorization_class,
-                "proposed_state_digest": _sha(canonical_json_bytes(proposal["proposed_state"])),
-            }}
+            try:
+                proposal = _proposal_from_wire(request["proposal"])
+                authorization = self._verify_authorization(payload, proposal)
+            except LedgerError as exc:
+                return {"ok": False, "code": exc.code}
+            return {"ok": True, "authorization": _authorization_wire(authorization)}
         if action == "prepare_transition":
             if payload["pending"]:
                 return {"ok": False, "code": "CAS_BUSY"}
@@ -228,39 +296,24 @@ class WitnessServer:
             if (proposal_wire["expected_sequence"] != last["sequence"]
                     or proposal_wire["expected_state_digest"] != last["current_committed_state_digest"]):
                 return {"ok": False, "code": "CAS_STALE"}
-            if proposal_wire["owner_approval_reference"] not in payload["approved_references"]:
-                return {"ok": False, "code": "AUTHORIZATION_REJECTED"}
-            old_raw = base64.b64decode(proposal_wire["previous_index_b64"], validate=True)
-            new_raw = base64.b64decode(proposal_wire["candidate_index_b64"], validate=True)
+            proposal = _proposal_from_wire(proposal_wire)
             old_state = _state_from_wire(last["state"])
-            proposed_state = _state_from_wire(proposal_wire["proposed_state"])
-            if _sha(old_raw) != old_state.index_sha256 or _sha(new_raw) != proposed_state.index_sha256:
+            proposed_state = proposal.proposed_state
+            if (_sha(proposal.previous_index_raw) != old_state.index_sha256
+                    or _sha(proposal.candidate_index_raw) != proposed_state.index_sha256):
                 return {"ok": False, "code": "INDEX_SHA_MISMATCH"}
-            validate_index_append(
-                old_raw, new_raw,
-                expected_epoch=proposed_state.policy_epoch,
-                expected_controller_id=proposed_state.controller_id,
-                expected_previous_sha256=old_state.index_sha256,
-                expected_current_sha256=proposed_state.index_sha256,
-                allow_policy_transition=proposed_state.policy_epoch > old_state.policy_epoch,
-                allow_empty_transition=proposed_state.policy_epoch > old_state.policy_epoch,
-            )
+            try:
+                current_authorization = self._verify_authorization(payload, proposal)
+                requested_authorization = _authorization_from_wire(request["authorization"])
+                if not _same_authorization_grant(current_authorization, requested_authorization):
+                    return {"ok": False, "code": "AUTHORIZATION_REJECTED"}
+                validate_transition_proposal(
+                    proposal, self._snapshot(payload), authorization=requested_authorization,
+                    expected_authority_identity=AUTHORITY_ID, now=datetime.now(timezone.utc),
+                )
+            except LedgerError as exc:
+                return {"ok": False, "code": exc.code}
             reference = proposal_wire["owner_approval_reference"]
-            authorization = VerifiedTransitionAuthorization(
-                authority_identity=AUTHORITY_ID,
-                transition_id=transition_id,
-                actor_principal=proposal_wire["actor_principal"],
-                approver_principal="synthetic-independent-approver",
-                operation_purpose=proposal_wire["operation_purpose"],
-                approval_reference=reference,
-                authorization_class=("owner_policy_transition" if reference in payload["owner_policy_refs"]
-                                     else "operator_role_operation"),
-                proposed_state_digest=_sha(canonical_json_bytes(proposed_state.payload())),
-            )
-            validate_state_successor(
-                old_state, proposed_state, authorization=authorization,
-                expected_authority_identity=AUTHORITY_ID, transition_id=transition_id,
-            )
             token = f"witness-fence-{last['sequence']}-{secrets.token_hex(12)}"
             prepared = {
                 "authority_identity": AUTHORITY_ID,
@@ -289,7 +342,19 @@ class WitnessServer:
                     or request["prepared"]["expected_state_digest"] != last["current_committed_state_digest"]):
                 return {"ok": False, "code": "CAS_STALE"}
             proposal = pending["proposal"]
-            proposed_state = _state_from_wire(proposal["proposed_state"])
+            typed_proposal = _proposal_from_wire(proposal)
+            proposed_state = typed_proposal.proposed_state
+            try:
+                current_authorization = self._verify_authorization(payload, typed_proposal)
+                requested_authorization = _authorization_from_wire(request["authorization"])
+                if not _same_authorization_grant(current_authorization, requested_authorization):
+                    return {"ok": False, "code": "AUTHORIZATION_REJECTED"}
+                validate_transition_proposal(
+                    typed_proposal, self._snapshot(payload), authorization=requested_authorization,
+                    expected_authority_identity=AUTHORITY_ID, now=datetime.now(timezone.utc),
+                )
+            except LedgerError as exc:
+                return {"ok": False, "code": exc.code}
             record = build_ledger_record(
                 authority_identity=AUTHORITY_ID,
                 sequence=last["sequence"] + 1,
@@ -312,6 +377,7 @@ class WitnessServer:
                 "proposed_state_digest": request["prepared"]["proposed_state_digest"],
                 "proposed_index_sha256": request["prepared"]["proposed_index_sha256"],
                 "prepared": None,
+                "proposal": proposal,
             }
             lose_ack = payload.get("lose_next_commit_ack") is True
             payload["lose_next_commit_ack"] = False
@@ -338,6 +404,7 @@ class WitnessServer:
                 "proposed_state_digest": prepared["proposed_state_digest"],
                 "proposed_index_sha256": prepared["proposed_index_sha256"],
                 "prepared": None,
+                "proposal": pending["proposal"],
             }
             self._persist(payload)
             return {"ok": True}
@@ -440,6 +507,7 @@ class UnixWitnessAdapter:
             expected_state_digest=payload["expected_state_digest"],
             proposed_state_digest=payload["proposed_state_digest"],
             proposed_index_sha256=payload["proposed_index_sha256"], prepared=prepared,
+            proposal=_proposal_from_wire(payload["proposal"]) if payload.get("proposal") else None,
         )
 
     @staticmethod
@@ -459,16 +527,20 @@ class UnixWitnessAdapter:
     def verify_transition_authorization(self, proposal: TransitionProposal) -> VerifiedTransitionAuthorization:
         result = self._call({"action": "verify_transition_authorization",
                              "proposal": self._proposal_wire(proposal)})["authorization"]
-        return VerifiedTransitionAuthorization(**result)
+        return _authorization_from_wire(result)
 
-    def prepare_transition(self, proposal: TransitionProposal) -> PreparedTransition:
+    def prepare_transition(self, proposal: TransitionProposal,
+                           authorization: VerifiedTransitionAuthorization) -> PreparedTransition:
         result = self._call({"action": "prepare_transition",
-                             "proposal": self._proposal_wire(proposal)})["prepared"]
+                             "proposal": self._proposal_wire(proposal),
+                             "authorization": _authorization_wire(authorization)})["prepared"]
         return PreparedTransition(**result)
 
-    def commit_transition(self, prepared: PreparedTransition) -> WitnessSnapshot:
+    def commit_transition(self, prepared: PreparedTransition,
+                          authorization: VerifiedTransitionAuthorization) -> WitnessSnapshot:
         result = self._call({"action": "commit_transition",
-                             "prepared": prepared.__dict__})["snapshot"]
+                             "prepared": prepared.__dict__,
+                             "authorization": _authorization_wire(authorization)})["snapshot"]
         return _typed_snapshot(result)
 
     def abort_transition(self, prepared: PreparedTransition, *, reason_code: str) -> None:
@@ -498,12 +570,44 @@ def _initial_material() -> tuple[bytes, TrustState, dict[str, Any]]:
         owner_approval_reference="synthetic-fixture-not-owner-approval",
         audit_timestamp=datetime.now(timezone.utc),
     )
+    role_valid_until = (datetime.now(timezone.utc) + timedelta(seconds=30)).isoformat().replace("+00:00", "Z")
     witness_state = {
         "authority_identity": AUTHORITY_ID,
         "records": [genesis], "pending": {}, "transitions": {},
         "lose_next_commit_ack": True,
-        "approved_references": [APPROVAL_REF, OWNER_REF],
+        "approved_references": [APPROVAL_REF, OWNER_REF,
+                                "synthetic-hosted-expiry-role", "synthetic-hosted-revocable-role"],
         "owner_policy_refs": [OWNER_REF],
+        "role_authorizations": {
+            APPROVAL_REF: {
+                "principal": "synthetic-hosted-operator",
+                "role": "qualification_corpus_custodian",
+                "authorization_class": "operator_role_operation",
+                "approver_principal": "synthetic-independent-approver",
+                "valid_until": role_valid_until, "revoked": False,
+            },
+            OWNER_REF: {
+                "principal": "synthetic-hosted-owner",
+                "role": "owner_policy_transition",
+                "authorization_class": "owner_policy_transition",
+                "approver_principal": "synthetic-independent-approver",
+                "valid_until": role_valid_until, "revoked": False,
+            },
+            "synthetic-hosted-expiry-role": {
+                "principal": "synthetic-hosted-operator",
+                "role": "qualification_corpus_custodian",
+                "authorization_class": "operator_role_operation",
+                "approver_principal": "synthetic-independent-approver",
+                "valid_until": role_valid_until, "revoked": False,
+            },
+            "synthetic-hosted-revocable-role": {
+                "principal": "synthetic-hosted-operator",
+                "role": "qualification_corpus_custodian",
+                "authorization_class": "operator_role_operation",
+                "approver_principal": "synthetic-independent-approver",
+                "valid_until": role_valid_until, "revoked": False,
+            },
+        },
     }
     return index_raw, state, witness_state
 
@@ -548,7 +652,7 @@ def _operator_gate_probe(args: argparse.Namespace, *, commit: bool) -> int:
         old_index = store.read_index()
         index = _json(old_index)
         index["qualification_corpus_intakes"].append({
-            "intake_id": "hosted-intake-1", "operation_id": "hosted-operation-1",
+            "intake_id": "hosted-intake-1", "operation_id": "hosted-transition-1",
             "operator_principal": "synthetic-hosted-operator",
             "subject_inventory_key": "synthetic-corpus",
             "subject_sha256": _sha(b"synthetic-corpus"),
@@ -616,7 +720,7 @@ def _operator_gate_probe(args: argparse.Namespace, *, commit: bool) -> int:
             race_index = deepcopy(race_base)
             race_index["qualification_corpus_intakes"].append({
                 "intake_id": f"hosted-race-intake-{number}",
-                "operation_id": f"hosted-race-operation-{number}",
+                "operation_id": f"hosted-race-transition-{number}",
                 "operator_principal": "synthetic-hosted-operator",
                 "subject_inventory_key": "synthetic-race-corpus",
                 "subject_sha256": _sha(f"synthetic-race-{number}".encode()),
@@ -721,8 +825,8 @@ def _operator_gate_probe(args: argparse.Namespace, *, commit: bool) -> int:
             previous_index_raw=store.read_index(),
             candidate_index_raw=candidate_index_raw,
             proposed_state=new_state,
-            operation_purpose="epoch_transition",
-            actor_principal="synthetic-hosted-operator",
+            operation_purpose="revocation",
+            actor_principal="synthetic-hosted-owner",
             owner_approval_reference=OWNER_REF,
         )
         epoch_committed = MonotonicTransitionCoordinator(
@@ -753,6 +857,107 @@ def _operator_gate_probe(args: argparse.Namespace, *, commit: bool) -> int:
     store.close()
     print(json.dumps(result, sort_keys=True))
     return 0
+
+
+def _operator_prepare_invalidation_probe(args: argparse.Namespace) -> int:
+    if args.invalidation_kind not in {"expired", "revoked"}:
+        raise RuntimeError("invalidation kind must be expired or revoked")
+    reference = ("synthetic-hosted-expiry-role" if args.invalidation_kind == "expired"
+                else "synthetic-hosted-revocable-role")
+    operator_uid = os.getuid()
+    store = DirectoryProjectionStore(Path(args.operator_dir), operator_uid=operator_uid)
+    authority = UnixWitnessAdapter(Path(args.socket), witness_uid=args.witness_uid,
+                                   operator_uid=operator_uid)
+    snapshot = authority.read_current()
+    old_raw = store.read_index()
+    index = _json(old_raw)
+    transition_id = f"hosted-invalidation-{args.invalidation_kind}"
+    index["qualification_corpus_intakes"].append({
+        "intake_id": f"hosted-invalidation-intake-{args.invalidation_kind}",
+        "operation_id": transition_id,
+        "operator_principal": "synthetic-hosted-operator",
+        "subject_inventory_key": "synthetic-invalidation-corpus",
+        "subject_sha256": _sha(args.invalidation_kind.encode()),
+    })
+    candidate_raw = canonical_json_bytes(index) + b"\n"
+    state = snapshot.state
+    proposed = TrustState(
+        policy_identity=state.policy_identity, policy_epoch=state.policy_epoch,
+        profile_sha256=state.profile_sha256,
+        build_inventory_sha256=state.build_inventory_sha256,
+        controller_id=state.controller_id, generation_id=state.generation_id,
+        index_sha256=_sha(candidate_raw), index_revision=state.index_revision + 1,
+        revocation_state_sha256=state.revocation_state_sha256,
+        revoked_authority_ids=state.revoked_authority_ids,
+        revoked_role_authorization_references=state.revoked_role_authorization_references,
+    )
+    proposal = TransitionProposal(
+        transition_id=transition_id, expected_sequence=snapshot.sequence,
+        expected_state_digest=snapshot.head_state_digest,
+        previous_index_raw=old_raw, candidate_index_raw=candidate_raw,
+        proposed_state=proposed, operation_purpose="qualification_corpus_intake",
+        actor_principal="synthetic-hosted-operator", owner_approval_reference=reference,
+    )
+    authorization = authority.verify_transition_authorization(proposal)
+    validate_transition_proposal(
+        proposal, snapshot, authorization=authorization,
+        expected_authority_identity=AUTHORITY_ID, now=datetime.now(timezone.utc),
+    )
+    prepared = authority.prepare_transition(proposal, authorization)
+    store.stage_index(transition_id, candidate_raw)
+    staged = store.staged_index(transition_id)
+    if staged != candidate_raw:
+        raise RuntimeError("invalidation probe did not stage the exact approved Index bytes")
+    print(json.dumps({
+        "uid": os.getuid(), "euid": os.geteuid(), "kind": args.invalidation_kind,
+        "transition_id": transition_id, "role_authorization_reference": reference,
+        "authority_status": "prepared", "prepared_fencing_token": prepared.fencing_token,
+        "old_index_sha256": _sha(old_raw), "staged_index_sha256": _sha(staged),
+    }, sort_keys=True))
+    store.close()
+    return 0
+
+
+def _operator_recover_invalidation_probe(args: argparse.Namespace) -> int:
+    transition_id = f"hosted-invalidation-{args.invalidation_kind}"
+    operator_uid = os.getuid()
+    store = DirectoryProjectionStore(Path(args.operator_dir), operator_uid=operator_uid)
+    authority = UnixWitnessAdapter(Path(args.socket), witness_uid=args.witness_uid,
+                                   operator_uid=operator_uid)
+    before = authority.read_current()
+    old_index = store.read_index()
+    coordinator = MonotonicTransitionCoordinator(
+        authority=authority, authority_identity=AUTHORITY_ID, store=store,
+    )
+    rejection = None
+    try:
+        coordinator.recover(transition_id=transition_id)
+    except LedgerError as exc:
+        rejection = exc.code
+    after = authority.read_current()
+    status = authority.read_transition(transition_id)
+    passed = (
+        rejection == "TRANSITION_ABORTED"
+        and type(status) is TransitionStatus and status.status == "aborted"
+        and after.sequence == before.sequence
+        and after.head_state_digest == before.head_state_digest
+        and not after.pending_transition_ids
+        and store.read_index() == old_index
+        and not store.recovery_required()
+    )
+    evidence = {
+        "uid": os.getuid(), "euid": os.geteuid(), "kind": args.invalidation_kind,
+        "transition_id": transition_id, "recovery_result": rejection,
+        "witness_transition_status": status.status if status else None,
+        "witness_sequence_before": before.sequence, "witness_sequence_after": after.sequence,
+        "witness_pending_after": list(after.pending_transition_ids),
+        "index_sha256_before": _sha(old_index), "index_sha256_after": _sha(store.read_index()),
+        "recovery_marker_present": store.recovery_required(),
+        "result": "passed" if passed else "failed",
+    }
+    print(json.dumps(evidence, sort_keys=True))
+    store.close()
+    return 0 if passed else 1
 
 
 def _serve(args: argparse.Namespace) -> int:
@@ -1191,6 +1396,108 @@ def _run_root(args: argparse.Namespace) -> int:
         if operator_run.returncode != 0:
             raise RuntimeError("Operator synthetic C3 CAS transition failed")
 
+        def stop_witness() -> None:
+            nonlocal server
+            if server is not None and server.poll() is None:
+                server.send_signal(signal.SIGTERM)
+                server.wait(timeout=10)
+                output = server.stdout.read() if server.stdout else ""
+                if server.returncode not in (0, -signal.SIGTERM):
+                    raise RuntimeError(f"synthetic Witness did not stop cleanly: {output}")
+
+        def start_witness() -> None:
+            nonlocal server
+            server = _launch_witness(script=script, state_file=witness_file,
+                                     socket_path=socket_path, witness=witness,
+                                     operator_uid=operator.pw_uid, api_gid=api_gid)
+            _wait_socket(server, socket_path)
+
+        def persist_synthetic_authority_state(state: dict[str, Any]) -> None:
+            if os.geteuid() != 0:
+                raise RuntimeError("only the temporary root provisioning phase may mutate synthetic Witness fixtures")
+            raw = canonical_json_bytes(state) + b"\n"
+            temp_path = witness_dir / f".fixture-state-{secrets.token_hex(8)}.stage"
+            fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                         | getattr(os, "O_NOFOLLOW", 0), 0o600)
+            try:
+                view = memoryview(raw)
+                while view:
+                    written = os.write(fd, view)
+                    if written <= 0:
+                        raise OSError("short write for synthetic Witness fixture")
+                    view = view[written:]
+                os.fchown(fd, witness.pw_uid, witness.pw_gid)
+                os.fchmod(fd, 0o600)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            os.replace(temp_path, witness_file)
+            dir_fd = os.open(witness_dir, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+
+        for invalidation_kind in ("expired", "revoked"):
+            reference = ("synthetic-hosted-expiry-role" if invalidation_kind == "expired"
+                         else "synthetic-hosted-revocable-role")
+            fixture_state = _json(witness_file.read_bytes())
+            grant = fixture_state["role_authorizations"][reference]
+            if invalidation_kind == "expired":
+                # Short, real wall-clock grant; recovery runs only after this
+                # actual expiry instant has passed.
+                expiry = datetime.now(timezone.utc) + timedelta(seconds=2)
+                grant["valid_until"] = expiry.isoformat().replace("+00:00", "Z")
+            else:
+                expiry = None
+            stop_witness()
+            persist_synthetic_authority_state(fixture_state)
+            start_witness()
+            prepare_run = _run_as(
+                operator,
+                [sys.executable, "-I", str(script), "--operator-prepare-invalidation-probe",
+                 "--operator-dir", str(operator_dir), "--socket", str(socket_path),
+                 "--witness-uid", str(witness.pw_uid), "--invalidation-kind", invalidation_kind],
+                env=safe_env,
+            )
+            try:
+                prepare_evidence = json.loads(prepare_run.stdout.strip())
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"{invalidation_kind} prepare probe emitted invalid evidence: {prepare_run.stdout}") from exc
+            if (prepare_run.returncode != 0 or prepare_evidence.get("uid") != operator.pw_uid
+                    or prepare_evidence.get("authority_status") != "prepared"
+                    or prepare_evidence.get("role_authorization_reference") != reference):
+                raise RuntimeError(f"{invalidation_kind} probe failed before Prepare was recorded: {prepare_evidence}")
+            if expiry is not None:
+                while datetime.now(timezone.utc) < expiry:
+                    time.sleep(min(0.05, max(0.001, (expiry - datetime.now(timezone.utc)).total_seconds())))
+            stop_witness()
+            if invalidation_kind == "revoked":
+                fixture_state = _json(witness_file.read_bytes())
+                fixture_state["role_authorizations"][reference]["revoked"] = True
+                persist_synthetic_authority_state(fixture_state)
+            start_witness()
+            recover_run = _run_as(
+                operator,
+                [sys.executable, "-I", str(script), "--operator-recover-invalidation-probe",
+                 "--operator-dir", str(operator_dir), "--socket", str(socket_path),
+                 "--witness-uid", str(witness.pw_uid), "--invalidation-kind", invalidation_kind],
+                env=safe_env,
+            )
+            try:
+                recovery_evidence = json.loads(recover_run.stdout.strip())
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"{invalidation_kind} recovery probe emitted invalid evidence: {recover_run.stdout}") from exc
+            if recover_run.returncode != 0 or recovery_evidence.get("result") != "passed":
+                raise RuntimeError(f"{invalidation_kind} recovery probe did not fail closed: {recovery_evidence}")
+            report["checks"].append({
+                "check": f"Prepare then {invalidation_kind} authorization cannot recover into Commit",
+                "uid": operator.pw_uid, "prepare_exit_code": prepare_run.returncode,
+                "prepare": prepare_evidence, "recovery_exit_code": recover_run.returncode,
+                "recovery": recovery_evidence,
+                "authority_fixture_mutated_only_by_temporary_root": True,
+            })
+
         # The Operator can change its own projection, but it cannot mutate the
         # independently owned Witness high-water state.
         report["checks"].append(_role_negative_probe(
@@ -1335,6 +1642,9 @@ def main() -> int:
     parser.add_argument("--serve", action="store_true")
     parser.add_argument("--root-test", action="store_true")
     parser.add_argument("--operator-commit", action="store_true")
+    parser.add_argument("--operator-prepare-invalidation-probe", action="store_true")
+    parser.add_argument("--operator-recover-invalidation-probe", action="store_true")
+    parser.add_argument("--invalidation-kind", choices=("expired", "revoked"))
     parser.add_argument("--operator-rollback-probe", action="store_true")
     parser.add_argument("--role-negative-probe", action="store_true")
     parser.add_argument("--authority-unavailable-probe", action="store_true")
@@ -1353,6 +1663,10 @@ def main() -> int:
         return _serve(args)
     if args.operator_commit:
         return _operator_gate_probe(args, commit=True)
+    if args.operator_prepare_invalidation_probe:
+        return _operator_prepare_invalidation_probe(args)
+    if args.operator_recover_invalidation_probe:
+        return _operator_recover_invalidation_probe(args)
     if args.operator_rollback_probe:
         result = _operator_gate_probe(args, commit=False)
         # The expected result is a denial by the independent post-restart

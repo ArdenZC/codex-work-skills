@@ -54,6 +54,40 @@ INDEX_ARRAYS = (
 )
 
 
+@dataclass(frozen=True)
+class PurposeIndexScope:
+    """The only Index mutation admitted for a C3 operation purpose."""
+
+    record_counts: tuple[tuple[str, int], ...]
+    authorized_role: str
+    authorization_class: str
+    policy_transition: str = "same_epoch"
+
+
+# This table is intentionally narrower than PURPOSES. These are the only
+# purpose-to-Index relationships established by current business contracts:
+# intake custody creates one intake row; production authoring creates one
+# author row. Epoch and revocation are Owner-only state transitions with no
+# Index business records. Receipt, qualification-run, adjudication, and
+# generation writes remain blocked until their record/actor/subject contract is
+# explicit. Do not infer a scope from an enum name.
+PURPOSE_INDEX_SCOPES: dict[str, PurposeIndexScope] = {
+    "qualification_corpus_intake": PurposeIndexScope(
+        (("qualification_corpus_intakes", 1),),
+        "qualification_corpus_custodian", "operator_role_operation",
+    ),
+    "production_authoring": PurposeIndexScope(
+        (("authors", 1),), "author", "operator_role_operation",
+    ),
+    "epoch_transition": PurposeIndexScope(
+        (), "owner_policy_transition", "owner_policy_transition", "epoch_transition",
+    ),
+    "revocation": PurposeIndexScope(
+        (), "owner_policy_transition", "owner_policy_transition", "revocation",
+    ),
+}
+
+
 class LedgerError(ValueError):
     """Stable, fail-closed C3 contract failure."""
 
@@ -281,9 +315,15 @@ def validate_index_append(previous_raw: bytes, current_raw: bytes, *,
                           expected_epoch: int, expected_controller_id: str,
                           expected_previous_sha256: str,
                           expected_current_sha256: str,
-                          allow_policy_transition: bool = False,
-                          allow_empty_transition: bool = False) -> dict[str, Any]:
-    """Validate exact Index 1.1 bytes, old prefixes, and non-reused IDs."""
+                          operation_purpose: str, actor_principal: str,
+                          operation_id: str) -> dict[str, Any]:
+    """Validate Index 1.1 bytes and the closed purpose-specific append scope."""
+    scope = PURPOSE_INDEX_SCOPES.get(operation_purpose)
+    if scope is None:
+        _fail("PURPOSE_INDEX_SCOPE_UNDEFINED",
+              "this operation purpose has no approved Index mutation contract")
+    if not actor_principal or not operation_id:
+        _fail("INDEX_OPERATION_BINDING_MISSING", "actor and operation ID are required")
     if hashlib.sha256(previous_raw).hexdigest() != expected_previous_sha256:
         _fail("INDEX_PREVIOUS_SHA", "previous Index bytes do not match the committed SHA")
     if hashlib.sha256(current_raw).hexdigest() != expected_current_sha256:
@@ -292,10 +332,11 @@ def validate_index_append(previous_raw: bytes, current_raw: bytes, *,
     current = _parse_object(current_raw, "candidate Index")
     _schema(previous, "protected-operation-index-v1.1.schema.json")
     _schema(current, "protected-operation-index-v1.1.schema.json")
+    policy_transition = scope.policy_transition in {"epoch_transition", "revocation"}
     if (current["policy_epoch"] != expected_epoch
-            or (previous["policy_epoch"] != current["policy_epoch"] and not allow_policy_transition)):
+            or (previous["policy_epoch"] != current["policy_epoch"] and not policy_transition)):
         _fail("INDEX_EPOCH_MISMATCH", "Index epoch differs from the committed Policy epoch")
-    if ((previous["controller_id"] != current["controller_id"] and not allow_policy_transition)
+    if ((previous["controller_id"] != current["controller_id"] and not policy_transition)
             or current["controller_id"] != expected_controller_id):
         _fail("INDEX_CONTROLLER_MISMATCH", "Index Controller identity differs from the committed Controller")
     old_ids, new_ids = _index_ids(previous), _index_ids(current)
@@ -320,9 +361,29 @@ def validate_index_append(previous_raw: bytes, current_raw: bytes, *,
     added_operations = new_ids["operation_id"] - old_ids["operation_id"]
     if len(added_operations) != len(new_operation_values) - len(old_operation_values):
         _fail("OPERATION_ID_REUSE", "a protected operation ID was reused in the Index transition")
-    added_rows = sum(len(current[name]) - len(previous[name]) for name in INDEX_ARRAYS)
-    if added_rows < 1 and not allow_empty_transition:
-        _fail("INDEX_NOOP", "an Index transition must append at least one protected record")
+    expected_counts = dict(scope.record_counts)
+    for name in INDEX_ARRAYS:
+        added_count = len(current[name]) - len(previous[name])
+        if added_count != expected_counts.get(name, 0):
+            _fail("PURPOSE_INDEX_SCOPE_MISMATCH",
+                  f"{operation_purpose} permits {expected_counts.get(name, 0)} new {name} record(s), got {added_count}")
+    added_rows: list[dict[str, Any]] = []
+    for name, _count in scope.record_counts:
+        added_rows.extend(current[name][len(previous[name]):])
+    if operation_purpose == "qualification_corpus_intake":
+        row = added_rows[0]
+        if (row["operator_principal"] != actor_principal
+                or row["operation_id"] != operation_id):
+            _fail("INDEX_OPERATION_BINDING_MISMATCH",
+                  "Intake Operator and Operation ID must match the authorized transition")
+    elif operation_purpose == "production_authoring":
+        row = added_rows[0]
+        if (row["principal_id"] != actor_principal
+                or row["operation_id"] != operation_id):
+            _fail("INDEX_OPERATION_BINDING_MISMATCH",
+                  "Author principal and Operation ID must match the authorized transition")
+    if not added_rows and scope.record_counts:
+        _fail("INDEX_NOOP", "an Index transition must append its purpose-authorized record")
     return current
 
 
@@ -556,6 +617,11 @@ class TransitionProposal:
     actor_principal: str
     owner_approval_reference: str
 
+    @property
+    def operation_id(self) -> str:
+        """C3 authorizes exactly one business Operation per transition ID."""
+        return self.transition_id
+
 
 @dataclass(frozen=True)
 class PreparedTransition:
@@ -580,6 +646,7 @@ class TransitionStatus:
     proposed_state_digest: str
     proposed_index_sha256: str
     prepared: PreparedTransition | None
+    proposal: TransitionProposal | None = None
 
 
 @dataclass(frozen=True)
@@ -594,22 +661,48 @@ class VerifiedTransitionAuthorization:
     approval_reference: str
     authorization_class: str
     proposed_state_digest: str
+    authorized_role: str
+    role_authorization_reference: str
+    authorization_epoch: int
+    revocation_state_sha256: str
+    authority_fencing_token: str
+    checked_at: datetime
+    valid_until: datetime
 
 
 class HighWaterAuthority(Protocol):
-    """Future adapter to a separately protected, authenticated linearizable service."""
+    """Future separately protected, authenticated linearizable service.
+
+    ``prepare_transition`` and ``commit_transition`` must independently reload
+    current role validity/revocation state. Commit must check it atomically with
+    the CAS linearization; a Prepare reservation is not durable authorization.
+    """
 
     def read_current(self) -> WitnessSnapshot: ...
 
-    def prepare_transition(self, proposal: TransitionProposal) -> PreparedTransition: ...
+    def prepare_transition(self, proposal: TransitionProposal,
+                           authorization: VerifiedTransitionAuthorization) -> PreparedTransition: ...
 
     def verify_transition_authorization(self, proposal: TransitionProposal) -> VerifiedTransitionAuthorization: ...
 
-    def commit_transition(self, prepared: PreparedTransition) -> WitnessSnapshot: ...
+    def commit_transition(self, prepared: PreparedTransition,
+                          authorization: VerifiedTransitionAuthorization) -> WitnessSnapshot: ...
 
     def abort_transition(self, prepared: PreparedTransition, *, reason_code: str) -> None: ...
 
     def read_transition(self, transition_id: str) -> TransitionStatus | None: ...
+
+
+def _same_authorization_grant(left: VerifiedTransitionAuthorization,
+                              right: VerifiedTransitionAuthorization) -> bool:
+    """Compare the authority grant while allowing a fresh check timestamp."""
+    return all(getattr(left, name) == getattr(right, name) for name in (
+        "authority_identity", "transition_id", "actor_principal", "approver_principal",
+        "operation_purpose", "approval_reference", "authorization_class",
+        "proposed_state_digest", "authorized_role", "role_authorization_reference",
+        "authorization_epoch", "revocation_state_sha256", "authority_fencing_token",
+        "valid_until",
+    ))
 
 
 @dataclass(frozen=True)
@@ -826,7 +919,8 @@ class MonotonicAntiRollbackGate:
 def validate_transition_proposal(proposal: TransitionProposal,
                                  snapshot: WitnessSnapshot,
                                  *, authorization: VerifiedTransitionAuthorization,
-                                 expected_authority_identity: str) -> dict[str, Any]:
+                                 expected_authority_identity: str,
+                                 now: datetime | None = None) -> dict[str, Any]:
     """Check CAS token inputs and append-only Index bytes before Authority prepare."""
     if proposal.expected_sequence != snapshot.sequence:
         _fail("CAS_SEQUENCE_STALE", "transition used a stale committed sequence")
@@ -839,11 +933,23 @@ def validate_transition_proposal(proposal: TransitionProposal,
     if proposal.operation_purpose not in PURPOSES:
         _fail("PURPOSE_INVALID", "operation purpose is not a closed C3 purpose")
     current_state = proposal.proposed_state
-    if ((current_state.policy_epoch > snapshot.state.policy_epoch
-         and proposal.operation_purpose not in {"epoch_transition", "revocation"})
-            or (current_state.policy_epoch == snapshot.state.policy_epoch
-                and proposal.operation_purpose in {"epoch_transition", "revocation"})):
-        _fail("PURPOSE_STATE_MISMATCH", "epoch and revocation changes require the matching transition purpose")
+    scope = PURPOSE_INDEX_SCOPES.get(proposal.operation_purpose)
+    if scope is None:
+        _fail("PURPOSE_INDEX_SCOPE_UNDEFINED",
+              "this operation purpose has no approved Index mutation contract")
+    epoch_delta = current_state.policy_epoch - snapshot.state.policy_epoch
+    if ((scope.policy_transition == "same_epoch" and epoch_delta != 0)
+            or (scope.policy_transition in {"epoch_transition", "revocation"} and epoch_delta != 1)):
+        _fail("PURPOSE_STATE_MISMATCH", "operation purpose does not authorize this Policy epoch transition")
+    added_revoked_authorities = (set(current_state.revoked_authority_ids)
+                                 - set(snapshot.state.revoked_authority_ids))
+    added_revoked_roles = (set(current_state.revoked_role_authorization_references)
+                           - set(snapshot.state.revoked_role_authorization_references))
+    if scope.policy_transition == "revocation" and not (added_revoked_authorities or added_revoked_roles):
+        _fail("PURPOSE_STATE_MISMATCH", "revocation purpose must add a monotonic authority or role revocation")
+    if scope.policy_transition == "epoch_transition" and (added_revoked_authorities or added_revoked_roles):
+        _fail("PURPOSE_STATE_MISMATCH", "revocation changes require the separate revocation purpose")
+    current_time = _utc(now or datetime.now(timezone.utc))
     if (type(authorization) is not VerifiedTransitionAuthorization
             or authorization.authority_identity != expected_authority_identity
             or authorization.transition_id != proposal.transition_id
@@ -852,9 +958,18 @@ def validate_transition_proposal(proposal: TransitionProposal,
             or authorization.approver_principal == authorization.actor_principal
             or authorization.operation_purpose != proposal.operation_purpose
             or authorization.approval_reference != proposal.owner_approval_reference
-            or authorization.authorization_class not in {"operator_role_operation", "owner_policy_transition"}
+            or authorization.authorization_class != scope.authorization_class
+            or authorization.authorized_role != scope.authorized_role
+            or authorization.role_authorization_reference != proposal.owner_approval_reference
+            or authorization.authorization_epoch != snapshot.state.policy_epoch
+            or authorization.revocation_state_sha256 != snapshot.state.revocation_state_sha256
+            or authorization.authority_fencing_token != snapshot.fencing_token
             or authorization.proposed_state_digest != _digest(current_state.payload())):
         _fail("AUTHORIZATION_BINDING_MISMATCH", "independent Authority authorization is not bound to this exact transition")
+    checked_at, valid_until = _utc(authorization.checked_at), _utc(authorization.valid_until)
+    if (checked_at > current_time or current_time - checked_at > timedelta(seconds=MAX_AUTHORITY_AGE_SECONDS)
+            or current_time >= valid_until or valid_until <= checked_at):
+        _fail("AUTHORIZATION_EXPIRED", "independent Authority role authorization is stale or expired")
     validate_state_successor(snapshot.state, current_state,
                              authorization=authorization,
                              expected_authority_identity=expected_authority_identity,
@@ -865,8 +980,9 @@ def validate_transition_proposal(proposal: TransitionProposal,
         expected_controller_id=current_state.controller_id,
         expected_previous_sha256=snapshot.state.index_sha256,
         expected_current_sha256=current_state.index_sha256,
-        allow_policy_transition=(current_state.policy_epoch > snapshot.state.policy_epoch),
-        allow_empty_transition=(current_state.policy_epoch > snapshot.state.policy_epoch),
+        operation_purpose=proposal.operation_purpose,
+        actor_principal=proposal.actor_principal,
+        operation_id=proposal.operation_id,
     )
     return {
         "transition_version": TRANSITION_VERSION,
@@ -1175,12 +1291,14 @@ class MonotonicTransitionCoordinator:
                 _fail("CURRENT_INDEX_MISMATCH", "local Index does not match independent committed state")
             if proposal.previous_index_raw != current_index:
                 _fail("STALE_INDEX_BYTES", "transition source bytes differ from the current Index")
-            validate_transition_proposal(proposal, snapshot,
-                                         authorization=self.authority.verify_transition_authorization(proposal),
-                                         expected_authority_identity=self.authority_identity)
+            authorization = self.authority.verify_transition_authorization(proposal)
+            validate_transition_proposal(
+                proposal, snapshot, authorization=authorization,
+                expected_authority_identity=self.authority_identity, now=self.now(),
+            )
             hit("validated")
             prepare_attempted = True
-            prepared_value = self.authority.prepare_transition(proposal)
+            prepared_value = self.authority.prepare_transition(proposal, authorization)
             prepared = validate_prepared_transition(
                 prepared_value, proposal=proposal,
                 authority_identity=self.authority_identity, snapshot=snapshot,
@@ -1191,7 +1309,17 @@ class MonotonicTransitionCoordinator:
             if staged != proposal.candidate_index_raw:
                 _fail("STAGED_INDEX_MISMATCH", "staged Index bytes differ from the approved candidate")
             hit("index_staged")
-            committed_snapshot = self.authority.commit_transition(prepared)
+            commit_snapshot = self._snapshot()
+            if (commit_snapshot.sequence != proposal.expected_sequence
+                    or commit_snapshot.head_state_digest != proposal.expected_state_digest
+                    or commit_snapshot.pending_transition_ids != (proposal.transition_id,)):
+                _fail("CAS_STALE", "High-Water state or pending reservation changed before Commit")
+            commit_authorization = self.authority.verify_transition_authorization(proposal)
+            validate_transition_proposal(
+                proposal, commit_snapshot, authorization=commit_authorization,
+                expected_authority_identity=self.authority_identity, now=self.now(),
+            )
+            committed_snapshot = self.authority.commit_transition(prepared, commit_authorization)
             committed = True
             if type(committed_snapshot) is not WitnessSnapshot:
                 _fail("AUTHORITY_RESPONSE_TYPE", "Authority commit did not return a typed snapshot")
@@ -1265,59 +1393,154 @@ class MonotonicTransitionCoordinator:
             ) from exc
 
     def recover(self, *, transition_id: str) -> WitnessSnapshot:
-        """Reconcile only against the Authority's latest committed state.
+        """Recover only an independently known committed or prepared status.
 
-        The adapter may expose an outstanding prepared transition, but this
-        generic foundation will not invent or restore bytes. Missing, conflicting,
-        or ambiguous staged bytes remain RECOVERY_REQUIRED for an Owner-run recovery.
+        A prepared transaction is never committed by recovery until the current
+        Authority revalidates its role, epoch, revocation set and fencing state.
+        An unknown or unresolved status cannot be converted into a retry.
         """
-        snapshot = self._snapshot()
+        try:
+            snapshot = self._snapshot()
+            status = self.authority.read_transition(transition_id)
+        except Exception as exc:
+            self.store.mark_recovery_required(transition_id, "AUTHORITY_STATUS_UNKNOWN")
+            raise LedgerError("RECOVERY_REQUIRED", "Authority transition status is unavailable") from exc
+        if (type(status) is not TransitionStatus
+                or status.authority_identity != self.authority_identity
+                or status.transition_id != transition_id):
+            self.store.mark_recovery_required(transition_id, "AUTHORITY_STATUS_UNKNOWN")
+            _fail("RECOVERY_REQUIRED", "Authority did not prove a known transition status")
+        if status.status in {"unresolved"}:
+            self.store.mark_recovery_required(transition_id, "AUTHORITY_STATUS_UNRESOLVED")
+            _fail("RECOVERY_REQUIRED", "Authority reports an unresolved transition")
+
         local_index = self.store.read_index()
         staged = self.store.staged_index(transition_id)
-        if snapshot.pending_transition_ids:
-            if snapshot.pending_transition_ids != (transition_id,):
-                self.store.mark_recovery_required(transition_id, "PENDING_TRANSITION_ID_MISMATCH")
-                _fail("RECOVERY_REQUIRED", "Authority reports a different or multiple pending transition")
-            status = self.authority.read_transition(transition_id)
-            if (type(status) is not TransitionStatus
-                    or status.authority_identity != self.authority_identity
-                    or status.transition_id != transition_id
-                    or status.status != "prepared"
-                    or type(status.prepared) is not PreparedTransition
+        local_sha = hashlib.sha256(local_index).hexdigest()
+
+        def abort_known_prepared(prepared: PreparedTransition, reason: str) -> None:
+            try:
+                self.authority.abort_transition(prepared, reason_code=reason)
+                aborted_snapshot = self._snapshot()
+                aborted_status = self.authority.read_transition(transition_id)
+                if (aborted_snapshot.sequence != status.expected_sequence
+                        or aborted_snapshot.head_state_digest != status.expected_state_digest
+                        or aborted_snapshot.pending_transition_ids
+                        or type(aborted_status) is not TransitionStatus
+                        or aborted_status.status != "aborted"
+                        or hashlib.sha256(self.store.read_index()).hexdigest()
+                        != aborted_snapshot.state.index_sha256):
+                    raise RuntimeError("Authority did not prove the prepared transaction was aborted")
+                self.store.install_ledger(encode_ledger(self.authority_identity,
+                                                        list(aborted_snapshot.history)))
+                self.store.clear_recovery_required(transition_id)
+            except Exception as exc:
+                self.store.mark_recovery_required(transition_id, "ABORT_STATUS_UNKNOWN")
+                raise LedgerError("RECOVERY_REQUIRED", "prepared transaction abort status is unknown") from exc
+            raise LedgerError("TRANSITION_ABORTED", f"{reason}: current authorization failed; Index was not committed")
+
+        if status.status == "aborted":
+            if (snapshot.pending_transition_ids
+                    or snapshot.sequence != status.expected_sequence
+                    or snapshot.head_state_digest != status.expected_state_digest
+                    or local_sha != snapshot.state.index_sha256):
+                self.store.mark_recovery_required(transition_id, "ABORTED_STATUS_CONFLICT")
+                _fail("RECOVERY_REQUIRED", "aborted status conflicts with current Authority or Index bytes")
+            self.store.install_ledger(encode_ledger(self.authority_identity, list(snapshot.history)))
+            self.store.clear_recovery_required(transition_id)
+            _fail("TRANSITION_ABORTED", "Authority confirms the transition was rejected and aborted")
+
+        if status.status == "prepared":
+            prepared = status.prepared
+            proposal = status.proposal
+            if (snapshot.pending_transition_ids != (transition_id,)
+                    or type(prepared) is not PreparedTransition
+                    or type(proposal) is not TransitionProposal
+                    or proposal.transition_id != transition_id
                     or status.expected_sequence != snapshot.sequence
                     or status.expected_state_digest != snapshot.head_state_digest):
                 self.store.mark_recovery_required(transition_id, "PREPARED_STATUS_INVALID")
                 _fail("RECOVERY_REQUIRED", "pending Authority transition cannot be independently reconciled")
-            local_sha = hashlib.sha256(local_index).hexdigest()
+            try:
+                validate_prepared_transition(prepared, proposal=proposal,
+                                             authority_identity=self.authority_identity,
+                                             snapshot=snapshot)
+            except LedgerError as exc:
+                self.store.mark_recovery_required(transition_id, "PREPARED_BINDING_INVALID")
+                raise LedgerError("RECOVERY_REQUIRED", "Authority prepared binding is invalid") from exc
             if local_sha != snapshot.state.index_sha256:
                 self.store.mark_recovery_required(transition_id, "LOCAL_INDEX_DIVERGED_DURING_PREPARE")
                 _fail("RECOVERY_REQUIRED", "local committed Index changed before Authority linearization")
             if staged is None:
-                self.authority.abort_transition(status.prepared,
-                                                reason_code="RECOVERY_ABORT_UNSTAGED")
-                current = self._snapshot()
-                self.store.install_ledger(encode_ledger(self.authority_identity,
-                                                        list(current.history)))
-                self.store.clear_recovery_required(transition_id)
-                return current
+                abort_known_prepared(prepared, "RECOVERY_ABORT_UNSTAGED")
             if hashlib.sha256(staged).hexdigest() != status.proposed_index_sha256:
                 self.store.mark_recovery_required(transition_id, "STAGED_INDEX_SHA_MISMATCH")
                 _fail("RECOVERY_REQUIRED", "prepared transition staged bytes do not match Authority proposal")
-            committed = self.authority.commit_transition(status.prepared)
+            if staged != proposal.candidate_index_raw:
+                self.store.mark_recovery_required(transition_id, "STAGED_INDEX_BYTES_MISMATCH")
+                _fail("RECOVERY_REQUIRED", "prepared transition staged bytes differ from exact authorized proposal")
+            try:
+                authorization = self.authority.verify_transition_authorization(proposal)
+                validate_transition_proposal(
+                    proposal, snapshot, authorization=authorization,
+                    expected_authority_identity=self.authority_identity, now=self.now(),
+                )
+            except LedgerError as exc:
+                abort_known_prepared(prepared, exc.code)
+            try:
+                committed = self.authority.commit_transition(prepared, authorization)
+            except LedgerError as exc:
+                if exc.code in {"AUTHORIZATION_EXPIRED", "AUTHORIZATION_REVOKED", "AUTHORIZATION_REJECTED"}:
+                    abort_known_prepared(prepared, exc.code)
+                self.store.mark_recovery_required(transition_id, "COMMIT_STATUS_UNKNOWN")
+                raise LedgerError("RECOVERY_REQUIRED", "Commit status is unknown; no automatic retry was attempted") from exc
+            except Exception as exc:
+                self.store.mark_recovery_required(transition_id, "COMMIT_STATUS_UNKNOWN")
+                raise LedgerError("RECOVERY_REQUIRED", "Commit status is unknown; no automatic retry was attempted") from exc
             if type(committed) is not WitnessSnapshot:
                 self.store.mark_recovery_required(transition_id, "COMMIT_STATUS_INVALID")
-                _fail("RECOVERY_REQUIRED", "Authority commit status is not independently verifiable")
-            snapshot = self._snapshot()
-            if snapshot.sequence != committed.sequence or snapshot.head_state_digest != committed.head_state_digest:
+                _fail("RECOVERY_REQUIRED", "Authority commit did not return a typed snapshot")
+            try:
+                snapshot = self._snapshot()
+            except Exception as exc:
+                self.store.mark_recovery_required(transition_id, "COMMIT_STATUS_UNKNOWN")
+                raise LedgerError("RECOVERY_REQUIRED", "Commit may have linearized but its status is unknown") from exc
+            try:
+                status = self.authority.read_transition(transition_id)
+            except Exception as exc:
+                self.store.mark_recovery_required(transition_id, "COMMIT_STATUS_UNKNOWN")
+                raise LedgerError("RECOVERY_REQUIRED", "Commit may have linearized but transition status is unavailable") from exc
+            if (type(status) is not TransitionStatus
+                    or status.authority_identity != self.authority_identity
+                    or status.transition_id != transition_id
+                    or status.status != "committed"):
+                self.store.mark_recovery_required(transition_id, "COMMIT_STATUS_UNKNOWN")
+                _fail("RECOVERY_REQUIRED", "Authority did not prove that recovery Commit was committed")
+            if (snapshot.sequence != committed.sequence
+                    or snapshot.head_state_digest != committed.head_state_digest
+                    or snapshot.pending_transition_ids):
                 self.store.mark_recovery_required(transition_id, "RECOVERY_COMMIT_MISMATCH")
                 _fail("RECOVERY_REQUIRED", "Authority state changed while resolving the prepared transition")
-        if hashlib.sha256(local_index).hexdigest() != snapshot.state.index_sha256:
+        elif status.status != "committed":
+            self.store.mark_recovery_required(transition_id, "AUTHORITY_STATUS_INVALID")
+            _fail("RECOVERY_REQUIRED", "Authority returned an unsupported transition status")
+
+        if status.status == "committed" and not any(
+                row.get("transition_id") == transition_id
+                and row.get("current_committed_state_digest") == status.proposed_state_digest
+                and row.get("state", {}).get("index_sha256") == status.proposed_index_sha256
+                for row in snapshot.history):
+            self.store.mark_recovery_required(transition_id, "COMMITTED_STATUS_NOT_IN_HISTORY")
+            _fail("RECOVERY_REQUIRED", "committed status is not present in the authenticated Ledger history")
+        if snapshot.pending_transition_ids:
+            self.store.mark_recovery_required(transition_id, "RECOVERY_PENDING_REMAINS")
+            _fail("RECOVERY_REQUIRED", "Authority still reports a pending transition")
+        if local_sha != snapshot.state.index_sha256:
             if staged is None or hashlib.sha256(staged).hexdigest() != snapshot.state.index_sha256:
                 self.store.mark_recovery_required(transition_id, "COMMITTED_INDEX_BYTES_UNAVAILABLE")
                 _fail("RECOVERY_REQUIRED", "latest committed Index bytes are unavailable; no rollback or reset is permitted")
             self.store.install_staged_index(transition_id)
-        self.store.install_ledger(encode_ledger(self.authority_identity,
-                                                list(snapshot.history)))
+        self.store.install_ledger(encode_ledger(self.authority_identity, list(snapshot.history)))
         final = self._snapshot()
         if final.pending_transition_ids or final.head_state_digest != snapshot.head_state_digest:
             self.store.mark_recovery_required(transition_id, "RECOVERY_REREAD_MISMATCH")
