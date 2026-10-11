@@ -892,23 +892,61 @@ def main() -> int:
         for path in (CONFIG_ROOT / "os-package-manifest.txt", CONFIG_ROOT / "shared-libraries-manifest.txt"):
             os.chown(path, 0, 0)
             os.chmod(path, 0o444)
-        sys.path.insert(0, str(ROOT / "tools" / "rq03f_c1"))
-        import runtime_closure
         os_release = Path("/usr/lib/os-release") if Path("/usr/lib/os-release").is_file() else Path("/etc/os-release")
-        closure = runtime_closure.capture(
-            source_commit=source_commit,
-            inventory_sha256=build_sha,
-            base_image_digest_claim="sha256:" + "0" * 64,
-            os_release=os_release,
-            python_executable=venv_python,
-            runtime_root=runtime_root,
-            os_package_manifest=CONFIG_ROOT / "os-package-manifest.txt",
-            os_package_manifest_sha256=package_sha,
-            shared_libraries_manifest=CONFIG_ROOT / "shared-libraries-manifest.txt",
-            shared_libraries_manifest_sha256=libraries_sha,
-            protected_trust_root=trust_root,
-            output=RUNTIME_CLOSURE_PATH,
-        )
+        # Runtime Closure capture is explicitly a non-root Candidate operation.
+        # Keep its first output in a Candidate-owned scratch directory, then
+        # place those exact candidate-only bytes in the synthetic protected
+        # fixture for Launcher validation. This does not upgrade the evidence
+        # to Owner authority.
+        candidate_closure_dir = operation_root / "candidate-runtime-closure"
+        candidate_closure_dir.mkdir(mode=0o700)
+        os.chown(candidate_closure_dir, identities["candidate"]["uid"], identities["candidate"]["gid"])
+        os.chmod(candidate_closure_dir, 0o700)
+        candidate_closure_path = candidate_closure_dir / "runtime-closure.json"
+        capture_args = [
+            str(venv_python), "-I", "-S", "-B",
+            str(controller_root / "scripts" / "runtime_closure.py"), "capture",
+            "--source-commit", source_commit,
+            "--inventory-sha256", build_sha,
+            "--base-image-digest-claim", "sha256:" + "0" * 64,
+            "--os-release", str(os_release),
+            "--python-executable", str(venv_python),
+            "--runtime-root", str(runtime_root),
+            "--os-package-manifest", str(CONFIG_ROOT / "os-package-manifest.txt"),
+            "--os-package-manifest-sha256", package_sha,
+            "--shared-libraries-manifest", str(CONFIG_ROOT / "shared-libraries-manifest.txt"),
+            "--shared-libraries-manifest-sha256", libraries_sha,
+            "--protected-trust-root", str(trust_root),
+            "--output", str(candidate_closure_path),
+        ]
+        capture_result = identity_command(identities["candidate"], capture_args)
+        if capture_result.returncode != 0:
+            fail(f"non-root candidate Runtime Closure capture failed: {capture_result.stderr[-1600:]}")
+        try:
+            closure_result = json.loads(capture_result.stdout)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("non-root Runtime Closure capture did not emit JSON") from exc
+        candidate_closure_info = candidate_closure_path.lstat()
+        if (not stat.S_ISREG(candidate_closure_info.st_mode)
+                or candidate_closure_info.st_uid != identities["candidate"]["uid"]
+                or candidate_closure_info.st_gid != identities["candidate"]["gid"]
+                or candidate_closure_info.st_nlink != 1
+                or stat.S_IMODE(candidate_closure_info.st_mode) != 0o600):
+            fail("Candidate Runtime Closure output has an unexpected identity or mode")
+        closure_raw = candidate_closure_path.read_bytes()
+        closure_sha = sha_bytes(closure_raw)
+        if closure_result.get("evidence_sha256") != closure_sha:
+            fail("Candidate Runtime Closure stdout SHA does not bind its exact output bytes")
+        write_new(RUNTIME_CLOSURE_PATH, closure_raw, 0o444)
+        os.chown(RUNTIME_CLOSURE_PATH, 0, 0)
+        os.chmod(RUNTIME_CLOSURE_PATH, 0o444)
+        evidence.append({"case": "runtime-closure-candidate-capture",
+                         "capture_uid": identities["candidate"]["uid"],
+                         "capture_gid": identities["candidate"]["gid"],
+                         "candidate_output_sha256": closure_sha,
+                         "synthetic_protected_copy_sha256": sha_bytes(RUNTIME_CLOSURE_PATH.read_bytes()),
+                         "authority_status": "candidate_only_unverified_host_claims"})
+        closure = closure_result
         now = datetime.now(timezone.utc)
         profile, profile_raw, index, index_raw, auth_files = profile_and_index(
             identities, controller_id, "fixed-operator-launcher", "1.0", build_sha, trust_root, now)
