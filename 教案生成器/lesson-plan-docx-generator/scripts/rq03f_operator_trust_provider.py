@@ -172,7 +172,7 @@ def _tree_sha(root: Path, *, excluded_roots: tuple[Path, ...] = ()) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def _verify_runtime_closure(policy: dict[str, Any]) -> None:
+def _verify_runtime_closure(policy: dict[str, Any], build: dict[str, Any]) -> None:
     binding = policy["runtime_closure"]
     path = Path(binding["path"])
     raw, _ = _read_file(path, owner_uids={0})
@@ -193,13 +193,18 @@ def _verify_runtime_closure(policy: dict[str, Any]) -> None:
             "Runtime Closure claims differ from the independently pinned policy")
     for path_field, digest_field in (("os_release_path", "os_release_sha256"),
                                      ("os_package_manifest_path", "os_package_manifest_sha256"),
-                                     ("shared_libraries_manifest_path", "shared_libraries_manifest_sha256"),
-                                     ("python_executable", "python_executable_sha256")):
+                                     ("shared_libraries_manifest_path", "shared_libraries_manifest_sha256")):
         file_path = Path(evidence[path_field])
         raw_file, _ = _read_file(file_path, owner_uids={0})
         require(_sha(raw_file) == evidence[digest_field], f"Runtime Closure file changed: {path_field}")
     executable = Path(evidence["python_executable"])
     require(executable == Path(controller["python_executable"]), "Python executable path drift")
+    runtime = build["python_runtime"]
+    require(runtime["python_executable"] == str(executable),
+            "Python executable path differs from the pinned Build Inventory")
+    executable_raw, _ = _read_file(executable, owner_uids={0})
+    require(_sha(executable_raw) == runtime["python_executable_sha256"],
+            "Python executable bytes differ from the pinned Build Inventory")
     runtime_root = Path(controller["runtime_root"])
     require(_tree_sha(runtime_root) == evidence["runtime_root_tree_sha256"],
             "Runtime Root changed since Runtime Closure capture")
@@ -289,7 +294,12 @@ class OperatorTrustContextProvider:
             require(index_payload.get("policy_epoch") == policy["profile"]["policy_epoch"]
                     and index_payload.get("controller_id") == policy["controller"]["controller_id"],
                     "current protected Index differs from policy epoch or Controller")
-            _verify_runtime_closure(policy)
+            build_binding = policy["controller"]["build_inventory"]
+            build_raw, _ = _read_file(Path(build_binding["path"]), owner_uids={0})
+            require(_sha(build_raw) == build_binding["sha256"],
+                    "Owner-pinned Build Inventory changed")
+            build = checked(build_raw, "operator-controller-build-inventory-v1.1")
+            _verify_runtime_closure(policy, build)
 
             inventory_binding = policy["dependency_inventory"]
             manifest_raw, _ = _read_file(Path(inventory_binding["path"]), owner_uids={0})
@@ -309,10 +319,6 @@ class OperatorTrustContextProvider:
                         and row["storage_class"] == "protected_external",
                         f"protected dependency Inventory path or class mismatch: {key}")
                 row["sha256"] = digest
-            build_raw, _ = _read_file(Path(policy["controller"]["build_inventory"]["path"]), owner_uids={0})
-            require(_sha(build_raw) == policy["controller"]["build_inventory"]["sha256"],
-                    "Owner-pinned Build Inventory changed")
-            build = _json(build_raw, "Build Inventory")
             for component in build["components"]:
                 key = component.get("inventory_key")
                 if key is None:

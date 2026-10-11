@@ -15,6 +15,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 CONTROLLER_SCRIPTS = (
     Path(__file__).resolve().parents[1]
@@ -36,12 +37,13 @@ from rq03f_operator_launch_policy import (
 from rq03f_operator_trust_provider import (
     ProviderError,
     ReadOnlyPreflightTrustContext,
+    _verify_runtime_closure,
     _append_only,
     require_protected_write,
 )
 import rq03f_fixed_operator_launcher as fixed_launcher
 from lifecycle_digest import schema_errors
-from semantic_scope_records import TrustContext
+from semantic_scope_records import RecordError, TrustContext
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -171,6 +173,74 @@ class LauncherFailureLogTests(unittest.TestCase):
         self.assertNotIn("holdout", stream.getvalue())
         self.assertNotIn("secret-value", stream.getvalue())
         self.assertNotIn("/private/", stream.getvalue())
+
+
+class RuntimeClosureBindingTests(unittest.TestCase):
+    def test_python_executable_sha_comes_from_pinned_build_inventory(self):
+        executable = b"synthetic pinned Python executable"
+        os_release = b"synthetic os-release"
+        packages = b"synthetic package manifest"
+        libraries = b"synthetic shared-library manifest"
+        executable_path = "/generation/runtime/bin/python"
+        closure = {
+            "schema_version": "rq03f-runtime-closure-candidate-1.0",
+            "authority_status": "candidate_only_unverified_host_claims",
+            "source_commit": "a" * 40,
+            "build_inventory_sha256": _sha("build-inventory"),
+            "base_image_digest_claim": "sha256:" + "0" * 64,
+            "os_release_path": "/evidence/os-release",
+            "os_release_sha256": hashlib.sha256(os_release).hexdigest(),
+            "python_executable": executable_path,
+            "python_version": "3.12.0",
+            "python_stdlib_root": "/generation/runtime/lib/python3.12",
+            "python_stdlib_tree_sha256": _sha("stdlib-tree"),
+            "runtime_root": "/generation/runtime",
+            "runtime_root_tree_sha256": _sha("runtime-tree"),
+            "os_package_manifest_path": "/evidence/packages.txt",
+            "os_package_manifest_sha256": hashlib.sha256(packages).hexdigest(),
+            "shared_libraries_manifest_path": "/evidence/libraries.txt",
+            "shared_libraries_manifest_sha256": hashlib.sha256(libraries).hexdigest(),
+        }
+        closure_raw = json.dumps(closure, sort_keys=True, separators=(",", ":")).encode()
+        contents = {
+            Path("/evidence/runtime-closure.json"): closure_raw,
+            Path("/evidence/os-release"): os_release,
+            Path("/evidence/packages.txt"): packages,
+            Path("/evidence/libraries.txt"): libraries,
+            Path(executable_path): executable,
+        }
+        policy = {
+            "runtime_closure": {
+                "path": "/evidence/runtime-closure.json",
+                "sha256": hashlib.sha256(closure_raw).hexdigest(),
+                "base_image_digest_claim": closure["base_image_digest_claim"],
+                "os_package_manifest_sha256": closure["os_package_manifest_sha256"],
+                "shared_libraries_manifest_sha256": closure["shared_libraries_manifest_sha256"],
+            },
+            "source_commit": closure["source_commit"],
+            "controller": {
+                "python_executable": executable_path,
+                "runtime_root": closure["runtime_root"],
+                "build_inventory": {"sha256": closure["build_inventory_sha256"]},
+            },
+        }
+        build = {"python_runtime": {
+            "python_executable": executable_path,
+            "python_executable_sha256": hashlib.sha256(executable).hexdigest(),
+        }}
+
+        with patch("rq03f_operator_trust_provider._read_file",
+                   side_effect=lambda path, **_kwargs: (contents[Path(path)], None)), \
+                patch("rq03f_operator_trust_provider._tree_sha",
+                      side_effect=lambda path, **_kwargs: {
+                          "/generation/runtime": _sha("runtime-tree"),
+                          "/generation/runtime/lib/python3.12": _sha("stdlib-tree"),
+                      }[str(path)]):
+            _verify_runtime_closure(policy, build)
+
+            build["python_runtime"]["python_executable_sha256"] = _sha("wrong executable")
+            with self.assertRaisesRegex(RecordError, "Python executable bytes differ"):
+                _verify_runtime_closure(policy, build)
 
 
 class LaunchPolicyContractTests(unittest.TestCase):
