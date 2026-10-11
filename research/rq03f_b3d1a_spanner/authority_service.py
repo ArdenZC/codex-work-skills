@@ -612,6 +612,12 @@ class SpannerAuthorityService:
 
     @classmethod
     def _read_transition(cls, transaction: Any, transition_id: str) -> dict[str, Any] | None:
+        """Decode a stored row; by itself this is not a trusted status result.
+
+        Trust-bearing callers must validate the AuthorityHead, independent
+        checkpoint, and complete history using the same database snapshot
+        before exposing this decoded record.
+        """
         rows = cls._read_sql(
             transaction,
             "SELECT Status, RequestJSONB64, RequestSHA256, ActorPrincipal, OperationPurpose, "
@@ -652,6 +658,7 @@ class SpannerAuthorityService:
         if (candidate.fencing_token < checkpoint.fencing_token
                 or (candidate.sequence == checkpoint.sequence and (
                     candidate.state_digest != checkpoint.state_digest
+                    or candidate.policy_epoch != checkpoint.policy_epoch
                     or candidate.index_revision != checkpoint.index_revision
                     or candidate.index_sha256 != checkpoint.index_sha256
                 ))):
@@ -948,9 +955,20 @@ class SpannerAuthorityService:
         self.__database.run_in_transaction(abort_tx)
 
     def read_transition(self, transition_id: str, peer: AuthenticatedPeer) -> dict[str, Any] | None:
-        if not self.__checkpoint.available:
-            raise AuthorityError("CHECKPOINT_UNAVAILABLE", "status reads are blocked while checkpoint is unavailable")
-        row = self._read_transition(self.__database, transition_id)
+        """Return a transition status only after full trusted-state reconciliation.
+
+        Head, transition row, and complete event/index history are read from a
+        single strongly consistent Spanner snapshot. The separate checkpoint
+        must match that snapshot exactly; unavailable, stale, divergent, or
+        rollback states fail closed and are never repaired by this read.
+        """
+        if not isinstance(transition_id, str) or not TRANSITION_ID_RE.fullmatch(transition_id):
+            raise AuthorityError("TRANSITION_ID_INVALID", "Transition ID format is invalid")
+        with self.__database.snapshot(multi_use=True) as snapshot:
+            head = self._read_head(snapshot)
+            self._reconcile_checkpoint(head)
+            self._verify_history(snapshot, head)
+            row = self._read_transition(snapshot, transition_id)
         if row is not None and row["actor"] != peer.principal:
             raise AuthorityError("ACTOR_IDENTITY_REJECTED", "transition status is scoped to its authenticated actor")
         return row

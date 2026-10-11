@@ -277,6 +277,30 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         self.assertEqual(self.checkpoint.current(), checkpoint_before)
         self.assertIsNone(self.service._read_transition(self.database, attempt_id))
 
+    def _status_read_observation(self) -> tuple:
+        records = self._query(
+            "SELECT TransitionId, Status, RequestSHA256, ResultSequence, ResultStateDigest "
+            "FROM TransitionRecords ORDER BY TransitionId",
+        )
+        history = self._query(
+            "SELECT IndexRevision, IndexSHA256, IndexBytesB64, TransitionId "
+            "FROM IndexHistory ORDER BY IndexRevision",
+        )
+        return (
+            self._read_head(), self.checkpoint.current(),
+            tuple(tuple(row) for row in records),
+            tuple(tuple(row) for row in history),
+        )
+
+    def _assert_transition_status_fails_closed_without_side_effects(
+        self, transition_id: str, expected_code: str,
+    ) -> None:
+        before = self._status_read_observation()
+        with self.assertRaises(AuthorityError) as raised:
+            self.operator.transition_status(transition_id)
+        self.assertEqual(raised.exception.code, expected_code)
+        self.assertEqual(self._status_read_observation(), before)
+
     def _assert_head_mirror_tamper_rejected(
         self, field: str, value: object, value_type: object, attempt_id: str,
     ) -> None:
@@ -323,6 +347,7 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         request = self._request("atomic-0001")
         prepared = self.operator.prepare_transition(request)
         self.assertEqual(prepared["status"], "prepared")
+        self.assertEqual(self.operator.transition_status("atomic-0001")["status"], "prepared")
         before = self.service.read_current()
         self.assertEqual(before.sequence, 0)
         self.assertEqual(before.fencing_token, 1)
@@ -396,6 +421,46 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         self.assertEqual(count, 1)
         self._assert_history_tamper_blocks_new_write("history-event-deleted-deny")
 
+    def test_transition_status_rejects_modified_committed_event_without_side_effects(self):
+        transition_id = self._commit_intake_history(1)[0]
+        altered = base64.b64encode(b'{"tampered":true}').decode("ascii")
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "UPDATE TransitionEvents SET EventJSONB64=@event "
+            "WHERE TransitionId=@id AND EventNumber=1",
+            params={"event": altered, "id": transition_id},
+            param_types={"event": param_types.STRING, "id": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_transition_status_fails_closed_without_side_effects(
+            transition_id, "RECOVERY_REQUIRED",
+        )
+
+    def test_transition_status_rejects_deleted_committed_event_without_side_effects(self):
+        transition_id = self._commit_intake_history(1)[0]
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "DELETE FROM TransitionEvents WHERE TransitionId=@id AND EventNumber=1",
+            params={"id": transition_id}, param_types={"id": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_transition_status_fails_closed_without_side_effects(
+            transition_id, "RECOVERY_REQUIRED",
+        )
+
+    def test_transition_status_rejects_damaged_index_history_without_side_effects(self):
+        transition_id = self._commit_intake_history(2)[-1]
+        altered = b'{"synthetic":"tampered history Index"}\n'
+        count = self.database.run_in_transaction(lambda transaction: transaction.execute_update(
+            "UPDATE IndexHistory SET IndexBytesB64=@bytes, IndexSHA256=@digest "
+            "WHERE IndexRevision=1",
+            params={"bytes": base64.b64encode(altered).decode("ascii"),
+                    "digest": sha256(altered)},
+            param_types={"bytes": param_types.STRING, "digest": param_types.STRING},
+        ))
+        self.assertEqual(count, 1)
+        self._assert_transition_status_fails_closed_without_side_effects(
+            transition_id, "RECOVERY_REQUIRED",
+        )
+
     def test_reordered_committed_events_are_rejected_and_do_not_advance_head(self):
         transition_id, _ = self._commit_intake_history(2)
         rows = self._query(
@@ -467,6 +532,7 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
         self._assert_uncommitted("abort-0001", "aborted")
         self.assertEqual([row[1] for row in self._events("abort-0001")],
                          ["prepared", "aborted"])
+        self.assertEqual(self.operator.transition_status("abort-0001")["status"], "aborted")
 
     def test_known_abort_is_distinct_from_unknown_and_same_id_can_be_resubmitted(self):
         request = self._request("known-abort-0001")
@@ -734,8 +800,9 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
             self.operator.transition_status("unknown-commit-0001")
         self.assertEqual(unavailable.exception.code, "CHECKPOINT_UNAVAILABLE")
         self.checkpoint.available = True
-        self.assertEqual(self.operator.transition_status("unknown-commit-0001")["status"],
-                         "committed")
+        self._assert_transition_status_fails_closed_without_side_effects(
+            "unknown-commit-0001", "RECOVERY_REQUIRED",
+        )
         with self.assertRaises(AuthorityError) as recovery_required:
             self.service.read_current()
         self.assertEqual(recovery_required.exception.code, "RECOVERY_REQUIRED")
@@ -743,6 +810,16 @@ class SpannerAuthorityServiceTests(unittest.TestCase):
             self.operator.commit_transition("unknown-commit-0001")
         self.assertEqual(int(self._read_head()[0]), 1)
         self.assertEqual(self.checkpoint.current().sequence, 0)
+
+    def test_transition_status_rejects_committed_record_after_old_head_restore(self):
+        old_head = self.service._read_head(self.database)
+        transition_id = "status-rollback-0001"
+        self.operator.prepare_transition(self._current_intake_request(transition_id))
+        self.operator.commit_transition(transition_id)
+        self.service.test_only_restore_head(old_head)
+        self._assert_transition_status_fails_closed_without_side_effects(
+            transition_id, "ROLLBACK_DETECTED",
+        )
 
     def test_external_checkpoint_detects_old_database_snapshot(self):
         before = self.service._read_head(self.database)

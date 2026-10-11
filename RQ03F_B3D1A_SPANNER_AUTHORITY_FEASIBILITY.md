@@ -30,6 +30,12 @@ This is an application-level consistency check of the rows visible in one Spanne
 
 The starting review covered Issue #64; the D0 acceptance matrix, Owner decision register, production Authority options, deployment readiness and pin-migration reports; C1/C2/C3 implementations; and the latest master. D0 still records architecture choice, independent administration, Authority Genesis, role registry, Profile/Index 1.1 adoption, and production deployment as Owner decisions or open prerequisites.
 
+### Owner Re-review remediation — trusted transition status query
+
+`read_transition()` no longer returns a decoded Transition row on the strength of checkpoint availability alone. It opens one strongly consistent multi-use Spanner snapshot, validates the complete AuthorityHead and its redundant state fields, reconciles that Head with the independent checkpoint, validates all TransitionEvents and IndexHistory from the same database snapshot, then reads the requested Transition record from that snapshot and checks its actor binding. A result (`prepared`, `aborted`, or `committed`) is returned only after those checks succeed. A missing/unavailable checkpoint yields `CHECKPOINT_UNAVAILABLE`; a Spanner head ahead of the checkpoint yields `RECOVERY_REQUIRED`; an older restored Head yields `ROLLBACK_DETECTED`; other checkpoint divergence fails closed. This read path never advances the checkpoint, retries a business operation, or mutates the Head, Index, Transition, or history tables.
+
+The lower-level `_read_transition()` helper is explicitly documented as a raw row decoder, not a trusted status result. The public Operator status path uses only the reconciled query; no separate diagnostic status endpoint is exposed. Regression coverage checks that event modification/deletion, damaged IndexHistory, a successful database Commit with a stale checkpoint, and an old restored Head cannot produce a trusted status or change Transition records, Index/IndexHistory, or checkpoint. A matching committed Transition remains queryable by its same ID after Head, checkpoint, and full history agree. Prepared, aborted, and committed statuses are also exercised on a consistent state. The local Emulator suite now has 39 tests (the prior 35 retained, plus 4 status-query regressions).
+
 ## Existing production boundary
 
 C3 defines the `HighWaterAuthority` protocol and `MonotonicTransitionCoordinator`; it does not ship a production database adapter. C2's `require_protected_write()` remains unconditional: absent an accepted C3 anti-rollback Gate it raises `C3_ANTI_ROLLBACK_GATE_REQUIRED`. This research work did not change either boundary, their schemas, or the formal trust material.
@@ -90,7 +96,7 @@ New research-only files:
 
 - `research/rq03f_b3d1a_spanner/authority_service.py` — synthetic service and constrained Operator client, explicit local-emulator endpoint guard, C3 validation calls, synthetic checkpoint, and one-shot fault hooks.
 - `research/rq03f_b3d1a_spanner/schema.sql` — isolated research schema; no production schema changes.
-- `research/rq03f_b3d1a_spanner/tests/test_authority_service.py` — 35 Emulator-backed contract and negative tests after the Owner Review remediation (the original 25 are retained, with 10 additional integrity regressions).
+- `research/rq03f_b3d1a_spanner/tests/test_authority_service.py` — 39 Emulator-backed contract and negative tests after the Owner Review remediations (the original 25 are retained, with 14 added integrity/status regressions).
 - `research/rq03f_b3d1a_spanner/run_emulator_tests.sh` — loopback-only Docker launcher pinned to the official Emulator image digest.
 - `research/rq03f_b3d1a_spanner/requirements-spanner.txt` and `requirements-spanner-lock.txt` — research-only dependency declaration and complete pinned transitive lock.
 - `.github/workflows/rq03f-b3d1a-spanner-emulator.yml` — isolated Ubuntu research check, read-only repository permission, no GCP secrets, and no required-gate replacement.
@@ -101,7 +107,7 @@ The workflow and harness are branch-controlled by the candidate commit. The work
 
 ## Emulator results and fault matrix
 
-Original D1A local command: `RQ03F_SPANNER_PYTHON=/tmp/rq03f-b3d1a-venv/bin/python bash research/rq03f_b3d1a_spanner/run_emulator_tests.sh` — **25 tests passed** against the pinned official Emulator image on the pre-remediation HEAD. After Owner Review remediation, the same suite retains those 25 tests and adds 10 integrity regressions; the current local result is 35 passing tests. The workflow repeats this command after installing the research lock.
+Original D1A local command: `RQ03F_SPANNER_PYTHON=/tmp/rq03f-b3d1a-venv/bin/python bash research/rq03f_b3d1a_spanner/run_emulator_tests.sh` — **25 tests passed** against the pinned official Emulator image on the pre-remediation HEAD. After the two Owner Review remediations, the same suite retains those 25 tests and adds 14 integrity/status regressions; the current local result is 39 passing tests. The workflow repeats this command after installing the research lock.
 
 | Scenario | Result checked in final state | Evidence limit |
 | --- | --- | --- |
@@ -123,7 +129,7 @@ Original D1A local command: `RQ03F_SPANNER_PYTHON=/tmp/rq03f-b3d1a-venv/bin/pyth
 
 ### Added Owner Review integrity regressions
 
-The 10 added tests independently corrupt one `AuthorityHead` mirror field at a time (`PolicyEpoch`, `IndexRevision`, and `RevocationStateSHA256`) and require both `read_current()` and Prepare to reject the Head without creating a Transition or changing the Index bytes. History tests commit multiple revisions, then modify an event, modify and recompute an event hash while breaking its record binding, delete a committed event, reinsert it at the wrong event number, modify a prior IndexHistory row with a matching replacement SHA, delete a prior revision, or reinsert it at a wrong revision. Each test verifies `RECOVERY_REQUIRED`, unchanged Authority Head/Index bytes and external checkpoint, and no new Transition.
+The 14 added tests independently corrupt one `AuthorityHead` mirror field at a time (`PolicyEpoch`, `IndexRevision`, and `RevocationStateSHA256`) and require both `read_current()` and Prepare to reject the Head without creating a Transition or changing the Index bytes. History tests commit multiple revisions, then modify an event, modify and recompute an event hash while breaking its record binding, delete a committed event, reinsert it at the wrong event number, modify a prior IndexHistory row with a matching replacement SHA, delete a prior revision, or reinsert it at a wrong revision. Each test verifies `RECOVERY_REQUIRED`, unchanged Authority Head/Index bytes and external checkpoint, and no new Transition. Status-query regressions additionally verify fail-closed behavior after event modification/deletion, prior IndexHistory damage, a stale checkpoint after a successful Commit, and restoration of an older AuthorityHead; they assert no Transition/IndexHistory or checkpoint mutation. The existing positive lost-ACK path confirms that a same-ID committed result is returned only when Head, checkpoint, and complete history are aligned.
 
 These Emulator tests show that this implementation detects those isolated or internally inconsistent changes. They do not prove resistance to a database administrator who can rewrite all mutually dependent rows, the Authority process, or an independent Owner log/checkpoint.
 
