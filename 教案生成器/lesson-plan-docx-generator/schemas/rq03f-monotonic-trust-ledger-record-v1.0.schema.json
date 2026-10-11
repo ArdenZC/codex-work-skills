@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ-03F Monotonic Trust Ledger committed record 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ledger_version", "authority_identity", "sequence", "previous_committed_state_digest", "previous_record_sha256", "current_committed_state_digest", "state", "transition_id", "operation_purpose", "commitment_status", "owner_approval_reference", "audit_timestamp"],
+  "properties": {
+    "ledger_version": { "const": "rq03f-monotonic-trust-ledger-1.0" },
+    "authority_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "previous_committed_state_digest": { "anyOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] },
+    "previous_record_sha256": { "anyOf": [{ "type": "string", "pattern": "^[a-f0-9]{64}$" }, { "type": "null" }] },
+    "current_committed_state_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy_identity", "policy_epoch", "profile_sha256", "build_inventory_sha256", "controller_id", "generation_id", "index_sha256", "index_revision", "revocation_state_sha256", "revoked_authority_ids", "revoked_role_authorization_references"],
+      "properties": {
+        "policy_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "policy_epoch": { "type": "integer", "minimum": 1 },
+        "profile_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "build_inventory_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "controller_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "generation_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "index_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "index_revision": { "type": "integer", "minimum": 0 },
+        "revocation_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "revoked_authority_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" } },
+        "revoked_role_authorization_references": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" } }
+      }
+    },
+    "transition_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "operation_purpose": { "enum": ["read_only_preflight", "qualification_corpus_intake", "qualification_review", "production_authoring", "teacher_approval", "pa_approval", "generation", "revocation", "epoch_transition"] },
+    "commitment_status": { "const": "committed" },
+    "owner_approval_reference": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+$" },
+    "audit_timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" }
+  },
+  "allOf": [
+    { "if": { "properties": { "sequence": { "const": 0 } } }, "then": { "properties": { "previous_committed_state_digest": { "type": "null" }, "previous_record_sha256": { "type": "null" } } } },
+    { "if": { "properties": { "sequence": { "minimum": 1 } } }, "then": { "properties": { "previous_committed_state_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "previous_record_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } } }
+  ]
+}

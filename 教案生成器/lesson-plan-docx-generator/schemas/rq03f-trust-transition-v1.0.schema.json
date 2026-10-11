@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ-03F High-Water trust transition 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["transition_version", "transition_id", "authority_identity", "expected_sequence", "expected_state_digest", "proposed_state_digest", "operation_purpose", "actor_principal", "owner_approval_reference", "status", "fencing_token", "audit_timestamp", "resolution_code"],
+  "properties": {
+    "transition_version": { "const": "rq03f-trust-transition-1.0" },
+    "transition_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "authority_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+    "expected_sequence": { "type": "integer", "minimum": 0 },
+    "expected_state_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "proposed_state_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "operation_purpose": { "enum": ["read_only_preflight", "qualification_corpus_intake", "qualification_review", "production_authoring", "teacher_approval", "pa_approval", "generation", "revocation", "epoch_transition"] },
+    "actor_principal": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+    "owner_approval_reference": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+$" },
+    "status": { "enum": ["prepared", "committed", "aborted", "unresolved"] },
+    "fencing_token": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+$" },
+    "audit_timestamp": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "resolution_code": { "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^\\S+$" }, { "type": "null" }] }
+  },
+  "allOf": [
+    { "if": { "properties": { "status": { "enum": ["prepared", "committed"] } } }, "then": { "properties": { "resolution_code": { "type": "null" } } } },
+    { "if": { "properties": { "status": { "enum": ["aborted", "unresolved"] } } }, "then": { "properties": { "resolution_code": { "type": "string", "minLength": 1 } } } }
+  ]
+}

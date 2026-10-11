@@ -36,6 +36,7 @@ REQUIRED_MODULES = frozenset({
     "exemplar_contract",
     "exemplar_split",
     "path_safety",
+    "rq03f_monotonic_trust_ledger",
 })
 REQUIRED_CONTROLLER_TREES = frozenset({"controller_scripts_tree", "controller_schemas_tree"})
 REQUIRED_SCHEMAS = frozenset({
@@ -47,6 +48,10 @@ REQUIRED_SCHEMAS = frozenset({
     "operator-controller-build-inventory-v1.1.schema.json",
     "operator-role-authorization-v1.1.schema.json",
     "protected-operation-index-v1.1.schema.json",
+    "rq03f-high-water-authority-response-v1.0.schema.json",
+    "rq03f-monotonic-trust-ledger-record-v1.0.schema.json",
+    "rq03f-monotonic-trust-ledger-v1.0.schema.json",
+    "rq03f-trust-transition-v1.0.schema.json",
     "qualification-adjudication.schema.json",
     "qualification-corpus-intake-v1.0.schema.json",
     "qualification-corpus.schema.json",
