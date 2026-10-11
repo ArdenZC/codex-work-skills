@@ -156,15 +156,21 @@ def _tree_sha(root: Path, *, excluded_roots: tuple[Path, ...] = ()) -> str:
             if any(path.resolve(strict=True).is_relative_to(item.resolve(strict=True)) for item in excluded_roots):
                 continue
             info = path.lstat()
-            require(info.st_uid == 0 and info.st_mode & 0o022 == 0,
-                    "runtime file is not root-owned and non-writable")
             if stat.S_ISLNK(info.st_mode):
+                # Symlink permission bits are ignored by Linux; require a
+                # root-owned link in a protected directory and verify the
+                # resolved target as an ordinary pinned runtime file.
+                require(info.st_uid == 0,
+                        "runtime symlink is not root-owned")
                 target = os.readlink(path)
                 resolved = path.resolve(strict=True)
                 require(resolved.is_file(), "runtime symlink target is not a file")
+                target_raw, _ = _read_file(resolved, owner_uids={0})
                 rows.append({"path": path.relative_to(root).as_posix(), "kind": "symlink",
-                             "target": target, "target_sha256": hashlib.sha256(resolved.read_bytes()).hexdigest()})
+                             "target": target, "target_sha256": _sha(target_raw)})
             else:
+                require(info.st_uid == 0 and info.st_mode & 0o022 == 0,
+                        "runtime file is not root-owned and non-writable")
                 require(stat.S_ISREG(info.st_mode), "runtime closure contains a special file")
                 rows.append({"path": path.relative_to(root).as_posix(), "kind": "file",
                              "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})

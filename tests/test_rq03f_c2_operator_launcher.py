@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 import sys
 import subprocess
+import stat
 import tempfile
 import unittest
 from dataclasses import replace
@@ -41,6 +42,8 @@ from rq03f_operator_trust_provider import (
     _append_only,
     require_protected_write,
 )
+import rq03f_operator_trust_provider as trust_provider
+import rq03f_operator_launch_policy as launch_policy
 import rq03f_fixed_operator_launcher as fixed_launcher
 from lifecycle_digest import schema_errors
 from semantic_scope_records import RecordError, TrustContext
@@ -241,6 +244,37 @@ class RuntimeClosureBindingTests(unittest.TestCase):
             build["python_runtime"]["python_executable_sha256"] = _sha("wrong executable")
             with self.assertRaisesRegex(RecordError, "Python executable bytes differ"):
                 _verify_runtime_closure(policy, build)
+
+    def test_root_owned_runtime_file_symlink_hashes_target_not_link_mode_bits(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            root.mkdir()
+            target = Path(temporary) / "target.py"
+            target.write_bytes(b"pinned runtime module")
+            link = root / "module.py"
+            link.symlink_to(target)
+            original_lstat = Path.lstat
+
+            class LinkInfo:
+                st_mode = stat.S_IFLNK | 0o777
+                st_uid = 0
+
+            def lstat(path: Path):
+                if path == link:
+                    return LinkInfo()
+                return original_lstat(path)
+
+            with patch.object(launch_policy, "inspect_path"), \
+                    patch.object(Path, "lstat", autospec=True, side_effect=lstat), \
+                    patch.object(trust_provider, "_read_file",
+                                 return_value=(b"pinned runtime module", None)):
+                digest = trust_provider._tree_sha(root)
+
+        expected = json.dumps([{
+            "path": "module.py", "kind": "symlink", "target": str(target),
+            "target_sha256": hashlib.sha256(b"pinned runtime module").hexdigest(),
+        }], ensure_ascii=False, separators=(",", ":")).encode()
+        self.assertEqual(digest, hashlib.sha256(expected).hexdigest())
 
 
 class LaunchPolicyContractTests(unittest.TestCase):
