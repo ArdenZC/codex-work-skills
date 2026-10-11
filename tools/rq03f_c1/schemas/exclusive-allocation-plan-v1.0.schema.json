@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ03F exclusive allocation plan 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "operation_kind", "operation_scope", "target_id", "trusted_parent", "protected_trust_root",
+    "parent_device", "parent_inode", "parent_mount_id", "operator_uid", "operator_gid",
+    "source_commit", "source_checkout", "archive_sources"
+  ],
+  "properties": {
+    "schema_version": { "const": "rq03f-exclusive-allocation-plan-1.0" },
+    "operation_kind": { "enum": ["generation", "legacy_archive"] },
+    "operation_scope": { "enum": ["qualification_controller_generation", "legacy_profile_index_archive"] },
+    "target_id": { "type": "string", "pattern": "^rq03f-[a-z0-9](?:[a-z0-9-]{0,54}[a-z0-9])?$" },
+    "trusted_parent": { "type": "string", "minLength": 2, "pattern": "^/" },
+    "protected_trust_root": { "type": "string", "minLength": 2, "pattern": "^/" },
+    "parent_device": { "type": "integer", "minimum": 1 },
+    "parent_inode": { "type": "integer", "minimum": 1 },
+    "parent_mount_id": { "type": "integer", "minimum": 1 },
+    "operator_uid": { "type": "integer", "minimum": 1 },
+    "operator_gid": { "type": "integer", "minimum": 1 },
+    "source_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "source_checkout": { "type": "string", "minLength": 2, "pattern": "^/" },
+    "archive_sources": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array", "minItems": 2, "maxItems": 2,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["name", "relative_path", "sha256"],
+            "properties": {
+              "name": { "enum": ["authority-profile.json", "operation-index.json"] },
+              "relative_path": { "type": "string", "minLength": 1 },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "operation_kind": { "const": "generation" } } },
+      "then": { "properties": { "operation_scope": { "const": "qualification_controller_generation" }, "archive_sources": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "operation_kind": { "const": "legacy_archive" } } },
+      "then": { "properties": { "operation_scope": { "const": "legacy_profile_index_archive" }, "archive_sources": { "type": "array" } } }
+    }
+  ]
+}

@@ -30,6 +30,7 @@ from typing import Iterable, Sequence
 
 ROOT = Path(__file__).resolve().parents[2]
 TEST_MODULE = "tests.test_template_packages"
+C1_OPERATOR_TEST_MODULE = "tests.test_rq03f_c1_operator_infrastructure"
 LESSON_V21_TEST_MODULE = "tests.test_lesson_content_v21"
 LESSON_V22_TEST_MODULE = "tests.test_lesson_content_v22"
 LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
@@ -245,6 +246,10 @@ def _suite_specs() -> dict[str, SuiteSpec]:
         ),
         "classifier": SuiteSpec("classifier", True, "module", _module_count("tests.test_ci_change_classifier")),
         "runner": SuiteSpec("runner", True, "module", _module_count("tests.test_run_test_shards")),
+        "c1-operator-infrastructure": SuiteSpec(
+            "c1-operator-infrastructure", False, "linux-module", _module_count(C1_OPERATOR_TEST_MODULE),
+            "rq03f-operator-infrastructure",
+        ),
         "hardening": SuiteSpec(
             "hardening", True, "module",
             sum(_module_count(m) for m in ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")),
@@ -281,6 +286,7 @@ ALIASES = {
         "release",
         "classifier",
         "runner",
+        "c1-operator-infrastructure",
         "hardening",
     ),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
@@ -338,6 +344,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return ("tests.test_ci_change_classifier",)
     if name == "runner":
         return ("tests.test_run_test_shards",)
+    if name == "c1-operator-infrastructure":
+        return (C1_OPERATOR_TEST_MODULE,)
     if name == "hardening":
         return ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")
     if name == "lesson-benchmark":
@@ -542,7 +550,11 @@ def _run_worker(name: str, *, verbose: bool) -> int:
     spec = _suite_specs()[name]
     if name == "lesson-package":
         return _run_lesson_package_parallel(_suite_test_ids(name), verbose=verbose)
+    if spec.kind == "linux-module" and not sys.platform.startswith("linux"):
+        raise RuntimeError(f"{name} requires Linux and cannot run on {sys.platform}")
     if spec.kind == "module":
+        return _run_ids(_suite_test_ids(name), verbose=verbose)
+    if spec.kind == "linux-module":
         return _run_ids(_suite_test_ids(name), verbose=verbose)
     if spec.kind == "discover":
         return _run_discovery(name, verbose=verbose)

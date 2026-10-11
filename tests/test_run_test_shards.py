@@ -27,6 +27,22 @@ class TestShardManifest(unittest.TestCase):
         discovered_count = unittest.defaultTestLoader.discover(str(ROOT / "tests"), pattern="test_*.py").countTestCases()
         self.assertEqual(manifest_count + release_scale_count, discovered_count)
 
+    def test_c1_operator_tests_are_explicitly_covered_by_linux_full_manifest(self) -> None:
+        specs = run_test_shards._suite_specs()
+        suite_name = "c1-operator-infrastructure"
+        self.assertEqual(specs[suite_name].kind, "linux-module")
+        self.assertEqual(
+            specs[suite_name].count,
+            unittest.defaultTestLoader.loadTestsFromName(
+                run_test_shards.C1_OPERATOR_TEST_MODULE
+            ).countTestCases(),
+        )
+        self.assertIn(suite_name, run_test_shards._expand_suites(("full",), specs))
+        self.assertEqual(len(run_test_shards.SEMANTIC_SCOPE_SHARDS), 6)
+        with patch.object(run_test_shards.sys, "platform", "win32"):
+            with self.assertRaisesRegex(RuntimeError, "requires Linux"):
+                run_test_shards._run_worker(suite_name, verbose=False)
+
     def test_lesson_content_and_package_are_an_exact_partition(self) -> None:
         content = set(run_test_shards._lesson_content_ids())
         package = set(run_test_shards._lesson_package_ids())
