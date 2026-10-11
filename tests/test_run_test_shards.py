@@ -43,6 +43,21 @@ class TestShardManifest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "requires Linux"):
                 run_test_shards._run_worker(suite_name, verbose=False)
 
+    def test_c2_operator_launcher_tests_are_explicitly_covered_by_linux_full_manifest(self) -> None:
+        specs = run_test_shards._suite_specs()
+        suite_name = "c2-operator-launcher"
+        self.assertEqual(specs[suite_name].kind, "linux-module")
+        self.assertEqual(
+            specs[suite_name].count,
+            unittest.defaultTestLoader.loadTestsFromName(
+                run_test_shards.C2_OPERATOR_TEST_MODULE
+            ).countTestCases(),
+        )
+        self.assertIn(suite_name, run_test_shards._expand_suites(("full",), specs))
+        with patch.object(run_test_shards.sys, "platform", "win32"):
+            with self.assertRaisesRegex(RuntimeError, "requires Linux"):
+                run_test_shards._run_worker(suite_name, verbose=False)
+
     def test_lesson_content_and_package_are_an_exact_partition(self) -> None:
         content = set(run_test_shards._lesson_content_ids())
         package = set(run_test_shards._lesson_package_ids())

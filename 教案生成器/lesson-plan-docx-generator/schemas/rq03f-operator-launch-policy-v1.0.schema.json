@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ-03F Operator Launch Policy 1.0 candidate contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "policy_version", "authority_status", "owner_adopted_policy_source_identity",
+    "source_commit", "generation", "controller", "profile", "operation_index",
+    "runtime_closure", "dependency_inventory", "identities",
+    "role_authorization_references", "revocation_references", "anti_rollback", "service"
+  ],
+  "properties": {
+    "policy_version": { "const": "rq03f-operator-launch-policy-1.0" },
+    "authority_status": { "const": "candidate_only_not_owner_authority" },
+    "owner_adopted_policy_source_identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["adoption_status", "policy_identity", "source_commit"],
+      "properties": {
+        "adoption_status": { "enum": ["candidate_only", "owner_adopted"] },
+        "policy_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "source_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "generation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["generation_id", "final_path", "operation_root"],
+      "properties": {
+        "generation_id": { "type": "string", "pattern": "^rq03f-[a-z0-9](?:[a-z0-9-]{0,54}[a-z0-9])?$" },
+        "final_path": { "type": "string", "minLength": 1 },
+        "operation_root": { "type": "string", "minLength": 1 }
+      }
+    },
+    "controller": {
+      "type": "object", "additionalProperties": false,
+      "required": ["controller_id", "implementation", "version", "root", "runtime_root", "python_executable", "build_inventory", "controller_allowlist", "fixed_entrypoint"],
+      "properties": {
+        "controller_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "implementation": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "version": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "root": { "type": "string", "minLength": 1 },
+        "runtime_root": { "type": "string", "minLength": 1 },
+        "python_executable": { "type": "string", "minLength": 1 },
+        "build_inventory": {
+          "type": "object", "additionalProperties": false,
+          "required": ["key", "path", "sha256"],
+          "properties": {
+            "key": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+            "path": { "type": "string", "minLength": 1 },
+            "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "controller_allowlist": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["controller_id", "implementation", "version"],
+            "properties": {
+              "controller_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+              "implementation": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+              "version": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" }
+            }
+          }
+        },
+        "fixed_entrypoint": {
+          "type": "object", "additionalProperties": false,
+          "required": ["entrypoint_id", "operation", "module_path", "module_sha256"],
+          "properties": {
+            "entrypoint_id": { "const": "rq03f-operator-preflight-v1" },
+            "operation": { "const": "read_only_preflight" },
+            "module_path": { "type": "string", "minLength": 1 },
+            "module_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        }
+      }
+    },
+    "profile": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "path", "sha256", "policy_epoch"],
+      "properties": {
+        "version": { "const": "1.1" },
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "policy_epoch": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "operation_index": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "path", "initial_adoption_sha256", "consistency"],
+      "properties": {
+        "version": { "const": "1.1" },
+        "path": { "type": "string", "minLength": 1 },
+        "initial_adoption_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "consistency": { "const": "current_append_only_each_operation" }
+      }
+    },
+    "runtime_closure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "base_image_digest_claim", "os_package_manifest_sha256", "shared_libraries_manifest_sha256", "authority_status"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "base_image_digest_claim": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "os_package_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "shared_libraries_manifest_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "authority_status": { "const": "candidate_only_unverified_host_claims" }
+      }
+    },
+    "dependency_inventory": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "sha256", "run_root", "protected_roots"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "run_root": { "type": "string", "minLength": 1 },
+        "protected_roots": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "identities": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operator", "candidate", "author", "reviewer", "approver"],
+      "properties": {
+        "operator": { "$ref": "#/$defs/identity" },
+        "candidate": { "$ref": "#/$defs/identity" },
+        "author": { "$ref": "#/$defs/identity" },
+        "reviewer": { "$ref": "#/$defs/identity" },
+        "approver": { "$ref": "#/$defs/identity" }
+      }
+    },
+    "role_authorization_references": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["principal_id", "authorization_reference", "authorization_sha256", "allowed_roles"],
+        "properties": {
+          "principal_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+          "authorization_reference": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+          "authorization_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "allowed_roles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["author", "scope_reviewer", "qualification_approver", "corpus_adjudicator", "teacher_approver", "qualification_corpus_custodian"] } }
+        }
+      }
+    },
+    "revocation_references": {
+      "type": "object", "additionalProperties": false,
+      "required": ["inventory_key", "fields", "recheck_each_operation"],
+      "properties": {
+        "inventory_key": { "const": "authority_profile" },
+        "fields": { "const": ["revoked_authority_ids", "roles[].revoked_at", "roles[].revocation_reason"] },
+        "recheck_each_operation": { "const": true }
+      }
+    },
+    "anti_rollback": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required", "interface", "production_writes_allowed", "absent_behavior"],
+      "properties": {
+        "required": { "const": true },
+        "interface": { "const": "rq03f-c3-anti-rollback-gate-v1" },
+        "production_writes_allowed": { "const": false },
+        "absent_behavior": { "const": "block" }
+      }
+    },
+    "service": {
+      "type": "object", "additionalProperties": false,
+      "required": ["disabled_by_default", "install_or_start_authorized"],
+      "properties": {
+        "disabled_by_default": { "const": true },
+        "install_or_start_authorized": { "const": false }
+      }
+    }
+  },
+  "$defs": {
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["principal_id", "uid", "gid"],
+      "properties": {
+        "principal_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "uid": { "type": "integer", "minimum": 1 },
+        "gid": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}
