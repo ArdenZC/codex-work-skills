@@ -52,6 +52,7 @@ jobs:
         run: >-
           python -m pip install --no-cache-dir
           -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          'openpyxl>=3.1,<4'
 
       - name: Compile C3 controller, witness harness, and contract suite
         run: |
@@ -68,8 +69,9 @@ jobs:
           set -euo pipefail
           projection_root="/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           created=0
+          setup_complete=0
           cleanup_owned_fixture() {
-            if [[ "$created" == 1 && "$projection_root" == "/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then
+            if [[ "$created" == 1 && "$setup_complete" == 0 && "$projection_root" == "/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then
               sudo -n rm -rf --one-file-system -- "$projection_root"
             fi
           }
@@ -80,6 +82,7 @@ jobs:
           sudo -n chmod 0700 "$projection_root"
           printf 'RQ03F_C3_PROJECTION_TEST_ROOT=%s\n' "$projection_root" >> "$GITHUB_ENV"
           stat -c 'projection test parent: uid=%u gid=%g mode=%a path=%n' "$projection_root"
+          setup_complete=1
 
       - name: Run C3 and C2 deterministic contract regressions
         env:
