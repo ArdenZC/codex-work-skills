@@ -916,7 +916,10 @@ class LedgerContractTests(unittest.TestCase):
     def test_filesystem_projection_uses_exclusive_staging_and_atomic_index_replace(self):
         if not sys.platform.startswith("linux"):
             self.skipTest("dirfd projection tests require Linux")
-        with tempfile.TemporaryDirectory(dir=Path.home()) as directory:
+        projection_test_root = os.environ.get("RQ03F_C3_PROJECTION_TEST_ROOT")
+        with tempfile.TemporaryDirectory(
+            dir=projection_test_root or Path.home()
+        ) as directory:
             root = Path(directory)
             (root / "operation-index.json").write_bytes(self.index)
             (root / "operation-index.json").chmod(0o600)
@@ -936,7 +939,10 @@ class LedgerContractTests(unittest.TestCase):
     def test_filesystem_projection_rejects_symlink_and_hardlink_index(self):
         if not sys.platform.startswith("linux"):
             self.skipTest("dirfd projection tests require Linux")
-        with tempfile.TemporaryDirectory(dir=Path.home()) as directory:
+        projection_test_root = os.environ.get("RQ03F_C3_PROJECTION_TEST_ROOT")
+        with tempfile.TemporaryDirectory(
+            dir=projection_test_root or Path.home()
+        ) as directory:
             root = Path(directory)
             outside = root.parent / (root.name + "-outside")
             outside.write_bytes(self.index)

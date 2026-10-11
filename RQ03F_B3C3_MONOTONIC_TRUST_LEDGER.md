@@ -7,7 +7,7 @@
 - C1 Hosted [38112567308](https://github.com/ArdenZC/codex-work-skills/actions/runs/38112567308), C2 Hosted [38112567301](https://github.com/ArdenZC/codex-work-skills/actions/runs/38112567301), and Template Package [38112567310](https://github.com/ArdenZC/codex-work-skills/actions/runs/38112567310): `SUCCESS` at C2 PR head `b32e9c53f183e1a1ec5e4137411e53f1e9be4840`.
 - Formal Trust Anchor: `eb4a95c618e05c5ad6413137478bc65dbca75ec9` (not changed or written).
 - Branch: `feature/rq03f-b3c3-monotonic-trust-ledger`.
-- Draft PR: [#62](https://github.com/ArdenZC/codex-work-skills/pull/62), current implementation HEAD `8ef89b6e65897193f71a7da5a113002249679e96`.
+- Draft PR: [#62](https://github.com/ArdenZC/codex-work-skills/pull/62), implementation commits are on `feature/rq03f-b3c3-monotonic-trust-ledger`.
 - Formal Production Operator Trust, external High-Water Authority, protected Intake, Agent A/B, Live Qualification, RC-02, and Lesson Skill 2.4 remain blocked/not started.
 
 ## Scope and threat model
@@ -88,13 +88,22 @@ C2 `ReadOnlyPreflightTrustContext` and `require_protected_write()` remain uncond
 
 The new C3 module has 52 tests covering closed schemas and duplicate JSON, Ledger chain and Authority freshness, state/epoch/profile/Generation/revocation/Index mismatches, stale and replayed transitions, duplicate operation IDs, stale fencing/CAS, two writers racing one revision, definite CAS rejection after a competing commit, ABA restoration, C2 old-context behavior, and transaction/recovery failure injection before prepare, after prepare, after staging, after Authority commit, after Index install, after local Ledger projection, before final reread, and after lost ACK. Filesystem tests exercise exclusive staging, symlink/hardlink rejection, and exact atomic projection behavior.
 
-Current local regression result: C3 + C2 + C1 deterministic modules passed **108 tests** (`C3 52`, `C2 31`, `C1 25`; one inherited C1 POSIX ACL test is intentionally skipped locally and runs in hosted Linux). The targeted C3 shard-manifest assertion also passed (109 tests in that combined command). `git diff --check` and Python compilation passed. The full `tests.test_run_test_shards` module has an existing Gradebook validator failure described below.
+Local regression results:
+
+- C3 + C2 + C1 deterministic modules and the targeted C3 shard-manifest assertion passed **109 tests** (`C3 52`, `C2 31`, `C1 25`, shard assertion 1); one inherited C1 POSIX ACL test is intentionally skipped locally and runs in hosted Linux.
+- The inherited qualification-intake suite passed **17/17** after the controller build fixture was changed to derive its pinned module and schema rows from the current closed C2 `REQUIRED_MODULES` / `REQUIRED_SCHEMAS` sets and preload the C3 ledger module.
+- The C3 filesystem projection tests passed with a private test parent supplied through `RQ03F_C3_PROJECTION_TEST_ROOT`.
+- Workflow YAML parsing, Python compilation, and `git diff --check` passed.
+
+The full `tests.test_run_test_shards` module has an existing Gradebook validator failure described below.
 
 The Gradebook failure was reproduced on this branch and on an isolated clean worktree at the same trusted base `b894077fb5967a9aed8713892f448acfa5b65b62`; no Gradebook code, workbook asset, or Gradebook test is modified here. The base and branch both fail `test_gradebook_discovery_worker_does_not_reuse_lesson_package_common` because the nested `test_template_validator` returns 1 with `Named-range template changed protected workbook structure or formatting.` The Codex runtime resolves `soffice` to `/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice`, version `LibreOfficeDev 26.8.0.0.alpha0 2c87e51eeaa2b413ff4ae097b2705eea1995d8e5`. The validator reports 20 protected-signature differences; the observed difference is `font.charset` changing from `1` to `null` on LibreOfficeDev XLS round-trip (first reported at `non_target_sheets.Sheet1.cells[1][1].format.font`). This is a reproduced baseline/environment incompatibility, not reported as a pass. Fresh Template Package CI remains required to establish the hosted result.
 
 ## Hosted Linux evidence boundary
 
-The new `rq03f-b3c3-monotonic-trust-ledger` workflow checks out the exact PR head with no persisted token, installs only temporary runner prerequisites, reruns C3/C2/C1 deterministic tests and C1/C2 hosted regressions, and runs `tools/rq03f_c3/hosted_linux_isolation.py --root-test` as root solely for provisioning. That harness creates collision-checked, separate real UIDs for Operator, Candidate, Author, Reviewer, Approver, and Witness; drops all capabilities before role work; closes inherited non-standard file descriptors; records `/proc` UID/GID/capability evidence; applies and checks directory/file ownership, modes and ACLs; and requires cleanup of all temporary users, groups, sockets, and directories.
+The new `rq03f-b3c3-monotonic-trust-ledger` workflow checks out the exact PR head with no persisted token, installs only temporary runner prerequisites, reruns C3/C2/C1 deterministic tests and C1/C2 hosted regressions, and runs `tools/rq03f_c3/hosted_linux_isolation.py --root-test` as root solely for provisioning. The C1 deterministic suite runs in a separate process with the actual hosted runner UID and primary GID, using `setpriv --clear-groups --bounding-set=-all`; the process reports its real UID/GID and verifies `os.getgroups()` is empty and effective capabilities are zero. No identity APIs are mocked. The C3 filesystem projection tests use a newly created private fixture parent under `/var/lib`, owned by the runner UID with mode `0700`, because the hosted runner's home path carries an extended ACL that the production projection validator correctly rejects. The fixture is created exclusively and removed on success or failure.
+
+The C3 hosted harness creates collision-checked, separate real UIDs for Operator, Candidate, Author, Reviewer, Approver, and Witness; drops all capabilities before role work; closes inherited non-standard file descriptors; records `/proc` UID/GID/capability evidence; applies and checks directory/file ownership, modes and ACLs; and requires cleanup of all temporary users, groups, sockets, and directories.
 
 The test Operator can use the fixed synthetic protocol to commit through a Unix-socket Witness with a different UID. The synthetic Witness is separately owned and not readable/writable by the Operator UID. The hosted sequence exercises a committed write with a deliberately dropped ACK and exact recovery/idempotent retry, a two-writer same-revision CAS race with exactly one winner, an Owner-authorized synthetic epoch/Profile/Generation rotation with role revocation (old request rejected), a Witness process restart, complete restoration of the old Operator Index/Ledger snapshot (rejected against the persisted Witness high-water state), candidate `PYTHONPATH` module shadowing, and fail-closed behavior with the Witness unavailable. Test state and approvals are synthetic and never copied into formal trust storage.
 
@@ -103,7 +112,12 @@ This hosted workflow is authored by the PR and runs on a GitHub-hosted temporary
 ## CI and exact-head tracking
 
 - C2 post-merge baseline: [run 38114284561](https://github.com/ArdenZC/codex-work-skills/actions/runs/38114284561), `SUCCESS`, head `b894077fb5967a9aed8713892f448acfa5b65b62`.
-- Exact-head PR checks: [PR #62 Checks](https://github.com/ArdenZC/codex-work-skills/pull/62/checks). The dedicated C3 and existing C2 workflows check out `pull_request.head.sha`; Template Package CI classifies this PR and retains all required platform/shard gates, including Windows/macOS Semantic Scope shards. This report update itself triggers fresh exact-head runs; their exact run URLs and outcomes are included in the delivery response.
+- Earlier exact-head CI at `0b7335bed315de48c6e7e23857d902922c9ed6af` exposed three actionable issues; none is reported as passing:
+  - C3 workflow [38116342934](https://github.com/ArdenZC/codex-work-skills/actions/runs/38116342934) failed because two projection tests used the hosted home directory, whose extended ACL is rejected by the production validator, and the combined C1 deterministic suite inherited supplementary groups. The workflow now uses an exclusive private fixture parent and clears groups while retaining the actual runner UID/GID.
+  - C1 Hosted [38116342885](https://github.com/ArdenZC/codex-work-skills/actions/runs/38116342885) failed before its intended trust assertions because the C1 intake test fixture hard-coded an older controller module/schema list. The C2 closure now requires the C3 module and three C3 schemas, so the fixture reported `operator controller build inventory is incomplete`; later expected error assertions consequently failed. The fixture now derives rows from the closed C2 required sets and preloads the new C3 module. Local intake tests pass 17/17.
+  - C2 Hosted [38116342886](https://github.com/ArdenZC/codex-work-skills/actions/runs/38116342886) passed on that earlier head.
+- The Template Package run [38116342889](https://github.com/ArdenZC/codex-work-skills/actions/runs/38116342889) at that earlier head retained the complete matrix, including all 12 Windows/macOS Semantic Scope shards. Five semantic shards had failed while other jobs were still queued, so this run is not accepted as passing; the updated fixture is exercised again by the fresh final-head matrix.
+- Fresh exact-head CI for the final pushed commit is required after these fixes. The C3, C1, C2, and Template Package workflows check out or validate the exact PR head and retain the required gates. Final run URLs and outcomes are reported in the delivery response; no pending result is presented as a pass.
 
 ## Files changed
 
@@ -114,6 +128,7 @@ This hosted workflow is authored by the PR and runs on a GitHub-hosted temporary
 - `教案生成器/lesson-plan-docx-generator/scripts/rq03f_operator_trust_provider.py` — fresh C3 Gate request/result validation while retaining unconditional protected-write denial.
 - Four `rq03f-*-v1.0.schema.json` files under `教案生成器/lesson-plan-docx-generator/schemas/`.
 - `tests/test_rq03f_c3_monotonic_trust_ledger.py` and one C2 negative integration test.
+- `tests/test_qualification_corpus_intake.py` — keep its synthetic pinned Build Inventory fixture aligned with the current closed controller module/schema sets and preload the C3 closure module.
 - `tools/rq03f_c3/hosted_linux_isolation.py` — disposable six-UID synthetic Witness integration test.
 - `RQ03F_B3C3_MONOTONIC_TRUST_LEDGER.md` — this report.
 
@@ -123,7 +138,7 @@ Before Production Trust could be considered, an independent deployment owner mus
 
 ## Final review fields
 
-- Implementation HEAD before this report-only commit: `8ef89b6e65897193f71a7da5a113002249679e96`; final PR head is the report commit recorded in PR #62.
+- Implementation HEAD before the final report commit is recorded in the delivery response; the final PR head is the report commit recorded in PR #62.
 - Draft PR: [#62](https://github.com/ArdenZC/codex-work-skills/pull/62), remains Draft; no merge requested or performed.
 - Hosted Linux UID/Witness and Template Package CI: exact-head results are available from [PR #62 Checks](https://github.com/ArdenZC/codex-work-skills/pull/62/checks) and listed in the delivery response.
 - Production trust: **not established**; Formal Trust Anchor unchanged.

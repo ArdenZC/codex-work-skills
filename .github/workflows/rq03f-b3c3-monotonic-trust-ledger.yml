@@ -63,16 +63,58 @@ jobs:
             tests/test_rq03f_c3_monotonic_trust_ledger.py
           bash -n tools/rq03f_c1/hosted_linux_isolation.sh
 
-      - name: Run C3, C2, and C1 deterministic contract regressions
+      - name: Provision private C3 filesystem projection test parent
+        run: |
+          set -euo pipefail
+          projection_root="/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          created=0
+          cleanup_owned_fixture() {
+            if [[ "$created" == 1 && "$projection_root" == "/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then
+              sudo -n rm -rf --one-file-system -- "$projection_root"
+            fi
+          }
+          trap cleanup_owned_fixture EXIT
+          sudo -n mkdir -m 0700 -- "$projection_root"
+          created=1
+          sudo -n chown "$(id -u):$(id -g)" "$projection_root"
+          sudo -n chmod 0700 "$projection_root"
+          printf 'RQ03F_C3_PROJECTION_TEST_ROOT=%s\n' "$projection_root" >> "$GITHUB_ENV"
+          stat -c 'projection test parent: uid=%u gid=%g mode=%a path=%n' "$projection_root"
+
+      - name: Run C3 and C2 deterministic contract regressions
         env:
           PYTHONPATH: 教案生成器/lesson-plan-docx-generator/scripts
         run: |
           python -m unittest \
             tests.test_rq03f_c3_monotonic_trust_ledger \
             tests.test_rq03f_c2_operator_launcher \
-            tests.test_rq03f_c1_operator_infrastructure \
             tests.test_run_test_shards.TestShardManifest.test_c3_ledger_tests_are_explicitly_covered_by_linux_full_manifest \
             -v
+
+      - name: Run C1 deterministic regressions as the runner UID without supplementary groups
+        env:
+          PYTHONPATH: 教案生成器/lesson-plan-docx-generator/scripts
+        run: |
+          set -euo pipefail
+          runner_uid="$(id -u)"
+          runner_gid="$(id -g)"
+          python_bin="$(command -v python)"
+          sudo -n env "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
+            /usr/bin/setpriv \
+              --reuid="$runner_uid" \
+              --regid="$runner_gid" \
+              --clear-groups \
+              --bounding-set=-all \
+              -- "$python_bin" -c \
+                'import os; status = dict(line.split(":", 1) for line in open("/proc/self/status") if ":" in line); capeff = int(status["CapEff"].strip(), 16); print(f"C1 test process identity: uid={os.getuid()} euid={os.geteuid()} gid={os.getgid()} egid={os.getegid()} supplementary_groups={os.getgroups()} CapEff={capeff:x}"); assert not os.getgroups() and capeff == 0'
+          sudo -n env "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
+            /usr/bin/setpriv \
+            --reuid="$runner_uid" \
+            --regid="$runner_gid" \
+            --clear-groups \
+            --bounding-set=-all \
+            -- "$python_bin" -m unittest \
+              tests.test_rq03f_c1_operator_infrastructure -v
 
       - name: Run inherited C1 hosted real-UID filesystem regression
         run: bash tools/rq03f_c1/hosted_linux_isolation.sh
@@ -102,6 +144,10 @@ jobs:
         shell: bash
         run: |
           failed=0
+          projection_root="/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ "${RQ03F_C3_PROJECTION_TEST_ROOT:-}" == "$projection_root" ]] && sudo -n test -e "$projection_root"; then
+            sudo -n rm -rf --one-file-system -- "$projection_root"
+          fi
           if getent passwd | awk -F: '$1 ~ /^rq03c3-[0-9a-f]+-(operator|candidate|author|reviewer|approver|witness)$/ {print; found=1} END {exit !found}'; then
             echo "temporary C3 user remains"
             failed=1
