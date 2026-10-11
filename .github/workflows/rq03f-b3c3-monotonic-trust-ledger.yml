@@ -1,0 +1,184 @@
+name: RQ-03F-B3-C3 Monotonic Trust Ledger
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - .github/workflows/rq03f-b3c3-monotonic-trust-ledger.yml
+      - .github/scripts/run_test_shards.py
+      - tests/test_run_test_shards.py
+      - tests/test_rq03f_c1_operator_infrastructure.py
+      - tests/test_rq03f_c2_operator_launcher.py
+      - tests/test_rq03f_c3_monotonic_trust_ledger.py
+      - tools/rq03f_c1/**
+      - tools/rq03f_c2/**
+      - tools/rq03f_c3/**
+      - 教案生成器/lesson-plan-docx-generator/scripts/**
+      - 教案生成器/lesson-plan-docx-generator/schemas/**
+      - RQ03F_B3C3_MONOTONIC_TRUST_LEDGER.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rq03f-b3c3-ledger-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  hosted-linux-witness:
+    name: Disposable Ubuntu real-UID High-Water Witness
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact PR head without persisting a GitHub token
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up isolated Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install disposable Linux ACL and runtime prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y acl python3-pip python3-venv
+
+      - name: Install repository validation requirements
+        run: >-
+          python -m pip install --no-cache-dir
+          -r 教案生成器/lesson-plan-docx-generator/requirements.txt
+          'openpyxl>=3.1,<4'
+
+      - name: Compile C3 controller, witness harness, and contract suite
+        run: |
+          python -m py_compile \
+            教案生成器/lesson-plan-docx-generator/scripts/rq03f_monotonic_trust_ledger.py \
+            教案生成器/lesson-plan-docx-generator/scripts/operator_controller_bootstrap.py \
+            教案生成器/lesson-plan-docx-generator/scripts/rq03f_operator_trust_provider.py \
+            tools/rq03f_c3/hosted_linux_isolation.py \
+            tests/test_rq03f_c3_monotonic_trust_ledger.py
+          bash -n tools/rq03f_c1/hosted_linux_isolation.sh
+
+      - name: Provision private C3 filesystem projection test parent
+        run: |
+          set -euo pipefail
+          projection_root="/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          created=0
+          setup_complete=0
+          cleanup_owned_fixture() {
+            if [[ "$created" == 1 && "$setup_complete" == 0 && "$projection_root" == "/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" ]]; then
+              sudo -n rm -rf --one-file-system -- "$projection_root"
+            fi
+          }
+          trap cleanup_owned_fixture EXIT
+          sudo -n mkdir -m 0700 -- "$projection_root"
+          created=1
+          sudo -n chown "$(id -u):$(id -g)" "$projection_root"
+          sudo -n chmod 0700 "$projection_root"
+          printf 'RQ03F_C3_PROJECTION_TEST_ROOT=%s\n' "$projection_root" >> "$GITHUB_ENV"
+          stat -c 'projection test parent: uid=%u gid=%g mode=%a path=%n' "$projection_root"
+          setup_complete=1
+
+      - name: Run C3 and C2 deterministic contract regressions
+        env:
+          PYTHONPATH: 教案生成器/lesson-plan-docx-generator/scripts
+        run: |
+          python -m unittest \
+            tests.test_rq03f_c3_monotonic_trust_ledger \
+            tests.test_rq03f_c2_operator_launcher \
+            tests.test_run_test_shards.TestShardManifest.test_c3_ledger_tests_are_explicitly_covered_by_linux_full_manifest \
+            -v
+
+      - name: Run C1 deterministic regressions with the root-owned system Python as the runner UID
+        env:
+          PYTHONPATH: 教案生成器/lesson-plan-docx-generator/scripts
+        run: |
+          set -euo pipefail
+          runner_uid="$(id -u)"
+          runner_gid="$(id -g)"
+          python_bin="$(readlink -f /usr/bin/python3)"
+          python_owner="$(stat -c %u "$python_bin")"
+          python_mode="$(stat -c %a "$python_bin")"
+          if [[ "$python_owner" != 0 || $((8#$python_mode & 18)) -ne 0 || ! -x "$python_bin" ]]; then
+            echo "C1 test Python is not root-owned and non-writable: path=$python_bin owner=$python_owner mode=$python_mode"
+            exit 2
+          fi
+          "$python_bin" --version
+          "$python_bin" -m pip --version
+          sudo -n env "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
+            /usr/bin/setpriv \
+              --reuid="$runner_uid" \
+              --regid="$runner_gid" \
+              --clear-groups \
+              --bounding-set=-all \
+              -- "$python_bin" -c \
+                'import os; status = dict(line.split(":", 1) for line in open("/proc/self/status") if ":" in line); capeff = int(status["CapEff"].strip(), 16); print(f"C1 test process identity: uid={os.getuid()} euid={os.geteuid()} gid={os.getgid()} egid={os.getegid()} supplementary_groups={os.getgroups()} CapEff={capeff:x}"); assert not os.getgroups() and capeff == 0'
+          sudo -n env "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
+            "RQ03F_C1_TEST_TMPDIR=$RQ03F_C3_PROJECTION_TEST_ROOT" \
+            /usr/bin/setpriv \
+            --reuid="$runner_uid" \
+            --regid="$runner_gid" \
+            --clear-groups \
+            --bounding-set=-all \
+            -- "$python_bin" -m unittest \
+              tests.test_rq03f_c1_operator_infrastructure -v
+
+      - name: Run inherited C1 hosted real-UID filesystem regression
+        run: bash tools/rq03f_c1/hosted_linux_isolation.sh
+
+      - name: Run inherited C2 hosted real-UID Launcher regression
+        env:
+          C2_EXPECTED_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rq03f-c3-evidence"
+          python_bin="$(command -v python)"
+          sudo -n env "PATH=$PATH" C2_EXPECTED_SOURCE_COMMIT="$C2_EXPECTED_SOURCE_COMMIT" \
+            "$python_bin" tools/rq03f_c2/hosted_linux_isolation.py \
+            | tee "$RUNNER_TEMP/rq03f-c3-evidence/rq03f-c2-hosted-regression.json"
+
+      - name: Run C3 hosted independent-UID Witness, rollback, CAS, and recovery checks
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rq03f-c3-evidence"
+          python_bin="$(command -v python)"
+          sudo -n env "PATH=$PATH" "$python_bin" tools/rq03f_c3/hosted_linux_isolation.py \
+            --root-test \
+            | tee "$RUNNER_TEMP/rq03f-c3-evidence/rq03f-c3-hosted-witness-evidence.json"
+
+      - name: Verify temporary C3 identities, groups, and protected paths were removed
+        if: always()
+        shell: bash
+        run: |
+          failed=0
+          projection_root="/var/lib/rq03f-c3-projection-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          if [[ "${RQ03F_C3_PROJECTION_TEST_ROOT:-}" == "$projection_root" ]] && sudo -n test -e "$projection_root"; then
+            sudo -n rm -rf --one-file-system -- "$projection_root"
+          fi
+          if getent passwd | awk -F: '$1 ~ /^rq03c3-[0-9a-f]+-(operator|candidate|author|reviewer|approver|witness)$/ {print; found=1} END {exit !found}'; then
+            echo "temporary C3 user remains"
+            failed=1
+          fi
+          if getent group | awk -F: '$1 ~ /^rq03c3-[0-9a-f]+-(operator|candidate|author|reviewer|approver|witness|api)$/ {print; found=1} END {exit !found}'; then
+            echo "temporary C3 group remains"
+            failed=1
+          fi
+          if sudo -n find /var/lib -maxdepth 1 -name 'rq03f-c3-hosted-*' -print -quit | grep -q .; then
+            echo "temporary C3 projection or Witness directory remains"
+            failed=1
+          fi
+          exit "$failed"
+
+      - name: Upload synthetic-only hosted execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rq03f-b3c3-hosted-witness-${{ github.run_id }}
+          path: ${{ runner.temp }}/rq03f-c3-evidence/
+          if-no-files-found: warn
+          retention-days: 14

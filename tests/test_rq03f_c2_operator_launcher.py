@@ -407,6 +407,58 @@ class LaunchPolicyContractTests(unittest.TestCase):
             with self.subTest(gate=gate), self.assertRaisesRegex(ProviderError, "until C3"):
                 require_protected_write(gate, operation_purpose="production_authoring")
 
+    def test_even_a_verified_c3_gate_does_not_enable_c2_protected_writes(self):
+        from tests.test_rq03f_c3_monotonic_trust_ledger import (
+            AUTHORITY as TEST_AUTHORITY,
+            MemoryProjection,
+            MemoryWitness,
+            base_index,
+            encode_json,
+            genesis_record,
+            initial_state,
+        )
+        from rq03f_monotonic_trust_ledger import (
+            LedgerRequest,
+            MonotonicAntiRollbackGate,
+        )
+
+        index_raw = encode_json(base_index())
+        state = initial_state(index_raw)
+        witness = MemoryWitness(state)
+        projection = MemoryProjection(index_raw, [genesis_record(state)])
+        gate = MonotonicAntiRollbackGate(
+            authority=witness,
+            expected_authority_identity=TEST_AUTHORITY,
+            ledger_reader=projection.read_ledger,
+            index_reader=projection.read_index,
+            recovery_reader=projection.recovery_required,
+        )
+
+        class CandidateProviderFixture(trust_provider.OperatorTrustContextProvider):
+            def __call__(self):
+                return "read-only-context"
+
+            def _gate_request(self, purpose):
+                return LedgerRequest(**(self.request_values | {"operation_purpose": purpose}))
+
+        provider = object.__new__(CandidateProviderFixture)
+        provider._anti_rollback_gate = gate
+        provider.request_values = {
+            "policy_identity": state.policy_identity,
+            "policy_epoch": state.policy_epoch,
+            "profile_sha256": state.profile_sha256,
+            "build_inventory_sha256": state.build_inventory_sha256,
+            "controller_id": state.controller_id,
+            "generation_id": state.generation_id,
+            "index_sha256": state.index_sha256,
+            "revocation_state_sha256": state.revocation_state_sha256,
+        }
+        result = gate.check_current_state(**provider._gate_request("production_authoring").__dict__)
+        self.assertEqual(result.decision, "verified")
+        with self.assertRaises(ProviderError) as raised:
+            provider.context_for_operation("production_authoring")
+        self.assertEqual(raised.exception.code, "C3_ANTI_ROLLBACK_GATE_REQUIRED")
+
     def test_read_only_provider_context_cannot_issue_any_protected_role(self):
         context = ReadOnlyPreflightTrustContext(
             inventory=None,

@@ -17,12 +17,19 @@ from pathlib import Path
 import stat
 import sysconfig
 import threading
-from typing import Any, Callable, Protocol
+from typing import Any, Callable
 
 from lifecycle_digest import canonical_json_bytes, sha256_bytes
 from semantic_scope_records import Inventory, TrustContext, checked, parse, require
 
 import rq03f_operator_launch_policy as launch_policy
+from rq03f_monotonic_trust_ledger import (
+    AntiRollbackGate,
+    LedgerRequest,
+    MonotonicAntiRollbackGate,
+    revocation_state,
+    validate_gate_result,
+)
 
 
 class ProviderError(ValueError):
@@ -31,13 +38,6 @@ class ProviderError(ValueError):
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
-
-
-class AntiRollbackGate(Protocol):
-    """C3 contract only. C2 has no implementation that can satisfy it."""
-
-    def check_current_state(self, *, policy_identity: str, policy_epoch: int,
-                            index_sha256: str, operation_purpose: str) -> object: ...
 
 
 class ReadOnlyPreflightTrustContext(TrustContext):
@@ -225,9 +225,11 @@ def _verify_runtime_closure(policy: dict[str, Any], build: dict[str, Any]) -> No
 class OperatorTrustContextProvider:
     """Callable Provider compatible with semantic_lifecycle.operator_context."""
 
-    def __init__(self, *, policy_loader: Callable[[], Any], initial_state: Any):
+    def __init__(self, *, policy_loader: Callable[[], Any], initial_state: Any,
+                 anti_rollback_gate: AntiRollbackGate | None = None):
         self._policy_loader = policy_loader
         self._initial = initial_state
+        self._anti_rollback_gate = anti_rollback_gate
         self._lock = threading.RLock()
         operator_uid = initial_state.policy["identities"]["operator"]["uid"]
         index_raw, index_info = _read_file(Path(initial_state.policy["operation_index"]["path"]),
@@ -401,10 +403,55 @@ class OperatorTrustContextProvider:
                 non_operator_process_unix_uids=context.non_operator_process_unix_uids,
             )
 
+    def _gate_request(self, purpose: str) -> LedgerRequest:
+        state = self._fresh_state()
+        policy = state.policy
+        context = self()
+        profile, _index = context.load()
+        index_raw, index_info = _read_file(
+            Path(policy["operation_index"]["path"]),
+            owner_uids={0, policy["identities"]["operator"]["uid"]},
+        )
+        require(index_info.st_uid == policy["identities"]["operator"]["uid"],
+                "protected Index owner changed while building Gate request")
+        current_index_sha = _sha(index_raw)
+        require(profile["policy_epoch"] == policy["profile"]["policy_epoch"],
+                "Gate request Profile epoch differs from Launch Policy")
+        revocation_sha, _revoked_ids, _revoked_roles = revocation_state(profile)
+        return LedgerRequest(
+            policy_identity=policy["owner_adopted_policy_source_identity"]["policy_identity"],
+            policy_epoch=policy["profile"]["policy_epoch"],
+            profile_sha256=policy["profile"]["sha256"],
+            build_inventory_sha256=policy["controller"]["build_inventory"]["sha256"],
+            controller_id=policy["controller"]["controller_id"],
+            generation_id=policy["generation"]["generation_id"],
+            index_sha256=current_index_sha,
+            revocation_state_sha256=revocation_sha,
+            operation_purpose=purpose,
+        )
+
     def context_for_operation(self, purpose: str) -> TrustContext:
         context = self()
         if purpose != "read_only_preflight":
-            require_protected_write(None, operation_purpose=purpose)
+            gate = self._anti_rollback_gate
+            if gate is not None:
+                if type(gate) is not MonotonicAntiRollbackGate:
+                    raise ProviderError("C3_ANTI_ROLLBACK_GATE_TYPE",
+                                        "sensitive operations require the pinned C3 Gate implementation")
+                request = self._gate_request(purpose)
+                result = gate.check_current_state(**request.__dict__)
+                try:
+                    validate_gate_result(
+                        result, request=request,
+                        expected_authority_identity=gate.authority_identity,
+                    )
+                except Exception as exc:
+                    raise ProviderError(getattr(exc, "code", "C3_GATE_BLOCKED"),
+                                         "current C3 High-Water verification failed") from exc
+            # C3 verifies state but does not enable protected writes in this
+            # candidate C2 service.  Owner deployment and a separately reviewed
+            # write-capable launcher remain prerequisites.
+            require_protected_write(gate, operation_purpose=purpose)
         return context
 
 

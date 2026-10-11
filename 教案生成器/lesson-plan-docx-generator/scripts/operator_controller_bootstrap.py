@@ -36,6 +36,7 @@ REQUIRED_MODULES = frozenset({
     "exemplar_contract",
     "exemplar_split",
     "path_safety",
+    "rq03f_monotonic_trust_ledger",
 })
 REQUIRED_CONTROLLER_TREES = frozenset({"controller_scripts_tree", "controller_schemas_tree"})
 REQUIRED_SCHEMAS = frozenset({
@@ -47,6 +48,10 @@ REQUIRED_SCHEMAS = frozenset({
     "operator-controller-build-inventory-v1.1.schema.json",
     "operator-role-authorization-v1.1.schema.json",
     "protected-operation-index-v1.1.schema.json",
+    "rq03f-high-water-authority-response-v1.0.schema.json",
+    "rq03f-monotonic-trust-ledger-record-v1.0.schema.json",
+    "rq03f-monotonic-trust-ledger-v1.0.schema.json",
+    "rq03f-trust-transition-v1.0.schema.json",
     "qualification-adjudication.schema.json",
     "qualification-corpus-intake-v1.0.schema.json",
     "qualification-corpus.schema.json",
@@ -359,6 +364,25 @@ def prepare_isolated_runtime(
     return payload
 
 
+def preload_verified_controller_modules(payload: dict[str, Any]) -> None:
+    """Import the complete module closure only from the verified install root."""
+    import importlib
+
+    rows = {row["component_id"]: row for row in payload["components"]}
+    for module_name in sorted(REQUIRED_MODULES):
+        row = rows.get(module_name)
+        _require(row is not None and row["component_type"] == "python_module",
+                 "required controller module is absent from Build Inventory")
+        loaded = importlib.import_module(module_name)
+        module_path = getattr(loaded, "__file__", None)
+        _require(isinstance(module_path, str),
+                 f"loaded controller module has no file origin: {module_name}")
+        loaded_path = Path(module_path).resolve(strict=True)
+        expected_path = Path(row["runtime_path"]).resolve(strict=True)
+        _require(loaded_path == expected_path,
+                 f"loaded controller module came from an unpinned path: {module_name}")
+
+
 def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--build-inventory", type=Path, required=True)
@@ -391,6 +415,7 @@ def _main() -> int:
         _require(row is not None, "entrypoint module is not present in pinned build inventory")
         import importlib
 
+        preload_verified_controller_modules(payload)
         loaded = importlib.import_module(module_name)
         _require(Path(loaded.__file__).resolve(strict=True)
                  == Path(row["runtime_path"]).resolve(strict=True),

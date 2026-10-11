@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RQ-03F authenticated High-Water Authority response 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["authority_response_version", "authority_identity", "sequence", "head_state_digest", "head_record_sha256", "state", "checked_at", "valid_until", "fencing_token", "pending_transition_ids"],
+  "properties": {
+    "authority_response_version": { "const": "rq03f-high-water-authority-response-1.0" },
+    "authority_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "head_state_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "head_record_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["policy_identity", "policy_epoch", "profile_sha256", "build_inventory_sha256", "controller_id", "generation_id", "index_sha256", "index_revision", "revocation_state_sha256", "revoked_authority_ids", "revoked_role_authorization_references"],
+      "properties": {
+        "policy_identity": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "policy_epoch": { "type": "integer", "minimum": 1 },
+        "profile_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "build_inventory_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "controller_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "generation_id": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" },
+        "index_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "index_revision": { "type": "integer", "minimum": 0 },
+        "revocation_state_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "revoked_authority_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" } },
+        "revoked_role_authorization_references": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^\\S+$" } }
+      }
+    },
+    "checked_at": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "valid_until": { "type": "string", "format": "date-time", "pattern": "Z$" },
+    "fencing_token": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^\\S+$" },
+    "pending_transition_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 160, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" } }
+  }
+}

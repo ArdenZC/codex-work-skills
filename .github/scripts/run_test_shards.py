@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TEST_MODULE = "tests.test_template_packages"
 C1_OPERATOR_TEST_MODULE = "tests.test_rq03f_c1_operator_infrastructure"
 C2_OPERATOR_TEST_MODULE = "tests.test_rq03f_c2_operator_launcher"
+C3_LEDGER_TEST_MODULE = "tests.test_rq03f_c3_monotonic_trust_ledger"
 LESSON_V21_TEST_MODULE = "tests.test_lesson_content_v21"
 LESSON_V22_TEST_MODULE = "tests.test_lesson_content_v22"
 LESSON_V23_TEST_MODULE = "tests.test_lesson_content_v23"
@@ -255,6 +256,10 @@ def _suite_specs() -> dict[str, SuiteSpec]:
             "c2-operator-launcher", False, "linux-module", _module_count(C2_OPERATOR_TEST_MODULE),
             "rq03f-b3c2-launcher",
         ),
+        "c3-monotonic-trust-ledger": SuiteSpec(
+            "c3-monotonic-trust-ledger", False, "linux-module", _module_count(C3_LEDGER_TEST_MODULE),
+            "rq03f-b3c3-ledger",
+        ),
         "hardening": SuiteSpec(
             "hardening", True, "module",
             sum(_module_count(m) for m in ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")),
@@ -293,6 +298,7 @@ ALIASES = {
         "runner",
         "c1-operator-infrastructure",
         "c2-operator-launcher",
+        "c3-monotonic-trust-ledger",
         "hardening",
     ),
     "ci": ("full", "lesson-skill", "gradebook-skill"),
@@ -354,6 +360,8 @@ def _suite_test_ids(name: str) -> tuple[str, ...]:
         return (C1_OPERATOR_TEST_MODULE,)
     if name == "c2-operator-launcher":
         return (C2_OPERATOR_TEST_MODULE,)
+    if name == "c3-monotonic-trust-ledger":
+        return (C3_LEDGER_TEST_MODULE,)
     if name == "hardening":
         return ("tests.test_lesson_skill_hardening", "tests.test_lesson_release_compatibility")
     if name == "lesson-benchmark":

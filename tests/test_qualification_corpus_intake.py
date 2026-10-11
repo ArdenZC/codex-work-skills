@@ -37,6 +37,7 @@ from qualification_corpus_intake import (
 from semantic_scope_records import Inventory, RecordError, TrustContext, checked, parse
 import semantic_scope_review  # noqa: F401 - synthetic controller closure import
 import reviewer_qualification  # noqa: F401 - synthetic controller closure import
+import rq03f_monotonic_trust_ledger  # noqa: F401 - synthetic controller closure import
 import source_truth  # noqa: F401 - synthetic controller closure import
 import exemplar_contract  # noqa: F401 - synthetic controller closure import
 import exemplar_split  # noqa: F401 - synthetic controller closure import
@@ -115,19 +116,7 @@ class IntakeFixture:
         )
 
         controller_components = []
-        required_modules = (
-            "operator_controller_bootstrap",
-            "semantic_scope_records",
-            "semantic_scope_review",
-            "operation_provenance",
-            "reviewer_qualification",
-            "qualification_corpus_intake",
-            "lifecycle_digest",
-            "source_truth",
-            "exemplar_contract",
-            "exemplar_split",
-            "path_safety",
-        )
+        required_modules = tuple(sorted(controller_bootstrap.REQUIRED_MODULES))
         for module_name in required_modules:
             key = "controller:" + module_name
             raw = (SCRIPTS / (module_name + ".py")).read_bytes()
@@ -141,23 +130,7 @@ class IntakeFixture:
                     "sha256": sha256_bytes(raw),
                 }
             )
-        required_schemas = (
-            "managed-reviewer-service-observation-v1.1.schema.json",
-            "managed-service-capture-manifest-v1.1.schema.json",
-            "managed-service-observation-policy-v1.1.schema.json",
-            "operation-provenance-receipt-v1.2.schema.json",
-            "operator-authority-profile-v1.1.schema.json",
-            "operator-controller-build-inventory-v1.1.schema.json",
-            "operator-role-authorization-v1.1.schema.json",
-            "protected-operation-index-v1.1.schema.json",
-            "qualification-adjudication.schema.json",
-            "qualification-corpus-intake-v1.0.schema.json",
-            "qualification-corpus.schema.json",
-            "reviewer-configuration-v1.1.schema.json",
-            "reviewer-qualification-v1.1.schema.json",
-            "semantic-scope-review.schema.json",
-            "source-truth-manifest.schema.json",
-        )
+        required_schemas = tuple(sorted(controller_bootstrap.REQUIRED_SCHEMAS))
         for schema_name in required_schemas:
             key = "controller-schema:" + schema_name
             raw = (SCHEMAS / schema_name).read_bytes()
