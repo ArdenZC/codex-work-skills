@@ -94,14 +94,22 @@ jobs:
             tests.test_run_test_shards.TestShardManifest.test_c3_ledger_tests_are_explicitly_covered_by_linux_full_manifest \
             -v
 
-      - name: Run C1 deterministic regressions as the runner UID without supplementary groups
+      - name: Run C1 deterministic regressions with the root-owned system Python as the runner UID
         env:
           PYTHONPATH: 教案生成器/lesson-plan-docx-generator/scripts
         run: |
           set -euo pipefail
           runner_uid="$(id -u)"
           runner_gid="$(id -g)"
-          python_bin="$(command -v python)"
+          python_bin="$(readlink -f /usr/bin/python3)"
+          python_owner="$(stat -c %u "$python_bin")"
+          python_mode="$(stat -c %a "$python_bin")"
+          if [[ "$python_owner" != 0 || $((8#$python_mode & 18)) -ne 0 || ! -x "$python_bin" ]]; then
+            echo "C1 test Python is not root-owned and non-writable: path=$python_bin owner=$python_owner mode=$python_mode"
+            exit 2
+          fi
+          "$python_bin" --version
+          "$python_bin" -m pip --version
           sudo -n env "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" \
             /usr/bin/setpriv \
               --reuid="$runner_uid" \
