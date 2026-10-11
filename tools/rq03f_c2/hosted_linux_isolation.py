@@ -48,6 +48,19 @@ GIT_ENV = {
 }
 
 
+def _git_readonly_args(*args: str) -> list[str]:
+    """Run read-only Git queries against this exact checkout as a trusted path.
+
+    The hosted harness runs as root after provisioning disposable identities,
+    while checkout files are owned by the runner UID. Git's safe.directory
+    protection therefore rejects the repository unless the harness grants an
+    explicit, command-scoped exception for this one resolved checkout. The
+    exception never enters global/system configuration and does not wildcard
+    any other repository.
+    """
+    return ["/usr/bin/git", "-c", f"safe.directory={ROOT}", "-C", str(ROOT), *args]
+
+
 def fail(message: str) -> None:
     raise RuntimeError(message)
 
@@ -368,8 +381,7 @@ def _git_source_blob_manifest(source: Path, commit: str) -> dict[str, tuple[str,
     except ValueError:
         fail("Controller source is outside the checked-out repository")
     result = subprocess.run(
-        ["/usr/bin/git", "-C", str(ROOT), "ls-tree", "-r", "-z", "--full-tree",
-         commit, "--", source_key],
+        _git_readonly_args("ls-tree", "-r", "-z", "--full-tree", commit, "--", source_key),
         env=GIT_ENV, capture_output=True, check=False,
     )
     if result.returncode != 0:
@@ -803,7 +815,7 @@ def main() -> int:
     if re.fullmatch(r"[a-f0-9]{40}", source_commit) is None:
         fail("exact GitHub event source commit must be explicitly provided")
     checked_out_head = command(
-        ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "--verify", "HEAD^{commit}"],
+        _git_readonly_args("rev-parse", "--verify", "HEAD^{commit}"),
         env=GIT_ENV,
     ).stdout.strip()
     if checked_out_head != source_commit:

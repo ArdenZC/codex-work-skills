@@ -73,6 +73,7 @@ jobs:
         env:
           C2_EXPECTED_SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
+          set -euo pipefail
           mkdir -p "$RUNNER_TEMP/rq03f-c2-evidence"
           sudo -n env C2_EXPECTED_SOURCE_COMMIT="$C2_EXPECTED_SOURCE_COMMIT" \
             python tools/rq03f_c2/hosted_linux_isolation.py \

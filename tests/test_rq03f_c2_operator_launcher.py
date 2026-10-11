@@ -387,12 +387,15 @@ class HostedSourceCopyTests(unittest.TestCase):
     def test_git_blob_manifest_copies_only_exact_committed_source_bytes(self):
         from tools.rq03f_c2.hosted_linux_isolation import (
             GIT_ENV,
+            _git_readonly_args,
             _git_source_blob_manifest,
             copy_source_tree,
         )
 
+        git_args = _git_readonly_args("rev-parse", "--verify", "HEAD^{commit}")
+        self.assertEqual(git_args[:4], ["/usr/bin/git", "-c", f"safe.directory={ROOT}", "-C"])
         commit = subprocess.run(
-            ["/usr/bin/git", "-C", str(ROOT), "rev-parse", "--verify", "HEAD^{commit}"],
+            git_args,
             env=GIT_ENV,
             capture_output=True,
             check=True,
@@ -408,6 +411,16 @@ class HostedSourceCopyTests(unittest.TestCase):
                 (destination / "operator_allocator.py").read_bytes(),
                 (source / "operator_allocator.py").read_bytes(),
             )
+
+
+class HostedWorkflowFailurePropagationTests(unittest.TestCase):
+    def test_root_harness_pipeline_propagates_python_failure(self):
+        workflow = (ROOT / ".github" / "workflows" / "rq03f-b3c2-launcher-provider.yml").read_text(encoding="utf-8")
+        step = workflow.split("- name: Run C2 synthetic Policy/Index with real Linux identities and filesystem permissions", 1)[1]
+        step = step.split("\n      - name:", 1)[0]
+        self.assertIn("set -euo pipefail", step)
+        self.assertLess(step.index("set -euo pipefail"), step.index("python tools/rq03f_c2/hosted_linux_isolation.py"))
+        self.assertIn("| tee \"$RUNNER_TEMP/rq03f-c2-evidence/rq03f-b3c2-hosted-evidence.json\"", step)
 
 
 if __name__ == "__main__":
