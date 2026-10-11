@@ -27,6 +27,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
+C1_TOOLS = ROOT / "tools" / "rq03f_c1"
 SCRIPTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "scripts"
 SCHEMAS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "schemas"
 REQUIREMENTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "requirements.txt"
@@ -872,6 +873,13 @@ def main() -> int:
         command([str(venv_python), "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "-r", str(REQUIREMENTS)])
         command([str(venv_python), "-m", "pip", "install", "--no-cache-dir", "--disable-pip-version-check", "typing_extensions"])
         copy_controller(controller_root, source_commit)
+        # The C1 Runtime Closure CLI is a provisioning tool, not a Controller
+        # module. Copy its exact Git blobs into a separate read-only test-tools
+        # directory so a real Candidate UID can execute the existing capture
+        # contract without loading code from a mutable checkout path.
+        candidate_tools_root = base / "candidate-test-tools"
+        copy_source_tree(C1_TOOLS, candidate_tools_root,
+                         expected_blobs=_git_source_blob_manifest(C1_TOOLS, source_commit))
         os.chown(generation_root, 0, 0)
         os.chown(operation_root, 0, 0)
         os.chmod(generation_root, 0o755)
@@ -905,7 +913,7 @@ def main() -> int:
         candidate_closure_path = candidate_closure_dir / "runtime-closure.json"
         capture_args = [
             str(venv_python), "-I", "-S", "-B",
-            str(controller_root / "scripts" / "runtime_closure.py"), "capture",
+            str(candidate_tools_root / "runtime_closure.py"), "capture",
             "--source-commit", source_commit,
             "--inventory-sha256", build_sha,
             "--base-image-digest-claim", "sha256:" + "0" * 64,
