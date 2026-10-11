@@ -783,6 +783,89 @@ def _add_user(name: str) -> None:
                     "--shell", "/usr/sbin/nologin", name], check=True)
 
 
+def _root_directory(path: Path) -> None:
+    try:
+        path.mkdir(mode=0o755)
+    except FileExistsError:
+        pass
+    info = path.lstat()
+    if not stat.S_ISDIR(info.st_mode) or stat.S_ISLNK(info.st_mode):
+        raise RuntimeError(f"hosted trusted-code path is not a real directory: {path}")
+    os.chown(path, 0, 0)
+    os.chmod(path, 0o755)
+    info = path.lstat()
+    if info.st_uid != 0 or info.st_gid != 0 or stat.S_IMODE(info.st_mode) != 0o755:
+        raise RuntimeError(f"hosted trusted-code directory ownership/mode mismatch: {path}")
+
+
+def _install_readonly_hosted_source(base: Path) -> tuple[Path, dict[str, Any]]:
+    code_root = base / "trusted-code"
+    _root_directory(code_root)
+    script_source = Path(__file__).resolve(strict=True)
+    source_roots = (SCRIPTS, SCRIPTS.parent / "schemas")
+    pathspecs = [str(path.relative_to(ROOT)) for path in source_roots]
+    pathspecs.append(str(script_source.relative_to(ROOT)))
+    listed = subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "-s", "-z", "--", *pathspecs],
+        check=True, capture_output=True,
+    ).stdout
+    records: list[dict[str, str]] = []
+    for item in listed.split(b"\0"):
+        if not item:
+            continue
+        metadata, raw_relative = item.split(b"\t", 1)
+        mode, blob_sha, stage = metadata.decode("ascii").split()
+        relative_text = raw_relative.decode("utf-8")
+        source = ROOT / relative_text
+        info = source.lstat()
+        if (mode not in {"100644", "100755"} or stage != "0"
+                or not stat.S_ISREG(info.st_mode) or stat.S_ISLNK(info.st_mode)
+                or info.st_nlink != 1
+                or source.resolve(strict=True) != source):
+            raise RuntimeError(f"hosted trusted-code source is not a tracked canonical file: {relative_text}")
+        raw = source.read_bytes()
+        git_blob_sha = hashlib.sha1(b"blob " + str(len(raw)).encode("ascii") + b"\0" + raw).hexdigest()
+        if git_blob_sha != blob_sha:
+            raise RuntimeError(f"hosted trusted-code source differs from checked-out Git bytes: {relative_text}")
+        target = code_root / relative_text
+        relative_parent = target.parent.relative_to(code_root)
+        parent = code_root
+        for component in relative_parent.parts:
+            parent = parent / component
+            _root_directory(parent)
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                     | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0), 0o444)
+        try:
+            remaining = memoryview(raw)
+            while remaining:
+                written = os.write(fd, remaining)
+                if written <= 0:
+                    raise OSError("short write while copying hosted trusted code")
+                remaining = remaining[written:]
+            os.fsync(fd)
+            os.fchown(fd, 0, 0)
+            os.fchmod(fd, 0o444)
+        finally:
+            os.close(fd)
+        copied = target.read_bytes()
+        target_info = target.stat()
+        if (copied != raw or target_info.st_uid != 0 or target_info.st_gid != 0
+                or target_info.st_nlink != 1
+                or stat.S_IMODE(target_info.st_mode) != 0o444):
+            raise RuntimeError(f"hosted trusted-code copy verification failed: {relative_text}")
+        records.append({"path": relative_text, "sha256": _sha(raw), "git_blob_sha1": blob_sha})
+    script_copy = code_root / script_source.relative_to(ROOT)
+    if not records or not script_copy.is_file():
+        raise RuntimeError("hosted trusted-code copy is incomplete")
+    return script_copy, {
+        "check": "tracked source and schema bytes copied exactly for nonprivileged UID processes",
+        "result": "passed", "file_count": len(records),
+        "manifest_sha256": _sha(canonical_json_bytes(records)),
+        "code_root": str(code_root), "owner_uid": 0, "directory_mode": "0755",
+        "file_mode": "0444",
+    }
+
+
 def _hosted_identity_names(token: str) -> tuple[str, dict[str, str]]:
     if len(token) != 14 or any(character not in "0123456789abcdef" for character in token):
         raise RuntimeError("synthetic hosted identity token must be 14 lowercase hex characters")
@@ -832,9 +915,10 @@ def _child_process_identity(pid: int) -> dict[str, Any]:
 
 def _role_negative_probe(identity: pwd.struct_passwd, *, operator_dir: Path,
                          witness_file: Path, socket_path: Path,
-                         env: dict[str, str], is_operator: bool) -> dict[str, Any]:
+                         env: dict[str, str], is_operator: bool,
+                         script: Path) -> dict[str, Any]:
     role = identity.pw_name.rsplit("-", 1)[-1]
-    command = [sys.executable, "-I", str(Path(__file__).resolve()), "--role-negative-probe",
+    command = [sys.executable, "-I", str(script), "--role-negative-probe",
                "--operator-dir", str(operator_dir), "--witness-file", str(witness_file),
                "--socket", str(socket_path), "--role", role]
     completed = _run_as(identity, command, env=env)
@@ -1014,6 +1098,8 @@ def _run_root(args: argparse.Namespace) -> int:
         base_created = True
         os.chown(base, 0, 0)
         os.chmod(base, 0o711)
+        script, source_copy_evidence = _install_readonly_hosted_source(base)
+        report["checks"].append(source_copy_evidence)
         operator_dir = base / "operator-projection"
         operator_dir.mkdir(mode=0o700)
         os.chown(operator_dir, operator.pw_uid, operator.pw_gid)
@@ -1043,7 +1129,6 @@ def _run_root(args: argparse.Namespace) -> int:
         os.chown(witness_file, witness.pw_uid, witness.pw_gid)
         os.chmod(witness_file, 0o600)
 
-        script = Path(__file__).resolve()
         server = _launch_witness(script=script, state_file=witness_file,
                                  socket_path=socket_path, witness=witness,
                                  operator_uid=operator.pw_uid, api_gid=api_gid)
@@ -1110,21 +1195,21 @@ def _run_root(args: argparse.Namespace) -> int:
         # independently owned Witness high-water state.
         report["checks"].append(_role_negative_probe(
             operator, operator_dir=operator_dir, witness_file=witness_file,
-            socket_path=socket_path, env=safe_env, is_operator=True,
+            socket_path=socket_path, env=safe_env, is_operator=True, script=script,
         ))
         for role in ("candidate", "author", "reviewer", "approver"):
             report["checks"].append(_role_negative_probe(
                 identities[role], operator_dir=operator_dir, witness_file=witness_file,
-                socket_path=socket_path, env=safe_env, is_operator=False,
+                socket_path=socket_path, env=safe_env, is_operator=False, script=script,
             ))
         report["checks"].append(_role_negative_probe(
             identities["witness"], operator_dir=operator_dir, witness_file=witness_file,
-            socket_path=socket_path, env=safe_env, is_operator=False,
+            socket_path=socket_path, env=safe_env, is_operator=False, script=script,
         ))
 
         # Make a candidate-owned import shadow and pass it through PYTHONPATH.
-        # Isolated Python plus the Owner-controlled installed script path must
-        # keep the loaded C3 module inside the pinned checkout copy.
+        # Isolated Python plus the root-owned exact-source copy must keep the
+        # loaded C3 module inside the checkout-pinned source closure.
         shadow = base / "candidate-python-shadow"
         shadow.mkdir(mode=0o755)
         os.chown(shadow, identities["candidate"].pw_uid, identities["candidate"].pw_gid)
