@@ -34,6 +34,20 @@ Benchmark Quality Eligibility 1.0 is an independent, offline group-level foundat
 
 没有任务资料时也必须先形成整门课程 outline，再写逐课内容。Outline 至少给出目标、模块/项目、课次、学时、先决知识、能力阶段、课次产出、相邻课次衔接和案例策略；每项需包含 `lesson_id`、`unit`、`task`、`lesson_type`、`hours`、`theory_hours`、`practice_hours`、`prior_learning`、`capability_stage`、`deliverable`、`next_bridge`、`practice_task_ids`。outline 是全课程骨架，不能只根据单课临时拼接。
 
+## 日常教案的优秀案例检索与对照（默认 Agent 工作流）
+
+普通教案任务在课程基本盘和全课程 outline 冻结后、开始写 Lesson Content 前，先用当前可用的免费公开检索能力主动查找同课程/主题、相近学习者与教学情境的真实教学案例，并实际打开、阅读候选案例。优先核对政府与职业教育平台、院校正式发布的完整教案、已公开的教学能力比赛作品或有明确遴选依据的示范课。普通知识网页、课程介绍、教学大纲、获奖名单或搜索摘要本身都不是完整优秀教案。不得付费、绕过登录/付费墙或把未打开的页面说成已阅读。
+
+对候选案例沿用 `exemplar_contract.py` 的来源身份、作品分组、设计模式、学生活动、学习证据和 `do_not_copy` 思路；实际来源必须由 Agent 观察核实，脚本生成的卡片或哈希本身不能证明网页真实可读。`QUALIFIED` 只表示来源和结构符合 Exemplar Contract 的资格要求，不代表教学优秀；没有获奖或正式优秀认定证明，本身不妨碍结构合格来源成为 `QUALIFIED`，也不得虚构荣誉。另行判断 `QUALITY_ELIGIBLE` 时，必须按 `benchmark_quality_eligibility.py` 与 `docs/benchmark-quality-eligibility-v1.md` 的六项评估取得相应证据：权威性/优秀性（含合同要求的认可证据）、课程相关性、学习者相关性、教学情境相关性、模式证据充分度、可迁移性；Tier A、机构权威或单一荣誉都不能单独证明教学优秀或满足质量准入。记录缺证与限制，不把未经证实的来源写成 `QUALITY_ELIGIBLE`。每条可用来源在日常记录中注明原始 URL、发布机构/作者、题名、检索日期、实际读到的内容范围、优秀性证据（如有）、适用处、局限和具体可迁移模式。只摘取抽象设计方法，不复制原文、独特案例叙事、原学生数据或教师话术；课程事实仍以已确认的 Source Truth 为准。
+
+把可迁移方法落实到当前课的任务链：学生要解决的问题、教师与学生各自的可观察行动、产出/学习证据、形成性检查、合理的课堂工作量和必要支架。案例与本课程在专业方向、学段或课堂条件上的差异必须进入适用性判断。若检索不可用，或未找到可信、可读且足够相关的完整优秀教案，明确报告 `ONLINE_EXEMPLAR_SEARCH_NOT_EXECUTED` 或“未找到可信完整优秀教案”，说明实际情况后继续正常编写；可以使用真实但未证优秀的公开教案作有限参考，但要清楚标注，不能阻止教案生成。
+
+完成第一版 Content 及其现有 `pedagogical_review` 后、调用 Word 生成器前，再按 `schemas/benchmark-lesson-review.schema.json` 的全部 15 个维度逐项检查，并结合相关公开案例做日常对照。中文摘要应指出：本课已有的有效设计、案例中的具体模式、当前教案的实际证据、真实差距、适用性判断、建议动作及是否值得修改；只报告有教学意义的差距，来源未提供的信息标记为缺证。Source Truth 对齐只能依据课程资料，不能由优秀案例代替。
+
+普通模式使用中文标明“日常非盲对照”及其来源与限制。Author 已在编写前阅读案例时，写后比较必须承认同一上下文暴露；不得伪称独立 Reviewer、盲审、独立 A/B 评审、正式 `BENCHMARK_REVIEW_COMPLETE` 或 Authorization 通过，也不为普通任务伪造 Catalog、Split、A/B Packs、Selection、Review sidecars 或质量状态。只有发现确有教学价值、且不违背课时、Source Truth 和现有设计意图的问题时，才进行至多一轮实质性修订；没有实际问题就保留第一版，不为差异而改写。修订时更新 Content 2.3 原有 `pedagogical_review` 的 `issues`、`draft_content`、`revised_content`、`decision`、`review_history` 与对应 provenance/digest；一轮内完成复审，避免增加套话。
+
+正式 Quality Eligibility、确定性分组 Split、A/B Benchmark、15 维逐课 Review、Authorization 和 Acceptance 仍作为高级可选模式，继续使用 `exemplar_split.py`、`benchmark_preparation.py`、`validate_benchmark_review.py` 及既有合同和测试；不改变生成器 `--benchmark-mode none` 默认值、Content Schema 或正式流程。日常模式无需教师额外提供 JSON/Benchmark Pack，完成对照后仍经既有 canonical Word 生成器和 QA。
+
 ## Teaching Exemplar Benchmark 2.3
 
 Benchmark 是与 Lesson Content 分离的 sidecar 闭环，不增加 Lesson 字段，也不改变九阶段、课程结构、时间/评分规则、WorkOrder、现有 production transaction 或 Lesson Template 1.1.2。Skill 2.3.0 引入的生产授权机制保持不变：默认 `--benchmark-mode none`；`optional` 可不提供授权，但只要提供授权就必须同时提供完整 Benchmark evidence；正式 Benchmark 流程使用 `--benchmark-mode required --benchmark-authorization <authorization.json>` 与 Catalog、Split、A/B Packs、A/B Selections、课程 Review、逐课 Review shards。Round 2 还须提供 `--benchmark-previous-review`、`--benchmark-previous-lesson-reviews-dir` 和 `--benchmark-previous-content`。生成器与 Acceptance 都调用同一个 deterministic claims helper 重验全链，并比较 Authorization、artifact manifest 和 sidecar provenance。required 缺授权/证据、claims 不匹配或 sidecar 篡改都必须失败关闭。`2.3-benchmark-linked` 仅表示 Benchmark evidence chain 已绑定，不表示教学结论通过。Benchmark 不能证明课程或教学质量；Contract 1.0 支持 Content 2.2 与 2.3，并记录实际输入版本。
