@@ -32,6 +32,7 @@ from package_common import (
     field_spec,
     implementation_bookmarks,
     is_semantic_manifest,
+    legacy_layout_manifest,
     layout_manifest,
     load_manifest,
     manifest_template_path,
@@ -262,7 +263,7 @@ def _title_format_signature(document, manifest: dict[str, Any]) -> dict[str, Any
 
 
 def _protected_text_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    manifest = layout_manifest(manifest)
+    manifest = legacy_layout_manifest(manifest)
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable, evaluation = _writable_main_table_cells(manifest)
 
@@ -353,7 +354,7 @@ def _direct_format_signature(cell) -> dict[str, Any]:
 
 
 def _writable_direct_format_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    manifest = layout_manifest(manifest)
+    manifest = legacy_layout_manifest(manifest)
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     writable, evaluation = _writable_main_table_cells(manifest)
     values: list[dict[str, Any]] = []
@@ -382,7 +383,7 @@ def _writable_direct_format_signature(document, manifest: dict[str, Any]) -> lis
 
 
 def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) -> list[dict[str, Any]]:
-    manifest = layout_manifest(manifest)
+    manifest = legacy_layout_manifest(manifest)
     table = document.tables[int(manifest["structure"]["main_table"]["index"])]
     _writable, evaluation = _writable_main_table_cells(manifest)
     if evaluation is None:

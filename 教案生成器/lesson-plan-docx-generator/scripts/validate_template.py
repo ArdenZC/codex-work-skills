@@ -284,6 +284,123 @@ def _document_xml_without_bookmarks(path: Path, replacements: list[tuple[str, st
     return etree.tostring(root, method="c14n", with_comments=False)
 
 
+def _evaluation_width_patch(manifest: dict[str, Any]) -> list[int] | None:
+    patches = manifest.get("template", {}).get("patches", {})
+    value = patches.get("evaluation_table_column_widths_twips") if isinstance(patches, dict) else None
+    if value is None:
+        return None
+    if (
+        not isinstance(value, list)
+        or len(value) != 4
+        or any(type(width) is not int or width <= 0 for width in value)
+    ):
+        raise ValueError("template.patches.evaluation_table_column_widths_twips must contain four positive integers")
+    return value
+
+
+def _evaluation_pagination_patch(manifest: dict[str, Any]) -> dict[str, bool] | None:
+    patches = manifest.get("template", {}).get("patches", {})
+    value = patches.get("evaluation_table_pagination") if isinstance(patches, dict) else None
+    if value is None:
+        return None
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"keep_rows_together"}
+        or any(type(value[key]) is not bool for key in value)
+    ):
+        raise ValueError(
+            "template.patches.evaluation_table_pagination must declare boolean keep_rows_together"
+        )
+    return value
+
+
+def _evaluation_table_xml(root: etree._Element, manifest: dict[str, Any]) -> etree._Element:
+    spec = manifest["structure"]["evaluation_table"]
+    body = root.find(qn("w:body"))
+    top_tables = body.findall(qn("w:tbl")) if body is not None else []
+    table_index = int(spec["table"])
+    rows = top_tables[table_index].findall(qn("w:tr"))
+    cells = rows[int(spec["row"])].findall(qn("w:tc"))
+    nested = cells[int(spec["cell"])].findall(qn("w:tbl"))
+    if len(nested) != 1:
+        raise ValueError(f"expected one nested evaluation table, found {len(nested)}")
+    return nested[0]
+
+
+def _normalize_evaluation_pagination_to_reference(
+    actual_root: etree._Element,
+    reference_root: etree._Element,
+    manifest: dict[str, Any],
+) -> None:
+    """Ignore only the declared evaluation row-split flag."""
+    if _evaluation_pagination_patch(manifest) is None:
+        return
+    actual_rows = _evaluation_table_xml(actual_root, manifest).findall(qn("w:tr"))
+    reference_rows = _evaluation_table_xml(reference_root, manifest).findall(qn("w:tr"))
+    if len(actual_rows) != len(reference_rows):
+        raise ValueError("evaluation table row count changed while applying pagination patch")
+    for actual_row, reference_row in zip(actual_rows, reference_rows):
+        actual_properties = actual_row.find(qn("w:trPr"))
+        reference_properties = reference_row.find(qn("w:trPr"))
+        for tag in (qn("w:cantSplit"),):
+            reference_flags = reference_properties.findall(tag) if reference_properties is not None else []
+            actual_flags = actual_properties.findall(tag) if actual_properties is not None else []
+            if reference_flags:
+                if len(reference_flags) != len(actual_flags) or any(
+                    etree.tostring(expected) != etree.tostring(found)
+                    for expected, found in zip(reference_flags, actual_flags)
+                ):
+                    raise ValueError("evaluation pagination patch may add flags but cannot change baseline flags")
+            elif actual_flags:
+                for flag in actual_flags:
+                    actual_properties.remove(flag)
+        if actual_properties is not None and len(actual_properties) == 0:
+            if reference_properties is None or len(reference_properties) > 0:
+                actual_row.remove(actual_properties)
+
+
+def _normalize_evaluation_widths_to_reference(
+    actual_root: etree._Element,
+    reference_root: etree._Element,
+    manifest: dict[str, Any],
+) -> None:
+    """Ignore only declared evaluation grid/cell width values in baseline comparison."""
+    if _evaluation_width_patch(manifest) is None:
+        return
+    actual = _evaluation_table_xml(actual_root, manifest)
+    reference = _evaluation_table_xml(reference_root, manifest)
+    actual_grid = actual.find(qn("w:tblGrid"))
+    reference_grid = reference.find(qn("w:tblGrid"))
+    actual_columns = actual_grid.findall(qn("w:gridCol")) if actual_grid is not None else []
+    reference_columns = reference_grid.findall(qn("w:gridCol")) if reference_grid is not None else []
+    if len(actual_columns) != len(reference_columns) or len(actual_columns) != 4:
+        raise ValueError("evaluation table grid changed while applying declared width patch")
+    for actual_column, reference_column in zip(actual_columns, reference_columns):
+        if actual_column.get(qn("w:w")) is None or reference_column.get(qn("w:w")) is None:
+            raise ValueError("evaluation table grid column is missing its declared width")
+        actual_column.set(qn("w:w"), reference_column.get(qn("w:w")))
+
+    actual_rows = actual.findall(qn("w:tr"))
+    reference_rows = reference.findall(qn("w:tr"))
+    if len(actual_rows) != len(reference_rows):
+        raise ValueError("evaluation table row count changed while applying declared width patch")
+    for actual_row, reference_row in zip(actual_rows, reference_rows):
+        actual_cells = actual_row.findall(qn("w:tc"))
+        reference_cells = reference_row.findall(qn("w:tc"))
+        if len(actual_cells) != len(reference_cells) or len(actual_cells) != 4:
+            raise ValueError("evaluation table cell structure changed while applying declared width patch")
+        for actual_cell, reference_cell in zip(actual_cells, reference_cells):
+            actual_properties = actual_cell.find(qn("w:tcPr"))
+            reference_properties = reference_cell.find(qn("w:tcPr"))
+            actual_width = actual_properties.find(qn("w:tcW")) if actual_properties is not None else None
+            reference_width = reference_properties.find(qn("w:tcW")) if reference_properties is not None else None
+            if actual_width is None or reference_width is None:
+                raise ValueError("evaluation cell width is missing while applying declared width patch")
+            if actual_width.get(qn("w:w")) is None or reference_width.get(qn("w:w")) is None:
+                raise ValueError("evaluation cell width value is missing while applying declared width patch")
+            actual_width.set(qn("w:w"), reference_width.get(qn("w:w")))
+
+
 def _visible_text_replacements(manifest: dict[str, Any]) -> list[tuple[str, str]]:
     patches = manifest.get("template", {}).get("patches", {})
     values = patches.get("visible_text_replacements", []) if isinstance(patches, dict) else []
@@ -304,6 +421,7 @@ def _docx_equivalent_without_bookmarks(
     actual: Path,
     reference: Path,
     replacements: list[tuple[str, str]] | None = None,
+    manifest: dict[str, Any] | None = None,
 ) -> bool:
     with zipfile.ZipFile(actual, "r") as actual_zip, zipfile.ZipFile(reference, "r") as reference_zip:
         actual_names = set(actual_zip.namelist())
@@ -313,15 +431,22 @@ def _docx_equivalent_without_bookmarks(
             if name == "word/document.xml":
                 actual_xml = _document_xml_without_bookmarks(actual, replacements)
                 reference_xml = _document_xml_without_bookmarks(reference)
+                actual_root = etree.fromstring(actual_xml)
+                reference_root = etree.fromstring(reference_xml)
                 if replacements:
                     word_namespace = qn("w:body").split("}", 1)[0][1:]
-                    actual_root = etree.fromstring(_document_xml_without_bookmarks(actual))
-                    reference_root = etree.fromstring(reference_xml)
-                    actual_text = "\n".join(node.text or "" for node in actual_root.xpath(".//w:t", namespaces={"w": word_namespace}))
-                    reference_text = "\n".join(node.text or "" for node in reference_root.xpath(".//w:t", namespaces={"w": word_namespace}))
+                    actual_text_root = etree.fromstring(_document_xml_without_bookmarks(actual))
+                    original_text_root = etree.fromstring(_document_xml_without_bookmarks(reference))
+                    actual_text = "\n".join(node.text or "" for node in actual_text_root.xpath(".//w:t", namespaces={"w": word_namespace}))
+                    reference_text = "\n".join(node.text or "" for node in original_text_root.xpath(".//w:t", namespaces={"w": word_namespace}))
                     for old_text, new_text in replacements:
                         if actual_text.count(new_text) != reference_text.count(old_text):
                             return False
+                if manifest is not None:
+                    _normalize_evaluation_widths_to_reference(actual_root, reference_root, manifest)
+                    _normalize_evaluation_pagination_to_reference(actual_root, reference_root, manifest)
+                actual_xml = etree.tostring(actual_root, method="c14n", with_comments=False)
+                reference_xml = etree.tostring(reference_root, method="c14n", with_comments=False)
                 if actual_xml != reference_xml:
                     return False
                 continue
@@ -430,8 +555,57 @@ def validate_template(
                 f"got {len(nested.rows)}x{len(nested.columns)}"
             )
         report["checks"]["evaluation_table"] = {"rows": len(nested.rows), "columns": len(nested.columns)}
+        expected_widths = _evaluation_width_patch(manifest)
+        if expected_widths is not None:
+            table_width = nested._tbl.tblPr.find(qn("w:tblW"))
+            actual_table_width = int(table_width.get(qn("w:w"), "0")) if table_width is not None else 0
+            actual_grid_widths = [
+                int(column.get(qn("w:w"), "0"))
+                for column in nested._tbl.tblGrid.findall(qn("w:gridCol"))
+            ]
+            actual_row_widths = [
+                [
+                    int(cell._tc.tcPr.tcW.get(qn("w:w"), "0"))
+                    if cell._tc.tcPr is not None and cell._tc.tcPr.tcW is not None
+                    else 0
+                    for cell in actual_cells(row)
+                ]
+                for row in nested.rows
+            ]
+            widths_match = (
+                actual_grid_widths == expected_widths
+                and all(row_widths == expected_widths for row_widths in actual_row_widths)
+                and actual_table_width == sum(expected_widths)
+            )
+            report["checks"]["evaluation_table_widths_twips"] = {
+                "expected": expected_widths,
+                "actual_grid": actual_grid_widths,
+                "actual_table": actual_table_width,
+                "every_row_matches": all(row_widths == expected_widths for row_widths in actual_row_widths),
+            }
+            if not widths_match:
+                errors.append("Evaluation table widths do not match the manifest's declared column widths.")
+        expected_pagination = _evaluation_pagination_patch(manifest)
+        if expected_pagination is not None:
+            evaluation_rows = nested._tbl.tr_lst
+            actual_pagination = {
+                "rows_kept_together": all(
+                    row.find(qn("w:trPr")) is not None
+                    and row.find(qn("w:trPr")).find(qn("w:cantSplit")) is not None
+                    for row in evaluation_rows
+                ),
+            }
+            pagination_matches = actual_pagination["rows_kept_together"] == expected_pagination["keep_rows_together"]
+            report["checks"]["evaluation_table_pagination"] = {
+                "expected_keep_rows_together": expected_pagination["keep_rows_together"],
+                "actual_rows_kept_together": actual_pagination["rows_kept_together"],
+            }
+            if not pagination_matches:
+                errors.append("Evaluation table pagination does not match the manifest's declared row behavior.")
     except (IndexError, KeyError, TypeError) as exc:
         errors.append(f"Evaluation table coordinate is invalid: {exc}")
+    except ValueError as exc:
+        errors.append(f"Evaluation table width contract is invalid: {exc}")
 
     if is_semantic_manifest(manifest):
         inventory = validate_bookmark_inventory(
@@ -478,7 +652,12 @@ def validate_template(
             except ValueError as exc:
                 errors.append(str(exc))
                 replacements = []
-            if not _docx_equivalent_without_bookmarks(template, reference, replacements):
+            try:
+                equivalent = _docx_equivalent_without_bookmarks(template, reference, replacements, manifest)
+            except ValueError as exc:
+                errors.append(f"Semantic template patch is invalid: {exc}")
+                equivalent = False
+            if not equivalent:
                 errors.append("Semantic template changed visible content or structure relative to the protected baseline.")
             report["checks"]["visible_text_replacements"] = [
                 {"from": old_text, "to": new_text}

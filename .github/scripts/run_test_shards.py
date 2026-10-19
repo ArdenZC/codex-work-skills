@@ -48,6 +48,7 @@ SEMANTIC_LIFECYCLE_RENDER_TESTS = {
     "lesson-semantic-lifecycle-installed": frozenset({"test_installed_copy_external_controller_resume"}),
     "lesson-semantic-lifecycle-rollback": frozenset({"test_real_generator_publication_and_final_stale_rollback"}),
 }
+ISSUE71_TEMPLATE_TEST_MODULE = "tests.test_issue71_template_v113"
 GRADEBOOK_SHARDS = ROOT / ".github" / "scripts" / "run_gradebook_shards.py"
 LESSON_SKILL_TESTS = ROOT / "教案生成器" / "lesson-plan-docx-generator" / "tests"
 GRADEBOOK_SKILL_TESTS = ROOT / "平时成绩记分册生成器" / "course-gradebook-generator" / "tests"
@@ -152,9 +153,16 @@ def _lesson_content_ids() -> tuple[str, ...]:
 
 def _lesson_package_ids() -> tuple[str, ...]:
     mixin = importlib.import_module("tests.test_lesson_content_v2").LessonContentV2Mixin
-    return _class_test_ids(
-        "LessonTemplatePackageTests",
-        exclude=(name for name in vars(mixin) if name.startswith("test_")),
+    return tuple(
+        sorted(
+            (
+                *_class_test_ids(
+                    "LessonTemplatePackageTests",
+                    exclude=(name for name in vars(mixin) if name.startswith("test_")),
+                ),
+                *_module_test_ids(ISSUE71_TEMPLATE_TEST_MODULE),
+            )
+        )
     )
 
 
