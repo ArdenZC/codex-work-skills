@@ -40,7 +40,7 @@ def render_docx_directory(
     timeout: int = 180,
     pdf_output_dir: Path | str | None = None,
 ) -> dict[str, Any]:
-    """Render every DOCX and optionally retain PDFs for auditable manifests."""
+    """Render DOCX files; smoke results never claim visual readability was checked."""
 
     directory = Path(output_dir).expanduser().resolve()
     retained_pdf_dir = Path(pdf_output_dir).expanduser().resolve() if pdf_output_dir else None
@@ -56,6 +56,7 @@ def render_docx_directory(
                 "status": "failed",
                 "reason": "LibreOffice render smoke failed",
                 "scope": "smoke",
+                "visual_readability_status": "not_evaluated",
                 "renderer": None,
                 "files_checked": len(files),
                 "page_count": 0,
@@ -67,6 +68,7 @@ def render_docx_directory(
             "status": "not_executed",
             "reason": "LibreOffice render smoke not executed: LibreOffice/soffice was not found",
             "scope": "smoke",
+            "visual_readability_status": "not_evaluated",
             "renderer": None,
             "files_checked": 0,
             "page_count": 0,
@@ -79,6 +81,7 @@ def render_docx_directory(
             "status": "failed",
             "reason": "LibreOffice render smoke failed: no DOCX files were available for rendering",
             "scope": "smoke",
+            "visual_readability_status": "not_evaluated",
             "renderer": renderer,
             "files_checked": 0,
             "page_count": 0,
@@ -148,6 +151,7 @@ def render_docx_directory(
         "status": "failed" if errors else "passed",
         "reason": "LibreOffice render smoke passed" if not errors else "LibreOffice render smoke failed",
         "scope": "smoke",
+        "visual_readability_status": "not_evaluated",
         "renderer": renderer,
         "files_checked": len(files),
         "page_count": sum(page_counts.values()),

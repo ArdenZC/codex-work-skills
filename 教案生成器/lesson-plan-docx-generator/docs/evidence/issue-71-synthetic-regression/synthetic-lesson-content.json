@@ -1,0 +1,836 @@
+{
+  "content_contract_version": "2.3",
+  "course_name": "数据结构高级Issue71合成回归",
+  "major": "高职计算机应用技术专业",
+  "audience": "高职二年级学生",
+  "default_hours": 2,
+  "total_hours": 2,
+  "confirmed_course_info": {
+    "course_name": "数据结构高级Issue71合成回归",
+    "major": "高职计算机应用技术专业",
+    "audience": "高职二年级学生",
+    "total_hours": 2,
+    "theory_hours": 2,
+    "practice_hours": 0,
+    "delivery_mode": "theory_only"
+  },
+  "delivery_plan": {
+    "mode": "theory_only",
+    "total_hours": 2,
+    "theory_hours": 2,
+    "practice_hours": 0
+  },
+  "course_materials": {
+    "textbook": null
+  },
+  "reference_pool": [
+    {
+      "reference_id": "REF-HEP-GRAPH",
+      "reference_type": "book",
+      "title": "数据结构（C语言描述）（第3版）",
+      "authors": [
+        "李学刚"
+      ],
+      "edition": "第3版",
+      "publisher": "高等教育出版社",
+      "year": 2022,
+      "source_kind": "verified_public",
+      "source_region": "domestic",
+      "evidence": "2026-10-19读取出版社产品页和目录：核对作者、书名、版次、出版社、出版时间、ISBN；目录显示单元5“图”、图的存储结构、DFS与BFS。未读取完整教材章节。 ISBN 978-7-04-057486-9。https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=61aba9ab938b7cc2960edf7f",
+      "source_url": "https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=61aba9ab938b7cc2960edf7f",
+      "authoritative_source": "高等教育出版社产品信息检索系统"
+    }
+  ],
+  "reference_research": {
+    "status": "verified_external_source",
+    "note": "2026-10-19读取出版社产品页和目录：核对作者、书名、版次、出版社、出版时间、ISBN；目录显示单元5“图”、图的存储结构、DFS与BFS。未读取完整教材章节。",
+    "queries": [
+      {
+        "lesson_id": "L71A",
+        "query": "数据结构高级Issue71合成回归 高职计算机应用技术专业 建立图的邻接表示并推演DFS与BFS 数据结构教材 图的存储 DFS BFS 连通性"
+      }
+    ],
+    "sources": [
+      {
+        "reference_id": "REF-HEP-GRAPH",
+        "source_url": "https://xuanshu.hep.com.cn/front/book/findBookDetails?bookId=61aba9ab938b7cc2960edf7f",
+        "source_title": "数据结构（C语言描述）（第3版）",
+        "source_author_or_organization": "李学刚",
+        "source_year": 2022,
+        "authoritative_source": "高等教育出版社产品信息检索系统"
+      }
+    ]
+  },
+  "artifact_plan": {
+    "lesson_plans": true,
+    "practice_work_orders": false
+  },
+  "outline": [
+    {
+      "lesson_id": "L71A",
+      "unit": "项目三 图的概念、存储与遍历",
+      "task": "建立图的邻接表示并推演DFS与BFS",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "prior_learning": "学生已经能读取顶点与边的表格，并用字母标记一个简单无向图。",
+      "capability_stage": "理解",
+      "deliverable": "含邻接表、两种遍历记录和连通分量核验的图分析单。",
+      "next_bridge": "下一课从本课的邻接表示继续比较邻接矩阵，并分析稀疏图与稠密图的存储取舍。",
+      "practice_task_ids": []
+    }
+  ],
+  "lessons": [
+    {
+      "lesson_id": "L71A",
+      "unit": "项目三 图的概念、存储与遍历",
+      "task": "建立图的邻接表示并推演DFS与BFS",
+      "lesson_type": "theory",
+      "hours": 2,
+      "theory_hours": 2,
+      "practice_hours": 0,
+      "progression": {
+        "prior_lesson_id": null,
+        "prior_learning": "学生已经能读取顶点与边的表格，并用字母标记一个简单无向图。",
+        "capability_stage": "理解",
+        "deliverable": "含邻接表、两种遍历记录和连通分量核验的图分析单。",
+        "next_bridge": "下一课从本课的邻接表示继续比较邻接矩阵，并分析稀疏图与稠密图的存储取舍。"
+      },
+      "student_analysis": {
+        "base": [
+          "能够读取顶点和边的表格，并按给定字母标记相邻顶点。",
+          "接触过顺序表格整理，但尚未稳定记录遍历过程中的访问状态。"
+        ],
+        "problems": [
+          "容易把经过某条边和图整体连通性混为一谈，误判单边删除会产生孤立分量。",
+          "从 D 开始遍历时若不先约定邻居顺序，结果会因访问次序不同而无法复现。"
+        ],
+        "strategies": [
+          "先把边表转成按字母排序的邻接表，再用路径和已访问集合逐步复核。",
+          "分别检查任意单边删除与指定双边删除的连通分量，避免凭图形直觉下结论。"
+        ]
+      },
+      "teaching_content": [
+        "固定无向图：顶点 A–E，边 AB、AC、BC、CD、CE、DE；每条边在邻接表两端登记。",
+        "按字母序建立邻接表：A—B,C；B—A,C；C—A,B,D,E；D—C,E；E—C,D。",
+        "从 D 开始且邻居按字母序，递归 DFS 为 D→C→A→B→E，队列 BFS 为 D→C→E→A→B。",
+        "每次删除一条边后图仍连通；删除 CD 与 CE 后，连通分量为 {A,B,C} 与 {D,E}。"
+      ],
+      "goals": {
+        "knowledge": [
+          "说明无向边在邻接表中的双端登记规则，以及邻居顺序对遍历结果的影响。",
+          "区分单边移除后的替代路径与移除边集后的连通分量。"
+        ],
+        "ability": [
+          "从边表构造按字母序排列的邻接表，并用度数总和核对六条无向边。",
+          "按固定邻居顺序推演 DFS、BFS，并给出删边后的连通性证据。"
+        ],
+        "quality": [
+          "用图的明确约定和可复现路径支持判断，不以直觉替代边集核验。",
+          "发现遍历分歧时回到邻居顺序和访问记录说明并修订结果。"
+        ]
+      },
+      "key_point": {
+        "content": [
+          "无向图的邻接表双端登记与固定邻居顺序下的 DFS/BFS 推演。"
+        ],
+        "strategy": [
+          "先逐边检查对称登记，再逐步记录访问集合或队列。"
+        ]
+      },
+      "difficult_point": {
+        "content": [
+          "区分一次边移除与一组边移除对图连通性的不同影响。"
+        ],
+        "strategy": [
+          "用替代路径检验单边移除，用连通分量清单检验指定双边移除。"
+        ]
+      },
+      "teaching_methods": [
+        "边表到邻接表的任务推演",
+        "DFS/BFS 过程演示与同伴复核"
+      ],
+      "resources": [
+        "A–E 顶点与边卡片",
+        "邻接表及 DFS/BFS 过程记录单"
+      ],
+      "reference_ids": [
+        "REF-HEP-GRAPH"
+      ],
+      "practice_task_ids": [],
+      "implementation": [
+        {
+          "id": "before_class_preparation",
+          "label": "课前准备",
+          "minutes": 10,
+          "modality": "线上",
+          "content": [
+            "根据给定顶点和边表预填相邻关系，标出还需确认的遍历顺序。"
+          ],
+          "teacher_actions": [
+            "发布 A–E 的边表和预习单，提示记录无向边的表示规则。"
+          ],
+          "student_actions": [
+            "提交预习单，并圈出一组需要教师确认的相邻顶点。"
+          ],
+          "objective": "带着边表中的疑点进入邻接表示与遍历推演。"
+        },
+        {
+          "id": "task_introduction",
+          "label": "任务导入",
+          "minutes": 10,
+          "modality": "线下讨论",
+          "content": [
+            "提出维护人员删除一条链路后要判断网络是否分裂的问题。"
+          ],
+          "teacher_actions": [
+            "展示固定边集，追问“删任意一条边是否都会产生未访问分量”。"
+          ],
+          "student_actions": [
+            "先独立写下判断，再指出需要检查的顶点和路径。"
+          ],
+          "objective": "把图的连通性结论转成可被边集复核的问题。"
+        },
+        {
+          "id": "operation_demonstration",
+          "label": "方法示范",
+          "minutes": 15,
+          "modality": "板书演示",
+          "content": [
+            "示范无向边写入两个端点的邻接表，并按字母序排列邻居。"
+          ],
+          "teacher_actions": [
+            "用 D 起点演示 DFS 的递归回溯和 BFS 的队列入队/出队。"
+          ],
+          "student_actions": [
+            "同步记录每一步的当前顶点、邻居次序和访问集合。"
+          ],
+          "objective": "说明固定的邻居次序如何得到可复现的遍历序列。"
+        },
+        {
+          "id": "task_implementation",
+          "label": "任务实施",
+          "minutes": 25,
+          "modality": "小组研讨",
+          "content": [
+            "小组把 AB、AC、BC、CD、CE、DE 转成邻接表并检查对称性。"
+          ],
+          "teacher_actions": [
+            "巡视各组的存储表，追问一条无向边是否在两端都登记。"
+          ],
+          "student_actions": [
+            "完成五行邻接表，核对度数总和为 12，并交叉检查每条边。"
+          ],
+          "objective": "以邻接表和度数核验检验存储表示是否忠实于边集。"
+        },
+        {
+          "id": "task_extension",
+          "label": "变式核验",
+          "minutes": 10,
+          "modality": "个人推演",
+          "content": [
+            "逐一假设移除六条边中的一条，尝试从 D 到达其余顶点。"
+          ],
+          "teacher_actions": [
+            "要求学生把“仍连通”的结论写成具体路径，而非凭图形直觉判断。"
+          ],
+          "student_actions": [
+            "选择最容易误判的一条边，写出删除后的替代路径。"
+          ],
+          "objective": "核验任何单边删除后仍可连通，并留下可复查路径。"
+        },
+        {
+          "id": "project_practice",
+          "label": "图遍历推演",
+          "minutes": 15,
+          "modality": "小组实训",
+          "content": [
+            "分别从 D 执行 DFS、BFS，且每次按邻居字母序选择。"
+          ],
+          "teacher_actions": [
+            "检查 DFS 回溯位置和 BFS 队列变化，指出跳过邻居的依据。"
+          ],
+          "student_actions": [
+            "提交两条访问序列和逐步的栈/队列记录。"
+          ],
+          "objective": "形成 DFS D→C→A→B→E 与 BFS D→C→E→A→B 的过程证据。"
+        },
+        {
+          "id": "peer_review",
+          "label": "组间互评",
+          "minutes": 5,
+          "modality": "同伴互评",
+          "content": [
+            "交换图分析单，按边集、邻居序、访问序列、连通性四项互审。"
+          ],
+          "teacher_actions": [
+            "收集一处序列分歧，要求双方回到当前邻居表定位原因。"
+          ],
+          "student_actions": [
+            "标注一处可复现的正确证据或一项需要修正的记录。"
+          ],
+          "objective": "用同一输入和明确顺序定位遍历差异。"
+        },
+        {
+          "id": "lesson_summary",
+          "label": "课堂小结",
+          "minutes": 10,
+          "modality": "线下讨论",
+          "content": [
+            "对比删除一条边与同时删除 CD、CE 后的连通分量。"
+          ],
+          "teacher_actions": [
+            "总结边集、邻接表、遍历过程和连通性之间的核验链。"
+          ],
+          "student_actions": [
+            "口头说明单边删除仍连通，并写出双边删除后的两个分量。"
+          ],
+          "objective": "确认结论由当前图的边集推出，不把错误反例带入后续课。"
+        },
+        {
+          "id": "after_class_improvement",
+          "label": "课后完善",
+          "minutes": 15,
+          "modality": "线上",
+          "content": [
+            "依据互评修订图分析单，并附两种遍历序列的顺序约定。"
+          ],
+          "teacher_actions": [
+            "发布补充要求：将每条无向边与邻接表中的两个登记位置对应。"
+          ],
+          "student_actions": [
+            "提交修订版和一条单边删除后的替代路径。"
+          ],
+          "objective": "将课堂核验落实到可复查的图分析成果。"
+        }
+      ],
+      "evaluation": {
+        "score": 88.5,
+        "remarks": {
+          "attendance": "按时到课并提交课前邻接表预习单，图例与顶点集合一致",
+          "attention": "能沿示范逐步核对边表与邻接表中的六条无向边",
+          "participation": "在排序访问讨论中说明先访问 C 再访问 E 的依据",
+          "compliance": "按图例标注无向边，不把边的两个方向重复计作两条边",
+          "values": "用连通分量结果复核结论，发现与口头判断冲突后及时更正",
+          "ethics": "保留遍历起点和邻居顺序，使同伴能够复现记录结果",
+          "habits": "邻接表按字母顺序整理，并在提交前检查对称关系和度数和",
+          "online_learning": "完成课前图结构预读，能指出邻接表适合表达稀疏关系的原因",
+          "discussion": "围绕删边是否断连提出反例，并用实际路径解释单边删除仍连通",
+          "homework": "课后提交 DFS 与 BFS 访问序列，附邻居顺序和队列记录",
+          "practice": "准确写出 A 至 E 五个顶点及 AB、AC、BC、CD、CE、DE 六条边",
+          "presentation": "展示删除 CD 与 CE 后的两个连通分量，并说明 D、E 仍相连",
+          "improvement": "依据互评补齐图的存储表，并更正单条边删除即可断连的判断"
+        }
+      },
+      "reflection": {
+        "summary": "合成回归课以固定边集检查邻接表和遍历顺序；需重点观察学生能否用替代路径修正单边删除的连通性判断。",
+        "innovation": "用一次边移除和双边移除的对照，把遍历过程、存储表示和连通分量核验放进同一张图分析单。",
+        "improvement": "若小组仍按图形直觉判断连通，应在下一轮加入边表标注，要求先写路径再报告分量。"
+      },
+      "pedagogical_review": {
+        "issues": [],
+        "draft_content": {
+          "progression": {
+            "prior_lesson_id": null,
+            "prior_learning": "学生已经能读取顶点与边的表格，并用字母标记一个简单无向图。",
+            "capability_stage": "理解",
+            "deliverable": "含邻接表、两种遍历记录和连通分量核验的图分析单。",
+            "next_bridge": "下一课从本课的邻接表示继续比较邻接矩阵，并分析稀疏图与稠密图的存储取舍。"
+          },
+          "student_analysis": {
+            "base": [
+              "能够读取顶点和边的表格，并按给定字母标记相邻顶点。",
+              "接触过顺序表格整理，但尚未稳定记录遍历过程中的访问状态。"
+            ],
+            "problems": [
+              "容易把经过某条边和图整体连通性混为一谈，误判单边删除会产生孤立分量。",
+              "从 D 开始遍历时若不先约定邻居顺序，结果会因访问次序不同而无法复现。"
+            ],
+            "strategies": [
+              "先把边表转成按字母排序的邻接表，再用路径和已访问集合逐步复核。",
+              "分别检查任意单边删除与指定双边删除的连通分量，避免凭图形直觉下结论。"
+            ]
+          },
+          "teaching_content": [
+            "固定无向图：顶点 A–E，边 AB、AC、BC、CD、CE、DE；每条边在邻接表两端登记。",
+            "按字母序建立邻接表：A—B,C；B—A,C；C—A,B,D,E；D—C,E；E—C,D。",
+            "从 D 开始且邻居按字母序，递归 DFS 为 D→C→A→B→E，队列 BFS 为 D→C→E→A→B。",
+            "每次删除一条边后图仍连通；删除 CD 与 CE 后，连通分量为 {A,B,C} 与 {D,E}。"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明无向边在邻接表中的双端登记规则，以及邻居顺序对遍历结果的影响。",
+              "区分单边移除后的替代路径与移除边集后的连通分量。"
+            ],
+            "ability": [
+              "从边表构造按字母序排列的邻接表，并用度数总和核对六条无向边。",
+              "按固定邻居顺序推演 DFS、BFS，并给出删边后的连通性证据。"
+            ],
+            "quality": [
+              "用图的明确约定和可复现路径支持判断，不以直觉替代边集核验。",
+              "发现遍历分歧时回到邻居顺序和访问记录说明并修订结果。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "无向图的邻接表双端登记与固定邻居顺序下的 DFS/BFS 推演。"
+            ],
+            "strategy": [
+              "先逐边检查对称登记，再逐步记录访问集合或队列。"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "区分一次边移除与一组边移除对图连通性的不同影响。"
+            ],
+            "strategy": [
+              "用替代路径检验单边移除，用连通分量清单检验指定双边移除。"
+            ]
+          },
+          "teaching_methods": [
+            "边表到邻接表的任务推演",
+            "DFS/BFS 过程演示与同伴复核"
+          ],
+          "resources": [
+            "A–E 顶点与边卡片",
+            "邻接表及 DFS/BFS 过程记录单"
+          ],
+          "reference_ids": [
+            "REF-HEP-GRAPH"
+          ],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "线上",
+              "content": [
+                "根据给定顶点和边表预填相邻关系，标出还需确认的遍历顺序。"
+              ],
+              "teacher_actions": [
+                "发布 A–E 的边表和预习单，提示记录无向边的表示规则。"
+              ],
+              "student_actions": [
+                "提交预习单，并圈出一组需要教师确认的相邻顶点。"
+              ],
+              "objective": "带着边表中的疑点进入邻接表示与遍历推演。"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "线下讨论",
+              "content": [
+                "提出维护人员删除一条链路后要判断网络是否分裂的问题。"
+              ],
+              "teacher_actions": [
+                "展示固定边集，追问“删任意一条边是否都会产生未访问分量”。"
+              ],
+              "student_actions": [
+                "先独立写下判断，再指出需要检查的顶点和路径。"
+              ],
+              "objective": "把图的连通性结论转成可被边集复核的问题。"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "板书演示",
+              "content": [
+                "示范无向边写入两个端点的邻接表，并按字母序排列邻居。"
+              ],
+              "teacher_actions": [
+                "用 D 起点演示 DFS 的递归回溯和 BFS 的队列入队/出队。"
+              ],
+              "student_actions": [
+                "同步记录每一步的当前顶点、邻居次序和访问集合。"
+              ],
+              "objective": "说明固定的邻居次序如何得到可复现的遍历序列。"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 25,
+              "modality": "小组研讨",
+              "content": [
+                "小组把 AB、AC、BC、CD、CE、DE 转成邻接表并检查对称性。"
+              ],
+              "teacher_actions": [
+                "巡视各组的存储表，追问一条无向边是否在两端都登记。"
+              ],
+              "student_actions": [
+                "完成五行邻接表，核对度数总和为 12，并交叉检查每条边。"
+              ],
+              "objective": "以邻接表和度数核验检验存储表示是否忠实于边集。"
+            },
+            {
+              "id": "task_extension",
+              "label": "变式核验",
+              "minutes": 10,
+              "modality": "个人推演",
+              "content": [
+                "逐一假设移除六条边中的一条，尝试从 D 到达其余顶点。"
+              ],
+              "teacher_actions": [
+                "要求学生把“仍连通”的结论写成具体路径，而非凭图形直觉判断。"
+              ],
+              "student_actions": [
+                "选择最容易误判的一条边，写出删除后的替代路径。"
+              ],
+              "objective": "核验任何单边删除后仍可连通，并留下可复查路径。"
+            },
+            {
+              "id": "project_practice",
+              "label": "图遍历推演",
+              "minutes": 15,
+              "modality": "小组实训",
+              "content": [
+                "分别从 D 执行 DFS、BFS，且每次按邻居字母序选择。"
+              ],
+              "teacher_actions": [
+                "检查 DFS 回溯位置和 BFS 队列变化，指出跳过邻居的依据。"
+              ],
+              "student_actions": [
+                "提交两条访问序列和逐步的栈/队列记录。"
+              ],
+              "objective": "形成 DFS D→C→A→B→E 与 BFS D→C→E→A→B 的过程证据。"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 5,
+              "modality": "同伴互评",
+              "content": [
+                "交换图分析单，按边集、邻居序、访问序列、连通性四项互审。"
+              ],
+              "teacher_actions": [
+                "收集一处序列分歧，要求双方回到当前邻居表定位原因。"
+              ],
+              "student_actions": [
+                "标注一处可复现的正确证据或一项需要修正的记录。"
+              ],
+              "objective": "用同一输入和明确顺序定位遍历差异。"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "线下讨论",
+              "content": [
+                "对比删除一条边与同时删除 CD、CE 后的连通分量。"
+              ],
+              "teacher_actions": [
+                "总结边集、邻接表、遍历过程和连通性之间的核验链。"
+              ],
+              "student_actions": [
+                "口头说明单边删除仍连通，并写出双边删除后的两个分量。"
+              ],
+              "objective": "确认结论由当前图的边集推出，不把错误反例带入后续课。"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "线上",
+              "content": [
+                "依据互评修订图分析单，并附两种遍历序列的顺序约定。"
+              ],
+              "teacher_actions": [
+                "发布补充要求：将每条无向边与邻接表中的两个登记位置对应。"
+              ],
+              "student_actions": [
+                "提交修订版和一条单边删除后的替代路径。"
+              ],
+              "objective": "将课堂核验落实到可复查的图分析成果。"
+            }
+          ],
+          "evaluation": {
+            "score": 88.5,
+            "remarks": {
+              "attendance": "按时到课并提交课前邻接表预习单，图例与顶点集合一致",
+              "attention": "能沿示范逐步核对边表与邻接表中的六条无向边",
+              "participation": "在排序访问讨论中说明先访问 C 再访问 E 的依据",
+              "compliance": "按图例标注无向边，不把边的两个方向重复计作两条边",
+              "values": "用连通分量结果复核结论，发现与口头判断冲突后及时更正",
+              "ethics": "保留遍历起点和邻居顺序，使同伴能够复现记录结果",
+              "habits": "邻接表按字母顺序整理，并在提交前检查对称关系和度数和",
+              "online_learning": "完成课前图结构预读，能指出邻接表适合表达稀疏关系的原因",
+              "discussion": "围绕删边是否断连提出反例，并用实际路径解释单边删除仍连通",
+              "homework": "课后提交 DFS 与 BFS 访问序列，附邻居顺序和队列记录",
+              "practice": "准确写出 A 至 E 五个顶点及 AB、AC、BC、CD、CE、DE 六条边",
+              "presentation": "展示删除 CD 与 CE 后的两个连通分量，并说明 D、E 仍相连",
+              "improvement": "依据互评补齐图的存储表，并更正单条边删除即可断连的判断"
+            }
+          },
+          "reflection": {
+            "summary": "合成回归课以固定边集检查邻接表和遍历顺序；需重点观察学生能否用替代路径修正单边删除的连通性判断。",
+            "innovation": "用一次边移除和双边移除的对照，把遍历过程、存储表示和连通分量核验放进同一张图分析单。",
+            "improvement": "若小组仍按图形直觉判断连通，应在下一轮加入边表标注，要求先写路径再报告分量。"
+          }
+        },
+        "revised_content": {
+          "progression": {
+            "prior_lesson_id": null,
+            "prior_learning": "学生已经能读取顶点与边的表格，并用字母标记一个简单无向图。",
+            "capability_stage": "理解",
+            "deliverable": "含邻接表、两种遍历记录和连通分量核验的图分析单。",
+            "next_bridge": "下一课从本课的邻接表示继续比较邻接矩阵，并分析稀疏图与稠密图的存储取舍。"
+          },
+          "student_analysis": {
+            "base": [
+              "能够读取顶点和边的表格，并按给定字母标记相邻顶点。",
+              "接触过顺序表格整理，但尚未稳定记录遍历过程中的访问状态。"
+            ],
+            "problems": [
+              "容易把经过某条边和图整体连通性混为一谈，误判单边删除会产生孤立分量。",
+              "从 D 开始遍历时若不先约定邻居顺序，结果会因访问次序不同而无法复现。"
+            ],
+            "strategies": [
+              "先把边表转成按字母排序的邻接表，再用路径和已访问集合逐步复核。",
+              "分别检查任意单边删除与指定双边删除的连通分量，避免凭图形直觉下结论。"
+            ]
+          },
+          "teaching_content": [
+            "固定无向图：顶点 A–E，边 AB、AC、BC、CD、CE、DE；每条边在邻接表两端登记。",
+            "按字母序建立邻接表：A—B,C；B—A,C；C—A,B,D,E；D—C,E；E—C,D。",
+            "从 D 开始且邻居按字母序，递归 DFS 为 D→C→A→B→E，队列 BFS 为 D→C→E→A→B。",
+            "每次删除一条边后图仍连通；删除 CD 与 CE 后，连通分量为 {A,B,C} 与 {D,E}。"
+          ],
+          "goals": {
+            "knowledge": [
+              "说明无向边在邻接表中的双端登记规则，以及邻居顺序对遍历结果的影响。",
+              "区分单边移除后的替代路径与移除边集后的连通分量。"
+            ],
+            "ability": [
+              "从边表构造按字母序排列的邻接表，并用度数总和核对六条无向边。",
+              "按固定邻居顺序推演 DFS、BFS，并给出删边后的连通性证据。"
+            ],
+            "quality": [
+              "用图的明确约定和可复现路径支持判断，不以直觉替代边集核验。",
+              "发现遍历分歧时回到邻居顺序和访问记录说明并修订结果。"
+            ]
+          },
+          "key_point": {
+            "content": [
+              "无向图的邻接表双端登记与固定邻居顺序下的 DFS/BFS 推演。"
+            ],
+            "strategy": [
+              "先逐边检查对称登记，再逐步记录访问集合或队列。"
+            ]
+          },
+          "difficult_point": {
+            "content": [
+              "区分一次边移除与一组边移除对图连通性的不同影响。"
+            ],
+            "strategy": [
+              "用替代路径检验单边移除，用连通分量清单检验指定双边移除。"
+            ]
+          },
+          "teaching_methods": [
+            "边表到邻接表的任务推演",
+            "DFS/BFS 过程演示与同伴复核"
+          ],
+          "resources": [
+            "A–E 顶点与边卡片",
+            "邻接表及 DFS/BFS 过程记录单"
+          ],
+          "reference_ids": [
+            "REF-HEP-GRAPH"
+          ],
+          "implementation": [
+            {
+              "id": "before_class_preparation",
+              "label": "课前准备",
+              "minutes": 10,
+              "modality": "线上",
+              "content": [
+                "根据给定顶点和边表预填相邻关系，标出还需确认的遍历顺序。"
+              ],
+              "teacher_actions": [
+                "发布 A–E 的边表和预习单，提示记录无向边的表示规则。"
+              ],
+              "student_actions": [
+                "提交预习单，并圈出一组需要教师确认的相邻顶点。"
+              ],
+              "objective": "带着边表中的疑点进入邻接表示与遍历推演。"
+            },
+            {
+              "id": "task_introduction",
+              "label": "任务导入",
+              "minutes": 10,
+              "modality": "线下讨论",
+              "content": [
+                "提出维护人员删除一条链路后要判断网络是否分裂的问题。"
+              ],
+              "teacher_actions": [
+                "展示固定边集，追问“删任意一条边是否都会产生未访问分量”。"
+              ],
+              "student_actions": [
+                "先独立写下判断，再指出需要检查的顶点和路径。"
+              ],
+              "objective": "把图的连通性结论转成可被边集复核的问题。"
+            },
+            {
+              "id": "operation_demonstration",
+              "label": "方法示范",
+              "minutes": 15,
+              "modality": "板书演示",
+              "content": [
+                "示范无向边写入两个端点的邻接表，并按字母序排列邻居。"
+              ],
+              "teacher_actions": [
+                "用 D 起点演示 DFS 的递归回溯和 BFS 的队列入队/出队。"
+              ],
+              "student_actions": [
+                "同步记录每一步的当前顶点、邻居次序和访问集合。"
+              ],
+              "objective": "说明固定的邻居次序如何得到可复现的遍历序列。"
+            },
+            {
+              "id": "task_implementation",
+              "label": "任务实施",
+              "minutes": 25,
+              "modality": "小组研讨",
+              "content": [
+                "小组把 AB、AC、BC、CD、CE、DE 转成邻接表并检查对称性。"
+              ],
+              "teacher_actions": [
+                "巡视各组的存储表，追问一条无向边是否在两端都登记。"
+              ],
+              "student_actions": [
+                "完成五行邻接表，核对度数总和为 12，并交叉检查每条边。"
+              ],
+              "objective": "以邻接表和度数核验检验存储表示是否忠实于边集。"
+            },
+            {
+              "id": "task_extension",
+              "label": "变式核验",
+              "minutes": 10,
+              "modality": "个人推演",
+              "content": [
+                "逐一假设移除六条边中的一条，尝试从 D 到达其余顶点。"
+              ],
+              "teacher_actions": [
+                "要求学生把“仍连通”的结论写成具体路径，而非凭图形直觉判断。"
+              ],
+              "student_actions": [
+                "选择最容易误判的一条边，写出删除后的替代路径。"
+              ],
+              "objective": "核验任何单边删除后仍可连通，并留下可复查路径。"
+            },
+            {
+              "id": "project_practice",
+              "label": "图遍历推演",
+              "minutes": 15,
+              "modality": "小组实训",
+              "content": [
+                "分别从 D 执行 DFS、BFS，且每次按邻居字母序选择。"
+              ],
+              "teacher_actions": [
+                "检查 DFS 回溯位置和 BFS 队列变化，指出跳过邻居的依据。"
+              ],
+              "student_actions": [
+                "提交两条访问序列和逐步的栈/队列记录。"
+              ],
+              "objective": "形成 DFS D→C→A→B→E 与 BFS D→C→E→A→B 的过程证据。"
+            },
+            {
+              "id": "peer_review",
+              "label": "组间互评",
+              "minutes": 5,
+              "modality": "同伴互评",
+              "content": [
+                "交换图分析单，按边集、邻居序、访问序列、连通性四项互审。"
+              ],
+              "teacher_actions": [
+                "收集一处序列分歧，要求双方回到当前邻居表定位原因。"
+              ],
+              "student_actions": [
+                "标注一处可复现的正确证据或一项需要修正的记录。"
+              ],
+              "objective": "用同一输入和明确顺序定位遍历差异。"
+            },
+            {
+              "id": "lesson_summary",
+              "label": "课堂小结",
+              "minutes": 10,
+              "modality": "线下讨论",
+              "content": [
+                "对比删除一条边与同时删除 CD、CE 后的连通分量。"
+              ],
+              "teacher_actions": [
+                "总结边集、邻接表、遍历过程和连通性之间的核验链。"
+              ],
+              "student_actions": [
+                "口头说明单边删除仍连通，并写出双边删除后的两个分量。"
+              ],
+              "objective": "确认结论由当前图的边集推出，不把错误反例带入后续课。"
+            },
+            {
+              "id": "after_class_improvement",
+              "label": "课后完善",
+              "minutes": 15,
+              "modality": "线上",
+              "content": [
+                "依据互评修订图分析单，并附两种遍历序列的顺序约定。"
+              ],
+              "teacher_actions": [
+                "发布补充要求：将每条无向边与邻接表中的两个登记位置对应。"
+              ],
+              "student_actions": [
+                "提交修订版和一条单边删除后的替代路径。"
+              ],
+              "objective": "将课堂核验落实到可复查的图分析成果。"
+            }
+          ],
+          "evaluation": {
+            "score": 88.5,
+            "remarks": {
+              "attendance": "按时到课并提交课前邻接表预习单，图例与顶点集合一致",
+              "attention": "能沿示范逐步核对边表与邻接表中的六条无向边",
+              "participation": "在排序访问讨论中说明先访问 C 再访问 E 的依据",
+              "compliance": "按图例标注无向边，不把边的两个方向重复计作两条边",
+              "values": "用连通分量结果复核结论，发现与口头判断冲突后及时更正",
+              "ethics": "保留遍历起点和邻居顺序，使同伴能够复现记录结果",
+              "habits": "邻接表按字母顺序整理，并在提交前检查对称关系和度数和",
+              "online_learning": "完成课前图结构预读，能指出邻接表适合表达稀疏关系的原因",
+              "discussion": "围绕删边是否断连提出反例，并用实际路径解释单边删除仍连通",
+              "homework": "课后提交 DFS 与 BFS 访问序列，附邻居顺序和队列记录",
+              "practice": "准确写出 A 至 E 五个顶点及 AB、AC、BC、CD、CE、DE 六条边",
+              "presentation": "展示删除 CD 与 CE 后的两个连通分量，并说明 D、E 仍相连",
+              "improvement": "依据互评补齐图的存储表，并更正单条边删除即可断连的判断"
+            }
+          },
+          "reflection": {
+            "summary": "合成回归课以固定边集检查邻接表和遍历顺序；需重点观察学生能否用替代路径修正单边删除的连通性判断。",
+            "innovation": "用一次边移除和双边移除的对照，把遍历过程、存储表示和连通分量核验放进同一张图分析单。",
+            "improvement": "若小组仍按图形直觉判断连通，应在下一轮加入边表标注，要求先写路径再报告分量。"
+          }
+        },
+        "decision": "approved",
+        "review_history": [
+          {
+            "round": 1,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "24B99F942F3A26EAB2CEF74DC0D0514C93A7A074AB733BDDA04AB04827DA2D55"
+          }
+        ]
+      }
+    }
+  ],
+  "authoring_provenance": {
+    "mode": "agent",
+    "status": "completed",
+    "authoring_id": "issue-71-synthetic-regression-20261019",
+    "source_snapshot": {
+      "confirmed_course_profile_sha256": "E31F08F7E205AE597DF37F72164EF89E057CB6053352A4400F42A4ABBB5A4786",
+      "whole_course_outline_sha256": "FE3442069A8EDC711DE42203D2E7023D932D86904A570AD94B175127EE2FA219",
+      "reference_pool_sha256": "72409411DA5E69A641A32698C571172B87EAEC2DF254C608DC35ED2820F8F388"
+    },
+    "draft_content_sha256": "B2E4C910EC013903899A3EC017C4444C2ECFBF8CBA733CEA555384FFD7390014",
+    "final_content_sha256": "B2E4C910EC013903899A3EC017C4444C2ECFBF8CBA733CEA555384FFD7390014",
+    "review_rounds": 1
+  }
+}

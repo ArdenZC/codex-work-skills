@@ -35,6 +35,19 @@ and all eleven passed/failed checks: clipping, overflow, overlap, blank_pages,
 abnormal_page_break, large_blank_block, missing_text, text_outside_table,
 abnormal_row_height, table_boundary, broken_nested_evaluation_table.
 
+For every sampled Lesson, locate the complete evaluation table in the retained PDF
+and inspect every page it occupies, including pages beyond the deterministic
+first/middle/last sample when needed. Check whether remarks remain readable at
+normal page scale, how the narrow remarks column wraps, whether a row splits or
+expands abnormally, and whether the table leaves excessive blank space at the end.
+Record those actual page numbers and observations in the inspection evidence;
+mark `abnormal_row_height` or `table_boundary` failed when the layout makes the
+remarks unreadable, and explain the readability failure in `notes`. A successful
+PDF conversion or page count is only `PDF_RENDER`; it cannot establish
+`VISUAL_READABILITY`. Do not clear or change any score, rubric, or evaluation
+remark to make the table fit. A layout change that alters the protected template
+requires an Owner decision before implementation.
+
 Evidence and all lifecycle sidecars must remain **outside** the immutable final
 output directory; use the run workspace. Never modify an already authorized output.
 
