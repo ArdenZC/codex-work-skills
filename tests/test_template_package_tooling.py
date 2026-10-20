@@ -304,16 +304,17 @@ class TemplatePackageToolingTests(unittest.TestCase):
         target = skill / "assets" / "templates" / "demo-template" / "v1.0.1"
         return skill, base, other, source, target
 
-    def test_discover_current_seven_packages_without_libreoffice(self) -> None:
+    def test_discover_current_eight_packages_without_libreoffice(self) -> None:
         result = self.run_tool("discover", "--json")
         self.assert_process_succeeded(result)
         payload = self.json_result(result)
-        self.assertEqual(payload["count"], 7)
+        self.assertEqual(payload["count"], 8)
         self.assertEqual({(item["id"], item["version"]) for item in payload["packages"]}, {
             ("lesson-plan", "1.0.0"),
             ("lesson-plan", "1.1.0"),
             ("lesson-plan", "1.1.1"),
             ("lesson-plan", "1.1.2"),
+            ("lesson-plan", "1.1.3"),
             ("course-gradebook", "1.0.0"),
             ("course-gradebook", "1.1.0"),
             ("practice-work-order", "1.0.0"),

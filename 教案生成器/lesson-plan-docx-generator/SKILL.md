@@ -200,6 +200,14 @@ Canonical generator、template fidelity 或 Output QA 任一环节失败，必�
 
 默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。Content 2.2/2.3 不请求 render 时可报告 `qa_status=passed`、`production_status=structural_pass`，不得称为生产通过。存在 Lesson 产物的课程只有在真实 render 成功、每课 PDF 均已保留且 SHA-256/页数校验通过后才是 `production_status=production_pass`；无 Lesson 产物时保持 `structural_pass`。缺少渲染后端或 render 失败须 fail-closed。`--render` 只代表 smoke，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
 
+教师单次明确选择候选模板 1.1.3 时，可在独立生成命令中同时传入其模板和 manifest；模板 QA 与输出 QA 仍照常执行，成功后核对 `qa-report.json` 的 `template_version`：
+
+```powershell
+python scripts/generate_lesson_plans.py --tasks-json tasks.json --output-dir output --template assets/templates/lesson-plan/v1.1.3/template.docx --manifest assets/templates/lesson-plan/v1.1.3/manifest.yaml --render
+```
+
+从 Lesson Skill 目录运行，或将两个模板路径替换为安装目录下的对应绝对路径。此显式选择只影响本次独立生成，不改变默认版本；当前 canonical Orchestrator production 仍要求默认模板，直到另有 Owner 决策完成迁移和资格确认。
+
 生产命令：
 
 ```powershell

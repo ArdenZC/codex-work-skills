@@ -98,6 +98,29 @@ def _merge_signature(path: Path) -> list[list[list[tuple[str, str]]]]:
 
 
 class Issue71TemplateV113Tests(unittest.TestCase):
+    def test_protected_fixture_and_template_manifests_are_checked_out_as_lf(self) -> None:
+        paths = [
+            ISSUE71_INPUT.relative_to(ROOT).as_posix(),
+            (V112 / "manifest.yaml").relative_to(ROOT).as_posix(),
+            *[path.relative_to(ROOT).as_posix() for path in sorted(V113.rglob("manifest.yaml"))],
+        ]
+        result = subprocess.run(
+            ["git", "check-attr", "-z", "eol", "--", *paths],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        fields = result.stdout.split("\0")
+        self.assertEqual(fields[-1], "")
+        triples = [fields[index : index + 3] for index in range(0, len(fields) - 1, 3)]
+        attributes = {path: value for path, name, value in triples if name == "eol"}
+        self.assertEqual(attributes, {path: "lf" for path in paths})
+        for relative_path in paths:
+            self.assertNotIn(b"\r\n", (ROOT / relative_path).read_bytes(), relative_path)
+
     def test_v113_has_declared_evaluation_layout_and_v112_is_unchanged(self) -> None:
         old_template = V112 / "template.docx"
         old_manifest = V112 / "manifest.yaml"
