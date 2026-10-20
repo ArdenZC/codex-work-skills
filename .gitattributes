@@ -1,3 +1,6 @@
 /教案生成器/lesson-plan-docx-generator/examples/synthetic-benchmark-closure/**/*.json text eol=lf
 /tests/fixtures/lesson-original-nc02.json text eol=lf
 /tests/fixtures/semantic-scope/**/*.json text eol=lf
+/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-71-synthetic-regression/synthetic-lesson-content.json text eol=lf
+/教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.2/manifest.yaml text eol=lf
+/教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.3/**/manifest.yaml text eol=lf

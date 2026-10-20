@@ -60,9 +60,11 @@ DEFAULT_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2"
 V10_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "manifest.yaml"
 V11_MANIFEST = DEFAULT_MANIFEST
 V111_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
+V113_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.3" / "manifest.yaml"
 V10_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
 V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 V111_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
+V113_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.3" / "template.docx"
 LEGACY_TEMPLATE = SKILL_DIR / "assets" / "lesson-plan-template.docx"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -383,6 +385,7 @@ def validate_agent_owned_content(data: dict[str, Any], *, allow_test_fixture: bo
 def _known_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
     known = (
+        (V113_TEMPLATE, "1.1.3"),
         (V11_TEMPLATE, "1.1.2"),
         (V111_TEMPLATE, "1.1.1"),
         (V10_TEMPLATE, "1.0.0"),
@@ -404,6 +407,7 @@ def _known_template_version(path: Path) -> str | None:
 def _exact_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
     for candidate, version in (
+        (V113_TEMPLATE, "1.1.3"),
         (V11_TEMPLATE, "1.1.2"),
         (V111_TEMPLATE, "1.1.1"),
         (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "template.docx", "1.1.0"),
@@ -526,7 +530,9 @@ def resolve_template_package(
 
     if manifest is None:
         known_version = _known_template_version(template)
-        if known_version == "1.1.2":
+        if known_version == "1.1.3":
+            resolved_manifest = V113_MANIFEST.resolve()
+        elif known_version == "1.1.2":
             resolved_manifest = V11_MANIFEST.resolve()
         elif known_version == "1.1.1":
             resolved_manifest = V111_MANIFEST.resolve()
@@ -534,7 +540,7 @@ def resolve_template_package(
             resolved_manifest = (SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.0" / "manifest.yaml").resolve()
         elif known_version == "1.0.0":
             resolved_manifest = V10_MANIFEST.resolve()
-        elif template.parent.name in {"v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2"} and (template.parent / "manifest.yaml").exists():
+        elif template.parent.name in {"v1.0.0", "v1.1.0", "v1.1.1", "v1.1.2", "v1.1.3"} and (template.parent / "manifest.yaml").exists():
             resolved_manifest = (template.parent / "manifest.yaml").resolve()
         else:
             raise ValueError("Custom template requires a matching --manifest.")
@@ -791,6 +797,21 @@ def layout_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     """Return the coordinate manifest used only for protected layout comparisons."""
     reference = base_manifest_path(manifest)
     return load_manifest(reference) if reference is not None else manifest
+
+
+def legacy_layout_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Follow semantic template ancestry to its legacy coordinate manifest."""
+    current = manifest
+    seen: set[Path] = set()
+    while is_semantic_manifest(current):
+        reference = base_manifest_path(current)
+        if reference is None:
+            raise ValueError("Semantic template ancestry is missing its base manifest")
+        if reference in seen:
+            raise ValueError(f"Semantic template ancestry contains a base-manifest cycle: {reference}")
+        seen.add(reference)
+        current = load_manifest(reference)
+    return current
 
 
 def required_bookmarks(manifest: dict[str, Any]) -> list[str]:

@@ -123,7 +123,7 @@ after_class_improvement
 
 每阶段由 Agent 写入 `content`、`teacher_actions`、`student_actions` 和 `objective`。学生可观察的证据/产出写在现有 `student_actions`；需要时在 `objective` 中说明证据与学习目标的对应关系。Content Contract 2.2 没有独立的 `student_evidence` 或 `success_criteria` 字段，它们是未来契约升级候选，不得作为 2.2 输入字段。必须形成“内容 → 教师活动 → 学生活动及证据/产出 → 设计意图”的阶段级教学链；不要求每个小项机械重复课题，也不能用“所有 item status=passed”作为唯一语义判断。同一课内部可以自然复用必要术语，但不得复制机械句式。阶段语义由 Agent review 负责。
 
-`pedagogical_review` 是真正的内容交接，不是 PASS/FAIL 标签。每课必须保存 `issues`、`draft_content`、`revised_content`、`decision` 和 `review_history`。若发现专业表达不自然、跨课模板复读、活动不可执行、课时容量不合理或参考资料不相关，Agent 必须先返回重写后的 `revised_content`，再进行至少一轮复审；最终 `decision=approved` 且 `issues=[]`。生成器只消费最终 reviewed content，并用 digest 链核对初稿、重写稿和复审顺序。
+`pedagogical_review` 是真正的内容交接，不是 PASS/FAIL 标签。每课必须保存 `issues`、`draft_content`、`revised_content`、`decision` 和 `review_history`。若发现专业表达不自然、跨课模板复读、活动不可执行、课时容量不合理或参考资料不相关，Agent 必须先返回重写后的 `revised_content`，再进行至少一轮复审；最终 `decision=approved` 且 `issues=[]`。教学表达要落到本课的问题、教师的具体追问或示范、学生可检查的作品、即时反馈和成功标准；避免重复“本阶段聚焦 X / 教师围绕 X / 学生针对 X / 本阶段核验 X”句式。保留必要的知识解释和支架，不以缩短文字代替教学改进。生成器只消费最终 reviewed content，并用 digest 链核对初稿、重写稿和复审顺序。
 
 时间合同固定为：课前准备 10 分钟、课后完善 15 分钟；七个课中阶段合计严格等于 `lesson.hours × 45` 分钟。课前/课后不计入 `theory_hours`、`total_hours` 或课堂学时；每课必须显式写入 10 和 15，不能写 0 或可变范围。1 学时 Lesson 的课中内容、步骤、证据和任务复杂度必须实质性少于 2 学时，不能只把分钟数缩短。
 
@@ -131,7 +131,11 @@ after_class_improvement
 
 `course_materials.textbook`、课次 `resources` 和课程级 `reference_pool` 始终分离。教材、PPT、课件、案例表/案例数据、任务单、设备、环境和内部教学文件不是 references。教材对象要求真实 `authors`/编者、`title`、`publisher`、`source_kind`；`edition`、`year`、ISBN 等可选，可靠时才写年份；不写“年份未知”、空逗号或猜测书目信息。
 
-有可验证外部来源时，Agent 先检索真实来源再建立 reference pool；`book` 至少有作者/编者、书名、出版社，`formal_course_document` 保留真实责任者、机构和平台/出版社，URL/evidence 只留在 JSON/QA。`reference_research.status=no_verified_external_source` 只表示没有核实到公开来源，不表示没有用户提供的来源；reference pool 可以为空，也可以只包含真实且有出处的 `source_kind=provided` 正式资料。此状态下 query/source 列表必须为空，且不能出现 `verified_public`。此时课次 `reference_ids` 可以为空。只要存在 `verified_public` references，当前兼容硬门槛仍要求每课至少关联一条；逐课相关性门槛留待 2.3 重新设计。参考资料规划概念可称 `course_reference_pool` 或 `reference_catalog`，落盘仍只有 canonical `reference_pool`；`source_region` 只作描述统计，不设国内来源占比门槛。不得为了“凑数”虚构作者、出版社、ISBN、标准编号或公开来源。
+有可验证外部来源时，Agent 先检索真实来源再建立 reference pool，并按以下顺序寻找与本课实际主题相符的资料：已确认使用的课程教材或教师提供的正式中文资料；中文专业教材/高职教材；实际读到相关内容的权威中文教学文件或课程资源；只有确有必要且内容相关时再考虑英文原始资料。该顺序是检索优先级，不是地区配额；不为凑数加入不相关的中文来源，也不禁止有用的英文原始来源。
+
+书籍条目核对真实作者/编者、书名、版次、出版社，以及出版社可核实的出版年或 ISBN（如适用）；课程文档核对真实责任者、机构、平台/出版社和对应课题。优先查看出版社/出版机构页面、目录或可访问的相关章节，并记录实际读到的范围。目录只能证明目录所示主题匹配，不能声称已读完整章节；课程首页不能机械复用为每课的第二条参考文献。老师的课件和任务书可以作为教学资源/课程来源依据，但不能冒充出版物。无法核实作者、题名、版次、出版社、年份/ISBN 或相关性时宁缺毋滥，并报告缺口；不得编造章页、出版信息、荣誉或阅读经历。`book` 至少有作者/编者、书名、出版社，`formal_course_document` 保留真实责任者、机构和平台/出版社，URL/evidence 只留在 JSON/QA。
+
+`reference_research.status=no_verified_external_source` 只表示没有核实到公开来源，不表示没有用户提供的来源；reference pool 可以为空，也可以只包含真实且有出处的 `source_kind=provided` 正式资料。此状态下 query/source 列表必须为空，且不能出现 `verified_public`。此时课次 `reference_ids` 可以为空。只要存在 `verified_public` references，当前兼容硬门槛仍要求每课至少关联一条；逐课相关性门槛留待 2.3 重新设计。参考资料规划概念可称 `course_reference_pool` 或 `reference_catalog`，落盘仍只有 canonical `reference_pool`；`source_region` 只作描述统计，不设国内来源占比门槛。不得为了“凑数”虚构作者、出版社、ISBN、标准编号或公开来源。
 
 引用身份只做保守规范化：Unicode、书名括号、空白、全/半角标点、中文/阿拉伯数字版次和常见版次后缀可统一；相近但不同的书名不能被模糊合并，例如“数据结构基础”不能等同于“高级数据结构”。教材不进入 references；同一真实来源跨课复用可以通过，单课内部重复仍失败。禁止为了降低课程重复率编造或改写参考来源。
 
@@ -152,6 +156,12 @@ Lesson Agent 先完成全课程 outline、当前 delivery mode 所需 Lesson、C
 Agent 负责课程级规划、相邻衔接、案例策略、所有教学正文、阶段活动、学生证据、评价 remarks、反思、参考来源判断和 Practice Task prose。每课必须附 `pedagogical_review`，至少审阅专业准确性、目标—活动—证据链、阶段连贯性、课时容量、递进关系和参考文献相关性；发现问题先重写再交给生成器。
 
 Python 只 hard-fail 可确定事实：课时和阶段分钟、理论/实践账、ID 与 outline 一致性、按合同版本与 delivery mode 校验 `practice_task_ids`、参考来源元数据/来源状态、教材与 references 分离、课程基本盘、schema、模板、事务、DOCX 结构/保真和真实渲染。它不得用字符 n-gram、相似度阈值、动作词或专业词库来判断自然度、相关性、教学价值、案例质量、90 分钟完成度或阶段语义，也不能发现问题后向 JSON 追加教学句子。
+
+## 评价数据与 QA 结论边界
+
+评价表的视觉排版问题不能通过清空、重分配、重算或重新解释 `evaluation.score`、各项得分、评价维度或评分政策来修复；预填得分也不自动构成缺陷。评价备注应完整保留。若需要调整备注列宽或表格结构，先列出兼容方案并取得 Owner 对模板/布局变更的明确决定，不得改动 Template 1.1.2 binary、其固定行列/列宽/书签，或用缩小字号、压缩间距和任意页数上限掩盖问题。
+
+报告 QA 时分别记录 `CONTENT`、`TEMPLATE_STRUCTURE`、`PDF_RENDER`、`VISUAL_READABILITY`、`SUBJECT_CORRECTNESS`、`REFERENCES` 和 `CROSS_FILE_ALIGNMENT`。DOCX 结构通过不代表可读性通过；PDF 转换和页数通过只代表 render smoke 通过，不代表分页/视觉、学科事实、参考来源或跨文件一致性通过。评价表要检查实际跨页、备注列换行和尾页留白；用现有 Visual Sampling 与 Visual Review Packet 选样并记录真实检查页，不增加新的 Authority 或付费审查服务。
 
 为防止机械注入，formatter 只删除独立的主题元话术尾缀，如 `聚焦/聚焦于/围绕/针对/对应主题/核心主题/本节主题/任务主题/本节关联：...`；正常专业句子不改写，例如“比较两种结构的空间代价，对应不同数据规模。” 最终 DOCX 的这类 meta suffix 计数必须为 0，不能把防御性清理当作根层教学质量判断。
 
@@ -189,6 +199,14 @@ Canonical generator、template fidelity 或 Output QA 任一环节失败，必�
 正式生成命令 `generate_lesson_plans.py --render` 必须在唯一 `run_id` 下保留 DOCX 和 PDF，并写出同目录 `artifact-manifest.json`，记录课程、专业、学时、DOCX/PDF SHA-256、实际页数、QA status 和 render status。standalone `validate_output.py --render` 只执行临时诊断 render，不保留 PDF，也不能产生 `production_pass`。验收报告只从 generator manifest 读取 artifact path、页数与指纹，不手写或猜测页数。
 
 默认使用模板路径 `assets/templates/lesson-plan/v1.1.2/template.docx`。生成器先在正式目录同父目录创建 candidate，所有结构/内容/模板/路径 QA 通过后才交换；非空输出目录需显式 `--backup-existing`，失败须恢复原输出。Content 2.2/2.3 不请求 render 时可报告 `qa_status=passed`、`production_status=structural_pass`，不得称为生产通过。存在 Lesson 产物的课程只有在真实 render 成功、每课 PDF 均已保留且 SHA-256/页数校验通过后才是 `production_status=production_pass`；无 Lesson 产物时保持 `structural_pass`。缺少渲染后端或 render 失败须 fail-closed。`--render` 只代表 smoke，不能声称分页/视觉通过。人工视觉检查另行记录，至少查看第一课、最密集课和最后一课。
+
+教师单次明确选择候选模板 1.1.3 时，可在独立生成命令中同时传入其模板和 manifest；模板 QA 与输出 QA 仍照常执行，成功后核对 `qa-report.json` 的 `template_version`：
+
+```powershell
+python scripts/generate_lesson_plans.py --tasks-json tasks.json --output-dir output --template assets/templates/lesson-plan/v1.1.3/template.docx --manifest assets/templates/lesson-plan/v1.1.3/manifest.yaml --render
+```
+
+从 Lesson Skill 目录运行，或将两个模板路径替换为安装目录下的对应绝对路径。此显式选择只影响本次独立生成，不改变默认版本；当前 canonical Orchestrator production 仍要求默认模板，直到另有 Owner 决策完成迁移和资格确认。
 
 生产命令：
 
