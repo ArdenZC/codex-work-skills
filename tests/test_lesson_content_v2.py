@@ -1586,6 +1586,13 @@ class LessonContentV2Mixin:
                 created_under.append(Path(kwargs["dir"]).resolve())
                 return real_mkdtemp(*args, **kwargs)
 
+            # The probe is invoked with Darwin behavior below, but the test
+            # itself can run on a case-sensitive Linux volume (or a
+            # case-sensitive APFS/NTFS volume). Capture this volume's actual
+            # behavior first so the assertion checks the probe result rather
+            # than assuming the runner's default filesystem format.
+            lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
+            expected_case_sensitivity = filesystem_case_sensitive(protected)
             lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
             with (
                 patch.object(lesson_path_safety.sys, "platform", "darwin"),
@@ -1593,7 +1600,9 @@ class LessonContentV2Mixin:
                 patch.object(lesson_path_safety.tempfile, "gettempdir", return_value=str(safe_temp)),
                 patch.object(lesson_path_safety.tempfile, "mkdtemp", side_effect=tracked_mkdtemp),
             ):
-                self.assertFalse(filesystem_case_sensitive(protected))
+                self.assertEqual(
+                    filesystem_case_sensitive(protected), expected_case_sensitivity
+                )
             self.assertEqual(created_under, [safe_temp.resolve()])
             self.assertEqual(list(protected.iterdir()), [])
             self.assertFalse(paths_overlap(safe_temp, protected))
