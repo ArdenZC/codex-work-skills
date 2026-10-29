@@ -20,7 +20,15 @@ from lesson_acceptance import _generation_evidence_gate
 from package_common import canonical_json_sha256, content_digest_rollup, lesson_agent_content
 from project_merge import validate_project_merge
 from tests.test_lesson_content_v22 import _refresh_review_digests
-from tests.test_lesson_content_v23 import _base_payload, _bind_v23, _outline_row, _task
+from tests.test_lesson_content_v22 import make_v22_payload
+from tests.test_lesson_content_v23 import (
+    _base_payload,
+    _bind_v23,
+    _outline_row,
+    _task,
+    lesson_acceptance,
+    lesson_content_quality,
+)
 from tests.test_lesson_content_v2 import lesson_generator
 
 
@@ -123,6 +131,135 @@ class LessonContentV24Tests(unittest.TestCase):
                 self.assertTrue(all(item["lesson_type"] == "practice" for item in payload["lessons"]))
                 self.assertEqual(sum(item["practice_hours"] for item in payload["lessons"]), 40)
                 self.assertEqual(len(payload.get("practice_task_contract", {}).get("tasks", [])), 20 if workorders else 0)
+
+    def test_40_hour_modes_pass_full_content_qa_and_acceptance_practice_handoff(self) -> None:
+        cases = (
+            ("separate_full_lessons", 20, 20, False, 10, 10),
+            ("separate_full_lessons", 20, 20, True, 10, 10),
+            ("practice_only", 0, 40, False, 0, 20),
+            ("practice_only", 0, 40, True, 0, 20),
+        )
+        for mode, theory, practice, workorders, theory_lessons, practice_lessons in cases:
+            with self.subTest(mode=mode, workorders=workorders):
+                payload = make_v24_payload(
+                    mode=mode,
+                    theory_hours=theory,
+                    practice_hours=practice,
+                    workorders=workorders,
+                )
+                self.validate(payload)
+                quality = lesson_content_quality.assess_content_quality(payload)
+                self.assertEqual(quality["status"], "passed", quality["errors"])
+                self.assertEqual(len(payload["lessons"]), 20)
+                self.assertEqual(
+                    sum(item["lesson_type"] == "theory" for item in payload["lessons"]),
+                    theory_lessons,
+                )
+                self.assertEqual(
+                    sum(item["lesson_type"] == "practice" for item in payload["lessons"]),
+                    practice_lessons,
+                )
+                self.assertEqual(quality["practice_handoff"]["status"], "passed" if workorders else "not_applicable")
+                handoff = lesson_acceptance.practice_handoff_metrics(payload)
+                self.assertEqual(handoff["status"], "PASS" if workorders else "not_applicable", handoff)
+                self.assertEqual(handoff["lesson_task_linkage_complete"], True)
+                self.assertEqual(handoff["task_count"], practice // 2 if workorders else 0)
+                self.assertEqual(sum(item["hours"] for item in payload["lessons"]), 40)
+
+    def test_v24_missing_duplicate_overlapping_and_mismatched_links_fail_both_qa_paths(self) -> None:
+        for mode, theory, practice in (("separate_full_lessons", 4, 4), ("practice_only", 0, 4)):
+            base = make_v24_payload(mode=mode, theory_hours=theory, practice_hours=practice, workorders=True)
+
+            cases = {}
+
+            missing = copy.deepcopy(base)
+            missing["practice_task_contract"]["tasks"][0]["lesson_ids"] = ["L-NOT-FOUND"]
+            cases["missing_lesson"] = missing
+
+            duplicate = copy.deepcopy(base)
+            first_id = duplicate["practice_task_contract"]["tasks"][0]["lesson_ids"][0]
+            duplicate["practice_task_contract"]["tasks"][0]["lesson_ids"].append(first_id)
+            cases["duplicate_lesson_allocation"] = duplicate
+
+            overlap = copy.deepcopy(base)
+            overlap_tasks = overlap["practice_task_contract"]["tasks"]
+            self.assertGreaterEqual(len(overlap_tasks), 2)
+            first_id = overlap_tasks[0]["lesson_ids"][0]
+            old_second_id = overlap_tasks[1]["lesson_ids"][0]
+            overlap_tasks[1]["lesson_ids"] = [first_id]
+            first_lesson = next(item for item in overlap["lessons"] if item["lesson_id"] == first_id)
+            old_second_lesson = next(item for item in overlap["lessons"] if item["lesson_id"] == old_second_id)
+            first_lesson["practice_task_ids"].append(overlap_tasks[1]["task_id"])
+            old_second_lesson["practice_task_ids"].remove(overlap_tasks[1]["task_id"])
+            cases["overlapping_practice_hours"] = overlap
+
+            reverse_mismatch = copy.deepcopy(base)
+            task = reverse_mismatch["practice_task_contract"]["tasks"][0]
+            linked_lesson = next(item for item in reverse_mismatch["lessons"] if item["lesson_id"] == task["lesson_ids"][0])
+            linked_lesson["practice_task_ids"].remove(task["task_id"])
+            cases["reverse_link_mismatch"] = reverse_mismatch
+
+            for label, payload in cases.items():
+                with self.subTest(mode=mode, invalid_case=label):
+                    quality = lesson_content_quality.assess_content_quality(payload)
+                    handoff = lesson_acceptance.practice_handoff_metrics(payload)
+                    self.assertEqual(quality["status"], "failed", quality["practice_handoff"])
+                    self.assertEqual(quality["practice_handoff"]["status"], "failed")
+                    self.assertEqual(handoff["status"], "FAIL", handoff)
+                    if label in {"duplicate_lesson_allocation", "overlapping_practice_hours"}:
+                        self.assertTrue(handoff["practice_hour_allocation_errors"], handoff)
+
+    def test_historical_22_23_workorder_link_semantics_remain_unchanged(self) -> None:
+        content_22 = make_v22_payload(
+            theory_hours=20,
+            practice_hours=20,
+            lesson_count=10,
+            practice_work_orders=True,
+        )
+        self.validate(content_22)
+        qa_22 = lesson_content_quality.assess_content_quality(content_22)
+        self.assertEqual(qa_22["status"], "passed", qa_22["errors"])
+        self.assertEqual(lesson_acceptance.practice_handoff_metrics(content_22)["status"], "PASS")
+        self.assertTrue(all(not lesson.get("practice_task_ids") for lesson in content_22["lessons"]))
+
+        content_23_split = _base_payload(theory_hours=20, practice_hours=20, lesson_count=10)
+        _bind_v23(
+            content_23_split,
+            mode="split_lessons",
+            theory_hours=20,
+            practice_hours=20,
+            workorders=True,
+            task_links=[["L01"] for _ in range(10)],
+        )
+        lesson_generator.validate_test_fixture_content_v2_input(content_23_split)
+        qa_23_split = lesson_content_quality.assess_content_quality(content_23_split)
+        self.assertEqual(qa_23_split["status"], "passed", qa_23_split["errors"])
+        self.assertEqual(lesson_acceptance.practice_handoff_metrics(content_23_split)["status"], "PASS")
+        self.assertTrue(all(not lesson.get("practice_task_ids") for lesson in content_23_split["lessons"]))
+
+        content_23_practice_only = make_v22_payload(
+            course="护理技能实训",
+            major="护理专业",
+            audience="高职二年级",
+            theory_hours=0,
+            practice_hours=40,
+            lesson_count=0,
+            practice_work_orders=True,
+        )
+        _bind_v23(
+            content_23_practice_only,
+            mode="practice_only",
+            theory_hours=0,
+            practice_hours=40,
+            workorders=True,
+            task_links=[[] for _ in range(20)],
+        )
+        lesson_generator.validate_test_fixture_content_v2_input(content_23_practice_only)
+        qa_23_practice_only = lesson_content_quality.assess_content_quality(content_23_practice_only)
+        self.assertEqual(qa_23_practice_only["status"], "passed", qa_23_practice_only["errors"])
+        self.assertEqual(lesson_acceptance.practice_handoff_metrics(content_23_practice_only)["status"], "PASS")
+        self.assertEqual(content_23_practice_only["lessons"], [])
+        self.assertTrue(all(not task["lesson_ids"] for task in content_23_practice_only["practice_task_contract"]["tasks"]))
 
     def test_40_hour_theory_only_generates_20_theory_lessons(self) -> None:
         payload = make_v24_payload(mode="theory_only", theory_hours=40, practice_hours=0)
@@ -298,6 +435,9 @@ class LessonContentV24Tests(unittest.TestCase):
         unsearched = copy.deepcopy(evidence)
         unsearched["exemplar_research"]["status"] = "not_executed"
         self.assertTrue(any("cannot pass" in message for message in validate_generation_evidence(unsearched, payload, content_bytes=raw)))
+        search_blocked = copy.deepcopy(evidence)
+        search_blocked["exemplar_research"]["status"] = "search_blocked"
+        self.assertTrue(any("cannot pass" in message for message in validate_generation_evidence(search_blocked, payload, content_bytes=raw)))
         no_comparison = copy.deepcopy(evidence)
         no_comparison["lesson_comparisons"] = []
         self.assertTrue(validate_generation_evidence(no_comparison, payload, content_bytes=raw))

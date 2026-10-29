@@ -1874,11 +1874,13 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
 
 
 def practice_hour_allocation_errors_v23(data: dict[str, Any]) -> list[str]:
-    """Return Content 2.3 integrated/hybrid WorkOrder allocation violations.
+    """Return version-aware full-Lesson WorkOrder allocation violations.
 
-    In these modes, task.lesson_ids names the Lesson practice-hours allocated
-    to that 2-hour task.  The links therefore form a disjoint, complete
-    partition of practice-bearing Lesson hours.
+    Content 2.3 applies this to integrated/hybrid. Content 2.4 also uses it
+    for separate_full_lessons/practice_only. In these modes, task.lesson_ids
+    names the Lesson practice-hours allocated to that 2-hour task. The links
+    therefore form a disjoint, complete partition of practice-bearing Lesson
+    hours.
     """
 
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}

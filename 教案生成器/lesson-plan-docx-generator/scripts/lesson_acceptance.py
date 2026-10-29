@@ -769,7 +769,10 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
         invalid_links: list[dict[str, Any]] = []
         unresolved: list[dict[str, Any]] = []
         linked_tasks: set[str] = set()
-        full_links = mode in {"integrated_lessons", "hybrid"}
+        content_version = str(data.get("content_contract_version", ""))
+        full_links = mode in {"integrated_lessons", "hybrid"} or (
+            content_version == "2.4" and mode in {"separate_full_lessons", "practice_only"}
+        )
         if not requested:
             invalid_disabled = contract_value is not None or any(lesson_task_ids.values())
             return {
@@ -810,7 +813,7 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
                 invalid_links.append({"task_id": task_id, "lesson_id": None})
             if mode == "split_lessons" and _number(plan.get("theory_hours")) and not linked_ids:
                 invalid_links.append({"task_id": task_id, "lesson_id": None})
-            if mode == "practice_only" and linked_ids:
+            if mode == "practice_only" and not full_links and linked_ids:
                 invalid_links.extend({"task_id": task_id, "lesson_id": value} for value in linked_ids)
             for lesson_id in linked_ids:
                 linked = lesson_map.get(lesson_id)

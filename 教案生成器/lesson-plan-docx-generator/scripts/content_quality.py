@@ -3165,7 +3165,7 @@ def _v22_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
-    """Summarize supplementary WorkOrders and the Content 2.3 Lesson/task links."""
+    """Summarize version-aware supplementary WorkOrders and Lesson/task links."""
 
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
     artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), dict) else {}
@@ -3243,14 +3243,17 @@ def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     if not math.isclose(task_hours, expected_hours, abs_tol=1e-9):
         errors.append("practice task hours do not match delivery_plan.practice_hours")
 
-    full_lesson_links = mode in {"integrated_lessons", "hybrid"}
+    content_version = str(data.get("content_contract_version", ""))
+    full_lesson_links = mode in {"integrated_lessons", "hybrid"} or (
+        content_version == "2.4" and mode in {"separate_full_lessons", "practice_only"}
+    )
     for task_id, task in task_by_id.items():
         linked_ids = [str(value) for value in task.get("lesson_ids", [])]
         if full_lesson_links and not linked_ids:
             invalid_links.append({"task_id": task_id, "lesson_id": None})
         if mode == "split_lessons" and expected_hours > 0 and not linked_ids:
             invalid_links.append({"task_id": task_id, "lesson_id": None})
-        if mode == "practice_only" and linked_ids:
+        if mode == "practice_only" and not full_lesson_links and linked_ids:
             invalid_links.extend({"task_id": task_id, "lesson_id": lesson_id} for lesson_id in linked_ids)
         for lesson_id in linked_ids:
             lesson = lesson_by_id.get(lesson_id)
