@@ -1,11 +1,11 @@
 ---
 name: lesson-plan-docx-generator
-description: Generate projectized Chinese vocational-course lesson plan DOCX files from Lesson Content Contract 2.3 (with explicit 2.2 compatibility), using the protected Word template, deterministic QA, and optional render smoke.
+description: Generate projectized Chinese vocational-course lesson plan DOCX files from the full-coverage Lesson Content Contract 2.4 while retaining explicit historical 2.2/2.3 compatibility.
 ---
 
 # 教案生成器 Skill 2.3.1
 
-本文件是 Lesson 的唯一人类行为合同。当前版本为 Lesson Skill 2.3.1、默认 Lesson Content Contract 2.3、兼容 Content Contract 2.2、Lesson Template 1.1.2、Acceptance 3.0（canonical lifecycle）/2.0（legacy 兼容）、Exemplar Contract 1.0、Benchmark Review 1.0 和 Authorization 1.0。默认 Word 模板 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Schema 和 Python 只实现确定性字段、课时、来源、模板和输出门禁，不代替 Agent 创作教学正文或教学判断。
+本文件是 Lesson 的唯一人类行为合同。Skill 版本仍是 2.3.1；本分支为新课程引入 Content Contract 2.4（保留 Content 2.2/2.3 历史兼容）、Lesson Template 1.1.2、Acceptance 3.0 / 2.0、Exemplar Contract 1.0、Benchmark Review 1.0 和 Authorization 1.0。Template 1.1.2 binary 与版本不变；2.0/2.1 只作显式 `--legacy` 兼容读取。Content 2.4 不改九阶段、评分数值/规则和评价栏目，并要求运行期 generation-evidence 门禁。
 
 
 ## Lifecycle candidate / practice_only 路由
@@ -40,11 +40,11 @@ Benchmark Quality Eligibility 1.0 is an independent, offline group-level foundat
 
 对候选案例沿用 `exemplar_contract.py` 的来源身份、作品分组、设计模式、学生活动、学习证据和 `do_not_copy` 思路；实际来源必须由 Agent 观察核实，脚本生成的卡片或哈希本身不能证明网页真实可读。`QUALIFIED` 只表示来源和结构符合 Exemplar Contract 的资格要求，不代表教学优秀；没有获奖或正式优秀认定证明，本身不妨碍结构合格来源成为 `QUALIFIED`，也不得虚构荣誉。另行判断 `QUALITY_ELIGIBLE` 时，必须按 `benchmark_quality_eligibility.py` 与 `docs/benchmark-quality-eligibility-v1.md` 的六项评估取得相应证据：权威性/优秀性（含合同要求的认可证据）、课程相关性、学习者相关性、教学情境相关性、模式证据充分度、可迁移性；Tier A、机构权威或单一荣誉都不能单独证明教学优秀或满足质量准入。记录缺证与限制，不把未经证实的来源写成 `QUALITY_ELIGIBLE`。每条可用来源在日常记录中注明原始 URL、发布机构/作者、题名、检索日期、实际读到的内容范围、优秀性证据（如有）、适用处、局限和具体可迁移模式。只摘取抽象设计方法，不复制原文、独特案例叙事、原学生数据或教师话术；课程事实仍以已确认的 Source Truth 为准。
 
-把可迁移方法落实到当前课的任务链：学生要解决的问题、教师与学生各自的可观察行动、产出/学习证据、形成性检查、合理的课堂工作量和必要支架。案例与本课程在专业方向、学段或课堂条件上的差异必须进入适用性判断。若检索不可用，或未找到可信、可读且足够相关的完整优秀教案，明确报告 `ONLINE_EXEMPLAR_SEARCH_NOT_EXECUTED` 或“未找到可信完整优秀教案”，说明实际情况后继续正常编写；可以使用真实但未证优秀的公开教案作有限参考，但要清楚标注，不能阻止教案生成。
+把可迁移方法落实到当前课的任务链：学生要解决的问题、教师与学生各自的可观察行动、产出/学习证据、形成性检查、合理的课堂工作量和必要支架。案例与本课程在专业方向、学段或课堂条件上的差异必须进入适用性判断。优秀性未经核实时只能标 `not_proven`；若没有可信完整优秀教案，可使用真实、可访问且有具体教学过程的公开设计作有限方法对照，不得伪称优秀。Content 2.4 必须在 `generation-evidence.json` 留下逐项目搜索、来源阅读和限制；没有执行搜索、没有可读对照来源或记录缺失时可继续撰写草稿，但生成器必须拒绝报告完整证据通过及正式交付。
 
 完成第一版 Content 及其现有 `pedagogical_review` 后、调用 Word 生成器前，再按 `schemas/benchmark-lesson-review.schema.json` 的全部 15 个维度逐项检查，并结合相关公开案例做日常对照。中文摘要应指出：本课已有的有效设计、案例中的具体模式、当前教案的实际证据、真实差距、适用性判断、建议动作及是否值得修改；只报告有教学意义的差距，来源未提供的信息标记为缺证。Source Truth 对齐只能依据课程资料，不能由优秀案例代替。
 
-普通模式使用中文标明“日常非盲对照”及其来源与限制。Author 已在编写前阅读案例时，写后比较必须承认同一上下文暴露；不得伪称独立 Reviewer、盲审、独立 A/B 评审、正式 `BENCHMARK_REVIEW_COMPLETE` 或 Authorization 通过，也不为普通任务伪造 Catalog、Split、A/B Packs、Selection、Review sidecars 或质量状态。只有发现确有教学价值、且不违背课时、Source Truth 和现有设计意图的问题时，才进行至多一轮实质性修订；没有实际问题就保留第一版，不为差异而改写。修订时更新 Content 2.3 原有 `pedagogical_review` 的 `issues`、`draft_content`、`revised_content`、`decision`、`review_history` 与对应 provenance/digest；一轮内完成复审，避免增加套话。
+普通模式使用中文标明“日常非盲对照”及其来源与限制。Author 已在编写前阅读案例时，写后比较必须承认同一上下文暴露；不得伪称独立 Reviewer、盲审、独立 A/B 评审、正式 `BENCHMARK_REVIEW_COMPLETE` 或 Authorization 通过，也不为普通任务伪造 Catalog、Split、A/B Packs、Selection、Review sidecars 或质量状态。Content 2.4 将这项逐课对照绑定到完整 Lesson 内容摘要，并逐项记录已有设计、教学证据、差距、改进理由和结论。只有发现确有教学价值、且不违背课时、Source Truth 和现有设计意图的问题时，才进行至多一轮实质性修订；没有实际问题就保留第一版，不为差异而改写。修订时更新对应的 `pedagogical_review` 与 provenance/digest；一轮内完成复审，避免增加套话。
 
 正式 Quality Eligibility、确定性分组 Split、A/B Benchmark、15 维逐课 Review、Authorization 和 Acceptance 仍作为高级可选模式，继续使用 `exemplar_split.py`、`benchmark_preparation.py`、`validate_benchmark_review.py` 及既有合同和测试；不改变生成器 `--benchmark-mode none` 默认值、Content Schema 或正式流程。日常模式无需教师额外提供 JSON/Benchmark Pack，完成对照后仍经既有 canonical Word 生成器和 QA。
 
@@ -84,9 +84,30 @@ Authorization 由 `build_benchmark_authorization.py` 在完整验证 Content、C
 
 Acceptance 2.0 在提供 Review 时必须执行 A 与 B 两侧的 full-linkage 校验，并读取每课 Review 分片；Round 2 还需 Round 1 Review、分片与 Lesson snapshot。缺失或别名重叠的路径必须失败。`PASSED` 与 `PASSED_WITH_TEACHER_ADJUSTMENTS` 还要求 visual evidence、全部 teaching-design 维度、完整 teacher usability、每个 course-scope 项目和所有 provenance flags 均已处置；Benchmark 存在时必须是 `BENCHMARK_REVIEW_COMPLETE` / `NO_REVISION_REQUIRED`。未提供 Benchmark 继续兼容当前行为。Negative Controls 显式失败仍为 FAILED，但 per-course completion 不因默认 `not_executed` 阻塞通过；Negative Controls 留给 Skill Release Qualification，不是 per-course Acceptance 3.0 的必需门禁。0 个合格来源是合法 UNAVAILABLE，可继续 Lesson production，但 `production_pass` 不代表 Benchmark 完成。
 
-## Content Contract 2.3 (current default)
+## Content Contract 2.4 (new-course full coverage)
 
-新任务默认输出 `content_contract_version="2.3"`。版本 2.2 的输入继续按原历史规则校验，不得改写或重新解释。覆盖课时统一由 `expected_lesson_coverage_hours(delivery_plan)` 决定：`theory_only`、`integrated_lessons`、`hybrid` 使用 `total_hours`；`split_lessons` 使用 `theory_hours`；`practice_only` 保持零 Lesson。
+Content 2.4 是本分支新课的当前生成合同。字段与硬校验见 [`docs/content-contract-v2.4.md`](docs/content-contract-v2.4.md)。历史 Content 2.2/2.3 保持其原版本分支和原语义，不得静默重解释旧 `split_lessons` 或 `practice_only`。
+
+每次课默认 2 学时，每 2 学时生成一份 Lesson。40 学时纯理论生成 20 理论 Lesson；40 学时、20 理论+20实践的分开教学用 `mode=separate_full_lessons`，生成 10 理论+10实践 Lesson；40 学时纯实践用 `mode=practice_only`，生成 20 实践 Lesson。工单只作实践 Lesson 的配套材料，不能抵掉 Lesson 或把课时再加一次。理论/实践共用原九阶段、Template 1.1.2 和现有评分体系。
+
+一次确认课程基本盘后，主 Agent 冻结项目化全课程 outline、每课主题/学时/类型、先修、递进与贯穿案例，再按项目委派。若会话支持子 Agent，每项目固定一名专属 Agent 完成该项目全部理论和实践课；否则逐项目顺序 fallback 并留下记录。子 Agent 不得改全局基本盘、大纲、其他项目或最终文件。主 Agent 对项目返回按冻结 outline 合并并检查遗漏/重复/越界课、项目范围、学时、术语/案例一致和理论实践衔接；发现问题退回对应项目。`scripts/project_merge.py` 有确定性拒绝门禁。
+
+编写前，每项目必须实际联网检索、打开并读相近完整教案/正式示范课内容。优秀性无可核实证据只能标 `not_proven`，不能把介绍页、大纲、获奖名单或搜索摘要冒充优秀教案。初稿完成后，每课必须按现有 `schemas/benchmark-lesson-review.schema.json` 完成 15 维“日常非盲对照”，记录已有设计、实际证据、差距、改进理由和结论；只有实质问题才修改，并保存复审。不得把该流程伪称正式 A/B/盲审/Benchmark Authorization。
+
+Content 2.4 生产必须提供并校验 `generation-evidence.json`：
+
+```bash
+python scripts/generate_lesson_plans.py \\
+  --tasks-json lesson-content.json \\
+  --generation-evidence generation-evidence.json \\
+  --output-dir generated --render
+```
+
+该 sidecar 绑定实际参考文献检索、优秀教案检索及阅读、逐课 15 维对照、项目委派/回退及主 Agent 课程汇总。无检索/未读来源、缺逐课对照或维度、课程 ID/学时冲突或假引用均 fail closed。QA 的 `teaching_quality_gate=evidence_complete` 只说明证据完整且被绑定，不代表自动教学质量通过、正式 Benchmark 通过或教师 Acceptance。结构、学科正确性、来源相关性与可读性仍分别报告。
+
+## Content Contract 2.3 (historical compatibility)
+
+本节只描述 Content 2.3 历史输入语义，不作为新课程默认。Content 2.2/2.3 文件继续按原合同校验，不得改写或重新解释。覆盖课时使用 `expected_lesson_coverage_hours(delivery_plan, content_contract_version="2.3")`：`theory_only`、`integrated_lessons`、`hybrid` 使用 `total_hours`；`split_lessons` 使用 `theory_hours`；`practice_only` 保持零 Lesson。新课程使用上文 Content 2.4 合同。
 
 对于 `integrated_lessons` 与 `hybrid`，Lesson 是课程全过程主教案，Lesson 数量为 `ceil(total_hours / default_hours)`，课程总账同时精确满足 `Σ lesson.hours = total_hours`、`Σ lesson.theory_hours = theory_hours`、`Σ lesson.practice_hours = practice_hours`。每课 `hours = theory_hours + practice_hours`；integrated Lesson 的理论和实践构成都必须大于 0。Hybrid 可按真实安排混合 theory、practice、integrated Lesson。最后一课保留真实余数。
 
@@ -216,7 +237,7 @@ python scripts/generate_lesson_plans.py --tasks-json tasks.json --output-dir out
 
 `--skip-template-validation`、`--skip-output-validation` 只允许受控测试并需显式环境变量；生产交付不得绕过。安装器不自动安装 Python 依赖，只执行完整源树、shared schema、模板和 fingerprint 的事务安装；完成后应在新会话中验证 Skill 版本和真实生成路径。
 
-Content 2.0/2.1 只走明确 `--legacy` 兼容入口；Content 2.2 是历史合同兼容输入；默认新生成遵循 2.3。不要删除、修改或重新发布 `lesson-plan v1.1.2` 模板 binary，也不要在本轮进入 Phase 3 或完整课程批量生产。
+Content 2.0/2.1 只走明确 `--legacy` 兼容入口；Content 2.2/2.3 是历史合同兼容输入；默认新课程遵循 Content 2.4，并在 Word 前通过 generation-evidence 门禁。Skill 的显式 O2 lifecycle 仍有自己的已发布版本边界，不能因此声称 Content 2.4 已获得 O2 Production Authorization。不要删除、修改或重新发布 `lesson-plan v1.1.2` 模板 binary。
 
 ## RQ-03O2 opt-in lifecycle
 

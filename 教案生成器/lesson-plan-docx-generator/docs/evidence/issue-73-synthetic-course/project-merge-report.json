@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "errors": [],
+  "duplicate_lesson_ids": [],
+  "project_scope_conflicts": [],
+  "project_ids": [
+    "项目一：线性结构与受限容器",
+    "项目二：树与图关系处理",
+    "项目三：排序与检索性能"
+  ],
+  "frozen_outline_sha256": "3ED05A2FC3570E89C7CD5BF38ABAF70DE0A0EE4E5E6E2C68AF1F7959553E3549",
+  "project_input_sha256": {
+    "项目一：线性结构与受限容器": "5541D64BA4F64D76392DE3A3666196675C50DA5263FFB06CD0EAB8C784EC0FAF",
+    "项目二：树与图关系处理": "DB549CB0FEC110E3C7A739D63BA9D9BE145A816E7C6C431FFCF5EB4A5A949929",
+    "项目三：排序与检索性能": "54C7EA5AF3F26C9203FCD69F09BC3DF6A7AEFFB206ACA3542DA36BF755C4D933"
+  },
+  "project_output_sha256": {
+    "项目一：线性结构与受限容器": "895644B5DDBD24374270B056D7F9D66B390E39D6F54937573C243356CB21354E",
+    "项目二：树与图关系处理": "D1BC04A25DB5FA204236FBF357ECB931B30D2C9BDEF002037C1136E9FCF3AF83",
+    "项目三：排序与检索性能": "939526B2AE1711086A26C02283DE1733B1B9DC191312FEC4A85CDC8F92D182A0"
+  },
+  "merged_lesson_ids": [
+    "L01",
+    "L02",
+    "L03",
+    "L04",
+    "L05",
+    "L06",
+    "L07",
+    "L08",
+    "L09",
+    "L10",
+    "L11",
+    "L12",
+    "L13",
+    "L14",
+    "L15",
+    "L16",
+    "L17",
+    "L18",
+    "L19",
+    "L20"
+  ],
+  "hours": {
+    "total": "40",
+    "theory": "20",
+    "practice": "20"
+  }
+}

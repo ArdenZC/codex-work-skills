@@ -67,7 +67,7 @@ def gap_tuple(summary):
 def practice_complexity(content, lesson):
     # 2.2 has no per-Lesson allocation authority. Separate work orders are not
     # an allocation to a Lesson, and must never be guessed into one.
-    hours = int(Decimal(str(lesson.get("practice_hours", 0)))) if content["content_contract_version"] == "2.3" else 0
+    hours = int(Decimal(str(lesson.get("practice_hours", 0)))) if content["content_contract_version"] in {"2.3", "2.4"} else 0
     task_ids = set(lesson.get("practice_task_ids", []))
     tasks = [task for task in content.get("practice_task_contract", {}).get("tasks", [])
              if task["task_id"] in task_ids or lesson["lesson_id"] in task.get("lesson_ids", [])]

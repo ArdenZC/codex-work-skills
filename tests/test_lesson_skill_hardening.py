@@ -413,6 +413,24 @@ class LessonSkillHardeningTests(unittest.TestCase):
             )
             self.assertNotIn("QA/render/production:", markdown)
 
+            per_lesson_manifest = copy.deepcopy(markdown_report)
+            per_lesson_manifest["artifact_manifest"] = {
+                "data": {
+                    "artifacts": [
+                        {"final_docx_path": "L01.docx", "final_pdf_path": "render/pdf/L01.pdf"},
+                        {"final_docx_path": "L02.docx", "final_pdf_path": "render/pdf/L02.pdf"},
+                    ],
+                    "actual_pdf_page_count": 12,
+                    "qa_status": "passed",
+                    "render_status": "passed",
+                    "production_status": "production_pass",
+                }
+            }
+            per_lesson_markdown = lesson_acceptance.acceptance_markdown(per_lesson_manifest)
+            self.assertIn("Final DOCX: `2 per-Lesson files", per_lesson_markdown)
+            self.assertIn("Final PDF: `2 per-Lesson files", per_lesson_markdown)
+            self.assertNotIn("Final DOCX: `None", per_lesson_markdown)
+
             old_report = copy.deepcopy(report)
             old_report["metadata"].pop("production_status")
             self.assertEqual(lesson_acceptance.validate_report_schema(old_report), [])

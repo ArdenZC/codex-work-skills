@@ -67,6 +67,19 @@ TEST_FIXTURE_AUTHORING_ENV = "LESSON_ALLOW_TEST_FIXTURE_AUTHORING"
 RUN_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{5,95}$")
 
 
+def _generation_evidence_module():
+    """Load the current evidence helper for CLI and package-import callers."""
+
+    try:
+        import generation_evidence
+    except ModuleNotFoundError:
+        scripts_dir = str(Path(__file__).resolve().parent)
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import generation_evidence
+    return generation_evidence
+
+
 
 def actual_cells(row):
     return [_Cell(tc, row._parent) for tc in row._tr.tc_lst]
@@ -456,7 +469,12 @@ def _reference_evidence_payload(meta: dict[str, Any], source_path: Path, run_id:
             else (
                 ["research source is missing"]
                 if source is None
-                else reference_source_binding_errors(reference, source, f"reference_research.sources[{reference_id}]")
+                else reference_source_binding_errors(
+                    reference,
+                    source,
+                    f"reference_research.sources[{reference_id}]",
+                    allow_identifier_evidence_url=meta.get("content_contract_version") == "2.4",
+                )
             )
         )
         references.append(
@@ -505,6 +523,7 @@ def _build_artifact_manifest(
     *,
     benchmark_authorization: dict[str, Any] | None = None,
     benchmark_authorization_sha256: str | None = None,
+    generation_evidence_sha256: str | None = None,
 ) -> dict[str, Any]:
     render_artifacts = {
         item["docx_path"]: item
@@ -538,7 +557,7 @@ def _build_artifact_manifest(
     )
     if lesson_hours.is_integer():
         lesson_hours = int(lesson_hours)
-    is_current_contract = meta.get("content_contract_version") in {"2.2", "2.3"}
+    is_current_contract = meta.get("content_contract_version") in {"2.2", "2.3", "2.4"}
     source_final_content_sha256 = str((meta.get("authoring_provenance") or {}).get("final_content_sha256", "")).upper()
     packaged_content_sha256 = _reviewed_content_digest(meta) if is_current_contract else None
     reference_evidence_path = candidate / "reference-evidence.json"
@@ -580,9 +599,8 @@ def _build_artifact_manifest(
         "artifacts": records,
     }
     if benchmark_authorization is None:
-        manifest["lesson_skill_capability"] = (
-            "2.3-compatible" if meta.get("content_contract_version") == "2.3" else "2.2-compatible"
-        )
+        contract_capability = str(meta.get("content_contract_version"))
+        manifest["lesson_skill_capability"] = f"{contract_capability}-compatible"
         manifest["teaching_exemplar_benchmark"] = {"status": "not_provided"}
     else:
         if not isinstance(benchmark_authorization_sha256, str):
@@ -596,6 +614,11 @@ def _build_artifact_manifest(
         )
     if is_current_contract:
         manifest["production_status"] = report.get("production_status")
+    if meta.get("content_contract_version") == "2.4":
+        if not isinstance(generation_evidence_sha256, str):
+            raise RuntimeError("Content Contract 2.4 requires full-course generation evidence")
+        manifest["generation_evidence_path"] = "generation-evidence.json"
+        manifest["generation_evidence_sha256"] = generation_evidence_sha256
     return manifest
 
 
@@ -686,7 +709,7 @@ def verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: 
         if not isinstance(benchmark, dict):
             raise RuntimeError("artifact manifest teaching_exemplar_benchmark must be an object")
         if benchmark.get("status") == "not_provided":
-            expected_capability = "2.3-compatible" if source_contract_version == "2.3" else "2.2-compatible"
+            expected_capability = f"{source_contract_version}-compatible"
             if benchmark != {"status": "not_provided"} or manifest.get("lesson_skill_capability") != expected_capability:
                 raise RuntimeError("missing Benchmark Authorization must use the source contract compatibility block")
             if manifest.get("benchmark_authorization_path") is not None or (root / "benchmark-authorization.json").exists():
@@ -724,7 +747,7 @@ def verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: 
             binding_errors = validate_manifest_benchmark_binding(manifest, authorization, authorization_sha256)
             if binding_errors:
                 raise RuntimeError("; ".join(binding_errors))
-    is_current_contract = source_contract_version in {"2.2", "2.3"}
+    is_current_contract = source_contract_version in {"2.2", "2.3", "2.4"}
     if manifest.get("course_name") != source_data.get("course_name") or manifest.get("major") != source_data.get("major"):
         raise RuntimeError("artifact manifest course identity does not match the source JSON")
     source_lessons = source_data.get("lessons") if isinstance(source_data.get("lessons"), list) else []
@@ -764,7 +787,26 @@ def verify_artifact_manifest(root: Path, manifest: dict[str, Any], source_path: 
     if manifest.get("qa_status") != qa_report.get("status"):
         raise RuntimeError("artifact manifest qa_status does not match the QA report")
     if is_current_contract and qa_report.get("status") != "passed":
-        raise RuntimeError("Content Contract 2.2/2.3 artifact publication requires qa status=passed")
+        raise RuntimeError("Content Contract 2.2/2.3/2.4 artifact publication requires qa status=passed")
+    if source_contract_version == "2.4":
+        evidence_path = _artifact_relative_path(root, manifest.get("generation_evidence_path"))
+        if evidence_path is None or evidence_path != (root / "generation-evidence.json").resolve() or evidence_path.is_symlink() or not evidence_path.is_file():
+            raise RuntimeError("generation-evidence.json is missing or outside the final artifact directory")
+        evidence_sha = str(manifest.get("generation_evidence_sha256", "")).upper()
+        if not re.fullmatch(r"[0-9A-F]{64}", evidence_sha) or evidence_sha != _file_sha256(evidence_path):
+            raise RuntimeError("artifact manifest generation_evidence_sha256 mismatch")
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8-sig"))
+        evidence_errors = _generation_evidence_module().validate_generation_evidence(
+            evidence, source_data, content_bytes=source_path.read_bytes()
+        )
+        if evidence_errors:
+            raise RuntimeError("generation evidence verification failed: " + "; ".join(evidence_errors[:8]))
+        gate = qa_report.get("teaching_quality_gate")
+        expected_gate_status = (
+            "evidence_complete" if evidence["course_review"].get("status") == "passed" else "evidence_limited"
+        )
+        if not isinstance(gate, dict) or gate.get("status") != expected_gate_status or gate.get("generation_evidence_sha256", "").upper() != evidence_sha:
+            raise RuntimeError("QA teaching_quality_gate must match and bind to the verified generation evidence")
     render = qa_report.get("render") if isinstance(qa_report.get("render"), dict) else {}
     render_status = render.get("status")
     if manifest.get("render_status") != render_status or (is_current_contract and render_status not in {"passed", "not_executed"}):
@@ -1128,6 +1170,11 @@ def main(argv=None, *, o2_run=None) -> None:
     parser.add_argument("--benchmark-previous-lesson-reviews-dir", type=Path)
     parser.add_argument("--benchmark-previous-content", type=Path)
     parser.add_argument(
+        "--generation-evidence",
+        type=Path,
+        help="Required Content 2.4 evidence for project workflow, executed searches, and per-Lesson 15-dimension comparison",
+    )
+    parser.add_argument(
         "--benchmark-mode",
         choices=("none", "optional", "required"),
         default="none",
@@ -1243,9 +1290,23 @@ def main(argv=None, *, o2_run=None) -> None:
         )
     with source_path.open("r", encoding="utf-8") as f:
         meta = json.load(f)
-    if meta.get("content_contract_version") not in {"2.2", "2.3"} and not args.legacy:
+    contract_version = meta.get("content_contract_version")
+    if contract_version == "2.4" and args.generation_evidence is None:
+        raise ValueError("Content Contract 2.4 production generation requires --generation-evidence")
+    if contract_version != "2.4" and args.generation_evidence is not None:
+        raise ValueError("--generation-evidence is supported only for Content Contract 2.4")
+    generation_evidence: dict[str, Any] | None = None
+    generation_evidence_sha256: str | None = None
+    generation_evidence_bytes: bytes | None = None
+    if args.generation_evidence is not None:
+        evidence_path = args.generation_evidence.expanduser().resolve()
+        generation_evidence_bytes = evidence_path.read_bytes()
+        generation_evidence, generation_evidence_sha256 = _generation_evidence_module().load_and_validate_generation_evidence(
+            evidence_path, meta, source_path
+        )
+    if contract_version not in {"2.2", "2.3", "2.4"} and not args.legacy:
         raise ValueError(
-            "Lesson Content Contract 2.2 or 2.3 is required for production generation; "
+            "Lesson Content Contract 2.2, 2.3, or 2.4 is required for production generation; "
             "legacy 2.0/2.1 input requires the explicit --legacy flag."
         )
     validate_content_v2_input(
@@ -1253,7 +1314,7 @@ def main(argv=None, *, o2_run=None) -> None:
         schema_path,
         allow_test_fixture=allow_test_fixture_authoring,
     )
-    if meta.get("content_contract_version") in {"2.2", "2.3"}:
+    if meta.get("content_contract_version") in {"2.2", "2.3", "2.4"}:
         meta = apply_reviewed_lesson_content(meta)
     scope_report: dict[str, Any] | None = None
     if source_truth_path is not None:
@@ -1285,8 +1346,8 @@ def main(argv=None, *, o2_run=None) -> None:
     benchmark_authorization_bytes: bytes | None = None
     benchmark_authorization_sha256: str | None = None
     if benchmark_authorization_path is not None:
-        if meta.get("content_contract_version") not in {"2.2", "2.3"}:
-            raise ValueError("Benchmark Authorization is supported with Lesson Content Contract 2.2 or 2.3")
+        if meta.get("content_contract_version") not in {"2.2", "2.3", "2.4"}:
+            raise ValueError("Benchmark Authorization is supported with Lesson Content Contract 2.2, 2.3, or 2.4")
         try:
             benchmark_authorization_bytes = benchmark_authorization_path.read_bytes()
             benchmark_authorization = json.loads(benchmark_authorization_bytes.decode("utf-8-sig"))
@@ -1341,6 +1402,8 @@ def main(argv=None, *, o2_run=None) -> None:
         protected_paths.extend(source_truth_local_paths)
     if benchmark_authorization_path is not None:
         protected_paths.append(benchmark_authorization_path)
+    if args.generation_evidence is not None:
+        protected_paths.append(args.generation_evidence.expanduser().resolve())
     assert_output_path_safe(out_dir, protected_paths)
     requested_qa = Path(args.qa_report).expanduser().resolve() if args.qa_report else None
     internal_qa = out_dir / "qa-report.json"
@@ -1378,7 +1441,7 @@ def main(argv=None, *, o2_run=None) -> None:
         )
         practice_contract = meta.get("practice_task_contract")
         artifact_plan = meta.get("artifact_plan") or {}
-        if meta.get("content_contract_version") in {"2.2", "2.3"}:
+        if meta.get("content_contract_version") in {"2.2", "2.3", "2.4"}:
             writes_practice_handoff = bool(artifact_plan.get("practice_work_orders"))
         else:
             writes_practice_handoff = True
@@ -1392,6 +1455,8 @@ def main(argv=None, *, o2_run=None) -> None:
             generated_filenames.append(build_lesson(template, candidate, meta, item, seq, manifest).name)
         if benchmark_authorization_bytes is not None:
             (candidate / "benchmark-authorization.json").write_bytes(benchmark_authorization_bytes)
+        if generation_evidence_bytes is not None:
+            (candidate / "generation-evidence.json").write_bytes(generation_evidence_bytes)
         candidate_qa = candidate / "qa-report.json"
         if not args.skip_output_validation:
             report = validate_outputs(
@@ -1428,8 +1493,19 @@ def main(argv=None, *, o2_run=None) -> None:
                 source_truth_path=source_truth_path,
                 content_path=source_path,
             )
-        if meta.get("content_contract_version") in {"2.2", "2.3"} and report.get("production_status") == "failed":
-            raise RuntimeError("Content Contract 2.2/2.3 output did not pass production readiness checks")
+        if meta.get("content_contract_version") in {"2.2", "2.3", "2.4"} and report.get("production_status") == "failed":
+            raise RuntimeError("Content Contract 2.2/2.3/2.4 output did not pass production readiness checks")
+        if generation_evidence is not None:
+            report["teaching_quality_gate"] = {
+                "status": "evidence_complete" if generation_evidence["course_review"].get("status") == "passed" else "evidence_limited",
+                "meaning": "workflow evidence state only; this is not an automated pedagogical pass or formal blind benchmark",
+                "generation_evidence_sha256": generation_evidence_sha256,
+                "project_mode": generation_evidence["project_workflow"]["mode"],
+                "project_count": len(generation_evidence["project_workflow"]["projects"]),
+                "lesson_comparison_count": len(generation_evidence["lesson_comparisons"]),
+                "rubric_dimensions_per_lesson": 15,
+                "status_is_not_a_structural_or_subject_quality_substitute": True,
+            }
         _stable_render_artifacts(report, candidate, generated_filenames)
         created_at = datetime.now(timezone.utc).isoformat()
         reference_evidence_path = candidate / "reference-evidence.json"
@@ -1437,6 +1513,9 @@ def main(argv=None, *, o2_run=None) -> None:
             json.dumps(_reference_evidence_payload(meta, source_path, run_id), ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
+        # Keep the first manifest verification bound to the same QA payload
+        # that will later be published alongside the artifacts.
+        candidate_qa.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         manifest_data = _build_artifact_manifest(
             candidate,
             meta,
@@ -1447,6 +1526,7 @@ def main(argv=None, *, o2_run=None) -> None:
             created_at,
             benchmark_authorization=benchmark_authorization,
             benchmark_authorization_sha256=benchmark_authorization_sha256,
+            generation_evidence_sha256=generation_evidence_sha256,
         )
         if o2_run is not None:
             from lifecycle_digest import read_json_object, sha256_bytes
@@ -1464,7 +1544,7 @@ def main(argv=None, *, o2_run=None) -> None:
             encoding="utf-8",
         )
         verified_production_status = _verify_artifact_manifest(candidate, manifest_data, source_path)
-        if meta.get("content_contract_version") in {"2.2", "2.3"}:
+        if meta.get("content_contract_version") in {"2.2", "2.3", "2.4"}:
             if verified_production_status not in {"production_pass", "structural_pass"}:
                 raise RuntimeError("verified Content Contract 2.2/2.3 artifacts did not produce a valid production state")
             report["production_status"] = verified_production_status
@@ -1517,7 +1597,7 @@ def main(argv=None, *, o2_run=None) -> None:
             print(out_dir / filename)
         if backup is not None:
             print(f"backup={backup}")
-        if meta.get("content_contract_version") in {"2.2", "2.3"}:
+        if meta.get("content_contract_version") in {"2.2", "2.3", "2.4"}:
             print(
                 f"Content Contract {meta.get('content_contract_version')} "
                 f"production_status={report['production_status']} "
