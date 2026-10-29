@@ -1,0 +1,2414 @@
+{
+  "status": "passed",
+  "generated_at": "2026-10-29T10:32:54.432704+00:00",
+  "template_id": "lesson-plan",
+  "template_version": "1.1.2",
+  "generator_version": "1.1.2",
+  "template_path": "/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/assets/templates/lesson-plan/v1.1.2/template.docx",
+  "custom_template": false,
+  "engine": "python-docx",
+  "validation": {
+    "template": true,
+    "output": true,
+    "skipped": []
+  },
+  "validation_skipped": [],
+  "output_dir": "/tmp/issue73-pilot-artifacts-20261029-3",
+  "errors": [],
+  "warnings": [],
+  "checks": {
+    "validation": {
+      "template": true,
+      "output": true,
+      "skipped": []
+    },
+    "anchors": {
+      "mode": "word_bookmark",
+      "required": 70,
+      "preserved": 70,
+      "missing": [],
+      "duplicates": [],
+      "duplicate_ids": [],
+      "invalid_names": [],
+      "unexpected_names": [],
+      "invalid_ids": [],
+      "boundary_errors": []
+    },
+    "file_count": {
+      "expected": 20,
+      "actual": 20
+    },
+    "total_hours": {
+      "expected": 40.0,
+      "actual": 40.0
+    },
+    "course_hours": {
+      "expected": 40,
+      "actual": 40.0,
+      "lesson_hours": 40.0,
+      "practice_hours": 20.0
+    },
+    "lessons": [
+      {
+        "file_index": 1,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 2,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 3,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 4,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 5,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 6,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 7,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 8,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 9,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 10,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 11,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 12,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 13,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 14,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 15,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 16,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 17,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 18,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 19,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      },
+      {
+        "file_index": 20,
+        "errors": [],
+        "fields_checked": [
+          "audience",
+          "course_name",
+          "hours",
+          "major",
+          "task",
+          "unit"
+        ]
+      }
+    ],
+    "course_profile": {
+      "evidence": "semantic fields read from every final DOCX after generation",
+      "confirmed_course_info": {
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级"
+      },
+      "input": {
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级"
+      },
+      "docx": [
+        {
+          "lesson_id": "L01",
+          "file": "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L02",
+          "file": "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L03",
+          "file": "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L04",
+          "file": "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L05",
+          "file": "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L06",
+          "file": "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L07",
+          "file": "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L08",
+          "file": "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L09",
+          "file": "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L10",
+          "file": "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L11",
+          "file": "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L12",
+          "file": "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L13",
+          "file": "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L14",
+          "file": "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L15",
+          "file": "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L16",
+          "file": "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L17",
+          "file": "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L18",
+          "file": "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L19",
+          "file": "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        },
+        {
+          "lesson_id": "L20",
+          "file": "教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.docx",
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级",
+          "expected": {
+            "course_name": "数据结构与算法",
+            "major": "软件技术专业",
+            "audience": "高职二年级"
+          },
+          "exact_match": true
+        }
+      ],
+      "exact_match": true
+    }
+  },
+  "files_checked": 20,
+  "qa_report": "/tmp/issue73-pilot-artifacts-20261029-3/qa-report.json",
+  "content_contract_version": "2.4",
+  "content_quality": {
+    "status": "passed",
+    "content_contract_version": "2.4",
+    "diagnostic_content_policy": {
+      "mode": "agent_review_and_exact_facts",
+      "hash": "sha256"
+    },
+    "errors": [],
+    "warnings": [],
+    "authoring_provenance": {
+      "mode": "synthetic_fixture",
+      "status": "completed",
+      "authoring_id": "issue-73-three-project-subagent-pilot",
+      "review_rounds": 2,
+      "semantic_source": "Agent attestation; Python checks only exact snapshot and digest linkage"
+    },
+    "agent_pedagogical_review": {
+      "status": "passed",
+      "scope": "lesson-level Agent authoring, revision, pedagogical chain, and capacity",
+      "records": [
+        {
+          "lesson_id": "L01",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "4078F281153C773C03D71F4A1AD58DCD4D36B2F262A8A0390074B7E59299F304",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L02",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "0E0D33789D9D68E71E7C2E7EAF7A922C7A61B50D3A9FDF9D727D851096D130F3",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L03",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "FE0BF56C9E65698DAE28B92A72424C6D23EF6C03C10B1A37C51435C0A6B008D9",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L04",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "9913A4F6447B10BEBCCC92EB4B143090EEFC1CB1A5B06F3FFD438F79DB8DD8C0",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L05",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "992E0DC04EF063334B7AE967BF1E3454C8C1420E5BC7BD75508EFCFC439A90A9",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L06",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "678A7F1C12BC145866DD0EFB0452D42D2D51EFBFC86028878B46D220C7A7C3DD",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L07",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "EDF6B585356F10B92090FC419B87E909F0BC1C055E083F4A13A1D92E3CECC526",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L08",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "3E02C19D1A3C874E72FBC5A6ED2D1F778B038EF5BF8F1077329BE68614AB8B9E",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L09",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "B2C948C77BBCB422C5309731152AF43F9E9BAE5BCDE3F6CF9C987C00FD1313B9",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L10",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "CC910FC0AE224F12040309200AB9A7CF429DDC72E31BF0A2E44FB418677C5CB0",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L11",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "A1FD964CCE2BAC583A1624C64C87EB90DAA0FA392E7141238927621E4C5A13E4",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L12",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "56C4A17E12E0572EA8BBFA82D693E86EC176F5343E0563C605F8F31F0199195A",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L13",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "A850B025E9ABB4E2E401ACE2654F801182DE9885BB369156CB79A016D1A6D1CE",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L14",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "E5EACAFE99F53760C6395EB2ECE611436CE30114F5BC1C9305F6FBCDBCED81EF",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L15",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "0863F15C1456DDCB85078B8C24080C16D050C143F1B18BD6FEC131665BBF10DE",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L16",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "E885B9C8FC2D89E0E684C309F6E85AF8356C42713C0B2521F44E317C7F9D277D",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L17",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": false,
+          "revised_content_sha256": "D151BCE5417268427D6AA0D2B3EF5A57820C01A218F71A806B66315F97F80D93",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L18",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": false,
+          "revised_content_sha256": "DAFEE4D5B1DA85EFA57ACB2116DFD8C08069976CA656D13E136190127A070D85",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L19",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": true,
+          "revised_content_sha256": "BD32285FAA8A0A35C707B90368394C11B7A7F5DA7C9FB84B78199A738F988EBC",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L20",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 2,
+          "rewrite_performed": false,
+          "revised_content_sha256": "9E1C0F21616E966E5C5862D5D8D65BEE83803CC7A13343F175A359C40AA5CF91",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        }
+      ],
+      "required_contract_fields": [
+        "issues",
+        "draft_content",
+        "revised_content",
+        "decision",
+        "review_history"
+      ]
+    },
+    "exact_duplicates": [],
+    "adjacent_exact_duplicates": [],
+    "item_duplicates": [],
+    "adjacent_item_duplicates": [],
+    "frequency_item_duplicates": [],
+    "adjacent_similarity_pairs": [],
+    "field_similarity_pairs": [],
+    "adjacent_field_similarity_pairs": [],
+    "whole_lesson_similarity_pairs": [],
+    "high_similarity_pairs": [],
+    "implementation_duplicates": [],
+    "adjacent_implementation_exact_duplicates": [],
+    "implementation_similarity_pairs": [],
+    "adjacent_implementation_similarity_pairs": [],
+    "structural_similarity_pairs": [],
+    "implementation_structural_similarity_pairs": [],
+    "evaluation_remark_duplicates": [],
+    "evaluation_remark_similarity": [],
+    "repeated_sentences": [],
+    "boilerplate_hits": [],
+    "progression": {
+      "status": "passed",
+      "lesson_ids": [
+        "L01",
+        "L02",
+        "L03",
+        "L04",
+        "L05",
+        "L06",
+        "L07",
+        "L08",
+        "L09",
+        "L10",
+        "L11",
+        "L12",
+        "L13",
+        "L14",
+        "L15",
+        "L16",
+        "L17",
+        "L18",
+        "L19",
+        "L20"
+      ],
+      "links": [
+        {
+          "from": "L01",
+          "to": "L02",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L02",
+          "to": "L03",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L03",
+          "to": "L04",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L04",
+          "to": "L05",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L05",
+          "to": "L06",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L06",
+          "to": "L07",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L07",
+          "to": "L08",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L08",
+          "to": "L09",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L09",
+          "to": "L10",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L10",
+          "to": "L11",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L11",
+          "to": "L12",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L12",
+          "to": "L13",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L13",
+          "to": "L14",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L14",
+          "to": "L15",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L15",
+          "to": "L16",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L16",
+          "to": "L17",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L17",
+          "to": "L18",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L18",
+          "to": "L19",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L19",
+          "to": "L20",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        }
+      ],
+      "sequence_links": [
+        {
+          "from": "L01",
+          "to": "L02",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L02",
+          "to": "L03",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L03",
+          "to": "L04",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L04",
+          "to": "L05",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L05",
+          "to": "L06",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L06",
+          "to": "L07",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L07",
+          "to": "L08",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L08",
+          "to": "L09",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L09",
+          "to": "L10",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L10",
+          "to": "L11",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L11",
+          "to": "L12",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L12",
+          "to": "L13",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L13",
+          "to": "L14",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L14",
+          "to": "L15",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L15",
+          "to": "L16",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L16",
+          "to": "L17",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L17",
+          "to": "L18",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L18",
+          "to": "L19",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L19",
+          "to": "L20",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        }
+      ],
+      "declared_prior_links": [
+        {
+          "from": "L01",
+          "to": "L02",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L02",
+          "to": "L03",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L03",
+          "to": "L04",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L04",
+          "to": "L05",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L05",
+          "to": "L06",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L06",
+          "to": "L07",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L07",
+          "to": "L08",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L08",
+          "to": "L09",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L09",
+          "to": "L10",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L10",
+          "to": "L11",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L11",
+          "to": "L12",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L12",
+          "to": "L13",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L13",
+          "to": "L14",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L14",
+          "to": "L15",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L15",
+          "to": "L16",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L16",
+          "to": "L17",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L17",
+          "to": "L18",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L18",
+          "to": "L19",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L19",
+          "to": "L20",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        }
+      ],
+      "requires_agent_review": true,
+      "agent_review_items": [],
+      "method": "explicit progression fields plus Agent review; no character n-gram scoring"
+    },
+    "intra_lesson_coherence": {
+      "status": "passed",
+      "method": "stage-level chain: content -> teacher activity -> student activity/evidence -> design intent",
+      "failures": []
+    },
+    "course_scope_grounding": {
+      "status": "not_provided",
+      "source_truth_manifest_sha256": null,
+      "source_truth_outline_sha256": null,
+      "content_outline_sha256": "4912291770fe11b93a61844a34249f14944a2f7133fdfdb2087854618fbb3507",
+      "lesson_count": 20,
+      "lessons": [
+        {
+          "lesson_id": "L01",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L02",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L03",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L04",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L05",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L06",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L07",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L08",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L09",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L10",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L11",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L12",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L13",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L14",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L15",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L16",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L17",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L18",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L19",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        },
+        {
+          "lesson_id": "L20",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "failed"
+        }
+      ],
+      "failures": [
+        {
+          "code": "intra_lesson_coherence",
+          "message": "Existing intra-Lesson coherence validation failed."
+        }
+      ]
+    },
+    "reference_provenance": {
+      "by_lesson": {
+        "L01": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L02": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L03": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L04": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L05": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L06": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L07": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L08": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L09": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L10": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L11": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L12": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L13": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L14": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L15": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          },
+          {
+            "index": 2,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L16": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          },
+          {
+            "index": 2,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L17": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          },
+          {
+            "index": 2,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L18": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          },
+          {
+            "index": 2,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L19": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          },
+          {
+            "index": 2,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ],
+        "L20": [
+          {
+            "index": 1,
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          },
+          {
+            "index": 2,
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "source_kind": "verified_public",
+            "source_region": "domestic",
+            "evidence_present": true
+          }
+        ]
+      },
+      "validation_scope": "contract_locator_and_exact_source_binding",
+      "reuse_policy": "reference_reusable",
+      "cross_lesson_reuse": "allowed",
+      "same_lesson_duplicate_policy": "hard_fail",
+      "missing_evidence": [],
+      "invalid_generic": [],
+      "invalid_verified_public": [],
+      "invalid_resource_only": [],
+      "invalid_metadata": [],
+      "provenance_binding_errors": [],
+      "source_evidence": [
+        {
+          "reference_id": "REF-HEP-JAVA-2013",
+          "canonical_identity": {
+            "reference_id": "REF-HEP-JAVA-2013",
+            "reference_type": "book",
+            "title": "数据结构(java版)",
+            "authors": [
+              "杨淑萍",
+              "聂哲"
+            ],
+            "institution": "",
+            "publisher": "高等教育出版社",
+            "responsible_party": "",
+            "year": "2013",
+            "source_identifier": "9787040376265",
+            "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=59ce6307ba9eb884cf81dc1c",
+            "authoritative_source": "高等教育出版社官方产品信息检索系统(直接读取官方产品页核验;opac 搜索结果读取失败,不作为独立核验)"
+          },
+          "research_evidence": {
+            "reference_id": "REF-HEP-JAVA-2013",
+            "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=59ce6307ba9eb884cf81dc1c",
+            "source_title": "数据结构（Java版）",
+            "source_author_or_organization": "高等教育出版社（高教社产品信息检索系统）",
+            "source_year": 2013,
+            "source_identifier": "978-7-04-037626-5",
+            "authoritative_source": "高等教育出版社官方产品信息检索系统（直接读取官方产品页核验；OPAC 搜索结果读取失败，不作为独立核验）"
+          },
+          "binding_status": "passed"
+        },
+        {
+          "reference_id": "REF-HEP-JAVA-2021",
+          "canonical_identity": {
+            "reference_id": "REF-HEP-JAVA-2021",
+            "reference_type": "book",
+            "title": "数据结构(java语言描述)(换封面,十四五)",
+            "authors": [
+              "张静"
+            ],
+            "institution": "",
+            "publisher": "高等教育出版社",
+            "responsible_party": "",
+            "year": "2021",
+            "source_identifier": "9787040559576",
+            "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=648deb81938b7cc2960f04a1",
+            "authoritative_source": "高等教育出版社官方产品信息检索系统"
+          },
+          "research_evidence": {
+            "reference_id": "REF-HEP-JAVA-2021",
+            "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=648deb81938b7cc2960f04a1",
+            "source_title": "数据结构（Java语言描述）（换封面，十四五）",
+            "source_author_or_organization": "高等教育出版社官方产品信息检索系统",
+            "source_year": 2021,
+            "source_identifier": "978-7-04-055957-6",
+            "authoritative_source": "高等教育出版社官方产品信息检索系统"
+          },
+          "binding_status": "passed"
+        }
+      ],
+      "same_lesson_duplicates": [],
+      "unresolved_ids": [],
+      "placeholder_items": [],
+      "empty_reference_lessons": [],
+      "textbook_overlap": [],
+      "textbook_overlap_allowed": false,
+      "catalog_source_regions": {
+        "domestic": 2,
+        "foreign": 0,
+        "unknown": 0
+      },
+      "reuse_frequency": {
+        "REF-HEP-JAVA-2013": 20,
+        "REF-HEP-JAVA-2021": 6
+      }
+    },
+    "practice_handoff": {
+      "status": "not_applicable",
+      "contract_version": null,
+      "task_count": 0,
+      "expected_task_count": 0,
+      "expected_workorder_count": 0,
+      "actual_workorder_count": 0,
+      "expected_practice_hours": 20.0,
+      "actual_practice_hours": null,
+      "lesson_practice_hours": 20.0,
+      "sum_task_practice_hours": 0,
+      "unresolved_task_ids": [],
+      "unlinked_task_ids": [],
+      "invalid_practice_lesson_links": [],
+      "invalid_task_hours": [],
+      "hour_consistent": true,
+      "lesson_task_linkage_complete": true,
+      "one_way_lesson_links": false,
+      "workorders_requested": false,
+      "contract_required": false,
+      "contract_not_allowed": false,
+      "contract_errors": [],
+      "artifact_plan": {
+        "lesson_plans": true,
+        "practice_work_orders": false
+      }
+    },
+    "coverage": {
+      "lesson_count": 20,
+      "score_pattern": {
+        "values": [
+          88.5,
+          91.0,
+          89.5,
+          92.5,
+          90.0,
+          93.5,
+          87.5,
+          94.0,
+          86.5,
+          95.0,
+          87.0,
+          92.0,
+          89.0,
+          96.0,
+          88.5,
+          91.0,
+          89.5,
+          92.5,
+          90.0,
+          93.5
+        ],
+        "all_same": false,
+        "simple_cycle": false,
+        "cycle_period": null,
+        "cycle_confidence": 0.0,
+        "full_cycles": 0,
+        "tail_length": 0,
+        "tail_fraction": 0.0,
+        "arithmetic_progression": false,
+        "arithmetic_step": null,
+        "strict_monotonic": false,
+        "range_valid": true
+      },
+      "implementation_stages": {
+        "L01": 9,
+        "L02": 9,
+        "L03": 9,
+        "L04": 9,
+        "L05": 9,
+        "L06": 9,
+        "L07": 9,
+        "L08": 9,
+        "L09": 9,
+        "L10": 9,
+        "L11": 9,
+        "L12": 9,
+        "L13": 9,
+        "L14": 9,
+        "L15": 9,
+        "L16": 9,
+        "L17": 9,
+        "L18": 9,
+        "L19": 9,
+        "L20": 9
+      },
+      "implementation_review": {
+        "L01": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L02": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L03": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L04": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L05": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L06": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L07": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L08": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L09": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L10": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L11": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L12": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L13": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L14": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L15": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L16": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L17": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L18": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L19": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L20": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        }
+      },
+      "meaningful_characters": null,
+      "content_fields": 14,
+      "evaluation_criteria": 13,
+      "in_class_stage_ids": [
+        "lesson_summary",
+        "operation_demonstration",
+        "peer_review",
+        "project_practice",
+        "task_extension",
+        "task_implementation",
+        "task_introduction"
+      ],
+      "required_stage_ids": [
+        "before_class_preparation",
+        "task_introduction",
+        "operation_demonstration",
+        "task_implementation",
+        "task_extension",
+        "project_practice",
+        "peer_review",
+        "lesson_summary",
+        "after_class_improvement"
+      ],
+      "stage_semantic_rule": "Agent review; not all item statuses and not lexical overlap",
+      "mechanical_topic_suffix_count_before_formatting": 0,
+      "reference_metrics": {
+        "textbook_present": false,
+        "pool_size": 2,
+        "domestic_source_count": 2,
+        "foreign_source_count": 0,
+        "unknown_source_count": 0,
+        "domestic_share": 1.0,
+        "lessons_with_references": 20,
+        "lessons_without_references": 0,
+        "reuse_frequency": {
+          "REF-HEP-JAVA-2013": 20,
+          "REF-HEP-JAVA-2021": 6
+        },
+        "empty_reference_lesson_count": 0
+      },
+      "non_it_contamination": []
+    },
+    "completeness": {
+      "status": "schema_validated"
+    },
+    "density_errors": [],
+    "resource_reuse": [],
+    "evaluation_remark_density": [],
+    "reuse_policy": {
+      "mode": "exact_duplicate_audit; cross-lesson source reuse is allowed"
+    }
+  },
+  "render": {
+    "status": "passed",
+    "reason": "LibreOffice render smoke passed",
+    "scope": "smoke",
+    "visual_readability_status": "not_evaluated",
+    "renderer": "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+    "files_checked": 20,
+    "page_count": 130,
+    "page_counts": {
+      "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx": 6,
+      "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx": 7,
+      "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx": 7,
+      "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx": 6,
+      "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx": 6,
+      "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx": 7,
+      "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx": 6,
+      "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx": 6,
+      "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx": 6,
+      "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx": 5,
+      "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx": 5,
+      "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx": 5,
+      "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx": 5,
+      "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx": 6,
+      "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx": 8,
+      "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx": 8,
+      "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx": 8,
+      "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx": 7,
+      "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx": 8,
+      "教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.docx": 8
+    },
+    "page_count_method": "pdf_page_object_regex",
+    "errors": [],
+    "requested": true,
+    "pdf_artifacts": [
+      {
+        "docx_path": "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx",
+        "final_pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx",
+        "final_pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+        "actual_pdf_page_count": 7
+      },
+      {
+        "docx_path": "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx",
+        "final_pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+        "actual_pdf_page_count": 7
+      },
+      {
+        "docx_path": "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx",
+        "final_pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx",
+        "final_pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx",
+        "final_pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "actual_pdf_page_count": 7
+      },
+      {
+        "docx_path": "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx",
+        "final_pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx",
+        "final_pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx",
+        "final_pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx",
+        "final_pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+        "actual_pdf_page_count": 5
+      },
+      {
+        "docx_path": "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx",
+        "final_pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+        "actual_pdf_page_count": 5
+      },
+      {
+        "docx_path": "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx",
+        "final_pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+        "actual_pdf_page_count": 5
+      },
+      {
+        "docx_path": "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx",
+        "final_pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+        "actual_pdf_page_count": 5
+      },
+      {
+        "docx_path": "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx",
+        "final_pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+        "actual_pdf_page_count": 6
+      },
+      {
+        "docx_path": "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx",
+        "final_pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "actual_pdf_page_count": 8
+      },
+      {
+        "docx_path": "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx",
+        "final_pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "actual_pdf_page_count": 8
+      },
+      {
+        "docx_path": "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx",
+        "final_pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "actual_pdf_page_count": 8
+      },
+      {
+        "docx_path": "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx",
+        "final_pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "actual_pdf_page_count": 7
+      },
+      {
+        "docx_path": "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx",
+        "final_pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "actual_pdf_page_count": 8
+      },
+      {
+        "docx_path": "教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.docx",
+        "final_pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "actual_pdf_page_count": 8
+      }
+    ]
+  },
+  "visual_inspection": {
+    "status": "not_executed",
+    "reason": "visual inspection is performed by the calling Agent after render smoke",
+    "scope": "agent",
+    "evidence_file": "visual-inspection.json",
+    "pages_checked": [],
+    "errors": []
+  },
+  "anchor_mode": "word_bookmark",
+  "required_anchor_count": 70,
+  "preserved_anchor_count": 70,
+  "missing_anchors": [],
+  "duplicate_anchors": [],
+  "invalid_anchor_names": [],
+  "unexpected_anchor_names": [],
+  "invalid_anchor_ids": [],
+  "anchor_boundary_errors": [],
+  "course_profile": {
+    "evidence": "semantic fields read from every final DOCX after generation",
+    "confirmed_course_info": {
+      "course_name": "数据结构与算法",
+      "major": "软件技术专业",
+      "audience": "高职二年级"
+    },
+    "input": {
+      "course_name": "数据结构与算法",
+      "major": "软件技术专业",
+      "audience": "高职二年级"
+    },
+    "docx": [
+      {
+        "lesson_id": "L01",
+        "file": "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L02",
+        "file": "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L03",
+        "file": "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L04",
+        "file": "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L05",
+        "file": "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L06",
+        "file": "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L07",
+        "file": "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L08",
+        "file": "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L09",
+        "file": "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L10",
+        "file": "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L11",
+        "file": "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L12",
+        "file": "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L13",
+        "file": "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L14",
+        "file": "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L15",
+        "file": "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L16",
+        "file": "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L17",
+        "file": "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L18",
+        "file": "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L19",
+        "file": "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L20",
+        "file": "教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      }
+    ],
+    "exact_match": true
+  },
+  "production_status": "production_pass",
+  "teaching_quality_gate": {
+    "status": "evidence_complete",
+    "meaning": "workflow evidence state only; this is not an automated pedagogical pass or formal blind benchmark",
+    "generation_evidence_sha256": "428820F09824E7D453261B52C360613D2DA80FAFB0430D8BF394EEAD1532B609",
+    "project_mode": "project_subagents",
+    "project_count": 3,
+    "lesson_comparison_count": 20,
+    "rubric_dimensions_per_lesson": 15,
+    "status_is_not_a_structural_or_subject_quality_substitute": true
+  },
+  "run_id": "issue73-pilot-40h-separate",
+  "artifact_manifest": "artifact-manifest.json",
+  "reference_evidence": "reference-evidence.json"
+}

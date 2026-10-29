@@ -3,7 +3,7 @@ skill:
   name: 教案生成器
   version: 2.3.1
   phase: stable
-  content_contract: "2.3"
+  content_contract: "2.4"
   teaching_exemplar_contract: "1.0"
   benchmark_review_contract: "1.0"
   benchmark_authorization_contract: "1.0"
@@ -11,6 +11,7 @@ skill:
     - "2.0"
     - "2.1"
     - "2.2"
+    - "2.3"
 template:
   id: lesson-plan
   version: 1.1.2

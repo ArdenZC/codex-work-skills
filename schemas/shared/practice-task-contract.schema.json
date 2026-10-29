@@ -57,7 +57,7 @@
         "practice_hours": {"$ref": "#/$defs/nonNegativeHours"},
         "delivery_mode": {
           "type": "string",
-          "enum": ["theory_only", "practice_only", "split_lessons", "integrated_lessons", "hybrid"]
+          "enum": ["theory_only", "practice_only", "split_lessons", "separate_full_lessons", "integrated_lessons", "hybrid"]
         },
         "default_lesson_hours": {"$ref": "#/$defs/positiveHours"}
       }

@@ -1,0 +1,30 @@
+{
+  "evidence_version": "1.0",
+  "generated_at": "2026-10-29T16:32:39.421506+00:00",
+  "synthetic_fixture": true,
+  "purpose": "Exercise the complete Content 2.4 quality validator and Acceptance practice-handoff metric without regenerating Word artifacts.",
+  "reports": [
+    {
+      "file": "40h-separate-full-lessons-with-10-workorders.json",
+      "content_qa_status": "passed",
+      "practice_handoff_status": "passed",
+      "acceptance_practice_handoff_status": "passed",
+      "acceptance_independent_recheck_status": "PASS",
+      "lesson_count": 20,
+      "task_count": 10,
+      "allocated_practice_hours": 20.0,
+      "allocation_errors": []
+    },
+    {
+      "file": "40h-practice-only-with-20-workorders.json",
+      "content_qa_status": "passed",
+      "practice_handoff_status": "passed",
+      "acceptance_practice_handoff_status": "passed",
+      "acceptance_independent_recheck_status": "PASS",
+      "lesson_count": 20,
+      "task_count": 20,
+      "allocated_practice_hours": 40.0,
+      "allocation_errors": []
+    }
+  ]
+}

@@ -1,0 +1,504 @@
+{
+  "manifest_version": "2.0",
+  "skill_version": "2.3.1",
+  "content_contract_version": "2.4",
+  "run_id": "issue73-pilot-40h-separate",
+  "course_name": "数据结构与算法",
+  "major": "软件技术专业",
+  "lesson_hours": 40,
+  "source_json_path": "/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/pilot-40h-separate/lesson-content-v2.4.json",
+  "source_json_sha256": "69A225D09A20E7380BA2D507CF02E00036017CC9D50AD88F9B465942692B59B3",
+  "source_json_path_privacy": "local_diagnostic",
+  "source_label": "lesson-content-v2.4.json",
+  "source_sha256": "69A225D09A20E7380BA2D507CF02E00036017CC9D50AD88F9B465942692B59B3",
+  "final_docx_path": null,
+  "final_docx_sha256": null,
+  "final_pdf_path": null,
+  "final_pdf_sha256": null,
+  "actual_pdf_page_count": 130,
+  "qa_status": "passed",
+  "render_status": "passed",
+  "qa_report_path": "qa-report.json",
+  "reference_evidence_path": "reference-evidence.json",
+  "reference_evidence_sha256": "70B56472D127E999835DB8E7FA0B7EC22D3F3F93B48731D44BCA0C232E83FB21",
+  "confirmed_course_info": {
+    "course_name": "数据结构与算法",
+    "major": "软件技术专业",
+    "audience": "高职二年级",
+    "total_hours": 40,
+    "theory_hours": 20,
+    "practice_hours": 20,
+    "delivery_mode": "separate_full_lessons"
+  },
+  "course_profile": {
+    "evidence": "semantic fields read from every final DOCX after generation",
+    "confirmed_course_info": {
+      "course_name": "数据结构与算法",
+      "major": "软件技术专业",
+      "audience": "高职二年级"
+    },
+    "input": {
+      "course_name": "数据结构与算法",
+      "major": "软件技术专业",
+      "audience": "高职二年级"
+    },
+    "docx": [
+      {
+        "lesson_id": "L01",
+        "file": "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L02",
+        "file": "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L03",
+        "file": "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L04",
+        "file": "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L05",
+        "file": "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L06",
+        "file": "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L07",
+        "file": "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L08",
+        "file": "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L09",
+        "file": "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L10",
+        "file": "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L11",
+        "file": "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L12",
+        "file": "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L13",
+        "file": "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L14",
+        "file": "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L15",
+        "file": "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L16",
+        "file": "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L17",
+        "file": "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L18",
+        "file": "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L19",
+        "file": "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      },
+      {
+        "lesson_id": "L20",
+        "file": "教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.docx",
+        "course_name": "数据结构与算法",
+        "major": "软件技术专业",
+        "audience": "高职二年级",
+        "expected": {
+          "course_name": "数据结构与算法",
+          "major": "软件技术专业",
+          "audience": "高职二年级"
+        },
+        "exact_match": true
+      }
+    ],
+    "exact_match": true
+  },
+  "reviewed_content_digest": {
+    "source_final_content_sha256": "DB1BCCB2EEB2FB84CE708A3250ADAD39B653F422374111D4752C6B22729D21BC",
+    "packaged_final_content_sha256": "DB1BCCB2EEB2FB84CE708A3250ADAD39B653F422374111D4752C6B22729D21BC",
+    "match": true
+  },
+  "created_at": "2026-10-29T10:33:39.155095+00:00",
+  "artifacts": [
+    {
+      "lesson_id": "L01",
+      "lesson_hours": 2,
+      "final_docx_path": "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx",
+      "final_docx_sha256": "6791B5A099A90EE043B51FDD77E7F4C72A618734A51CE94C72C35B0857949171",
+      "final_pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+      "final_pdf_sha256": "43A6777733F7D02E06EBA4EFF88844B21001CD45EF3668FC6E339917AC8BA76B",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L02",
+      "lesson_hours": 2,
+      "final_docx_path": "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx",
+      "final_docx_sha256": "E9FA6DF1885BA689AB7B5D9D9C0EACA1765AF9B1471B37BD2E2FAF9497867611",
+      "final_pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+      "final_pdf_sha256": "C9176341544A14D49D87B26EB0820932F2CD67AE8FE71ABD3FCAE6E77C02989B",
+      "actual_pdf_page_count": 7
+    },
+    {
+      "lesson_id": "L03",
+      "lesson_hours": 2,
+      "final_docx_path": "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx",
+      "final_docx_sha256": "434828F6517224C42B86BF23903D45125EC5F440A15DC2B070EFB46327E28610",
+      "final_pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+      "final_pdf_sha256": "AD26DC3209CBDA7CE2737E160879B3E43DD38491C59062190583E6E0F2F94733",
+      "actual_pdf_page_count": 7
+    },
+    {
+      "lesson_id": "L04",
+      "lesson_hours": 2,
+      "final_docx_path": "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx",
+      "final_docx_sha256": "406F5B9E2E6070F8B8C4B0E564790BC3A352287FDE0601C47E22177675CFC0FD",
+      "final_pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+      "final_pdf_sha256": "0C59485C2C921F126F0AD666EFF684FFE5A31B55A146417345B18A62E3C217A6",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L05",
+      "lesson_hours": 2,
+      "final_docx_path": "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx",
+      "final_docx_sha256": "D075940BF321A7C2F1B012EEF653C064C3B648D6D4F8FA709C4095166B4EE2C7",
+      "final_pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+      "final_pdf_sha256": "A7D59432AE97F194B76ED3CC2B5E81781205B56636CBD1F578FD00B02FE7E2BB",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L06",
+      "lesson_hours": 2,
+      "final_docx_path": "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx",
+      "final_docx_sha256": "A974BABBBBC727008846707D3FCAA61F9ADA4060B03189ADD67337DFD75ECDCE",
+      "final_pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+      "final_pdf_sha256": "6BAFE650880521BDEC0023914A5D122BC62CA78A0FCE37113A96265ED3088B8F",
+      "actual_pdf_page_count": 7
+    },
+    {
+      "lesson_id": "L07",
+      "lesson_hours": 2,
+      "final_docx_path": "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx",
+      "final_docx_sha256": "A36B91C68659AD2C3DD45C6E15F8B0190297CE8ABF4F3A42876BEACA1EF77EB0",
+      "final_pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
+      "final_pdf_sha256": "C26736AF028403DACEE5E3D98F718B6C338D87DD9C4D3A893164CDF75497181C",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L08",
+      "lesson_hours": 2,
+      "final_docx_path": "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx",
+      "final_docx_sha256": "456C27287521BE400386C436AB2D762201AB612AD651F8BFFAB8E313848D8EEF",
+      "final_pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+      "final_pdf_sha256": "7617AD06C14F21CB3DF0D04661E246D8CECD4D47197535A1E8290CD6681CC088",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L09",
+      "lesson_hours": 2,
+      "final_docx_path": "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx",
+      "final_docx_sha256": "9F65A3DC4C2D6B8A95765471CE1920F39948E9F1BD5E101CD357AC777AC6BD18",
+      "final_pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
+      "final_pdf_sha256": "1C042BE6F72C851ECF2F1F07D8C22A05D0A1441A4337051DFA72C784F6B28F09",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L10",
+      "lesson_hours": 2,
+      "final_docx_path": "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx",
+      "final_docx_sha256": "A1D0909A6F64897140ED51703E668E46A6A0142902B52146F327DA881716903D",
+      "final_pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+      "final_pdf_sha256": "6B39F8DFE0257DAC9FE2E7BFAE5AB1E9F80749D1E474F72DB3D2DCB13DADE49B",
+      "actual_pdf_page_count": 5
+    },
+    {
+      "lesson_id": "L11",
+      "lesson_hours": 2,
+      "final_docx_path": "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx",
+      "final_docx_sha256": "59ECFCC7542DC593BEA72AADCC8B661FC70E10D1F1A6317580E8FB1730D7D299",
+      "final_pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+      "final_pdf_sha256": "DFE0507CCE5F073A9299052E5C7E03B1465D5D43D3A9E9438A74DDC92C776FBC",
+      "actual_pdf_page_count": 5
+    },
+    {
+      "lesson_id": "L12",
+      "lesson_hours": 2,
+      "final_docx_path": "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx",
+      "final_docx_sha256": "F4662E2E746A6F0F25B8A5F38F5C002B7A706942378AA59F1775D20124450DD9",
+      "final_pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+      "final_pdf_sha256": "D1CAED8DA7CB98FA2AC1386649BFE34E6D761937225938D8A7724856AAD11182",
+      "actual_pdf_page_count": 5
+    },
+    {
+      "lesson_id": "L13",
+      "lesson_hours": 2,
+      "final_docx_path": "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx",
+      "final_docx_sha256": "3875FEA2DD90437AE93AD5153C26234DC1F69961F713B42A068B59F5E9DA59BA",
+      "final_pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+      "final_pdf_sha256": "F24B55A9C811CD9255BEDE253ACF28CF3BC45911A22D98EF74FD2C0CAD1854DC",
+      "actual_pdf_page_count": 5
+    },
+    {
+      "lesson_id": "L14",
+      "lesson_hours": 2,
+      "final_docx_path": "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx",
+      "final_docx_sha256": "1D9330A26FFE2E063BD1426C7ADE1259E84191C0CFB6C4AB074E554BDB88046C",
+      "final_pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+      "final_pdf_sha256": "F06F77CE4744B0F64A37B5C334603B6AA7A7532BBABCE8E7C686FCBA97835153",
+      "actual_pdf_page_count": 6
+    },
+    {
+      "lesson_id": "L15",
+      "lesson_hours": 2,
+      "final_docx_path": "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx",
+      "final_docx_sha256": "19DE78B75434383CF7ACC7A4DEB26B963CF47DB905811A9E15954B3BF1814BA6",
+      "final_pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+      "final_pdf_sha256": "4ADA132B09A0D514F5A900E0A3B7FD53D5A36DD451A0FD374B0D161023CED2E3",
+      "actual_pdf_page_count": 8
+    },
+    {
+      "lesson_id": "L16",
+      "lesson_hours": 2,
+      "final_docx_path": "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx",
+      "final_docx_sha256": "F505E79254542ACDBE518FA13E34F47E9FEE7BAC7298D08DAA2FA130C0979B00",
+      "final_pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+      "final_pdf_sha256": "ABDEB28DF7613EAAAB385AD6D4FE0E978F9DDA4FBA71401E219F4ECB905D52B0",
+      "actual_pdf_page_count": 8
+    },
+    {
+      "lesson_id": "L17",
+      "lesson_hours": 2,
+      "final_docx_path": "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx",
+      "final_docx_sha256": "2ED88070ACCB76BD80928BF8EEDE41C02410A0E5A918460548A7A5E069DAACD2",
+      "final_pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+      "final_pdf_sha256": "C57B46F952E6B78E4D7D16D704FEE78138EF4EF6165AA4C70EC209ED5CECA6EA",
+      "actual_pdf_page_count": 8
+    },
+    {
+      "lesson_id": "L18",
+      "lesson_hours": 2,
+      "final_docx_path": "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx",
+      "final_docx_sha256": "32083CCF144B58596E6B234E7CB64A319E30C4B51BE02E19D0AE69D5396F20F2",
+      "final_pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+      "final_pdf_sha256": "6B975359E7F78CBBA3988B01D4D711AD163BDA0161865762EA6BC526DA80CF6A",
+      "actual_pdf_page_count": 7
+    },
+    {
+      "lesson_id": "L19",
+      "lesson_hours": 2,
+      "final_docx_path": "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx",
+      "final_docx_sha256": "B4B3DA1C6E7A9393131A32814587ECB9C3DF8168DE7BBBFC85AFB2925E13F951",
+      "final_pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+      "final_pdf_sha256": "E7DC6D3A73D5FA5BBCF32797C45369C56CBB6925AE94C1BB9F95262761D58C8A",
+      "actual_pdf_page_count": 8
+    },
+    {
+      "lesson_id": "L20",
+      "lesson_hours": 2,
+      "final_docx_path": "教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.docx",
+      "final_docx_sha256": "84A0C942A027D557A75607114EBB01C01A87F0AAD90691B4CADE7B58308527BB",
+      "final_pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+      "final_pdf_sha256": "CD8D0375D0D8346B15A50FF1D2BE06D4E5C528C202B50E4DA4FEC6B4F8D5E5E7",
+      "actual_pdf_page_count": 8
+    }
+  ],
+  "lesson_skill_capability": "2.4-compatible",
+  "teaching_exemplar_benchmark": {
+    "status": "not_provided"
+  },
+  "generation_evidence_path": "generation-evidence.json",
+  "generation_evidence_sha256": "428820F09824E7D453261B52C360613D2DA80FAFB0430D8BF394EEAD1532B609",
+  "production_status": "production_pass"
+}

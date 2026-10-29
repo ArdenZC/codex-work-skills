@@ -1,0 +1,70 @@
+{
+  "evidence_version": "1.0",
+  "run_id": "issue73-pilot-40h-separate",
+  "course_name": "数据结构与算法",
+  "major": "软件技术专业",
+  "source_json_path": "/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/pilot-40h-separate/lesson-content-v2.4.json",
+  "references": [
+    {
+      "reference_id": "REF-HEP-JAVA-2013",
+      "source_kind": "verified_public",
+      "canonical_identity": {
+        "reference_id": "REF-HEP-JAVA-2013",
+        "reference_type": "book",
+        "title": "数据结构(java版)",
+        "authors": [
+          "杨淑萍",
+          "聂哲"
+        ],
+        "institution": "",
+        "publisher": "高等教育出版社",
+        "responsible_party": "",
+        "year": "2013",
+        "source_identifier": "9787040376265",
+        "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=59ce6307ba9eb884cf81dc1c",
+        "authoritative_source": "高等教育出版社官方产品信息检索系统(直接读取官方产品页核验;opac 搜索结果读取失败,不作为独立核验)"
+      },
+      "research_evidence": {
+        "reference_id": "REF-HEP-JAVA-2013",
+        "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=59ce6307ba9eb884cf81dc1c",
+        "source_title": "数据结构（Java版）",
+        "source_author_or_organization": "高等教育出版社（高教社产品信息检索系统）",
+        "source_year": 2013,
+        "source_identifier": "978-7-04-037626-5",
+        "authoritative_source": "高等教育出版社官方产品信息检索系统（直接读取官方产品页核验；OPAC 搜索结果读取失败，不作为独立核验）"
+      },
+      "binding_status": "passed",
+      "binding_errors": []
+    },
+    {
+      "reference_id": "REF-HEP-JAVA-2021",
+      "source_kind": "verified_public",
+      "canonical_identity": {
+        "reference_id": "REF-HEP-JAVA-2021",
+        "reference_type": "book",
+        "title": "数据结构(java语言描述)(换封面,十四五)",
+        "authors": [
+          "张静"
+        ],
+        "institution": "",
+        "publisher": "高等教育出版社",
+        "responsible_party": "",
+        "year": "2021",
+        "source_identifier": "9787040559576",
+        "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=648deb81938b7cc2960f04a1",
+        "authoritative_source": "高等教育出版社官方产品信息检索系统"
+      },
+      "research_evidence": {
+        "reference_id": "REF-HEP-JAVA-2021",
+        "source_url": "https://xuanshu.hep.com.cn/front/h5Mobile/bookDetails?bookId=648deb81938b7cc2960f04a1",
+        "source_title": "数据结构（Java语言描述）（换封面，十四五）",
+        "source_author_or_organization": "高等教育出版社官方产品信息检索系统",
+        "source_year": 2021,
+        "source_identifier": "978-7-04-055957-6",
+        "authoritative_source": "高等教育出版社官方产品信息检索系统"
+      },
+      "binding_status": "passed",
+      "binding_errors": []
+    }
+  ]
+}

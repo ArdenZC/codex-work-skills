@@ -2588,9 +2588,9 @@ def _reference_provenance_report(
     provenance_binding_errors: list[dict[str, Any]] = []
     source_evidence: list[dict[str, Any]] = []
     is_reference_pool_contract = bool(
-        data and data.get("content_contract_version") in {"2.1", "2.2", "2.3"}
+        data and data.get("content_contract_version") in {"2.1", "2.2", "2.3", "2.4"}
     )
-    is_current_contract = bool(data and data.get("content_contract_version") in {"2.2", "2.3"})
+    is_current_contract = bool(data and data.get("content_contract_version") in {"2.2", "2.3", "2.4"})
     pool = {
         str(reference.get("reference_id")): reference
         for reference in (data or {}).get("reference_pool", [])
@@ -2632,6 +2632,7 @@ def _reference_provenance_report(
                     reference,
                     source,
                     f"reference_research.sources[{reference_id}]",
+                    allow_identifier_evidence_url=(data or {}).get("content_contract_version") == "2.4",
                 )
             )
             source_evidence.append(
@@ -3164,7 +3165,7 @@ def _v22_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
-    """Summarize supplementary WorkOrders and the Content 2.3 Lesson/task links."""
+    """Summarize version-aware supplementary WorkOrders and Lesson/task links."""
 
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
     artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), dict) else {}
@@ -3242,14 +3243,17 @@ def _v23_practice_handoff_report(data: dict[str, Any]) -> dict[str, Any]:
     if not math.isclose(task_hours, expected_hours, abs_tol=1e-9):
         errors.append("practice task hours do not match delivery_plan.practice_hours")
 
-    full_lesson_links = mode in {"integrated_lessons", "hybrid"}
+    content_version = str(data.get("content_contract_version", ""))
+    full_lesson_links = mode in {"integrated_lessons", "hybrid"} or (
+        content_version == "2.4" and mode in {"separate_full_lessons", "practice_only"}
+    )
     for task_id, task in task_by_id.items():
         linked_ids = [str(value) for value in task.get("lesson_ids", [])]
         if full_lesson_links and not linked_ids:
             invalid_links.append({"task_id": task_id, "lesson_id": None})
         if mode == "split_lessons" and expected_hours > 0 and not linked_ids:
             invalid_links.append({"task_id": task_id, "lesson_id": None})
-        if mode == "practice_only" and linked_ids:
+        if mode == "practice_only" and not full_lesson_links and linked_ids:
             invalid_links.extend({"task_id": task_id, "lesson_id": lesson_id} for lesson_id in linked_ids)
         for lesson_id in linked_ids:
             lesson = lesson_by_id.get(lesson_id)
@@ -3388,7 +3392,7 @@ def _assess_content_quality_v22(
 
     practice_handoff = (
         _v23_practice_handoff_report(data)
-        if data.get("content_contract_version") == "2.3"
+        if data.get("content_contract_version") in {"2.3", "2.4"}
         else _v22_practice_handoff_report(data)
     )
     if practice_handoff["status"] == "failed":
@@ -3540,7 +3544,7 @@ def assess_content_quality(
 ) -> dict[str, Any]:
     """Run deterministic course-level checks, including item and skeleton repetition."""
 
-    if data.get("content_contract_version") in {"2.2", "2.3"}:
+    if data.get("content_contract_version") in {"2.2", "2.3", "2.4"}:
         return _assess_content_quality_v22(
             data,
             manifest,
@@ -3555,7 +3559,7 @@ def assess_content_quality(
     errors: list[str] = []
     warnings: list[str] = []
     errors.extend(f"confirmed course information: {message}" for message in confirmed_course_info_errors(data))
-    if data.get("content_contract_version") in {"2.2", "2.3"} and data.get("allow_textbook_as_reference", False):
+    if data.get("content_contract_version") in {"2.2", "2.3", "2.4"} and data.get("allow_textbook_as_reference", False):
         errors.append(
             f"allow_textbook_as_reference is not supported in Content Contract {data.get('content_contract_version')}; "
             "course_materials.textbook and reference_pool are separate"
@@ -4072,8 +4076,8 @@ def assess_content_quality(
         "capability_stage_vocabulary": list(CAPABILITY_STAGES),
         "completeness": completeness,
         "reference_metrics": {
-            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") in {"2.1", "2.2", "2.3"} else False),
-            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") in {"2.1", "2.2", "2.3"} else None,
+            "textbook_present": bool(((data.get("course_materials") or {}).get("textbook")) if data.get("content_contract_version") in {"2.1", "2.2", "2.3", "2.4"} else False),
+            "pool_size": len(data.get("reference_pool", [])) if data.get("content_contract_version") in {"2.1", "2.2", "2.3", "2.4"} else None,
             "lessons_with_references": sum(1 for lesson in lessons if lesson_references(data, lesson)),
             "lessons_without_references": sum(1 for lesson in lessons if not lesson_references(data, lesson)),
             "reuse_frequency": reference_provenance.get("reuse_frequency", {}),

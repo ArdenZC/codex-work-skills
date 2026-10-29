@@ -16,7 +16,7 @@ from install_adapters import _required_engine_files
 
 SKILL_NAME = "lesson-plan-docx-generator"
 SKILL_VERSION = "2.3.1"
-CONTENT_CONTRACT_VERSION = "2.3"
+CONTENT_CONTRACT_VERSION = "2.4"
 TEMPLATE_VERSION = "1.1.2"
 INSTALL_MANIFEST = Path("install-manifest.json")
 SHARED_SCHEMA = Path("schemas/shared/practice-task-contract.schema.json")
@@ -29,9 +29,12 @@ REQUIRED_RELATIVE_FILES = (
     Path("docs/intake-contract-v2.1.1.json"),
     Path("docs/teaching-exemplar-benchmark-v1.md"),
     Path("docs/content-contract-v2.3.md"),
+    Path("docs/content-contract-v2.4.md"),
     Path("requirements.txt"),
     Path("scripts/generate_lesson_plans.py"),
     Path("scripts/content_contract.py"),
+    Path("scripts/generation_evidence.py"),
+    Path("scripts/project_merge.py"),
     Path("scripts/content_quality.py"),
     Path("scripts/course_scope_grounding.py"),
     Path("scripts/package_common.py"),
@@ -52,6 +55,7 @@ REQUIRED_RELATIVE_FILES = (
     Path("scripts/lesson_acceptance.py"),
     Path("scripts/validate_benchmark_review.py"),
     Path("schemas/lesson-plan-input.schema.json"),
+    Path("schemas/generation-evidence.schema.json"),
     Path("schemas/practice-task-contract.schema.json"),
     Path("schemas/teaching-exemplar-card.schema.json"),
     Path("schemas/teaching-exemplar-catalog.schema.json"),

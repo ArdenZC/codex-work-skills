@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex-work-skills.local/schemas/generation-evidence-v1.0.json",
+  "title": "Full-course Lesson Generation Evidence 1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generation_evidence_version", "content_contract_version", "content_sha256", "course_case_facts_sha256", "project_workflow", "exemplar_research", "lesson_comparisons", "course_review"],
+  "properties": {
+    "generation_evidence_version": {"const": "1.0"},
+    "content_contract_version": {"const": "2.4"},
+    "content_sha256": {"$ref": "#/$defs/sha256"},
+    "course_case_facts_sha256": {"$ref": "#/$defs/sha256"},
+    "project_workflow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["mode", "outline_sha256", "frozen_outline_sha256", "frozen_outline", "course_case_facts_sha256", "projects"],
+      "properties": {
+        "mode": {"enum": ["project_subagents", "sequential_fallback"]},
+        "outline_sha256": {"$ref": "#/$defs/sha256"},
+        "frozen_outline_sha256": {"$ref": "#/$defs/sha256"},
+        "frozen_outline": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/frozenOutlineRow"}},
+        "course_case_facts_sha256": {"$ref": "#/$defs/sha256"},
+        "projects": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/project"}}
+      }
+    },
+    "exemplar_research": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "queries", "sources"],
+      "properties": {
+        "status": {"enum": ["completed_with_qualified_exemplar", "completed_limited_comparison", "searched_no_qualified_exemplar", "searched_no_accessible_design", "search_blocked", "not_executed"]},
+        "queries": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/search"}},
+        "sources": {"type": "array", "items": {"$ref": "#/$defs/exemplar"}}
+      }
+    },
+    "lesson_comparisons": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/lessonReview"}},
+    "course_review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "lesson_ids", "project_ids", "declared_hours", "lesson_hours", "theory_hours", "practice_hours", "duplicate_lesson_ids", "project_scope_conflicts", "cross_project_checks"],
+      "properties": {
+        "status": {"enum": ["passed", "limited", "failed"]},
+        "lesson_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "project_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "declared_hours": {"type": "number", "exclusiveMinimum": 0},
+        "lesson_hours": {"type": "number", "minimum": 0},
+        "theory_hours": {"type": "number", "minimum": 0},
+        "practice_hours": {"type": "number", "minimum": 0},
+        "duplicate_lesson_ids": {"type": "array", "items": {"type": "string"}},
+        "project_scope_conflicts": {"type": "array", "items": {"type": "string"}},
+        "cross_project_checks": {"type": "object", "minProperties": 3, "additionalProperties": {"type": "string", "minLength": 12}}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "frozenOutlineRow": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lesson_id", "unit", "task", "lesson_type", "hours", "theory_hours", "practice_hours", "prior_learning", "capability_stage", "deliverable", "next_bridge", "practice_task_ids"],
+      "properties": {
+        "lesson_id": {"type": "string", "minLength": 1},
+        "unit": {"type": "string", "minLength": 1},
+        "task": {"type": "string", "minLength": 1},
+        "lesson_type": {"enum": ["theory", "practice", "integrated"]},
+        "hours": {"type": "number", "exclusiveMinimum": 0},
+        "theory_hours": {"type": "number", "minimum": 0},
+        "practice_hours": {"type": "number", "minimum": 0},
+        "prior_learning": {"type": "string", "minLength": 1},
+        "capability_stage": {"type": "string", "minLength": 1},
+        "deliverable": {"type": "string", "minLength": 1},
+        "next_bridge": {"type": "string", "minLength": 1},
+        "practice_task_ids": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "project": {
+      "type": "object", "additionalProperties": false,
+      "required": ["project_id", "lesson_ids", "owner", "status", "input_sha256", "output_sha256", "returned_lesson_ids", "hours", "theory_hours", "practice_hours", "course_case_facts_sha256", "self_check"],
+      "properties": {
+        "project_id": {"type": "string", "minLength": 1},
+        "lesson_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "owner": {"type": "string", "minLength": 1},
+        "status": {"const": "completed"},
+        "input_sha256": {"$ref": "#/$defs/sha256"},
+        "output_sha256": {"$ref": "#/$defs/sha256"},
+        "returned_lesson_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "hours": {"type": "number", "minimum": 0},
+        "theory_hours": {"type": "number", "minimum": 0},
+        "practice_hours": {"type": "number", "minimum": 0},
+        "course_case_facts_sha256": {"$ref": "#/$defs/sha256"},
+        "self_check": {"type": "string", "minLength": 20}
+      }
+    },
+    "search": {
+      "type": "object", "additionalProperties": false,
+      "required": ["query_id", "query", "language", "tool", "searched_at", "result_urls", "project_ids", "lesson_ids"],
+      "properties": {
+        "query_id": {"type": "string", "minLength": 1},
+        "query": {"type": "string", "minLength": 6},
+        "language": {"enum": ["zh", "mixed", "en"]},
+        "tool": {"type": "string", "minLength": 1},
+        "searched_at": {"type": "string", "format": "date-time"},
+        "result_urls": {"type": "array", "items": {"type": "string", "pattern": "^https?://[^\\s]+$"}},
+        "project_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "lesson_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "exemplar": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_id", "title", "author_or_organization", "url", "discovery_url", "source_type", "read_scope", "read_excerpt", "capture_sha256", "lesson_ids", "project_ids", "excellence_status", "excellence_evidence", "transferable_methods", "limitations"],
+      "properties": {
+        "source_id": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 3},
+        "author_or_organization": {"type": "string", "minLength": 2},
+        "url": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+        "discovery_url": {"type": "string", "pattern": "^https?://[^\\s]+$"},
+        "source_type": {"enum": ["complete_teaching_design", "formal_demonstration_lesson", "ordinary_public_design"]},
+        "read_scope": {"type": "string", "minLength": 20},
+        "read_excerpt": {"type": "string", "minLength": 160},
+        "capture_sha256": {"$ref": "#/$defs/sha256"},
+        "lesson_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "project_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "excellence_status": {"enum": ["verified_excellent", "not_proven"]},
+        "excellence_evidence": {"type": "string", "minLength": 12},
+        "transferable_methods": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 12}},
+        "limitations": {"type": "string", "minLength": 12}
+      }
+    },
+    "lessonReview": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lesson_id", "lesson_content_sha256", "comparison_status", "comparison_status_note", "comparison_type", "source_ids", "dimensions", "revision"],
+      "properties": {
+        "lesson_id": {"type": "string", "minLength": 1},
+        "lesson_content_sha256": {"$ref": "#/$defs/sha256"},
+        "comparison_status": {"enum": ["EXEMPLAR_COMPARISON_DONE", "SEARCHED_NO_QUALIFIED_EXEMPLAR", "SEARCH_BLOCKED"]},
+        "comparison_status_note": {"type": "string", "minLength": 12},
+        "comparison_type": {"enum": ["daily_non_blind", "search_no_qualified_exemplar"]},
+        "source_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "dimensions": {"type": "array", "minItems": 15, "maxItems": 15, "items": {"$ref": "#/$defs/dimensionReview"}},
+        "revision": {
+          "type": "object", "additionalProperties": false,
+          "required": ["necessary", "actual_issue", "reason", "changed", "draft_content_sha256", "final_content_sha256", "re_review"],
+          "properties": {
+            "necessary": {"type": "boolean"},
+            "actual_issue": {"type": "string"},
+            "reason": {"type": "string", "minLength": 12},
+            "changed": {"type": "boolean"},
+            "draft_content_sha256": {"$ref": "#/$defs/sha256"},
+            "final_content_sha256": {"$ref": "#/$defs/sha256"},
+            "re_review": {"type": "string", "minLength": 12}
+          }
+        }
+      }
+    },
+    "dimensionReview": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dimension", "status", "existing_design", "current_evidence", "exemplar_pattern", "gap", "improvement_reason", "conclusion"],
+      "properties": {
+        "dimension": {"enum": ["source_truth_alignment", "learner_analysis", "objective_quality", "content_selection", "key_difficult_point_resolution", "teacher_action_quality", "student_cognitive_activity", "learning_evidence", "objective_activity_evidence_assessment_alignment", "authentic_vocational_context", "differentiation_scaffold", "interaction_deep_learning", "assessment_quality", "progression_capacity", "teacher_usability"]},
+        "status": {"enum": ["MEETS", "PARTIAL", "GAP", "NOT_APPLICABLE", "INSUFFICIENT_EVIDENCE"]},
+        "existing_design": {"type": "string", "minLength": 12},
+        "current_evidence": {"type": "string", "minLength": 12},
+        "exemplar_pattern": {"type": "string", "minLength": 12},
+        "gap": {"type": "string", "minLength": 8},
+        "improvement_reason": {"type": "string", "minLength": 12},
+        "conclusion": {"enum": ["retain", "revise", "human_review"]}
+      }
+    }
+  }
+}

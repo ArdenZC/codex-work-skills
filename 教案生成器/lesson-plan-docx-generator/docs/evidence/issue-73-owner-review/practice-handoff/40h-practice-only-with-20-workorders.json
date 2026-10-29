@@ -1,0 +1,1189 @@
+{
+  "scenario": "40h-practice-only-with-20-workorders",
+  "synthetic_fixture": true,
+  "course": "数据结构综合实施",
+  "content_contract_version": "2.4",
+  "delivery_mode": "practice_only",
+  "declared_hours": {
+    "mode": "practice_only",
+    "total_hours": 40,
+    "theory_hours": 0,
+    "practice_hours": 40
+  },
+  "lesson_count": 20,
+  "lesson_type_counts": {
+    "theory": 0,
+    "practice": 20,
+    "integrated": 0
+  },
+  "practice_task_count": 20,
+  "content_qa": {
+    "status": "passed",
+    "content_contract_version": "2.4",
+    "diagnostic_content_policy": {
+      "mode": "agent_review_and_exact_facts",
+      "hash": "sha256"
+    },
+    "errors": [],
+    "warnings": [],
+    "authoring_provenance": {
+      "mode": "synthetic_fixture",
+      "status": "completed",
+      "authoring_id": "synthetic-fixture-contract-test",
+      "review_rounds": 1,
+      "semantic_source": "Agent attestation; Python checks only exact snapshot and digest linkage"
+    },
+    "agent_pedagogical_review": {
+      "status": "passed",
+      "scope": "lesson-level Agent authoring, revision, pedagogical chain, and capacity",
+      "records": [
+        {
+          "lesson_id": "L01",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "7FB00DA2001C6BFFA10CCD4CB063F1A8D27739226A8AA5C6A96399BE1E563294",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L02",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "F6E3444DA0325956A5989C8E71407EB5B75756A184A4F03CFD3700CFD6272677",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L03",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "8D850DFEAEB195F31D2AD66FB81A35E0288D703E70B851C8901EFF9C3F3F7443",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L04",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "AEAA8CD313E3C18739FAA54378EABF96E27BEAE0069AD33D9088A492D6C74018",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L05",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "B98381DCDAB403BB668A829F9F2F70F9D037CAB6B7FCFB30DA880C7AC33ACE23",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L06",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "784F64AFEBB61A87E9BCE9C58711CCD9BD008B71C0DD98557D4A09D77A82C4C9",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L07",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "DD726D13C696313B3637B70602E0B1799199958863B1A3DDC9C4DB59C319428D",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L08",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "8328A215ADCE9679B6FF837E61EEB6799A7E98AF53FFD940406C9250A2A4C701",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L09",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "41EC2331078ED5F05775F29CA4892683F5FA11FF66857F065C8F7A04945CDEE2",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L10",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "93B3567E80B849C33EB034F086AABD38B9094529ACCC736DDD26C46391153173",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L11",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "6F62E31EECC50D16ED4F5165EFBFFEA367628DC34DCD56C205F93124616B9C23",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L12",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "2848E8C859E648CFE98D6373BE130A33683A2EA05EF29E8D2045B19822C02E31",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L13",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "B0A0450615AF282DC43A737813999C1213DD627619C95F6732D335A8BAEAC218",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L14",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "5D77433678B42A960C3E53D7420B66FB1487CCD3BEDF997B829D92EBA9557F30",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L15",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "3A9F6F8312347AF2FBFFAE3A2245352B3D80662149C4D94F0E58EB739F5A1534",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L16",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "7A4EB18E1239C2B726035144FA1EC28319329782770F1EAE99FE690729FD42B7",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L17",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "9B31106F0246420845F32905264F69A2306C7799463CE319940DE822ADEEB98A",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L18",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "B25FA04CAFE34D1A39749C82775318DAC3AF7998B5F3CC9074D9241EFD52A4BD",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L19",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "642848387EA33D223EF6CA66BDE587FC12AE90E73172757BA688E81E5F120D0E",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        },
+        {
+          "lesson_id": "L20",
+          "status": "passed",
+          "decision": "approved",
+          "issues": [],
+          "review_rounds": 1,
+          "rewrite_performed": false,
+          "revised_content_sha256": "068728675EB03C886FD4C5260429CD620EC419BD28A9645D60EC0AE805B30592",
+          "semantic_source": "Agent review; Python only checks review state and digest linkage"
+        }
+      ],
+      "required_contract_fields": [
+        "issues",
+        "draft_content",
+        "revised_content",
+        "decision",
+        "review_history"
+      ]
+    },
+    "exact_duplicates": [],
+    "adjacent_exact_duplicates": [],
+    "item_duplicates": [],
+    "adjacent_item_duplicates": [],
+    "frequency_item_duplicates": [],
+    "adjacent_similarity_pairs": [],
+    "field_similarity_pairs": [],
+    "adjacent_field_similarity_pairs": [],
+    "whole_lesson_similarity_pairs": [],
+    "high_similarity_pairs": [],
+    "implementation_duplicates": [],
+    "adjacent_implementation_exact_duplicates": [],
+    "implementation_similarity_pairs": [],
+    "adjacent_implementation_similarity_pairs": [],
+    "structural_similarity_pairs": [],
+    "implementation_structural_similarity_pairs": [],
+    "evaluation_remark_duplicates": [],
+    "evaluation_remark_similarity": [],
+    "repeated_sentences": [],
+    "boilerplate_hits": [],
+    "progression": {
+      "status": "passed",
+      "lesson_ids": [
+        "L01",
+        "L02",
+        "L03",
+        "L04",
+        "L05",
+        "L06",
+        "L07",
+        "L08",
+        "L09",
+        "L10",
+        "L11",
+        "L12",
+        "L13",
+        "L14",
+        "L15",
+        "L16",
+        "L17",
+        "L18",
+        "L19",
+        "L20"
+      ],
+      "links": [
+        {
+          "from": "L01",
+          "to": "L02",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L02",
+          "to": "L03",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L03",
+          "to": "L04",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L04",
+          "to": "L05",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L05",
+          "to": "L06",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L06",
+          "to": "L07",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L07",
+          "to": "L08",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L08",
+          "to": "L09",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L09",
+          "to": "L10",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L10",
+          "to": "L11",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L11",
+          "to": "L12",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L12",
+          "to": "L13",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L13",
+          "to": "L14",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L14",
+          "to": "L15",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L15",
+          "to": "L16",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L16",
+          "to": "L17",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L17",
+          "to": "L18",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L18",
+          "to": "L19",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L19",
+          "to": "L20",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        }
+      ],
+      "sequence_links": [
+        {
+          "from": "L01",
+          "to": "L02",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L02",
+          "to": "L03",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L03",
+          "to": "L04",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L04",
+          "to": "L05",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L05",
+          "to": "L06",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L06",
+          "to": "L07",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L07",
+          "to": "L08",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L08",
+          "to": "L09",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L09",
+          "to": "L10",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L10",
+          "to": "L11",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L11",
+          "to": "L12",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L12",
+          "to": "L13",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L13",
+          "to": "L14",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L14",
+          "to": "L15",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L15",
+          "to": "L16",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L16",
+          "to": "L17",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L17",
+          "to": "L18",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L18",
+          "to": "L19",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L19",
+          "to": "L20",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        }
+      ],
+      "declared_prior_links": [
+        {
+          "from": "L01",
+          "to": "L02",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L02",
+          "to": "L03",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L03",
+          "to": "L04",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L04",
+          "to": "L05",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L05",
+          "to": "L06",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L06",
+          "to": "L07",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L07",
+          "to": "L08",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L08",
+          "to": "L09",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L09",
+          "to": "L10",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L10",
+          "to": "L11",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L11",
+          "to": "L12",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L12",
+          "to": "L13",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L13",
+          "to": "L14",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L14",
+          "to": "L15",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L15",
+          "to": "L16",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L16",
+          "to": "L17",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L17",
+          "to": "L18",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L18",
+          "to": "L19",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        },
+        {
+          "from": "L19",
+          "to": "L20",
+          "status": "passed",
+          "kind": "declared_sequence",
+          "semantic_source": "Agent review and explicit progression fields"
+        }
+      ],
+      "requires_agent_review": true,
+      "agent_review_items": [],
+      "method": "explicit progression fields plus Agent review; no character n-gram scoring"
+    },
+    "intra_lesson_coherence": {
+      "status": "passed",
+      "method": "stage-level chain: content -> teacher activity -> student activity/evidence -> design intent",
+      "failures": []
+    },
+    "course_scope_grounding": {
+      "status": "not_provided",
+      "source_truth_manifest_sha256": null,
+      "source_truth_outline_sha256": null,
+      "content_outline_sha256": "00ba43c1c0b31b67538e5cd70151a2d0410ba8d22aa12e95280aff7b8bf84f2f",
+      "lesson_count": 20,
+      "lessons": [
+        {
+          "lesson_id": "L01",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L02",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L03",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L04",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L05",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L06",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L07",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L08",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L09",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L10",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L11",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L12",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L13",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L14",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L15",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L16",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L17",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L18",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L19",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        },
+        {
+          "lesson_id": "L20",
+          "outline_alignment": "not_checked",
+          "scope_anchor_status": "not_checked",
+          "intra_lesson_status": "passed"
+        }
+      ],
+      "failures": []
+    },
+    "reference_provenance": {
+      "by_lesson": {
+        "L01": [],
+        "L02": [],
+        "L03": [],
+        "L04": [],
+        "L05": [],
+        "L06": [],
+        "L07": [],
+        "L08": [],
+        "L09": [],
+        "L10": [],
+        "L11": [],
+        "L12": [],
+        "L13": [],
+        "L14": [],
+        "L15": [],
+        "L16": [],
+        "L17": [],
+        "L18": [],
+        "L19": [],
+        "L20": []
+      },
+      "validation_scope": "contract_locator_and_exact_source_binding",
+      "reuse_policy": "reference_reusable",
+      "cross_lesson_reuse": "allowed",
+      "same_lesson_duplicate_policy": "hard_fail",
+      "missing_evidence": [],
+      "invalid_generic": [],
+      "invalid_verified_public": [],
+      "invalid_resource_only": [],
+      "invalid_metadata": [],
+      "provenance_binding_errors": [],
+      "source_evidence": [],
+      "same_lesson_duplicates": [],
+      "unresolved_ids": [],
+      "placeholder_items": [],
+      "empty_reference_lessons": [
+        "L01",
+        "L02",
+        "L03",
+        "L04",
+        "L05",
+        "L06",
+        "L07",
+        "L08",
+        "L09",
+        "L10",
+        "L11",
+        "L12",
+        "L13",
+        "L14",
+        "L15",
+        "L16",
+        "L17",
+        "L18",
+        "L19",
+        "L20"
+      ],
+      "textbook_overlap": [],
+      "textbook_overlap_allowed": false,
+      "catalog_source_regions": {
+        "domestic": 0,
+        "foreign": 0,
+        "unknown": 0
+      },
+      "reuse_frequency": {}
+    },
+    "practice_handoff": {
+      "status": "passed",
+      "contract_version": "1.1",
+      "task_count": 20,
+      "expected_task_count": 20,
+      "expected_workorder_count": 20,
+      "actual_workorder_count": 20,
+      "expected_practice_hours": 40.0,
+      "actual_practice_hours": 40,
+      "lesson_practice_hours": 40.0,
+      "sum_task_practice_hours": 40.0,
+      "unresolved_task_ids": [],
+      "unlinked_task_ids": [],
+      "invalid_practice_lesson_links": [],
+      "practice_hour_allocation_errors": [],
+      "invalid_task_hours": [],
+      "hour_consistent": true,
+      "lesson_task_linkage_complete": true,
+      "one_way_lesson_links": false,
+      "workorders_requested": true,
+      "contract_required": true,
+      "contract_not_allowed": false,
+      "contract_errors": [],
+      "artifact_plan": {
+        "lesson_plans": true,
+        "practice_work_orders": true
+      }
+    },
+    "coverage": {
+      "lesson_count": 20,
+      "score_pattern": {
+        "values": [
+          88.5,
+          91.0,
+          89.5,
+          92.5,
+          90.0,
+          93.5,
+          87.5,
+          94.0,
+          86.5,
+          95.0,
+          87.0,
+          92.0,
+          89.0,
+          96.0,
+          90.5,
+          94.5,
+          85.5,
+          93.0,
+          94.0,
+          92.5
+        ],
+        "all_same": false,
+        "simple_cycle": false,
+        "cycle_period": null,
+        "cycle_confidence": 0.0,
+        "full_cycles": 0,
+        "tail_length": 0,
+        "tail_fraction": 0.0,
+        "arithmetic_progression": false,
+        "arithmetic_step": null,
+        "strict_monotonic": false,
+        "range_valid": true
+      },
+      "implementation_stages": {
+        "L01": 9,
+        "L02": 9,
+        "L03": 9,
+        "L04": 9,
+        "L05": 9,
+        "L06": 9,
+        "L07": 9,
+        "L08": 9,
+        "L09": 9,
+        "L10": 9,
+        "L11": 9,
+        "L12": 9,
+        "L13": 9,
+        "L14": 9,
+        "L15": 9,
+        "L16": 9,
+        "L17": 9,
+        "L18": 9,
+        "L19": 9,
+        "L20": 9
+      },
+      "implementation_review": {
+        "L01": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L02": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L03": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L04": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L05": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L06": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L07": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L08": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L09": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L10": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L11": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L12": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L13": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L14": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L15": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L16": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L17": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L18": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L19": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        },
+        "L20": {
+          "status": "passed",
+          "method": "stage-level pedagogical chain reviewed by Agent",
+          "stages": 9
+        }
+      },
+      "meaningful_characters": null,
+      "content_fields": 14,
+      "evaluation_criteria": 13,
+      "in_class_stage_ids": [
+        "lesson_summary",
+        "operation_demonstration",
+        "peer_review",
+        "project_practice",
+        "task_extension",
+        "task_implementation",
+        "task_introduction"
+      ],
+      "required_stage_ids": [
+        "before_class_preparation",
+        "task_introduction",
+        "operation_demonstration",
+        "task_implementation",
+        "task_extension",
+        "project_practice",
+        "peer_review",
+        "lesson_summary",
+        "after_class_improvement"
+      ],
+      "stage_semantic_rule": "Agent review; not all item statuses and not lexical overlap",
+      "mechanical_topic_suffix_count_before_formatting": 0,
+      "reference_metrics": {
+        "textbook_present": false,
+        "pool_size": 0,
+        "domestic_source_count": 0,
+        "foreign_source_count": 0,
+        "unknown_source_count": 0,
+        "domestic_share": null,
+        "lessons_with_references": 0,
+        "lessons_without_references": 20,
+        "reuse_frequency": {},
+        "empty_reference_lesson_count": 20
+      }
+    },
+    "completeness": {
+      "status": "schema_validated"
+    },
+    "density_errors": [],
+    "resource_reuse": [],
+    "evaluation_remark_density": [],
+    "reuse_policy": {
+      "mode": "exact_duplicate_audit; cross-lesson source reuse is allowed"
+    }
+  },
+  "acceptance_practice_handoff": {
+    "status": "passed",
+    "contract_version": "1.1",
+    "task_count": 20,
+    "expected_task_count": 20,
+    "expected_workorder_count": 20,
+    "actual_workorder_count": 20,
+    "expected_practice_hours": 40.0,
+    "actual_practice_hours": 40,
+    "lesson_practice_hours": 40.0,
+    "sum_task_practice_hours": 40.0,
+    "unresolved_task_ids": [],
+    "unlinked_task_ids": [],
+    "invalid_practice_lesson_links": [],
+    "practice_hour_allocation_errors": [],
+    "invalid_task_hours": [],
+    "hour_consistent": true,
+    "lesson_task_linkage_complete": true,
+    "one_way_lesson_links": false,
+    "workorders_requested": true,
+    "contract_required": true,
+    "contract_not_allowed": false,
+    "contract_errors": [],
+    "artifact_plan": {
+      "lesson_plans": true,
+      "practice_work_orders": true
+    }
+  },
+  "acceptance_independent_recheck": {
+    "status": "PASS",
+    "workorders_requested": true,
+    "contract_required": true,
+    "task_count": 20,
+    "expected_task_count": 20,
+    "expected_workorder_count": 20,
+    "expected_practice_hours": 40.0,
+    "actual_practice_hours": 40.0,
+    "sum_task_practice_hours": 40.0,
+    "invalid_practice_lesson_links": [],
+    "unresolved_task_ids": [],
+    "unlinked_task_ids": [],
+    "hour_consistent": true,
+    "lesson_task_linkage_complete": true,
+    "practice_hour_allocation_errors": [],
+    "one_way_lesson_links": false,
+    "contract_errors": []
+  }
+}

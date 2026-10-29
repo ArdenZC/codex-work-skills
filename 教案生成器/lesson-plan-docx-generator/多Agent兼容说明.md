@@ -1,8 +1,8 @@
 # 教案生成器多 Agent 兼容说明
 
-所有 Agent 共用 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`。Lesson Skill 2.3.1 默认输出 Content Contract 2.3；Content 2.2 保持历史语义并可直接兼容读取。正式规划先做一次中文 intake、冻结课程事实并完成全课程 outline，再由 Agent 写逐课正文与 pedagogical review。
+所有 Agent 共用 `SKILL.md`、`AGENTS.md` 和 `通用提示词.md`。新课程默认输出 Content Contract 2.4；Content 2.2/2.3 保持历史语义并可兼容读取。正式规划先做一次中文 intake、冻结课程事实并完成全课程 outline，再按项目委派完整项目内的理论/实践 Lesson，由主 Agent 统一合并复核。Content 2.4 的课程项目、搜索和对照证据见 `docs/content-contract-v2.4.md`。
 
-Content 2.3 的 Lesson coverage 取决于 delivery mode：`theory_only`、`integrated_lessons`、`hybrid` 覆盖 `total_hours`；`split_lessons` 覆盖 `theory_hours`；`practice_only` 保持零 Lesson。Integrated Lesson 必须有正理论和实践构成；hybrid 可混合 theory/practice/integrated Lesson；课程理论、实践、总学时逐项守恒。64/32/32 integrated 且默认每课 2 学时对应 32 个 Lesson、64 小时覆盖。工单 false 时仍生成 32 Lesson、0 工单；true 时另有 16 个配套实践任务/工单，这些实践学时不再次累计。Content 2.2 仍按理论 Lesson 规则，split 与 practice_only 语义不变。
+Content 2.4 的 Lesson coverage 对所有新课 mode 都覆盖 `total_hours`；`separate_full_lessons` 分别生成 theory/practice Lesson，`practice_only` 也完整生成实践 Lesson。历史 Content 2.3 的 `split_lessons` 继续只覆盖 `theory_hours`、`practice_only` 保持零 Lesson。Integrated Lesson 必须有正理论和实践构成；hybrid 可混合 theory/practice/integrated Lesson；课程理论、实践、总学时逐项守恒。64/32/32 integrated 且默认每课 2 学时对应 32 个 Lesson、64 小时覆盖。工单 false 时仍生成 Lesson；true 时另有配套任务/工单，这些实践学时不再次累计。Content 2.2 仍按自身历史规则校验。
 
 用户明确要求 Practice Task/WorkOrder 时，Lesson Agent 完成 handoff 后调用 WorkOrder Skill Agent。Content 2.3 的 integrated/practice Lesson 与实践任务双向链接，theory Lesson 的 `practice_task_ids` 为空；工单关闭时所有 Lesson 链接为空。Split 保留 task→theory Lesson 单向链接。不得由 Lesson Python 调用 WorkOrder Python 或伪造 DOCX。
 

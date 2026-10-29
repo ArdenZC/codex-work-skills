@@ -10,12 +10,12 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_CEILING
 from typing import Any, Iterable, Mapping
 
 
-CONTENT_CONTRACT_VERSION = "2.3"
-COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2", "2.3")
+CONTENT_CONTRACT_VERSION = "2.4"
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2", "2.3", "2.4")
 LEGACY_CONTENT_CONTRACT_VERSION = "2.0"
 EVALUATION_SCORE_MIN = Decimal("85")
 EVALUATION_SCORE_MAX = Decimal("96")
@@ -26,16 +26,23 @@ DELIVERY_MODES = (
     "theory_only",
     "practice_only",
     "split_lessons",
+    "separate_full_lessons",
     "integrated_lessons",
     "hybrid",
 )
 
 
-def expected_lesson_coverage_hours(delivery_plan: Mapping[str, Any]) -> Decimal:
+def expected_lesson_coverage_hours(
+    delivery_plan: Mapping[str, Any],
+    content_contract_version: str = "2.3",
+) -> Decimal:
     """Return the Lesson-hour ledger required by a delivery mode.
 
     Content 2.3 expands Lesson coverage for integrated and hybrid delivery while
     retaining the Content 2.2 boundaries for split and practice-only courses.
+    Content 2.4 uses an explicit ``separate_full_lessons`` mode for separately
+    taught theory/practice lessons and gives ``practice_only`` full Lesson
+    coverage. Historical split/practice-only inputs keep their old semantics.
     """
 
     if not isinstance(delivery_plan, Mapping):
@@ -43,10 +50,15 @@ def expected_lesson_coverage_hours(delivery_plan: Mapping[str, Any]) -> Decimal:
     mode = delivery_plan.get("mode")
     if mode in {"theory_only", "integrated_lessons", "hybrid"}:
         value = delivery_plan.get("total_hours")
+    elif mode == "separate_full_lessons" and content_contract_version == "2.4":
+        value = delivery_plan.get("total_hours")
     elif mode == "split_lessons":
         value = delivery_plan.get("theory_hours")
     elif mode == "practice_only":
-        return Decimal("0")
+        if content_contract_version == "2.4":
+            value = delivery_plan.get("total_hours")
+        else:
+            return Decimal("0")
     else:
         raise ValueError(f"unsupported delivery_plan.mode for Lesson coverage: {mode!r}")
     try:
@@ -56,6 +68,107 @@ def expected_lesson_coverage_hours(delivery_plan: Mapping[str, Any]) -> Decimal:
     if not hours.is_finite() or hours < 0:
         raise ValueError(f"delivery_plan hours are invalid for mode {mode!r}")
     return hours
+
+
+def delivery_plan_v24_errors(data: Mapping[str, Any]) -> list[str]:
+    """Validate the Content 2.4 full-course Lesson ledger and lesson types."""
+
+    plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
+    mode = plan.get("mode")
+    lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
+    errors: list[str] = []
+    if mode == "split_lessons":
+        errors.append("Content 2.4 must use separate_full_lessons; split_lessons is retained only for historical contracts")
+        return errors
+    if mode not in {"theory_only", "practice_only", "separate_full_lessons", "integrated_lessons", "hybrid"}:
+        errors.append(f"unsupported Content 2.4 delivery_plan.mode: {mode!r}")
+        return errors
+
+    def number(field: str) -> Decimal | None:
+        try:
+            value = Decimal(str(plan[field]))
+        except (KeyError, InvalidOperation, TypeError, ValueError):
+            return None
+        return value if value.is_finite() and value >= 0 else None
+
+    total = number("total_hours")
+    theory = number("theory_hours")
+    practice = number("practice_hours")
+    try:
+        default_hours = Decimal(str(data.get("default_hours")))
+    except (InvalidOperation, TypeError, ValueError):
+        default_hours = Decimal("0")
+    if total is None or theory is None or practice is None:
+        errors.append("Content 2.4 delivery_plan must declare finite non-negative total/theory/practice hours")
+        return errors
+    if theory + practice != total or Decimal(str(data.get("total_hours", "-1"))) != total:
+        errors.append("Content 2.4 total_hours must equal theory_hours + practice_hours and the course total")
+    if default_hours <= 0 or not default_hours.is_finite():
+        errors.append("default_hours must be a positive finite number")
+        return errors
+    expected_count = int((total / default_hours).to_integral_value(rounding=ROUND_CEILING))
+    if len(lessons) != expected_count:
+        errors.append(f"Content 2.4 requires {expected_count} Lessons for {total} course hours; got {len(lessons)}")
+    if data.get("artifact_plan", {}).get("lesson_plans") is not True:
+        errors.append("Content 2.4 with positive course hours must set artifact_plan.lesson_plans=true")
+
+    lesson_total = Decimal("0")
+    lesson_theory = Decimal("0")
+    lesson_practice = Decimal("0")
+    for index, lesson in enumerate(lessons, 1):
+        if not isinstance(lesson, Mapping):
+            continue
+        try:
+            hours = Decimal(str(lesson.get("hours")))
+            row_theory = Decimal(str(lesson.get("theory_hours")))
+            row_practice = Decimal(str(lesson.get("practice_hours")))
+        except (InvalidOperation, TypeError, ValueError):
+            errors.append(f"lessons[{index - 1}] has invalid hour composition")
+            continue
+        if not all(value.is_finite() for value in (hours, row_theory, row_practice)):
+            errors.append(f"lessons[{index - 1}] has non-finite hour composition")
+            continue
+        if hours <= 0 or row_theory < 0 or row_practice < 0 or row_theory + row_practice != hours:
+            errors.append(f"lessons[{index - 1}] hours must equal theory_hours + practice_hours")
+        expected_hours = min(default_hours, max(Decimal("0"), total - default_hours * (index - 1)))
+        if hours != expected_hours:
+            errors.append(
+                f"lessons[{index - 1}].hours must preserve the {default_hours}-hour Lesson size and final remainder; expected {expected_hours}, got {hours}"
+            )
+        lesson_total += hours
+        lesson_theory += row_theory
+        lesson_practice += row_practice
+        lesson_type = lesson.get("lesson_type")
+        if mode == "theory_only" and (lesson_type != "theory" or row_theory != hours or row_practice != 0):
+            errors.append(f"{lesson.get('lesson_id')} must be a theory-only Lesson")
+        elif mode == "practice_only" and (lesson_type != "practice" or row_theory != 0 or row_practice != hours):
+            errors.append(f"{lesson.get('lesson_id')} must be a practice-only Lesson")
+        elif mode == "separate_full_lessons":
+            if lesson_type == "theory" and (row_theory != hours or row_practice != 0):
+                errors.append(f"{lesson.get('lesson_id')} theory Lesson must contain only theory hours")
+            elif lesson_type == "practice" and (row_theory != 0 or row_practice != hours):
+                errors.append(f"{lesson.get('lesson_id')} practice Lesson must contain only practice hours")
+            elif lesson_type not in {"theory", "practice"}:
+                errors.append(f"{lesson.get('lesson_id')} separate_full_lessons cannot contain integrated Lessons")
+        elif mode == "integrated_lessons" and (
+            lesson_type != "integrated" or row_theory <= 0 or row_practice <= 0
+        ):
+            errors.append(f"{lesson.get('lesson_id')} integrated Lesson must contain positive theory and practice hours")
+
+    if lesson_total != total:
+        errors.append(f"Lesson hours must cover total_hours exactly: expected {total}, got {lesson_total}")
+    if lesson_theory != theory or lesson_practice != practice:
+        errors.append(
+            "Lesson theory/practice totals must equal the confirmed course split: "
+            f"expected {theory}/{practice}, got {lesson_theory}/{lesson_practice}"
+        )
+    if mode == "theory_only" and (theory != total or practice != 0):
+        errors.append("theory_only requires all course hours to be theory")
+    if mode == "practice_only" and (theory != 0 or practice != total):
+        errors.append("practice_only requires all course hours to be practice")
+    if mode == "separate_full_lessons" and (theory <= 0 or practice <= 0):
+        errors.append("separate_full_lessons requires positive theory and practice hours")
+    return errors
 REFERENCE_TYPES = (
     "book",
     "standard",
@@ -433,8 +546,15 @@ def reference_source_binding_errors(
     reference: dict[str, Any],
     source: dict[str, Any],
     prefix: str = "reference",
+    *,
+    allow_identifier_evidence_url: bool = False,
 ) -> list[str]:
-    """Return fail-closed errors for one-to-one pool/research source binding."""
+    """Return fail-closed errors for one-to-one pool/research source binding.
+
+    Historical Content contracts require the canonical ISBN to appear in the
+    source URL. Content 2.4 can instead bind a separate, actually searched
+    identifier verification page without changing that legacy rule.
+    """
 
     errors: list[str] = []
     reference_id = _clean(reference.get("reference_id", ""))
@@ -481,9 +601,14 @@ def reference_source_binding_errors(
         elif actual_identifier != expected_identifier:
             errors.append(f"{prefix}.source_identifier must match the canonical reference identifier")
         source_url_identifier = _compact_reference_identifier(source.get("source_url", ""))
-        if expected_identifier not in source_url_identifier:
+        identifier_evidence_url = _compact_reference_identifier(
+            source.get("source_identifier_evidence_url", "")
+        )
+        if expected_identifier not in source_url_identifier and not (
+            allow_identifier_evidence_url and identifier_evidence_url
+        ):
             errors.append(
-                f"{prefix}.source_identifier must be evidenced by source_url; locator identity does not match"
+                f"{prefix}.source_identifier must be evidenced by its source URL or a separate identifier-verification URL"
             )
     return errors
 
@@ -587,7 +712,7 @@ def reference_metadata_errors(reference: dict[str, Any], prefix: str = "referenc
 def lesson_references(data: dict[str, Any] | None, lesson: dict[str, Any]) -> list[dict[str, Any]]:
     """Resolve a lesson's renderable references for either contract version."""
 
-    if not data or data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
+    if not data or data.get("content_contract_version") not in {"2.1", "2.2", "2.3", "2.4"}:
         return list(lesson.get("references", []))
     pool = {
         str(reference.get("reference_id")): reference

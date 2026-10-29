@@ -2346,6 +2346,10 @@ class RoutineExemplarWorkflowGuidanceTests(unittest.TestCase):
         prompt = (LESSON / "通用提示词.md").read_text(encoding="utf-8")
         for text in (skill, prompt):
             self.assertIn("ONLINE_EXEMPLAR_SEARCH_NOT_EXECUTED", text)
+            self.assertIn("search_blocked", text)
+            self.assertIn("searched_no_qualified_exemplar", text)
+            self.assertIn("searched_no_accessible_design", text)
+            self.assertIn("检索后未找到可靠优秀教案不等于没有执行检索", text)
             self.assertIn("日常非盲对照", text)
             self.assertIn("schemas/benchmark-lesson-review.schema.json", text)
             self.assertIn("至多一轮实质性修订", text)

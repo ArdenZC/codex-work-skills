@@ -5,6 +5,7 @@ import json
 import hashlib
 import re
 import unicodedata
+from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Any
@@ -276,8 +277,10 @@ def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
 
     provenance = data["authoring_provenance"]
     expected_rounds = int(provenance["review_rounds"])
+    variable_lesson_rounds = data.get("content_contract_version") == "2.4"
     first_round_digests: list[str] = []
     final_round_digests: list[str] = []
+    observed_round_counts: list[int] = []
     for index, lesson in enumerate(data.get("lessons", [])):
         prefix = f"lessons[{index}].pedagogical_review"
         review = lesson.get("pedagogical_review")
@@ -312,10 +315,15 @@ def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
             )
         if not isinstance(history, list) or not history:
             raise ValueError(f"{prefix}.review_history must record at least one review round")
-        if len(history) != expected_rounds:
+        if variable_lesson_rounds and len(history) > expected_rounds:
+            raise ValueError(
+                f"{prefix}.review_history length must not exceed authoring_provenance.review_rounds ({expected_rounds})"
+            )
+        if not variable_lesson_rounds and len(history) != expected_rounds:
             raise ValueError(
                 f"{prefix}.review_history length must equal authoring_provenance.review_rounds ({expected_rounds})"
             )
+        observed_round_counts.append(len(history))
         final_digest = canonical_json_sha256(revised)
         draft_digest = canonical_json_sha256(draft)
         first_digest = ""
@@ -345,7 +353,7 @@ def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
                     raise ValueError(
                         f"{prefix}.review_history[{round_index}] claims a rewrite but the next round has the same content digest"
                     )
-        if expected_rounds < 2 and any(record.get("decision") == "needs_revision" for record in history):
+        if len(history) < 2 and any(record.get("decision") == "needs_revision" for record in history):
             raise ValueError(f"{prefix}.review_history needs a second review after a revision")
         first_round_digests.append(first_digest)
         final_round_digests.append(final_digest)
@@ -353,6 +361,10 @@ def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
             raise ValueError(f"{prefix}.review_history first content digest must match draft_content")
         if not any(record.get("decision") == "needs_revision" for record in history) and draft_digest != final_digest:
             raise ValueError(f"{prefix}.draft_content differs from final content without a revision round")
+    if variable_lesson_rounds and observed_round_counts and max(observed_round_counts) != expected_rounds:
+        raise ValueError(
+            "authoring_provenance.review_rounds must equal the maximum per-Lesson review_history length"
+        )
     expected_draft_rollup = content_digest_rollup(first_round_digests)
     expected_final_rollup = content_digest_rollup(final_round_digests)
     if provenance.get("draft_content_sha256", "").upper() != expected_draft_rollup:
@@ -376,7 +388,7 @@ def _validate_pedagogical_review_contract(data: dict[str, Any]) -> None:
 def validate_agent_owned_content(data: dict[str, Any], *, allow_test_fixture: bool = False) -> None:
     """Production boundary for Agent authoring, revision, and final consumption."""
 
-    if data.get("content_contract_version") not in {"2.2", "2.3"}:
+    if data.get("content_contract_version") not in {"2.2", "2.3", "2.4"}:
         return
     _validate_agent_authoring_provenance(data, allow_test_fixture=allow_test_fixture)
     _validate_pedagogical_review_contract(data)
@@ -1218,6 +1230,7 @@ def _validate_materials_contract(
                 reference,
                 source,
                 f"reference_research.sources[{reference_id}]",
+                allow_identifier_evidence_url=contract_version == "2.4",
             )
             if binding_errors:
                 raise ValueError("; ".join(binding_errors))
@@ -1270,6 +1283,175 @@ def _validate_materials_v22(data: dict[str, Any]) -> None:
 
 def _validate_materials_v23(data: dict[str, Any]) -> None:
     _validate_materials_contract(data, contract_version="2.3", theory_only=False)
+
+
+def _validate_materials_v24(data: dict[str, Any]) -> None:
+    """Validate actual-search provenance and references for Content 2.4."""
+
+    materials = data["course_materials"]
+    textbook = materials.get("textbook") if isinstance(materials, dict) else None
+    if textbook is not None:
+        _validate_locator_evidence(
+            textbook,
+            "course_materials.textbook",
+            allow_generic=False,
+            reject_placeholder=True,
+        )
+
+    research = data.get("reference_research")
+    if not isinstance(research, dict):
+        raise ValueError("Content 2.4 reference_research is required")
+    status = research.get("status")
+    if status in {"not_executed", "search_blocked"}:
+        raise ValueError(f"reference research cannot pass generation with status={status}")
+    if status not in {"searched_verified_sources", "searched_no_reliable_source"}:
+        raise ValueError("Content 2.4 reference_research.status must distinguish executed search from no search")
+    queries = research.get("queries", [])
+    sources = research.get("sources", [])
+    lessons = data.get("lessons", [])
+    known_lesson_ids = {str(item.get("lesson_id")) for item in lessons if isinstance(item, dict)}
+    query_by_id: dict[str, dict[str, Any]] = {}
+    searched_lessons: set[str] = set()
+    chinese_search_recorded = False
+    for index, query in enumerate(queries, 1):
+        if not isinstance(query, dict):
+            raise ValueError(f"reference_research.queries[{index}] must be an object")
+        query_id = require_meaningful_text(query.get("query_id"), f"reference_research.queries[{index}].query_id")
+        if query_id in query_by_id:
+            raise ValueError(f"reference_research.queries contains duplicate query_id {query_id!r}")
+        require_meaningful_text(query.get("query"), f"reference_research.queries[{index}].query", 6)
+        require_meaningful_text(query.get("tool"), f"reference_research.queries[{index}].tool")
+        if query.get("language") not in {"zh", "mixed", "en"}:
+            raise ValueError(f"reference_research.queries[{index}].language must be zh/mixed/en")
+        chinese_search_recorded = chinese_search_recorded or query.get("language") == "zh"
+        try:
+            datetime.fromisoformat(str(query.get("searched_at", "")).replace("Z", "+00:00"))
+        except ValueError:
+            raise ValueError(f"reference_research.queries[{index}].searched_at must be an ISO 8601 timestamp") from None
+        if not isinstance(query.get("result_urls"), list):
+            raise ValueError(f"reference_research.queries[{index}].result_urls must record an actual result set (use [] for no results)")
+        assigned = query.get("lesson_ids")
+        if not isinstance(assigned, list) or not assigned or len(assigned) != len(set(assigned)):
+            raise ValueError(f"reference_research.queries[{index}].lesson_ids must be non-empty and unique")
+        unknown = set(map(str, assigned)) - known_lesson_ids
+        if unknown:
+            raise ValueError(f"reference_research.queries[{index}] has unknown Lesson IDs: {', '.join(sorted(unknown))}")
+        searched_lessons.update(map(str, assigned))
+        query_by_id[query_id] = query
+    if not query_by_id or searched_lessons != known_lesson_ids:
+        missing = sorted(known_lesson_ids - searched_lessons)
+        raise ValueError("actual reference search must cover every Lesson; missing: " + ", ".join(missing))
+    if not chinese_search_recorded:
+        raise ValueError("Content 2.4 requires recording a Chinese-first reference search query")
+
+    reference_by_id: dict[str, dict[str, Any]] = {}
+    for index, reference in enumerate(data.get("reference_pool", []), 1):
+        if not isinstance(reference, dict):
+            raise ValueError(f"reference_pool[{index}] must be an object")
+        reference_id = require_meaningful_text(reference.get("reference_id"), f"reference_pool[{index}].reference_id")
+        if reference_id in reference_by_id:
+            raise ValueError(f"reference_pool[{index}].reference_id must be unique; duplicate {reference_id!r}")
+        reference_by_id[reference_id] = reference
+        if reference.get("reference_type") not in REFERENCE_TYPES:
+            raise ValueError(f"reference_pool[{index}].reference_type is invalid")
+        if reference.get("source_region") not in {"domestic", "foreign", "unknown"}:
+            raise ValueError(f"reference_pool[{index}].source_region is invalid")
+        if reference.get("source_kind") != "verified_public":
+            raise ValueError("Content 2.4 reference_pool entries must be tied to executed source research")
+        _validate_locator_evidence(reference, f"reference_pool[{index}]", allow_generic=False, require_authority=True, reject_placeholder=True)
+        metadata_errors = reference_metadata_errors(reference, f"reference_pool[{index}]")
+        if metadata_errors:
+            raise ValueError("; ".join(metadata_errors))
+
+    source_by_id: dict[str, dict[str, Any]] = {}
+    for index, source in enumerate(sources, 1):
+        if not isinstance(source, dict):
+            raise ValueError(f"reference_research.sources[{index}] must be an object")
+        reference_id = require_meaningful_text(source.get("reference_id"), f"reference_research.sources[{index}].reference_id")
+        if reference_id in source_by_id:
+            raise ValueError(f"reference_research.sources contains duplicate reference_id {reference_id!r}")
+        query_id = source.get("query_id")
+        if query_id not in query_by_id:
+            raise ValueError(f"reference_research.sources[{index}].query_id must reference an executed query")
+        if not set(map(str, source.get("lesson_ids", []))) <= set(map(str, query_by_id[query_id].get("lesson_ids", []))):
+            raise ValueError(f"reference_research.sources[{index}].lesson_ids must be covered by its query")
+        _validate_sha256(source.get("source_content_sha256"), f"reference_research.sources[{index}].source_content_sha256")
+        require_meaningful_text(source.get("read_scope"), f"reference_research.sources[{index}].read_scope", 12)
+        excerpt = str(source.get("read_excerpt", ""))
+        require_meaningful_text(excerpt, f"reference_research.sources[{index}].read_excerpt", 160)
+        if hashlib.sha256(excerpt.encode("utf-8")).hexdigest().upper() != str(source.get("source_content_sha256", "")).upper():
+            raise ValueError(f"reference_research.sources[{index}].source_content_sha256 does not match the retained read excerpt")
+        query_urls = set(map(str, query_by_id[query_id].get("result_urls", [])))
+        if source.get("source_url") not in query_urls and source.get("source_identifier_evidence_url") not in query_urls:
+            raise ValueError(f"reference_research.sources[{index}] URL must be among its actual search results")
+        reference_identifier = re.sub(
+            r"[^A-Za-z0-9]", "", str(reference_by_id.get(reference_id, {}).get("source_identifier", ""))
+        ).upper()
+        source_url_identifier = re.sub(r"[^A-Za-z0-9]", "", str(source.get("source_url", ""))).upper()
+        if (
+            reference_identifier
+            and reference_identifier not in source_url_identifier
+            and source.get("source_identifier_evidence_url") not in query_urls
+        ):
+            raise ValueError(
+                f"reference_research.sources[{index}].source_identifier_evidence_url must be an actual search result"
+            )
+        source_by_id[reference_id] = source
+    if status == "searched_verified_sources":
+        if not reference_by_id or set(source_by_id) != set(reference_by_id):
+            raise ValueError("searched_verified_sources requires matching reference_pool and read-source evidence")
+    elif reference_by_id or source_by_id:
+        raise ValueError("searched_no_reliable_source cannot contain claimed verified references")
+    for reference_id, reference in reference_by_id.items():
+        source = source_by_id.get(reference_id, {})
+        verified_fields = set(map(str, source.get("verified_fields", [])))
+        required_fields = {"title", "topic_scope"}
+        if reference.get("authors"):
+            required_fields.add("authors")
+        if reference.get("publisher"):
+            required_fields.add("publisher")
+        if reference.get("edition"):
+            required_fields.add("edition")
+        if reference.get("year"):
+            required_fields.add("year")
+        if reference.get("source_identifier"):
+            required_fields.add("isbn" if reference.get("reference_type") == "book" else "identifier")
+        if not required_fields <= verified_fields:
+            raise ValueError(
+                f"reference_research.sources[{reference_id}].verified_fields is missing bibliography checks: "
+                + ", ".join(sorted(required_fields - verified_fields))
+            )
+        binding_errors = reference_source_binding_errors(
+            reference,
+            source,
+            f"reference_research.sources[{reference_id}]",
+            allow_identifier_evidence_url=True,
+        )
+        if binding_errors:
+            raise ValueError("; ".join(binding_errors))
+
+    lesson_refs: dict[str, list[str]] = {}
+    for index, lesson in enumerate(lessons):
+        lesson_id = str(lesson.get("lesson_id"))
+        ids = list(map(str, lesson.get("reference_ids", [])))
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"lessons[{index}].reference_ids contains duplicates")
+        missing = [reference_id for reference_id in ids if reference_id not in reference_by_id]
+        if missing:
+            raise ValueError(f"lessons[{index}].reference_ids contains unresolved IDs: {', '.join(missing)}")
+        if status == "searched_verified_sources" and not ids:
+            raise ValueError(f"{lesson_id}.reference_ids must cite at least one actually verified relevant source")
+        lesson_refs[lesson_id] = ids
+    for reference_id, source in source_by_id.items():
+        mapped_lessons = set(map(str, source.get("lesson_ids", [])))
+        if not mapped_lessons:
+            raise ValueError(f"reference_research.sources[{reference_id}].lesson_ids must map this source to Lessons")
+        for lesson_id in mapped_lessons:
+            if reference_id not in lesson_refs.get(lesson_id, []):
+                raise ValueError(f"reference {reference_id} maps to {lesson_id} but is not cited there")
+    textbook_identity = reference_identity(textbook) if textbook is not None else ""
+    if textbook_identity and any(reference_identity(item) == textbook_identity for item in reference_by_id.values()):
+        raise ValueError("reference_pool contains the course textbook; textbook cannot be rendered as a reference")
 
 
 def _validate_implementation_stage_invariants(
@@ -1692,17 +1874,23 @@ def _validate_practice_contract_v22(data: dict[str, Any]) -> None:
 
 
 def practice_hour_allocation_errors_v23(data: dict[str, Any]) -> list[str]:
-    """Return Content 2.3 integrated/hybrid WorkOrder allocation violations.
+    """Return version-aware full-Lesson WorkOrder allocation violations.
 
-    In these modes, task.lesson_ids names the Lesson practice-hours allocated
-    to that 2-hour task.  The links therefore form a disjoint, complete
-    partition of practice-bearing Lesson hours.
+    Content 2.3 applies this to integrated/hybrid. Content 2.4 also uses it
+    for separate_full_lessons/practice_only. In these modes, task.lesson_ids
+    names the Lesson practice-hours allocated to that 2-hour task. The links
+    therefore form a disjoint, complete partition of practice-bearing Lesson
+    hours.
     """
 
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), dict) else {}
     artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), dict) else {}
     mode = str(plan.get("mode", ""))
-    if mode not in {"integrated_lessons", "hybrid"} or not artifact_plan.get("practice_work_orders"):
+    version = data.get("content_contract_version")
+    allocatable_modes = {"integrated_lessons", "hybrid"}
+    if version == "2.4":
+        allocatable_modes.update({"separate_full_lessons", "practice_only"})
+    if mode not in allocatable_modes or not artifact_plan.get("practice_work_orders"):
         return []
 
     lessons = [item for item in data.get("lessons", []) if isinstance(item, dict)]
@@ -1763,8 +1951,8 @@ def practice_hour_allocation_errors_v23(data: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
-    """Enforce full Lesson coverage and internal practice accounting for Content 2.3."""
+def _validate_practice_contract_v23(data: dict[str, Any], *, contract_version: str = "2.3") -> None:
+    """Validate the shared 2.3/2.4 ledger while preserving 2.3 semantics."""
 
     plan = data["delivery_plan"]
     total = _decimal_hours(plan["total_hours"], "delivery_plan.total_hours")
@@ -1777,9 +1965,10 @@ def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
         )
 
     mode = str(plan["mode"])
-    coverage = expected_lesson_coverage_hours(plan)
+    coverage = expected_lesson_coverage_hours(plan, contract_version)
     lessons = data["lessons"]
-    if coverage == 0 and lessons:
+    is_full_coverage = contract_version == "2.4"
+    if not is_full_coverage and coverage == 0 and lessons:
         raise ValueError("practice_only Content 2.3 requires zero Lesson DOCX lessons")
     if coverage > 0 and not lessons:
         raise ValueError("positive Lesson coverage requires Lesson DOCX lessons")
@@ -1839,7 +2028,7 @@ def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
             "Lesson hours must equal expected Lesson coverage: "
             f"expected {coverage}, got {actual_lesson_hours}"
         )
-    if mode in {"theory_only", "integrated_lessons", "hybrid"}:
+    if mode in {"theory_only", "integrated_lessons", "hybrid", "separate_full_lessons"}:
         if actual_theory != theory or actual_practice != practice:
             raise ValueError(
                 "Lesson theory/practice hour sums must equal delivery_plan: "
@@ -1851,21 +2040,26 @@ def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
                 "split_lessons must keep practice hours outside Lesson accounting: "
                 f"expected lesson theory/practice={theory}/0, got {actual_theory}/{actual_practice}"
             )
-    elif mode == "practice_only" and (actual_theory != 0 or actual_practice != 0):
+    elif mode == "practice_only" and is_full_coverage and (actual_theory != 0 or actual_practice != practice):
+        raise ValueError("Content 2.4 practice_only Lessons must cover all declared practice hours")
+    elif mode == "practice_only" and not is_full_coverage and (actual_theory != 0 or actual_practice != 0):
         raise ValueError("practice_only must preserve the Content 2.2 zero-Lesson behavior")
 
     if mode == "theory_only":
         if practice != 0 or lesson_types - {"theory"}:
             raise ValueError("theory_only requires theory Lessons and practice_hours=0")
     elif mode == "practice_only":
-        if theory != 0 or lessons:
-            raise ValueError("practice_only requires theory_hours=0 and no Lesson DOCX lessons")
+        if theory != 0 or (not is_full_coverage and lessons) or (is_full_coverage and lesson_types - {"practice"}):
+            raise ValueError("practice_only requires theory_hours=0 and, for Content 2.4, only full-coverage practice Lessons")
     elif mode == "split_lessons":
         if lesson_types - {"theory"}:
             raise ValueError("split_lessons must preserve the Content 2.2 theory-only Lesson boundary")
     elif mode == "integrated_lessons":
         if theory <= 0 or practice <= 0 or lesson_types - {"integrated"}:
             raise ValueError("integrated_lessons requires positive theory/practice hours and only integrated Lessons")
+    elif mode == "separate_full_lessons":
+        if theory <= 0 or practice <= 0 or lesson_types - {"theory", "practice"}:
+            raise ValueError("separate_full_lessons requires both types and only separately taught theory/practice Lessons")
 
     artifact_plan = data["artifact_plan"]
     expected_lesson_artifact = coverage > 0
@@ -1980,12 +2174,12 @@ def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
         if len(linked_ids) != len(set(linked_ids)):
             raise ValueError(f"{prefix}.lesson_ids must not contain duplicate Lesson IDs")
         task_lesson_ids[task_id] = linked_ids
-        requires_practice_link = mode in {"integrated_lessons", "hybrid"}
+        requires_practice_link = mode in {"integrated_lessons", "hybrid"} or (is_full_coverage and mode in {"separate_full_lessons", "practice_only"})
         if requires_practice_link and not linked_ids:
             raise ValueError(f"{prefix}.lesson_ids must identify a Lesson that carries practice hours")
         if mode == "split_lessons" and theory > 0 and not linked_ids:
             raise ValueError(f"{prefix}.lesson_ids must identify related theory Lessons")
-        if mode == "practice_only" and linked_ids:
+        if mode == "practice_only" and not is_full_coverage and linked_ids:
             raise ValueError(f"{prefix}.lesson_ids must be empty for a practice_only course")
         for lesson_id in linked_ids:
             linked = lesson_by_id.get(lesson_id)
@@ -2010,7 +2204,7 @@ def _validate_practice_contract_v23(data: dict[str, Any]) -> None:
             f"expected {practice}, got {task_hours}"
         )
     task_ids = set(task_by_id)
-    if mode in {"integrated_lessons", "hybrid"}:
+    if mode in {"integrated_lessons", "hybrid"} or (is_full_coverage and mode in {"separate_full_lessons", "practice_only"}):
         for lesson_id, lesson in lesson_by_id.items():
             ids = lesson_task_ids[lesson_id]
             if lesson["lesson_type"] == "theory":
@@ -2092,7 +2286,7 @@ def _validate_meaningful_contract(data: dict[str, Any]) -> None:
                 f"{prefix}.evaluation.remarks.{criterion}",
                 4,
             )
-        if data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
+        if data.get("content_contract_version") not in {"2.1", "2.2", "2.3", "2.4"}:
             for reference_index, reference in enumerate(lesson["references"], 1):
                 reference_prefix = f"{prefix}.references[{reference_index}]"
                 reference_text = require_meaningful_text(reference["text"], f"{reference_prefix}.text")
@@ -2163,6 +2357,21 @@ def _validate_content_v2(
             raise ValueError("confirmed course information mismatch: " + "; ".join(confirmed_errors))
         _validate_materials_v23(data)
         _validate_practice_contract_v23(data)
+        validate_agent_owned_content(data, allow_test_fixture=allow_test_fixture)
+        return
+    if version == "2.4":
+        _schema_errors(data, schema_path)
+        _validate_meaningful_contract(data)
+        confirmed_errors = confirmed_course_info_errors(data)
+        if confirmed_errors:
+            raise ValueError("confirmed course information mismatch: " + "; ".join(confirmed_errors))
+        _validate_materials_v24(data)
+        _validate_practice_contract_v23(data, contract_version="2.4")
+        from content_contract import delivery_plan_v24_errors
+
+        ledger_errors = delivery_plan_v24_errors(data)
+        if ledger_errors:
+            raise ValueError("; ".join(ledger_errors))
         validate_agent_owned_content(data, allow_test_fixture=allow_test_fixture)
         return
     for field_name in ("default_hours", "total_hours"):

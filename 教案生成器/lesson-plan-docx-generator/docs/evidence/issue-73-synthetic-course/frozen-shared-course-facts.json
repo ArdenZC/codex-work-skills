@@ -1,0 +1,51 @@
+{
+  "synthetic_course": true,
+  "notice": "主 Agent 冻结的合成教学事实；仅用于课程覆盖/生成链验收，不代表真实院校课程数据。项目 Agent 不得修改或另造冲突数据。",
+  "language_runtime": "Java SE 17",
+  "inventory_records": [
+    {"resource_id": "B-101", "name": "《算法入门》", "status": "在馆", "quantity": 12},
+    {"resource_id": "B-205", "name": "《数据结构》", "status": "借出", "quantity": 5},
+    {"resource_id": "B-309", "name": "《程序设计》", "status": "在馆", "quantity": 12},
+    {"resource_id": "E-301", "name": "示波器", "status": "在用", "quantity": 3},
+    {"resource_id": "E-304", "name": "万用表", "status": "在馆", "quantity": 5}
+  ],
+  "inventory_rules": [
+    "所有记录均为合成样例，无真实个人信息。",
+    "项目一与项目三必须使用以上 resource_id；同数量排序时保持输入顺序以检验稳定性。",
+    "图书与设备共用目录记录接口，状态值保持原样。"
+  ],
+  "campus_graph": {
+    "synthetic": true,
+    "vertices_in_order": ["A", "B", "C", "D", "E", "F"],
+    "vertex_names": {
+      "A": "图书馆",
+      "B": "教学楼",
+      "C": "实训中心",
+      "D": "机房",
+      "E": "设备库",
+      "F": "独立校区"
+    },
+    "undirected_weighted_edges": [
+      ["A", "B", 4],
+      ["A", "C", 2],
+      ["B", "C", 1],
+      ["B", "D", 5],
+      ["C", "D", 8],
+      ["C", "E", 10],
+      ["D", "E", 2]
+    ],
+    "neighbor_order": "字典序升序",
+    "traversal_from_A": ["A", "B", "C", "D", "E"],
+    "connected_components": [["A", "B", "C", "D", "E"], ["F"]],
+    "whole_graph_scan_order": ["A", "B", "C", "D", "E", "F"],
+    "mst_prim_from_A_edges": [["A", "C", 2], ["C", "B", 1], ["B", "D", 5], ["D", "E", 2]],
+    "mst_edges_total_weight": 10,
+    "after_removing_BC_mst_edges": [["A", "C", 2], ["A", "B", 4], ["B", "D", 5], ["D", "E", 2]],
+    "after_removing_BC_mst_total_weight": 13,
+    "rules": [
+      "遍历先从 A 开始；若需覆盖全图，再按顶点顺序从未访问顶点继续。",
+      "F 是独立顶点，不可声称全图连通。",
+      "MST 只在 A–E 的连通分量计算；所有路线数据为合成权重。"
+    ]
+  }
+}

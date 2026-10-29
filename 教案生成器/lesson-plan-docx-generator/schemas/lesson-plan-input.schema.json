@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.3.json",
-  "title": "Lesson Content V2/V2.1/V2.2/V2.3 input",
+  "$id": "https://codex-work-skills.local/schemas/lesson-plan-input-v2.4.json",
+  "title": "Lesson Content V2/V2.1/V2.2/V2.3/V2.4 input",
   "type": "object",
   "additionalProperties": false,
   "required": ["content_contract_version", "course_name", "major", "audience", "default_hours", "total_hours", "lessons"],
   "properties": {
-    "content_contract_version": {"enum": ["2.0", "2.1", "2.2", "2.3"]},
+    "content_contract_version": {"enum": ["2.0", "2.1", "2.2", "2.3", "2.4"]},
     "course_name": {"type": "string", "minLength": 1, "maxLength": 32},
     "major": {"type": "string", "minLength": 1, "maxLength": 32},
     "audience": {"type": "string", "minLength": 1, "maxLength": 32},
@@ -17,7 +17,8 @@
     "delivery_plan": {"$ref": "#/$defs/deliveryPlan"},
     "course_materials": {"$ref": "#/$defs/courseMaterials"},
     "reference_pool": {"type": "array", "items": {"$ref": "#/$defs/referencePoolItem"}},
-    "reference_research": {"$ref": "#/$defs/referenceResearch"},
+    "reference_research": {"oneOf": [{"$ref": "#/$defs/referenceResearch"}, {"$ref": "#/$defs/referenceResearchV24"}]},
+    "course_case_facts_sha256": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
     "allow_textbook_as_reference": {"type": "boolean"},
     "artifact_plan": {"$ref": "#/$defs/artifactPlan"},
     "practice_task_contract": {
@@ -80,6 +81,22 @@
             "$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.1.json"
           },
           "lessons": {"minItems": 0, "items": {"$ref": "#/$defs/lessonV23"}},
+          "outline": {"items": {"$ref": "#/$defs/outlineItem"}}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"content_contract_version": {"const": "2.4"}}, "required": ["content_contract_version"]},
+      "then": {
+        "required": ["confirmed_course_info", "authoring_provenance", "delivery_plan", "course_materials", "reference_pool", "reference_research", "artifact_plan", "outline", "course_case_facts_sha256"],
+        "properties": {
+          "reference_pool": {"items": {"$ref": "#/$defs/referencePoolItemV22"}},
+          "reference_research": {"$ref": "#/$defs/referenceResearchV24"},
+          "practice_task_contract": {
+            "$ref": "https://codex-work-skills.local/schemas/shared/practice-task-contract-v1.1.json"
+          },
+          "artifact_plan": {"$ref": "#/$defs/artifactPlan"},
+          "lessons": {"minItems": 1, "items": {"$ref": "#/$defs/lessonV23"}},
           "outline": {"items": {"$ref": "#/$defs/outlineItem"}}
         }
       }
@@ -266,7 +283,7 @@
       "additionalProperties": false,
       "required": ["mode", "total_hours", "theory_hours", "practice_hours"],
       "properties": {
-        "mode": {"type": "string", "enum": ["theory_only", "practice_only", "split_lessons", "integrated_lessons", "hybrid"]},
+        "mode": {"type": "string", "enum": ["theory_only", "practice_only", "split_lessons", "separate_full_lessons", "integrated_lessons", "hybrid"]},
         "total_hours": {"$ref": "#/$defs/positiveNumber"},
         "theory_hours": {"$ref": "#/$defs/nonNegativeNumber"},
         "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"}
@@ -283,7 +300,7 @@
         "total_hours": {"$ref": "#/$defs/positiveNumber"},
         "theory_hours": {"$ref": "#/$defs/nonNegativeNumber"},
         "practice_hours": {"$ref": "#/$defs/nonNegativeNumber"},
-        "delivery_mode": {"type": "string", "enum": ["theory_only", "practice_only", "split_lessons", "integrated_lessons", "hybrid"]}
+        "delivery_mode": {"type": "string", "enum": ["theory_only", "practice_only", "split_lessons", "separate_full_lessons", "integrated_lessons", "hybrid"]}
       }
     },
     "citationAuthors": {
@@ -383,6 +400,53 @@
         "note": {"type": "string", "maxLength": 500},
         "queries": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/referenceQuery"}},
         "sources": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/referenceSource"}}
+      }
+    },
+    "referenceResearchV24": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "queries", "sources"],
+      "properties": {
+        "status": {"enum": ["searched_verified_sources", "searched_no_reliable_source", "search_blocked", "not_executed"]},
+        "note": {"type": "string", "maxLength": 1000},
+        "queries": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/referenceQueryV24"}},
+        "sources": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/referenceSourceV24"}}
+      }
+    },
+    "referenceQueryV24": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query_id", "query", "language", "lesson_ids", "searched_at", "tool", "result_urls"],
+      "properties": {
+        "query_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "query": {"type": "string", "minLength": 6, "maxLength": 300},
+        "language": {"enum": ["zh", "mixed", "en"]},
+        "lesson_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"}},
+        "searched_at": {"type": "string", "format": "date-time"},
+        "tool": {"type": "string", "minLength": 1, "maxLength": 120},
+        "result_urls": {"type": "array", "maxItems": 20, "items": {"type": "string", "pattern": "^https?://[^\\s]+$", "maxLength": 500}}
+      }
+    },
+    "referenceSourceV24": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference_id", "source_url", "source_title", "source_author_or_organization", "authoritative_source", "query_id", "lesson_ids", "accessed_at", "read_scope", "read_excerpt", "verified_fields", "source_content_sha256"],
+      "properties": {
+        "reference_id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
+        "source_url": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 500},
+        "source_title": {"type": "string", "minLength": 2, "maxLength": 240},
+        "source_author_or_organization": {"type": "string", "minLength": 2, "maxLength": 240},
+        "source_year": {"$ref": "#/$defs/citationYear"},
+        "source_identifier": {"type": "string", "minLength": 2, "maxLength": 160},
+        "source_identifier_evidence_url": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 500},
+        "authoritative_source": {"type": "string", "minLength": 2, "maxLength": 240},
+        "query_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "lesson_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$"}},
+        "accessed_at": {"type": "string", "format": "date-time"},
+        "read_scope": {"type": "string", "minLength": 12, "maxLength": 1000},
+        "read_excerpt": {"type": "string", "minLength": 160, "maxLength": 4000},
+        "verified_fields": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["title", "authors", "publisher", "edition", "year", "isbn", "identifier", "topic_scope", "teaching_design_content"]}},
+        "source_content_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
       }
     },
     "referenceQuery": {

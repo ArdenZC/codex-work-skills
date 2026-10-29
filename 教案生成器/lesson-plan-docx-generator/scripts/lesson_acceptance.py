@@ -1,4 +1,4 @@
-"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0/2.1/2.2/2.3.
+"""Read-only Lesson Acceptance V2 evidence collector for Content 2.0–2.4.
 
 The production Lesson Content QA remains the authority for structural,
 similarity, progression, and implementation checks.  This module only reads
@@ -36,7 +36,7 @@ from package_common import practice_hour_allocation_errors_v23
 
 ACCEPTANCE_SCHEMA_VERSION = "2.0"
 CONTENT_CONTRACT_VERSION = "2.3"
-COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2", "2.3")
+COMPATIBLE_CONTENT_CONTRACT_VERSIONS = ("2.0", "2.1", "2.2", "2.3", "2.4")
 DEFAULT_TEMPLATE_ID = "lesson-plan"
 DEFAULT_TEMPLATE_VERSION = "v1.1.2"
 SOURCE_TYPES = ("real_agent", "synthetic_fixture", "human_authored", "mixed")
@@ -217,6 +217,70 @@ def _sha256_file(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest().upper()
+
+
+def _generation_evidence_gate(
+    data: Mapping[str, Any],
+    qa_report: Mapping[str, Any],
+    output_dir: Path,
+    manifest: Mapping[str, Any] | None,
+    source_json_path: Path | None,
+) -> dict[str, Any]:
+    """Revalidate Content 2.4's bound search/project/comparison evidence."""
+
+    if str(data.get("content_contract_version")) != "2.4":
+        return _not_applicable_gate(
+            "generation_evidence",
+            {"content_contract_version": data.get("content_contract_version")},
+            "Full-course generation evidence is required for Content Contract 2.4.",
+        )
+    errors: list[str] = []
+    evidence_path: Path | None = None
+    if not isinstance(manifest, Mapping):
+        errors.append("artifact manifest is missing")
+    else:
+        evidence_path = _manifest_artifact_path(output_dir, manifest.get("generation_evidence_path"))
+        expected_path = (output_dir.resolve() / "generation-evidence.json").resolve()
+        if evidence_path is None or evidence_path != expected_path or evidence_path.is_symlink() or not evidence_path.is_file():
+            errors.append("manifest generation_evidence_path must point to retained generation-evidence.json")
+        if evidence_path is not None and evidence_path.is_file() and not evidence_path.is_symlink():
+            actual_sha = _sha256_file(evidence_path)
+            expected_sha = str(manifest.get("generation_evidence_sha256", "")).upper()
+            if not re.fullmatch(r"[0-9A-F]{64}", expected_sha) or expected_sha != actual_sha:
+                errors.append("manifest generation_evidence_sha256 mismatch")
+    source_path = source_json_path
+    if source_path is None and isinstance(manifest, Mapping):
+        source_value = manifest.get("source_json_path")
+        source_path = Path(source_value).expanduser().resolve() if isinstance(source_value, str) and source_value.strip() else None
+    if source_path is None or not source_path.is_file():
+        errors.append("source Content JSON bytes are unavailable for generation evidence binding")
+    evidence: dict[str, Any] | None = None
+    evidence_sha = _sha256_file(evidence_path) if evidence_path is not None and evidence_path.is_file() and not evidence_path.is_symlink() else None
+    if evidence_path is not None and evidence_path.is_file() and not evidence_path.is_symlink():
+        try:
+            evidence = _read_json(evidence_path, "generation evidence")
+            from generation_evidence import validate_generation_evidence
+
+            errors.extend(validate_generation_evidence(
+                evidence,
+                data,
+                content_bytes=source_path.read_bytes() if source_path is not None and source_path.is_file() else None,
+            ))
+        except (ImportError, OSError, TypeError, ValueError) as exc:
+            errors.append(f"generation evidence validation failed: {exc}")
+    quality_gate = qa_report.get("teaching_quality_gate") if isinstance(qa_report.get("teaching_quality_gate"), Mapping) else {}
+    if evidence is not None and evidence.get("course_review", {}).get("status") != "passed":
+        errors.append("generation evidence is limited; full-course acceptance requires completed Lesson comparisons")
+    if quality_gate.get("status") != "evidence_complete":
+        errors.append("QA teaching_quality_gate must be evidence_complete")
+    if evidence_sha is None or str(quality_gate.get("generation_evidence_sha256", "")).upper() != evidence_sha:
+        errors.append("QA teaching_quality_gate does not bind the retained generation evidence")
+    return _gate(
+        "generation_evidence",
+        not errors,
+        {"path": str(evidence_path) if evidence_path else None, "sha256": evidence_sha, "qa_gate": quality_gate, "errors": errors},
+        "Content 2.4 search, project workflow, per-Lesson comparison and course review evidence must validate and match QA.",
+    )
 
 
 def _is_within(path: Path, parent: Path) -> bool:
@@ -403,7 +467,7 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
 
     lessons = data.get("lessons") if isinstance(data.get("lessons"), list) else []
     version = data.get("content_contract_version")
-    if version not in {"2.1", "2.2", "2.3"}:
+    if version not in {"2.1", "2.2", "2.3", "2.4"}:
         return {
             "status": "not_applicable",
             "contract_version": version,
@@ -427,7 +491,7 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
         lesson_type: sum(1 for lesson in lessons if isinstance(lesson, Mapping) and lesson.get("lesson_type") == lesson_type)
         for lesson_type in ("theory", "practice", "integrated")
     }
-    if version == "2.3":
+    if version in {"2.3", "2.4"}:
         artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
         workorders_requested = bool(artifact_plan.get("practice_work_orders"))
         contract = data.get("practice_task_contract") if isinstance(data.get("practice_task_contract"), Mapping) else {}
@@ -436,7 +500,7 @@ def delivery_metrics(data: Mapping[str, Any]) -> dict[str, Any]:
         lesson_hours = sum((_number(lesson.get("hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
         lesson_theory_hours = sum((_number(lesson.get("theory_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
         lesson_practice_hours = sum((_number(lesson.get("practice_hours")) or 0) for lesson in lessons if isinstance(lesson, Mapping))
-        coverage_hours = _number(expected_lesson_coverage_hours(plan)) or 0
+        coverage_hours = _number(expected_lesson_coverage_hours(plan, version)) or 0
         total_hours = expected["total_hours"] or 0
         default_hours = _number(data.get("default_hours")) or 0
         expected_lesson_count = math.ceil(coverage_hours / default_hours) if default_hours > 0 else None
@@ -588,7 +652,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     quality = qa_report.get("content_quality", {}) if isinstance(qa_report, Mapping) else {}
     provenance = quality.get("reference_provenance", {}) if isinstance(quality, Mapping) else {}
     version = data.get("content_contract_version")
-    if version not in {"2.1", "2.2", "2.3"}:
+    if version not in {"2.1", "2.2", "2.3", "2.4"}:
         return {
             "status": "not_applicable",
             "textbook_present": False,
@@ -621,7 +685,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     research = data.get("reference_research") if isinstance(data.get("reference_research"), Mapping) else {}
     no_verified_external_source = (
         version in {"2.2", "2.3"} and research.get("status") == "no_verified_external_source"
-    )
+    ) or (version == "2.4" and research.get("status") == "searched_no_reliable_source")
     empty_reference_failures = 0 if no_verified_external_source else empty_count
     domestic = int(provenance.get("catalog_source_regions", {}).get("domestic", 0)) if isinstance(provenance, Mapping) else 0
     foreign = int(provenance.get("catalog_source_regions", {}).get("foreign", 0)) if isinstance(provenance, Mapping) else 0
@@ -630,7 +694,7 @@ def reference_metrics(data: Mapping[str, Any], qa_report: Mapping[str, Any] | No
     domestic_share = domestic / known if known else None
     textbook_overlap_failure = 0 if data.get("allow_textbook_as_reference", False) else overlap_count
     failures = placeholder_count + textbook_overlap_failure + duplicate_count + unresolved_count + resource_only_count + invalid_generic_count + empty_reference_failures
-    if version in {"2.2", "2.3"}:
+    if version in {"2.2", "2.3", "2.4"}:
         return {
             "status": "PASS" if failures == 0 else "FAIL",
             "contract_version": version,
@@ -683,9 +747,9 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
     existing = quality.get("practice_handoff") if isinstance(quality, Mapping) else None
     if isinstance(existing, Mapping) and existing and data.get("content_contract_version") != "2.3":
         return _json_safe(existing)
-    if data.get("content_contract_version") not in {"2.1", "2.2", "2.3"}:
+    if data.get("content_contract_version") not in {"2.1", "2.2", "2.3", "2.4"}:
         return {"status": "not_applicable", "task_count": 0, "hour_consistent": True}
-    if data.get("content_contract_version") == "2.3":
+    if data.get("content_contract_version") in {"2.3", "2.4"}:
         artifact_plan = data.get("artifact_plan") if isinstance(data.get("artifact_plan"), Mapping) else {}
         requested = bool(artifact_plan.get("practice_work_orders"))
         plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
@@ -705,7 +769,10 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
         invalid_links: list[dict[str, Any]] = []
         unresolved: list[dict[str, Any]] = []
         linked_tasks: set[str] = set()
-        full_links = mode in {"integrated_lessons", "hybrid"}
+        content_version = str(data.get("content_contract_version", ""))
+        full_links = mode in {"integrated_lessons", "hybrid"} or (
+            content_version == "2.4" and mode in {"separate_full_lessons", "practice_only"}
+        )
         if not requested:
             invalid_disabled = contract_value is not None or any(lesson_task_ids.values())
             return {
@@ -746,7 +813,7 @@ def practice_handoff_metrics(data: Mapping[str, Any], qa_report: Mapping[str, An
                 invalid_links.append({"task_id": task_id, "lesson_id": None})
             if mode == "split_lessons" and _number(plan.get("theory_hours")) and not linked_ids:
                 invalid_links.append({"task_id": task_id, "lesson_id": None})
-            if mode == "practice_only" and linked_ids:
+            if mode == "practice_only" and not full_links and linked_ids:
                 invalid_links.extend({"task_id": task_id, "lesson_id": value} for value in linked_ids)
             for lesson_id in linked_ids:
                 linked = lesson_map.get(lesson_id)
@@ -942,8 +1009,8 @@ def _artifact_manifest_gate(
     expected_hours = (
         _number(plan.get("theory_hours"))
         if contract_version == "2.2"
-        else _number(expected_lesson_coverage_hours(plan))
-        if contract_version == "2.3"
+        else _number(expected_lesson_coverage_hours(plan, contract_version))
+        if contract_version in {"2.3", "2.4"}
         else _number(data.get("total_hours"))
     )
     if isinstance(manifest, Mapping):
@@ -958,14 +1025,14 @@ def _artifact_manifest_gate(
             errors.append("manifest qa_status does not match QA report")
         if manifest.get("render_status") != render.get("status"):
             errors.append("manifest render_status does not match QA report")
-        if contract_version in {"2.2", "2.3"}:
+        if contract_version in {"2.2", "2.3", "2.4"}:
             if "content_contract_version" in manifest and manifest.get("content_contract_version") != data.get("content_contract_version"):
                 errors.append("manifest content_contract_version does not match the source JSON")
         if qa_report.get("artifact_manifest") != "artifact-manifest.json":
             errors.append("QA report does not point to artifact-manifest.json")
         reference_evidence_path = _manifest_artifact_path(output_dir, manifest.get("reference_evidence_path"))
         reference_sha = manifest.get("reference_evidence_sha256")
-        if contract_version in {"2.2", "2.3"} and (
+        if contract_version in {"2.2", "2.3", "2.4"} and (
             not isinstance(reference_sha, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", reference_sha)
         ):
             errors.append("manifest reference_evidence_sha256 must be 64 hex characters")
@@ -984,6 +1051,11 @@ def _artifact_manifest_gate(
                 errors.append("manifest source_json_sha256 mismatch")
             if source_json_path is not None and manifest_source != source_json_path.resolve():
                 errors.append("manifest source_json_path does not match the acceptance input JSON")
+    generation_evidence_gate = _generation_evidence_gate(data, qa_report, output_dir, manifest, source_json_path)
+    if generation_evidence_gate.get("status") == "FAIL":
+        observed = generation_evidence_gate.get("observed")
+        evidence_errors = observed.get("errors", []) if isinstance(observed, Mapping) else []
+        errors.extend(f"generation evidence: {message}" for message in evidence_errors)
     if not isinstance(records, list) or len(records) != len(lessons):
         errors.append(f"manifest artifacts must contain exactly {len(lessons)} lesson records")
         records = records if isinstance(records, list) else []
@@ -1105,7 +1177,7 @@ def _artifact_manifest_gate(
                 if manifest.get(sha_field) != record.get(sha_field):
                     errors.append(f"manifest {sha_field} does not match its artifact record")
         digest = manifest.get("reviewed_content_digest")
-        if contract_version in {"2.2", "2.3"}:
+        if contract_version in {"2.2", "2.3", "2.4"}:
             if not isinstance(digest, Mapping):
                 errors.append("manifest reviewed_content_digest is required")
             else:
@@ -1136,7 +1208,7 @@ def _artifact_manifest_gate(
                 if qa_artifact.get("actual_pdf_page_count") != record.get("actual_pdf_page_count"):
                     errors.append(f"QA pdf_artifacts[{index}] page count does not match manifest")
     production_status = "not_applicable"
-    if contract_version in {"2.2", "2.3"}:
+    if contract_version in {"2.2", "2.3", "2.4"}:
         if qa_report.get("status") == "passed" and (not rendered or not lessons):
             production_status = "structural_pass"
         elif qa_report.get("status") == "passed" and rendered and not errors:
@@ -1148,7 +1220,7 @@ def _artifact_manifest_gate(
         if "production_status" in qa_report and qa_report.get("production_status") != production_status:
             errors.append("QA production_status does not match inferred artifact evidence")
     inferred_production_status = production_status
-    if errors and contract_version in {"2.2", "2.3"}:
+    if errors and contract_version in {"2.2", "2.3", "2.4"}:
         production_status = "failed"
     return _gate(
         "artifact_manifest",
@@ -1182,12 +1254,12 @@ def structural_hard_gates(
     version = str(data.get("content_contract_version") or qa_report.get("content_contract_version") or "unknown")
     plan = data.get("delivery_plan") if isinstance(data.get("delivery_plan"), Mapping) else {}
     declared_course_hours = _number(data.get("total_hours"))
-    is_current_contract = version in {"2.2", "2.3"}
+    is_current_contract = version in {"2.2", "2.3", "2.4"}
     declared_lesson_hours = (
         _number(plan.get("theory_hours"))
         if version == "2.2"
-        else _number(expected_lesson_coverage_hours(plan))
-        if version == "2.3"
+        else _number(expected_lesson_coverage_hours(plan, version))
+        if version in {"2.3", "2.4"}
         else declared_course_hours
     )
     qa_checks = qa_report.get("checks") if isinstance(qa_report.get("checks"), Mapping) else {}
@@ -1251,8 +1323,15 @@ def structural_hard_gates(
         else _not_applicable_gate(
             "artifact_manifest",
             {"content_contract_version": version},
-            "Artifact manifests are required for Content Contract 2.2/2.3 smoke/final reports.",
+            "Artifact manifests are required for Content Contract 2.2/2.3/2.4 smoke/final reports.",
         )
+    )
+    generation_evidence_gate = _generation_evidence_gate(
+        data,
+        qa_report,
+        output_dir or Path(str(qa_report.get("output_dir", "."))),
+        artifact_manifest,
+        source_json_path,
     )
     expected_profile = {
         field_name: data.get(field_name)
@@ -1294,7 +1373,7 @@ def structural_hard_gates(
         else _not_applicable_gate(
             "course_profile",
             {"content_contract_version": version},
-            "Independent confirmed-course-profile evidence is required for Content Contract 2.2/2.3.",
+            "Independent confirmed-course-profile evidence is required for Content Contract 2.2/2.3/2.4.",
         )
     )
     gates = [
@@ -1337,20 +1416,21 @@ def structural_hard_gates(
             "content_contract",
             contract in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and qa_report.get("content_contract_version") in COMPATIBLE_CONTENT_CONTRACT_VERSIONS and contract == qa_report.get("content_contract_version"),
             {"input": contract, "qa": qa_report.get("content_contract_version"), "current": CONTENT_CONTRACT_VERSION},
-            "Acceptance 2.0 reads Content Contract 2.0/2.1/2.2/2.3; it does not author content.",
+            "Acceptance 2.0 reads compatible Content Contract 2.0/2.1/2.2/2.3/2.4 inputs; it does not author content.",
         ),
+        generation_evidence_gate,
         course_profile_gate,
         _gate(
             "delivery_consistency",
             delivery.get("status") in {"PASS", "not_applicable"},
             delivery,
-            "Content 2.1/2.2/2.3 delivery hours and lesson/artifact accounting must reconcile.",
+            "Content 2.1–2.4 delivery hours and lesson/artifact accounting must reconcile.",
         ),
         _gate(
             "reference_hard_gates",
             references.get("status") in {"PASS", "not_applicable"},
             references,
-            "Reference placeholders, textbook overlap, same-lesson duplicates, and unresolved IDs must be zero; cross-lesson reuse is allowed.",
+            "Reference identity, source and lesson bindings must reconcile; cross-lesson reuse is allowed when relevant.",
         ),
         _gate(
             "practice_handoff",
@@ -2352,7 +2432,7 @@ def build_acceptance_report(
         "qa_report_sha256": _sha256_file(qa_report_path),
         "output_inventory_fingerprint": inventory.get("fingerprint"),
         "render_status": render.get("status", "not_executed"),
-        "production_status": manifest_gate_data.get("production_status", "failed") if contract_version in {"2.2", "2.3"} else "not_applicable",
+        "production_status": manifest_gate_data.get("production_status", "failed") if contract_version in {"2.2", "2.3", "2.4"} else "not_applicable",
         "visual_status": visual_status,
         "delivery_mode": (data.get("delivery_plan") or {}).get("mode") if isinstance(data.get("delivery_plan"), Mapping) else None,
         "theory_hours": _number((data.get("delivery_plan") or {}).get("theory_hours")) if isinstance(data.get("delivery_plan"), Mapping) else None,
@@ -2500,6 +2580,21 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
     artifact_data = artifact_manifest.get("data") if isinstance(artifact_manifest, Mapping) else {}
     if not isinstance(artifact_data, Mapping):
         artifact_data = {}
+    artifact_records = artifact_data.get("artifacts", [])
+    if isinstance(artifact_records, list) and artifact_records:
+        docx_count = sum(
+            isinstance(record, Mapping) and isinstance(record.get("final_docx_path"), str)
+            for record in artifact_records
+        )
+        pdf_count = sum(
+            isinstance(record, Mapping) and isinstance(record.get("final_pdf_path"), str)
+            for record in artifact_records
+        )
+        docx_summary = f"{docx_count} per-Lesson files; see the manifest for paths and SHA256 values"
+        pdf_summary = f"{pdf_count} per-Lesson files; see the manifest for paths and SHA256 values"
+    else:
+        docx_summary = f"{artifact_data.get('final_docx_path')} / {artifact_data.get('final_docx_sha256')}"
+        pdf_summary = f"{artifact_data.get('final_pdf_path')} / {artifact_data.get('final_pdf_sha256')}"
     sequence = report.get("sequence_review", {})
     quality = report.get("content_quality_evidence", {})
     benchmark = report.get("benchmark_review")
@@ -2542,8 +2637,8 @@ def acceptance_markdown(report: Mapping[str, Any]) -> str:
             "## Final artifact chain",
             "",
             f"- Source JSON: `{artifact_data.get('source_json_path')}` / `{artifact_data.get('source_json_sha256')}`",
-            f"- Final DOCX: `{artifact_data.get('final_docx_path')}` / `{artifact_data.get('final_docx_sha256')}`",
-            f"- Final PDF: `{artifact_data.get('final_pdf_path')}` / `{artifact_data.get('final_pdf_sha256')}`",
+            f"- Final DOCX: `{docx_summary}`",
+            f"- Final PDF: `{pdf_summary}`",
             f"- Retained final PDF pages: `{artifact_data.get('actual_pdf_page_count')}`; QA: `{artifact_data.get('qa_status')}`; render: `{artifact_data.get('render_status')}`; production: `{artifact_data.get('production_status')}`",
             f"- Reference evidence: `{artifact_data.get('reference_evidence_path')}` / `{artifact_data.get('reference_evidence_sha256')}`",
             "- Page count and hashes are read from the retained final files; this report does not handwrite them.",
