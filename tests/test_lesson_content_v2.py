@@ -1587,12 +1587,18 @@ class LessonContentV2Mixin:
                 return real_mkdtemp(*args, **kwargs)
 
             # The probe is invoked with Darwin behavior below, but the test
-            # itself can run on a case-sensitive Linux volume (or a
-            # case-sensitive APFS/NTFS volume). Capture this volume's actual
-            # behavior first so the assertion checks the probe result rather
-            # than assuming the runner's default filesystem format.
-            lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
-            expected_case_sensitivity = filesystem_case_sensitive(protected)
+            # itself can run on a case-sensitive Linux volume or a
+            # case-sensitive APFS/NTFS directory. Measure this directory's
+            # actual behavior directly; the production helper intentionally
+            # short-circuits on Windows and cannot provide this expectation.
+            with tempfile.TemporaryDirectory(
+                prefix="lesson-v2-expected-case-semantics-", dir=safe_temp
+            ) as probe_name:
+                expected_probe = Path(probe_name)
+                (expected_probe / "CaseProbe").mkdir()
+                expected_case_sensitivity = not (
+                    expected_probe / "caseprobe"
+                ).exists()
             lesson_path_safety._DARWIN_CASE_SENSITIVITY.clear()
             with (
                 patch.object(lesson_path_safety.sys, "platform", "darwin"),
