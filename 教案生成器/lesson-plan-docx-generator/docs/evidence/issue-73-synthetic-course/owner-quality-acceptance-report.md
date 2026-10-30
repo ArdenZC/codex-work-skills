@@ -130,7 +130,11 @@
 ## 版本、测试和 CI 记录
 
 - 合并基线：PR #74 已合并到 master，HEAD `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`；该 PR 的自然 CI Gate 为 SUCCESS。当前修改在独立验收分支上，未修改已合并 PR #74。
-- 当前 r4 成品 manifest SHA-256、Owner 报告分支最终 HEAD/Tree、变更文件与新 Draft PR 的自然 CI Gate 会在 PR 创建后补录；新 PR CI 未触发前不预报结果。
+- r4 成品 SHA-256：`artifact-manifest.json` `CCBA09DE8DE743491CCEBE89B5CE67AA546A1CAFE43969F598A0A49E8DD3CCC2`；`qa-report.json` `00FDEDEF48B07237410F2355C302D1544C40A1795E59259EB671FA1317F33E78`；Content `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB`。生成证据 sidecar SHA-256 为 `D6F451AD086EE1386ADAD0AD9A00F37268E60C283A27B43D556A237AA0CB0176`。
+- 本次审计内容快照 HEAD：`c5cb8c02c7ca6a9b321806a29867391eb422065c`；Tree：`9cbbd4e4e395c15711eed724bf7afd5aaa49f915`；父提交为合并基线 `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`。报告后续的文字版修订会单独记为 Draft PR 中的报告提交。
+- 共变更 72 个文件：课程源 Content 与 evidence 2 个；20 份 DOCX 和 20 份 PDF、manifest/QA/参考证据/逐页视觉证据及合成课程 README/Acceptance 记录共 48 个；学生 starter 10 个及 README 1 个；项目二审计更正 1 个；Template 1.1.2/1.1.3 同输入对照的记录、QA、manifest 与 7 个 DOCX/PDF 共 9 个；本 Owner 报告 1 个。精确路径和哈希见该提交文件清单及各 artifact manifest。
+- 定向测试：`tests.test_lesson_content_v24` 12/12、`tests.test_lesson_release_compatibility` 14/14、`tests.test_issue71_template_v113` 4/4 PASS；Content 2.4 契约/质量/证据复核为 PASS、0 errors/0 warnings；manifest `production_pass`。10 组注入参考实现断言 PASS 的 JDK 限制见上文。没有运行完整仓库测试分片。
+- PR #74 基线自然 CI Gate：SUCCESS（2026-10-29）。本验收 Draft PR 的自然 CI Gate 将在创建/推送 PR 后触发；取得结果后记录具体提交与检查链接，不提前声称通过。
 - 定向测试：`python3 -m unittest tests.test_lesson_content_v24`（12 PASS）；`python3 -m unittest tests.test_lesson_release_compatibility`（14 PASS）；`python3 -m unittest tests.test_issue71_template_v113`（4 PASS）。没有运行完整仓库测试分片。
 - 生成器 r4：Content 2.4 `production_pass`，QA `passed`、render `passed`，20 DOCX + 20 PDF、133 页；manifest 与生成证据已校验。
 - Java：JDK 21 编译器按 Source/Target 17 编译临时参考实现并在 JDK 21 运行，10/10 断言套件 PASS；这不等同原始 TODO 已完成或原生 JDK 17 运行验证。
