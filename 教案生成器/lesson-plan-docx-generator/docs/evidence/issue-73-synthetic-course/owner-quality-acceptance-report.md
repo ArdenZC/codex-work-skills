@@ -87,7 +87,7 @@
 
 - 当前默认是 Template 1.1.2；20 份 PDF 共 133 页，逐课缩略页覆盖每一页，并对 L07 p1、L11 p4、L14 p4、L12 p6、L19 p8 等高风险页做了全尺寸复核。没有发现完全空白页；发现窄备注列、续表无重复标题、L05 p7/L11 p4 活动内容重叠、L07 p1/L14 p4 文字裁切，以及 L12 p6/L19 p8 稀疏尾页。逐页范围、检查项、页级 finding、渲染器和 artifact 指纹记录在 `artifacts/visual-inspection-evidence.json`；该记录明确为 failed with findings，不是 PASS。
 - DOCX 中的完整内容未因这些预览问题而缺失，但 PDF 里的裁切/重叠确实影响读课：L07 学情分析越出表格边界；L11 任务实施表交叠；L14 教师活动丢失关键“误选/环”文字。当前不迁移默认模板。原生 Microsoft Word/WPS 本轮不可用，必须保留 `WORD_WPS_UNVERIFIED`；LibreOfficeDev 26.8 PDF 预览不能替代 Word/WPS。
-- 同输入长备注对照记录在 `template-1.1.3-comparison/comparison-record.md`：Content SHA `E37EFF...` 的 L06，1.1.2 为 9 页、1.1.3 为 7 页；1.1.3 备注更易横向阅读。但 1.1.3 的 L07 p1、L11 p4 裁切/重叠仍在。建议先解决这两类溢出，再由 Owner 单独审批迁移并做原生 Word/WPS 验证；本轮没有改默认模板。
+- 同输入长备注对照记录在 [`t113/comparison-record.md`](t113/comparison-record.md)：最终 Content SHA `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB` 的 L06，1.1.2 为 9 页、1.1.3 为 7 页；逐页查看 p3，1.1.3 的备注横向空间更好。该结论只适用于 L06，不能外推到全课。默认模板保持 1.1.2；仍需全课排版复核和原生 Word/WPS 验证，Owner 单独批准后才能迁移。
 - Acceptance 2.0 的生成报告见 `acceptance-final/lesson-acceptance-report.md`。其硬结构/交付/manifest gate 为 PASS，但最终 Acceptance 显示 FAILED，原因是视觉证据记录存在失败项。此结果不得改写成 QA PASS，也不得改写成教师验收通过。
 
 ## 已整改问题与第二轮复审
@@ -100,6 +100,7 @@
 | L15 逆序上界对重复键表述过宽、平均模型缺失；L16 改进方法只列名 | 限定严格逆序；明确互异键均匀随机排列模型；展开随机/三数取中、三路分区、introsort 操作步骤和保证边界。 | 项目三独立复审并计算 L18 比较/移动、L19 分区计数；新内容写入第 8 轮上限内，没有伪造第 9 轮。 |
 | L20 哈希测试未覆盖碰撞链未命中和满表失败后的保持性 | 用同起始槽测试键 C-204 检查 3/4/5/6/0；新增满表 7 次终止和溢出后七槽快照不变断言。 | 项目三复算模 7 路径并核对 starter、DOCX/PDF；L20 full-table test 结果一致。 |
 | 图论文被错误归因为 Kruskal/DSU 来源；L09/L13 逐课对照不相关 | 把论文作用限定为图主题组织和有限 Prim 背景；L09/L13 改为 DFS/BFS 和分量事实。 | 独立对标复审确认最终 sidecar 无不当归因；原始 Agent 返包保留并附修订说明追踪。 |
+| Windows CI 临时仓库的 `git add --all` 在两项生命周期测试中 exit 128 | 发现新增模板对照深路径在 Windows 测试 clone 下最长约 280 字符；将对照目录缩为 `t113/t112`，最长路径降至 242 字符，不改生成器代码。 | 触发失败的两个测试在当前环境重跑 2/2 PASS；Windows CI 自然重跑结果待当前 Draft PR 检查。 |
 
 修订后重新运行 Content 2.4 契约/质量/证据校验并重生成全部 20 课。项目复审结论、主审内容摘要和最新哈希保留在来源文件和本报告；不超出 Content 2.4 既有 review-history 的 8 轮上限。
 
@@ -131,11 +132,10 @@
 
 - 合并基线：PR #74 已合并到 master，HEAD `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`；该 PR 的自然 CI Gate 为 SUCCESS。当前修改在独立验收分支上，未修改已合并 PR #74。
 - r4 成品 SHA-256：`artifact-manifest.json` `CCBA09DE8DE743491CCEBE89B5CE67AA546A1CAFE43969F598A0A49E8DD3CCC2`；`qa-report.json` `00FDEDEF48B07237410F2355C302D1544C40A1795E59259EB671FA1317F33E78`；Content `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB`。生成证据 sidecar SHA-256 为 `D6F451AD086EE1386ADAD0AD9A00F37268E60C283A27B43D556A237AA0CB0176`。
-- 本次审计内容快照 HEAD：`c5cb8c02c7ca6a9b321806a29867391eb422065c`；Tree：`9cbbd4e4e395c15711eed724bf7afd5aaa49f915`；父提交为合并基线 `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`。报告后续的文字版修订会单独记为 Draft PR 中的报告提交。
-- 共变更 72 个文件：课程源 Content 与 evidence 2 个；20 份 DOCX 和 20 份 PDF、manifest/QA/参考证据/逐页视觉证据及合成课程 README/Acceptance 记录共 48 个；学生 starter 10 个及 README 1 个；项目二审计更正 1 个；Template 1.1.2/1.1.3 同输入对照的记录、QA、manifest 与 7 个 DOCX/PDF 共 9 个；本 Owner 报告 1 个。精确路径和哈希见该提交文件清单及各 artifact manifest。
-- 定向测试：`tests.test_lesson_content_v24` 12/12、`tests.test_lesson_release_compatibility` 14/14、`tests.test_issue71_template_v113` 4/4 PASS；Content 2.4 契约/质量/证据复核为 PASS、0 errors/0 warnings；manifest `production_pass`。10 组注入参考实现断言 PASS 的 JDK 限制见上文。没有运行完整仓库测试分片。
-- PR #74 基线自然 CI Gate：SUCCESS（2026-10-29）。本验收 Draft PR 的自然 CI Gate 将在创建/推送 PR 后触发；取得结果后记录具体提交与检查链接，不提前声称通过。
-- 定向测试：`python3 -m unittest tests.test_lesson_content_v24`（12 PASS）；`python3 -m unittest tests.test_lesson_release_compatibility`（14 PASS）；`python3 -m unittest tests.test_issue71_template_v113`（4 PASS）。没有运行完整仓库测试分片。
+- 本次审计内容快照首次提交 HEAD：`c5cb8c02c7ca6a9b321806a29867391eb422065c`；Tree：`9cbbd4e4e395c15711eed724bf7afd5aaa49f915`；父提交为合并基线 `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`。PR #75 首次 CI 使用的 HEAD 为 `4ba4b5569d2da8984f30f497622be1a0835e6352`；本次 Windows 路径修复会在同一 Draft PR 追加独立提交。
+- 本次 PR 相对合并基线最终变更 68 个路径：课程源 Content 与 evidence 2 个；20 份 DOCX 和 20 份 PDF、manifest/QA/参考证据/逐页视觉证据及合成课程 README/Acceptance 记录共 48 个；学生 starter 10 个及 README 1 个；项目二审计更正 1 个；当前同输入比较记录与两套 L06 DOCX/PDF 共 5 个；本 Owner 报告 1 个。精确路径和哈希见 PR #75 文件清单、主 artifact manifest 与 `t113/comparison-record.md`。
+- 定向测试：`tests.test_lesson_content_v24` 12/12、`tests.test_lesson_release_compatibility` 14/14、`tests.test_issue71_template_v113` 4/4、两项 Windows 生命周期失败测试复测 2/2 PASS；Content 2.4 契约/质量/证据复核为 PASS、0 errors/0 warnings；主 r4 manifest `production_pass`。10 组注入参考实现断言 PASS 的 JDK 限制见上文。没有运行完整仓库测试分片。
+- PR #74 基线自然 CI Gate：SUCCESS（2026-10-29）。PR #75 首次自然 workflow run [40989886557](https://github.com/ArdenZC/codex-work-skills/actions/runs/40989886557) 在 Windows Template core lesson-plan 失败：两项生命周期来源测试在临时仓库 `git add --all` 处 exit 128。该包内新增对照路径最长为 280 字符，超过 Windows 常见路径上限；对照目录已缩短至 `t113/t112`，同两项测试在本地 2/2 PASS。当前路径修订提交会自然触发 CI 重跑；在本报告提交时 Gate 仍待复核，不能标记 SUCCESS。
 - 生成器 r4：Content 2.4 `production_pass`，QA `passed`、render `passed`，20 DOCX + 20 PDF、133 页；manifest 与生成证据已校验。
 - Java：JDK 21 编译器按 Source/Target 17 编译临时参考实现并在 JDK 21 运行，10/10 断言套件 PASS；这不等同原始 TODO 已完成或原生 JDK 17 运行验证。
 - 不运行 Codex Review；不合并 PR、不关闭 Issue、不发布 Release。
