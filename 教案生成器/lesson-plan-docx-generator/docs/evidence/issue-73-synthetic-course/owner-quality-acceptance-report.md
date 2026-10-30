@@ -9,7 +9,7 @@
 
 | 最终状态字段 | 状态 | 依据与边界 |
 | --- | --- | --- |
-| `ENGINEERING_VALIDATED` | **PASS** | Content 2.4 契约、内容质量、生成证据、20 份输出 manifest、目标测试与 Java 参考实现运行均通过；不代表真实课堂验证。 |
+| `ENGINEERING_VALIDATED` | **本地定向校验 PASS；本轮自然 CI 待确认** | Content 2.4 契约、内容质量、生成证据、20 份输出 manifest、目标测试与 Java 参考实现运行均通过。可选 1.1.4 包指纹缺陷已修并通过本地包校验；修订后的 PR CI 结果尚待返回。不代表真实课堂验证。 |
 | `CONTENT_REVIEWED` | **PASS（合成课程桌面审查）** | 20 课均有逐课结论；发现项已修改并二次复审。评分值、评价栏目和九阶段结构不变。 |
 | `REFERENCES_VERIFIED` | **PARTIAL** | 两条高教社书目元数据及目录/主题范围已独立核实；没有读取教材章节正文，故不为课程算法正确性背书。 |
 | `EXEMPLAR_COMPARISON_REVIEWED` | **PARTIAL** | 20 课均有具体的日常非盲对照；五个来源均未证明为优秀教案；P3 写前读取时序缺证。 |
@@ -144,6 +144,8 @@
 | L20 哈希测试未覆盖碰撞链未命中和满表失败后的保持性 | 用同起始槽测试键 C-204 检查 3/4/5/6/0；新增满表 7 次终止和溢出后七槽快照不变断言。 | 项目三复算模 7 路径并核对 starter、DOCX/PDF；L20 full-table test 结果一致。 |
 | 图论文被错误归因为 Kruskal/DSU 来源；L09/L13 逐课对照不相关 | 把论文作用限定为图主题组织和有限 Prim 背景；L09/L13 改为 DFS/BFS 和分量事实。 | 独立对标复审确认最终 sidecar 无不当归因；原始 Agent 返包保留并附修订说明追踪。 |
 | Windows CI 临时仓库的 `git add --all` 在两项生命周期测试中 exit 128 | 发现新增模板对照深路径在 Windows 测试 clone 下最长约 280 字符；将对照目录缩为 `t113/t112`，最长路径降至 242 字符，不改生成器代码。 | 触发失败的两个测试在当前环境重跑 2/2 PASS；Windows CI 自然重跑结果待当前 Draft PR 检查。 |
+| 首次视觉候选提交的 `Package contracts / static Ubuntu` 发现 v1.1.4 `fingerprint.value` 与模板文件 SHA-256 不一致 | 将 `fingerprint.value` 修正为实际模板 SHA-256 `D75A0A…29DBCD`；未修改模板文件或生成产物内容。 | 本地静态包合同验证 9/9、v1.1.4 定向测试 3/3、模板验证 errors=0/warnings=0；修订后自然 PR CI 待复核。 |
+| 新增的 v1.1.4 三项回归测试未进入根测试分片清单，Windows semantic-scope 精确覆盖检查少 3 项 | 将模板测试模块加入 `lesson-package` 分片，并在现有分区精确性测试中纳入该模块；不改变分片边界规则。 | 原 CI 差值为 manifest=1128、discovery=1131；修订后 6 项精确覆盖测试 PASS，`--list` 的全量 manifest 与根发现再次匹配。修订后自然 PR CI 待复核。 |
 
 修订后重新运行 Content 2.4 契约/质量/证据校验并重生成全部 20 课。项目复审结论、主审内容摘要和最新哈希保留在来源文件和本报告；不超出 Content 2.4 既有 review-history 的 8 轮上限。
 
@@ -178,9 +180,11 @@
 - 合并基线：PR #74 已合并到 master，HEAD `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`；该 PR 的自然 CI Gate 为 SUCCESS。当前修改在独立验收分支上，未修改已合并 PR #74。
 - r4 成品 SHA-256：`artifact-manifest.json` `CCBA09DE8DE743491CCEBE89B5CE67AA546A1CAFE43969F598A0A49E8DD3CCC2`；`qa-report.json` `00FDEDEF48B07237410F2355C302D1544C40A1795E59259EB671FA1317F33E78`；Content `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB`。生成证据 sidecar SHA-256 为 `D6F451AD086EE1386ADAD0AD9A00F37268E60C283A27B43D556A237AA0CB0176`。
 - 本次审计内容快照首次提交 HEAD：`c5cb8c02c7ca6a9b321806a29867391eb422065c`；Tree：`9cbbd4e4e395c15711eed724bf7afd5aaa49f915`；父提交为合并基线 `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`。PR #75 首次 CI 使用的 HEAD 为 `4ba4b5569d2da8984f30f497622be1a0835e6352`；本次 Windows 路径修复会在同一 Draft PR 追加独立提交。
-- 本次 PR 相对合并基线最终变更 68 个路径：课程源 Content 与 evidence 2 个；20 份 DOCX 和 20 份 PDF、manifest/QA/参考证据/逐页视觉证据及合成课程 README/Acceptance 记录共 48 个；学生 starter 10 个及 README 1 个；项目二审计更正 1 个；当前同输入比较记录与两套 L06 DOCX/PDF 共 5 个；本 Owner 报告 1 个。精确路径和哈希见 PR #75 文件清单、主 artifact manifest 与 `t113/comparison-record.md`。
+- 当前 PR #75 相对合并基线包含 196 个变更路径，涵盖课程源与复审记录、20 课 DOCX/PDF、可选 v1.1.4 模板和全页视觉证据、学生 starter 与生成器校验代码。精确路径和产物 SHA-256 见 PR #75 文件清单及候选 `artifact-manifest.json`、`visual-inspection-evidence.json`。
 - 定向测试：`tests.test_lesson_content_v24` 12/12、`tests.test_lesson_release_compatibility` 14/14、`tests.test_issue71_template_v113` 4/4、两项 Windows 生命周期失败测试复测 2/2 PASS；Content 2.4 契约/质量/证据复核为 PASS、0 errors/0 warnings；主 r4 manifest `production_pass`。10 组注入参考实现断言 PASS 的 JDK 限制见上文。没有运行完整仓库测试分片。
 - PR #74 基线自然 CI Gate：SUCCESS（2026-10-29）。PR #75 首次自然 workflow run [40989886557](https://github.com/ArdenZC/codex-work-skills/actions/runs/40989886557) 在 Windows Template core lesson-plan 失败：两项生命周期来源测试在临时仓库 `git add --all` 处 exit 128。该包内新增对照路径最长为 280 字符，超过 Windows 常见路径上限；对照目录已缩短至 `t113/t112`，同两项测试在本地 2/2 PASS。当前路径修订提交会自然触发 CI 重跑；在本报告提交时 Gate 仍待复核，不能标记 SUCCESS。
 - 生成器 r4：Content 2.4 `production_pass`，QA `passed`、render `passed`，20 DOCX + 20 PDF、133 页；manifest 与生成证据已校验。
 - Java：JDK 21 编译器按 Source/Target 17 编译临时参考实现并在 JDK 21 运行，10/10 断言套件 PASS；这不等同原始 TODO 已完成或原生 JDK 17 运行验证。
 - 不运行 Codex Review；不合并 PR、不关闭 Issue、不发布 Release。
+
+- 视觉候选提交 `285b97f` 的首次自然 CI 暴露两项本轮引入的问题：v1.1.4 manifest 指纹不一致，以及新增 3 个测试未进入全量测试分片，导致 Windows semantic-scope exact-coverage 失败。二者均已在本地修正；静态包合同 9/9、v1.1.4 测试 3/3、精确分片覆盖 6/6 通过。修订后的自然 PR CI 尚待结果，因此本轮 `ENGINEERING_VALIDATED` 尚未达到 CI Gate PASS。
