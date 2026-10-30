@@ -2,6 +2,8 @@
 
 This folder records a **synthetic** 40-hour, three-project data-structures course used to exercise Content Contract 2.4 and the original DOCX/PDF generator. It is not a real school's approved syllabus, a teacher review, or evidence that the generated course has been used in class.
 
+The Chinese [Owner quality acceptance report](owner-quality-acceptance-report.md) records the independent lesson-by-lesson review, content corrections, reference and exemplar limits, 133-page visual inspection, course-mode regressions, and items still awaiting real-course or teacher validation.
+
 ## Root causes and implementation
 
 The previous Content 2.3 delivery ledger deliberately counted only theory Lesson hours for `split_lessons`, while `practice_only` counted zero Lesson hours. Practice WorkOrders were a separate artifact and could therefore be mistaken for the practice course itself. Reference searches and exemplar comparisons were recommended in Skill text, but the normal generation path did not require auditable search receipts, read captures, or per-Lesson comparison records. Project instructions also lacked a checked merge boundary. Finally, a structural QA pass could be mistaken for a teaching-quality pass.
@@ -59,7 +61,7 @@ The Hubei Normal University OPAC URL appeared in the actual `Q-HEP-ISBN-01` sear
 
 ## Exemplar research and 15-dimension comparisons
 
-Before drafting, each project searched for topic- and learner-relevant public teaching designs. Agents read the returned documents themselves and recorded excerpts, read scopes, hashes, transferable methods, and limitations. Among the readable sources were:
+Each project return records searches for topic- and learner-relevant public teaching designs, read scopes, captured excerpts, hashes, transferable methods, and limitations. P1/P2 have read captures tied to their project work. P3 has search receipts and full-read capture claims, but does not record an access timestamp or an explicit read-before-draft field, so that chronology cannot be independently verified. The final 20-Lesson sidecar records after-draft comparisons; it does not repair the missing P3 chronology. Among the readable sources were:
 
 - 程菲, 安徽信息工程学院教务处：《数据结构与算法》线上教学设计, a complete 17-page, one-hour QuickSort lesson. Its population and programming prerequisite differ from this synthetic vocational course; it is used only for bounded method transfer, and the exact topic match is L19.
 - 张静, 公安海警学院, 《遍历二叉树》 teaching design: a complete short public micro-course design read from its PDF; its platform record did not establish an award.
@@ -71,29 +73,29 @@ All 20 Lessons have a post-draft comparison against the existing 15 dimensions. 
 
 ## Actual generator, QA, and Acceptance
 
-The original generator rendered the synthetic Content 2.4 through the unchanged v1.1.2 template. Retained artifacts are in `artifacts/`:
+The current default generator rendered the synthetic Content 2.4 through unchanged Template 1.1.2. Retained artifacts are in `artifacts/`:
 
 - 20 per-Lesson DOCX and 20 per-Lesson PDF files.
-- 40 total hours, 130 PDF pages, Content Contract 2.4.
+- 40 total hours, 133 PDF pages, Content Contract 2.4.
 - Generator: `production_status=production_pass`, QA `passed`, render `passed`.
 - Content-quality QA: zero errors/warnings and zero reported duplicate/similarity detector findings.
 - Manifest hash-binds the Content, generation-evidence sidecar, 20 DOCX/PDF pairs, and QA report.
 
-These statuses establish generation, consistency, and structural QA for this synthetic fixture. They do not establish that a teacher has visually inspected the pages, approved the scope, or accepted the teaching design. The generated [Acceptance report](acceptance-final/lesson-acceptance-report.md) therefore remains **`PENDING_MANUAL_REVIEW`**: visual review, teaching-design review, teacher usability, and course-scope review were not executed. The stored report makes this limitation explicit.
+These statuses establish generation, consistency, and structural QA for this synthetic fixture. All 133 current PDF pages were visually inspected as LibreOffice-rendered PDFs. The recorded inspection is **failed with findings**: narrow evaluation-remark columns, crowded continuations, and clipping/overlap remain (including L07 p1, L11 p4, and L14 p4), with sparse tail pages at L12 p6 and L19 p8. See [visual-inspection-evidence.json](artifacts/visual-inspection-evidence.json) for page coverage and findings. Native Microsoft Word/WPS layout has not been verified. A same-input L06 comparison shows 1.1.3 improves long-remark readability (7 pages versus 9), but it does not resolve the other overflow cases; the default template has not been changed. See the [Owner report](owner-quality-acceptance-report.md) and the [1.1.3 comparison record](template-1.1.3-comparison/comparison-record.md) for evidence and the separate migration recommendation. The generated [Acceptance report](acceptance-final/lesson-acceptance-report.md) remains **`FAILED` for visual evidence** and does not establish teacher acceptance, real-course alignment, or teacher usability.
 
-The generator run did not request WorkOrders. Contract tests cover both 40-hour `practice_only` cases with no WorkOrders and with 20 linked two-hour tasks; the tasks are additional artifacts and the Lesson ledger stays at 40 hours. The tests also cover the 40-hour split course with and without WorkOrders, 40-hour theory-only, missing and duplicate Lessons, split mismatch, unexecuted search, fake citation, absent exemplar comparison, subagent fallback, duplicate project results, cross-project conflicts, changed hour totals, and preservation of frozen outline order. The actual 40-hour DOCX/PDF render in this folder is the 20-theory/20-practice case; no separate pure-practice DOCX set is claimed here.
+The generator run did not request WorkOrders. Contract tests cover both 40-hour `practice_only` cases with no WorkOrders and with 20 linked two-hour tasks; the tasks are additional artifacts and the Lesson ledger stays at 40 hours. The tests also cover the 40-hour separate course with and without WorkOrders, and 40-hour theory-only without practice tasks. Missing and duplicate Lessons, split mismatch, unexecuted search, fake citation, absent exemplar comparison, subagent fallback, duplicate project results, cross-project conflicts, changed hour totals, and preservation of frozen outline order are covered as well. The actual 40-hour DOCX/PDF render in this folder is the 20-theory/20-practice case; no separate pure-practice DOCX set is claimed here.
 
 ## Test and review boundaries
 
 The existing historical Content 2.2/2.3 tests, final Acceptance lifecycle tests, and the new Content 2.4 tests are kept in the repository test shards.
 
-Local results on this branch:
+Final audit reruns on this branch:
 
-- Content 2.4: 9 tests passed.
-- Historical Content 2.2/2.3: 76 tests passed.
-- Lesson skill hardening: 38 tests passed.
-- Final Acceptance lifecycle: 92 tests passed, including the existing benchmark-linked render and acceptance cases.
-- Shard partition checks for lesson content/package separation: 2 tests passed; the new 2.4 module is in the lesson-content shard.
-- Full `tests.test_run_test_shards`: 30 of 31 passed. The remaining failure is the unchanged gradebook package's `test_template_validator`, which reports protected formatting differences in the gradebook v1.1.0 workbook. This PR does not modify that package or its template. Exact-HEAD GitHub Actions status is recorded in the Issue #73 Draft PR.
+- `python3 -m unittest tests.test_lesson_content_v24`: 12 tests passed, including 40-hour coverage, WorkOrder independence for separate/practice modes, and historical 2.2/2.3 semantics.
+- `python3 -m unittest tests.test_lesson_release_compatibility`: 14 tests passed.
+- `python3 -m unittest tests.test_issue71_template_v113`: 4 tests passed.
+- Content 2.4 schema, semantic, and generation-evidence validators: results are recorded in the Owner report.
+- The 10 Java student starters were checked with injected reference implementations using OpenJDK 21 compiler/runtime in `--source 17 --target 17` mode. This does not establish JDK 17 runtime compatibility or prove students have completed the TODOs. Native Word/WPS was unavailable.
+- No full repository test shard was run for this content audit. Exact-HEAD GitHub Actions status is recorded in the Issue #73 Draft PR.
 
 A structural or workflow-evidence pass must not be quoted as teacher approval, pedagogical quality acceptance, visual approval, or a formal blind benchmark.
