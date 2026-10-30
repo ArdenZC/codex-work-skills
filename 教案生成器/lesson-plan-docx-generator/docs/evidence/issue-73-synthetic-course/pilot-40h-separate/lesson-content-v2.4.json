@@ -822,7 +822,7 @@
       "prior_learning": "掌握冻结无向图和连通分量；本课为 A–E 连通子图赋合成权重。",
       "capability_stage": "综合",
       "deliverable": "候选边选择与并查集合并推演表",
-      "next_bridge": "L14 实现两算法并复核删 BC 后权重。",
+      "next_bridge": "在冻结的合成路线边权上推演Prim/Kruskal，并在L14用删边副本复核。",
       "practice_task_ids": []
     },
     {
@@ -889,7 +889,7 @@
       "hours": 2,
       "theory_hours": 2,
       "practice_hours": 0,
-      "prior_learning": "基本容器和比较操作",
+      "prior_learning": "已在L14按边权与端点顺序处理Kruskal候选边，并用并查集拒环；本课迁移逐趟过程记录。",
       "capability_stage": "理解",
       "deliverable": "小规模数组的插入排序过程表",
       "next_bridge": "转化为可测量的排序实现",
@@ -1075,7 +1075,7 @@
           "id": "task_introduction",
           "label": "任务导入",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "讲授+情境",
           "content": [
             "呈现五条冻结目录记录和一个容量为5的表，问“第3项插入后谁移动”。"
           ],
@@ -1091,7 +1091,7 @@
           "id": "operation_demonstration",
           "label": "方法示范",
           "minutes": 20,
-          "modality": "小组实训",
+          "modality": "教师示范+全班推演",
           "content": [
             "先画线性序列，再映射到连续槽位；演示在位置2插入E-304时从右向左移位。"
           ],
@@ -1107,7 +1107,7 @@
           "id": "task_implementation",
           "label": "任务实施",
           "minutes": 25,
-          "modality": "小组实训",
+          "modality": "个人纸笔分析",
           "content": [
             "比较get(4)、get(5)、insert(5,x)、insert(6,x)，再以目录编号查找和中间插入推导成本。"
           ],
@@ -1123,7 +1123,7 @@
           "id": "task_extension",
           "label": "任务拓展",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "小组讨论",
           "content": [
             "比较固定容量顺序表和“逻辑长度”概念；讨论扩容前后逻辑下标是否变化。"
           ],
@@ -1139,7 +1139,7 @@
           "id": "project_practice",
           "label": "项目实训",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "小组分析单整理",
           "content": [
             "小组完成容量5、size=4的记录卡演算，并在分析单上写操作成本理由。"
           ],
@@ -1155,7 +1155,7 @@
           "id": "peer_review",
           "label": "组间互评",
           "minutes": 5,
-          "modality": "小组实训",
+          "modality": "同伴互核",
           "content": [
             "交换分析单，只核对size、capacity、有效下标和插入移动方向。"
           ],
@@ -1171,7 +1171,7 @@
           "id": "lesson_summary",
           "label": "课堂小结",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "讲授+问答",
           "content": [
             "回扣逻辑相邻、连续存储和操作成本；预告链表将改变存储映射。"
           ],
@@ -1574,7 +1574,7 @@
               "id": "task_introduction",
               "label": "任务导入",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "讲授+情境",
               "content": [
                 "呈现五条冻结目录记录和一个容量为5的表，问“第3项插入后谁移动”。"
               ],
@@ -1590,7 +1590,7 @@
               "id": "operation_demonstration",
               "label": "方法示范",
               "minutes": 20,
-              "modality": "小组实训",
+              "modality": "教师示范+全班推演",
               "content": [
                 "先画线性序列，再映射到连续槽位；演示在位置2插入E-304时从右向左移位。"
               ],
@@ -1606,7 +1606,7 @@
               "id": "task_implementation",
               "label": "任务实施",
               "minutes": 25,
-              "modality": "小组实训",
+              "modality": "个人纸笔分析",
               "content": [
                 "比较get(4)、get(5)、insert(5,x)、insert(6,x)，再以目录编号查找和中间插入推导成本。"
               ],
@@ -1622,7 +1622,7 @@
               "id": "task_extension",
               "label": "任务拓展",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "小组讨论",
               "content": [
                 "比较固定容量顺序表和“逻辑长度”概念；讨论扩容前后逻辑下标是否变化。"
               ],
@@ -1638,7 +1638,7 @@
               "id": "project_practice",
               "label": "项目实训",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "小组分析单整理",
               "content": [
                 "小组完成容量5、size=4的记录卡演算，并在分析单上写操作成本理由。"
               ],
@@ -1654,7 +1654,7 @@
               "id": "peer_review",
               "label": "组间互评",
               "minutes": 5,
-              "modality": "小组实训",
+              "modality": "同伴互核",
               "content": [
                 "交换分析单，只核对size、capacity、有效下标和插入移动方向。"
               ],
@@ -1670,7 +1670,7 @@
               "id": "lesson_summary",
               "label": "课堂小结",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "讲授+问答",
               "content": [
                 "回扣逻辑相邻、连续存储和操作成本；预告链表将改变存储映射。"
               ],
@@ -1742,6 +1742,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "4078F281153C773C03D71F4A1AD58DCD4D36B2F262A8A0390074B7E59299F304"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "理论课课堂活动被统一标为“小组实训”，与实际讲授、纸笔推演和互核方式不符；现按真实活动修正教学形式。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "4078F281153C773C03D71F4A1AD58DCD4D36B2F262A8A0390074B7E59299F304"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "EFAFBA9E7FF75EC0E0A9A034DA308DFE01D50D9BDA4E6A04AFE0471322F199AF"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "minor",
+                "message": "L01项目实训的活动与师生活动均要求小组共同完成并提交，原形式标签却写成个人整理；同步改为小组分析单整理。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "EFAFBA9E7FF75EC0E0A9A034DA308DFE01D50D9BDA4E6A04AFE0471322F199AF"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "B328071BB20809590B616726A005EB44913C4EBAE0FA380DFA38B199733ACBDF"
           }
         ]
       }
@@ -1854,7 +1890,7 @@
           "id": "task_introduction",
           "label": "任务导入",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "讲授+结构图",
           "content": [
             "把三张目录记录卡放到桌面不同位置，提问如何仍保持先后关系。"
           ],
@@ -1870,7 +1906,7 @@
           "id": "operation_demonstration",
           "label": "方法示范",
           "minutes": 20,
-          "modality": "小组实训",
+          "modality": "教师示范+全班推演",
           "content": [
             "搭建哑结点head→B-101→B-205→B-309→null，演示在B-205后插入E-301。"
           ],
@@ -1886,7 +1922,7 @@
           "id": "task_implementation",
           "label": "任务实施",
           "minutes": 25,
-          "modality": "小组实训",
+          "modality": "个人纸笔分析",
           "content": [
             "演算删除B-205、尾项删除、单节点删除及空表；对比遍历定位与重接动作。"
           ],
@@ -1902,7 +1938,7 @@
           "id": "task_extension",
           "label": "任务拓展",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "小组讨论",
           "content": [
             "比较不带头结点和带哑结点模型如何处理首项插入，讨论统一接口减少哪些分支。"
           ],
@@ -1918,7 +1954,7 @@
           "id": "project_practice",
           "label": "项目实训",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "状态图整理",
           "content": [
             "小组绘制含头结点的完整操作图：插入E-301后删除B-205。"
           ],
@@ -1934,7 +1970,7 @@
           "id": "peer_review",
           "label": "组间互评",
           "minutes": 5,
-          "modality": "小组实训",
+          "modality": "同伴互核",
           "content": [
             "两组交换状态图，尝试从图中判断是否遗漏后缀或错误断链。"
           ],
@@ -1950,7 +1986,7 @@
           "id": "lesson_summary",
           "label": "课堂小结",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "讲授+问答",
           "content": [
             "总结链式存储的节点/引用、操作边界、定位与改链成本。"
           ],
@@ -2353,7 +2389,7 @@
               "id": "task_introduction",
               "label": "任务导入",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "讲授+结构图",
               "content": [
                 "把三张目录记录卡放到桌面不同位置，提问如何仍保持先后关系。"
               ],
@@ -2369,7 +2405,7 @@
               "id": "operation_demonstration",
               "label": "方法示范",
               "minutes": 20,
-              "modality": "小组实训",
+              "modality": "教师示范+全班推演",
               "content": [
                 "搭建哑结点head→B-101→B-205→B-309→null，演示在B-205后插入E-301。"
               ],
@@ -2385,7 +2421,7 @@
               "id": "task_implementation",
               "label": "任务实施",
               "minutes": 25,
-              "modality": "小组实训",
+              "modality": "个人纸笔分析",
               "content": [
                 "演算删除B-205、尾项删除、单节点删除及空表；对比遍历定位与重接动作。"
               ],
@@ -2401,7 +2437,7 @@
               "id": "task_extension",
               "label": "任务拓展",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "小组讨论",
               "content": [
                 "比较不带头结点和带哑结点模型如何处理首项插入，讨论统一接口减少哪些分支。"
               ],
@@ -2417,7 +2453,7 @@
               "id": "project_practice",
               "label": "项目实训",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "状态图整理",
               "content": [
                 "小组绘制含头结点的完整操作图：插入E-301后删除B-205。"
               ],
@@ -2433,7 +2469,7 @@
               "id": "peer_review",
               "label": "组间互评",
               "minutes": 5,
-              "modality": "小组实训",
+              "modality": "同伴互核",
               "content": [
                 "两组交换状态图，尝试从图中判断是否遗漏后缀或错误断链。"
               ],
@@ -2449,7 +2485,7 @@
               "id": "lesson_summary",
               "label": "课堂小结",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "讲授+问答",
               "content": [
                 "总结链式存储的节点/引用、操作边界、定位与改链成本。"
               ],
@@ -2526,6 +2562,24 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "0E0D33789D9D68E71E7C2E7EAF7A922C7A61B50D3A9FDF9D727D851096D130F3"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "理论课课堂活动被统一标为“小组实训”，与实际讲授、纸笔推演和互核方式不符；现按真实活动修正教学形式。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "0E0D33789D9D68E71E7C2E7EAF7A922C7A61B50D3A9FDF9D727D851096D130F3"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "BC2B7E72FFD434F32357B42D074B7A6DA858D640E5A8FA414A7668F51FCFCE31"
           }
         ]
       }
@@ -2638,7 +2692,7 @@
           "id": "task_introduction",
           "label": "任务导入",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "讲授+情境",
           "content": [
             "演示图书目录请求按到达次序服务，另用托盘暂存模拟栈。"
           ],
@@ -2654,7 +2708,7 @@
           "id": "operation_demonstration",
           "label": "方法示范",
           "minutes": 20,
-          "modality": "小组实训",
+          "modality": "教师示范+全班推演",
           "content": [
             "逐字符处理([{}])，再画物理数组长度6的循环队列，保留一格并计算判满条件。"
           ],
@@ -2670,7 +2724,7 @@
           "id": "task_implementation",
           "label": "任务实施",
           "minutes": 25,
-          "modality": "小组实训",
+          "modality": "个人纸笔演算",
           "content": [
             "演算五个目录编号全部入队、两次出队、再入队两项；对照线性数组与循环数组。"
           ],
@@ -2686,7 +2740,7 @@
           "id": "task_extension",
           "label": "任务拓展",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "小组讨论",
           "content": [
             "比较预留一槽方案与增加size计数器方案的表意差别；本课程实现采用预留一槽。"
           ],
@@ -2702,7 +2756,7 @@
           "id": "project_practice",
           "label": "项目实训",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "状态表整理",
           "content": [
             "小组用实体卡片完成括号匹配与循环排队两条独立轨迹。"
           ],
@@ -2718,7 +2772,7 @@
           "id": "peer_review",
           "label": "组间互评",
           "minutes": 5,
-          "modality": "小组实训",
+          "modality": "同伴互核",
           "content": [
             "交换状态表，重点核验队头、队尾和已出队槽位。"
           ],
@@ -2734,7 +2788,7 @@
           "id": "lesson_summary",
           "label": "课堂小结",
           "minutes": 10,
-          "modality": "小组实训",
+          "modality": "讲授+问答",
           "content": [
             "总结LIFO、FIFO、空满条件和回绕更新顺序。"
           ],
@@ -3137,7 +3191,7 @@
               "id": "task_introduction",
               "label": "任务导入",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "讲授+情境",
               "content": [
                 "演示图书目录请求按到达次序服务，另用托盘暂存模拟栈。"
               ],
@@ -3153,7 +3207,7 @@
               "id": "operation_demonstration",
               "label": "方法示范",
               "minutes": 20,
-              "modality": "小组实训",
+              "modality": "教师示范+全班推演",
               "content": [
                 "逐字符处理([{}])，再画物理数组长度6的循环队列，保留一格并计算判满条件。"
               ],
@@ -3169,7 +3223,7 @@
               "id": "task_implementation",
               "label": "任务实施",
               "minutes": 25,
-              "modality": "小组实训",
+              "modality": "个人纸笔演算",
               "content": [
                 "演算五个目录编号全部入队、两次出队、再入队两项；对照线性数组与循环数组。"
               ],
@@ -3185,7 +3239,7 @@
               "id": "task_extension",
               "label": "任务拓展",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "小组讨论",
               "content": [
                 "比较预留一槽方案与增加size计数器方案的表意差别；本课程实现采用预留一槽。"
               ],
@@ -3201,7 +3255,7 @@
               "id": "project_practice",
               "label": "项目实训",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "状态表整理",
               "content": [
                 "小组用实体卡片完成括号匹配与循环排队两条独立轨迹。"
               ],
@@ -3217,7 +3271,7 @@
               "id": "peer_review",
               "label": "组间互评",
               "minutes": 5,
-              "modality": "小组实训",
+              "modality": "同伴互核",
               "content": [
                 "交换状态表，重点核验队头、队尾和已出队槽位。"
               ],
@@ -3233,7 +3287,7 @@
               "id": "lesson_summary",
               "label": "课堂小结",
               "minutes": 10,
-              "modality": "小组实训",
+              "modality": "讲授+问答",
               "content": [
                 "总结LIFO、FIFO、空满条件和回绕更新顺序。"
               ],
@@ -3310,6 +3364,24 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "FE0BF56C9E65698DAE28B92A72424C6D23EF6C03C10B1A37C51435C0A6B008D9"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "理论课课堂活动被统一标为“小组实训”，与实际讲授、纸笔推演和互核方式不符；现按真实活动修正教学形式。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "FE0BF56C9E65698DAE28B92A72424C6D23EF6C03C10B1A37C51435C0A6B008D9"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "0151115A70A280EC9D1C110952EC8B330293569A8CAD2945C21DB47D73DF8B09"
           }
         ]
       }
@@ -3348,7 +3420,9 @@
         "insert(index,id)先检查0≤index≤size；若size==capacity则返回false；随后从size向index倒序右移，写入id，最后size加一。",
         "find(id)只遍历[0,size)，返回首个匹配位置；未命中返回-1。物理数组中size之后可能是null或旧值，不属于当前列表。",
         "使用初始[B-101,B-205,B-309,E-301]、容量5；E-304此时未在表中，查找返回-1。再在位置2插入E-304，结果为[B-101,B-205,E-304,B-309,E-301]。",
-        "测试index=-1、index=size+1、空表位置0、合法尾插、满表插入、find存在/缺失。位置不合法抛IndexOutOfBoundsException；位置合法但无容量返回false。"
+        "测试index=-1、index=size+1、空表位置0、合法尾插、满表插入、find存在/缺失。位置不合法抛IndexOutOfBoundsException；位置合法但无容量返回false。",
+        "接口约定：合法位置范围为插入0≤i≤size；非法位置抛IndexOutOfBoundsException，合法但满表返回false；固定容量不自动扩容。",
+        "实践起点的断言结果：插入E-304后为[B-101,B-205,E-304,B-309,E-301]；find(B-309)=2、find(E-304 before insertion)=-1。"
       ],
       "goals": {
         "knowledge": [
@@ -3396,7 +3470,8 @@
         "Java SE 17编译运行环境",
         "冻结目录记录及id列表",
         "固定容量5的数组状态模板",
-        "L01容量/下标分析单与L03循环队列状态表"
+        "L01容量/下标分析单与L03循环队列状态表",
+        "运行起点：practice-starters/L04SeqListLab.java（Java SE 17）"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -3441,7 +3516,8 @@
           "minutes": 20,
           "modality": "小组实训",
           "content": [
-            "编写insert和find骨架；逐行解释位置校验、容量检查、倒序移动、写入和size更新。"
+            "教师演示固定容量5、size只统计有效前缀；从右向左移动元素并用槽位表核对插入位置。",
+            "说明非法位置抛IndexOutOfBoundsException，合法位置但满表返回false；find只扫描[0,size)。"
           ],
           "teacher_actions": [
             "运行小步示范，每写完一段先观察data/size，再继续下一段。"
@@ -3457,13 +3533,15 @@
           "minutes": 25,
           "modality": "小组实训",
           "content": [
-            "学生完成SeqList类和基本查找，运行空表、缺失项、插入首/中/尾项等测试。"
+            "打开practice-starters/L04SeqListLab.java；先读接口和内置断言，再实现insert/find，不改固定容量和异常契约。",
+            "25分钟分配：3分钟读代码/画状态，8分钟实现插入与查找，6分钟核对中间插入及满表，5分钟跑空表/非法位置/缺失查找测试，3分钟修复首个失败断言。",
+            "运行后应得到[B-101,B-205,E-304,B-309,E-301]；find(B-309)=2，插入前find(E-304)=-1；满表插入返回false且items、size不变。"
           ],
           "teacher_actions": [
-            "按检查表巡回；不直接替学生改代码，先询问失败断言预期状态。"
+            "演示如何从expected状态定位首次偏差；巡视下标边界与移动方向，不代写方法体。"
           ],
           "student_actions": [
-            "每人提交源文件、编译运行记录和断言输出；失败者定位并修正条件。"
+            "按断言输入实现，运行`javac L04SeqListLab.java && java L04SeqListLab`；保存源码、输出与一个边界失败的修复说明。"
           ],
           "objective": "验证学生能够独立实现并形成可复现学习证据。"
         },
@@ -3850,7 +3928,9 @@
             "insert(index,id)先检查0≤index≤size；若size==capacity则返回false；随后从size向index倒序右移，写入id，最后size加一。",
             "find(id)只遍历[0,size)，返回首个匹配位置；未命中返回-1。物理数组中size之后可能是null或旧值，不属于当前列表。",
             "使用初始[B-101,B-205,B-309,E-301]、容量5；E-304此时未在表中，查找返回-1。再在位置2插入E-304，结果为[B-101,B-205,E-304,B-309,E-301]。",
-            "测试index=-1、index=size+1、空表位置0、合法尾插、满表插入、find存在/缺失。位置不合法抛IndexOutOfBoundsException；位置合法但无容量返回false。"
+            "测试index=-1、index=size+1、空表位置0、合法尾插、满表插入、find存在/缺失。位置不合法抛IndexOutOfBoundsException；位置合法但无容量返回false。",
+            "接口约定：合法位置范围为插入0≤i≤size；非法位置抛IndexOutOfBoundsException，合法但满表返回false；固定容量不自动扩容。",
+            "实践起点的断言结果：插入E-304后为[B-101,B-205,E-304,B-309,E-301]；find(B-309)=2、find(E-304 before insertion)=-1。"
           ],
           "goals": {
             "knowledge": [
@@ -3898,7 +3978,8 @@
             "Java SE 17编译运行环境",
             "冻结目录记录及id列表",
             "固定容量5的数组状态模板",
-            "L01容量/下标分析单与L03循环队列状态表"
+            "L01容量/下标分析单与L03循环队列状态表",
+            "运行起点：practice-starters/L04SeqListLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -3942,7 +4023,8 @@
               "minutes": 20,
               "modality": "小组实训",
               "content": [
-                "编写insert和find骨架；逐行解释位置校验、容量检查、倒序移动、写入和size更新。"
+                "教师演示固定容量5、size只统计有效前缀；从右向左移动元素并用槽位表核对插入位置。",
+                "说明非法位置抛IndexOutOfBoundsException，合法位置但满表返回false；find只扫描[0,size)。"
               ],
               "teacher_actions": [
                 "运行小步示范，每写完一段先观察data/size，再继续下一段。"
@@ -3958,13 +4040,15 @@
               "minutes": 25,
               "modality": "小组实训",
               "content": [
-                "学生完成SeqList类和基本查找，运行空表、缺失项、插入首/中/尾项等测试。"
+                "打开practice-starters/L04SeqListLab.java；先读接口和内置断言，再实现insert/find，不改固定容量和异常契约。",
+                "25分钟分配：3分钟读代码/画状态，8分钟实现插入与查找，6分钟核对中间插入及满表，5分钟跑空表/非法位置/缺失查找测试，3分钟修复首个失败断言。",
+                "运行后应得到[B-101,B-205,E-304,B-309,E-301]；find(B-309)=2，插入前find(E-304)=-1；满表插入返回false且items、size不变。"
               ],
               "teacher_actions": [
-                "按检查表巡回；不直接替学生改代码，先询问失败断言预期状态。"
+                "演示如何从expected状态定位首次偏差；巡视下标边界与移动方向，不代写方法体。"
               ],
               "student_actions": [
-                "每人提交源文件、编译运行记录和断言输出；失败者定位并修正条件。"
+                "按断言输入实现，运行`javac L04SeqListLab.java && java L04SeqListLab`；保存源码、输出与一个边界失败的修复说明。"
               ],
               "objective": "验证学生能够独立实现并形成可复现学习证据。"
             },
@@ -4097,6 +4181,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "9913A4F6447B10BEBCCC92EB4B143090EEFC1CB1A5B06F3FFD438F79DB8DD8C0"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "25分钟内要求独立实现但没有可直接运行的接口支架、明确失败契约或分段时间；增加L04起点文件、预期输出和边界测试。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "9913A4F6447B10BEBCCC92EB4B143090EEFC1CB1A5B06F3FFD438F79DB8DD8C0"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "00F3CA42795C352A74342DBBFBC2FA3540856704B94863DC296E15FDDB7BC0F4"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "minor",
+                "message": "L04满表插入的测试只检查false返回，未检查底层列表和size保持不变；增加不变式断言与预期说明。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "00F3CA42795C352A74342DBBFBC2FA3540856704B94863DC296E15FDDB7BC0F4"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "9797E169A252EE862DFC75E4FCF3EB4E8707A7A24618954AACC35DCD868840DD"
           }
         ]
       }
@@ -4135,7 +4255,9 @@
         "按位置插入先找到下标index-1的前驱；即使指针重接为O(1)，从头定位前驱的总体耗时仍可能为O(n)。",
         "删除先检查0≤index<size并找到前驱；保存removed=pred.next后令pred.next=removed.next，再置removed.next=null并减size。",
         "反转的每一轮先保存next=cur.next，再令cur.next=prev，更新prev与cur；循环结束后head.next=prev。若未保存next，未处理后缀不可恢复。",
-        "完整性检查验证节点数等于size、尾节点next为null且不存在环；按[B-101,B-205,B-309,E-301,E-304]记录每轮指针变化。"
+        "完整性检查验证节点数等于size、尾节点next为null且不存在环；按[B-101,B-205,B-309,E-301,E-304]记录每轮指针变化。",
+        "按位置插入/删除的前驱定位最坏O(n)，定位后的指针重接O(1)，完整操作最坏O(n)；反转遍历n个节点，时间O(n)、辅助空间O(1)。",
+        "反转每轮开始时，prev指向已处理且已反转前缀的头节点，cur指向原链未处理后缀的头节点；两段不相交且合计覆盖全部原节点。先保存next=cur.next，再令cur.next=prev并推进prev/cur，结束后令dummy.next=prev。"
       ],
       "goals": {
         "knowledge": [
@@ -4182,7 +4304,9 @@
         "Java SE 17运行环境",
         "冻结目录编号序列及L02含头结点状态图",
         "节点引用追踪表",
-        "《数据结构（Java版）》第2.4节目录：单链表实现、性能分析与实战演练"
+        "《数据结构（Java版）》第2.4节目录：单链表实现、性能分析与实战演练",
+        "运行起点：practice-starters/L05LinkedListLab.java（Java SE 17）",
+        "TEST-*为容器边界测试标记，不是冻结目录记录"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -4227,13 +4351,14 @@
           "minutes": 20,
           "modality": "小组实训",
           "content": [
-            "演示插入、删除和反转函数；逐轮停在引用改写之前检查变量。"
+            "用三节点[B-101,B-205,B-309]逐轮记录prev/cur/next；先让学生指出未处理后缀，再保存next并改写cur.next。",
+            "比较按位置操作的O(n)前驱定位与O(1)指针重接；反转整体O(n)时间、O(1)额外空间。"
           ],
           "teacher_actions": [
             "逐句运行小样例，特意显示保存next与修改cur.next的顺序。"
           ],
           "student_actions": [
-            "学生同步画引用图并在每轮记录变量值与head.next。"
+            "逐轮画出已反转前缀与未处理后缀，写出循环不变量并说明为何覆盖cur.next前必须保存next。"
           ],
           "objective": "建立可以从代码还原到链结构的阅读能力。"
         },
@@ -4243,13 +4368,15 @@
           "minutes": 25,
           "modality": "小组实训",
           "content": [
-            "独立实现三个操作并运行空表、单节点、首尾边界、完整五节点反转。"
+            "打开practice-starters/L05LinkedListLab.java；实现位置插入、位置删除、原地反转三个TODO，按给定IndexOutOfBoundsException契约处理非法位置。",
+            "25分钟分配：3分钟读接口和追踪输入，6分钟完成插入/删除，7分钟按循环不变量反转，6分钟运行空/单节点/首尾/五节点测试，3分钟修复一个失败断言。",
+            "执行`javac L05LinkedListLab.java && java L05LinkedListLab`；从五条冻结记录开始；容器位置测试会临时加入TEST-HEAD与TEST-MIDDLE并移除头尾节点，最终次序为[E-301,B-309,TEST-MIDDLE,B-205,B-101]，反转两次恢复。TEST-HEAD/TEST-MIDDLE仅为位置测试标记，不代表新增目录记录。"
           ],
           "teacher_actions": [
             "巡视时要求先说明失败测试预期，再查看首个错误状态。"
           ],
           "student_actions": [
-            "学生提交函数、测试输出和逐轮追踪记录。"
+            "保存源码、测试输出和一轮prev/cur/next追踪；失败时先核对size、dummy.next及尾节点next。"
           ],
           "objective": "以真实运行和结构状态检验实现正确性。"
         },
@@ -4635,7 +4762,9 @@
             "按位置插入先找到下标index-1的前驱；即使指针重接为O(1)，从头定位前驱的总体耗时仍可能为O(n)。",
             "删除先检查0≤index<size并找到前驱；保存removed=pred.next后令pred.next=removed.next，再置removed.next=null并减size。",
             "反转的每一轮先保存next=cur.next，再令cur.next=prev，更新prev与cur；循环结束后head.next=prev。若未保存next，未处理后缀不可恢复。",
-            "完整性检查验证节点数等于size、尾节点next为null且不存在环；按[B-101,B-205,B-309,E-301,E-304]记录每轮指针变化。"
+            "完整性检查验证节点数等于size、尾节点next为null且不存在环；按[B-101,B-205,B-309,E-301,E-304]记录每轮指针变化。",
+            "按位置插入/删除的前驱定位最坏O(n)，定位后的指针重接O(1)，完整操作最坏O(n)；反转遍历n个节点，时间O(n)、辅助空间O(1)。",
+            "反转每轮开始时，prev指向已处理且已反转前缀的头节点，cur指向原链未处理后缀的头节点；两段不相交且合计覆盖全部原节点。先保存next=cur.next，再令cur.next=prev并推进prev/cur，结束后令dummy.next=prev。"
           ],
           "goals": {
             "knowledge": [
@@ -4682,7 +4811,9 @@
             "Java SE 17运行环境",
             "冻结目录编号序列及L02含头结点状态图",
             "节点引用追踪表",
-            "《数据结构（Java版）》第2.4节目录：单链表实现、性能分析与实战演练"
+            "《数据结构（Java版）》第2.4节目录：单链表实现、性能分析与实战演练",
+            "运行起点：practice-starters/L05LinkedListLab.java（Java SE 17）",
+            "TEST-*为容器边界测试标记，不是冻结目录记录"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -4726,13 +4857,14 @@
               "minutes": 20,
               "modality": "小组实训",
               "content": [
-                "演示插入、删除和反转函数；逐轮停在引用改写之前检查变量。"
+                "用三节点[B-101,B-205,B-309]逐轮记录prev/cur/next；先让学生指出未处理后缀，再保存next并改写cur.next。",
+                "比较按位置操作的O(n)前驱定位与O(1)指针重接；反转整体O(n)时间、O(1)额外空间。"
               ],
               "teacher_actions": [
                 "逐句运行小样例，特意显示保存next与修改cur.next的顺序。"
               ],
               "student_actions": [
-                "学生同步画引用图并在每轮记录变量值与head.next。"
+                "逐轮画出已反转前缀与未处理后缀，写出循环不变量并说明为何覆盖cur.next前必须保存next。"
               ],
               "objective": "建立可以从代码还原到链结构的阅读能力。"
             },
@@ -4742,13 +4874,15 @@
               "minutes": 25,
               "modality": "小组实训",
               "content": [
-                "独立实现三个操作并运行空表、单节点、首尾边界、完整五节点反转。"
+                "打开practice-starters/L05LinkedListLab.java；实现位置插入、位置删除、原地反转三个TODO，按给定IndexOutOfBoundsException契约处理非法位置。",
+                "25分钟分配：3分钟读接口和追踪输入，6分钟完成插入/删除，7分钟按循环不变量反转，6分钟运行空/单节点/首尾/五节点测试，3分钟修复一个失败断言。",
+                "执行`javac L05LinkedListLab.java && java L05LinkedListLab`；从五条冻结记录开始；容器位置测试会临时加入TEST-HEAD与TEST-MIDDLE并移除头尾节点，最终次序为[E-301,B-309,TEST-MIDDLE,B-205,B-101]，反转两次恢复。TEST-HEAD/TEST-MIDDLE仅为位置测试标记，不代表新增目录记录。"
               ],
               "teacher_actions": [
                 "巡视时要求先说明失败测试预期，再查看首个错误状态。"
               ],
               "student_actions": [
-                "学生提交函数、测试输出和逐轮追踪记录。"
+                "保存源码、测试输出和一轮prev/cur/next追踪；失败时先核对size、dummy.next及尾节点next。"
               ],
               "objective": "以真实运行和结构状态检验实现正确性。"
             },
@@ -4881,6 +5015,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "992E0DC04EF063334B7AE967BF1E3454C8C1420E5BC7BD75508EFCFC439A90A9"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "缺少按位置插入/删除的整体复杂度、反转循环不变量及可运行支架，25分钟任务没有分解；补充知识说明、Starter和带时间预算的测试。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "992E0DC04EF063334B7AE967BF1E3454C8C1420E5BC7BD75508EFCFC439A90A9"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "DACB8DEEFDFAEEABCE249512571C99B20AEE777354E7676D524F76171EF3F959"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "L05循环不变量误称prev为反转前缀末节点；prev实际指向已反转前缀头节点，cur指向未处理后缀头节点。另将临时标识明确为测试标记，并补齐越界异常断言。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "DACB8DEEFDFAEEABCE249512571C99B20AEE777354E7676D524F76171EF3F959"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "43B265BEE0E0B26AA667AB68C194BD5A2DD62A96AB197D8EFA5DBC9E07A68BD5"
           }
         ]
       }
@@ -4919,7 +5089,9 @@
         "用([{}])作为合法样例，用([)]作为类型错配样例；另测右括号过早和左括号未闭合，输出具体失败位置而不是只打印false。",
         "循环队列采用L03同一约定：String[6]保留一槽，可用容量5；空为front==rear，满为(rear+1)%6==front。入队写rear后递增，出队读front后递增并清空旧槽。",
         "排队模拟使用冻结目录编号[B-101,B-205,B-309,E-301,E-304]；五项入队后判满，出队三项再加入已出队编号代表新的处理请求，检查rear从5回绕至0。",
-        "将程序输出和手工状态表逐行核对；测试空队列出队、连续五次入队、满队拒绝、跨末槽回绕及最终FIFO顺序。"
+        "将程序输出和手工状态表逐行核对；测试空队列出队、连续五次入队、满队拒绝、跨末槽回绕及最终FIFO顺序。",
+        "Java字符串索引从0起；普通字符跳过，只校验括号。右括号遇空栈或类型错配时报告该右括号索引；结束仍有左括号时报告栈顶未配对左括号索引。",
+        "offer在满队时返回false且front/rear/size/数组不变；poll在空队时返回null且状态不变。front指下一出队槽，rear指下一入队槽。"
       ],
       "goals": {
         "knowledge": [
@@ -4967,7 +5139,8 @@
         "冻结目录记录编号及字段事实表",
         "L03栈/循环队列状态表",
         "表达式括号输入样例与测试断言模板",
-        "《数据结构（Java版）》第3章目录：栈、队列与营业厅模拟"
+        "《数据结构（Java版）》第3章目录：栈、队列与营业厅模拟",
+        "运行起点：practice-starters/L06StackQueueLab.java（Java SE 17）"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -5012,13 +5185,14 @@
           "minutes": 20,
           "modality": "小组实训",
           "content": [
-            "示范括号逐字符压栈/配对弹栈，再示范长度6数组队列的front/rear更新。"
+            "按Java String零起始索引逐字符演示：`([{}])`返回-1，`([)]`在索引2错配，`a+)`在索引2遇无匹配右括号，`((a)`在索引0留下左括号。",
+            "以长度6数组演示：五项入队判满，满队offer不改状态；出队三项后再入队[B-101,B-205]，最终逻辑队列[E-301,E-304,B-101,B-205]、front=3、rear=1、size=4。"
           ],
           "teacher_actions": [
-            "对([)]在错误位置停下；在队列满、出队、rear回绕时显示数组和有效顺序。"
+            "逐字符标索引、栈顶和失败原因；逐槽展示长度6、可用5、拒绝操作状态不变及rear回绕。"
           ],
           "student_actions": [
-            "学生同步标出栈顶、失败位置、front/rear以及每步有效元素。"
+            "解释四个括号样例的返回索引；把队列每步front/rear/size与有效槽位写在同一张表中。"
           ],
           "objective": "将抽象模型转成分支条件和数组操作。"
         },
@@ -5028,13 +5202,15 @@
           "minutes": 25,
           "modality": "小组实训",
           "content": [
-            "独立实现括号匹配和循环队列，运行四种括号输入与满空/回绕序列。"
+            "打开practice-starters/L06StackQueueLab.java；完成括号扫描、RingQueue.offer/poll三个TODO，保留非括号字符跳过及失败索引契约。",
+            "25分钟分配：2分钟核对接口，8分钟完成括号检查，8分钟完成offer/poll，7分钟运行合法/三种失败、空队、满队及回绕断言并修复首错。",
+            "执行`javac L06StackQueueLab.java && java L06StackQueueLab`；预期回绕后逻辑顺序[E-301,E-304,B-101,B-205]，front=3、rear=1、size=4。"
           ],
           "teacher_actions": [
             "要求每人先写断言，再运行；对失败结果追问首个不符的状态。"
           ],
           "student_actions": [
-            "学生提交源代码、测试输出和对应手工状态表。"
+            "对照手工状态表运行断言；满队offer和空队poll核对physicalSnapshot、逻辑内容、front/rear/size均不变，正常poll后旧槽须清为null。"
           ],
           "objective": "用可运行程序验证L03模型与本课目标。"
         },
@@ -5044,7 +5220,8 @@
           "minutes": 10,
           "modality": "小组实训",
           "content": [
-            "扩展队列场景：五项入队后拒绝第六项；出队三项再加入两个请求，核对回绕后FIFO。"
+            "固定事件序列：依次入队[B-101,B-205,B-309,E-301,E-304]；出队前三项；将B-101、B-205作为新请求重新入队。",
+            "核对最终逻辑队列[E-301,E-304,B-101,B-205]、front=3、rear=1、size=4，物理有效槽位为3、4、5、0。"
           ],
           "teacher_actions": [
             "核验容量上限5及重复编号被解释为新请求事件。"
@@ -5421,7 +5598,9 @@
             "用([{}])作为合法样例，用([)]作为类型错配样例；另测右括号过早和左括号未闭合，输出具体失败位置而不是只打印false。",
             "循环队列采用L03同一约定：String[6]保留一槽，可用容量5；空为front==rear，满为(rear+1)%6==front。入队写rear后递增，出队读front后递增并清空旧槽。",
             "排队模拟使用冻结目录编号[B-101,B-205,B-309,E-301,E-304]；五项入队后判满，出队三项再加入已出队编号代表新的处理请求，检查rear从5回绕至0。",
-            "将程序输出和手工状态表逐行核对；测试空队列出队、连续五次入队、满队拒绝、跨末槽回绕及最终FIFO顺序。"
+            "将程序输出和手工状态表逐行核对；测试空队列出队、连续五次入队、满队拒绝、跨末槽回绕及最终FIFO顺序。",
+            "Java字符串索引从0起；普通字符跳过，只校验括号。右括号遇空栈或类型错配时报告该右括号索引；结束仍有左括号时报告栈顶未配对左括号索引。",
+            "offer在满队时返回false且front/rear/size/数组不变；poll在空队时返回null且状态不变。front指下一出队槽，rear指下一入队槽。"
           ],
           "goals": {
             "knowledge": [
@@ -5469,7 +5648,8 @@
             "冻结目录记录编号及字段事实表",
             "L03栈/循环队列状态表",
             "表达式括号输入样例与测试断言模板",
-            "《数据结构（Java版）》第3章目录：栈、队列与营业厅模拟"
+            "《数据结构（Java版）》第3章目录：栈、队列与营业厅模拟",
+            "运行起点：practice-starters/L06StackQueueLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -5513,13 +5693,14 @@
               "minutes": 20,
               "modality": "小组实训",
               "content": [
-                "示范括号逐字符压栈/配对弹栈，再示范长度6数组队列的front/rear更新。"
+                "按Java String零起始索引逐字符演示：`([{}])`返回-1，`([)]`在索引2错配，`a+)`在索引2遇无匹配右括号，`((a)`在索引0留下左括号。",
+                "以长度6数组演示：五项入队判满，满队offer不改状态；出队三项后再入队[B-101,B-205]，最终逻辑队列[E-301,E-304,B-101,B-205]、front=3、rear=1、size=4。"
               ],
               "teacher_actions": [
-                "对([)]在错误位置停下；在队列满、出队、rear回绕时显示数组和有效顺序。"
+                "逐字符标索引、栈顶和失败原因；逐槽展示长度6、可用5、拒绝操作状态不变及rear回绕。"
               ],
               "student_actions": [
-                "学生同步标出栈顶、失败位置、front/rear以及每步有效元素。"
+                "解释四个括号样例的返回索引；把队列每步front/rear/size与有效槽位写在同一张表中。"
               ],
               "objective": "将抽象模型转成分支条件和数组操作。"
             },
@@ -5529,13 +5710,15 @@
               "minutes": 25,
               "modality": "小组实训",
               "content": [
-                "独立实现括号匹配和循环队列，运行四种括号输入与满空/回绕序列。"
+                "打开practice-starters/L06StackQueueLab.java；完成括号扫描、RingQueue.offer/poll三个TODO，保留非括号字符跳过及失败索引契约。",
+                "25分钟分配：2分钟核对接口，8分钟完成括号检查，8分钟完成offer/poll，7分钟运行合法/三种失败、空队、满队及回绕断言并修复首错。",
+                "执行`javac L06StackQueueLab.java && java L06StackQueueLab`；预期回绕后逻辑顺序[E-301,E-304,B-101,B-205]，front=3、rear=1、size=4。"
               ],
               "teacher_actions": [
                 "要求每人先写断言，再运行；对失败结果追问首个不符的状态。"
               ],
               "student_actions": [
-                "学生提交源代码、测试输出和对应手工状态表。"
+                "对照手工状态表运行断言；满队offer和空队poll核对physicalSnapshot、逻辑内容、front/rear/size均不变，正常poll后旧槽须清为null。"
               ],
               "objective": "用可运行程序验证L03模型与本课目标。"
             },
@@ -5545,7 +5728,8 @@
               "minutes": 10,
               "modality": "小组实训",
               "content": [
-                "扩展队列场景：五项入队后拒绝第六项；出队三项再加入两个请求，核对回绕后FIFO。"
+                "固定事件序列：依次入队[B-101,B-205,B-309,E-301,E-304]；出队前三项；将B-101、B-205作为新请求重新入队。",
+                "核对最终逻辑队列[E-301,E-304,B-101,B-205]、front=3、rear=1、size=4，物理有效槽位为3、4、5、0。"
               ],
               "teacher_actions": [
                 "核验容量上限5及重复编号被解释为新请求事件。"
@@ -5668,6 +5852,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "678A7F1C12BC145866DD0EFB0452D42D2D51EFBFC86028878B46D220C7A7C3DD"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "原稿没有明确Java零起始错误位置、非括号字符策略、空/满失败的状态不变保证，回绕“重复编号”语义有歧义；补齐契约和固定事件轨迹。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "678A7F1C12BC145866DD0EFB0452D42D2D51EFBFC86028878B46D220C7A7C3DD"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "64B2C8ED18C7E99F8C584C12CCEF79527BDE31E8DA6DA7446A1450E7D2821037"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "L06 starter未以front/rear公式作判空判满，逻辑视图无法检测底层槽污染；现按循环公式判定并核验槽位快照与清槽。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "64B2C8ED18C7E99F8C584C12CCEF79527BDE31E8DA6DA7446A1450E7D2821037"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "FCA1E1719369B5D9B67E21892771CF473932248374A59835E0EF2795B90F0ABE"
           }
         ]
       }
@@ -5705,7 +5925,7 @@
         "二叉树每个节点最多有两个有序孩子，左/右有别，缺少孩子合法。",
         "冻结样树：G(校园目录)左 C(馆藏)、右 M(设备)；C 左 A(文学)、右 E(计算机)；M 左 J(仪器)、右 P(工具)。",
         "0 基顺序存储左下标 2i+1、右下标 2i+2；链式节点为 data/left/right。该七节点树适合数组；稀疏右链会浪费数组槽。",
-        "前序根-左-右；中序左-根-右；后序左-右-根；空节点立即返回。G树结果：前 G,C,A,E,M,J,P；中 A,C,E,G,J,M,P；后 A,E,C,J,P,M,G；层 G,C,M,A,E,J,P。递归三序 O(n)、栈 O(h)，层序队列 O(w)。"
+        "前序根-左-右；中序左-根-右；后序左-右-根；空节点立即返回。G树结果：前G,C,A,E,M,J,P；中A,C,E,G,J,M,P；后A,E,C,J,P,M,G；层G,C,M,A,E,J,P。递归三序O(n)、栈O(h)，最坏退化树O(n)；层序队列O(w)。"
       ],
       "goals": {
         "knowledge": [
@@ -5748,7 +5968,8 @@
         "冻结 G 树关系表",
         "访问时点/调用栈表",
         "Java 17 伪代码卡",
-        "高教社教材目录"
+        "高教社教材目录",
+        "推演表需记录递归调用/返回与每节点仅访问一次。"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -5768,7 +5989,7 @@
           "student_actions": [
             "圈根和叶子，写左右孩子能否交换的理由。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成预读根/父子/递归返回术语；画一张空树。，留下可核对的学习证据。"
+          "objective": "诊断根、左右孩子与递归返回先修概念。"
         },
         {
           "id": "task_introduction",
@@ -5784,7 +6005,7 @@
           "student_actions": [
             "将目录层级标为根/左/右，提出一个结构问题。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成展示校园目录层级；讨论没有右目录项是否仍可为二叉树。，留下可核对的学习证据。"
+          "objective": "建立二叉树最多两个有序孩子的结构模型。"
         },
         {
           "id": "operation_demonstration",
@@ -5800,7 +6021,7 @@
           "student_actions": [
             "同步记录 G→C→A→返回轨迹，预测 P 的位置。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成示范 G 树前序/中序进入、输出、返回；说明空指针基例。，留下可核对的学习证据。"
+          "objective": "示范访问进入、输出、返回与空基例的映射。"
         },
         {
           "id": "task_implementation",
@@ -5816,7 +6037,7 @@
           "student_actions": [
             "填轨迹、输出时点和最终序列，互核七个 ID。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成独立填写 G 的三种序列与层序；加列计数检查是否重复。，留下可核对的学习证据。"
+          "objective": "检验四种遍历在冻结G树上的逐节点推演。"
         },
         {
           "id": "task_extension",
@@ -5832,7 +6053,7 @@
           "student_actions": [
             "画下标位置，圈出未使用槽并说明存储选择。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成把树改成单侧右链；比较数组空槽和链式指针。，留下可核对的学习证据。"
+          "objective": "用单侧链变式比较数组空槽与链式表示成本。"
         },
         {
           "id": "project_practice",
@@ -5848,7 +6069,7 @@
           "student_actions": [
             "提交推演表并口头解释一个根节点输出时点。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成整理四条序列、存储比较和复杂度注记到推演表。，留下可核对的学习证据。"
+          "objective": "整理遍历序列、节点数和复杂度依据形成提交物。"
         },
         {
           "id": "peer_review",
@@ -5864,7 +6085,7 @@
           "student_actions": [
             "标出同伴第一处不一致并写校验理由。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成互换表格复算中序与后序，检查空基例和访问次数。，留下可核对的学习证据。"
+          "objective": "让同伴复算序列并指出第一处节点次序差异。"
         },
         {
           "id": "lesson_summary",
@@ -5880,7 +6101,7 @@
           "student_actions": [
             "不看口诀说明后序根为何最后输出。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成归纳有序左右孩子、三种输出时机和队列层序。，留下可核对的学习证据。"
+          "objective": "归纳左右顺序、输出时点及队列层序的区别。"
         },
         {
           "id": "after_class_improvement",
@@ -5896,7 +6117,7 @@
           "student_actions": [
             "修订序列并说明递归返回不等于访问。"
           ],
-          "objective": "围绕“二叉树结构、存储方式与遍历次序”完成给新树 T→(B,F), B.right=D, F.left=H，写前序/中序。，留下可核对的学习证据。"
+          "objective": "用新树迁移前序和中序推演。"
         }
       ],
       "evaluation": {
@@ -6194,7 +6415,7 @@
             "二叉树每个节点最多有两个有序孩子，左/右有别，缺少孩子合法。",
             "冻结样树：G(校园目录)左 C(馆藏)、右 M(设备)；C 左 A(文学)、右 E(计算机)；M 左 J(仪器)、右 P(工具)。",
             "0 基顺序存储左下标 2i+1、右下标 2i+2；链式节点为 data/left/right。该七节点树适合数组；稀疏右链会浪费数组槽。",
-            "前序根-左-右；中序左-根-右；后序左-右-根；空节点立即返回。G树结果：前 G,C,A,E,M,J,P；中 A,C,E,G,J,M,P；后 A,E,C,J,P,M,G；层 G,C,M,A,E,J,P。递归三序 O(n)、栈 O(h)，层序队列 O(w)。"
+            "前序根-左-右；中序左-根-右；后序左-右-根；空节点立即返回。G树结果：前G,C,A,E,M,J,P；中A,C,E,G,J,M,P；后A,E,C,J,P,M,G；层G,C,M,A,E,J,P。递归三序O(n)、栈O(h)，最坏退化树O(n)；层序队列O(w)。"
           ],
           "goals": {
             "knowledge": [
@@ -6237,7 +6458,8 @@
             "冻结 G 树关系表",
             "访问时点/调用栈表",
             "Java 17 伪代码卡",
-            "高教社教材目录"
+            "高教社教材目录",
+            "推演表需记录递归调用/返回与每节点仅访问一次。"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -6257,7 +6479,7 @@
               "student_actions": [
                 "圈根和叶子，写左右孩子能否交换的理由。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成预读根/父子/递归返回术语；画一张空树。，留下可核对的学习证据。"
+              "objective": "诊断根、左右孩子与递归返回先修概念。"
             },
             {
               "id": "task_introduction",
@@ -6273,7 +6495,7 @@
               "student_actions": [
                 "将目录层级标为根/左/右，提出一个结构问题。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成展示校园目录层级；讨论没有右目录项是否仍可为二叉树。，留下可核对的学习证据。"
+              "objective": "建立二叉树最多两个有序孩子的结构模型。"
             },
             {
               "id": "operation_demonstration",
@@ -6289,7 +6511,7 @@
               "student_actions": [
                 "同步记录 G→C→A→返回轨迹，预测 P 的位置。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成示范 G 树前序/中序进入、输出、返回；说明空指针基例。，留下可核对的学习证据。"
+              "objective": "示范访问进入、输出、返回与空基例的映射。"
             },
             {
               "id": "task_implementation",
@@ -6305,7 +6527,7 @@
               "student_actions": [
                 "填轨迹、输出时点和最终序列，互核七个 ID。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成独立填写 G 的三种序列与层序；加列计数检查是否重复。，留下可核对的学习证据。"
+              "objective": "检验四种遍历在冻结G树上的逐节点推演。"
             },
             {
               "id": "task_extension",
@@ -6321,7 +6543,7 @@
               "student_actions": [
                 "画下标位置，圈出未使用槽并说明存储选择。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成把树改成单侧右链；比较数组空槽和链式指针。，留下可核对的学习证据。"
+              "objective": "用单侧链变式比较数组空槽与链式表示成本。"
             },
             {
               "id": "project_practice",
@@ -6337,7 +6559,7 @@
               "student_actions": [
                 "提交推演表并口头解释一个根节点输出时点。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成整理四条序列、存储比较和复杂度注记到推演表。，留下可核对的学习证据。"
+              "objective": "整理遍历序列、节点数和复杂度依据形成提交物。"
             },
             {
               "id": "peer_review",
@@ -6353,7 +6575,7 @@
               "student_actions": [
                 "标出同伴第一处不一致并写校验理由。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成互换表格复算中序与后序，检查空基例和访问次数。，留下可核对的学习证据。"
+              "objective": "让同伴复算序列并指出第一处节点次序差异。"
             },
             {
               "id": "lesson_summary",
@@ -6369,7 +6591,7 @@
               "student_actions": [
                 "不看口诀说明后序根为何最后输出。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成归纳有序左右孩子、三种输出时机和队列层序。，留下可核对的学习证据。"
+              "objective": "归纳左右顺序、输出时点及队列层序的区别。"
             },
             {
               "id": "after_class_improvement",
@@ -6385,7 +6607,7 @@
               "student_actions": [
                 "修订序列并说明递归返回不等于访问。"
               ],
-              "objective": "围绕“二叉树结构、存储方式与遍历次序”完成给新树 T→(B,F), B.right=D, F.left=H，写前序/中序。，留下可核对的学习证据。"
+              "objective": "用新树迁移前序和中序推演。"
             }
           ],
           "evaluation": {
@@ -6431,6 +6653,24 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "EDF6B585356F10B92090FC419B87E909F0BC1C055E083F4A13A1D92E3CECC526"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "major",
+                "message": "九阶段内容有具体活动，但设计意图被机械复制成“围绕主题完成任务并留证”，未说明每阶段的教学作用；改为各阶段对应的认知/练习/评价目的。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "EDF6B585356F10B92090FC419B87E909F0BC1C055E083F4A13A1D92E3CECC526"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "72F91113A0A1ABDC06D61215FC3B104CB626ECAE0A6E34505DBC81445FA7688F"
           }
         ]
       },
@@ -6469,7 +6709,10 @@
         "BST invariant：左子树所有键 < 根 < 右子树所有键；重复键拒绝且不增 size。",
         "插入 45,25,65,15,35,55,75,30；30 成为 35 左孩子，中序为 15,25,30,35,45,55,65,75。",
         "查找 30 路径 45→25→35→30 命中；查 32 到空未命中；插 32 成为 30 右孩子。",
-        "成本 O(h)；合理平衡常近 O(log n)，递增插入 10,20,30,40,50 形成高度4右链，最坏 O(n)，普通 BST 不自动平衡。"
+        "成本 O(h)；合理平衡常近 O(log n)，递增插入 10,20,30,40,50 形成高度4右链，最坏 O(n)，普通 BST 不自动平衡。",
+        "高度按边数定义：空树为-1、叶节点为0；查找成本O(h)，不是固定O(log n)。",
+        "随机插入或近似平衡时高度期望/典型为O(log n)；递增插入形成n节点链时h=n-1、操作最坏O(n)。",
+        "在线更新要保证最坏高度可控可考虑AVL/红黑树；静态数据可排序后折半查找，但动态插入需维护顺序。"
       ],
       "goals": {
         "knowledge": [
@@ -6531,7 +6774,7 @@
           "student_actions": [
             "先插 45、25、65并记录路径。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成复习 L07 左右子树和中序；准备空树表。，留下可核对的学习证据。"
+          "objective": "诊断中序有序性与树高的先修认识。"
         },
         {
           "id": "task_introduction",
@@ -6547,7 +6790,7 @@
           "student_actions": [
             "判断三节点例子是否全局有序。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成用资源编码快速定位情境引出 BST。，留下可核对的学习证据。"
+          "objective": "从目录键值定位问题引出BST不变量。"
         },
         {
           "id": "operation_demonstration",
@@ -6555,7 +6798,8 @@
           "minutes": 20,
           "modality": "讲授+图示",
           "content": [
-            "示范八键插入及查找 30/32，演示重复 35 返回 duplicate。"
+            "用八键序列构造树并走查30/32，重复35返回duplicate且size不增；标出高度按边计数（空树-1、叶0）。",
+            "对递增序列10,20,30,40,50画出高度4右链，比较O(h)在平衡/退化两种形态下的界。"
           ],
           "teacher_actions": [
             "逐次写比较和指针转向，画平衡与右链。"
@@ -6563,7 +6807,7 @@
           "student_actions": [
             "同步补树形、路径和中序。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成示范八键插入及查找 30/32，演示重复 35 返回 duplicate。，留下可核对的学习证据。"
+          "objective": "示范插入路径、命中/未命中和重复键合同。"
         },
         {
           "id": "task_implementation",
@@ -6579,7 +6823,7 @@
           "student_actions": [
             "标节点、比较符号、终止原因。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成完成八键构造、命中/未命中表和高度计算。，留下可核对的学习证据。"
+          "objective": "检查学生能否构造树并按O(h)解释查找成本。"
         },
         {
           "id": "task_extension",
@@ -6587,7 +6831,8 @@
           "minutes": 10,
           "modality": "变式讨论",
           "content": [
-            "改为递增键序列，数高度和查找比较次数。"
+            "比较AVL/红黑树如何维护在线更新时的高度界；静态数据排序后可以折半查找，但不适用于不加维护的频繁插入。",
+            "对序列8,3,10,1,6,14,4画树、追踪查找5，并按边数报告高度。"
           ],
           "teacher_actions": [
             "追问普通 BST 是否自平衡。"
@@ -6595,7 +6840,7 @@
           "student_actions": [
             "写 O(h) 与最坏 O(n) 条件。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成改为递增键序列，数高度和查找比较次数。，留下可核对的学习证据。"
+          "objective": "用递增键变式显示普通BST最坏退化。"
         },
         {
           "id": "project_practice",
@@ -6611,7 +6856,7 @@
           "student_actions": [
             "将推演表整理成一页。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成提交树图、查找路径、重复键结果和退化分析。，留下可核对的学习证据。"
+          "objective": "整理树图、路径、重复键结果及高度说明。"
         },
         {
           "id": "peer_review",
@@ -6627,7 +6872,7 @@
           "student_actions": [
             "复算一条失败路径并反馈。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成同伴核验插入位置、路径和复杂度说明。，留下可核对的学习证据。"
+          "objective": "互核各键位置与查找路径的第一处差异。"
         },
         {
           "id": "lesson_summary",
@@ -6643,7 +6888,7 @@
           "student_actions": [
             "口述新键插入决策。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成归纳 invariant、查找终止和 O(h)。，留下可核对的学习证据。"
+          "objective": "归纳左小右大、终止条件和复杂度边界。"
         },
         {
           "id": "after_class_improvement",
@@ -6659,7 +6904,7 @@
           "student_actions": [
             "修订结果并标比较方向。"
           ],
-          "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成给新序列 8,3,10,1,6,14,4，画树并追踪查找5。，留下可核对的学习证据。"
+          "objective": "迁移到新键序列并标出查找失败位置。"
         }
       ],
       "evaluation": {
@@ -6956,7 +7201,10 @@
             "BST invariant：左子树所有键 < 根 < 右子树所有键；重复键拒绝且不增 size。",
             "插入 45,25,65,15,35,55,75,30；30 成为 35 左孩子，中序为 15,25,30,35,45,55,65,75。",
             "查找 30 路径 45→25→35→30 命中；查 32 到空未命中；插 32 成为 30 右孩子。",
-            "成本 O(h)；合理平衡常近 O(log n)，递增插入 10,20,30,40,50 形成高度4右链，最坏 O(n)，普通 BST 不自动平衡。"
+            "成本 O(h)；合理平衡常近 O(log n)，递增插入 10,20,30,40,50 形成高度4右链，最坏 O(n)，普通 BST 不自动平衡。",
+            "高度按边数定义：空树为-1、叶节点为0；查找成本O(h)，不是固定O(log n)。",
+            "随机插入或近似平衡时高度期望/典型为O(log n)；递增插入形成n节点链时h=n-1、操作最坏O(n)。",
+            "在线更新要保证最坏高度可控可考虑AVL/红黑树；静态数据可排序后折半查找，但动态插入需维护顺序。"
           ],
           "goals": {
             "knowledge": [
@@ -7018,7 +7266,7 @@
               "student_actions": [
                 "先插 45、25、65并记录路径。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成复习 L07 左右子树和中序；准备空树表。，留下可核对的学习证据。"
+              "objective": "诊断中序有序性与树高的先修认识。"
             },
             {
               "id": "task_introduction",
@@ -7034,7 +7282,7 @@
               "student_actions": [
                 "判断三节点例子是否全局有序。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成用资源编码快速定位情境引出 BST。，留下可核对的学习证据。"
+              "objective": "从目录键值定位问题引出BST不变量。"
             },
             {
               "id": "operation_demonstration",
@@ -7042,7 +7290,8 @@
               "minutes": 20,
               "modality": "讲授+图示",
               "content": [
-                "示范八键插入及查找 30/32，演示重复 35 返回 duplicate。"
+                "用八键序列构造树并走查30/32，重复35返回duplicate且size不增；标出高度按边计数（空树-1、叶0）。",
+                "对递增序列10,20,30,40,50画出高度4右链，比较O(h)在平衡/退化两种形态下的界。"
               ],
               "teacher_actions": [
                 "逐次写比较和指针转向，画平衡与右链。"
@@ -7050,7 +7299,7 @@
               "student_actions": [
                 "同步补树形、路径和中序。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成示范八键插入及查找 30/32，演示重复 35 返回 duplicate。，留下可核对的学习证据。"
+              "objective": "示范插入路径、命中/未命中和重复键合同。"
             },
             {
               "id": "task_implementation",
@@ -7066,7 +7315,7 @@
               "student_actions": [
                 "标节点、比较符号、终止原因。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成完成八键构造、命中/未命中表和高度计算。，留下可核对的学习证据。"
+              "objective": "检查学生能否构造树并按O(h)解释查找成本。"
             },
             {
               "id": "task_extension",
@@ -7074,7 +7323,8 @@
               "minutes": 10,
               "modality": "变式讨论",
               "content": [
-                "改为递增键序列，数高度和查找比较次数。"
+                "比较AVL/红黑树如何维护在线更新时的高度界；静态数据排序后可以折半查找，但不适用于不加维护的频繁插入。",
+                "对序列8,3,10,1,6,14,4画树、追踪查找5，并按边数报告高度。"
               ],
               "teacher_actions": [
                 "追问普通 BST 是否自平衡。"
@@ -7082,7 +7332,7 @@
               "student_actions": [
                 "写 O(h) 与最坏 O(n) 条件。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成改为递增键序列，数高度和查找比较次数。，留下可核对的学习证据。"
+              "objective": "用递增键变式显示普通BST最坏退化。"
             },
             {
               "id": "project_practice",
@@ -7098,7 +7348,7 @@
               "student_actions": [
                 "将推演表整理成一页。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成提交树图、查找路径、重复键结果和退化分析。，留下可核对的学习证据。"
+              "objective": "整理树图、路径、重复键结果及高度说明。"
             },
             {
               "id": "peer_review",
@@ -7114,7 +7364,7 @@
               "student_actions": [
                 "复算一条失败路径并反馈。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成同伴核验插入位置、路径和复杂度说明。，留下可核对的学习证据。"
+              "objective": "互核各键位置与查找路径的第一处差异。"
             },
             {
               "id": "lesson_summary",
@@ -7130,7 +7380,7 @@
               "student_actions": [
                 "口述新键插入决策。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成归纳 invariant、查找终止和 O(h)。，留下可核对的学习证据。"
+              "objective": "归纳左小右大、终止条件和复杂度边界。"
             },
             {
               "id": "after_class_improvement",
@@ -7146,7 +7396,7 @@
               "student_actions": [
                 "修订结果并标比较方向。"
               ],
-              "objective": "围绕“二叉搜索树的查找、插入与退化情形”完成给新序列 8,3,10,1,6,14,4，画树并追踪查找5。，留下可核对的学习证据。"
+              "objective": "迁移到新键序列并标出查找失败位置。"
             }
           ],
           "evaluation": {
@@ -7192,6 +7442,24 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "3E02C19D1A3C874E72FBC5A6ED2D1F778B038EF5BF8F1077329BE68614AB8B9E"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "major",
+                "message": "九阶段内容有具体活动，但设计意图被机械复制成“围绕主题完成任务并留证”，未说明每阶段的教学作用；改为各阶段对应的认知/练习/评价目的。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "3E02C19D1A3C874E72FBC5A6ED2D1F778B038EF5BF8F1077329BE68614AB8B9E"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "A8ABCB17CE90FC58E823121E0BD9BDBBD98396260868E445F03AC8266C52E04F"
           }
         ]
       },
@@ -7292,7 +7560,7 @@
           "student_actions": [
             "圈 B-C-D 环和孤立 F。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成预读有向/无向、顶点边；标冻结节点。，留下可核对的学习证据。"
+          "objective": "诊断有向/无向图、顶点和边的先修概念。"
         },
         {
           "id": "task_introduction",
@@ -7308,7 +7576,7 @@
           "student_actions": [
             "找 A 到 E 路径并指出 F。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成以校园站点关系引出可达性。，留下可核对的学习证据。"
+          "objective": "建立冻结校园网络的顶点与可达关系模型。"
         },
         {
           "id": "operation_demonstration",
@@ -7324,7 +7592,7 @@
           "student_actions": [
             "记录状态与输出。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成填矩阵和表；演示 DFS 调用栈、BFS入队标记。，留下可核对的学习证据。"
+          "objective": "示范对称邻接表示和DFS/BFS发现时点。"
         },
         {
           "id": "task_implementation",
@@ -7340,7 +7608,7 @@
           "student_actions": [
             "交矩阵、邻接表、序列和分量。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成补全六阶矩阵并做两起点推演。，留下可核对的学习证据。"
+          "objective": "检验两种表示与两起点序列能否逐项复算。"
         },
         {
           "id": "task_extension",
@@ -7356,7 +7624,7 @@
           "student_actions": [
             "记录两项变化并恢复主图。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成删 B-D 做局部变式，解释两端同步更新。，留下可核对的学习证据。"
+          "objective": "通过删边变式解释无向边两端必须同步改动。"
         },
         {
           "id": "project_practice",
@@ -7372,7 +7640,7 @@
           "student_actions": [
             "提交推演表。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成汇总栈队列轨迹、序列和分量。，留下可核对的学习证据。"
+          "objective": "整理邻接表、矩阵、轨迹和连通分量证据。"
         },
         {
           "id": "peer_review",
@@ -7388,7 +7656,7 @@
           "student_actions": [
             "复算 C-D 邻接。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成互审对称矩阵、表双向与visited时点。，留下可核对的学习证据。"
+          "objective": "互审矩阵对称性、邻居顺序与visited时点。"
         },
         {
           "id": "lesson_summary",
@@ -7404,7 +7672,7 @@
           "student_actions": [
             "解释 E起点差异和 F。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成比较 DFS 深入与 BFS 层次前沿。，留下可核对的学习证据。"
+          "objective": "归纳DFS深度前沿与BFS队列层次的差异。"
         },
         {
           "id": "after_class_improvement",
@@ -7420,7 +7688,7 @@
           "student_actions": [
             "修订并准备 L13断言。"
           ],
-          "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成写 E 起点序列及队列变化。，留下可核对的学习证据。"
+          "objective": "从E起点重跑以暴露算法前沿差异。"
         }
       ],
       "evaluation": {
@@ -7779,7 +8047,7 @@
               "student_actions": [
                 "圈 B-C-D 环和孤立 F。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成预读有向/无向、顶点边；标冻结节点。，留下可核对的学习证据。"
+              "objective": "诊断有向/无向图、顶点和边的先修概念。"
             },
             {
               "id": "task_introduction",
@@ -7795,7 +8063,7 @@
               "student_actions": [
                 "找 A 到 E 路径并指出 F。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成以校园站点关系引出可达性。，留下可核对的学习证据。"
+              "objective": "建立冻结校园网络的顶点与可达关系模型。"
             },
             {
               "id": "operation_demonstration",
@@ -7811,7 +8079,7 @@
               "student_actions": [
                 "记录状态与输出。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成填矩阵和表；演示 DFS 调用栈、BFS入队标记。，留下可核对的学习证据。"
+              "objective": "示范对称邻接表示和DFS/BFS发现时点。"
             },
             {
               "id": "task_implementation",
@@ -7827,7 +8095,7 @@
               "student_actions": [
                 "交矩阵、邻接表、序列和分量。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成补全六阶矩阵并做两起点推演。，留下可核对的学习证据。"
+              "objective": "检验两种表示与两起点序列能否逐项复算。"
             },
             {
               "id": "task_extension",
@@ -7843,7 +8111,7 @@
               "student_actions": [
                 "记录两项变化并恢复主图。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成删 B-D 做局部变式，解释两端同步更新。，留下可核对的学习证据。"
+              "objective": "通过删边变式解释无向边两端必须同步改动。"
             },
             {
               "id": "project_practice",
@@ -7859,7 +8127,7 @@
               "student_actions": [
                 "提交推演表。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成汇总栈队列轨迹、序列和分量。，留下可核对的学习证据。"
+              "objective": "整理邻接表、矩阵、轨迹和连通分量证据。"
             },
             {
               "id": "peer_review",
@@ -7875,7 +8143,7 @@
               "student_actions": [
                 "复算 C-D 邻接。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成互审对称矩阵、表双向与visited时点。，留下可核对的学习证据。"
+              "objective": "互审矩阵对称性、邻居顺序与visited时点。"
             },
             {
               "id": "lesson_summary",
@@ -7891,7 +8159,7 @@
               "student_actions": [
                 "解释 E起点差异和 F。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成比较 DFS 深入与 BFS 层次前沿。，留下可核对的学习证据。"
+              "objective": "归纳DFS深度前沿与BFS队列层次的差异。"
             },
             {
               "id": "after_class_improvement",
@@ -7907,7 +8175,7 @@
               "student_actions": [
                 "修订并准备 L13断言。"
               ],
-              "objective": "围绕“图的邻接表、邻接矩阵、DFS与BFS”完成写 E 起点序列及队列变化。，留下可核对的学习证据。"
+              "objective": "从E起点重跑以暴露算法前沿差异。"
             }
           ],
           "evaluation": {
@@ -7953,6 +8221,24 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "B2C948C77BBCB422C5309731152AF43F9E9BAE5BCDE3F6CF9C987C00FD1313B9"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "major",
+                "message": "九阶段内容有具体活动，但设计意图被机械复制成“围绕主题完成任务并留证”，未说明每阶段的教学作用；改为各阶段对应的认知/练习/评价目的。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "B2C948C77BBCB422C5309731152AF43F9E9BAE5BCDE3F6CF9C987C00FD1313B9"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "D04726241575C5E1CE8DAFE869832850B1437D75AE26722AC760F6F8ADD63EFB"
           }
         ]
       },
@@ -7971,7 +8257,7 @@
         "prior_learning": "掌握冻结无向图和连通分量；本课为 A–E 连通子图赋合成权重。",
         "capability_stage": "综合",
         "deliverable": "候选边选择与并查集合并推演表",
-        "next_bridge": "L14 实现两算法并复核删 BC 后权重。"
+        "next_bridge": "在冻结的合成路线边权上推演Prim/Kruskal，并在L14用删边副本复核。"
       },
       "student_analysis": {
         "base": [
@@ -7988,10 +8274,12 @@
         ]
       },
       "teaching_content": [
-        "合成分钟边：AB4,AC2,BC1,BD5,CD8,CE10,DE2；F无边，完整六点图无生成树。",
-        "MST范围明确为 A–E：Prim从A选 AC2,BC1,BD5,DE2，总10。",
-        "Kruskal排序 BC1,AC2,DE2,AB4,BD5,CD8,CE10；收 BC/AC/DE，拒 AB成环，收BD，总10。",
-        "全图最小生成森林为 A–E 树加孤立F；不可把10称作六点生成树。Prim选跨 U 边，Kruskal用并查集判环。"
+        "MST针对连通加权无向图，需覆盖全部顶点、恰有V-1条边且无环并使总权最小；负权边允许。",
+        "Prim从起点顶点集U开始，每轮选连接U与V-U的最轻边；矩阵版O(V²)，邻接表+二叉堆O(E log V)。",
+        "Kruskal按(weight,minEndpoint,maxEndpoint)升序扫描边，用并查集判环；接受到V-1条即停，排序O(E log E)，DSU合计O(E α(V))。",
+        "原图A–E按Prim(A)为AC2,BC1,BD5,DE2总10；Kruskal排序拒AB4成环后收BD5，总10。",
+        "F与其他点无边，A–F全图不存在生成树；其最小生成森林为A–E树加F孤点，权重10。",
+        "同权时可能存在多棵最优树；固定端点字典序只是复现约定，不代表唯一数学答案。"
       ],
       "goals": {
         "knowledge": [
@@ -8053,7 +8341,7 @@
           "student_actions": [
             "先写六点图是否连通。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成复习 L09 分量；读取边权。，留下可核对的学习证据。"
+          "objective": "诊断连通分量、边权与无向图前置知识。"
         },
         {
           "id": "task_introduction",
@@ -8069,7 +8357,7 @@
           "student_actions": [
             "圈 A–E 子图和边权。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成讨论五个站点低成本连接。，留下可核对的学习证据。"
+          "objective": "界定A–E连通子图和F孤立点，避免误称全图MST。"
         },
         {
           "id": "operation_demonstration",
@@ -8077,15 +8365,17 @@
           "minutes": 20,
           "modality": "讲授+图示",
           "content": [
-            "示范 Prim 四轮和 Kruskal排序/判环。"
+            "定义MST的连通加权无向图前提、V-1边/连通/无环性质；说明负权可用、同权可多解。",
+            "用同一冻结边表示范Prim的跨U候选和Kruskal的全局排序/并查集拒环；按固定(weight,min,max)排序核对AC/BC/BD/DE，总10。",
+            "比较矩阵Prim O(V²)、堆Prim O(E log V)、Kruskal O(E log E + E α(V))的适用实现条件。"
           ],
           "teacher_actions": [
-            "展示 AB4两端同属一分量。"
+            "教师分别核对A–E生成树与A–F森林边界，要求学生使用固定输入独立复算Prim与Kruskal。"
           ],
           "student_actions": [
-            "填U与parent状态。"
+            "分别画Prim的U和Kruskal的并查集分量；解释AB4为什么被拒并计算总权。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成示范 Prim 四轮和 Kruskal排序/判环。，留下可核对的学习证据。"
+          "objective": "示范Prim割边选择与Kruskal排序/并查集拒环。"
         },
         {
           "id": "task_implementation",
@@ -8101,7 +8391,7 @@
           "student_actions": [
             "核对四边且总10。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成独立完成两张候选表并求和。，留下可核对的学习证据。"
+          "objective": "检验候选表、边数、连通性和总权推导。"
         },
         {
           "id": "task_extension",
@@ -8109,7 +8399,8 @@
           "minutes": 10,
           "modality": "变式讨论",
           "content": [
-            "讨论能否称为六点树。"
+            "讨论负权边仍满足生成树定义；断开图应报告最小生成森林而不是完整MST。",
+            "对同权边交换作讨论，指出字典序保证可复现但不能证明最优解唯一。"
           ],
           "teacher_actions": [
             "要求分写A–E树、A–F森林。"
@@ -8117,7 +8408,7 @@
           "student_actions": [
             "写出F需新增题设边。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成讨论能否称为六点树。，留下可核对的学习证据。"
+          "objective": "用F和同权变式讨论MST、森林及多解边界。"
         },
         {
           "id": "project_practice",
@@ -8133,7 +8424,7 @@
           "student_actions": [
             "整理可重算推演表。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成提交边选择和并查集轨迹表。，留下可核对的学习证据。"
+          "objective": "提交两算法状态表、复杂度条件和10的计算依据。"
         },
         {
           "id": "peer_review",
@@ -8149,7 +8440,7 @@
           "student_actions": [
             "标首次分歧。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成同伴重算AB4拒绝理由。，留下可核对的学习证据。"
+          "objective": "互核AB4成环原因与Prim候选边范围。"
         },
         {
           "id": "lesson_summary",
@@ -8165,7 +8456,7 @@
           "student_actions": [
             "口述为何不能叫六点MST。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成归纳连通前提与两算法差异。，留下可核对的学习证据。"
+          "objective": "比较算法前提、实现表示和渐进复杂度。"
         },
         {
           "id": "after_class_improvement",
@@ -8181,7 +8472,7 @@
           "student_actions": [
             "交从C轨迹。"
           ],
-          "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成从C启动Prim并说明同权可能多解。，留下可核对的学习证据。"
+          "objective": "从C启动Prim并说明同权时确定结果的规则。"
         }
       ],
       "evaluation": {
@@ -8458,7 +8749,7 @@
             "prior_learning": "掌握冻结无向图和连通分量；本课为 A–E 连通子图赋合成权重。",
             "capability_stage": "综合",
             "deliverable": "候选边选择与并查集合并推演表",
-            "next_bridge": "L14 实现两算法并复核删 BC 后权重。"
+            "next_bridge": "在冻结的合成路线边权上推演Prim/Kruskal，并在L14用删边副本复核。"
           },
           "student_analysis": {
             "base": [
@@ -8475,10 +8766,12 @@
             ]
           },
           "teaching_content": [
-            "合成分钟边：AB4,AC2,BC1,BD5,CD8,CE10,DE2；F无边，完整六点图无生成树。",
-            "MST范围明确为 A–E：Prim从A选 AC2,BC1,BD5,DE2，总10。",
-            "Kruskal排序 BC1,AC2,DE2,AB4,BD5,CD8,CE10；收 BC/AC/DE，拒 AB成环，收BD，总10。",
-            "全图最小生成森林为 A–E 树加孤立F；不可把10称作六点生成树。Prim选跨 U 边，Kruskal用并查集判环。"
+            "MST针对连通加权无向图，需覆盖全部顶点、恰有V-1条边且无环并使总权最小；负权边允许。",
+            "Prim从起点顶点集U开始，每轮选连接U与V-U的最轻边；矩阵版O(V²)，邻接表+二叉堆O(E log V)。",
+            "Kruskal按(weight,minEndpoint,maxEndpoint)升序扫描边，用并查集判环；接受到V-1条即停，排序O(E log E)，DSU合计O(E α(V))。",
+            "原图A–E按Prim(A)为AC2,BC1,BD5,DE2总10；Kruskal排序拒AB4成环后收BD5，总10。",
+            "F与其他点无边，A–F全图不存在生成树；其最小生成森林为A–E树加F孤点，权重10。",
+            "同权时可能存在多棵最优树；固定端点字典序只是复现约定，不代表唯一数学答案。"
           ],
           "goals": {
             "knowledge": [
@@ -8540,7 +8833,7 @@
               "student_actions": [
                 "先写六点图是否连通。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成复习 L09 分量；读取边权。，留下可核对的学习证据。"
+              "objective": "诊断连通分量、边权与无向图前置知识。"
             },
             {
               "id": "task_introduction",
@@ -8556,7 +8849,7 @@
               "student_actions": [
                 "圈 A–E 子图和边权。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成讨论五个站点低成本连接。，留下可核对的学习证据。"
+              "objective": "界定A–E连通子图和F孤立点，避免误称全图MST。"
             },
             {
               "id": "operation_demonstration",
@@ -8564,15 +8857,17 @@
               "minutes": 20,
               "modality": "讲授+图示",
               "content": [
-                "示范 Prim 四轮和 Kruskal排序/判环。"
+                "定义MST的连通加权无向图前提、V-1边/连通/无环性质；说明负权可用、同权可多解。",
+                "用同一冻结边表示范Prim的跨U候选和Kruskal的全局排序/并查集拒环；按固定(weight,min,max)排序核对AC/BC/BD/DE，总10。",
+                "比较矩阵Prim O(V²)、堆Prim O(E log V)、Kruskal O(E log E + E α(V))的适用实现条件。"
               ],
               "teacher_actions": [
-                "展示 AB4两端同属一分量。"
+                "教师分别核对A–E生成树与A–F森林边界，要求学生使用固定输入独立复算Prim与Kruskal。"
               ],
               "student_actions": [
-                "填U与parent状态。"
+                "分别画Prim的U和Kruskal的并查集分量；解释AB4为什么被拒并计算总权。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成示范 Prim 四轮和 Kruskal排序/判环。，留下可核对的学习证据。"
+              "objective": "示范Prim割边选择与Kruskal排序/并查集拒环。"
             },
             {
               "id": "task_implementation",
@@ -8588,7 +8883,7 @@
               "student_actions": [
                 "核对四边且总10。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成独立完成两张候选表并求和。，留下可核对的学习证据。"
+              "objective": "检验候选表、边数、连通性和总权推导。"
             },
             {
               "id": "task_extension",
@@ -8596,7 +8891,8 @@
               "minutes": 10,
               "modality": "变式讨论",
               "content": [
-                "讨论能否称为六点树。"
+                "讨论负权边仍满足生成树定义；断开图应报告最小生成森林而不是完整MST。",
+                "对同权边交换作讨论，指出字典序保证可复现但不能证明最优解唯一。"
               ],
               "teacher_actions": [
                 "要求分写A–E树、A–F森林。"
@@ -8604,7 +8900,7 @@
               "student_actions": [
                 "写出F需新增题设边。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成讨论能否称为六点树。，留下可核对的学习证据。"
+              "objective": "用F和同权变式讨论MST、森林及多解边界。"
             },
             {
               "id": "project_practice",
@@ -8620,7 +8916,7 @@
               "student_actions": [
                 "整理可重算推演表。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成提交边选择和并查集轨迹表。，留下可核对的学习证据。"
+              "objective": "提交两算法状态表、复杂度条件和10的计算依据。"
             },
             {
               "id": "peer_review",
@@ -8636,7 +8932,7 @@
               "student_actions": [
                 "标首次分歧。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成同伴重算AB4拒绝理由。，留下可核对的学习证据。"
+              "objective": "互核AB4成环原因与Prim候选边范围。"
             },
             {
               "id": "lesson_summary",
@@ -8652,7 +8948,7 @@
               "student_actions": [
                 "口述为何不能叫六点MST。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成归纳连通前提与两算法差异。，留下可核对的学习证据。"
+              "objective": "比较算法前提、实现表示和渐进复杂度。"
             },
             {
               "id": "after_class_improvement",
@@ -8668,7 +8964,7 @@
               "student_actions": [
                 "交从C轨迹。"
               ],
-              "objective": "围绕“加权无向图最小生成树与Prim/Kruskal”完成从C启动Prim并说明同权可能多解。，留下可核对的学习证据。"
+              "objective": "从C启动Prim并说明同权时确定结果的规则。"
             }
           ],
           "evaluation": {
@@ -8714,6 +9010,24 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "CC910FC0AE224F12040309200AB9A7CF429DDC72E31BF0A2E44FB418677C5CB0"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "理论解释缺少MST的形式性质、负权适用性、两算法实现复杂度及同权多解条件；同时原教学桥接暗示真实路线，已修正为冻结合成边表。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "CC910FC0AE224F12040309200AB9A7CF429DDC72E31BF0A2E44FB418677C5CB0"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "49BBB4AE2546087B48FDCC5157FFEEB6413DF409CC958A84C1E9F6F55C6BDF8B"
           }
         ]
       },
@@ -8750,6 +9064,7 @@
       },
       "teaching_content": [
         "Node含 id,left,right；依父子表建 G,C,M,A,E,J,P。",
+        "按父子关系表构造G的链式节点：G.left=C、G.right=M，C.left=A、C.right=E，M.left=J、M.right=P；G为根。",
         "递归三序都空检查，emit时点分别前/中/后；层序用 ArrayDeque 左后右入队。",
         "G预期：pre G,C,A,E,M,J,P；in A,C,E,G,J,M,P；post A,E,C,J,P,M,G；level G,C,M,A,E,J,P。",
         "空树全空；单节点Q四序均Q；T→R与T→L测单侧空指针；每个非空节点一次。"
@@ -8794,7 +9109,8 @@
         "Java SE 17",
         "冻结父子表",
         "Node/遍历函数签名",
-        "输出断言表"
+        "输出断言表",
+        "运行起点：practice-starters/L11TreeTraversalLab.java（Java SE 17）"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -8814,7 +9130,7 @@
           "student_actions": [
             "手画G并写预期四序。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成复习 L07 结果并准备 Java 17 工程。，留下可核对的学习证据。"
+          "objective": "诊断递归空基例与遍历序列的先修理解。"
         },
         {
           "id": "task_introduction",
@@ -8830,7 +9146,7 @@
           "student_actions": [
             "列出G到P的指针连接。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成展示关系表转对象的提交任务。，留下可核对的学习证据。"
+          "objective": "把父子关系表转为固定的Node对象。"
         },
         {
           "id": "operation_demonstration",
@@ -8838,7 +9154,8 @@
           "minutes": 20,
           "modality": "讲授+图示",
           "content": [
-            "示范Node、null基例和emit时点；演示队列。"
+            "打开practice-starters/L11TreeTraversalLab.java；sampleTree()与四个遍历函数均留有TODO，先按父子关系表标出G树指针。",
+            "把空基例、三种emit时点与ArrayDeque左先入队映射到代码；四序预期见文件内断言。"
           ],
           "teacher_actions": [
             "对比中序输出位置和层序出队。"
@@ -8846,7 +9163,7 @@
           "student_actions": [
             "在草稿标四个emit规则。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成示范Node、null基例和emit时点；演示队列。，留下可核对的学习证据。"
+          "objective": "示范三种emit位置和队列层序的代码落点。"
         },
         {
           "id": "task_implementation",
@@ -8854,15 +9171,16 @@
           "minutes": 25,
           "modality": "纸笔/电脑实训",
           "content": [
-            "实现构造、四函数并跑空/单/G/左右单支用例。"
+            "25分钟分配：2分钟读接口，4分钟构造G树节点和指针，9分钟补三种递归遍历与层序，6分钟运行空/单/左链/右链/G树断言，4分钟修复首错。",
+            "执行`javac L11TreeTraversalLab.java && java L11TreeTraversalLab`；所有遍历序列必须匹配内置期望，G树结果同时核验父子链接。"
           ],
           "teacher_actions": [
             "巡视首次错误，不代贴答案。"
           ],
           "student_actions": [
-            "保存命令、输出和节点计数。"
+            "提交sampleTree()和四个函数、命令行输出及五类输入覆盖表；失败先核对父子链接、null基例、emit位置及层序左右顺序。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成实现构造、四函数并跑空/单/G/左右单支用例。，留下可核对的学习证据。"
+          "objective": "从父子关系表构造G树，再实现并核验四种遍历。"
         },
         {
           "id": "task_extension",
@@ -8878,7 +9196,7 @@
           "student_actions": [
             "记录变式输出和返回点。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成改单侧树检查空孩子。，留下可核对的学习证据。"
+          "objective": "用单侧树检查空孩子返回与访问顺序。"
         },
         {
           "id": "project_practice",
@@ -8886,15 +9204,15 @@
           "minutes": 10,
           "modality": "结对任务",
           "content": [
-            "整理代码、五类输入与测试报告。"
+            "整理建树代码、父子关系表、五类输入和输出断言报告。"
           ],
           "teacher_actions": [
             "核查日志可复现。"
           ],
           "student_actions": [
-            "提交源代码和报告。"
+            "提交G树构造、四种遍历源码和可复现测试报告。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成整理代码、五类输入与测试报告。，留下可核对的学习证据。"
+          "objective": "整理源码、输入类别、输出断言和节点计数。"
         },
         {
           "id": "peer_review",
@@ -8910,7 +9228,7 @@
           "student_actions": [
             "写具体运行结论。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成同伴运行一条单侧用例。，留下可核对的学习证据。"
+          "objective": "由同伴重跑单侧用例并记录首个偏差。"
         },
         {
           "id": "lesson_summary",
@@ -8926,7 +9244,7 @@
           "student_actions": [
             "解释遍历时点。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成对照 L07 理论结果复盘。，留下可核对的学习证据。"
+          "objective": "对照L07理论结果复核程序输出。"
         },
         {
           "id": "after_class_improvement",
@@ -8942,7 +9260,7 @@
           "student_actions": [
             "修订节点数和序列。"
           ],
-          "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成删去G的M子树重跑并记录。，留下可核对的学习证据。"
+          "objective": "删除G右子树副本后重跑回归断言。"
         }
       ],
       "evaluation": {
@@ -9237,6 +9555,7 @@
           },
           "teaching_content": [
             "Node含 id,left,right；依父子表建 G,C,M,A,E,J,P。",
+            "按父子关系表构造G的链式节点：G.left=C、G.right=M，C.left=A、C.right=E，M.left=J、M.right=P；G为根。",
             "递归三序都空检查，emit时点分别前/中/后；层序用 ArrayDeque 左后右入队。",
             "G预期：pre G,C,A,E,M,J,P；in A,C,E,G,J,M,P；post A,E,C,J,P,M,G；level G,C,M,A,E,J,P。",
             "空树全空；单节点Q四序均Q；T→R与T→L测单侧空指针；每个非空节点一次。"
@@ -9281,7 +9600,8 @@
             "Java SE 17",
             "冻结父子表",
             "Node/遍历函数签名",
-            "输出断言表"
+            "输出断言表",
+            "运行起点：practice-starters/L11TreeTraversalLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -9301,7 +9621,7 @@
               "student_actions": [
                 "手画G并写预期四序。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成复习 L07 结果并准备 Java 17 工程。，留下可核对的学习证据。"
+              "objective": "诊断递归空基例与遍历序列的先修理解。"
             },
             {
               "id": "task_introduction",
@@ -9317,7 +9637,7 @@
               "student_actions": [
                 "列出G到P的指针连接。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成展示关系表转对象的提交任务。，留下可核对的学习证据。"
+              "objective": "把父子关系表转为固定的Node对象。"
             },
             {
               "id": "operation_demonstration",
@@ -9325,7 +9645,8 @@
               "minutes": 20,
               "modality": "讲授+图示",
               "content": [
-                "示范Node、null基例和emit时点；演示队列。"
+                "打开practice-starters/L11TreeTraversalLab.java；sampleTree()与四个遍历函数均留有TODO，先按父子关系表标出G树指针。",
+                "把空基例、三种emit时点与ArrayDeque左先入队映射到代码；四序预期见文件内断言。"
               ],
               "teacher_actions": [
                 "对比中序输出位置和层序出队。"
@@ -9333,7 +9654,7 @@
               "student_actions": [
                 "在草稿标四个emit规则。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成示范Node、null基例和emit时点；演示队列。，留下可核对的学习证据。"
+              "objective": "示范三种emit位置和队列层序的代码落点。"
             },
             {
               "id": "task_implementation",
@@ -9341,15 +9662,16 @@
               "minutes": 25,
               "modality": "纸笔/电脑实训",
               "content": [
-                "实现构造、四函数并跑空/单/G/左右单支用例。"
+                "25分钟分配：2分钟读接口，4分钟构造G树节点和指针，9分钟补三种递归遍历与层序，6分钟运行空/单/左链/右链/G树断言，4分钟修复首错。",
+                "执行`javac L11TreeTraversalLab.java && java L11TreeTraversalLab`；所有遍历序列必须匹配内置期望，G树结果同时核验父子链接。"
               ],
               "teacher_actions": [
                 "巡视首次错误，不代贴答案。"
               ],
               "student_actions": [
-                "保存命令、输出和节点计数。"
+                "提交sampleTree()和四个函数、命令行输出及五类输入覆盖表；失败先核对父子链接、null基例、emit位置及层序左右顺序。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成实现构造、四函数并跑空/单/G/左右单支用例。，留下可核对的学习证据。"
+              "objective": "从父子关系表构造G树，再实现并核验四种遍历。"
             },
             {
               "id": "task_extension",
@@ -9365,7 +9687,7 @@
               "student_actions": [
                 "记录变式输出和返回点。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成改单侧树检查空孩子。，留下可核对的学习证据。"
+              "objective": "用单侧树检查空孩子返回与访问顺序。"
             },
             {
               "id": "project_practice",
@@ -9373,15 +9695,15 @@
               "minutes": 10,
               "modality": "结对任务",
               "content": [
-                "整理代码、五类输入与测试报告。"
+                "整理建树代码、父子关系表、五类输入和输出断言报告。"
               ],
               "teacher_actions": [
                 "核查日志可复现。"
               ],
               "student_actions": [
-                "提交源代码和报告。"
+                "提交G树构造、四种遍历源码和可复现测试报告。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成整理代码、五类输入与测试报告。，留下可核对的学习证据。"
+              "objective": "整理源码、输入类别、输出断言和节点计数。"
             },
             {
               "id": "peer_review",
@@ -9397,7 +9719,7 @@
               "student_actions": [
                 "写具体运行结论。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成同伴运行一条单侧用例。，留下可核对的学习证据。"
+              "objective": "由同伴重跑单侧用例并记录首个偏差。"
             },
             {
               "id": "lesson_summary",
@@ -9413,7 +9735,7 @@
               "student_actions": [
                 "解释遍历时点。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成对照 L07 理论结果复盘。，留下可核对的学习证据。"
+              "objective": "对照L07理论结果复核程序输出。"
             },
             {
               "id": "after_class_improvement",
@@ -9429,7 +9751,7 @@
               "student_actions": [
                 "修订节点数和序列。"
               ],
-              "objective": "围绕“构建二叉树并输出三种遍历与层序结果”完成删去G的M子树重跑并记录。，留下可核对的学习证据。"
+              "objective": "删除G右子树副本后重跑回归断言。"
             }
           ],
           "evaluation": {
@@ -9475,6 +9797,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "A1FD964CCE2BAC583A1624C64C87EB90DAA0FA392E7141238927621E4C5A13E4"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "原实践要求25分钟实现建树和四个遍历却未提供代码支架、命令或可核验的空/单/单侧样例；增加已固定G树的可运行Starter和分段任务。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "A1FD964CCE2BAC583A1624C64C87EB90DAA0FA392E7141238927621E4C5A13E4"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "85BA8CC7FC30D30AEA176A03D555D65F265C331699AFB2D01444157999AD6D12"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "能力目标包含建树，但原起点文件已预建G树；现将父子关系表建树纳入学生代码任务并保留四种遍历。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "85BA8CC7FC30D30AEA176A03D555D65F265C331699AFB2D01444157999AD6D12"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "71452F74931B124EC2CD1249AB8E3572D934162912DF54CAAE0EF2FC070640F2"
           }
         ]
       },
@@ -9513,7 +9871,8 @@
         "Node key,left,right；find 到节点或 null；insert duplicate 返回 DUPLICATE且size不变。",
         "delete：叶子返回null；单孩子返回孩子；双孩子用右子树最小后继替换并删原后继。",
         "八键输入查30命中 45→25→35→30；查90未命中；重复35后size仍8。",
-        "依次删15、25、45，预期中序分别 [25,30,35,45,55,65,75]、[30,35,45,55,65,75]、[30,35,55,65,75]；不存在99不改结构。"
+        "依次删15、25、45，节点数应分别降为7、6、5；中序分别为[25,30,35,45,55,65,75]、[30,35,45,55,65,75]、[30,35,55,65,75]；不存在99不改结构和size。",
+        "删除不存在的99后，中序与size均不变；双孩子删除还要验证右子树最小后继带右孩子时，未丢失的节点能够重新接回。"
       ],
       "goals": {
         "knowledge": [
@@ -9555,7 +9914,8 @@
         "Java SE 17",
         "L08八键输入",
         "删除用例卡",
-        "BST教材目录"
+        "BST教材目录",
+        "运行起点：practice-starters/L12BSTLab.java（Java SE 17）"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -9575,7 +9935,7 @@
           "student_actions": [
             "标15、25、45节点类型。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成复习 invariant 和八键图，准备工程。，留下可核对的学习证据。"
+          "objective": "诊断BST全子树有序与重复键约定。"
         },
         {
           "id": "task_introduction",
@@ -9591,7 +9951,7 @@
           "student_actions": [
             "画三类删除前后图。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成用编码维护情境引出操作。，留下可核对的学习证据。"
+          "objective": "由编码目录查找、维护和删除任务建立接口。"
         },
         {
           "id": "operation_demonstration",
@@ -9599,7 +9959,8 @@
           "minutes": 20,
           "modality": "讲授+图示",
           "content": [
-            "演示find30和后继55替换45。"
+            "打开practice-starters/L12BSTLab.java，读取八键树和find/insert/delete接口。",
+            "演示find(30)路径45→25→35→30，以及双孩子45以右子树最小后继55替换并删除原后继。"
           ],
           "teacher_actions": [
             "每支说明返回的新子树根。"
@@ -9607,7 +9968,7 @@
           "student_actions": [
             "预测逐删后的中序。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成演示find30和后继55替换45。，留下可核对的学习证据。"
+          "objective": "演示30查找路径与双孩子删除的右子树最小后继。"
         },
         {
           "id": "task_implementation",
@@ -9615,15 +9976,16 @@
           "minutes": 25,
           "modality": "纸笔/电脑实训",
           "content": [
-            "实现并跑查找/插入/删除用例。"
+            "25分钟分配：2分钟读接口，5分钟实现find/insert及重复键不增size，10分钟完成叶/单孩子/双孩子删除，5分钟跑中序和size断言，3分钟修复首错。",
+            "执行`javac L12BSTLab.java && java L12BSTLab`；依次删除15、25、45后size必须为7、6、5，中序分别为[25,30,35,45,55,65,75]、[30,35,45,55,65,75]、[30,35,55,65,75]。"
           ],
           "teacher_actions": [
             "首错时追踪父链，不直接给解。"
           ],
           "student_actions": [
-            "保存状态、size和中序。"
+            "每次操作保存返回状态、size和中序；15/25/45删除后size应为7/6/5，缺失键99删除须返回NOT_FOUND，删除前后逐项比较中序与size，确认树结构未变。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成实现并跑查找/插入/删除用例。，留下可核对的学习证据。"
+          "objective": "实现查找/插入/删除并用中序和size双重验证。"
         },
         {
           "id": "task_extension",
@@ -9631,15 +9993,15 @@
           "minutes": 10,
           "modality": "变式讨论",
           "content": [
-            "换另一个双孩子节点验证后继选择。"
+            "构造测试树[20,10,30,25,27,40]后删除20；右子树最小后继25带右孩子27，预期中序[10,25,27,30,40]，检查后继右子树接回且无节点丢失。"
           ],
           "teacher_actions": [
             "要求保留原用例回归。"
           ],
           "student_actions": [
-            "追加变式并运行。"
+            "保留主用例回归，记录变式删除前后的节点数和中序结果。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成换另一个双孩子节点验证后继选择。，留下可核对的学习证据。"
+          "objective": "换节点复核后继选择不会破坏全局次序。"
         },
         {
           "id": "project_practice",
@@ -9655,7 +10017,7 @@
           "student_actions": [
             "提交一次修复说明。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成交代码、方法契约、测试日志。，留下可核对的学习证据。"
+          "objective": "交付含方法契约、固定输入和逐步测试日志的模块。"
         },
         {
           "id": "peer_review",
@@ -9671,7 +10033,7 @@
           "student_actions": [
             "写具体断言结果。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成同伴手工复算15/25/45删除。，留下可核对的学习证据。"
+          "objective": "同伴手工复算15/25/45三类删除。"
         },
         {
           "id": "lesson_summary",
@@ -9687,7 +10049,7 @@
           "student_actions": [
             "解释后继为何保序。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成归纳路径共享和三删除分支。，留下可核对的学习证据。"
+          "objective": "归纳叶、单孩子、双孩子和缺失键分支。"
         },
         {
           "id": "after_class_improvement",
@@ -9703,7 +10065,7 @@
           "student_actions": [
             "保存新测和回归。"
           ],
-          "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成加测删根65与空树操作。，留下可核对的学习证据。"
+          "objective": "对空树、删根和缺失删除追加边界测试。"
         }
       ],
       "evaluation": {
@@ -10000,7 +10362,8 @@
             "Node key,left,right；find 到节点或 null；insert duplicate 返回 DUPLICATE且size不变。",
             "delete：叶子返回null；单孩子返回孩子；双孩子用右子树最小后继替换并删原后继。",
             "八键输入查30命中 45→25→35→30；查90未命中；重复35后size仍8。",
-            "依次删15、25、45，预期中序分别 [25,30,35,45,55,65,75]、[30,35,45,55,65,75]、[30,35,55,65,75]；不存在99不改结构。"
+            "依次删15、25、45，节点数应分别降为7、6、5；中序分别为[25,30,35,45,55,65,75]、[30,35,45,55,65,75]、[30,35,55,65,75]；不存在99不改结构和size。",
+            "删除不存在的99后，中序与size均不变；双孩子删除还要验证右子树最小后继带右孩子时，未丢失的节点能够重新接回。"
           ],
           "goals": {
             "knowledge": [
@@ -10042,7 +10405,8 @@
             "Java SE 17",
             "L08八键输入",
             "删除用例卡",
-            "BST教材目录"
+            "BST教材目录",
+            "运行起点：practice-starters/L12BSTLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -10062,7 +10426,7 @@
               "student_actions": [
                 "标15、25、45节点类型。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成复习 invariant 和八键图，准备工程。，留下可核对的学习证据。"
+              "objective": "诊断BST全子树有序与重复键约定。"
             },
             {
               "id": "task_introduction",
@@ -10078,7 +10442,7 @@
               "student_actions": [
                 "画三类删除前后图。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成用编码维护情境引出操作。，留下可核对的学习证据。"
+              "objective": "由编码目录查找、维护和删除任务建立接口。"
             },
             {
               "id": "operation_demonstration",
@@ -10086,7 +10450,8 @@
               "minutes": 20,
               "modality": "讲授+图示",
               "content": [
-                "演示find30和后继55替换45。"
+                "打开practice-starters/L12BSTLab.java，读取八键树和find/insert/delete接口。",
+                "演示find(30)路径45→25→35→30，以及双孩子45以右子树最小后继55替换并删除原后继。"
               ],
               "teacher_actions": [
                 "每支说明返回的新子树根。"
@@ -10094,7 +10459,7 @@
               "student_actions": [
                 "预测逐删后的中序。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成演示find30和后继55替换45。，留下可核对的学习证据。"
+              "objective": "演示30查找路径与双孩子删除的右子树最小后继。"
             },
             {
               "id": "task_implementation",
@@ -10102,15 +10467,16 @@
               "minutes": 25,
               "modality": "纸笔/电脑实训",
               "content": [
-                "实现并跑查找/插入/删除用例。"
+                "25分钟分配：2分钟读接口，5分钟实现find/insert及重复键不增size，10分钟完成叶/单孩子/双孩子删除，5分钟跑中序和size断言，3分钟修复首错。",
+                "执行`javac L12BSTLab.java && java L12BSTLab`；依次删除15、25、45后size必须为7、6、5，中序分别为[25,30,35,45,55,65,75]、[30,35,45,55,65,75]、[30,35,55,65,75]。"
               ],
               "teacher_actions": [
                 "首错时追踪父链，不直接给解。"
               ],
               "student_actions": [
-                "保存状态、size和中序。"
+                "每次操作保存返回状态、size和中序；15/25/45删除后size应为7/6/5，缺失键99删除须返回NOT_FOUND，删除前后逐项比较中序与size，确认树结构未变。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成实现并跑查找/插入/删除用例。，留下可核对的学习证据。"
+              "objective": "实现查找/插入/删除并用中序和size双重验证。"
             },
             {
               "id": "task_extension",
@@ -10118,15 +10484,15 @@
               "minutes": 10,
               "modality": "变式讨论",
               "content": [
-                "换另一个双孩子节点验证后继选择。"
+                "构造测试树[20,10,30,25,27,40]后删除20；右子树最小后继25带右孩子27，预期中序[10,25,27,30,40]，检查后继右子树接回且无节点丢失。"
               ],
               "teacher_actions": [
                 "要求保留原用例回归。"
               ],
               "student_actions": [
-                "追加变式并运行。"
+                "保留主用例回归，记录变式删除前后的节点数和中序结果。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成换另一个双孩子节点验证后继选择。，留下可核对的学习证据。"
+              "objective": "换节点复核后继选择不会破坏全局次序。"
             },
             {
               "id": "project_practice",
@@ -10142,7 +10508,7 @@
               "student_actions": [
                 "提交一次修复说明。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成交代码、方法契约、测试日志。，留下可核对的学习证据。"
+              "objective": "交付含方法契约、固定输入和逐步测试日志的模块。"
             },
             {
               "id": "peer_review",
@@ -10158,7 +10524,7 @@
               "student_actions": [
                 "写具体断言结果。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成同伴手工复算15/25/45删除。，留下可核对的学习证据。"
+              "objective": "同伴手工复算15/25/45三类删除。"
             },
             {
               "id": "lesson_summary",
@@ -10174,7 +10540,7 @@
               "student_actions": [
                 "解释后继为何保序。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成归纳路径共享和三删除分支。，留下可核对的学习证据。"
+              "objective": "归纳叶、单孩子、双孩子和缺失键分支。"
             },
             {
               "id": "after_class_improvement",
@@ -10190,7 +10556,7 @@
               "student_actions": [
                 "保存新测和回归。"
               ],
-              "objective": "围绕“实现二叉搜索树并测试查找/插入/删除”完成加测删根65与空树操作。，留下可核对的学习证据。"
+              "objective": "对空树、删根和缺失删除追加边界测试。"
             }
           ],
           "evaluation": {
@@ -10236,6 +10602,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "56C4A17E12E0572EA8BBFA82D693E86EC176F5343E0563C605F8F31F0199195A"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "BST三个核心方法从零实现的25分钟任务缺少接口支架和精确结果；双孩子后继与size约束未形成可直接执行步骤，现给定Starter与测试用时拆分。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "56C4A17E12E0572EA8BBFA82D693E86EC176F5343E0563C605F8F31F0199195A"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "9FBD86FFB2A41AB12E5D0B6857EA76DA8795B499C47D335454FDCCEE91A10CC0"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "原删除测试只核对中序，没有逐次断言节点数递减；现明确15/25/45删除后的size为7/6/5。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "9FBD86FFB2A41AB12E5D0B6857EA76DA8795B499C47D335454FDCCEE91A10CC0"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "4E165394490BCB2359A5DEF388BD3D500F6DD9B18F8CA5515273765F27D7BC91"
           }
         ]
       },
@@ -10273,7 +10675,7 @@
       "teaching_content": [
         "冻结顶点A图书馆、B教学楼、C实训中心、D机房、E设备库、F独立校区；边AB,AC,BC,BD,CD,CE,DE。",
         "DFS递归进入即visited；BFS根入队，邻居首次发现即visited并入队。",
-        "全图从A DFS/BFS均A,B,C,D,E,F；分量{A,B,C,D,E},{F}。",
+        "单次DFS(A)/BFS(A)只访问A,B,C,D,E；全图外层扫描A..F后另启F，完整访问集合为A..F，分量为{A,B,C,D,E}与{F}。",
         "从E单分量 DFS=E,C,A,B,D；BFS=E,C,D,A,B；A同序是本图巧合。"
       ],
       "goals": {
@@ -10316,7 +10718,8 @@
         "Java 17",
         "冻结边表",
         "DFS/BFS模板",
-        "预期断言表"
+        "预期断言表",
+        "运行起点：practice-starters/L13GraphTraversalLab.java（Java SE 17）"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -10336,7 +10739,7 @@
           "student_actions": [
             "手画邻接表预测A/E。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成复习L09邻居顺序和分量，准备项目。，留下可核对的学习证据。"
+          "objective": "诊断冻结边集、邻居升序和遍历visited约定。"
         },
         {
           "id": "task_introduction",
@@ -10352,7 +10755,7 @@
           "student_actions": [
             "指出F为何独立。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成提出可达资源巡检。，留下可核对的学习证据。"
+          "objective": "把资源巡检表达为图遍历与分量识别任务。"
         },
         {
           "id": "operation_demonstration",
@@ -10360,7 +10763,8 @@
           "minutes": 20,
           "modality": "讲授+图示",
           "content": [
-            "示范DFS首次进入标记，BFS首次入队标记。"
+            "打开practice-starters/L13GraphTraversalLab.java；冻结A–F邻接表由构造函数建立，不需学生重录图。",
+            "追踪DFS首次进入标记与BFS首次入队标记，说明邻接按字母升序。"
           ],
           "teacher_actions": [
             "演示汇合点重复入队风险。"
@@ -10368,7 +10772,7 @@
           "student_actions": [
             "记录A队列[B,C]、后续[D,E]。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成示范DFS首次进入标记，BFS首次入队标记。，留下可核对的学习证据。"
+          "objective": "示范DFS入栈/首次进入与BFS首次入队标记。"
         },
         {
           "id": "task_implementation",
@@ -10376,15 +10780,17 @@
           "minutes": 25,
           "modality": "纸笔/电脑实训",
           "content": [
-            "实现建图、DFS、BFS、全图扫描。"
+            "实现DFS、BFS和全图外层扫描；单次A起点分别输出A,B,C,D,E，不能把孤立F写入单次结果。",
+            "25分钟分配：2分钟读图和接口，8分钟实现DFS/BFS，5分钟实现A..F外层扫描，7分钟运行A/E起点和分量断言，3分钟修复首错。",
+            "执行`javac L13GraphTraversalLab.java && java L13GraphTraversalLab`；A起点DFS/BFS均为A,B,C,D,E；E起点DFS为E,C,A,B,D、BFS为E,C,D,A,B；分量为{A,B,C,D,E}与{F}。"
           ],
           "teacher_actions": [
             "检查F、排序、入队标记。"
           ],
           "student_actions": [
-            "跑A/E和全图断言。"
+            "保存命令、DFS调用栈/BFS队列轨迹、visited时点与断言输出；失败时从第一个相邻点顺序分歧定位。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成实现建图、DFS、BFS、全图扫描。，留下可核对的学习证据。"
+          "objective": "实现DFS、BFS和全图扫描并核验A/E结果。"
         },
         {
           "id": "task_extension",
@@ -10400,7 +10806,7 @@
           "student_actions": [
             "记录差异并回归。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成删BD做副本变式再恢复冻结主图。，留下可核对的学习证据。"
+          "objective": "通过删BD副本区分主图结果与变式结果。"
         },
         {
           "id": "project_practice",
@@ -10416,7 +10822,7 @@
           "student_actions": [
             "整理报告。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成提交程序、队列/栈轨迹、分量和变式。，留下可核对的学习证据。"
+          "objective": "整理源代码、轨迹、连通分量和回归输出。"
         },
         {
           "id": "peer_review",
@@ -10432,7 +10838,7 @@
           "student_actions": [
             "记录命令和结果。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成同伴运行断言复查E起点。，留下可核对的学习证据。"
+          "objective": "同伴重跑E起点并复核队列/栈轨迹。"
         },
         {
           "id": "lesson_summary",
@@ -10448,7 +10854,7 @@
           "student_actions": [
             "解释F的发现时点。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成总结邻接、DFS、BFS、全图扫描。，留下可核对的学习证据。"
+          "objective": "解释A起点同序为何不代表两算法等价。"
         },
         {
           "id": "after_class_improvement",
@@ -10464,7 +10870,7 @@
           "student_actions": [
             "提交代码修订记录。"
           ],
-          "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成从D起点重跑并保留全图回归。，留下可核对的学习证据。"
+          "objective": "从D起点重跑并检查全图分量不变量。"
         }
       ],
       "evaluation": {
@@ -10760,7 +11166,7 @@
           "teaching_content": [
             "冻结顶点A图书馆、B教学楼、C实训中心、D机房、E设备库、F独立校区；边AB,AC,BC,BD,CD,CE,DE。",
             "DFS递归进入即visited；BFS根入队，邻居首次发现即visited并入队。",
-            "全图从A DFS/BFS均A,B,C,D,E,F；分量{A,B,C,D,E},{F}。",
+            "单次DFS(A)/BFS(A)只访问A,B,C,D,E；全图外层扫描A..F后另启F，完整访问集合为A..F，分量为{A,B,C,D,E}与{F}。",
             "从E单分量 DFS=E,C,A,B,D；BFS=E,C,D,A,B；A同序是本图巧合。"
           ],
           "goals": {
@@ -10803,7 +11209,8 @@
             "Java 17",
             "冻结边表",
             "DFS/BFS模板",
-            "预期断言表"
+            "预期断言表",
+            "运行起点：practice-starters/L13GraphTraversalLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -10823,7 +11230,7 @@
               "student_actions": [
                 "手画邻接表预测A/E。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成复习L09邻居顺序和分量，准备项目。，留下可核对的学习证据。"
+              "objective": "诊断冻结边集、邻居升序和遍历visited约定。"
             },
             {
               "id": "task_introduction",
@@ -10839,7 +11246,7 @@
               "student_actions": [
                 "指出F为何独立。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成提出可达资源巡检。，留下可核对的学习证据。"
+              "objective": "把资源巡检表达为图遍历与分量识别任务。"
             },
             {
               "id": "operation_demonstration",
@@ -10847,7 +11254,8 @@
               "minutes": 20,
               "modality": "讲授+图示",
               "content": [
-                "示范DFS首次进入标记，BFS首次入队标记。"
+                "打开practice-starters/L13GraphTraversalLab.java；冻结A–F邻接表由构造函数建立，不需学生重录图。",
+                "追踪DFS首次进入标记与BFS首次入队标记，说明邻接按字母升序。"
               ],
               "teacher_actions": [
                 "演示汇合点重复入队风险。"
@@ -10855,7 +11263,7 @@
               "student_actions": [
                 "记录A队列[B,C]、后续[D,E]。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成示范DFS首次进入标记，BFS首次入队标记。，留下可核对的学习证据。"
+              "objective": "示范DFS入栈/首次进入与BFS首次入队标记。"
             },
             {
               "id": "task_implementation",
@@ -10863,15 +11271,17 @@
               "minutes": 25,
               "modality": "纸笔/电脑实训",
               "content": [
-                "实现建图、DFS、BFS、全图扫描。"
+                "实现DFS、BFS和全图外层扫描；单次A起点分别输出A,B,C,D,E，不能把孤立F写入单次结果。",
+                "25分钟分配：2分钟读图和接口，8分钟实现DFS/BFS，5分钟实现A..F外层扫描，7分钟运行A/E起点和分量断言，3分钟修复首错。",
+                "执行`javac L13GraphTraversalLab.java && java L13GraphTraversalLab`；A起点DFS/BFS均为A,B,C,D,E；E起点DFS为E,C,A,B,D、BFS为E,C,D,A,B；分量为{A,B,C,D,E}与{F}。"
               ],
               "teacher_actions": [
                 "检查F、排序、入队标记。"
               ],
               "student_actions": [
-                "跑A/E和全图断言。"
+                "保存命令、DFS调用栈/BFS队列轨迹、visited时点与断言输出；失败时从第一个相邻点顺序分歧定位。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成实现建图、DFS、BFS、全图扫描。，留下可核对的学习证据。"
+              "objective": "实现DFS、BFS和全图扫描并核验A/E结果。"
             },
             {
               "id": "task_extension",
@@ -10887,7 +11297,7 @@
               "student_actions": [
                 "记录差异并回归。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成删BD做副本变式再恢复冻结主图。，留下可核对的学习证据。"
+              "objective": "通过删BD副本区分主图结果与变式结果。"
             },
             {
               "id": "project_practice",
@@ -10903,7 +11313,7 @@
               "student_actions": [
                 "整理报告。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成提交程序、队列/栈轨迹、分量和变式。，留下可核对的学习证据。"
+              "objective": "整理源代码、轨迹、连通分量和回归输出。"
             },
             {
               "id": "peer_review",
@@ -10919,7 +11329,7 @@
               "student_actions": [
                 "记录命令和结果。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成同伴运行断言复查E起点。，留下可核对的学习证据。"
+              "objective": "同伴重跑E起点并复核队列/栈轨迹。"
             },
             {
               "id": "lesson_summary",
@@ -10935,7 +11345,7 @@
               "student_actions": [
                 "解释F的发现时点。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成总结邻接、DFS、BFS、全图扫描。，留下可核对的学习证据。"
+              "objective": "解释A起点同序为何不代表两算法等价。"
             },
             {
               "id": "after_class_improvement",
@@ -10951,7 +11361,7 @@
               "student_actions": [
                 "提交代码修订记录。"
               ],
-              "objective": "围绕“实现DFS/BFS并核验访问顺序与连通分量”完成从D起点重跑并保留全图回归。，留下可核对的学习证据。"
+              "objective": "从D起点重跑并检查全图分量不变量。"
             }
           ],
           "evaluation": {
@@ -10997,6 +11407,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "A850B025E9ABB4E2E401ACE2654F801182DE9885BB369156CB79A016D1A6D1CE"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "实践要求25分钟内建图、实现两个遍历并查全图，未提供可执行图数据、代码签名与固定输出；添加预置冻结邻接表和逐步实现安排。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "A850B025E9ABB4E2E401ACE2654F801182DE9885BB369156CB79A016D1A6D1CE"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "63565ED226AA1AADE74A13D1B015F394656130EF70023ACF8C4BD8CEE1953F6A"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "other",
+                "severity": "major",
+                "message": "修正单次从A开始的DFS/BFS结果：F与A不连通，单次遍历不能访问F；仅全图外层扫描会另启F并形成第二分量。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "63565ED226AA1AADE74A13D1B015F394656130EF70023ACF8C4BD8CEE1953F6A"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "14DBB1581A30D593C3D925EA6F1CBFE47ACD4DA92815670D23C5B4A256A81D75"
           }
         ]
       },
@@ -11035,7 +11481,7 @@
         "边与权值同L10：AB4,AC2,BC1,BD5,CD8,CE10,DE2，F无边。",
         "Prim(A)原图选 AC2,BC1,BD5,DE2，重10；Kruskal收BC/AC/DE，拒AB成环，收BD，重10。",
         "删BC后 Prim选 AC2,AB4,BD5,DE2；Kruskal同样四边，总13。",
-        "完整A–F无树，A–E两次都4边；只删BC，其余权值保持，F独立。"
+        "完整A–F无树，A–E两次都4边；只删BC，其余权值保持，F独立；森林必须只含原图边且报告权等于所选边权和。"
       ],
       "goals": {
         "knowledge": [
@@ -11044,7 +11490,7 @@
         ],
         "ability": [
           "实现两算法并复现10/13。",
-          "按4条边、连通、无环、总权验收。"
+          "按4条边、连通、无环、总权与输入边归属验收；确认A–F中F孤立。"
         ],
         "quality": [
           "规定同权端点字典序。",
@@ -11077,7 +11523,8 @@
         "Java17",
         "主/变式边表",
         "并查集框架",
-        "树性质断言"
+        "树性质断言",
+        "运行起点：practice-starters/L14MSTLab.java（Java SE 17）"
       ],
       "reference_ids": [
         "REF-HEP-JAVA-2013"
@@ -11097,7 +11544,7 @@
           "student_actions": [
             "写权重预期10/13。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成复习L10基线和准备两份边表。，留下可核对的学习证据。"
+          "objective": "诊断MST候选边、并查集与项目L10推演结果。"
         },
         {
           "id": "task_introduction",
@@ -11113,7 +11560,7 @@
           "student_actions": [
             "逐边核对差异。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成模拟校园连接路段关闭。，留下可核对的学习证据。"
+          "objective": "模拟封路事件并限定修改只作用在图副本。"
         },
         {
           "id": "operation_demonstration",
@@ -11121,7 +11568,8 @@
           "minutes": 20,
           "modality": "讲授+图示",
           "content": [
-            "示范Prim跨U和Kruskal判环。"
+            "打开practice-starters/L14MSTLab.java；冻结边集、端点同权顺序、并查集、删BC副本和树/森林断言已提供。",
+            "教师演示Prim从U取割边、Kruskal排序后拒绝成环边；强调该图中Prim与Kruskal选边顺序不同但最终树集合一致。"
           ],
           "teacher_actions": [
             "固定排序(weight,min,max)。"
@@ -11129,7 +11577,7 @@
           "student_actions": [
             "记录U/parent。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成示范Prim跨U和Kruskal判环。，留下可核对的学习证据。"
+          "objective": "示范Prim跨U扩展和Kruskal排序/DSU判环。"
         },
         {
           "id": "task_implementation",
@@ -11137,15 +11585,16 @@
           "minutes": 25,
           "modality": "纸笔/电脑实训",
           "content": [
-            "实现两算法并跑原图/删边。"
+            "25分钟分配：2分钟读输入/DSU，3分钟手工追踪一轮；两人各复制同一starter，8分钟并行分别实现Prim或Kruskal。再用8分钟交换副本，按边集/环/孤立点清单互审并把两个方法体合入共同文件；最后4分钟运行10/13与A–F森林断言、记录首错。",
+            "执行`javac L14MSTLab.java && java L14MSTLab`；A–E原图权重10，删BC副本权重13；A–F最小生成森林重10、含4条原图边、F无入选边，且reported weight等于边权和。"
           ],
           "teacher_actions": [
             "检查误选、环和F。"
           ],
           "student_actions": [
-            "保存每轮日志。"
+            "各自编辑独立副本：一人实现Prim并逐轮记录U，一人实现Kruskal并按(weight,minEndpoint,maxEndpoint)排序；互换副本按边集、输入边归属、权和、连通无环及F孤立清单审阅，把两方法体合入共同L14MSTLab.java后运行内置全部用例。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成实现两算法并跑原图/删边。，留下可核对的学习证据。"
+          "objective": "实现两算法并验证原图10、删BC后13及全图森林边界。"
         },
         {
           "id": "task_extension",
@@ -11161,7 +11610,7 @@
           "student_actions": [
             "修副本并回归原图。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成若结果不符，定位首个边集差异。，留下可核对的学习证据。"
+          "objective": "按首个边差异定位实现错因，不改权值迁就结果。"
         },
         {
           "id": "project_practice",
@@ -11169,7 +11618,7 @@
           "minutes": 10,
           "modality": "结对任务",
           "content": [
-            "交代码、日志、边差异、10/13结论。"
+            "交代码、日志、边差异、10/13结论及输入边归属/权和/F孤立的森林证据。"
           ],
           "teacher_actions": [
             "核对范围和四项树性质。"
@@ -11177,7 +11626,7 @@
           "student_actions": [
             "提交可复现报告。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成交代码、日志、边差异、10/13结论。，留下可核对的学习证据。"
+          "objective": "提交代码、运行日志、边集合和树性质断言。"
         },
         {
           "id": "peer_review",
@@ -11193,7 +11642,7 @@
           "student_actions": [
             "记录运行输出。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成同伴实际运行删边用例。，留下可核对的学习证据。"
+          "objective": "同伴实际运行删边用例并核对F孤立点。"
         },
         {
           "id": "lesson_summary",
@@ -11209,7 +11658,7 @@
           "student_actions": [
             "说明权重边界。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成对照L10理论回顾两实现。，留下可核对的学习证据。"
+          "objective": "回顾理论表与程序在固定同权规则下的一致性。"
         },
         {
           "id": "after_class_improvement",
@@ -11225,7 +11674,7 @@
           "student_actions": [
             "交差异和日志。"
           ],
-          "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成增加另一条边关闭变式并隔离。，留下可核对的学习证据。"
+          "objective": "增加隔离的第二个删边变式并回归原图。"
         }
       ],
       "evaluation": {
@@ -11522,7 +11971,7 @@
             "边与权值同L10：AB4,AC2,BC1,BD5,CD8,CE10,DE2，F无边。",
             "Prim(A)原图选 AC2,BC1,BD5,DE2，重10；Kruskal收BC/AC/DE，拒AB成环，收BD，重10。",
             "删BC后 Prim选 AC2,AB4,BD5,DE2；Kruskal同样四边，总13。",
-            "完整A–F无树，A–E两次都4边；只删BC，其余权值保持，F独立。"
+            "完整A–F无树，A–E两次都4边；只删BC，其余权值保持，F独立；森林必须只含原图边且报告权等于所选边权和。"
           ],
           "goals": {
             "knowledge": [
@@ -11531,7 +11980,7 @@
             ],
             "ability": [
               "实现两算法并复现10/13。",
-              "按4条边、连通、无环、总权验收。"
+              "按4条边、连通、无环、总权与输入边归属验收；确认A–F中F孤立。"
             ],
             "quality": [
               "规定同权端点字典序。",
@@ -11564,7 +12013,8 @@
             "Java17",
             "主/变式边表",
             "并查集框架",
-            "树性质断言"
+            "树性质断言",
+            "运行起点：practice-starters/L14MSTLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2013"
@@ -11584,7 +12034,7 @@
               "student_actions": [
                 "写权重预期10/13。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成复习L10基线和准备两份边表。，留下可核对的学习证据。"
+              "objective": "诊断MST候选边、并查集与项目L10推演结果。"
             },
             {
               "id": "task_introduction",
@@ -11600,7 +12050,7 @@
               "student_actions": [
                 "逐边核对差异。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成模拟校园连接路段关闭。，留下可核对的学习证据。"
+              "objective": "模拟封路事件并限定修改只作用在图副本。"
             },
             {
               "id": "operation_demonstration",
@@ -11608,7 +12058,8 @@
               "minutes": 20,
               "modality": "讲授+图示",
               "content": [
-                "示范Prim跨U和Kruskal判环。"
+                "打开practice-starters/L14MSTLab.java；冻结边集、端点同权顺序、并查集、删BC副本和树/森林断言已提供。",
+                "教师演示Prim从U取割边、Kruskal排序后拒绝成环边；强调该图中Prim与Kruskal选边顺序不同但最终树集合一致。"
               ],
               "teacher_actions": [
                 "固定排序(weight,min,max)。"
@@ -11616,7 +12067,7 @@
               "student_actions": [
                 "记录U/parent。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成示范Prim跨U和Kruskal判环。，留下可核对的学习证据。"
+              "objective": "示范Prim跨U扩展和Kruskal排序/DSU判环。"
             },
             {
               "id": "task_implementation",
@@ -11624,15 +12075,16 @@
               "minutes": 25,
               "modality": "纸笔/电脑实训",
               "content": [
-                "实现两算法并跑原图/删边。"
+                "25分钟分配：2分钟读输入/DSU，3分钟手工追踪一轮；两人各复制同一starter，8分钟并行分别实现Prim或Kruskal。再用8分钟交换副本，按边集/环/孤立点清单互审并把两个方法体合入共同文件；最后4分钟运行10/13与A–F森林断言、记录首错。",
+                "执行`javac L14MSTLab.java && java L14MSTLab`；A–E原图权重10，删BC副本权重13；A–F最小生成森林重10、含4条原图边、F无入选边，且reported weight等于边权和。"
               ],
               "teacher_actions": [
                 "检查误选、环和F。"
               ],
               "student_actions": [
-                "保存每轮日志。"
+                "各自编辑独立副本：一人实现Prim并逐轮记录U，一人实现Kruskal并按(weight,minEndpoint,maxEndpoint)排序；互换副本按边集、输入边归属、权和、连通无环及F孤立清单审阅，把两方法体合入共同L14MSTLab.java后运行内置全部用例。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成实现两算法并跑原图/删边。，留下可核对的学习证据。"
+              "objective": "实现两算法并验证原图10、删BC后13及全图森林边界。"
             },
             {
               "id": "task_extension",
@@ -11648,7 +12100,7 @@
               "student_actions": [
                 "修副本并回归原图。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成若结果不符，定位首个边集差异。，留下可核对的学习证据。"
+              "objective": "按首个边差异定位实现错因，不改权值迁就结果。"
             },
             {
               "id": "project_practice",
@@ -11656,7 +12108,7 @@
               "minutes": 10,
               "modality": "结对任务",
               "content": [
-                "交代码、日志、边差异、10/13结论。"
+                "交代码、日志、边差异、10/13结论及输入边归属/权和/F孤立的森林证据。"
               ],
               "teacher_actions": [
                 "核对范围和四项树性质。"
@@ -11664,7 +12116,7 @@
               "student_actions": [
                 "提交可复现报告。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成交代码、日志、边差异、10/13结论。，留下可核对的学习证据。"
+              "objective": "提交代码、运行日志、边集合和树性质断言。"
             },
             {
               "id": "peer_review",
@@ -11680,7 +12132,7 @@
               "student_actions": [
                 "记录运行输出。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成同伴实际运行删边用例。，留下可核对的学习证据。"
+              "objective": "同伴实际运行删边用例并核对F孤立点。"
             },
             {
               "id": "lesson_summary",
@@ -11696,7 +12148,7 @@
               "student_actions": [
                 "说明权重边界。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成对照L10理论回顾两实现。，留下可核对的学习证据。"
+              "objective": "回顾理论表与程序在固定同权规则下的一致性。"
             },
             {
               "id": "after_class_improvement",
@@ -11712,7 +12164,7 @@
               "student_actions": [
                 "交差异和日志。"
               ],
-              "objective": "围绕“比较Prim与Kruskal并校验路线变更影响”完成增加另一条边关闭变式并隔离。，留下可核对的学习证据。"
+              "objective": "增加隔离的第二个删边变式并回归原图。"
             }
           ],
           "evaluation": {
@@ -11758,6 +12210,60 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "E5EACAFE99F53760C6395EB2ECE611436CE30114F5BC1C9305F6FBCDBCED81EF"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "25分钟要求两算法从零编码且没有DSU框架、固定输入、Tie规则、完整森林边界与命令，学生难以独立完成；提供仅留两算法TODO的Starter并将DSU/数据/断言预先备妥。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "E5EACAFE99F53760C6395EB2ECE611436CE30114F5BC1C9305F6FBCDBCED81EF"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "5646F4B955C72162CC7DE9C9CC3FCBB999314EEFDADAE60069DD56B33834ADB5"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "原森林断言未充分核验输入边归属、结果权值与边权和、F孤立边界；现加入精确边集及对应不变式检查。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "5646F4B955C72162CC7DE9C9CC3FCBB999314EEFDADAE60069DD56B33834ADB5"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "464917EB7D5B938B4E276F73C4A6DE2500F13921E89F3D651CC46263D9BC8F91"
+          },
+          {
+            "round": 7,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "minor",
+                "message": "两人并行写同一 starter 的代码交换与合并步骤未说明；现加入独立副本、互审清单、合并方法体、运行顺序和分段时间。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "464917EB7D5B938B4E276F73C4A6DE2500F13921E89F3D651CC46263D9BC8F91"
+          },
+          {
+            "round": 8,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "9D653A318A650170244814363D39CFCAE22A3D58058BEC13966922CD26CC63EE"
           }
         ]
       },
@@ -11770,7 +12276,7 @@
       "hours": 2,
       "progression": {
         "prior_lesson_id": "L14",
-        "prior_learning": "基本容器和比较操作",
+        "prior_learning": "已在L14按边权与端点顺序处理Kruskal候选边，并用并查集拒环；本课迁移逐趟过程记录。",
         "capability_stage": "理解",
         "deliverable": "小规模数组的插入排序过程表",
         "next_bridge": "转化为可测量的排序实现"
@@ -11793,12 +12299,15 @@
         "排序键、记录身份与稳定性的定义；稳定指相等键记录的相对输入次序不变。",
         "直接插入排序保持左侧有序前缀；保存当前记录，将前面严格大于它的记录右移，再填入空位。",
         "若只在前项键值大于当前键时右移，则相等记录不越过彼此；若使用大于等于则可能失稳。",
-        "直接插入排序原地运行、辅助空间 O(1)，最好比较为 O(n)，平均与最坏为 O(n²)；按不同状态字段排序时只作算法测试，不推断库存可用性。"
+        "直接插入排序原地运行、辅助空间 O(1)。若 n 个互异键的输入次序均匀随机，平均比较和移动为 Θ(n²)；最坏比较和移动为 Θ(n²)。",
+        "输入已升序时每个新键只需一次失败比较，比较O(n)、移动0；移位数等于严格逆序对数I，I≤n(n-1)/2；互异键严格递减时达到该上界，比较/移动为Θ(n²)。",
+        "移位数等于严格逆序对数 I，I≤n(n−1)/2；只有互异键严格递减时达到该上界。对近乎有序输入，比较与移动可按 O(n+I) 理解；以上平均复杂度采用互异键均匀随机排列模型，不能外推到所有输入。"
       ],
       "goals": {
         "knowledge": [
           "解释排序键、稳定性、有序前缀与原地排序的含义。",
-          "说明插入排序只移动严格大于待插入键的前项时，为什么能保持同键记录的输入次序。"
+          "说明插入排序只移动严格大于待插入键的前项时，为什么能保持同键记录的输入次序。",
+          "区分已排序、逆序与近乎有序输入下的比较和移动复杂度。"
         ],
         "ability": [
           "逐趟演算给定五条冻结目录记录，准确写出比较、右移、插入位置与每趟结果。",
@@ -11998,19 +12507,19 @@
       "evaluation": {
         "score": 88.5,
         "remarks": {
-          "attendance": "到课并备齐当前任务材料",
-          "attention": "关注小规模数组的插入排序过程表中的处理依据",
-          "participation": "说明小规模数组的插入排序过程表的一项形成依据",
-          "compliance": "按本课要求保留对应记录",
-          "values": "说明小规模数组的插入排序过程表的职业用途",
-          "ethics": "如实报告小规模数组的插入排序过程表的完成情况",
-          "habits": "整理本课材料及其对应位置",
-          "online_learning": "预读小规模数组的插入排序过程表对应的任务要求",
-          "discussion": "围绕小规模数组的插入排序过程表解释处理决定",
-          "homework": "提交小规模数组的插入排序过程表及修订说明",
-          "practice": "按本课任务形成小规模数组的插入排序过程表",
-          "presentation": "说明小规模数组的插入排序过程表的形成依据",
-          "improvement": "补齐小规模数组的插入排序过程表中的当前任务缺项"
+          "attendance": "携带五条冻结记录与插入排序逐趟表",
+          "attention": "记录每轮待插入键、右移项与有序前缀",
+          "participation": "解释相等键处严格大于条件为何停止移动",
+          "compliance": "保留resource_id与同键记录原输入次序",
+          "values": "说明稳定排序对记录追溯次序的作用",
+          "ethics": "数量只作算法键，不解释为可用库存",
+          "habits": "分开记录键比较、右移和最终回填",
+          "online_learning": "预读插入排序并提交>与>=的疑问",
+          "discussion": "引用两组同键轨迹判断稳定性结论",
+          "homework": "交逐趟表、比较/移动统计及修订依据",
+          "practice": "验证非降序、8次键比较、6次右移与稳定性",
+          "presentation": "展示一组同键记录排序前后的相对位置",
+          "improvement": "按反馈重算相等键处理并修订过程表"
         }
       },
       "reflection": {
@@ -12285,7 +12794,7 @@
         "revised_content": {
           "progression": {
             "prior_lesson_id": "L14",
-            "prior_learning": "基本容器和比较操作",
+            "prior_learning": "已在L14按边权与端点顺序处理Kruskal候选边，并用并查集拒环；本课迁移逐趟过程记录。",
             "capability_stage": "理解",
             "deliverable": "小规模数组的插入排序过程表",
             "next_bridge": "转化为可测量的排序实现"
@@ -12308,12 +12817,15 @@
             "排序键、记录身份与稳定性的定义；稳定指相等键记录的相对输入次序不变。",
             "直接插入排序保持左侧有序前缀；保存当前记录，将前面严格大于它的记录右移，再填入空位。",
             "若只在前项键值大于当前键时右移，则相等记录不越过彼此；若使用大于等于则可能失稳。",
-            "直接插入排序原地运行、辅助空间 O(1)，最好比较为 O(n)，平均与最坏为 O(n²)；按不同状态字段排序时只作算法测试，不推断库存可用性。"
+            "直接插入排序原地运行、辅助空间 O(1)。若 n 个互异键的输入次序均匀随机，平均比较和移动为 Θ(n²)；最坏比较和移动为 Θ(n²)。",
+            "输入已升序时每个新键只需一次失败比较，比较O(n)、移动0；移位数等于严格逆序对数I，I≤n(n-1)/2；互异键严格递减时达到该上界，比较/移动为Θ(n²)。",
+            "移位数等于严格逆序对数 I，I≤n(n−1)/2；只有互异键严格递减时达到该上界。对近乎有序输入，比较与移动可按 O(n+I) 理解；以上平均复杂度采用互异键均匀随机排列模型，不能外推到所有输入。"
           ],
           "goals": {
             "knowledge": [
               "解释排序键、稳定性、有序前缀与原地排序的含义。",
-              "说明插入排序只移动严格大于待插入键的前项时，为什么能保持同键记录的输入次序。"
+              "说明插入排序只移动严格大于待插入键的前项时，为什么能保持同键记录的输入次序。",
+              "区分已排序、逆序与近乎有序输入下的比较和移动复杂度。"
             ],
             "ability": [
               "逐趟演算给定五条冻结目录记录，准确写出比较、右移、插入位置与每趟结果。",
@@ -12517,19 +13029,19 @@
           "evaluation": {
             "score": 88.5,
             "remarks": {
-              "attendance": "到课并备齐当前任务材料",
-              "attention": "关注小规模数组的插入排序过程表中的处理依据",
-              "participation": "说明小规模数组的插入排序过程表的一项形成依据",
-              "compliance": "按本课要求保留对应记录",
-              "values": "说明小规模数组的插入排序过程表的职业用途",
-              "ethics": "如实报告小规模数组的插入排序过程表的完成情况",
-              "habits": "整理本课材料及其对应位置",
-              "online_learning": "预读小规模数组的插入排序过程表对应的任务要求",
-              "discussion": "围绕小规模数组的插入排序过程表解释处理决定",
-              "homework": "提交小规模数组的插入排序过程表及修订说明",
-              "practice": "按本课任务形成小规模数组的插入排序过程表",
-              "presentation": "说明小规模数组的插入排序过程表的形成依据",
-              "improvement": "补齐小规模数组的插入排序过程表中的当前任务缺项"
+              "attendance": "携带五条冻结记录与插入排序逐趟表",
+              "attention": "记录每轮待插入键、右移项与有序前缀",
+              "participation": "解释相等键处严格大于条件为何停止移动",
+              "compliance": "保留resource_id与同键记录原输入次序",
+              "values": "说明稳定排序对记录追溯次序的作用",
+              "ethics": "数量只作算法键，不解释为可用库存",
+              "habits": "分开记录键比较、右移和最终回填",
+              "online_learning": "预读插入排序并提交>与>=的疑问",
+              "discussion": "引用两组同键轨迹判断稳定性结论",
+              "homework": "交逐趟表、比较/移动统计及修订依据",
+              "practice": "验证非降序、8次键比较、6次右移与稳定性",
+              "presentation": "展示一组同键记录排序前后的相对位置",
+              "improvement": "按反馈重算相等键处理并修订过程表"
             }
           },
           "reflection": {
@@ -12557,6 +13069,60 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "0863F15C1456DDCB85078B8C24080C16D050C143F1B18BD6FEC131665BBF10DE"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "复杂度只列最好O(n)和平均/最坏O(n²)，没有说明已排序、逆序和近乎有序输入的工作量来源；增加比较/移动条件及逆序对关系。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "0863F15C1456DDCB85078B8C24080C16D050C143F1B18BD6FEC131665BBF10DE"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "F3FDD4637B1471E42B18C537E51AE4B006F73A75D984409F2E34821C02CCA340"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "minor",
+                "message": "评价备注曾使用“对应记录/任务缺项”等泛化措辞，不能检查本课稳定性、输入情形和复杂度证据；已改为逐项对应插入排序过程、同键身份与比较/移动记录。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "F3FDD4637B1471E42B18C537E51AE4B006F73A75D984409F2E34821C02CCA340"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "707B37F4C74A956D160ED874225A63384A3F1744F2030EBD6E2256126C02D80C"
+          },
+          {
+            "round": 7,
+            "issues": [
+              {
+                "category": "other",
+                "severity": "minor",
+                "message": "平均复杂度的输入模型未明示；现限定为互异键的均匀随机排列，并与逆序对边界区分。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "707B37F4C74A956D160ED874225A63384A3F1744F2030EBD6E2256126C02D80C"
+          },
+          {
+            "round": 8,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "9C503AF471BD3637B6E1779A28B0856E2415976D1BAB1092CFF907C0FEA01901"
           }
         ]
       }
@@ -12588,15 +13154,19 @@
         ]
       },
       "teaching_content": [
-        "快速排序通过分区把支点放到其最终位置，再递归处理左右子区间。",
-        "本项目固定 Lomuto 规则：pivot=a[high]，j 从 low 到 high-1，只有 a[j].quantity < pivot.quantity 才与 i 区域交换。",
-        "分区过程中保持 [low..i-1] 均小于 pivot，[i..j-1] 均大于或等于 pivot，其余尚未扫描；扫描后将支点与 i 交换。",
-        "递归边界 low>=high；平均时间 O(n log n)，最坏 O(n²)；递归栈平均 O(log n)，极端分区时 O(n)。严格小于会把相等键留在右侧，算法不稳定。"
+        "快速排序分区将支点放至最终位置后递归处理左右子区间；本课固定Lomuto末元素支点和严格小于规则。",
+        "扫描期间[low..i-1]键小于pivot，[i..j-1]键大于等于pivot，余下未处理；循环后交换pivot与i并递归[pivot-左]、[pivot-右]区间。",
+        "平衡分区时最好Θ(n log n)；若支点位置随机或分区期望较均衡，期望/平均O(n log n)。",
+        "每次都产生极端分区时最坏Θ(n²)，如末元素支点处理已排序序列或全相等键；递归栈平衡时O(log n)、最坏O(n)。",
+        "Lomuto分区本身用O(1)临时空间但递归需要栈；严格小于会让等键落右侧，且交换可能颠倒记录身份，因此不稳定。",
+        "支点选择优化：随机支点从当前区间均匀抽一个位置并换到 high；三数取中比较 low、mid、high，把中位键移到 high。它们降低常见极端支点概率，但最坏仍 Θ(n²)，且二路Lomuto对全相等键仍退化。",
+        "三路分区维护 <pivot、=pivot、>pivot 三段：小于时与左边界交换并前移两个游标；大于时与右边界交换、右界左移而扫描游标不动；相等时只推进扫描游标。递归仅处理两侧，所有键相等时一次线性扫描后结束。",
+        "Introsort设置深度上限 2⌊log₂n⌋并先执行快速排序；达到上限后对当前区间改用堆排序，较小区间可改用插入排序，因此最坏时间为 O(n log n)。三路分区适合重复键，但不单独保证任意输入的 O(n log n) 最坏时间。"
       ],
       "goals": {
         "knowledge": [
           "说明本课 Lomuto 分区的支点、扫描范围、严格比较条件、分区不变量和递归终止条件。",
-          "比较平均与最坏分区树，解释最坏情况下总工作量和递归栈为什么增大。"
+          "比较平衡、随机/期望与极端分区的时间及栈复杂度，并说明常见改进的边界。"
         ],
         "ability": [
           "对冻结目录数量序列完成一趟手工分区，画出递归区间并核对每个子数组边界。",
@@ -12799,19 +13369,19 @@
       "evaluation": {
         "score": 91.0,
         "remarks": {
-          "attendance": "到课并备齐当前任务材料",
-          "attention": "关注指定输入的分区过程与递归树中的处理依据",
-          "participation": "说明指定输入的分区过程与递归树的一项形成依据",
-          "compliance": "按本课要求保留对应记录",
-          "values": "说明指定输入的分区过程与递归树的职业用途",
-          "ethics": "如实报告指定输入的分区过程与递归树的完成情况",
-          "habits": "整理本课材料及其对应位置",
-          "online_learning": "预读指定输入的分区过程与递归树对应的任务要求",
-          "discussion": "围绕指定输入的分区过程与递归树解释处理决定",
-          "homework": "提交指定输入的分区过程与递归树及修订说明",
-          "practice": "按本课任务形成指定输入的分区过程与递归树",
-          "presentation": "说明指定输入的分区过程与递归树的形成依据",
-          "improvement": "补齐指定输入的分区过程与递归树中的当前任务缺项"
+          "attendance": "携带冻结输入序列和Lomuto分区约定卡",
+          "attention": "关注支点位置、循环不变量和递归区间",
+          "participation": "解释严格小于如何决定等键记录分区",
+          "compliance": "按末元素支点与扫描边界实现规则推演",
+          "values": "说明快排不稳定及本课固定规则范围",
+          "ethics": "说明应用快速排序时需考虑输入分布风险",
+          "habits": "每轮保留low/high、i/j和pivotIndex",
+          "online_learning": "预读复杂度情形并提交极端分区疑问",
+          "discussion": "用调用树和比较记录讨论递归深度",
+          "homework": "提交分区过程表、递归树与复杂度条件",
+          "practice": "核验分区性质、子区间终止及等键处理",
+          "presentation": "展示一趟分区后支点最终位置的依据",
+          "improvement": "按同伴反馈重画首个递归区间并复核"
         }
       },
       "reflection": {
@@ -13108,15 +13678,19 @@
             ]
           },
           "teaching_content": [
-            "快速排序通过分区把支点放到其最终位置，再递归处理左右子区间。",
-            "本项目固定 Lomuto 规则：pivot=a[high]，j 从 low 到 high-1，只有 a[j].quantity < pivot.quantity 才与 i 区域交换。",
-            "分区过程中保持 [low..i-1] 均小于 pivot，[i..j-1] 均大于或等于 pivot，其余尚未扫描；扫描后将支点与 i 交换。",
-            "递归边界 low>=high；平均时间 O(n log n)，最坏 O(n²)；递归栈平均 O(log n)，极端分区时 O(n)。严格小于会把相等键留在右侧，算法不稳定。"
+            "快速排序分区将支点放至最终位置后递归处理左右子区间；本课固定Lomuto末元素支点和严格小于规则。",
+            "扫描期间[low..i-1]键小于pivot，[i..j-1]键大于等于pivot，余下未处理；循环后交换pivot与i并递归[pivot-左]、[pivot-右]区间。",
+            "平衡分区时最好Θ(n log n)；若支点位置随机或分区期望较均衡，期望/平均O(n log n)。",
+            "每次都产生极端分区时最坏Θ(n²)，如末元素支点处理已排序序列或全相等键；递归栈平衡时O(log n)、最坏O(n)。",
+            "Lomuto分区本身用O(1)临时空间但递归需要栈；严格小于会让等键落右侧，且交换可能颠倒记录身份，因此不稳定。",
+            "支点选择优化：随机支点从当前区间均匀抽一个位置并换到 high；三数取中比较 low、mid、high，把中位键移到 high。它们降低常见极端支点概率，但最坏仍 Θ(n²)，且二路Lomuto对全相等键仍退化。",
+            "三路分区维护 <pivot、=pivot、>pivot 三段：小于时与左边界交换并前移两个游标；大于时与右边界交换、右界左移而扫描游标不动；相等时只推进扫描游标。递归仅处理两侧，所有键相等时一次线性扫描后结束。",
+            "Introsort设置深度上限 2⌊log₂n⌋并先执行快速排序；达到上限后对当前区间改用堆排序，较小区间可改用插入排序，因此最坏时间为 O(n log n)。三路分区适合重复键，但不单独保证任意输入的 O(n log n) 最坏时间。"
           ],
           "goals": {
             "knowledge": [
               "说明本课 Lomuto 分区的支点、扫描范围、严格比较条件、分区不变量和递归终止条件。",
-              "比较平均与最坏分区树，解释最坏情况下总工作量和递归栈为什么增大。"
+              "比较平衡、随机/期望与极端分区的时间及栈复杂度，并说明常见改进的边界。"
             ],
             "ability": [
               "对冻结目录数量序列完成一趟手工分区，画出递归区间并核对每个子数组边界。",
@@ -13323,19 +13897,19 @@
           "evaluation": {
             "score": 91.0,
             "remarks": {
-              "attendance": "到课并备齐当前任务材料",
-              "attention": "关注指定输入的分区过程与递归树中的处理依据",
-              "participation": "说明指定输入的分区过程与递归树的一项形成依据",
-              "compliance": "按本课要求保留对应记录",
-              "values": "说明指定输入的分区过程与递归树的职业用途",
-              "ethics": "如实报告指定输入的分区过程与递归树的完成情况",
-              "habits": "整理本课材料及其对应位置",
-              "online_learning": "预读指定输入的分区过程与递归树对应的任务要求",
-              "discussion": "围绕指定输入的分区过程与递归树解释处理决定",
-              "homework": "提交指定输入的分区过程与递归树及修订说明",
-              "practice": "按本课任务形成指定输入的分区过程与递归树",
-              "presentation": "说明指定输入的分区过程与递归树的形成依据",
-              "improvement": "补齐指定输入的分区过程与递归树中的当前任务缺项"
+              "attendance": "携带冻结输入序列和Lomuto分区约定卡",
+              "attention": "关注支点位置、循环不变量和递归区间",
+              "participation": "解释严格小于如何决定等键记录分区",
+              "compliance": "按末元素支点与扫描边界实现规则推演",
+              "values": "说明快排不稳定及本课固定规则范围",
+              "ethics": "说明应用快速排序时需考虑输入分布风险",
+              "habits": "每轮保留low/high、i/j和pivotIndex",
+              "online_learning": "预读复杂度情形并提交极端分区疑问",
+              "discussion": "用调用树和比较记录讨论递归深度",
+              "homework": "提交分区过程表、递归树与复杂度条件",
+              "practice": "核验分区性质、子区间终止及等键处理",
+              "presentation": "展示一趟分区后支点最终位置的依据",
+              "improvement": "按同伴反馈重画首个递归区间并复核"
             }
           },
           "reflection": {
@@ -13363,6 +13937,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "E885B9C8FC2D89E0E684C309F6E85AF8356C42713C0B2521F44E317C7F9D277D"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "复杂度将平均O(n log n)无条件化，未说明末元素支点在有序/全等数据上的最坏行为、最好情形或改进方法保证边界；补入条件化分析。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "E885B9C8FC2D89E0E684C309F6E85AF8356C42713C0B2521F44E317C7F9D277D"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "C346B2FC5E83FA7A7ECA415ACA050CC8A73A9D7DB52D410B156B4B943CC22CF7"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "other",
+                "severity": "minor",
+                "message": "快排改进只列名称和粗略边界，缺少操作步骤；现补充支点抽样/三数取中、三路游标更新及 introsort 深度超限切堆排步骤。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "C346B2FC5E83FA7A7ECA415ACA050CC8A73A9D7DB52D410B156B4B943CC22CF7"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "B6FC554E553FBB56BF9FE0DD3DEBC8217AAF64CFC74D2614232DB5506A8211A2"
           }
         ]
       }
@@ -14245,7 +14855,8 @@
         "Java SE 17运行环境",
         "冻结校园目录五条记录",
         "插入排序初始代码框架",
-        "排序输出与计数验证清单"
+        "排序输出与计数验证清单",
+        "运行起点：practice-starters/L18InsertionSortLab.java（Java SE 17）"
       ],
       "implementation": [
         {
@@ -14288,9 +14899,8 @@
           "minutes": 20,
           "modality": "课堂讲授/演示",
           "content": [
-            "演示 Java 17 `record Entry(String resource_id,String name,String status,int quantity) {}` 的字段使用；解释数组元素是完整记录。",
-            "逐句演示 `key=a[i]`、`j=i-1`、`while(j>=0 && a[j].quantity()>key.quantity())`、右移、`a[j+1]=key`。",
-            "对照 L15 手算一轮，说明计数器只在实际执行 quantity 比较时加一；`j>=0` 短路保护数组边界。"
+            "打开practice-starters/L18InsertionSortLab.java，阅读Entry字段和比较/右移分开的计数契约。",
+            "先根据L15过程表预测最终resourceId次序和两个同键组相对顺序，再实现insertionSort。"
           ],
           "teacher_actions": [
             "只运行一轮并对照伪代码解释每个变量，不替学生完成后续实现。"
@@ -14306,17 +14916,15 @@
           "minutes": 25,
           "modality": "个人操作/小组讨论",
           "content": [
-            "学生完成 insertionSort 与比较计数器；主测试使用 5 条 frozen records。",
-            "逐步运行并记录 quantity 比较、右移、回填次数；预期关键字比较 8、右移 6。",
-            "断言排序结果为 E301,B205,E304,B101,B309；断言 B205 在 E304 前，B101 在 B309 前。"
+            "25分钟分配：3分钟核对输入与契约，9分钟实现稳定插入，6分钟运行输出/稳定性断言，4分钟复核8/6计数，3分钟修复首个失败。",
+            "执行`javac L18InsertionSortLab.java && java L18InsertionSortLab`；期望E-301,B-205,E-304,B-101,B-309，键比较8、右移6。"
           ],
           "teacher_actions": [
             "巡视 j 边界、key 暂存、严格条件与写回位置；发现错误先问对应过程表哪一行失配。",
             "提供带方法签名和测试断言的代码框架给需要支持者；进阶者独立添加比较计数器与最小输入测试。"
           ],
           "student_actions": [
-            "编译运行、修复错误并保存代码和逐轮记录；每条输出仍包含原 resource_id/name/status/quantity。",
-            "先补齐 key 暂存和回填；拓展者对比 > 与 >= 的失败断言。"
+            "提交代码、两组同键相对顺序断言和比较/右移计数；失败先核对是否使用严格大于而非大于等于。"
           ],
           "objective": "通过可复现测试证明代码正确、稳定且计数口径清楚。"
         },
@@ -14409,19 +15017,19 @@
       "evaluation": {
         "score": 92.5,
         "remarks": {
-          "attendance": "到课并备齐当前任务材料",
-          "attention": "关注算法实现、测试序列和比较次数表中的处理依据",
-          "participation": "说明算法实现、测试序列和比较次数表的一项形成依据",
-          "compliance": "按本课要求保留对应记录",
-          "values": "说明算法实现、测试序列和比较次数表的职业用途",
-          "ethics": "如实报告算法实现、测试序列和比较次数表的完成情况",
-          "habits": "整理本课材料及其对应位置",
-          "online_learning": "预读算法实现、测试序列和比较次数表对应的任务要求",
-          "discussion": "围绕算法实现、测试序列和比较次数表解释处理决定",
-          "homework": "提交算法实现、测试序列和比较次数表及修订说明",
-          "practice": "按本课任务形成算法实现、测试序列和比较次数表",
-          "presentation": "说明算法实现、测试序列和比较次数表的形成依据",
-          "improvement": "补齐算法实现、测试序列和比较次数表中的当前任务缺项"
+          "attendance": "携带Java工程、五条冻结记录和L15过程表",
+          "attention": "检查键比较、右移、回填和同键身份轨迹",
+          "participation": "说明比较次数只按实际键比较计数",
+          "compliance": "保存冻结记录字段并仅按quantity排序",
+          "values": "说明本练习不把算法键解释成库存结论",
+          "ethics": "报告8次键比较与6次右移，不夸大性能",
+          "habits": "比较数与右移数分别计数并保存日志",
+          "online_learning": "预读L18 starter并提交计数口径疑问",
+          "discussion": "引用B-205/E-304或B-101/B-309断言解释稳定性",
+          "homework": "提交代码、输出断言、计数和修订日志",
+          "practice": "验证排序结果、两组同键顺序和8/6计数",
+          "presentation": "演示一组稳定性断言及失败反例",
+          "improvement": "依失败断言定位比较符并复跑边界测试"
         }
       },
       "reflection": {
@@ -14770,7 +15378,8 @@
             "Java SE 17运行环境",
             "冻结校园目录五条记录",
             "插入排序初始代码框架",
-            "排序输出与计数验证清单"
+            "排序输出与计数验证清单",
+            "运行起点：practice-starters/L18InsertionSortLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2021",
@@ -14817,9 +15426,8 @@
               "minutes": 20,
               "modality": "课堂讲授/演示",
               "content": [
-                "演示 Java 17 `record Entry(String resource_id,String name,String status,int quantity) {}` 的字段使用；解释数组元素是完整记录。",
-                "逐句演示 `key=a[i]`、`j=i-1`、`while(j>=0 && a[j].quantity()>key.quantity())`、右移、`a[j+1]=key`。",
-                "对照 L15 手算一轮，说明计数器只在实际执行 quantity 比较时加一；`j>=0` 短路保护数组边界。"
+                "打开practice-starters/L18InsertionSortLab.java，阅读Entry字段和比较/右移分开的计数契约。",
+                "先根据L15过程表预测最终resourceId次序和两个同键组相对顺序，再实现insertionSort。"
               ],
               "teacher_actions": [
                 "只运行一轮并对照伪代码解释每个变量，不替学生完成后续实现。"
@@ -14835,17 +15443,15 @@
               "minutes": 25,
               "modality": "个人操作/小组讨论",
               "content": [
-                "学生完成 insertionSort 与比较计数器；主测试使用 5 条 frozen records。",
-                "逐步运行并记录 quantity 比较、右移、回填次数；预期关键字比较 8、右移 6。",
-                "断言排序结果为 E301,B205,E304,B101,B309；断言 B205 在 E304 前，B101 在 B309 前。"
+                "25分钟分配：3分钟核对输入与契约，9分钟实现稳定插入，6分钟运行输出/稳定性断言，4分钟复核8/6计数，3分钟修复首个失败。",
+                "执行`javac L18InsertionSortLab.java && java L18InsertionSortLab`；期望E-301,B-205,E-304,B-101,B-309，键比较8、右移6。"
               ],
               "teacher_actions": [
                 "巡视 j 边界、key 暂存、严格条件与写回位置；发现错误先问对应过程表哪一行失配。",
                 "提供带方法签名和测试断言的代码框架给需要支持者；进阶者独立添加比较计数器与最小输入测试。"
               ],
               "student_actions": [
-                "编译运行、修复错误并保存代码和逐轮记录；每条输出仍包含原 resource_id/name/status/quantity。",
-                "先补齐 key 暂存和回填；拓展者对比 > 与 >= 的失败断言。"
+                "提交代码、两组同键相对顺序断言和比较/右移计数；失败先核对是否使用严格大于而非大于等于。"
               ],
               "objective": "通过可复现测试证明代码正确、稳定且计数口径清楚。"
             },
@@ -14938,19 +15544,19 @@
           "evaluation": {
             "score": 92.5,
             "remarks": {
-              "attendance": "到课并备齐当前任务材料",
-              "attention": "关注算法实现、测试序列和比较次数表中的处理依据",
-              "participation": "说明算法实现、测试序列和比较次数表的一项形成依据",
-              "compliance": "按本课要求保留对应记录",
-              "values": "说明算法实现、测试序列和比较次数表的职业用途",
-              "ethics": "如实报告算法实现、测试序列和比较次数表的完成情况",
-              "habits": "整理本课材料及其对应位置",
-              "online_learning": "预读算法实现、测试序列和比较次数表对应的任务要求",
-              "discussion": "围绕算法实现、测试序列和比较次数表解释处理决定",
-              "homework": "提交算法实现、测试序列和比较次数表及修订说明",
-              "practice": "按本课任务形成算法实现、测试序列和比较次数表",
-              "presentation": "说明算法实现、测试序列和比较次数表的形成依据",
-              "improvement": "补齐算法实现、测试序列和比较次数表中的当前任务缺项"
+              "attendance": "携带Java工程、五条冻结记录和L15过程表",
+              "attention": "检查键比较、右移、回填和同键身份轨迹",
+              "participation": "说明比较次数只按实际键比较计数",
+              "compliance": "保存冻结记录字段并仅按quantity排序",
+              "values": "说明本练习不把算法键解释成库存结论",
+              "ethics": "报告8次键比较与6次右移，不夸大性能",
+              "habits": "比较数与右移数分别计数并保存日志",
+              "online_learning": "预读L18 starter并提交计数口径疑问",
+              "discussion": "引用B-205/E-304或B-101/B-309断言解释稳定性",
+              "homework": "提交代码、输出断言、计数和修订日志",
+              "practice": "验证排序结果、两组同键顺序和8/6计数",
+              "presentation": "演示一组稳定性断言及失败反例",
+              "improvement": "依失败断言定位比较符并复跑边界测试"
             }
           },
           "reflection": {
@@ -14972,6 +15578,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "DAFEE4D5B1DA85EFA57ACB2116DFD8C08069976CA656D13E136190127A070D85"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "L18插入排序课的活动备注应指向五项冻结记录、8次键比较、6次右移和同键稳定性。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "DAFEE4D5B1DA85EFA57ACB2116DFD8C08069976CA656D13E136190127A070D85"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "1EA8F7988530A88AFF3FF2DDE2BA4ABB3FE34F6C75C8DD1DDE89A69BF7C63745"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "minor",
+                "message": "评价备注曾沿用通用任务描述，未检查8次键比较、6次右移和稳定性断言；已改为对应代码、输出、计数、自检和反馈。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "1EA8F7988530A88AFF3FF2DDE2BA4ABB3FE34F6C75C8DD1DDE89A69BF7C63745"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "EB8123F79E6D33C20A73798F0618C896DE47562F86F98B1A41725B699B09E381"
           }
         ]
       }
@@ -15051,7 +15693,8 @@
         "Java SE 17运行环境",
         "冻结校园目录五条记录及 L18 输出",
         "Lomuto分区约定卡",
-        "递归区间与比较次数日志表"
+        "递归区间与比较次数日志表",
+        "运行起点：practice-starters/L19QuickSortLab.java（Java SE 17）"
       ],
       "implementation": [
         {
@@ -15094,9 +15737,8 @@
           "minutes": 20,
           "modality": "课堂讲授/演示",
           "content": [
-            "演示统一 Partition：pivot=a[high]，i=low；对 j<high 的每项计一次键比较，仅当 a[j].quantity()<pivot.quantity() 时交换并递增 i；最后交换 i 与 high。",
-            "解释返回 pivotIndex 后递归 [low,p-1] 与 [p+1,high]；low>=high 停止。",
-            "用冻结原序手算首轮：pivot E-304(5)，四次比较，E-301(3) 移至前端，pivotIndex=1。"
+            "打开practice-starters/L19QuickSortLab.java；快速排序递归范围和冻结输入已给出，仅Partition留TODO。",
+            "示范末元素pivot、j<high扫描、严格<交换和返回位置后递归左右段。"
           ],
           "teacher_actions": [
             "投屏代码并对照 L16 不变量，标明键比较计数只在扫描循环中递增。"
@@ -15112,17 +15754,15 @@
           "minutes": 25,
           "modality": "个人操作/小组讨论",
           "content": [
-            "学生完成 QuickSort、Partition 与计数日志。原序 [B10112,B2055,B30912,E3013,E3045]：根分区4次后为 [E3013,E3045,B30912,B10112,B2055]；右段 [B30912,B10112,B2055] 再2次；其右段 [B10112,B30912] 再1次，总计7。",
-            "原序输出身份为 E301,E304,B205,B309,B101；再以 L18 有序输入 E301,B205,E304,B101,B309 运行，记录4+2=6次并得到同一最终身份次序 E301,E304,B205,B309,B101。",
-            "检查两组同键身份次序均可能变化；不能称此算法稳定。"
+            "25分钟分配：2分钟读规则，5分钟核对手工首趟，10分钟实现Partition并复用递归框架，5分钟分别运行原序和L18序，3分钟定位首错。",
+            "执行`javac L19QuickSortLab.java && java L19QuickSortLab`；指定原序和L18输出序的关键字比较分别为7和6，输出身份序列E-301,E-304,B-205,B-309,B-101。"
           ],
           "teacher_actions": [
             "巡视 pivot、循环端点、计数器和递归范围，按日志定位偏差。",
             "基础组从已填根分区日志补全递归段；进阶组独立实现事件计数并解释支点敏感性。"
           ],
           "student_actions": [
-            "提交可运行代码、两次逐分区表、累计计数和完整字段校验。",
-            "可用注释框架跟踪 low/high；拓展者复算两个排列的完整比较总数。"
+            "保存两个输入顺序的完整分区区间、计数和输出身份；说明7/6不是运行时延或均值，记录同键逆序证据。"
           ],
           "objective": "以同一冻结数据验证算法、递归和计数证据。"
         },
@@ -15215,19 +15855,19 @@
       "evaluation": {
         "score": 90.0,
         "remarks": {
-          "attendance": "到课并备齐当前任务材料",
-          "attention": "关注带计数实现、不同输入的性能记录中的处理依据",
-          "participation": "说明带计数实现、不同输入的性能记录的一项形成依据",
-          "compliance": "按本课要求保留对应记录",
-          "values": "说明带计数实现、不同输入的性能记录的职业用途",
-          "ethics": "如实报告带计数实现、不同输入的性能记录的完成情况",
-          "habits": "整理本课材料及其对应位置",
-          "online_learning": "预读带计数实现、不同输入的性能记录对应的任务要求",
-          "discussion": "围绕带计数实现、不同输入的性能记录解释处理决定",
-          "homework": "提交带计数实现、不同输入的性能记录及修订说明",
-          "practice": "按本课任务形成带计数实现、不同输入的性能记录",
-          "presentation": "说明带计数实现、不同输入的性能记录的形成依据",
-          "improvement": "补齐带计数实现、不同输入的性能记录中的当前任务缺项"
+          "attendance": "携带L16 Lomuto约定卡和L18输出序列",
+          "attention": "跟踪pivot、比较数、交换和递归范围",
+          "participation": "解释pivotIndex为何不再进入子区间",
+          "compliance": "保留原序与L18序两组同一记录输入",
+          "values": "说明两种排列的计数不是运行时延",
+          "ethics": "只按固定排序键与冻结记录实现分区",
+          "habits": "每层保存low/high、pivot与比较累加值",
+          "online_learning": "预读递归终止并提交重复键疑问",
+          "discussion": "引用7/6完整分区日志支持比较结论",
+          "homework": "交两组分区轨迹、累计比较和身份序列",
+          "practice": "验证两组结果、终止条件与同键身份变化",
+          "presentation": "展示原序与有序输入的首层分区差异",
+          "improvement": "按互核反馈修复递归边界并重跑两输入"
         }
       },
       "reflection": {
@@ -15573,7 +16213,8 @@
             "Java SE 17运行环境",
             "冻结校园目录五条记录及 L18 输出",
             "Lomuto分区约定卡",
-            "递归区间与比较次数日志表"
+            "递归区间与比较次数日志表",
+            "运行起点：practice-starters/L19QuickSortLab.java（Java SE 17）"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2021",
@@ -15620,9 +16261,8 @@
               "minutes": 20,
               "modality": "课堂讲授/演示",
               "content": [
-                "演示统一 Partition：pivot=a[high]，i=low；对 j<high 的每项计一次键比较，仅当 a[j].quantity()<pivot.quantity() 时交换并递增 i；最后交换 i 与 high。",
-                "解释返回 pivotIndex 后递归 [low,p-1] 与 [p+1,high]；low>=high 停止。",
-                "用冻结原序手算首轮：pivot E-304(5)，四次比较，E-301(3) 移至前端，pivotIndex=1。"
+                "打开practice-starters/L19QuickSortLab.java；快速排序递归范围和冻结输入已给出，仅Partition留TODO。",
+                "示范末元素pivot、j<high扫描、严格<交换和返回位置后递归左右段。"
               ],
               "teacher_actions": [
                 "投屏代码并对照 L16 不变量，标明键比较计数只在扫描循环中递增。"
@@ -15638,17 +16278,15 @@
               "minutes": 25,
               "modality": "个人操作/小组讨论",
               "content": [
-                "学生完成 QuickSort、Partition 与计数日志。原序 [B10112,B2055,B30912,E3013,E3045]：根分区4次后为 [E3013,E3045,B30912,B10112,B2055]；右段 [B30912,B10112,B2055] 再2次；其右段 [B10112,B30912] 再1次，总计7。",
-                "原序输出身份为 E301,E304,B205,B309,B101；再以 L18 有序输入 E301,B205,E304,B101,B309 运行，记录4+2=6次并得到同一最终身份次序 E301,E304,B205,B309,B101。",
-                "检查两组同键身份次序均可能变化；不能称此算法稳定。"
+                "25分钟分配：2分钟读规则，5分钟核对手工首趟，10分钟实现Partition并复用递归框架，5分钟分别运行原序和L18序，3分钟定位首错。",
+                "执行`javac L19QuickSortLab.java && java L19QuickSortLab`；指定原序和L18输出序的关键字比较分别为7和6，输出身份序列E-301,E-304,B-205,B-309,B-101。"
               ],
               "teacher_actions": [
                 "巡视 pivot、循环端点、计数器和递归范围，按日志定位偏差。",
                 "基础组从已填根分区日志补全递归段；进阶组独立实现事件计数并解释支点敏感性。"
               ],
               "student_actions": [
-                "提交可运行代码、两次逐分区表、累计计数和完整字段校验。",
-                "可用注释框架跟踪 low/high；拓展者复算两个排列的完整比较总数。"
+                "保存两个输入顺序的完整分区区间、计数和输出身份；说明7/6不是运行时延或均值，记录同键逆序证据。"
               ],
               "objective": "以同一冻结数据验证算法、递归和计数证据。"
             },
@@ -15741,19 +16379,19 @@
           "evaluation": {
             "score": 90.0,
             "remarks": {
-              "attendance": "到课并备齐当前任务材料",
-              "attention": "关注带计数实现、不同输入的性能记录中的处理依据",
-              "participation": "说明带计数实现、不同输入的性能记录的一项形成依据",
-              "compliance": "按本课要求保留对应记录",
-              "values": "说明带计数实现、不同输入的性能记录的职业用途",
-              "ethics": "如实报告带计数实现、不同输入的性能记录的完成情况",
-              "habits": "整理本课材料及其对应位置",
-              "online_learning": "预读带计数实现、不同输入的性能记录对应的任务要求",
-              "discussion": "围绕带计数实现、不同输入的性能记录解释处理决定",
-              "homework": "提交带计数实现、不同输入的性能记录及修订说明",
-              "practice": "按本课任务形成带计数实现、不同输入的性能记录",
-              "presentation": "说明带计数实现、不同输入的性能记录的形成依据",
-              "improvement": "补齐带计数实现、不同输入的性能记录中的当前任务缺项"
+              "attendance": "携带L16 Lomuto约定卡和L18输出序列",
+              "attention": "跟踪pivot、比较数、交换和递归范围",
+              "participation": "解释pivotIndex为何不再进入子区间",
+              "compliance": "保留原序与L18序两组同一记录输入",
+              "values": "说明两种排列的计数不是运行时延",
+              "ethics": "只按固定排序键与冻结记录实现分区",
+              "habits": "每层保存low/high、pivot与比较累加值",
+              "online_learning": "预读递归终止并提交重复键疑问",
+              "discussion": "引用7/6完整分区日志支持比较结论",
+              "homework": "交两组分区轨迹、累计比较和身份序列",
+              "practice": "验证两组结果、终止条件与同键身份变化",
+              "presentation": "展示原序与有序输入的首层分区差异",
+              "improvement": "按互核反馈修复递归边界并重跑两输入"
             }
           },
           "reflection": {
@@ -15781,6 +16419,42 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "BD32285FAA8A0A35C707B90368394C11B7A7F5DA7C9FB84B78199A738F988EBC"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "L19快排课的活动备注应指向固定Lomuto实现、原序/插入排序序与7/6比较记录。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "BD32285FAA8A0A35C707B90368394C11B7A7F5DA7C9FB84B78199A738F988EBC"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "F2029CC0A901BFC3082764CD82FFB16876253242505A7BE3653AD83F17CAE533"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "minor",
+                "message": "评价备注曾沿用通用分区过程表描述，未检查两种输入的7/6比较和身份变化；已改为对应具体分区与边界证据。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "F2029CC0A901BFC3082764CD82FFB16876253242505A7BE3653AD83F17CAE533"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "9A873A9F2B2FBC279C0B24836BF4DA683102F38D75953119935706A437BE2CD4"
           }
         ]
       }
@@ -15815,9 +16489,11 @@
         "冻结五条记录按 resource_id 建立哈希索引；照抄课程统一事实，不新增或改写校园资产数据。",
         "教学函数 h(resource_id)=ASCII码点和 mod 7：B-205 与 E-301 的和均为262，起始槽均为3。",
         "采用表长7线性探测；按冻结输入次序构表时 B-205 落3，E-301 在3冲突后落4；其余记录分别到槽5、1、6。",
-        "装载因子 α=5/7≈0.714；查找 E-301 检查槽3、4。缺失查询只用 `NO-SUCH-ID` 测试哨兵，不代表第六条目录记录。",
+        "装载因子α=5/7≈0.714；查找E-301检查槽3、4。NO-SUCH-ID与C-204仅为查询哨兵；C-204从3沿占用簇到空槽0未命中，不代表新增记录。",
         "完整键比较、空槽停止、最多检查7槽以避免循环；生产系统还需评估扩容、删除标记、散列质量和并发。",
-        "教学小表不承诺平均常数级保证；冲突集中时最坏 O(n)。"
+        "教学小表不承诺平均常数级保证；冲突集中时最坏 O(n)。",
+        "重复resource_id的插入策略为拒绝并保留原条目，不覆盖字段；成功查询返回完整记录，未命中返回null/未找到。",
+        "满表插入新键返回false；拒绝后逐槽比较7个位置，确认原表完全不变。"
       ],
       "goals": {
         "knowledge": [
@@ -15861,7 +16537,9 @@
         "Java SE 17运行环境",
         "冻结校园目录五条记录",
         "7槽哈希表格与探测日志",
-        "查找模块验收表"
+        "查找模块验收表",
+        "运行起点：practice-starters/L20HashIndexLab.java（Java SE 17）",
+        "碰撞链缺失查询与满表终止断言"
       ],
       "implementation": [
         {
@@ -15904,10 +16582,8 @@
           "minutes": 20,
           "modality": "课堂讲授/演示",
           "content": [
-            "逐项核对：B-101《算法入门》在馆数量12；B-205《数据结构》借出数量5；B-309《程序设计》在馆数量12；E-301示波器在用数量3；E-304万用表在馆数量5。",
-            "计算 B101=257%7=5，B205=262%7=3，B309=267%7=1，E301=262%7=3 后探测到4，E304=265%7=6。",
-            "成功查找 E-301：槽3先比较 B-205 不匹配，再到槽4比较完整 resource_id 命中；α=5/7。",
-            "讨论空槽未命中、最多探测7槽和教学实现尚无删除/扩容。"
+            "打开practice-starters/L20HashIndexLab.java；七槽、冻结记录、ASCII和模7函数、输入事实与查询轨迹断言已给出。",
+            "明确insert遇重复resource_id返回false且不覆盖旧条目；lookup以完整键比较、遇空槽停止、最多探测7槽，未命中返回null。"
           ],
           "teacher_actions": [
             "逐项展示 ASCII 求和、取余、碰撞与探测，保持 status/quantity 与冻结事实一致。"
@@ -15923,17 +16599,15 @@
           "minutes": 25,
           "modality": "个人操作/小组讨论",
           "content": [
-            "学生实现 Entry 与固定容量开放寻址表；插入时线性探测，重复 key 行为须显式定义。",
-            "查找 E-301 应在槽3、4检查后返回示波器记录；查 `NO-SUCH-ID` 仅作为缺失输入，遇第一个空槽后返回未找到。",
-            "设置探测次数上限；断言结果仍保留五条记录 resource_id/name/status/quantity。"
+            "25分钟分配：3分钟读事实/接口，6分钟实现插入与重复键规则，8分钟完成有界查询，5分钟跑碰撞/命中/碰撞链未命中/满表断言，3分钟修复首错。",
+            "执行`javac L20HashIndexLab.java && java L20HashIndexLab`；B-205/E-301起始槽均3，E-301检查3、4后命中；缺失C-204检查3、4、5、6、0后停止，满表缺失最多查7槽；重复键不改原记录；满表新增返回false且7槽快照不变。"
           ],
           "teacher_actions": [
             "检查完整键比较、空槽退出和探测上限；用手算轨迹定位偏差。",
             "基础组使用已标起始槽的表逐步探测；进阶组证明表满时的终止上限并分析删除链问题。"
           ],
           "student_actions": [
-            "提交源码和逐槽日志，分别报告成功路径、缺失路径与装载率，不报告未经测量的运行时间。",
-            "先填入 B-205/E-301 冲突路径；拓展者完成未命中和满表边界。"
+            "保存槽位图、成功/失败探测序列和返回记录字段；分别核对普通空槽停止、碰撞链后空槽停止与满表七槽上限。"
           ],
           "objective": "用可复现探测路径证明索引和查询行为。"
         },
@@ -16026,19 +16700,19 @@
       "evaluation": {
         "score": 93.5,
         "remarks": {
-          "attendance": "到课并备齐当前任务材料",
-          "attention": "关注查询模块、冲突测试和性能选择说明中的处理依据",
-          "participation": "说明查询模块、冲突测试和性能选择说明的一项形成依据",
-          "compliance": "按本课要求保留对应记录",
-          "values": "说明查询模块、冲突测试和性能选择说明的职业用途",
-          "ethics": "如实报告查询模块、冲突测试和性能选择说明的完成情况",
-          "habits": "整理本课材料及其对应位置",
-          "online_learning": "预读查询模块、冲突测试和性能选择说明对应的任务要求",
-          "discussion": "围绕查询模块、冲突测试和性能选择说明解释处理决定",
-          "homework": "提交查询模块、冲突测试和性能选择说明及修订说明",
-          "practice": "按本课任务形成查询模块、冲突测试和性能选择说明",
-          "presentation": "说明查询模块、冲突测试和性能选择说明的形成依据",
-          "improvement": "补齐查询模块、冲突测试和性能选择说明中的当前任务缺项"
+          "attendance": "携带冻结记录表、七槽哈希纸表与Java工程",
+          "attention": "检查resource_id、起始槽、探测路径和返回记录",
+          "participation": "说明E-301需先比较槽3再命中槽4",
+          "compliance": "使用完整键、固定散列函数及重复拒绝合同",
+          "values": "说明演示散列不作生产性能或并发承诺",
+          "ethics": "将索引查询用于精确键定位并说明边界",
+          "habits": "记录槽位、碰撞、探测次数和查询结果",
+          "online_learning": "预读线性探测并提交重复键或空槽疑问",
+          "discussion": "用B-205/E-301轨迹解释碰撞后继续探测",
+          "homework": "提交索引代码、探测表、成功/失败查询日志",
+          "practice": "断言重复键不覆盖原记录且缺失查询终止",
+          "presentation": "演示槽3/4探测与完整记录返回字段",
+          "improvement": "按反馈复查空槽停止及最多七槽的边界"
         }
       },
       "reflection": {
@@ -16344,9 +17018,11 @@
             "冻结五条记录按 resource_id 建立哈希索引；照抄课程统一事实，不新增或改写校园资产数据。",
             "教学函数 h(resource_id)=ASCII码点和 mod 7：B-205 与 E-301 的和均为262，起始槽均为3。",
             "采用表长7线性探测；按冻结输入次序构表时 B-205 落3，E-301 在3冲突后落4；其余记录分别到槽5、1、6。",
-            "装载因子 α=5/7≈0.714；查找 E-301 检查槽3、4。缺失查询只用 `NO-SUCH-ID` 测试哨兵，不代表第六条目录记录。",
+            "装载因子α=5/7≈0.714；查找E-301检查槽3、4。NO-SUCH-ID与C-204仅为查询哨兵；C-204从3沿占用簇到空槽0未命中，不代表新增记录。",
             "完整键比较、空槽停止、最多检查7槽以避免循环；生产系统还需评估扩容、删除标记、散列质量和并发。",
-            "教学小表不承诺平均常数级保证；冲突集中时最坏 O(n)。"
+            "教学小表不承诺平均常数级保证；冲突集中时最坏 O(n)。",
+            "重复resource_id的插入策略为拒绝并保留原条目，不覆盖字段；成功查询返回完整记录，未命中返回null/未找到。",
+            "满表插入新键返回false；拒绝后逐槽比较7个位置，确认原表完全不变。"
           ],
           "goals": {
             "knowledge": [
@@ -16390,7 +17066,9 @@
             "Java SE 17运行环境",
             "冻结校园目录五条记录",
             "7槽哈希表格与探测日志",
-            "查找模块验收表"
+            "查找模块验收表",
+            "运行起点：practice-starters/L20HashIndexLab.java（Java SE 17）",
+            "碰撞链缺失查询与满表终止断言"
           ],
           "reference_ids": [
             "REF-HEP-JAVA-2021",
@@ -16437,10 +17115,8 @@
               "minutes": 20,
               "modality": "课堂讲授/演示",
               "content": [
-                "逐项核对：B-101《算法入门》在馆数量12；B-205《数据结构》借出数量5；B-309《程序设计》在馆数量12；E-301示波器在用数量3；E-304万用表在馆数量5。",
-                "计算 B101=257%7=5，B205=262%7=3，B309=267%7=1，E301=262%7=3 后探测到4，E304=265%7=6。",
-                "成功查找 E-301：槽3先比较 B-205 不匹配，再到槽4比较完整 resource_id 命中；α=5/7。",
-                "讨论空槽未命中、最多探测7槽和教学实现尚无删除/扩容。"
+                "打开practice-starters/L20HashIndexLab.java；七槽、冻结记录、ASCII和模7函数、输入事实与查询轨迹断言已给出。",
+                "明确insert遇重复resource_id返回false且不覆盖旧条目；lookup以完整键比较、遇空槽停止、最多探测7槽，未命中返回null。"
               ],
               "teacher_actions": [
                 "逐项展示 ASCII 求和、取余、碰撞与探测，保持 status/quantity 与冻结事实一致。"
@@ -16456,17 +17132,15 @@
               "minutes": 25,
               "modality": "个人操作/小组讨论",
               "content": [
-                "学生实现 Entry 与固定容量开放寻址表；插入时线性探测，重复 key 行为须显式定义。",
-                "查找 E-301 应在槽3、4检查后返回示波器记录；查 `NO-SUCH-ID` 仅作为缺失输入，遇第一个空槽后返回未找到。",
-                "设置探测次数上限；断言结果仍保留五条记录 resource_id/name/status/quantity。"
+                "25分钟分配：3分钟读事实/接口，6分钟实现插入与重复键规则，8分钟完成有界查询，5分钟跑碰撞/命中/碰撞链未命中/满表断言，3分钟修复首错。",
+                "执行`javac L20HashIndexLab.java && java L20HashIndexLab`；B-205/E-301起始槽均3，E-301检查3、4后命中；缺失C-204检查3、4、5、6、0后停止，满表缺失最多查7槽；重复键不改原记录；满表新增返回false且7槽快照不变。"
               ],
               "teacher_actions": [
                 "检查完整键比较、空槽退出和探测上限；用手算轨迹定位偏差。",
                 "基础组使用已标起始槽的表逐步探测；进阶组证明表满时的终止上限并分析删除链问题。"
               ],
               "student_actions": [
-                "提交源码和逐槽日志，分别报告成功路径、缺失路径与装载率，不报告未经测量的运行时间。",
-                "先填入 B-205/E-301 冲突路径；拓展者完成未命中和满表边界。"
+                "保存槽位图、成功/失败探测序列和返回记录字段；分别核对普通空槽停止、碰撞链后空槽停止与满表七槽上限。"
               ],
               "objective": "用可复现探测路径证明索引和查询行为。"
             },
@@ -16559,19 +17233,19 @@
           "evaluation": {
             "score": 93.5,
             "remarks": {
-              "attendance": "到课并备齐当前任务材料",
-              "attention": "关注查询模块、冲突测试和性能选择说明中的处理依据",
-              "participation": "说明查询模块、冲突测试和性能选择说明的一项形成依据",
-              "compliance": "按本课要求保留对应记录",
-              "values": "说明查询模块、冲突测试和性能选择说明的职业用途",
-              "ethics": "如实报告查询模块、冲突测试和性能选择说明的完成情况",
-              "habits": "整理本课材料及其对应位置",
-              "online_learning": "预读查询模块、冲突测试和性能选择说明对应的任务要求",
-              "discussion": "围绕查询模块、冲突测试和性能选择说明解释处理决定",
-              "homework": "提交查询模块、冲突测试和性能选择说明及修订说明",
-              "practice": "按本课任务形成查询模块、冲突测试和性能选择说明",
-              "presentation": "说明查询模块、冲突测试和性能选择说明的形成依据",
-              "improvement": "补齐查询模块、冲突测试和性能选择说明中的当前任务缺项"
+              "attendance": "携带冻结记录表、七槽哈希纸表与Java工程",
+              "attention": "检查resource_id、起始槽、探测路径和返回记录",
+              "participation": "说明E-301需先比较槽3再命中槽4",
+              "compliance": "使用完整键、固定散列函数及重复拒绝合同",
+              "values": "说明演示散列不作生产性能或并发承诺",
+              "ethics": "将索引查询用于精确键定位并说明边界",
+              "habits": "记录槽位、碰撞、探测次数和查询结果",
+              "online_learning": "预读线性探测并提交重复键或空槽疑问",
+              "discussion": "用B-205/E-301轨迹解释碰撞后继续探测",
+              "homework": "提交索引代码、探测表、成功/失败查询日志",
+              "practice": "断言重复键不覆盖原记录且缺失查询终止",
+              "presentation": "演示槽3/4探测与完整记录返回字段",
+              "improvement": "按反馈复查空槽停止及最多七槽的边界"
             }
           },
           "reflection": {
@@ -16593,6 +17267,60 @@
             "issues": [],
             "decision": "approved",
             "content_sha256": "9E1C0F21616E966E5C5862D5D8D65BEE83803CC7A13343F175A359C40AA5CF91"
+          },
+          {
+            "round": 3,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "L20哈希课备注应指向完整resource_id、碰撞槽3/4、重复键拒绝和未命中边界。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "9E1C0F21616E966E5C5862D5D8D65BEE83803CC7A13343F175A359C40AA5CF91"
+          },
+          {
+            "round": 4,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "891CA5CCA8700C38792AD6CEDE8581B669EC252B42B3E6E9442D3520D58DB205"
+          },
+          {
+            "round": 5,
+            "issues": [
+              {
+                "category": "template_repetition",
+                "severity": "minor",
+                "message": "评价备注曾未能核验碰撞路径、完整键比较与重复插入合同；已改为对应槽3/4、原记录保护及有界失败查询。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "891CA5CCA8700C38792AD6CEDE8581B669EC252B42B3E6E9442D3520D58DB205"
+          },
+          {
+            "round": 6,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "957A2D5A101910812AA7235E592A19CF8629A3298ACD8EDCFBE57B3C94E03213"
+          },
+          {
+            "round": 7,
+            "issues": [
+              {
+                "category": "activity_feasibility",
+                "severity": "major",
+                "message": "L20原缺失键NO-SUCH-ID从空槽开始，不能检验碰撞链上的未命中和满表终止；增加同起始槽的C-204和满表7次探测测试。"
+              }
+            ],
+            "decision": "needs_revision",
+            "content_sha256": "957A2D5A101910812AA7235E592A19CF8629A3298ACD8EDCFBE57B3C94E03213"
+          },
+          {
+            "round": 8,
+            "issues": [],
+            "decision": "approved",
+            "content_sha256": "56BDBCDC1809405A7E3263793D8D2E758AC72898F1B2F5B8C6183671746539E3"
           }
         ]
       }
@@ -16613,12 +17341,12 @@
     "authoring_id": "issue-73-three-project-subagent-pilot",
     "source_snapshot": {
       "confirmed_course_profile_sha256": "1688195C6F05A479C08729D2B3867EA031ABDF540FDFF82607DC7A16DA60BAF6",
-      "whole_course_outline_sha256": "4912291770FE11B93A61844A34249F14944A2F7133FDFDB2087854618FBB3507",
+      "whole_course_outline_sha256": "EEB0517ADAD4A08ED3CBEA9564B7D026B558D48B099B1E2A090FBB5454002EAE",
       "reference_pool_sha256": "BF98E43BB28CA9D4236284B6C6F792D9528C2EBB0913A607710375A7FC990450"
     },
     "draft_content_sha256": "A8C1F2A4C563B633C4468324E73D657BB070EED9F256C67DC6C64605EF258993",
-    "final_content_sha256": "DB1BCCB2EEB2FB84CE708A3250ADAD39B653F422374111D4752C6B22729D21BC",
-    "review_rounds": 2
+    "final_content_sha256": "670ABE43B090CBCDEBB5A45C22294A4436A3573EF37F93B7453F1EE786B2C4B6",
+    "review_rounds": 8
   },
   "course_case_facts_sha256": "E58D47617DE5731324FBD76A1AFAEDBAF5B30EED532457D1EBB1C8EB099DD682"
 }

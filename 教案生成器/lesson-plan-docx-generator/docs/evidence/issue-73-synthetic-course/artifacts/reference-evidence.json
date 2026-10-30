@@ -1,6 +1,6 @@
 {
   "evidence_version": "1.0",
-  "run_id": "issue73-pilot-40h-separate",
+  "run_id": "issue73-quality-acceptance-r4",
   "course_name": "数据结构与算法",
   "major": "软件技术专业",
   "source_json_path": "/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/pilot-40h-separate/lesson-content-v2.4.json",

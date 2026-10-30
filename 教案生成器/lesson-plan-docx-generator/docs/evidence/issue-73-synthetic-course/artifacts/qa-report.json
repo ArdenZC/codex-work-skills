@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "generated_at": "2026-10-29T10:32:54.432704+00:00",
+  "generated_at": "2026-10-30T01:52:54.765604+00:00",
   "template_id": "lesson-plan",
   "template_version": "1.1.2",
   "generator_version": "1.1.2",
@@ -13,7 +13,7 @@
     "skipped": []
   },
   "validation_skipped": [],
-  "output_dir": "/tmp/issue73-pilot-artifacts-20261029-3",
+  "output_dir": "/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/artifacts",
   "errors": [],
   "warnings": [],
   "checks": {
@@ -568,7 +568,7 @@
     }
   },
   "files_checked": 20,
-  "qa_report": "/tmp/issue73-pilot-artifacts-20261029-3/qa-report.json",
+  "qa_report": "/tmp/issue73-render-r4/qa-report.json",
   "content_contract_version": "2.4",
   "content_quality": {
     "status": "passed",
@@ -583,7 +583,7 @@
       "mode": "synthetic_fixture",
       "status": "completed",
       "authoring_id": "issue-73-three-project-subagent-pilot",
-      "review_rounds": 2,
+      "review_rounds": 8,
       "semantic_source": "Agent attestation; Python checks only exact snapshot and digest linkage"
     },
     "agent_pedagogical_review": {
@@ -595,9 +595,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "4078F281153C773C03D71F4A1AD58DCD4D36B2F262A8A0390074B7E59299F304",
+          "revised_content_sha256": "B328071BB20809590B616726A005EB44913C4EBAE0FA380DFA38B199733ACBDF",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -605,9 +605,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 4,
           "rewrite_performed": true,
-          "revised_content_sha256": "0E0D33789D9D68E71E7C2E7EAF7A922C7A61B50D3A9FDF9D727D851096D130F3",
+          "revised_content_sha256": "BC2B7E72FFD434F32357B42D074B7A6DA858D640E5A8FA414A7668F51FCFCE31",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -615,9 +615,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 4,
           "rewrite_performed": true,
-          "revised_content_sha256": "FE0BF56C9E65698DAE28B92A72424C6D23EF6C03C10B1A37C51435C0A6B008D9",
+          "revised_content_sha256": "0151115A70A280EC9D1C110952EC8B330293569A8CAD2945C21DB47D73DF8B09",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -625,9 +625,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "9913A4F6447B10BEBCCC92EB4B143090EEFC1CB1A5B06F3FFD438F79DB8DD8C0",
+          "revised_content_sha256": "9797E169A252EE862DFC75E4FCF3EB4E8707A7A24618954AACC35DCD868840DD",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -635,9 +635,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "992E0DC04EF063334B7AE967BF1E3454C8C1420E5BC7BD75508EFCFC439A90A9",
+          "revised_content_sha256": "43B265BEE0E0B26AA667AB68C194BD5A2DD62A96AB197D8EFA5DBC9E07A68BD5",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -645,9 +645,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "678A7F1C12BC145866DD0EFB0452D42D2D51EFBFC86028878B46D220C7A7C3DD",
+          "revised_content_sha256": "FCA1E1719369B5D9B67E21892771CF473932248374A59835E0EF2795B90F0ABE",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -655,9 +655,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 4,
           "rewrite_performed": true,
-          "revised_content_sha256": "EDF6B585356F10B92090FC419B87E909F0BC1C055E083F4A13A1D92E3CECC526",
+          "revised_content_sha256": "72F91113A0A1ABDC06D61215FC3B104CB626ECAE0A6E34505DBC81445FA7688F",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -665,9 +665,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 4,
           "rewrite_performed": true,
-          "revised_content_sha256": "3E02C19D1A3C874E72FBC5A6ED2D1F778B038EF5BF8F1077329BE68614AB8B9E",
+          "revised_content_sha256": "A8ABCB17CE90FC58E823121E0BD9BDBBD98396260868E445F03AC8266C52E04F",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -675,9 +675,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 4,
           "rewrite_performed": true,
-          "revised_content_sha256": "B2C948C77BBCB422C5309731152AF43F9E9BAE5BCDE3F6CF9C987C00FD1313B9",
+          "revised_content_sha256": "D04726241575C5E1CE8DAFE869832850B1437D75AE26722AC760F6F8ADD63EFB",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -685,9 +685,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 4,
           "rewrite_performed": true,
-          "revised_content_sha256": "CC910FC0AE224F12040309200AB9A7CF429DDC72E31BF0A2E44FB418677C5CB0",
+          "revised_content_sha256": "49BBB4AE2546087B48FDCC5157FFEEB6413DF409CC958A84C1E9F6F55C6BDF8B",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -695,9 +695,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "A1FD964CCE2BAC583A1624C64C87EB90DAA0FA392E7141238927621E4C5A13E4",
+          "revised_content_sha256": "71452F74931B124EC2CD1249AB8E3572D934162912DF54CAAE0EF2FC070640F2",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -705,9 +705,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "56C4A17E12E0572EA8BBFA82D693E86EC176F5343E0563C605F8F31F0199195A",
+          "revised_content_sha256": "4E165394490BCB2359A5DEF388BD3D500F6DD9B18F8CA5515273765F27D7BC91",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -715,9 +715,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "A850B025E9ABB4E2E401ACE2654F801182DE9885BB369156CB79A016D1A6D1CE",
+          "revised_content_sha256": "14DBB1581A30D593C3D925EA6F1CBFE47ACD4DA92815670D23C5B4A256A81D75",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -725,9 +725,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 8,
           "rewrite_performed": true,
-          "revised_content_sha256": "E5EACAFE99F53760C6395EB2ECE611436CE30114F5BC1C9305F6FBCDBCED81EF",
+          "revised_content_sha256": "9D653A318A650170244814363D39CFCAE22A3D58058BEC13966922CD26CC63EE",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -735,9 +735,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 8,
           "rewrite_performed": true,
-          "revised_content_sha256": "0863F15C1456DDCB85078B8C24080C16D050C143F1B18BD6FEC131665BBF10DE",
+          "revised_content_sha256": "9C503AF471BD3637B6E1779A28B0856E2415976D1BAB1092CFF907C0FEA01901",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -745,9 +745,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "E885B9C8FC2D89E0E684C309F6E85AF8356C42713C0B2521F44E317C7F9D277D",
+          "revised_content_sha256": "B6FC554E553FBB56BF9FE0DD3DEBC8217AAF64CFC74D2614232DB5506A8211A2",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -765,9 +765,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
-          "rewrite_performed": false,
-          "revised_content_sha256": "DAFEE4D5B1DA85EFA57ACB2116DFD8C08069976CA656D13E136190127A070D85",
+          "review_rounds": 6,
+          "rewrite_performed": true,
+          "revised_content_sha256": "EB8123F79E6D33C20A73798F0618C896DE47562F86F98B1A41725B699B09E381",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -775,9 +775,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
+          "review_rounds": 6,
           "rewrite_performed": true,
-          "revised_content_sha256": "BD32285FAA8A0A35C707B90368394C11B7A7F5DA7C9FB84B78199A738F988EBC",
+          "revised_content_sha256": "9A873A9F2B2FBC279C0B24836BF4DA683102F38D75953119935706A437BE2CD4",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         },
         {
@@ -785,9 +785,9 @@
           "status": "passed",
           "decision": "approved",
           "issues": [],
-          "review_rounds": 2,
-          "rewrite_performed": false,
-          "revised_content_sha256": "9E1C0F21616E966E5C5862D5D8D65BEE83803CC7A13343F175A359C40AA5CF91",
+          "review_rounds": 8,
+          "rewrite_performed": true,
+          "revised_content_sha256": "56BDBCDC1809405A7E3263793D8D2E758AC72898F1B2F5B8C6183671746539E3",
           "semantic_source": "Agent review; Python only checks review state and digest linkage"
         }
       ],
@@ -1261,7 +1261,7 @@
       "status": "not_provided",
       "source_truth_manifest_sha256": null,
       "source_truth_outline_sha256": null,
-      "content_outline_sha256": "4912291770fe11b93a61844a34249f14944a2f7133fdfdb2087854618fbb3507",
+      "content_outline_sha256": "eeb0517adad4a08ed3cbea9564b7d026b558d48b099b1e2a090fbb5454002eae",
       "lesson_count": 20,
       "lessons": [
         {
@@ -1975,24 +1975,24 @@
     "visual_readability_status": "not_evaluated",
     "renderer": "/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
     "files_checked": 20,
-    "page_count": 130,
+    "page_count": 133,
     "page_counts": {
       "教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.docx": 6,
       "教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.docx": 7,
       "教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.docx": 7,
-      "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx": 6,
-      "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx": 6,
-      "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx": 7,
-      "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx": 6,
-      "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx": 6,
-      "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx": 6,
+      "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx": 7,
+      "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx": 8,
+      "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx": 9,
+      "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx": 5,
+      "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx": 5,
+      "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx": 4,
       "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx": 5,
       "教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.docx": 5,
-      "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx": 5,
+      "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx": 6,
       "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx": 5,
       "教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.docx": 6,
       "教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.docx": 8,
-      "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx": 8,
+      "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx": 9,
       "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx": 8,
       "教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.docx": 7,
       "教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.docx": 8,
@@ -2020,32 +2020,32 @@
       {
         "docx_path": "教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.docx",
         "final_pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
-        "actual_pdf_page_count": 6
+        "actual_pdf_page_count": 7
       },
       {
         "docx_path": "教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.docx",
         "final_pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
-        "actual_pdf_page_count": 6
+        "actual_pdf_page_count": 8
       },
       {
         "docx_path": "教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.docx",
         "final_pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
-        "actual_pdf_page_count": 7
+        "actual_pdf_page_count": 9
       },
       {
         "docx_path": "教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.docx",
         "final_pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
-        "actual_pdf_page_count": 6
+        "actual_pdf_page_count": 5
       },
       {
         "docx_path": "教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.docx",
         "final_pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
-        "actual_pdf_page_count": 6
+        "actual_pdf_page_count": 5
       },
       {
         "docx_path": "教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.docx",
         "final_pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
-        "actual_pdf_page_count": 6
+        "actual_pdf_page_count": 4
       },
       {
         "docx_path": "教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.docx",
@@ -2060,7 +2060,7 @@
       {
         "docx_path": "教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.docx",
         "final_pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
-        "actual_pdf_page_count": 5
+        "actual_pdf_page_count": 6
       },
       {
         "docx_path": "教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.docx",
@@ -2080,7 +2080,7 @@
       {
         "docx_path": "教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.docx",
         "final_pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
-        "actual_pdf_page_count": 8
+        "actual_pdf_page_count": 9
       },
       {
         "docx_path": "教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.docx",
@@ -2401,14 +2401,14 @@
   "teaching_quality_gate": {
     "status": "evidence_complete",
     "meaning": "workflow evidence state only; this is not an automated pedagogical pass or formal blind benchmark",
-    "generation_evidence_sha256": "428820F09824E7D453261B52C360613D2DA80FAFB0430D8BF394EEAD1532B609",
+    "generation_evidence_sha256": "D6F451AD086EE1386ADAD0AD9A00F37268E60C283A27B43D556A237AA0CB0176",
     "project_mode": "project_subagents",
     "project_count": 3,
     "lesson_comparison_count": 20,
     "rubric_dimensions_per_lesson": 15,
     "status_is_not_a_structural_or_subject_quality_substitute": true
   },
-  "run_id": "issue73-pilot-40h-separate",
+  "run_id": "issue73-quality-acceptance-r4",
   "artifact_manifest": "artifact-manifest.json",
   "reference_evidence": "reference-evidence.json"
 }

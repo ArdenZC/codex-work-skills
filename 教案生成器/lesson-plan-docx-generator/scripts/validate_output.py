@@ -66,6 +66,12 @@ def cell_text(table, row_index: int, cell_index: int) -> str:
     return actual_cells(table.rows[row_index])[cell_index].text.strip()
 
 
+def _visible_text(value: str) -> str:
+    """Return rendered source text without silently normalizing content."""
+
+    return value
+
+
 def manifest_field_text(document, main_table, manifest: dict[str, Any], name: str) -> str:
     spec = field_spec(manifest, name)
     if is_semantic_manifest(manifest):
@@ -75,16 +81,16 @@ def manifest_field_text(document, main_table, manifest: dict[str, Any], name: st
             raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} is missing")
         cell_element = bookmark_parent_cell(document, record)
         if cell_element is not None:
-            return _Cell(cell_element, document).text.strip()
+            return _visible_text(_Cell(cell_element, document).text.strip())
         paragraph_element = bookmark_parent_paragraph(document, record)
         if paragraph_element is not None:
-            return Paragraph(paragraph_element, document).text.strip()
+            return _visible_text(Paragraph(paragraph_element, document).text.strip())
         raise ValueError(f"Semantic bookmark {bookmark_name} for field {name} has no writable container")
     if not all(key in spec for key in ("table", "row", "cell")):
         raise ValueError(f"Manifest field {name} is not a table-cell field")
     table_index = int(spec["table"])
     target_table = main_table if table_index == 0 else document.tables[table_index]
-    return cell_text(target_table, int(spec["row"]), int(spec["cell"]))
+    return _visible_text(cell_text(target_table, int(spec["row"]), int(spec["cell"])))
 
 
 def parse_number(value: Any, label: str) -> float:
@@ -151,6 +157,15 @@ def _lesson_file_sort_key(path: Path) -> tuple[int, int, str]:
 
 def _xml(element) -> str:
     return etree.tostring(copy.deepcopy(element), encoding="unicode")
+
+
+def _xml_without_text(element) -> str:
+    cloned = copy.deepcopy(element)
+    text_tags = {qn("w:t"), qn("w:instrText"), qn("w:delText")}
+    for node in cloned.iter():
+        if node.tag in text_tags:
+            node.text = ""
+    return etree.tostring(cloned, encoding="unicode")
 
 
 def _canonical_xml(element) -> str:
@@ -423,6 +438,27 @@ def _evaluation_writable_format_signature(document, manifest: dict[str, Any]) ->
     ]
 
 
+def _top_level_table_structure_signature(table) -> dict[str, Any]:
+    rows = []
+    for row in table.rows:
+        rows.append(
+            {
+                "trPr": _xml(row._tr.trPr) if row._tr.trPr is not None else "",
+                "cells": [
+                    _xml(cell._tc.tcPr) if cell._tc.tcPr is not None else ""
+                    for cell in actual_cells(row)
+                ],
+            }
+        )
+    return {
+        "tablePr": _xml(table._tbl.tblPr) if table._tbl.tblPr is not None else "",
+        "tblGrid": _xml(table._tbl.tblGrid) if table._tbl.tblGrid is not None else "",
+        "rows": rows,
+        "row_count": len(table.rows),
+        "column_count": len(table.columns),
+    }
+
+
 def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, Any]:
     layout = layout_manifest(manifest)
     table = document.tables[int(layout["structure"]["main_table"]["index"])]
@@ -438,6 +474,11 @@ def protected_layout_signature(document, manifest: dict[str, Any]) -> dict[str, 
         "tablePr": _xml(table._tbl.tblPr) if table._tbl.tblPr is not None else "",
         "tblGrid": _xml(table._tbl.tblGrid) if table._tbl.tblGrid is not None else "",
         "rows": rows,
+        "additional_top_level_tables": [
+            _top_level_table_structure_signature(candidate)
+            for index, candidate in enumerate(document.tables)
+            if index != int(layout["structure"]["main_table"]["index"])
+        ],
         "evaluation_table": _evaluation_table_layout_signature(document, layout),
         "sections": [
             {
@@ -536,6 +577,7 @@ def _protected_layout_matches(actual: dict[str, Any], expected: dict[str, Any]) 
 
 
 def _validate_text_length(name: str, value: str, spec: dict[str, Any], errors: list[str]) -> None:
+    value = _visible_text(value)
     max_chars = spec.get("max_chars")
     if max_chars is not None and len(value) > int(max_chars):
         errors.append(f"{name} exceeds manifest max_chars={max_chars}: {len(value)}")
@@ -608,16 +650,17 @@ def _field_targets(document, table, spec: dict[str, Any], name: str = "", manife
 
 def _document_text(document, table) -> str:
     values = [paragraph.text for paragraph in document.paragraphs]
-    for row in table.rows:
-        for cell in actual_cells(row):
-            values.append(cell.text)
-            for nested in cell.tables:
-                for nested_row in nested.rows:
-                    values.extend(nested_cell.text for nested_cell in nested_row.cells)
+    for document_table in document.tables:
+        for row in document_table.rows:
+            for cell in actual_cells(row):
+                values.append(cell.text)
+                for nested in cell.tables:
+                    for nested_row in nested.rows:
+                        values.extend(nested_cell.text for nested_cell in nested_row.cells)
     for section in document.sections:
         values.extend(paragraph.text for paragraph in section.header.paragraphs)
         values.extend(paragraph.text for paragraph in section.footer.paragraphs)
-    return "\n".join(values)
+    return _visible_text("\n".join(values))
 
 
 def _evaluation_score_errors(score_values: list[Decimal]) -> list[str]:
@@ -1062,6 +1105,61 @@ def validate_output_dir(
             item_errors.append(f"main table rows expected {main_spec['rows']}, got {len(table.rows)}")
         if len(table.columns) != int(main_spec["columns"]):
             item_errors.append(f"main table columns expected {main_spec['columns']}, got {len(table.columns)}")
+        expected_table_count = manifest.get("structure", {}).get("top_level_tables")
+        if expected_table_count is not None and len(document.tables) != int(expected_table_count):
+            item_errors.append(
+                f"top-level table count expected {expected_table_count}, got {len(document.tables)}"
+            )
+        for table_name in ("implementation_table", "reflection_table"):
+            table_spec = manifest.get("structure", {}).get(table_name)
+            if not isinstance(table_spec, dict):
+                continue
+            table_index = int(table_spec.get("index", -1))
+            if table_index < 0 or table_index >= len(document.tables):
+                item_errors.append(f"{table_name} is missing at index {table_index}")
+                continue
+            section_table = document.tables[table_index]
+            if len(section_table.rows) != int(table_spec.get("rows", -1)):
+                item_errors.append(
+                    f"{table_name} rows expected {table_spec.get('rows')}, got {len(section_table.rows)}"
+                )
+            if len(section_table.columns) != int(table_spec.get("columns", -1)):
+                item_errors.append(
+                    f"{table_name} columns expected {table_spec.get('columns')}, got {len(section_table.columns)}"
+                )
+            header_row = table_spec.get("header_row")
+            if header_row is not None:
+                row_index = int(header_row)
+                has_repeat_flag = (
+                    0 <= row_index < len(section_table.rows)
+                    and section_table.rows[row_index]._tr.trPr is not None
+                    and section_table.rows[row_index]._tr.trPr.find(qn("w:tblHeader")) is not None
+                )
+                if not has_repeat_flag:
+                    item_errors.append(f"{table_name} repeated header row {row_index} is not declared")
+            if table_spec.get("keep_rows_together"):
+                header_row = table_spec.get("header_row")
+                split_rows = [
+                    index
+                    for index, row in enumerate(section_table.rows)
+                    if index != header_row
+                    and (row._tr.trPr is None or row._tr.trPr.find(qn("w:cantSplit")) is None)
+                ]
+                if split_rows:
+                    item_errors.append(f"{table_name} rows may split across pages: {split_rows}")
+            for row_index_value in table_spec.get("keep_with_next_rows", []):
+                row_index = int(row_index_value)
+                paragraphs = (
+                    section_table.rows[row_index]._tr.findall(".//" + qn("w:p"))
+                    if 0 <= row_index < len(section_table.rows)
+                    else []
+                )
+                if not paragraphs or any(
+                    paragraph.find(qn("w:pPr")) is None
+                    or paragraph.find(qn("w:pPr")).find(qn("w:keepNext")) is None
+                    for paragraph in paragraphs
+                ):
+                    item_errors.append(f"{table_name} row {row_index} is not kept with the following row")
 
         expected_headers = lesson_header_values(data, item)
         expected_course = expected_headers["course_name"]
@@ -1129,11 +1227,11 @@ def validate_output_dir(
         if is_semantic_manifest(manifest):
             title_record = find_bookmark(document, field_bookmark(manifest, "title"))
             title_element = bookmark_parent_paragraph(document, title_record) if title_record else None
-            actual_title = Paragraph(title_element, document).text if title_element is not None else ""
+            actual_title = _visible_text(Paragraph(title_element, document).text) if title_element is not None else ""
         else:
             title_spec = field_spec(manifest, "title")
             title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
-            actual_title = document.paragraphs[title_index].text if 0 <= title_index < len(document.paragraphs) else ""
+            actual_title = _visible_text(document.paragraphs[title_index].text) if 0 <= title_index < len(document.paragraphs) else ""
         if actual_title != expected_title:
             item_errors.append("title field mismatch")
 
@@ -1154,7 +1252,7 @@ def validate_output_dir(
                 for bookmark_name, expected_value in zip(bookmark_group, expected_values.values()):
                     record = find_bookmark(document, bookmark_name)
                     cell_element = bookmark_parent_cell(document, record) if record else None
-                    actual_value = _Cell(cell_element, document).text if cell_element is not None else ""
+                    actual_value = _visible_text(_Cell(cell_element, document).text) if cell_element is not None else ""
                     expected_text = str(expected_value).rstrip("\r\n")
                     if actual_value != expected_text:
                         item_errors.append(f"implementation cell mismatch at bookmark {bookmark_name}")
@@ -1164,7 +1262,7 @@ def validate_output_dir(
             ):
                 record = find_bookmark(document, bookmark_name)
                 cell_element = bookmark_parent_cell(document, record) if record else None
-                actual_value = _Cell(cell_element, document).text if cell_element is not None else ""
+                actual_value = _visible_text(_Cell(cell_element, document).text) if cell_element is not None else ""
                 if actual_value != expected_value:
                     item_errors.append(f"reflection cell mismatch at bookmark {bookmark_name}")
         else:
@@ -1175,7 +1273,7 @@ def validate_output_dir(
             ):
                 cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
                 for cell_index, expected_value in expected_values.items():
-                    actual_value = cells[cell_index].text if cell_index < len(cells) else ""
+                    actual_value = _visible_text(cells[cell_index].text) if cell_index < len(cells) else ""
                     expected_text = str(expected_value).rstrip("\r\n")
                     if actual_value != expected_text:
                         item_errors.append(f"implementation cell mismatch at row {row_index} cell {cell_index}")
@@ -1183,7 +1281,7 @@ def validate_output_dir(
             reflection_rows = [int(row) for row in manifest["fields"]["reflection"]["rows"]]
             for row_index, expected_value in zip(reflection_rows, format_reflection(item["reflection"])):
                 cells = actual_cells(table.rows[row_index]) if row_index < len(table.rows) else []
-                actual_value = cells[2].text if len(cells) > 2 else ""
+                actual_value = _visible_text(cells[2].text) if len(cells) > 2 else ""
                 if actual_value != expected_value:
                     item_errors.append(f"reflection cell mismatch at row {row_index} cell 2")
 
@@ -1214,7 +1312,7 @@ def validate_output_dir(
                 start=1,
             ):
                 for cell_index, expected_value in expected_values.items():
-                    actual_value = nested.cell(row_index, cell_index).text.strip()
+                    actual_value = _visible_text(nested.cell(row_index, cell_index).text.strip())
                     if actual_value != expected_value:
                         item_errors.append(f"evaluation cell mismatch at row {row_index} cell {cell_index}")
         except (IndexError, ValueError) as exc:

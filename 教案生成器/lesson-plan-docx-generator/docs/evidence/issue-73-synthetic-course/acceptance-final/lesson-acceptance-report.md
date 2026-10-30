@@ -1,16 +1,16 @@
 # Lesson Acceptance V2 Report
 
-- Final status: **PENDING_MANUAL_REVIEW**
+- Final status: **FAILED**
 - Course: 数据结构与算法 / 软件技术专业 / 高职二年级
 - Lessons/hours: 20 / 40.0
-- Source: `synthetic_fixture`; master: `3ce9d0f7f8f044c382282bda892164bb015ad3ca`
+- Source: `synthetic_fixture`; master: `d8200b6ca3c77a1e4ddcc8756457e46b25aa233f`
 - Content Contract: `2.4`; template: `v1.1.2`
 - Render/production: `passed` / `production_pass`
 - Delivery: `PASS`; reference gates: `PASS`; practice handoff: `not_applicable`
-- Input SHA256: `69A225D09A20E7380BA2D507CF02E00036017CC9D50AD88F9B465942692B59B3`
-- QA SHA256: `29039CD4FBDE5A99A2F2D456C44BB2C1C936B792A4D6C4B7B916F35A78B9C562`
-- Output inventory SHA256: `E9D9E80A3FE7618259EEF96FA2A0E9B862F2DAB51A5B02494E231B552EBA51B2`
-- Artifact manifest: `/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/artifacts/artifact-manifest.json`; SHA256: `398BF9A0FFE37C1A2A7BE55E705232CE96EEF0855B07226C5F2271D5165656B2`; run_id: `issue73-pilot-40h-separate`
+- Input SHA256: `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB`
+- QA SHA256: `00FDEDEF48B07237410F2355C302D1544C40A1795E59259EB671FA1317F33E78`
+- Output inventory SHA256: `E34E199C86C35369233B1BA5E75DEB9BEF47C393946FBF865B7B8A34B40DD25C`
+- Artifact manifest: `/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/artifacts/artifact-manifest.json`; SHA256: `CCBA09DE8DE743491CCEBE89B5CE67AA546A1CAFE43969F598A0A49E8DD3CCC2`; run_id: `issue73-quality-acceptance-r4`
 
 ## Structural hard gates
 
@@ -40,11 +40,11 @@ Overall: **PASS**
 
 ## Final artifact chain
 
-- Source JSON: `/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/pilot-40h-separate/lesson-content-v2.4.json` / `69A225D09A20E7380BA2D507CF02E00036017CC9D50AD88F9B465942692B59B3`
+- Source JSON: `/workspace/codex-work-skills/教案生成器/lesson-plan-docx-generator/docs/evidence/issue-73-synthetic-course/pilot-40h-separate/lesson-content-v2.4.json` / `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB`
 - Final DOCX: `20 per-Lesson files; see the manifest for paths and SHA256 values`
 - Final PDF: `20 per-Lesson files; see the manifest for paths and SHA256 values`
-- Retained final PDF pages: `130`; QA: `passed`; render: `passed`; production: `production_pass`
-- Reference evidence: `reference-evidence.json` / `70B56472D127E999835DB8E7FA0B7EC22D3F3F93B48731D44BCA0C232E83FB21`
+- Retained final PDF pages: `133`; QA: `passed`; render: `passed`; production: `production_pass`
+- Reference evidence: `reference-evidence.json` / `B6A3D867361D1A3BAFBE269F66BD95458FA0BD3AE6820DD0BC1B2E91F6101A47`
 - Page count and hashes are read from the retained final files; this report does not handwrite them.
 
 
@@ -62,12 +62,12 @@ Overall: **PASS**
 
 ## Manual review status
 
-- Visual: `not_executed`
+- Visual: `failed`
 - Teaching design: `not_executed`
 - Teacher usability: `not_executed`
 - Course scope: `not_executed`
 - Hallucination/provenance: `no_flags`
-- Manual completion required: `["visual_review", "teaching_design_review", "teacher_usability", "course_scope_review"]`
+- Manual completion required: `["teaching_design_review", "teacher_usability", "course_scope_review"]`
 - Read 4-6 representative lessons in full: L01, a boundary before/after, a complex/high-density lesson, and L32 when present.
 - Teacher rubric is 1-5 across all five documented criteria; the report requires complete per-Lesson assessments, usable_count, and tweak_count.
 

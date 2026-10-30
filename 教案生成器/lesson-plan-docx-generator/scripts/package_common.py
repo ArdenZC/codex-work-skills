@@ -62,10 +62,12 @@ V10_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "
 V11_MANIFEST = DEFAULT_MANIFEST
 V111_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "manifest.yaml"
 V113_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.3" / "manifest.yaml"
+V114_MANIFEST = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.4" / "manifest.yaml"
 V10_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.0.0" / "template.docx"
 V11_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.2" / "template.docx"
 V111_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.1" / "template.docx"
 V113_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.3" / "template.docx"
+V114_TEMPLATE = SKILL_DIR / "assets" / "templates" / "lesson-plan" / "v1.1.4" / "template.docx"
 LEGACY_TEMPLATE = SKILL_DIR / "assets" / "lesson-plan-template.docx"
 DEFAULT_SCHEMA = SKILL_DIR / "schemas" / "lesson-plan-input.schema.json"
 SEMVER_PATTERN = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
@@ -397,6 +399,7 @@ def validate_agent_owned_content(data: dict[str, Any], *, allow_test_fixture: bo
 def _known_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
     known = (
+        (V114_TEMPLATE, "1.1.4"),
         (V113_TEMPLATE, "1.1.3"),
         (V11_TEMPLATE, "1.1.2"),
         (V111_TEMPLATE, "1.1.1"),
@@ -419,6 +422,7 @@ def _known_template_version(path: Path) -> str | None:
 def _exact_template_version(path: Path) -> str | None:
     path = path.expanduser().resolve()
     for candidate, version in (
+        (V114_TEMPLATE, "1.1.4"),
         (V113_TEMPLATE, "1.1.3"),
         (V11_TEMPLATE, "1.1.2"),
         (V111_TEMPLATE, "1.1.1"),
@@ -544,6 +548,8 @@ def resolve_template_package(
         known_version = _known_template_version(template)
         if known_version == "1.1.3":
             resolved_manifest = V113_MANIFEST.resolve()
+        elif known_version == "1.1.4":
+            resolved_manifest = V114_MANIFEST.resolve()
         elif known_version == "1.1.2":
             resolved_manifest = V11_MANIFEST.resolve()
         elif known_version == "1.1.1":
