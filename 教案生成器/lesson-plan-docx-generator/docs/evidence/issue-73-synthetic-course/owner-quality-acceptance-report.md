@@ -9,7 +9,7 @@
 
 | 最终状态字段 | 状态 | 依据与边界 |
 | --- | --- | --- |
-| `ENGINEERING_VALIDATED` | **本地定向校验 PASS；本轮自然 CI 待确认** | Content 2.4 契约、内容质量、生成证据、20 份输出 manifest、目标测试与 Java 参考实现运行均通过。可选 1.1.4 包指纹缺陷已修并通过本地包校验；修订后的 PR CI 结果尚待返回。不代表真实课堂验证。 |
+| `ENGINEERING_VALIDATED` | **PENDING（定向校验通过；最新自然 CI 待确认）** | Content 2.4 契约、生成证据和课程目标检查通过。可选 1.1.4 模板及分片修复的定向检查通过；工具套件曾发现候选包与旧包数断言不兼容，已修改；本地 LibreOffice 26.8 下一个既有 gradebook 归档子用例仍有样式差异，须以修订后跨平台 PR CI 确认。 |
 | `CONTENT_REVIEWED` | **PASS（合成课程桌面审查）** | 20 课均有逐课结论；发现项已修改并二次复审。评分值、评价栏目和九阶段结构不变。 |
 | `REFERENCES_VERIFIED` | **PARTIAL** | 两条高教社书目元数据及目录/主题范围已独立核实；没有读取教材章节正文，故不为课程算法正确性背书。 |
 | `EXEMPLAR_COMPARISON_REVIEWED` | **PARTIAL** | 20 课均有具体的日常非盲对照；五个来源均未证明为优秀教案；P3 写前读取时序缺证。 |
@@ -144,8 +144,9 @@
 | L20 哈希测试未覆盖碰撞链未命中和满表失败后的保持性 | 用同起始槽测试键 C-204 检查 3/4/5/6/0；新增满表 7 次终止和溢出后七槽快照不变断言。 | 项目三复算模 7 路径并核对 starter、DOCX/PDF；L20 full-table test 结果一致。 |
 | 图论文被错误归因为 Kruskal/DSU 来源；L09/L13 逐课对照不相关 | 把论文作用限定为图主题组织和有限 Prim 背景；L09/L13 改为 DFS/BFS 和分量事实。 | 独立对标复审确认最终 sidecar 无不当归因；原始 Agent 返包保留并附修订说明追踪。 |
 | Windows CI 临时仓库的 `git add --all` 在两项生命周期测试中 exit 128 | 发现新增模板对照深路径在 Windows 测试 clone 下最长约 280 字符；将对照目录缩为 `t113/t112`，最长路径降至 242 字符，不改生成器代码。 | 触发失败的两个测试在当前环境重跑 2/2 PASS；Windows CI 自然重跑结果待当前 Draft PR 检查。 |
-| 首次视觉候选提交的 `Package contracts / static Ubuntu` 发现 v1.1.4 `fingerprint.value` 与模板文件 SHA-256 不一致 | 将 `fingerprint.value` 修正为实际模板 SHA-256 `D75A0A…29DBCD`；未修改模板文件或生成产物内容。 | 本地静态包合同验证 9/9、v1.1.4 定向测试 3/3、模板验证 errors=0/warnings=0；修订后自然 PR CI 待复核。 |
+| 首次视觉候选提交的模板包校验发现 `fingerprint.value` 不符；随后完整包验证发现孤立的 `base_manifest: layout-manifest.yaml` | 将指纹设为实际模板 SHA-256 `D75A0A…29DBCD`，并从自包含候选包移除不成对的 `base_manifest` 声明；模板 DOCX 和课程产物未变。 | 静态包合同 9/9、v1.1.4 全量 package-tool 校验 PASS、模板验证 errors=0/warnings=0；修订后自然 PR CI 待复核。 |
 | 新增的 v1.1.4 三项回归测试未进入根测试分片清单，Windows semantic-scope 精确覆盖检查少 3 项 | 将模板测试模块加入 `lesson-package` 分片，并在现有分区精确性测试中纳入该模块；不改变分片边界规则。 | 原 CI 差值为 manifest=1128、discovery=1131；修订后 6 项精确覆盖测试 PASS，`--list` 的全量 manifest 与根发现再次匹配。修订后自然 PR CI 待复核。 |
+| 模板包发现回归用例仍断言仓库只有 8 个模板包 | 将发现断言更新为 9 个，并把 lesson-plan 1.1.4 纳入预期集合。 | 新发现用例 1/1 PASS。`test_template_package_tooling` 全模块本地 59 项中，该断言已通过；仅 course-gradebook 归档子用例在本机 LibreOffice 26.8 报告原有工作簿字体粗体差异（expected bold=1, actual=None）。待最新 Windows/macOS CI 判定该平台差异。 |
 
 修订后重新运行 Content 2.4 契约/质量/证据校验并重生成全部 20 课。项目复审结论、主审内容摘要和最新哈希保留在来源文件和本报告；不超出 Content 2.4 既有 review-history 的 8 轮上限。
 
@@ -187,4 +188,4 @@
 - Java：JDK 21 编译器按 Source/Target 17 编译临时参考实现并在 JDK 21 运行，10/10 断言套件 PASS；这不等同原始 TODO 已完成或原生 JDK 17 运行验证。
 - 不运行 Codex Review；不合并 PR、不关闭 Issue、不发布 Release。
 
-- 视觉候选提交 `285b97f` 的首次自然 CI 暴露两项本轮引入的问题：v1.1.4 manifest 指纹不一致，以及新增 3 个测试未进入全量测试分片，导致 Windows semantic-scope exact-coverage 失败。二者均已在本地修正；静态包合同 9/9、v1.1.4 测试 3/3、精确分片覆盖 6/6 通过。修订后的自然 PR CI 尚待结果，因此本轮 `ENGINEERING_VALIDATED` 尚未达到 CI Gate PASS。
+- 视觉候选提交 `285b97f` 的自然 CI 暴露模板指纹和 semantic-scope 覆盖问题；提交 `5672cb1` 的自然 CI 又暴露候选包孤立的 `base_manifest` 声明与包数断言过时。相关项均已本地修复：静态合同 9/9、模板全量 package-tool 校验 PASS、v1.1.4 回归测试 3/3、精确分片覆盖 6/6、新包发现断言 1/1。完整 tooling 模块 59 项在本机 26.8 LibreOffice 下仍有一个 course-gradebook 原包样式子用例失败；此差异不涉及 lesson-plan DOCX，但当前自然 CI 仍需确认。最新修订 CI 完成前，`ENGINEERING_VALIDATED` 保持 PENDING。

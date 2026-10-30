@@ -4,7 +4,6 @@ template:
   version: 1.1.4
   format: docx
   file: template.docx
-  base_manifest: layout-manifest.yaml
   patches:
     evaluation_table_column_widths_twips:
     - 1304
