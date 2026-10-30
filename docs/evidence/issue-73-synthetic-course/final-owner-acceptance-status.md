@@ -4,11 +4,10 @@
 
 ## 最终代码与 CI
 
-- PR #75 保持 **OPEN / Draft**，未合并；PR #74 未修改。
-- 最终代码提交：`11182e2a6b6d5b84a086466c522f78fa2ecc6d70`。
-- 该提交 Tree：`eba6c26e7e4467f37eb8756dd460b41c1551b7a9`。
-- PR 相对最新 master 有 199 个变更路径；工作区干净。
-- [自然触发的 Template package CI run 41012486952](https://github.com/ArdenZC/codex-work-skills/actions/runs/41012486952)：**CI Gate PASS**。40 个 job 成功，Documentation checks 按变更分类跳过；Windows/macOS Lesson 核心、最终验收、语义分片、Template tooling、Template release 和相关静态合同均通过。
+- 本轮工程验收基线为 **PR #75 / Issue #73、#71**；PR #74 先前已合并。本附录记录合并前的审查快照，**PR 当前是否已合并以 GitHub 页面为准**。
+- **最后一个工程/模板实现提交**：`11182e2a6b6d5b84a086466c522f78fa2ecc6d70`（Tree `eba6c26e7e4467f37eb8756dd460b41c1551b7a9`）。其后 `0029a66b681f75f7ad46f146ea598c4d76d93e9c` 仅补充最终状态文档；本附录的收尾修订也不修改工程、模板或课程产物。
+- 工程提交对应的 [CI #41012486952](https://github.com/ArdenZC/codex-work-skills/actions/runs/41012486952) **SUCCESS / CI Gate PASS**；最新已核对的文档提交 `0029a66b681f75f7ad46f146ea598c4d76d93e9c` 对应 [exact-head CI #41021113748](https://github.com/ArdenZC/codex-work-skills/actions/runs/41021113748)，**41 个 job：40 成功、1 条件跳过、0 失败，CI Gate SUCCESS**；Windows/macOS Lesson core、Final Acceptance、Template tooling/release 均通过。
+- 收尾文档修订后，如出现新的 GitHub HEAD 或 CI，以实际提交和检查状态为准；**不得把较早提交的 CI 冒充新 HEAD 的 CI**。详细报告中工程状态 `PENDING` 属于 CI 完成前的历史审计快照，最终工程结论以本附录及精确 HEAD 的 GitHub CI 为准。
 - 首轮失败已落实修复并由最终 run 复验：模板 SHA 指纹不一致、语义分片未收录新增 3 项测试、候选包孤立的 `base_manifest` 声明，以及模板发现测试仍断言 8 个包。
 
 ## 最终状态字段
