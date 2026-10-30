@@ -1,0 +1,3743 @@
+{
+  "evidence_version": "1.0",
+  "review_status": "PASS_WITH_RENDERER_QUALIFICATION",
+  "scope": "Optional Template 1.1.4 candidate only; default Template 1.1.2 unchanged and its original 133-page visual inspection remains failed.",
+  "review_date_utc": "2026-10-30",
+  "reviewer_role": "primary owner-review agent",
+  "renderer": {
+    "name": "LibreOffice",
+    "version": "LibreOfficeDev 26.8",
+    "native_word_wps_status": "WORD_WPS_UNVERIFIED",
+    "font_configuration": "Temporary Fontconfig alias maps 仿宋 to Noto Sans CJK SC for consistent CJK metrics; config was external to the repository."
+  },
+  "source": {
+    "content_path": "../pilot-40h-separate/lesson-content-v2.4.json",
+    "content_sha256": "A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB",
+    "reviewed_content_digest": {
+      "source_final_content_sha256": "670ABE43B090CBCDEBB5A45C22294A4436A3573EF37F93B7453F1EE786B2C4B6",
+      "packaged_final_content_sha256": "670ABE43B090CBCDEBB5A45C22294A4436A3573EF37F93B7453F1EE786B2C4B6",
+      "match": true
+    },
+    "template_version": "1.1.4",
+    "template_sha256": "D75A0A777E0BE77525289AAF6464AECDE2783B1E68AE0B9A8BB613F74729DBCD",
+    "run_id": "issue73-visual-remediation-r7",
+    "production_status": "production_pass",
+    "qa_status": "passed",
+    "render_status": "passed",
+    "artifact_manifest_path": "artifact-manifest.json",
+    "artifact_manifest_sha256": "862A198F6CFE87EC8654B459CED62D34D16422EAE15FEE55D859A75C4502C868",
+    "qa_report_path": "qa-report.json",
+    "qa_report_sha256": "956F0BC7ECC89FE4E7CC019773E0FA7C86B8AFE9FF9468C4B72DF9C5AEEB1553"
+  },
+  "full_course_visual_result": {
+    "docx_count": 20,
+    "pdf_count": 20,
+    "hours": 40,
+    "page_count": 117,
+    "manual_pages_reviewed": 117,
+    "page_text_hashes_match_manifest": true,
+    "empty_pages": 0,
+    "pages_with_major_clipping_or_overlap_observed": 0,
+    "all_nonfirst_pages_have_running_column_label_guide": true,
+    "all_last_pages_contain_reflection": true,
+    "resolved_findings": [
+      "L07 p1 right-edge crop",
+      "L11 p4 overlap/crop",
+      "L14 p4 teacher activity clipping",
+      "L03/L04/L09 first-page title text omitted in LibreOffice output",
+      "narrow vertical evaluation remarks",
+      "reflection-only or one-line tail pages"
+    ],
+    "remaining_layout_notes": [
+      "Long implementation rows can span pages; the DOCX repeated-header row is valid, and an 8 pt running column-label guide is visible on every non-first page in LibreOffice.",
+      "Some final pages leave whitespace after the completed closing sequence; each contains the class summary, after-class activity, and reflection, and none is blank or reflection-only.",
+      "A few long practical activity rows are dense and are split across pages; content remains extractable and visually readable at page scale."
+    ],
+    "per_page_records": [
+      {
+        "lesson_id": "L01",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+        "pdf_sha256": "BDDAA8D5D4DA8561622D845A6207D8F25FD9CAD6D9BA73035AA88DA11281FEC4",
+        "text_char_count": 806,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L01-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L01",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+        "pdf_sha256": "BDDAA8D5D4DA8561622D845A6207D8F25FD9CAD6D9BA73035AA88DA11281FEC4",
+        "text_char_count": 947,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L01-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L01",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+        "pdf_sha256": "BDDAA8D5D4DA8561622D845A6207D8F25FD9CAD6D9BA73035AA88DA11281FEC4",
+        "text_char_count": 641,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L01-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L01",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+        "pdf_sha256": "BDDAA8D5D4DA8561622D845A6207D8F25FD9CAD6D9BA73035AA88DA11281FEC4",
+        "text_char_count": 892,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L01-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L01",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案01_项目一：线性结构与受限容器_线性表的逻辑结构、顺序存储与复杂度.pdf",
+        "pdf_sha256": "BDDAA8D5D4DA8561622D845A6207D8F25FD9CAD6D9BA73035AA88DA11281FEC4",
+        "text_char_count": 601,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L01-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L02",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+        "pdf_sha256": "044072E099CE3590A7AE21D0236C5225989BBF6FC8CB95C8A568170BEC19D3FB",
+        "text_char_count": 775,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L02-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L02",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+        "pdf_sha256": "044072E099CE3590A7AE21D0236C5225989BBF6FC8CB95C8A568170BEC19D3FB",
+        "text_char_count": 878,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L02-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L02",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+        "pdf_sha256": "044072E099CE3590A7AE21D0236C5225989BBF6FC8CB95C8A568170BEC19D3FB",
+        "text_char_count": 816,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L02-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L02",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+        "pdf_sha256": "044072E099CE3590A7AE21D0236C5225989BBF6FC8CB95C8A568170BEC19D3FB",
+        "text_char_count": 815,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L02-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L02",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案02_项目一：线性结构与受限容器_单链表节点、头指针与插入删除边界.pdf",
+        "pdf_sha256": "044072E099CE3590A7AE21D0236C5225989BBF6FC8CB95C8A568170BEC19D3FB",
+        "text_char_count": 453,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L02-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L03",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+        "pdf_sha256": "16D6BB5AC5EFC6B1A5E850A37367F28DCCBB64A5371FE08006C5A7308B590079",
+        "text_char_count": 759,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L03-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L03",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+        "pdf_sha256": "16D6BB5AC5EFC6B1A5E850A37367F28DCCBB64A5371FE08006C5A7308B590079",
+        "text_char_count": 906,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L03-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L03",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+        "pdf_sha256": "16D6BB5AC5EFC6B1A5E850A37367F28DCCBB64A5371FE08006C5A7308B590079",
+        "text_char_count": 829,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L03-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L03",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+        "pdf_sha256": "16D6BB5AC5EFC6B1A5E850A37367F28DCCBB64A5371FE08006C5A7308B590079",
+        "text_char_count": 798,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L03-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L03",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案03_项目一：线性结构与受限容器_栈、队列与循环队列的约束模型.pdf",
+        "pdf_sha256": "16D6BB5AC5EFC6B1A5E850A37367F28DCCBB64A5371FE08006C5A7308B590079",
+        "text_char_count": 422,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L03-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L04",
+        "page_number": 1,
+        "page_count": 6,
+        "pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "pdf_sha256": "2799BC63BA51CB64E69D5AFE377B5F84BC07E528BA041BFF70C171539A610BC0",
+        "text_char_count": 840,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L04-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L04",
+        "page_number": 2,
+        "page_count": 6,
+        "pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "pdf_sha256": "2799BC63BA51CB64E69D5AFE377B5F84BC07E528BA041BFF70C171539A610BC0",
+        "text_char_count": 941,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L04-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L04",
+        "page_number": 3,
+        "page_count": 6,
+        "pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "pdf_sha256": "2799BC63BA51CB64E69D5AFE377B5F84BC07E528BA041BFF70C171539A610BC0",
+        "text_char_count": 784,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L04-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L04",
+        "page_number": 4,
+        "page_count": 6,
+        "pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "pdf_sha256": "2799BC63BA51CB64E69D5AFE377B5F84BC07E528BA041BFF70C171539A610BC0",
+        "text_char_count": 565,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L04-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L04",
+        "page_number": 5,
+        "page_count": 6,
+        "pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "pdf_sha256": "2799BC63BA51CB64E69D5AFE377B5F84BC07E528BA041BFF70C171539A610BC0",
+        "text_char_count": 644,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L04-p05-06.jpg"
+      },
+      {
+        "lesson_id": "L04",
+        "page_number": 6,
+        "page_count": 6,
+        "pdf_path": "render/pdf/教案04_项目一：线性结构与受限容器_实现顺序表新增、查找和容量边界检查.pdf",
+        "pdf_sha256": "2799BC63BA51CB64E69D5AFE377B5F84BC07E528BA041BFF70C171539A610BC0",
+        "text_char_count": 739,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L04-p05-06.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 1,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 820,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 2,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 862,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 3,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 878,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 4,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 583,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 5,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 508,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 6,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 518,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L05",
+        "page_number": 7,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案05_项目一：线性结构与受限容器_完成单链表插入、删除、反转与指针检查.pdf",
+        "pdf_sha256": "D223CC517A4D8804F4117A0ED77476693760940133E98027ADBA164DE526B8E3",
+        "text_char_count": 438,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L05-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 1,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 731,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 2,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 909,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 3,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 892,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 4,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 673,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 5,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 526,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 6,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 543,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L06",
+        "page_number": 7,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案06_项目一：线性结构与受限容器_用栈与循环队列完成表达式和排队模拟.pdf",
+        "pdf_sha256": "754865862D0FFE12D4F5CAD660B81CE72270BD65690D6C54641F449C709EAA13",
+        "text_char_count": 480,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L06-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L07",
+        "page_number": 1,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
+        "pdf_sha256": "5F9817CBEF188A7C52A392CDE9ECE15C270486E2F98A0E43B9071AA1DE0B2D0C",
+        "text_char_count": 806,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L07-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L07",
+        "page_number": 2,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
+        "pdf_sha256": "5F9817CBEF188A7C52A392CDE9ECE15C270486E2F98A0E43B9071AA1DE0B2D0C",
+        "text_char_count": 826,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L07-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L07",
+        "page_number": 3,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
+        "pdf_sha256": "5F9817CBEF188A7C52A392CDE9ECE15C270486E2F98A0E43B9071AA1DE0B2D0C",
+        "text_char_count": 723,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L07-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L07",
+        "page_number": 4,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案07_项目二：树与图关系处理_二叉树结构、存储方式与遍历次序.pdf",
+        "pdf_sha256": "5F9817CBEF188A7C52A392CDE9ECE15C270486E2F98A0E43B9071AA1DE0B2D0C",
+        "text_char_count": 596,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L07-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L08",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+        "pdf_sha256": "14F2A39B22510D35C57D6D527D2D250A8AA3047C00F8EE7BCE9AF0DCCA951776",
+        "text_char_count": 701,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L08-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L08",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+        "pdf_sha256": "14F2A39B22510D35C57D6D527D2D250A8AA3047C00F8EE7BCE9AF0DCCA951776",
+        "text_char_count": 902,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L08-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L08",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+        "pdf_sha256": "14F2A39B22510D35C57D6D527D2D250A8AA3047C00F8EE7BCE9AF0DCCA951776",
+        "text_char_count": 501,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L08-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L08",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+        "pdf_sha256": "14F2A39B22510D35C57D6D527D2D250A8AA3047C00F8EE7BCE9AF0DCCA951776",
+        "text_char_count": 539,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L08-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L08",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案08_项目二：树与图关系处理_二叉搜索树的查找、插入与退化情形.pdf",
+        "pdf_sha256": "14F2A39B22510D35C57D6D527D2D250A8AA3047C00F8EE7BCE9AF0DCCA951776",
+        "text_char_count": 338,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L08-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L09",
+        "page_number": 1,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
+        "pdf_sha256": "7DC8245A1BBC8485233736D6DE74386B0755AEA1B85DE5A0CB7497B49D37CC75",
+        "text_char_count": 757,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L09-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L09",
+        "page_number": 2,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
+        "pdf_sha256": "7DC8245A1BBC8485233736D6DE74386B0755AEA1B85DE5A0CB7497B49D37CC75",
+        "text_char_count": 732,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L09-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L09",
+        "page_number": 3,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
+        "pdf_sha256": "7DC8245A1BBC8485233736D6DE74386B0755AEA1B85DE5A0CB7497B49D37CC75",
+        "text_char_count": 639,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L09-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L09",
+        "page_number": 4,
+        "page_count": 4,
+        "pdf_path": "render/pdf/教案09_项目二：树与图关系处理_图的邻接表、邻接矩阵、DFS与BFS.pdf",
+        "pdf_sha256": "7DC8245A1BBC8485233736D6DE74386B0755AEA1B85DE5A0CB7497B49D37CC75",
+        "text_char_count": 440,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L09-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L10",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+        "pdf_sha256": "92D6BB23C80DAED880B999510D0445193E0BE07E53B061E6B206AA93809C22E6",
+        "text_char_count": 763,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L10-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L10",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+        "pdf_sha256": "92D6BB23C80DAED880B999510D0445193E0BE07E53B061E6B206AA93809C22E6",
+        "text_char_count": 784,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L10-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L10",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+        "pdf_sha256": "92D6BB23C80DAED880B999510D0445193E0BE07E53B061E6B206AA93809C22E6",
+        "text_char_count": 610,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L10-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L10",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+        "pdf_sha256": "92D6BB23C80DAED880B999510D0445193E0BE07E53B061E6B206AA93809C22E6",
+        "text_char_count": 467,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L10-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L10",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案10_项目二：树与图关系处理_加权无向图最小生成树与PrimKruskal.pdf",
+        "pdf_sha256": "92D6BB23C80DAED880B999510D0445193E0BE07E53B061E6B206AA93809C22E6",
+        "text_char_count": 315,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L10-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L11",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+        "pdf_sha256": "79E65D6A5C8E675E714C13A3493F8883F32D8FA5DBC8480E2E8B55C3BC86DD3E",
+        "text_char_count": 798,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L11-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L11",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+        "pdf_sha256": "79E65D6A5C8E675E714C13A3493F8883F32D8FA5DBC8480E2E8B55C3BC86DD3E",
+        "text_char_count": 829,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L11-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L11",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+        "pdf_sha256": "79E65D6A5C8E675E714C13A3493F8883F32D8FA5DBC8480E2E8B55C3BC86DD3E",
+        "text_char_count": 364,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L11-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L11",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+        "pdf_sha256": "79E65D6A5C8E675E714C13A3493F8883F32D8FA5DBC8480E2E8B55C3BC86DD3E",
+        "text_char_count": 642,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L11-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L11",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案11_项目二：树与图关系处理_构建二叉树并输出三种遍历与层序结果.pdf",
+        "pdf_sha256": "79E65D6A5C8E675E714C13A3493F8883F32D8FA5DBC8480E2E8B55C3BC86DD3E",
+        "text_char_count": 314,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L11-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L12",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+        "pdf_sha256": "F35BC14AE470B42AD9CC71F0C946F9096A288156D3D54A24376520925A89AF6E",
+        "text_char_count": 793,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L12-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L12",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+        "pdf_sha256": "F35BC14AE470B42AD9CC71F0C946F9096A288156D3D54A24376520925A89AF6E",
+        "text_char_count": 763,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L12-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L12",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+        "pdf_sha256": "F35BC14AE470B42AD9CC71F0C946F9096A288156D3D54A24376520925A89AF6E",
+        "text_char_count": 457,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L12-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L12",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+        "pdf_sha256": "F35BC14AE470B42AD9CC71F0C946F9096A288156D3D54A24376520925A89AF6E",
+        "text_char_count": 635,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L12-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L12",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案12_项目二：树与图关系处理_实现二叉搜索树并测试查找插入删除.pdf",
+        "pdf_sha256": "F35BC14AE470B42AD9CC71F0C946F9096A288156D3D54A24376520925A89AF6E",
+        "text_char_count": 490,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L12-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L13",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+        "pdf_sha256": "3081AC426E42F7D3CD727EEA602DCD1E332A30C8CEB5019E887FBDEF2B16F8B1",
+        "text_char_count": 755,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L13-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L13",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+        "pdf_sha256": "3081AC426E42F7D3CD727EEA602DCD1E332A30C8CEB5019E887FBDEF2B16F8B1",
+        "text_char_count": 703,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L13-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L13",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+        "pdf_sha256": "3081AC426E42F7D3CD727EEA602DCD1E332A30C8CEB5019E887FBDEF2B16F8B1",
+        "text_char_count": 435,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L13-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L13",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+        "pdf_sha256": "3081AC426E42F7D3CD727EEA602DCD1E332A30C8CEB5019E887FBDEF2B16F8B1",
+        "text_char_count": 639,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L13-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L13",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案13_项目二：树与图关系处理_实现DFSBFS并核验访问顺序与连通分量.pdf",
+        "pdf_sha256": "3081AC426E42F7D3CD727EEA602DCD1E332A30C8CEB5019E887FBDEF2B16F8B1",
+        "text_char_count": 397,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L13-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L14",
+        "page_number": 1,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+        "pdf_sha256": "A9A0A330834888131AE19A7C35872AC99E274187A3A3174C6DAFE5C75B97889F",
+        "text_char_count": 724,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L14-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L14",
+        "page_number": 2,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+        "pdf_sha256": "A9A0A330834888131AE19A7C35872AC99E274187A3A3174C6DAFE5C75B97889F",
+        "text_char_count": 749,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L14-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L14",
+        "page_number": 3,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+        "pdf_sha256": "A9A0A330834888131AE19A7C35872AC99E274187A3A3174C6DAFE5C75B97889F",
+        "text_char_count": 473,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L14-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L14",
+        "page_number": 4,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+        "pdf_sha256": "A9A0A330834888131AE19A7C35872AC99E274187A3A3174C6DAFE5C75B97889F",
+        "text_char_count": 629,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L14-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L14",
+        "page_number": 5,
+        "page_count": 5,
+        "pdf_path": "render/pdf/教案14_项目二：树与图关系处理_比较Prim与Kruskal并校验路线变更影响.pdf",
+        "pdf_sha256": "A9A0A330834888131AE19A7C35872AC99E274187A3A3174C6DAFE5C75B97889F",
+        "text_char_count": 488,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L14-p05-05.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 1,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 714,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 2,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 701,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 3,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 915,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 4,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 249,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 5,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 463,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 6,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 597,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 7,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 436,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L15",
+        "page_number": 8,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案15_项目三：排序与检索性能_稳定性、原地性与插入排序工作机理.pdf",
+        "pdf_sha256": "B14FE9518E3B61EF670AA3E54F7287CC4694EC4908748302D7BF3DA615C9CE20",
+        "text_char_count": 623,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L15-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 1,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 733,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 2,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 882,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 3,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 755,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 4,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 497,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 5,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 561,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 6,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 556,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 7,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 415,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L16",
+        "page_number": 8,
+        "page_count": 8,
+        "pdf_path": "render/pdf/教案16_项目三：排序与检索性能_快速排序分区不变量、递归与复杂度.pdf",
+        "pdf_sha256": "9F293E0F50DE4A906D8CE8683DA46A34A9AF60D846EC52E4D72A5C64A9E82B5A",
+        "text_char_count": 604,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L16-p05-08.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 1,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 651,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 2,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 817,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 3,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 734,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 4,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 225,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 5,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 445,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 6,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 715,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L17",
+        "page_number": 7,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案17_项目三：排序与检索性能_查找策略、散列表冲突与负载因子.pdf",
+        "pdf_sha256": "7402377E69538215B70C34BA977BD2447FEA5B3C69091E04FC06E0C7125FBF25",
+        "text_char_count": 754,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L17-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 1,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 726,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 2,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 769,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 3,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 811,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 4,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 480,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 5,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 629,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 6,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 396,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L18",
+        "page_number": 7,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案18_项目三：排序与检索性能_实现插入排序并验证稳定性和比较次数.pdf",
+        "pdf_sha256": "DA5F84D977A36E1146C78A8C89172CE0302E0F132439B93662469871B7916DDF",
+        "text_char_count": 626,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L18-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 1,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 695,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 2,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 772,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 3,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 820,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 4,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 452,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 5,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 598,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 6,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 355,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L19",
+        "page_number": 7,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案19_项目三：排序与检索性能_实现快速排序分区并采集递归比较数据.pdf",
+        "pdf_sha256": "0FEB006CDD8107CF3FF71C37125E7A096D322FF6D4FBC034A2C34C3574C92432",
+        "text_char_count": 571,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L19-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 1,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 735,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": null,
+          "title_matches_docx_text": true,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 2,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 755,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 3,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 818,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 4,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 728,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p01-04.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 5,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 481,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 6,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 576,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": false,
+          "tail_contains_reflection": null
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p05-07.jpg"
+      },
+      {
+        "lesson_id": "L20",
+        "page_number": 7,
+        "page_count": 7,
+        "pdf_path": "render/pdf/教案20_项目三：排序与检索性能_实现库存条目检索并测试散列冲突处理.pdf",
+        "pdf_sha256": "9E52CAA7594C13731C5C99B35B8F2DA1202B4C758E560FB6373FD631B89D35D0",
+        "text_char_count": 592,
+        "page_size_pt": [
+          595.3,
+          841.89
+        ],
+        "flags": {
+          "manual_full_page_visual_scan": true,
+          "has_extractable_text": true,
+          "blank_page": false,
+          "text_bounds_inside_pdf_page": true,
+          "visible_clipping_or_overlap_observed": false,
+          "running_column_label_guide_present": true,
+          "title_matches_docx_text": null,
+          "tail_page": true,
+          "tail_contains_reflection": true
+        },
+        "contact_sheet": "visual-review/all-pages/L20-p05-07.jpg"
+      }
+    ]
+  },
+  "incremental_second_review": {
+    "first_candidate": "r6",
+    "finding": "L03, L04, and L09 page-one title text was present in DOCX but absent from LibreOffice PDF text/render due East Asian theme-font fallback.",
+    "correction": "Explicit 仿宋 mapping on the optional template title run; 20 final PDFs regenerated.",
+    "raster_comparison": "Compared every r6/r7 page at 0.7x. Exactly 25 pages changed: p1 for all 20 lessons plus L04 p2-p3 and L09 p2-p4; the other 92 pages are pixel-identical at the comparison scale.",
+    "changed_pages_reviewed_in_r7": [
+      {
+        "lesson_id": "教案01_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案02_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          64
+        ]
+      },
+      {
+        "lesson_id": "教案03_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          34,
+          29,
+          382,
+          42
+        ]
+      },
+      {
+        "lesson_id": "教案04_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          28,
+          29,
+          388,
+          544
+        ]
+      },
+      {
+        "lesson_id": "教案04_项",
+        "page_number": 2,
+        "difference_bbox_px": [
+          34,
+          31,
+          383,
+          556
+        ]
+      },
+      {
+        "lesson_id": "教案04_项",
+        "page_number": 3,
+        "difference_bbox_px": [
+          34,
+          27,
+          383,
+          525
+        ]
+      },
+      {
+        "lesson_id": "教案05_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案06_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案07_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          42
+        ]
+      },
+      {
+        "lesson_id": "教案08_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          64
+        ]
+      },
+      {
+        "lesson_id": "教案09_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          34,
+          28,
+          383,
+          556
+        ]
+      },
+      {
+        "lesson_id": "教案09_项",
+        "page_number": 2,
+        "difference_bbox_px": [
+          34,
+          31,
+          383,
+          555
+        ]
+      },
+      {
+        "lesson_id": "教案09_项",
+        "page_number": 3,
+        "difference_bbox_px": [
+          34,
+          22,
+          383,
+          522
+        ]
+      },
+      {
+        "lesson_id": "教案09_项",
+        "page_number": 4,
+        "difference_bbox_px": [
+          34,
+          31,
+          383,
+          326
+        ]
+      },
+      {
+        "lesson_id": "教案10_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          48,
+          28,
+          368,
+          65
+        ]
+      },
+      {
+        "lesson_id": "教案11_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          31,
+          28,
+          386,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案12_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          65
+        ]
+      },
+      {
+        "lesson_id": "教案13_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          28,
+          28,
+          388,
+          64
+        ]
+      },
+      {
+        "lesson_id": "教案14_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          32,
+          28,
+          386,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案15_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          31,
+          28,
+          386,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案16_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          31,
+          28,
+          386,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案17_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          31,
+          28,
+          385,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案18_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          31,
+          28,
+          386,
+          64
+        ]
+      },
+      {
+        "lesson_id": "教案19_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          29,
+          28,
+          388,
+          63
+        ]
+      },
+      {
+        "lesson_id": "教案20_项",
+        "page_number": 1,
+        "difference_bbox_px": [
+          31,
+          28,
+          386,
+          64
+        ]
+      }
+    ],
+    "title_verification": "All 20 first-page PDF title strings exactly match generated DOCX title paragraphs after whitespace normalization; all title strips visually reviewed.",
+    "content_reflow_pages_reviewed": [
+      "L04 p1-p3",
+      "L09 p1-p4"
+    ],
+    "high_resolution_pages": [
+      "L03 p1",
+      "L04 p1",
+      "L07 p1",
+      "L11 p4",
+      "L14 p4",
+      "L01 p3",
+      "L06 p3",
+      "L12 p5",
+      "L19 p7"
+    ]
+  },
+  "page_count_comparison": {
+    "source_sha256_shared_by_controlled_runs": "A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB",
+    "comparison_basis": "Same Content 2.4 bytes for all runs. The historical 133-page r4 output was rendered under the default environment; controlled 1.1.2/1.1.3/1.1.4 comparison reruns used the same temporary CJK Fontconfig alias. Page count is not treated as a quality score.",
+    "historical_original_template_v1_1_2": {
+      "total_pages": 133,
+      "manifest_path": "../artifacts/artifact-manifest.json",
+      "visual_evidence_path": "../artifacts/visual-inspection-evidence.json",
+      "visual_evidence_sha256": "415C2C7E05FD4BBA5AE083EEF2ADD0F2E80C5A834E6A09A969F110F2B4F8E154"
+    },
+    "controlled_same_input_reruns": {
+      "v1.1.2": {
+        "total_pages": 140,
+        "template_sha256": "6FFAFA579D3AACBC535BA624D0A6A766644868B0AF1FCE6AC37B20BA8F3D8FC1",
+        "per_lesson_pages": [
+          7,
+          7,
+          7,
+          8,
+          9,
+          9,
+          5,
+          5,
+          5,
+          5,
+          5,
+          6,
+          5,
+          6,
+          9,
+          9,
+          9,
+          8,
+          8,
+          8
+        ]
+      },
+      "v1.1.3": {
+        "total_pages": 122,
+        "template_sha256": "D0A5BA37D2CB4AF445F10DE17FBC3363FA26E52C373B3F71EFE0E6C49C47D613",
+        "per_lesson_pages": [
+          6,
+          6,
+          6,
+          7,
+          7,
+          7,
+          5,
+          5,
+          4,
+          5,
+          5,
+          5,
+          5,
+          5,
+          8,
+          8,
+          7,
+          7,
+          7,
+          7
+        ]
+      },
+      "v1.1.4_r7": {
+        "total_pages": 117,
+        "template_sha256": "D75A0A777E0BE77525289AAF6464AECDE2783B1E68AE0B9A8BB613F74729DBCD",
+        "per_lesson_pages": [
+          5,
+          5,
+          5,
+          6,
+          7,
+          7,
+          4,
+          5,
+          4,
+          5,
+          5,
+          5,
+          5,
+          5,
+          8,
+          8,
+          7,
+          7,
+          7,
+          7
+        ]
+      }
+    },
+    "per_lesson_matrix": [
+      {
+        "lesson_id": "L01",
+        "r4_default_v1_1_2_original_133_page_baseline": 6,
+        "controlled_same_input_v1_1_2": 7,
+        "controlled_same_input_v1_1_3": 6,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L02",
+        "r4_default_v1_1_2_original_133_page_baseline": 7,
+        "controlled_same_input_v1_1_2": 7,
+        "controlled_same_input_v1_1_3": 6,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L03",
+        "r4_default_v1_1_2_original_133_page_baseline": 7,
+        "controlled_same_input_v1_1_2": 7,
+        "controlled_same_input_v1_1_3": 6,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L04",
+        "r4_default_v1_1_2_original_133_page_baseline": 7,
+        "controlled_same_input_v1_1_2": 8,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 6
+      },
+      {
+        "lesson_id": "L05",
+        "r4_default_v1_1_2_original_133_page_baseline": 8,
+        "controlled_same_input_v1_1_2": 9,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 7
+      },
+      {
+        "lesson_id": "L06",
+        "r4_default_v1_1_2_original_133_page_baseline": 9,
+        "controlled_same_input_v1_1_2": 9,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 7
+      },
+      {
+        "lesson_id": "L07",
+        "r4_default_v1_1_2_original_133_page_baseline": 5,
+        "controlled_same_input_v1_1_2": 5,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 4
+      },
+      {
+        "lesson_id": "L08",
+        "r4_default_v1_1_2_original_133_page_baseline": 5,
+        "controlled_same_input_v1_1_2": 5,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L09",
+        "r4_default_v1_1_2_original_133_page_baseline": 4,
+        "controlled_same_input_v1_1_2": 5,
+        "controlled_same_input_v1_1_3": 4,
+        "final_candidate_v1_1_4_r7": 4
+      },
+      {
+        "lesson_id": "L10",
+        "r4_default_v1_1_2_original_133_page_baseline": 5,
+        "controlled_same_input_v1_1_2": 5,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L11",
+        "r4_default_v1_1_2_original_133_page_baseline": 5,
+        "controlled_same_input_v1_1_2": 5,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L12",
+        "r4_default_v1_1_2_original_133_page_baseline": 6,
+        "controlled_same_input_v1_1_2": 6,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L13",
+        "r4_default_v1_1_2_original_133_page_baseline": 5,
+        "controlled_same_input_v1_1_2": 5,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L14",
+        "r4_default_v1_1_2_original_133_page_baseline": 6,
+        "controlled_same_input_v1_1_2": 6,
+        "controlled_same_input_v1_1_3": 5,
+        "final_candidate_v1_1_4_r7": 5
+      },
+      {
+        "lesson_id": "L15",
+        "r4_default_v1_1_2_original_133_page_baseline": 8,
+        "controlled_same_input_v1_1_2": 9,
+        "controlled_same_input_v1_1_3": 8,
+        "final_candidate_v1_1_4_r7": 8
+      },
+      {
+        "lesson_id": "L16",
+        "r4_default_v1_1_2_original_133_page_baseline": 9,
+        "controlled_same_input_v1_1_2": 9,
+        "controlled_same_input_v1_1_3": 8,
+        "final_candidate_v1_1_4_r7": 8
+      },
+      {
+        "lesson_id": "L17",
+        "r4_default_v1_1_2_original_133_page_baseline": 8,
+        "controlled_same_input_v1_1_2": 9,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 7
+      },
+      {
+        "lesson_id": "L18",
+        "r4_default_v1_1_2_original_133_page_baseline": 7,
+        "controlled_same_input_v1_1_2": 8,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 7
+      },
+      {
+        "lesson_id": "L19",
+        "r4_default_v1_1_2_original_133_page_baseline": 8,
+        "controlled_same_input_v1_1_2": 8,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 7
+      },
+      {
+        "lesson_id": "L20",
+        "r4_default_v1_1_2_original_133_page_baseline": 8,
+        "controlled_same_input_v1_1_2": 8,
+        "controlled_same_input_v1_1_3": 7,
+        "final_candidate_v1_1_4_r7": 7
+      }
+    ],
+    "comparison_observation": "Across the representative long-remark pages L01 p3, L06 p3 and L18 p3, v1.1.2 wraps remarks into narrow vertical stacks; v1.1.3 improves horizontal room; optional v1.1.4 preserves horizontal reading while fixing lesson-table continuation layout. v1.1.3 improves long-note readability on the sampled pages but still leaves L12/L19 sparse tails versus v1.1.4."
+  },
+  "review_images": [
+    {
+      "path": "visual-review/all-pages/L01-p01-04.jpg",
+      "sha256": "1445E56C5129B3BA4E078F5A1F6576686FFAC6A738C21D9E67D62585F46A40EA",
+      "bytes": 229777
+    },
+    {
+      "path": "visual-review/all-pages/L01-p05-05.jpg",
+      "sha256": "5446CA7BE0BDFAEA55350D7F66C132613215B1144662EFBB13828966AA5547AE",
+      "bytes": 46463
+    },
+    {
+      "path": "visual-review/all-pages/L02-p01-04.jpg",
+      "sha256": "CA618E62ACE47308A49374766D6B8E9C2EC896D0B195963587ECBA4717ED6088",
+      "bytes": 231463
+    },
+    {
+      "path": "visual-review/all-pages/L02-p05-05.jpg",
+      "sha256": "A139D2DE66FFB7B3C9736001F9B0B1D4966CD0254E7854C31DB34F8175AFC80D",
+      "bytes": 36756
+    },
+    {
+      "path": "visual-review/all-pages/L03-p01-04.jpg",
+      "sha256": "85B7BFB6444F0F8A3A95B7333DA02F1DC97DF319F0F881A2DF3CEB11CED08B30",
+      "bytes": 226344
+    },
+    {
+      "path": "visual-review/all-pages/L03-p05-05.jpg",
+      "sha256": "782D2AAFFECECF7CA3A9C0E217F55F5926EBF7C5AC708E24006D29931F30BDE0",
+      "bytes": 35733
+    },
+    {
+      "path": "visual-review/all-pages/L04-p01-04.jpg",
+      "sha256": "862EEAD0D0B6920110400807D2D9EA6089BDBBAF673ABF85E68AEA696BFFF20A",
+      "bytes": 212974
+    },
+    {
+      "path": "visual-review/all-pages/L04-p05-06.jpg",
+      "sha256": "B5144D43F68C27B060F36D12D7BFBD34C23C3C671530E4DA7775FE36DD5166C1",
+      "bytes": 91189
+    },
+    {
+      "path": "visual-review/all-pages/L05-p01-04.jpg",
+      "sha256": "59ECCEB22CC7EB12AB822CC8D6F6634A23A7F208737D99C094A35A6836F8672F",
+      "bytes": 217442
+    },
+    {
+      "path": "visual-review/all-pages/L05-p05-07.jpg",
+      "sha256": "8B9D450883D7AE0D45C98B11E6316EE982AB861F7D8E3E82CF9719EA440E1908",
+      "bytes": 97475
+    },
+    {
+      "path": "visual-review/all-pages/L06-p01-04.jpg",
+      "sha256": "9161B140409E9A49E6F1DE4B88880702D1BAE446F45BBF933A3B3993D820E6A8",
+      "bytes": 224256
+    },
+    {
+      "path": "visual-review/all-pages/L06-p05-07.jpg",
+      "sha256": "ECF2CF49CB9607184B47872B05E9B8F0B78A63391569BCBAA89FA7BD7D6A78E3",
+      "bytes": 97942
+    },
+    {
+      "path": "visual-review/all-pages/L07-p01-04.jpg",
+      "sha256": "A337AE79AA0A27EB7A4CFC31AF044D7624AF15E1A62164895EAA34A60B0DAC67",
+      "bytes": 210649
+    },
+    {
+      "path": "visual-review/all-pages/L08-p01-04.jpg",
+      "sha256": "A5F9CFB857F3E2A0F31329AFFF5DBEFFDB8998D468AC29206E87EF4BFB14B9E4",
+      "bytes": 185659
+    },
+    {
+      "path": "visual-review/all-pages/L08-p05-05.jpg",
+      "sha256": "5D2CBF468D96070DB6DBBE592D225BC3F9DAAB6688467084A145B8E6E9B5A04C",
+      "bytes": 29933
+    },
+    {
+      "path": "visual-review/all-pages/L09-p01-04.jpg",
+      "sha256": "09C713806603E1D0C322D6EB7959B3E1FD41CA942FE009F83072021D018B79B4",
+      "bytes": 183006
+    },
+    {
+      "path": "visual-review/all-pages/L10-p01-04.jpg",
+      "sha256": "F8B20C343EB15113B3CAB89A44D5055B201CC94165CF291193EF5A164CA68194",
+      "bytes": 186236
+    },
+    {
+      "path": "visual-review/all-pages/L10-p05-05.jpg",
+      "sha256": "DCBD9654DC700639F5281EC1A783B93F4639E7EB3512FFE1745432B0326486BF",
+      "bytes": 29283
+    },
+    {
+      "path": "visual-review/all-pages/L11-p01-04.jpg",
+      "sha256": "FFD36020D94BCA4FD938FE9DD5D0BBADFB13C2AD1528E507F5E4E1AF78EBBE7A",
+      "bytes": 184156
+    },
+    {
+      "path": "visual-review/all-pages/L11-p05-05.jpg",
+      "sha256": "94C346BB4A638294EC100471FA014454506E7F4DD2AF8840BB4EDFE6B96FD5FE",
+      "bytes": 29030
+    },
+    {
+      "path": "visual-review/all-pages/L12-p01-04.jpg",
+      "sha256": "03AD370F2E1F1F6077EDEB5D088B022C6B683B534624679D9AD21A50C982A863",
+      "bytes": 178826
+    },
+    {
+      "path": "visual-review/all-pages/L12-p05-05.jpg",
+      "sha256": "BCA5CB8B835A3837BDE9547FEEAA3340594E3596C01E41AFF4A059DF249BFD53",
+      "bytes": 42332
+    },
+    {
+      "path": "visual-review/all-pages/L13-p01-04.jpg",
+      "sha256": "4B8FDBED4E7E0E6F603B1886FF8D62FDE396DE0D198901AE9573179C034861AE",
+      "bytes": 176244
+    },
+    {
+      "path": "visual-review/all-pages/L13-p05-05.jpg",
+      "sha256": "B1A9F01D84384AF3150ECC821200E00FF478971FDB40CD8EEDA981DA677C9CE1",
+      "bytes": 34998
+    },
+    {
+      "path": "visual-review/all-pages/L14-p01-04.jpg",
+      "sha256": "FB54CE76F0E0B825304A32E737136D7C929E106D713A677E8AA8C487D445FCB8",
+      "bytes": 175215
+    },
+    {
+      "path": "visual-review/all-pages/L14-p05-05.jpg",
+      "sha256": "B50FEE8E2865E2837B1FD9697135AD739D0F8887CA74E12ECE5DDA9AE2294858",
+      "bytes": 41159
+    },
+    {
+      "path": "visual-review/all-pages/L15-p01-04.jpg",
+      "sha256": "5DAE48C83F5248A669BC72322D3382920EFE8B9B20AB43049A20904890F8B9B6",
+      "bytes": 193671
+    },
+    {
+      "path": "visual-review/all-pages/L15-p05-08.jpg",
+      "sha256": "B7EB80646F2113D7958C01DB0B6ED9827B63B8779E7337BEDE89EE5641DF7E18",
+      "bytes": 136386
+    },
+    {
+      "path": "visual-review/all-pages/L16-p01-04.jpg",
+      "sha256": "92E06BD11C9304BC69E2AC0121C53F4418933B5A2E3FB3C8D3FC3D5FA6C4E022",
+      "bytes": 210779
+    },
+    {
+      "path": "visual-review/all-pages/L16-p05-08.jpg",
+      "sha256": "54E1A20E863B6851E5FC8BC4B29FAEB3383FA693BD8820367FF28C6ED33D2520",
+      "bytes": 134216
+    },
+    {
+      "path": "visual-review/all-pages/L17-p01-04.jpg",
+      "sha256": "D5014C7204C428806B971863D0C9FE4AE02942C6214E6E4D8E0B653C0BA6EA8C",
+      "bytes": 191387
+    },
+    {
+      "path": "visual-review/all-pages/L17-p05-07.jpg",
+      "sha256": "D3523899688AF2D7840B54C3DAEF23B6B22F0E092277CFE9F7F7F01FE52433FB",
+      "bytes": 127495
+    },
+    {
+      "path": "visual-review/all-pages/L18-p01-04.jpg",
+      "sha256": "F08BDED2DC6E920D1666E5588E219432142D5F1BCE9F4A65376A5B669DCFDB72",
+      "bytes": 195223
+    },
+    {
+      "path": "visual-review/all-pages/L18-p05-07.jpg",
+      "sha256": "634DECD05C31C3E55D3166BFAAB7312E7F4B30E36D8958CFB190ABC7B851A1EF",
+      "bytes": 109006
+    },
+    {
+      "path": "visual-review/all-pages/L19-p01-04.jpg",
+      "sha256": "1BA456D55DD371D3A8CDE5FED3788E066FA930DF1D87CC6C69F660F06DA38708",
+      "bytes": 195836
+    },
+    {
+      "path": "visual-review/all-pages/L19-p05-07.jpg",
+      "sha256": "E635E93E6472B69DCD16E192A6ACAD02B9D47570D436D761584956CCEA788BB6",
+      "bytes": 103928
+    },
+    {
+      "path": "visual-review/all-pages/L20-p01-04.jpg",
+      "sha256": "F4359D4CE2011AE9808DA5D4562AD916F40D111A6DD756455A4012CD511CCB5B",
+      "bytes": 212190
+    },
+    {
+      "path": "visual-review/all-pages/L20-p05-07.jpg",
+      "sha256": "4C54DD1DFA64FBED3D8B0DCC8712DDCC723F62CFC63F9F503F650DE5295AEFB8",
+      "bytes": 111130
+    },
+    {
+      "path": "visual-review/target-pages/L01-p1.png",
+      "sha256": "BC27B7EA16EEF6EBD46BF1FF7AF32C03BAFFC1A664C160C724FEF7CB7FDEAF23",
+      "bytes": 194258
+    },
+    {
+      "path": "visual-review/target-pages/L01-p3.png",
+      "sha256": "5B0F893ABE78D9C10E26856138C3EE666360D66209AAD420ED39CBF774085EC6",
+      "bytes": 149140
+    },
+    {
+      "path": "visual-review/target-pages/L02-p1.png",
+      "sha256": "9849337CF754C2D4CEE6400FFB3436DD8B0A5F896C59D61CBAB6D560734540DA",
+      "bytes": 183974
+    },
+    {
+      "path": "visual-review/target-pages/L03-p1.png",
+      "sha256": "CA62A085D04B3114EC7E6CC34968EF781EA86A5F3786EE6C77277522599461D1",
+      "bytes": 180536
+    },
+    {
+      "path": "visual-review/target-pages/L04-p1.png",
+      "sha256": "EEDAB001E328EDD21D8FB38E1526D5C6DB5C464ACF744E871A84B1CBB6D51690",
+      "bytes": 172652
+    },
+    {
+      "path": "visual-review/target-pages/L05-p1.png",
+      "sha256": "848E962C74DCE7CF2EA742FC99AFA9F3FA70DCEB5274C0379CA38FB8B331AD13",
+      "bytes": 175929
+    },
+    {
+      "path": "visual-review/target-pages/L05-p7.png",
+      "sha256": "451B978390F8EB5102E334B5BC5E883551BC1E85A89D7512EC9CAE690073E428",
+      "bytes": 91894
+    },
+    {
+      "path": "visual-review/target-pages/L06-p1.png",
+      "sha256": "A51A20C25AA7E1D104D6ABB306F81846C90F00A12AC053A96E24CE16F9AFA77A",
+      "bytes": 175805
+    },
+    {
+      "path": "visual-review/target-pages/L06-p3.png",
+      "sha256": "F5B54A156CBEC224395ABF4C34E15CB0C4198125025A807C7DD0E6CCBE2AC33A",
+      "bytes": 198467
+    },
+    {
+      "path": "visual-review/target-pages/L06-p7.png",
+      "sha256": "769CA90FBE09A059F08979672A7DF8288D8B308BEF22E94F194B6F1468A527C5",
+      "bytes": 99627
+    },
+    {
+      "path": "visual-review/target-pages/L07-p1.png",
+      "sha256": "49560E11FB791B24797F72BC59C281E96E35C522913587BC609176C65B5BD55A",
+      "bytes": 183589
+    },
+    {
+      "path": "visual-review/target-pages/L08-p1.png",
+      "sha256": "DBDC595D895A6FDA2B34AA5035259EF6BF94C6ACB8A972F250B6D2FDB2C27E14",
+      "bytes": 158412
+    },
+    {
+      "path": "visual-review/target-pages/L09-p1.png",
+      "sha256": "25C8082E354F820D02823E1E271414629BB532F17E008D0D8C02E40E23275E5F",
+      "bytes": 160438
+    },
+    {
+      "path": "visual-review/target-pages/L10-p1.png",
+      "sha256": "71100508D448506E62738239197F381C2314832AD649B75CFCB5ADA2E2ED8F54",
+      "bytes": 169199
+    },
+    {
+      "path": "visual-review/target-pages/L11-p1.png",
+      "sha256": "245A477E450446F3F7EC489EB78F8DB554F6B6D3A3A231D0A33BBB765AA5779C",
+      "bytes": 167495
+    },
+    {
+      "path": "visual-review/target-pages/L11-p4.png",
+      "sha256": "C6C506F141F4DF41F6701B405447E4468C20BEC37834D232F6352BD574C7DA9E",
+      "bytes": 131260
+    },
+    {
+      "path": "visual-review/target-pages/L12-p1.png",
+      "sha256": "9B3D595E3888EBAB671E54FE8A858C775D65B968D59853F070562554CB07F22D",
+      "bytes": 169816
+    },
+    {
+      "path": "visual-review/target-pages/L12-p5.png",
+      "sha256": "BB4A46F69B959CA10E16D14623D910760A49BE86AF244FDE2513E65AA4FBA5A1",
+      "bytes": 97251
+    },
+    {
+      "path": "visual-review/target-pages/L13-p1.png",
+      "sha256": "F0F30A7747678D64BC75B75E3B63F0E1C56D313B65039DDA4305D9F0E0A2E5F6",
+      "bytes": 167932
+    },
+    {
+      "path": "visual-review/target-pages/L14-p1.png",
+      "sha256": "67244CC5D38118CCDCFD86C74C5095D0C206B21341368964D76FCF735E052DA0",
+      "bytes": 161312
+    },
+    {
+      "path": "visual-review/target-pages/L14-p4.png",
+      "sha256": "1EBBE24636CF12F4505E942BFA1B12151ABFB437348C27D3ACDBA8D07B103E84",
+      "bytes": 121069
+    },
+    {
+      "path": "visual-review/target-pages/L15-p1.png",
+      "sha256": "A432AB79C4DABA6ECE53A865B252C336FB2E500313705A8A2B868D9F45D7E0ED",
+      "bytes": 180301
+    },
+    {
+      "path": "visual-review/target-pages/L15-p8.png",
+      "sha256": "3A932BC98B1C13CEAB683D4694548152E4F4A9737DABC4C1DF016CD3109BEC6F",
+      "bytes": 136151
+    },
+    {
+      "path": "visual-review/target-pages/L16-p1.png",
+      "sha256": "CAAF2DD69B17202C1627DDAD84F4F05FEB0FBF9F296015808ABA6FB6CAF64783",
+      "bytes": 171279
+    },
+    {
+      "path": "visual-review/target-pages/L16-p8.png",
+      "sha256": "7C2CD493CBC428327985241705DE8AF01109352589FBFFCA003D2A80BB781156",
+      "bytes": 133246
+    },
+    {
+      "path": "visual-review/target-pages/L17-p1.png",
+      "sha256": "651F0AFD3599D89803358F946DB0BBA10765A668A14488DC25E2F4FCB404988C",
+      "bytes": 180210
+    },
+    {
+      "path": "visual-review/target-pages/L18-p1.png",
+      "sha256": "4D687428F80B0504D1E3E473218A1A059938E718612C00CCAEAC6D1B1ED50BC2",
+      "bytes": 166624
+    },
+    {
+      "path": "visual-review/target-pages/L19-p1.png",
+      "sha256": "0718691835BC645AE19B5F47EDAC17CEEEAF4139770566F4BD9901ED39603969",
+      "bytes": 170582
+    },
+    {
+      "path": "visual-review/target-pages/L19-p7.png",
+      "sha256": "8657949463652AF0C7D1F2FB602A0051C214CF1F49DAA8188E68F4EDA33996A4",
+      "bytes": 125908
+    },
+    {
+      "path": "visual-review/target-pages/L20-p1.png",
+      "sha256": "FB10F062535F68466AA4F7946F35D08BBFCDB5D87D5F50ABFDE9903B78E7C96D",
+      "bytes": 178760
+    },
+    {
+      "path": "visual-review/template-comparison/L01-p3-remarks-v112-v113-v114.jpg",
+      "sha256": "DD146068277EBCC4AE84342003326920ABBE8591C13D41C94EE0E59BCF83BB5C",
+      "bytes": 254838
+    },
+    {
+      "path": "visual-review/template-comparison/L06-p3-remarks-v112-v113-v114.jpg",
+      "sha256": "ABEE6EE6A78AC3CE060255984A96BBA3B716226C5A9398FF31CB30D892476DB7",
+      "bytes": 311017
+    },
+    {
+      "path": "visual-review/template-comparison/L18-p3-remarks-v112-v113-v114.jpg",
+      "sha256": "DDE95C50238BD7DE9C5E1E379D51BBBAAB03CA2BEEB69DE61DC09B742CB28119",
+      "bytes": 292521
+    },
+    {
+      "path": "visual-review/title-strips.jpg",
+      "sha256": "9EEEA0CABBAD0702D893DDFAB4FFCC5E5EA014C8BCBAAA59A9311DC66E0DA298",
+      "bytes": 488610
+    }
+  ],
+  "acceptance_boundary": {
+    "default_template_migration": "NOT APPROVED / NOT PERFORMED",
+    "real_course": "REAL_COURSE_VERIFICATION_PENDING",
+    "teacher_acceptance": "TEACHER_ACCEPTANCE_PENDING",
+    "native_word_wps": "WORD_WPS_UNVERIFIED",
+    "synthetic_course_visual_candidate": "REVIEWED_PASS_WITH_RENDERER_QUALIFICATION"
+  }
+}

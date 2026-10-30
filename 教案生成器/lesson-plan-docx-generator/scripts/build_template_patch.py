@@ -155,11 +155,186 @@ def _patch_evaluation_pagination(
             tr_properties.remove(cant_split)
 
 
+def _implementation_table_element(root: etree._Element, structure: dict) -> etree._Element:
+    spec = structure.get("implementation_table", {})
+    body = root.find(f"{{{W_NS}}}body")
+    top_tables = body.findall(f"{{{W_NS}}}tbl") if body is not None else []
+    table_index = int(spec.get("index", -1))
+    if table_index < 0 or table_index >= len(top_tables):
+        raise ValueError("implementation_table.index points to a missing top-level table")
+    return top_tables[table_index]
+
+
+def _patch_implementation_layout(
+    root: etree._Element,
+    widths_twips: list[int] | None,
+    body_font_size_pt: int | float | None,
+    structure: dict,
+) -> None:
+    table = _implementation_table_element(root, structure)
+    rows = table.findall(f"{{{W_NS}}}tr")
+    expected_rows = int(structure.get("implementation_table", {}).get("rows", -1))
+    if len(rows) != expected_rows or not rows:
+        raise ValueError(f"expected {expected_rows} implementation rows, found {len(rows)}")
+
+    if widths_twips is not None:
+        if len(widths_twips) != 5 or any(type(value) is not int or value <= 0 for value in widths_twips):
+            raise ValueError("implementation_table_column_widths_twips must contain five positive integers")
+        table_properties = table.find(f"{{{W_NS}}}tblPr")
+        table_width = table_properties.find(f"{{{W_NS}}}tblW") if table_properties is not None else None
+        if table_width is None or table_width.get(f"{{{W_NS}}}type") != "dxa":
+            raise ValueError("implementation table must declare its total width in dxa")
+        total_width = int(table_width.get(f"{{{W_NS}}}w", "0"))
+        if sum(widths_twips) != total_width:
+            raise ValueError(
+                "implementation column widths must preserve the existing total table width "
+                f"({total_width} twips); received {sum(widths_twips)}"
+            )
+
+        grid = table.find(f"{{{W_NS}}}tblGrid")
+        grid_columns = grid.findall(f"{{{W_NS}}}gridCol") if grid is not None else []
+        header_cells = rows[0].findall(f"{{{W_NS}}}tc")
+        if len(header_cells) != 5 or not grid_columns:
+            raise ValueError("implementation table must retain five header cells and a table grid")
+
+        old_grid = [int(column.get(f"{{{W_NS}}}w", "0")) for column in grid_columns]
+        new_grid: list[int] = []
+        grid_cursor = 0
+        for cell, target_width in zip(header_cells, widths_twips):
+            properties = cell.find(f"{{{W_NS}}}tcPr")
+            span_element = properties.find(f"{{{W_NS}}}gridSpan") if properties is not None else None
+            span = int(span_element.get(f"{{{W_NS}}}val", "1")) if span_element is not None else 1
+            old_group = old_grid[grid_cursor : grid_cursor + span]
+            if len(old_group) != span or sum(old_group) <= 0:
+                raise ValueError("implementation header cell spans do not match the declared table grid")
+            assigned = [round(target_width * value / sum(old_group)) for value in old_group[:-1]]
+            assigned.append(target_width - sum(assigned))
+            if any(value <= 0 for value in assigned):
+                raise ValueError("implementation table widths produce an empty grid column")
+            new_grid.extend(assigned)
+            grid_cursor += span
+        if grid_cursor != len(old_grid):
+            raise ValueError("implementation header cells do not cover the table grid")
+
+        for column, width in zip(grid_columns, new_grid):
+            column.set(f"{{{W_NS}}}w", str(width))
+        for row_index, row in enumerate(rows):
+            cells = row.findall(f"{{{W_NS}}}tc")
+            cursor = 0
+            row_properties = row.find(f"{{{W_NS}}}trPr")
+            before = row_properties.find(f"{{{W_NS}}}gridBefore") if row_properties is not None else None
+            if before is not None:
+                cursor = int(before.get(f"{{{W_NS}}}val", "0"))
+            for cell in cells:
+                properties = cell.find(f"{{{W_NS}}}tcPr")
+                span_element = properties.find(f"{{{W_NS}}}gridSpan") if properties is not None else None
+                span = int(span_element.get(f"{{{W_NS}}}val", "1")) if span_element is not None else 1
+                width = sum(new_grid[cursor : cursor + span])
+                if width <= 0 or cursor + span > len(new_grid):
+                    raise ValueError(f"implementation row {row_index} has an invalid grid span")
+                cell_width = properties.find(f"{{{W_NS}}}tcW") if properties is not None else None
+                if cell_width is None:
+                    raise ValueError(f"implementation cell in row {row_index} has no declared width")
+                cell_width.set(f"{{{W_NS}}}w", str(width))
+                cell_width.set(f"{{{W_NS}}}type", "dxa")
+                cursor += span
+            after = row_properties.find(f"{{{W_NS}}}gridAfter") if row_properties is not None else None
+            after_span = int(after.get(f"{{{W_NS}}}val", "0")) if after is not None else 0
+            if cursor + after_span != len(new_grid):
+                raise ValueError(f"implementation row {row_index} does not cover the table grid")
+
+    if body_font_size_pt is not None:
+        if (
+            isinstance(body_font_size_pt, bool)
+            or not isinstance(body_font_size_pt, (int, float))
+            or body_font_size_pt <= 0
+            or int(body_font_size_pt * 2) != body_font_size_pt * 2
+        ):
+            raise ValueError("implementation_body_font_size_pt must be a positive half-point size")
+        half_points = str(int(body_font_size_pt * 2))
+        for row in rows[1:]:
+            cells = row.findall(f"{{{W_NS}}}tc")
+            for cell in cells[1:]:
+                for run in cell.findall(f".//{{{W_NS}}}r"):
+                    run_properties = run.find(f"{{{W_NS}}}rPr")
+                    if run_properties is None:
+                        run_properties = etree.Element(f"{{{W_NS}}}rPr")
+                        run.insert(0, run_properties)
+                    for name in ("sz", "szCs"):
+                        size = run_properties.find(f"{{{W_NS}}}{name}")
+                        if size is None:
+                            size = etree.SubElement(run_properties, f"{{{W_NS}}}{name}")
+                        size.set(f"{{{W_NS}}}val", half_points)
+
+
+def _patch_implementation_keep_with_next(
+    root: etree._Element,
+    keep_with_next_rows: list[int],
+    structure: dict,
+) -> None:
+    table = _implementation_table_element(root, structure)
+    rows = table.findall(f"{{{W_NS}}}tr")
+    expected_rows = int(structure.get("implementation_table", {}).get("rows", -1))
+    if len(rows) != expected_rows or not rows:
+        raise ValueError(f"expected {expected_rows} implementation rows, found {len(rows)}")
+    if (
+        not isinstance(keep_with_next_rows, list)
+        or any(type(index) is not int or not 0 <= index < len(rows) for index in keep_with_next_rows)
+        or len(set(keep_with_next_rows)) != len(keep_with_next_rows)
+    ):
+        raise ValueError("implementation_table_pagination.keep_with_next_rows must contain unique valid row indexes")
+    keep_rows = set(keep_with_next_rows)
+    for row_index, row in enumerate(rows):
+        for paragraph in row.findall(f".//{{{W_NS}}}p"):
+            paragraph_properties = paragraph.find(f"{{{W_NS}}}pPr")
+            keep_next = (
+                paragraph_properties.find(f"{{{W_NS}}}keepNext")
+                if paragraph_properties is not None
+                else None
+            )
+            if row_index in keep_rows:
+                if paragraph_properties is None:
+                    paragraph_properties = etree.Element(f"{{{W_NS}}}pPr")
+                    paragraph.insert(0, paragraph_properties)
+                if keep_next is None:
+                    paragraph_properties.append(etree.Element(f"{{{W_NS}}}keepNext"))
+            elif keep_next is not None:
+                paragraph_properties.remove(keep_next)
+
+
+def _patch_title_east_asia_font(root: etree._Element, font_name: str) -> None:
+    if not isinstance(font_name, str) or not font_name.strip():
+        raise ValueError("title_east_asia_font must be a non-empty font name")
+    paragraphs = root.xpath("./w:body/w:p", namespaces={"w": W_NS})
+    if not paragraphs:
+        raise ValueError("template must have a title paragraph as its first body paragraph")
+    runs = paragraphs[0].xpath("./w:r[w:t]", namespaces={"w": W_NS})
+    if not runs:
+        raise ValueError("template title paragraph must contain a text run")
+    run = runs[0]
+    run_properties = run.find(f"{{{W_NS}}}rPr")
+    if run_properties is None:
+        run_properties = etree.Element(f"{{{W_NS}}}rPr")
+        run.insert(0, run_properties)
+    fonts = run_properties.find(f"{{{W_NS}}}rFonts")
+    if fonts is None:
+        fonts = etree.Element(f"{{{W_NS}}}rFonts")
+        run_properties.insert(0, fonts)
+    for theme_attribute in ("asciiTheme", "eastAsiaTheme", "hAnsiTheme", "cstheme"):
+        fonts.attrib.pop(f"{{{W_NS}}}{theme_attribute}", None)
+    for script_attribute in ("ascii", "hAnsi", "eastAsia", "cs"):
+        fonts.set(f"{{{W_NS}}}{script_attribute}", font_name)
+
+
 def _replace_document_text(
     document_xml: bytes,
     replacements: list[tuple[str, str]],
     evaluation_widths_twips: list[int] | None = None,
     evaluation_pagination: dict | None = None,
+    implementation_widths_twips: list[int] | None = None,
+    implementation_body_font_size_pt: int | float | None = None,
+    implementation_keep_with_next_rows: list[int] | None = None,
+    title_east_asia_font: str | None = None,
     structure: dict | None = None,
 ) -> bytes:
     parser = etree.XMLParser(resolve_entities=False, no_network=True, remove_blank_text=False)
@@ -169,12 +344,29 @@ def _replace_document_text(
         raise ValueError(f"word/document.xml is not valid XML: {exc}") from exc
     for old_text, new_text in replacements:
         _replace_visible_once(root, old_text, new_text)
+    if title_east_asia_font is not None:
+        _patch_title_east_asia_font(root, title_east_asia_font)
     if evaluation_widths_twips is not None or evaluation_pagination is not None:
         if structure is None:
             raise ValueError("template structure is required for evaluation table layout changes")
         if evaluation_widths_twips is not None:
             _patch_evaluation_column_widths(root, evaluation_widths_twips, structure)
         _patch_evaluation_pagination(root, evaluation_pagination, structure)
+    if (
+        implementation_widths_twips is not None
+        or implementation_body_font_size_pt is not None
+        or implementation_keep_with_next_rows is not None
+    ):
+        if structure is None:
+            raise ValueError("template structure is required for implementation table layout changes")
+        _patch_implementation_layout(
+            root,
+            implementation_widths_twips,
+            implementation_body_font_size_pt,
+            structure,
+        )
+        if implementation_keep_with_next_rows is not None:
+            _patch_implementation_keep_with_next(root, implementation_keep_with_next_rows, structure)
     return etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
 
 
@@ -209,6 +401,10 @@ def build_patch(
     replacements: list[tuple[str, str]],
     evaluation_widths_twips: list[int] | None = None,
     evaluation_pagination: dict | None = None,
+    implementation_widths_twips: list[int] | None = None,
+    implementation_body_font_size_pt: int | float | None = None,
+    implementation_keep_with_next_rows: list[int] | None = None,
+    title_east_asia_font: str | None = None,
     structure: dict | None = None,
 ) -> None:
     if source.resolve() == target.resolve():
@@ -224,7 +420,15 @@ def build_patch(
                 payload = source_zip.read(info.filename)
                 if info.filename == "word/document.xml":
                     payload = _replace_document_text(
-                        payload, replacements, evaluation_widths_twips, evaluation_pagination, structure
+                        payload,
+                        replacements,
+                        evaluation_widths_twips,
+                        evaluation_pagination,
+                        implementation_widths_twips,
+                        implementation_body_font_size_pt,
+                        implementation_keep_with_next_rows,
+                        title_east_asia_font,
+                        structure,
                     )
                 target_zip.writestr(info, payload)
         with zipfile.ZipFile(temporary, "r") as check_zip:
@@ -252,6 +456,10 @@ def main() -> int:
     values = list(args.replace or [])
     evaluation_widths_twips = None
     evaluation_pagination = None
+    implementation_widths_twips = None
+    implementation_body_font_size_pt = None
+    implementation_keep_with_next_rows = None
+    title_east_asia_font = None
     structure = None
     if args.manifest:
         manifest = yaml.safe_load(args.manifest.expanduser().resolve().read_text(encoding="utf-8")) or {}
@@ -260,8 +468,30 @@ def main() -> int:
             values.append(f"{item['from']}={item['to']}")
         evaluation_widths_twips = patches.get("evaluation_table_column_widths_twips")
         evaluation_pagination = patches.get("evaluation_table_pagination")
+        implementation_widths_twips = patches.get("implementation_table_column_widths_twips")
+        implementation_body_font_size_pt = patches.get("implementation_body_font_size_pt")
+        title_east_asia_font = patches.get("title_east_asia_font")
+        implementation_pagination = patches.get("implementation_table_pagination")
+        if implementation_pagination is not None:
+            if (
+                not isinstance(implementation_pagination, dict)
+                or set(implementation_pagination) != {"keep_with_next_rows"}
+                or not isinstance(implementation_pagination.get("keep_with_next_rows"), list)
+            ):
+                raise ValueError("implementation_table_pagination must declare keep_with_next_rows")
+            implementation_keep_with_next_rows = implementation_pagination["keep_with_next_rows"]
         structure = manifest.get("structure")
-    if not values and evaluation_widths_twips is None and evaluation_pagination is None:
+    if not values and all(
+        value is None
+        for value in (
+            evaluation_widths_twips,
+            evaluation_pagination,
+            implementation_widths_twips,
+            implementation_body_font_size_pt,
+            implementation_keep_with_next_rows,
+            title_east_asia_font,
+        )
+    ):
         parser.error("provide --manifest with supported patches or at least one --replace")
     for value in values:
         if "=" not in value:
@@ -276,6 +506,10 @@ def main() -> int:
         replacements,
         evaluation_widths_twips,
         evaluation_pagination,
+        implementation_widths_twips,
+        implementation_body_font_size_pt,
+        implementation_keep_with_next_rows,
+        title_east_asia_font,
         structure,
     )
     print(f"patched={args.target.resolve()}")

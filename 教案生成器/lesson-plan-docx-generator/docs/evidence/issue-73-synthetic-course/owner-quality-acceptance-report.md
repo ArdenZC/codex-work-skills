@@ -13,7 +13,7 @@
 | `CONTENT_REVIEWED` | **PASS（合成课程桌面审查）** | 20 课均有逐课结论；发现项已修改并二次复审。评分值、评价栏目和九阶段结构不变。 |
 | `REFERENCES_VERIFIED` | **PARTIAL** | 两条高教社书目元数据及目录/主题范围已独立核实；没有读取教材章节正文，故不为课程算法正确性背书。 |
 | `EXEMPLAR_COMPARISON_REVIEWED` | **PARTIAL** | 20 课均有具体的日常非盲对照；五个来源均未证明为优秀教案；P3 写前读取时序缺证。 |
-| `VISUAL_REVIEWED` | **FAIL（已完成全页检查）** | 当前 Template 1.1.2 的全部 133 页已检查；存在实际可读性缺陷，详见 `artifacts/visual-inspection-evidence.json`。 |
+| `VISUAL_REVIEWED` | **默认版 FAIL；可选 1.1.4 候选 PASS（带渲染器限定）** | 默认 Template 1.1.2 的原始 133 页仍有缺陷；另对可选 1.1.4 按相同课程内容重生成并复核 117 页，缺陷修复；没有切换默认模板。页级证据见本报告的二次复审附录和候选 `visual-inspection-evidence.json`。 |
 | `REAL_COURSE_VERIFICATION_PENDING` | **PENDING** | 当前工作区未发现真实课程大纲、课件、原始教案或任务书。 |
 | `TEACHER_ACCEPTANCE_PENDING` | **PENDING** | 没有教师试教记录、真实学生产出或授课教师验收。 |
 
@@ -90,6 +90,49 @@
 - 同输入长备注对照记录在 [`t113/comparison-record.md`](t113/comparison-record.md)：最终 Content SHA `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB` 的 L06，1.1.2 为 9 页、1.1.3 为 7 页；逐页查看 p3，1.1.3 的备注横向空间更好。该结论只适用于 L06，不能外推到全课。默认模板保持 1.1.2；仍需全课排版复核和原生 Word/WPS 验证，Owner 单独批准后才能迁移。
 - Acceptance 2.0 的生成报告见 `acceptance-final/lesson-acceptance-report.md`。其硬结构/交付/manifest gate 为 PASS，但最终 Acceptance 显示 FAILED，原因是视觉证据记录存在失败项。此结果不得改写成 QA PASS，也不得改写成教师验收通过。
 
+### 二次视觉整改与 r7 复审（可选 Template 1.1.4）
+
+本附录记录可选版的新证据；上面的 r4 默认版失败记录继续有效。没有修改默认模板 1.1.2，也没有改九阶段、评分规则/值或评价栏目。相同 Content 2.4 输入 SHA 为 `A3927B87BA4EB095D27456A0599DD8C24AA1EA304471A184D7C60A2D735631DB`；v1.1.4 r7 生成 20 份 DOCX、20 份 PDF、40 学时、117 页，`production_pass`、QA `passed`、LibreOffice render `passed`。DOCX/PDF 哈希与 artifact manifest 全部逐文件一致，复审内容 digest 一致。
+
+实际整改和复审结果：
+
+- L07 p1 文字已收回表格边界；L11 p4 教学活动格无交叠/裁切；L14 p4“检查误选、环和 F”等教师活动文字完整。三个 Owner 指定页均在全尺寸图复查。
+- 评价备注列改为可横向阅读；L01 p3、L06 p3 等长备注样本在 1.1.4 中可读。没有改变评分值、栏名或表格结构。
+- DOCX 实施表首行带有效重复表头标记。LibreOffice 对延续中的单个长活动行不重复该行，因此 97 个非首页 PDF 页均显示 8pt 列名提示；原生 Word/WPS 的重复表头与分页仍为 `WORD_WPS_UNVERIFIED`。
+- r6 全页缩略审阅发现 L03、L04、L09 的首页标题正文虽在 DOCX，却因东亚主题字体回退而未绘入 PDF。可选 1.1.4 标题段显式指定 `仿宋` 后重生成 20 份；r7 的 20 个首页 PDF 标题逐字匹配 DOCX 标题（忽略空白），标题汇总图及 L03/L04 原尺寸图均确认完整。L04 p1–p3、L09 p1–p4 因标题变完整发生纵向回流，逐页复核；L11 p4、L14 p4 也重新查看。
+- r6→r7 以 0.7 倍页面栅格逐页比对：共 25 页有变化（20 个首页、L04 p2–p3、L09 p2–p4）；其余 92 页像素一致。r6 的 117 页均已看过完整页图，全部 25 张变化页均在 r7 复查，故最终覆盖仍为 117/117 页。
+- r7 20 份 PDF 无空白页、可提取文字均非空，未观察到页面边界溢出、遮挡、裁切或重叠。每份最后一页都保留课堂小结、课后完善与教学反思；没有反思单行尾页或仅反思尾页。部分尾页仍有留白，但内容闭环完整，不删减教学内容。
+- 同一 Content SHA、相同临时 CJK 字体别名下，对 1.1.2 / 1.1.3 / 1.1.4 作 20 课页数对照；另外对 L01、L06、L18 的代表性长备注页检查横向可读性。1.1.3/1.1.4 的页数减少仅作为排版观察，不作为质量分数。原始 r4 的 133 页与受控复渲的 1.1.2 140 页来自不同字体环境，不能直接用差值评模板优劣。
+- v1.1.4 仍是**可选候选**。建议 Owner 在原生 Word/WPS 验证后单独批准是否迁移默认；本轮没有擅自切换。
+
+| 课次 | r4 默认 1.1.2 原 133 页 | 同输入受控 1.1.2 | 同输入 1.1.3 | 最终 1.1.4 r7 |
+| --- | ---: | ---: | ---: | ---: |
+| L01 | 6 | 7 | 6 | 5 |
+| L02 | 7 | 7 | 6 | 5 |
+| L03 | 7 | 7 | 6 | 5 |
+| L04 | 7 | 8 | 7 | 6 |
+| L05 | 8 | 9 | 7 | 7 |
+| L06 | 9 | 9 | 7 | 7 |
+| L07 | 5 | 5 | 5 | 4 |
+| L08 | 5 | 5 | 5 | 5 |
+| L09 | 4 | 5 | 4 | 4 |
+| L10 | 5 | 5 | 5 | 5 |
+| L11 | 5 | 5 | 5 | 5 |
+| L12 | 6 | 6 | 5 | 5 |
+| L13 | 5 | 5 | 5 | 5 |
+| L14 | 6 | 6 | 5 | 5 |
+| L15 | 8 | 9 | 8 | 8 |
+| L16 | 9 | 9 | 8 | 8 |
+| L17 | 8 | 9 | 7 | 7 |
+| L18 | 7 | 8 | 7 | 7 |
+| L19 | 8 | 8 | 7 | 7 |
+| L20 | 8 | 8 | 7 | 7 |
+| **合计** | **133** | **140** | **122** | **117** |
+
+完整 117 页 flags、页数矩阵、PDF/DOCX 哈希、r6→r7 页差异、Contact sheets 和原尺寸重点页，见仓库根目录的[可选 v1.1.4 视觉复审证据](../../../../../docs/evidence/issue-73-synthetic-course/visual-candidate-v1.1.4/visual-inspection-evidence.json)及同目录视觉图。LibreOffice 结果不替代教师验收或 Word/WPS 检查。
+
+本轮最终文件 SHA-256：Template 1.1.4 `D75A0A777E0BE77525289AAF6464AECDE2783B1E68AE0B9A8BB613F74729DBCD`；candidate `artifact-manifest.json` `862A198F6CFE87EC8654B459CED62D34D16422EAE15FEE55D859A75C4502C868`；`qa-report.json` `956F0BC7ECC89FE4E7CC019773E0FA7C86B8AFE9FF9468C4B72DF9C5AEEB1553`；`visual-inspection-evidence.json` `1CC8A8D11BAD6A7B0612E6384BA298C56C2096703422D1E18245B43A0132B290`。完整 40 个 DOCX/PDF 哈希逐项记录在 candidate manifest，并已与文件实算值核对。
+
 ## 已整改问题与第二轮复审
 
 | 发现 | 已执行修订 | 二次复审证据 |
@@ -111,11 +154,13 @@
 | 模式 | 回归结果 |
 | --- | --- |
 | 40 学时纯理论 | 20 份理论 Lesson，PASS。 |
-| 40 学时理实分开 | 10 理论 + 10 实践；无 WorkOrder 和有 20 个关联 WorkOrder 两种，Lesson 仍为 20，PASS。 |
-| 40 学时纯实践 | 20 份实践 Lesson；无 WorkOrder 和有 20 个关联 WorkOrder 两种，Lesson 仍为 20，PASS。 |
+| 40 学时理实分开（无 WorkOrder） | 20 份 Lesson：10 理论 + 10 实践，0 个 WorkOrder，PASS。 |
+| 40 学时理实分开（有关联 WorkOrder） | 20 份 Lesson：10 理论 + 10 实践，20 个实践学时按 `practice_hours / 2` 关联 10 个 WorkOrder，PASS。 |
+| 40 学时纯实践（无 WorkOrder） | 20 份实践 Lesson，0 个 WorkOrder，PASS。 |
+| 40 学时纯实践（有关联 WorkOrder） | 20 份实践 Lesson，40 个实践学时按 `practice_hours / 2` 关联 20 个 WorkOrder，PASS。 |
 | Content 2.2 / 2.3 | 历史 Lesson / WorkOrder 语义保持原状，兼容测试 PASS。 |
 
-当前合成成品是 20 理论 + 20 实践小时的理实分开版本；本报告不声称另两种模式生成过完整 DOCX 套件。
+当前合成成品是 20 理论 + 20 实践小时的理实分开版本；若配套 WorkOrder，应为 10 个（20 实践学时 ÷ 2 学时/工单）。本报告不声称另两种模式生成过完整 DOCX 套件。
 
 ## 真实课程材料边界
 

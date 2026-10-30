@@ -269,6 +269,243 @@ def _check_field_coordinates(document, manifest: dict[str, Any], errors: list[st
             errors.append(f"Field {name} points to missing cell {cell_index} in row {row_index}")
 
 
+def _validate_visual_layout_patches(document, manifest: dict[str, Any], report: dict[str, Any], errors: list[str]) -> None:
+    patches = manifest.get("template", {}).get("patches", {})
+    if not isinstance(patches, dict):
+        return
+
+    require_tables_within_body = patches.get("require_tables_within_body")
+    if require_tables_within_body is not None:
+        if type(require_tables_within_body) is not bool:
+            errors.append("template.patches.require_tables_within_body must be a boolean")
+        elif require_tables_within_body:
+            section = document.sections[0] if document.sections else None
+            if section is None:
+                errors.append("require_tables_within_body needs a document section")
+            else:
+                body_width = section.page_width - section.left_margin - section.right_margin
+                overwide_tables = []
+                for index, table in enumerate(document.tables):
+                    grid = table._tbl.tblGrid
+                    columns = grid.gridCol_lst if grid is not None else []
+                    table_width = sum(
+                        int(column.get(qn("w:w"), "0")) * 635
+                        for column in columns
+                    )
+                    table_props = table._tbl.tblPr
+                    indent = table_props.find(qn("w:tblInd")) if table_props is not None else None
+                    indent_emu = (
+                        int(indent.get(qn("w:w"), "0")) * 635
+                        if indent is not None and indent.get(qn("w:type"), "dxa") == "dxa"
+                        else 0
+                    )
+                    if table_width + indent_emu > body_width:
+                        overwide_tables.append(
+                            {
+                                "index": index,
+                                "width_emu": table_width,
+                                "indent_emu": indent_emu,
+                            }
+                        )
+                report["checks"]["tables_within_body"] = {
+                    "body_width_emu": body_width,
+                    "overwide_tables": overwide_tables,
+                }
+                if overwide_tables:
+                    errors.append(f"Tables exceed the page body width: {overwide_tables}")
+
+    implementation_widths = _implementation_width_patch(manifest)
+    if implementation_widths is not None:
+        spec = manifest.get("structure", {}).get("implementation_table", {})
+        table_index = int(spec.get("index", -1)) if isinstance(spec, dict) else -1
+        if table_index < 0 or table_index >= len(document.tables):
+            errors.append("implementation_table_column_widths_twips points to a missing implementation table")
+        else:
+            table = document.tables[table_index]
+            actual_widths = [
+                int(cell._tc.tcPr.tcW.w)
+                if cell._tc.tcPr is not None and cell._tc.tcPr.tcW is not None and cell._tc.tcPr.tcW.w
+                else 0
+                for cell in actual_cells(table.rows[0])
+            ] if table.rows else []
+            grid = table._tbl.tblGrid
+            grid_widths = [int(column.get(qn("w:w"), "0")) for column in grid.gridCol_lst] if grid is not None else []
+            grid_total = sum(grid_widths)
+            widths_match = actual_widths == implementation_widths
+            grid_matches = grid_total == sum(implementation_widths)
+            report["checks"]["implementation_table_column_widths_twips"] = {
+                "expected": implementation_widths,
+                "actual": actual_widths,
+                "grid_total_twips": grid_total,
+                "matches": widths_match and grid_matches,
+            }
+            if not (widths_match and grid_matches):
+                errors.append("implementation table column widths do not match the declared five-column layout")
+
+    implementation_font_size = _implementation_body_font_size_patch(manifest)
+    if implementation_font_size is not None:
+        spec = manifest.get("structure", {}).get("implementation_table", {})
+        table_index = int(spec.get("index", -1)) if isinstance(spec, dict) else -1
+        if table_index < 0 or table_index >= len(document.tables):
+            errors.append("implementation_body_font_size_pt points to a missing implementation table")
+        else:
+            table = document.tables[table_index]
+            expected_half_points = int(implementation_font_size * 2)
+            actual_sizes: list[int | None] = []
+            for row in table.rows[1:]:
+                for cell in actual_cells(row)[1:]:
+                    for run in cell._tc.findall(".//" + qn("w:r")):
+                        if not "".join(node.text or "" for node in run.findall(".//" + qn("w:t"))).strip():
+                            continue
+                        rpr = run.find(qn("w:rPr"))
+                        size = rpr.find(qn("w:sz")) if rpr is not None else None
+                        size_cs = rpr.find(qn("w:szCs")) if rpr is not None else None
+                        actual_sizes.extend(
+                            [
+                                int(size.get(qn("w:val"))) if size is not None else None,
+                                int(size_cs.get(qn("w:val"))) if size_cs is not None else None,
+                            ]
+                        )
+            font_matches = bool(actual_sizes) and all(size == expected_half_points for size in actual_sizes)
+            report["checks"]["implementation_body_font_size"] = {
+                "expected_pt": implementation_font_size,
+                "actual_half_points": sorted(set(actual_sizes), key=lambda value: -1 if value is None else value),
+                "matches": font_matches,
+            }
+            if not font_matches:
+                errors.append("implementation table body text does not match the declared font size")
+
+    implementation_keep_next_rows = _implementation_keep_with_next_rows_patch(manifest)
+    if implementation_keep_next_rows is not None:
+        spec = manifest.get("structure", {}).get("implementation_table", {})
+        table_index = int(spec.get("index", -1)) if isinstance(spec, dict) else -1
+        if table_index < 0 or table_index >= len(document.tables):
+            errors.append("implementation_table_pagination points to a missing implementation table")
+        else:
+            table = document.tables[table_index]
+            actual_keep_next_rows = []
+            inconsistent_rows = []
+            for row_index, row in enumerate(table.rows):
+                paragraphs = row._tr.findall(".//" + qn("w:p"))
+                flags = [
+                    paragraph.find(qn("w:pPr")) is not None
+                    and paragraph.find(qn("w:pPr")).find(qn("w:keepNext")) is not None
+                    for paragraph in paragraphs
+                ]
+                if flags and all(flags):
+                    actual_keep_next_rows.append(row_index)
+                elif any(flags):
+                    inconsistent_rows.append(row_index)
+            matches = actual_keep_next_rows == implementation_keep_next_rows and not inconsistent_rows
+            report["checks"]["implementation_table_pagination"] = {
+                "expected_keep_with_next_rows": implementation_keep_next_rows,
+                "actual_keep_with_next_rows": actual_keep_next_rows,
+                "inconsistent_rows": inconsistent_rows,
+                "matches": matches,
+            }
+            if not matches:
+                errors.append("implementation table keep-with-next rows do not match the declared pagination patch")
+
+    title_font = patches.get("title_east_asia_font")
+    if title_font is not None:
+        if not isinstance(title_font, str) or not title_font.strip():
+            errors.append("template.patches.title_east_asia_font must be a non-empty font name")
+        else:
+            title_spec = manifest.get("fields", {}).get("title", {})
+            title_index = int(title_spec.get("paragraph", manifest["structure"]["title"]["paragraph"]))
+            title_matches = False
+            if 0 <= title_index < len(document.paragraphs) and document.paragraphs[title_index].runs:
+                title_run = document.paragraphs[title_index].runs[0]._r
+                run_properties = title_run.find(qn("w:rPr"))
+                fonts = run_properties.find(qn("w:rFonts")) if run_properties is not None else None
+                title_matches = bool(
+                    fonts is not None
+                    and fonts.get(qn("w:eastAsia")) == title_font
+                    and fonts.get(qn("w:eastAsiaTheme")) is None
+                )
+            report["checks"]["title_east_asia_font"] = {
+                "expected": title_font,
+                "matches": title_matches,
+            }
+            if not title_matches:
+                errors.append("title East Asian font does not match the declared explicit font mapping")
+
+    guide = patches.get("repeated_column_label_guide")
+    if guide is not None:
+        if not isinstance(guide, str) or not guide.strip():
+            errors.append("template.patches.repeated_column_label_guide must be a non-empty string")
+        else:
+            section = document.sections[0] if document.sections else None
+            running_header = "".join(paragraph.text for paragraph in section.header.paragraphs) if section else ""
+            first_page_header = "".join(paragraph.text for paragraph in section.first_page_header.paragraphs) if section else ""
+            declared = bool(
+                section
+                and section.different_first_page_header_footer
+                and guide in running_header
+                and not first_page_header.strip()
+            )
+            report["checks"]["repeated_column_label_guide"] = {
+                "declared": declared,
+                "first_page_hidden": bool(section and not first_page_header.strip()),
+            }
+            if not declared:
+                errors.append("The repeated column-label guide must appear on non-first-page headers only")
+
+    reflection = patches.get("reflection_compact_typography")
+    if reflection is not None:
+        if (
+            not isinstance(reflection, dict)
+            or not isinstance(reflection.get("font_size_pt"), (int, float))
+            or type(reflection.get("vertical_cell_margin_twips")) is not int
+            or type(reflection.get("natural_row_height")) is not bool
+        ):
+            errors.append("template.patches.reflection_compact_typography has an invalid shape")
+        else:
+            table_spec = manifest.get("structure", {}).get("reflection_table", {})
+            table_index = int(table_spec.get("index", -1)) if isinstance(table_spec, dict) else -1
+            if table_index < 0 or table_index >= len(document.tables):
+                errors.append("reflection_compact_typography points to a missing reflection table")
+            else:
+                table = document.tables[table_index]
+                expected_size = float(reflection["font_size_pt"])
+                actual_sizes = [
+                    run.font.size.pt
+                    for row in table.rows
+                    for cell in actual_cells(row)
+                    for paragraph in cell.paragraphs
+                    for run in paragraph.runs
+                    if run.text.strip() and run.font.size is not None
+                ]
+                table_margins = table._tbl.tblPr.find(qn("w:tblCellMar"))
+                actual_vertical_margins = {}
+                for side in ("top", "bottom"):
+                    element = table_margins.find(qn("w:" + side)) if table_margins is not None else None
+                    actual_vertical_margins[side] = (
+                        int(element.get(qn("w:w"), "-1"))
+                        if element is not None
+                        else None
+                    )
+                rows_with_height = [
+                    index
+                    for index, row in enumerate(table.rows)
+                    if row._tr.trPr is not None and row._tr.trPr.find(qn("w:trHeight")) is not None
+                ]
+                font_ok = bool(actual_sizes) and all(abs(size - expected_size) < 0.01 for size in actual_sizes)
+                margins_ok = all(
+                    value is not None and value == int(reflection["vertical_cell_margin_twips"])
+                    for value in actual_vertical_margins.values()
+                )
+                heights_ok = not rows_with_height if reflection["natural_row_height"] else True
+                report["checks"]["reflection_compact_typography"] = {
+                    "font_size_pt": sorted(set(actual_sizes)),
+                    "font_size_matches": font_ok,
+                    "vertical_cell_margins_twips": actual_vertical_margins,
+                    "natural_row_heights": heights_ok,
+                }
+                if not (font_ok and margins_ok and heights_ok):
+                    errors.append("Reflection rows do not match the declared compact natural-height layout")
+
+
 def _document_xml_without_bookmarks(path: Path, replacements: list[tuple[str, str]] | None = None) -> bytes:
     with zipfile.ZipFile(path, "r") as package:
         root = etree.fromstring(package.read("word/document.xml"))
@@ -296,6 +533,51 @@ def _evaluation_width_patch(manifest: dict[str, Any]) -> list[int] | None:
     ):
         raise ValueError("template.patches.evaluation_table_column_widths_twips must contain four positive integers")
     return value
+
+
+def _implementation_width_patch(manifest: dict[str, Any]) -> list[int] | None:
+    patches = manifest.get("template", {}).get("patches", {})
+    value = patches.get("implementation_table_column_widths_twips") if isinstance(patches, dict) else None
+    if value is None:
+        return None
+    if (
+        not isinstance(value, list)
+        or len(value) != 5
+        or any(type(width) is not int or width <= 0 for width in value)
+    ):
+        raise ValueError("template.patches.implementation_table_column_widths_twips must contain five positive integers")
+    return value
+
+
+def _implementation_body_font_size_patch(manifest: dict[str, Any]) -> float | None:
+    patches = manifest.get("template", {}).get("patches", {})
+    value = patches.get("implementation_body_font_size_pt") if isinstance(patches, dict) else None
+    if value is None:
+        return None
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or value <= 0
+        or int(value * 2) != value * 2
+    ):
+        raise ValueError("template.patches.implementation_body_font_size_pt must be a positive half-point size")
+    return float(value)
+
+
+def _implementation_keep_with_next_rows_patch(manifest: dict[str, Any]) -> list[int] | None:
+    patches = manifest.get("template", {}).get("patches", {})
+    value = patches.get("implementation_table_pagination") if isinstance(patches, dict) else None
+    if value is None:
+        return None
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"keep_with_next_rows"}
+        or not isinstance(value.get("keep_with_next_rows"), list)
+        or any(type(index) is not int or index < 0 for index in value["keep_with_next_rows"])
+        or len(set(value["keep_with_next_rows"])) != len(value["keep_with_next_rows"])
+    ):
+        raise ValueError("template.patches.implementation_table_pagination has an invalid shape")
+    return value["keep_with_next_rows"]
 
 
 def _evaluation_pagination_patch(manifest: dict[str, Any]) -> dict[str, bool] | None:
@@ -544,6 +826,77 @@ def validate_template(
         if len(table.columns) != int(main_spec.get("columns", 0)):
             errors.append(f"Main table column count mismatch: expected {main_spec.get('columns')}, got {len(table.columns)}")
         report["checks"]["main_table"] = {"rows": len(table.rows), "columns": len(table.columns)}
+
+    for table_name in ("implementation_table", "reflection_table"):
+        table_spec = structure.get(table_name)
+        if not isinstance(table_spec, dict):
+            continue
+        section_index = int(table_spec.get("index", -1))
+        if section_index < 0 or section_index >= len(document.tables):
+            errors.append(f"Missing {table_name} at index {section_index}")
+            continue
+        section_table = document.tables[section_index]
+        expected_rows = int(table_spec.get("rows", -1))
+        expected_columns = int(table_spec.get("columns", -1))
+        if len(section_table.rows) != expected_rows:
+            errors.append(
+                f"{table_name} row count mismatch: expected {expected_rows}, got {len(section_table.rows)}"
+            )
+        if len(section_table.columns) != expected_columns:
+            errors.append(
+                f"{table_name} column count mismatch: expected {expected_columns}, got {len(section_table.columns)}"
+            )
+        header_row = table_spec.get("header_row")
+        if header_row is not None:
+            row_index = int(header_row)
+            has_header = (
+                0 <= row_index < len(section_table.rows)
+                and section_table.rows[row_index]._tr.trPr is not None
+                and section_table.rows[row_index]._tr.trPr.find(qn("w:tblHeader")) is not None
+            )
+            report["checks"].setdefault("continuation_headers", {})[table_name] = {
+                "row": row_index,
+                "declared": has_header,
+            }
+            if not has_header:
+                errors.append(f"{table_name} repeated header row {row_index} is not declared")
+        if table_spec.get("keep_rows_together"):
+            split_rows = [
+                index
+                for index, row in enumerate(section_table.rows)
+                if index != header_row
+                and (row._tr.trPr is None or row._tr.trPr.find(qn("w:cantSplit")) is None)
+            ]
+            report["checks"].setdefault("rows_kept_together", {})[table_name] = {
+                "split_rows": split_rows,
+            }
+            if split_rows:
+                errors.append(f"{table_name} contains rows not kept together: {split_rows}")
+        keep_with_next_rows = table_spec.get("keep_with_next_rows", [])
+        if not isinstance(keep_with_next_rows, list):
+            errors.append(f"{table_name}.keep_with_next_rows must be a list")
+        else:
+            missing_keep_next = []
+            for row_index_value in keep_with_next_rows:
+                row_index = int(row_index_value)
+                if not 0 <= row_index < len(section_table.rows):
+                    missing_keep_next.append(row_index)
+                    continue
+                paragraphs = section_table.rows[row_index]._tr.findall(".//" + qn("w:p"))
+                if not paragraphs or any(
+                    paragraph.find(qn("w:pPr")) is None
+                    or paragraph.find(qn("w:pPr")).find(qn("w:keepNext")) is None
+                    for paragraph in paragraphs
+                ):
+                    missing_keep_next.append(row_index)
+            report["checks"].setdefault("keep_with_next", {})[table_name] = {
+                "rows": [int(value) for value in keep_with_next_rows],
+                "missing": missing_keep_next,
+            }
+            if missing_keep_next:
+                errors.append(f"{table_name} rows missing keep-with-next: {missing_keep_next}")
+
+    _validate_visual_layout_patches(document, manifest, report, errors)
 
     evaluation = structure.get("evaluation_table", {})
     try:
